@@ -226,6 +226,7 @@ describe ReactOnRailsHelper do
         .and_return([
                       {
                         "src" => "/packs/generated/LegacyModule-123.mjs",
+                        # String keys take precedence, so "module" => false wins over module: true.
                         "module" => false,
                         module: true
                       }
@@ -238,6 +239,25 @@ describe ReactOnRailsHelper do
 
       expect(links.first["rel"]).to eq("preload")
       expect(links.first["as"]).to eq("script")
+    end
+
+    it "preserves configured crossorigin values on modulepreload tags with integrity" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/ModernComponent-123.mjs",
+                        "integrity" => "sha384-modern"
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true, cross_origin: "" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["crossorigin"]).to eq("")
     end
 
     it "resolves manifest sources through Rails asset paths" do
@@ -273,6 +293,12 @@ describe ReactOnRailsHelper do
       links = preload_link_nodes(helper.react_on_rails_preload_links("generated/hello_world"))
 
       expect(links.first["href"]).to eq("/packs/generated/HelloWorld-456.js")
+    end
+
+    it "rejects hyphenated component names before manifest lookup" do
+      expect { helper.react_on_rails_preload_links("my-component") }
+        .to raise_error(ArgumentError, /without hyphens/)
+      expect(manifest).not_to have_received(:lookup_pack_with_chunks!)
     end
 
     it "raises a clear error for hash manifest sources without src" do
@@ -311,6 +337,28 @@ describe ReactOnRailsHelper do
           "/packs/generated/ReduxApp-456.js"
         ]
       )
+    end
+
+    it "deduplicates assets by href before rendering link attributes" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/runtime-123.js",
+                        "integrity" => "sha384-runtime"
+                      },
+                      "/packs/runtime-123.js"
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true, cross_origin: "anonymous" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hello_world"))
+
+      expect(links.size).to eq(1)
+      expect(links.first["href"]).to eq("/packs/runtime-123.js")
+      expect(links.first["integrity"]).to eq("sha384-runtime")
     end
   end
 

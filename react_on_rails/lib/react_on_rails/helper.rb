@@ -247,8 +247,9 @@ module ReactOnRails
         generated_component_pack_name(component_name)
       end
 
-      links = pack_names.flat_map { |pack_name| preload_links_for_generated_pack(pack_name) }
-      safe_join(links.uniq, "\n")
+      sources = pack_names.flat_map { |pack_name| preload_sources_for_generated_pack(pack_name) }
+      links = unique_preload_sources_by_href(sources).map { |source| preload_link_for_source(source) }
+      safe_join(links, "\n")
     end
 
     def sanitized_props_string(props)
@@ -488,26 +489,30 @@ module ReactOnRails
 
     def generated_component_pack_name(component_name)
       component_name = component_name.to_s
-      if component_name.start_with?("generated/")
-        return "generated/#{component_name.delete_prefix('generated/').camelize}"
+      component_name = component_name.delete_prefix("generated/")
+
+      unless component_name.match?(/\A[A-Za-z0-9_]+\z/)
+        raise ArgumentError,
+              "react_on_rails_preload_links component names must use PascalCase or snake_case without hyphens: " \
+              "#{component_name.inspect}"
       end
 
       "generated/#{component_name.camelize}"
     end
 
-    def preload_links_for_generated_pack(pack_name)
-      preload_links_for_javascript_pack(pack_name) + preload_links_for_stylesheet_pack(pack_name)
+    def preload_sources_for_generated_pack(pack_name)
+      preload_sources_for_javascript_pack(pack_name) + preload_sources_for_stylesheet_pack(pack_name)
     end
 
-    def preload_links_for_javascript_pack(pack_name)
+    def preload_sources_for_javascript_pack(pack_name)
       preload_sources_for_pack(pack_name, type: :javascript, required: true).map do |source|
-        preload_link_for_javascript_source(source)
+        { source:, source_type: :javascript }
       end
     end
 
-    def preload_links_for_stylesheet_pack(pack_name)
+    def preload_sources_for_stylesheet_pack(pack_name)
       preload_sources_for_pack(pack_name, type: :stylesheet, required: false).map do |source|
-        preload_link_for_stylesheet_source(source)
+        { source:, source_type: :stylesheet }
       end
     end
 
@@ -525,21 +530,44 @@ module ReactOnRails
       ::Shakapacker.instance
     end
 
-    def preload_link_for_javascript_source(source)
-      attributes = preload_link_attributes(source)
+    def unique_preload_sources_by_href(sources)
+      seen_hrefs = {}
+      sources.filter_map do |source|
+        href = preload_source_path(source.fetch(:source))
+        next if seen_hrefs.key?(href)
+
+        seen_hrefs[href] = true
+        source.merge(href:)
+      end
+    end
+
+    def preload_link_for_source(source)
+      case source.fetch(:source_type)
+      when :javascript
+        preload_link_for_javascript_source(source.fetch(:source), href: source.fetch(:href))
+      when :stylesheet
+        preload_link_for_stylesheet_source(source.fetch(:source), href: source.fetch(:href))
+      else
+        raise ArgumentError, "Unexpected preload source type: #{source.fetch(:source_type).inspect}"
+      end
+    end
+
+    def preload_link_for_javascript_source(source, href:)
+      attributes = preload_link_attributes(source, href:)
       if modulepreload_source?(source)
-        tag.link(**attributes.merge(rel: "modulepreload", crossorigin: preload_crossorigin))
+        attributes[:crossorigin] = preload_crossorigin unless attributes.key?(:crossorigin)
+        tag.link(**attributes.merge(rel: "modulepreload"))
       else
         tag.link(**attributes.merge(rel: "preload", as: "script"))
       end
     end
 
-    def preload_link_for_stylesheet_source(source)
-      tag.link(**preload_link_attributes(source).merge(rel: "preload", as: "style"))
+    def preload_link_for_stylesheet_source(source, href:)
+      tag.link(**preload_link_attributes(source, href:).merge(rel: "preload", as: "style"))
     end
 
-    def preload_link_attributes(source)
-      attributes = { href: preload_source_path(source) }
+    def preload_link_attributes(source, href:)
+      attributes = { href: }
       integrity = preload_source_integrity(source)
       return attributes unless integrity.present?
 
