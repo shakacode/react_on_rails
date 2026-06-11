@@ -26,7 +26,7 @@ The generator sets up:
 
 - **[Quick Start Guide](./quick-start.md)** - Fastest path (15 minutes)
 - **[Installation Guide](./installation-into-an-existing-rails-app.md)** - For existing Rails apps
-- **[Complete Tutorial](./tutorial.md)** - Step-by-step with Redux and routing
+- **[Complete Tutorial](./tutorial.md)** - Step-by-step with TypeScript, hooks, and auto-bundling
 
 ---
 
@@ -263,4 +263,4 @@ Now that you understand the core concepts, here are recommended paths forward:
 
 ---
 
-**Ready to build something?** The [Tutorial](./tutorial.md) walks you through building a complete app with Redux, routing, and testing.
+**Ready to build something?** The [Tutorial](./tutorial.md) walks you through building a TypeScript component with hooks, Rails props, auto-bundling, and optional server rendering.
