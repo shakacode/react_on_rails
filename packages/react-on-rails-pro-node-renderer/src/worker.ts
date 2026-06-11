@@ -60,6 +60,7 @@ import {
 } from './shared/utils.js';
 import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './shared/tracing.js';
 import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
+import { hasAnyVMContext } from './worker/vm.js';
 
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
@@ -211,7 +212,15 @@ export default function run(config: Partial<Config>) {
   // getConfig():
   buildConfig(config);
 
-  const { serverBundleCachePath, logHttpLevel, port, host, fastifyServerOptions, workersCount } = getConfig();
+  const {
+    serverBundleCachePath,
+    logHttpLevel,
+    port,
+    host,
+    fastifyServerOptions,
+    workersCount,
+    enableHealthEndpoints,
+  } = getConfig();
 
   // The renderer uses cleartext HTTP/2 (h2c). Node's `allowHTTP1` option only
   // applies to TLS servers (http2.createSecureServer), so it cannot enable
@@ -644,6 +653,38 @@ export default function run(config: Partial<Config>) {
       renderer_version: packageJson.version,
     });
   });
+
+  // Built-in, opt-in probe endpoints (enableHealthEndpoints config option).
+  // Like /info, they are plain GET routes outside the authenticated render and
+  // asset endpoints: orchestrator probes cannot carry the renderer password.
+  // Both intentionally return status-only bodies — no versions, paths, or
+  // license details — so leaving them reachable exposes nothing sensitive.
+  // NOTE: this listener speaks cleartext HTTP/2 (h2c), so HTTP/1.1-only probes
+  // (e.g. Kubernetes httpGet) cannot reach these routes. Use tcpSocket or exec
+  // probes (`curl --http2-prior-knowledge`). See
+  // docs/oss/building-features/node-renderer/health-checks.md.
+  if (enableHealthEndpoints) {
+    // Liveness: 200 whenever this process can answer — i.e. the event loop is
+    // responsive. Intentionally checks no dependencies (no bundle, Rails, or
+    // license state) so a transient dependency issue never restarts the pod.
+    app.get('/health', (_req, res) => {
+      res.send({ status: 'ok' });
+    });
+
+    // Readiness: 200 only when this process can actually serve render requests.
+    // Answering at all proves the worker is online; additionally require at
+    // least one bundle compiled into the VM pool, because a renderer with zero
+    // bundles responds 410 to renders until the Rails client uploads one.
+    // With workersCount > 1 the cluster module distributes probe connections
+    // across workers, so a probe checks one worker per request.
+    app.get('/ready', (_req, res) => {
+      if (hasAnyVMContext()) {
+        res.send({ status: 'ready' });
+      } else {
+        res.status(503).send({ status: 'waiting_for_bundle' });
+      }
+    });
+  }
 
   // In tests we will run worker in master thread, so we need to ensure server
   // will not listen:

@@ -72,6 +72,15 @@ export function getVMContext(bundlePath: string): VMContext | undefined {
 }
 
 /**
+ * Whether this worker has at least one bundle compiled into a VM context.
+ * Used by the built-in /ready readiness endpoint: a worker with zero loaded
+ * bundles cannot serve render requests until a bundle is uploaded.
+ */
+export function hasAnyVMContext() {
+  return vmContexts.size > 0;
+}
+
+/**
  * The type of the result returned by executing the code payload sent in the rendering request.
  */
 export type RenderCodeResult = string | Promise<string> | Readable;
