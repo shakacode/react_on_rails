@@ -201,5 +201,7 @@ When worker subagents are explicitly authorized:
 For the complete numbered sequence, follow the canonical closeout lane in
 `.agents/workflows/pr-processing.md` instead of stopping at PR creation. The
 coordinator owns the live re-fetch, current-head checks and review-thread triage,
-release-mode or accelerated-RC confidence refresh, full-CI request and waitback
-when uncertainty remains, and any authorized ready/merge action.
+stale release-mode classification updates and the finalized PR-body
+`Agent Merge Confidence` block refresh required for accelerated-RC readiness (kept
+distinct), full-CI request and waitback when uncertainty remains, and any
+authorized ready/merge action.
