@@ -46,6 +46,14 @@ const MASTER_WORKER_SHUTDOWN_MESSAGE_GRACE_MS = 1000;
 // message grace window plus the worker hook budget. If a worker is stuck after
 // that point, this guarantees the master still exits.
 const MASTER_SHUTDOWN_TIMEOUT_MS = MASTER_WORKER_SHUTDOWN_MESSAGE_GRACE_MS + WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS;
+// When a worker's event loop is blocked (synchronous render) it can process
+// neither SHUTDOWN_WORKER_MESSAGE nor a disconnect, so only SIGKILL can stop
+// it — and the master must send that SIGKILL while it is still alive itself.
+// Process supervisors kill the master well before MASTER_SHUTDOWN_TIMEOUT_MS
+// (Foreman's default SIGTERM-to-SIGKILL window is 5s), so survivors are
+// force-killed early: after the message grace window has given draining a
+// chance, but safely inside the supervisor's window.
+const SHUTDOWN_WORKER_FORCE_KILL_TIMEOUT_MS = 2000;
 const SIGNAL_EXIT_CODES: Partial<Record<NodeJS.Signals, number>> = {
   SIGINT: 130,
   SIGTERM: 143,
@@ -196,8 +204,17 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     }, MASTER_SHUTDOWN_TIMEOUT_MS);
     if (typeof shutdownTimer.unref === 'function') shutdownTimer.unref();
 
+    // Early force-kill of workers that cannot drain (blocked event loop).
+    // Their SIGKILL-induced exits complete the disconnect, which lets the
+    // normal waitForWorkerExits path below finish the shutdown promptly.
+    const forceKillTimer = setTimeout(() => {
+      forceKillSurvivingWorkers(workersAtShutdown);
+    }, SHUTDOWN_WORKER_FORCE_KILL_TIMEOUT_MS);
+    if (typeof forceKillTimer.unref === 'function') forceKillTimer.unref();
+
     const finishShutdown = () => {
       clearTimeout(shutdownTimer);
+      clearTimeout(forceKillTimer);
       process.exit(exitCode);
     };
 

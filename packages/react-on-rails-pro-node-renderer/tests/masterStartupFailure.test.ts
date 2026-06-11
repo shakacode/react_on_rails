@@ -595,7 +595,9 @@ describe('master graceful shutdown on external signals via masterRun wiring', ()
     harness.signalHandlers.SIGINT!();
 
     expect(harness.mockCluster.disconnect).not.toHaveBeenCalled();
-    expect(harness.setTimeoutSpy).toHaveBeenCalledTimes(2);
+    // One hard-deadline timer, one early worker force-kill timer, one
+    // message-grace timer — armed once despite the second signal.
+    expect(harness.setTimeoutSpy).toHaveBeenCalledTimes(3);
     expect(harness.processExitSpy).not.toHaveBeenCalled();
   });
 
