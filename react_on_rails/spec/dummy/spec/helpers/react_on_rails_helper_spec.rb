@@ -208,7 +208,7 @@ describe ReactOnRailsHelper do
         .with("generated/LegacyModule", type: :javascript)
         .and_return([
                       {
-                        "src" => "/packs/generated/LegacyModule-123.js",
+                        "src" => "/packs/generated/LegacyModule-123.mjs",
                         "module" => false,
                         module: true
                       }

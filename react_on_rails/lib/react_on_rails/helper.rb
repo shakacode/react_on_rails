@@ -560,7 +560,10 @@ module ReactOnRails
     end
 
     def modulepreload_source?(source)
-      return true if preload_manifest_value(source, "module") == true
+      module_value = preload_manifest_value(source, "module")
+      return true if module_value == true
+      return false if module_value == false
+
       return true if preload_manifest_value(source, "rel").to_s == "modulepreload"
       return true if preload_manifest_value(source, "type").to_s == "module"
 
