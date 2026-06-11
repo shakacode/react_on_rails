@@ -232,6 +232,34 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(thrown?.stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
   });
 
+  test('frames on generated lines past the last mapping keep the bundled location', async () => {
+    // The map covers generated lines 3-4 only; the throw is on line 5. Node's
+    // `findEntry` returns the nearest previous mapping (not `{}`) for such
+    // positions — the resolver must reject the cross-line entry rather than
+    // rewrite the frame to an unrelated original line.
+    const bundleSource = [
+      '// generated banner line 1',
+      '// generated banner line 2',
+      'function mapped(){return 1;}',
+      'global.mapped = mapped;',
+      "function boomUnmapped(){throw new Error('unmapped kaboom');}",
+      'global.triggerUnmapped = boomUnmapped;',
+    ].join('\n');
+    const bundlePath = await writeVmBundle(
+      `${bundleSource}\n${inlineSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
+    );
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    const result = await runInVM('global.triggerUnmapped()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain('unmapped kaboom');
+    expect(result.exceptionMessage).toContain(`at boomUnmapped (${bundlePath}:5:`);
+    expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+  });
+
   test('bundle without a source map keeps the real bundle path in stack frames', async () => {
     const bundlePath = await writeVmBundle(`${buildThrowingBundleSource()}\n`);
     const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);

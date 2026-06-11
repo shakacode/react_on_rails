@@ -197,9 +197,18 @@ export function resolveOriginalPosition(
     return null;
   }
 
-  // `findEntry` returns `{}` when no mapping exists for the position.
+  // `findEntry` returns `{}` only when no mapping exists at or before the
+  // position; for positions on unmapped generated lines it returns the nearest
+  // previous mapping, which may belong to an earlier generated line. Accept
+  // only entries from the requested line so frames in webpack runtime glue or
+  // other unmapped lines fall back to their bundled location instead of being
+  // rewritten to an unrelated original file.
   const entry = sourceMap.findEntry(lineNumber - 1, zeroBasedColumn) as Partial<SourceMapping>;
-  if (entry.originalSource === undefined || entry.originalLine === undefined) {
+  if (
+    entry.originalSource === undefined ||
+    entry.originalLine === undefined ||
+    entry.generatedLine !== lineNumber - 1
+  ) {
     return null;
   }
 
