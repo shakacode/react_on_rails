@@ -14,7 +14,7 @@ Do not rely on CSS imported only by a Server Component to create a browser style
 configs, the server and RSC bundles do not extract CSS. Server-only CSS imports may let the server render class
 names, but they do not cause React on Rails to emit a stylesheet link for the browser.
 
-## Investigation note
+## Bundle CSS architecture
 
 React on Rails Pro builds three graphs for an RSC app:
 
@@ -36,14 +36,17 @@ Verified in this repository:
 
 - The current RSC rendering-flow docs state that the client bundle extracts CSS, the server bundle uses
   CSS Modules locals only, and the RSC bundle does not extract CSS.
-- The Pro dummy app has a request spec that checks `react-client-manifest.json` records CSS for a
-  `'use client'` component rendered by an RSC page.
-- The Pro dummy app has a Playwright regression test for that same path: a CSS Module imported by a
-  `'use client'` component in an RSC tree is preloaded or linked before the styled probe paints.
+- The Pro dummy app request spec
+  `react_on_rails_pro/spec/dummy/spec/requests/rsc_use_client_css_manifest_spec.rb` checks
+  `react-client-manifest.json` records CSS for a `'use client'` component rendered by an RSC page.
+- The Pro dummy app Playwright regression test
+  `react_on_rails_pro/spec/dummy/e2e-tests/rsc_use_client_css.spec.ts` checks that same path: a CSS
+  Module imported by a `'use client'` component in an RSC tree is preloaded or linked before the styled
+  probe paints.
 - The React on Rails helper still loads generated component packs by appending both
   `generated/<ComponentName>` JavaScript and stylesheet pack tags when `auto_load_bundle` is enabled.
 
-Assumptions not proven by this docs-only pass:
+Known gaps (no regression fixture yet):
 
 - Plain non-module CSS imported behind a `'use client'` boundary should follow the same manifest stylesheet
   path as CSS Modules, but the checked regression fixture uses an SCSS module.
@@ -282,19 +285,36 @@ Static extraction libraries are the best fit when you want authored-in-JS styles
 RSC pages. Configure the package so CSS is emitted into a stylesheet that Shakapacker can extract and Rails can
 serve.
 
-Example shape for Vanilla Extract:
+Example shape for Vanilla Extract, appended to your existing client config:
 
 ```js
-// config/webpack/commonWebpackConfig.js
+// config/webpack/clientWebpackConfig.js
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const { VanillaExtractPlugin } = require('@vanilla-extract/webpack-plugin');
-const { generateWebpackConfig, merge } = require('shakapacker');
+const commonWebpackConfig = require('./commonWebpackConfig');
 
-const baseConfig = generateWebpackConfig();
+const configureClient = () => {
+  const clientConfig = commonWebpackConfig();
 
-module.exports = () =>
-  merge({}, baseConfig, {
-    plugins: [new VanillaExtractPlugin()],
+  // Keep your existing React on Rails Pro plugins. Add Vanilla Extract to the
+  // browser/client build so authored .css.ts modules emit stylesheet assets.
+  clientConfig.plugins.push(new VanillaExtractPlugin());
+
+  clientConfig.module.rules.push({
+    test: /\.vanilla\.css$/i,
+    use: [
+      MiniCssExtractPlugin.loader,
+      {
+        loader: require.resolve('css-loader'),
+        options: { url: false },
+      },
+    ],
   });
+
+  return clientConfig;
+};
+
+module.exports = configureClient;
 ```
 
 ```tsx
@@ -309,7 +329,7 @@ export const card = style({
 
 ```tsx
 // app/javascript/components/ProductCard.tsx
-import { card } from './productCard.css';
+import { card } from './productCard.css.ts';
 
 export default function ProductCard({ product }) {
   return <article className={card}>{product.name}</article>;
@@ -321,13 +341,16 @@ the CSS is emitted for Rails to serve:
 
 ```ts
 // app/javascript/packs/client-bundle.ts
-import '../components/productCard.css';
+import '../components/productCard.css.ts';
 import '../styles/application.css';
 ```
 
-Treat this as a starting point. Confirm the package's webpack/Rspack plugin supports the bundler you use and
-then verify the emitted CSS in your client assets. If the styled component is a Client Component instead, keep
-the style import behind that `'use client'` boundary and verify the CSS appears in `react-client-manifest.json`.
+The authored Vanilla Extract module is `productCard.css.ts`; importing that module triggers the bundler plugin.
+The webpack plugin emits `.vanilla.css`, and Shakapacker must still handle that generated CSS with a CSS
+extraction rule so Rails can serve the asset. Treat this as a starting point. Confirm the package's
+webpack/Rspack plugin supports the bundler you use and then verify the emitted CSS in your client assets. If
+the styled component is a Client Component instead, keep the style import behind that `'use client'` boundary
+and verify the CSS appears in `react-client-manifest.json`.
 
 ### 5. Treat runtime CSS-in-JS as package-specific
 
@@ -346,8 +369,8 @@ Runtime CSS-in-JS libraries are no longer one category:
 Status key:
 
 - **Verified**: covered by current repo code, docs, or tests.
-- **Assumed**: expected from current repo behavior or package docs, but not exercised by a React on Rails Pro
-  fixture in this docs-only pass.
+- **Assumed**: expected from current repo behavior or package docs, but not yet covered by a React on Rails Pro
+  regression fixture.
 - **Unsupported**: does not fit the current generated RSC/server CSS pipeline.
 - **Unknown**: needs a fixture or package-specific investigation before recommendation.
 
