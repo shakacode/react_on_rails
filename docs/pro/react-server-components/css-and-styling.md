@@ -293,7 +293,9 @@ Static extraction libraries are the best fit when you want authored-in-JS styles
 RSC pages. Configure the package so CSS is emitted into a stylesheet that Shakapacker can extract and Rails can
 serve.
 
-Example shape for Vanilla Extract, appended inside your existing generated Pro client config:
+Example shape for Vanilla Extract, appended inside your existing generated Pro client config. Do not replace
+the generated `configureClient`; add the imports and helper near the top of the file, then call the helper near
+the end of the existing `configureClient`.
 
 ```js
 // config/webpack/clientWebpackConfig.js
@@ -328,22 +330,19 @@ const excludeVanillaExtractCss = (rule) => {
   }
 };
 
-const configureClient = () => {
-  const clientConfig = commonWebpackConfig();
-
-  // --- Start of generated Pro client setup from this clientWebpackConfig.js ---
-  // Delete the server-bundle entry, install the RSC client-manifest plugin,
-  // and preserve LoadablePlugin plus browser resolve fallbacks.
-  // --- End of generated Pro client setup ---
-
+const applyVanillaExtract = (clientConfig) => {
   clientConfig.plugins.push(new VanillaExtractPlugin());
 
   clientConfig.module.rules.forEach(excludeVanillaExtractCss);
   clientConfig.module.rules.push(vanillaExtractCssRule);
-
-  return clientConfig;
 };
 ```
+
+Call `applyVanillaExtract(clientConfig)` inside the existing generated `configureClient`, after the Pro client
+setup that removes the `server-bundle` entry, installs the RSC client-manifest plugin, and preserves
+LoadablePlugin plus browser resolve fallbacks. The `rule.test.test('app.css')` probe is only a convenience for
+the generated broad CSS rule. Inspect the resolved `clientConfig.module.rules` in your app and replace the
+helper with an explicit rule mutation if it does not hit exactly the broad CSS rule.
 
 ```ts
 // app/javascript/components/productCard.css.ts
