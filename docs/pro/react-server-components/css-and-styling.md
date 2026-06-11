@@ -159,13 +159,17 @@ For manually loaded packs, render the stylesheet pack in the Rails layout or vie
 <%= javascript_pack_tag "client-bundle", defer: true %>
 ```
 
-For generated packs with `auto_load_bundle: true`, keep empty Shakapacker tag placeholders in the layout.
-React on Rails appends generated component pack names while rendering the view:
+For generated packs with `auto_load_bundle: true`, keep React on Rails' argless tag placeholders in the
+layout. React on Rails appends generated component pack names while rendering the view:
 
 ```erb
 <%= stylesheet_pack_tag media: "all" %>
 <%= javascript_pack_tag defer: true %>
 ```
+
+Calling these helpers without pack names is a React on Rails extension. React on Rails accumulates pack names
+with `append_stylesheet_pack_tag`/`append_javascript_pack_tag` during rendering and injects them when the
+argless helpers are evaluated.
 
 When SSR and `auto_load_bundle` are both used, render the body into `content_for` before the `<head>` so the
 append calls run before `stylesheet_pack_tag` emits the head links:
@@ -338,7 +342,7 @@ const configureClient = () => {
 };
 ```
 
-```tsx
+```ts
 // app/javascript/components/productCard.css.ts
 import { style } from '@vanilla-extract/css';
 
