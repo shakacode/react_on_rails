@@ -35,8 +35,9 @@ bundle add react_on_rails --strict
 # Run the installer for TypeScript
 bin/rails generate react_on_rails:install --typescript
 
-# Optional: Use Rspack for faster builds
-# bin/rails generate react_on_rails:install --typescript --rspack
+# Fresh installs use Rspack by default when supported.
+# To force Webpack instead, pass --no-rspack:
+# bin/rails generate react_on_rails:install --typescript --no-rspack
 
 # For JavaScript instead of TypeScript, omit --typescript
 # bin/rails generate react_on_rails:install

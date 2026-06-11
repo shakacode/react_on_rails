@@ -9,7 +9,7 @@ This tutorial starts from the [Quick Start](./quick-start.md) app and builds a s
 - `bin/dev` with HMR during development
 - Optional server rendering with `prerender: true`
 
-Redux is still supported, but it is no longer the main path for a first React on Rails app. See [Appendix: Redux integration](#appendix-redux-integration) when you need a shared client store or you are maintaining an existing Redux setup.
+Redux is still supported, but it is no longer the main path for a first React on Rails app. See [Appendix: Redux Integration](#appendix-redux-integration) when you need a shared client store or you are maintaining an existing Redux setup.
 
 ## Table of Contents
 
@@ -93,7 +93,7 @@ mkdir -p app/javascript/src/Counter/ror_components
 Add `app/javascript/src/Counter/ror_components/Counter.client.tsx`:
 
 ```tsx
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 
 type CounterProps = {
   initialCount?: number;
@@ -102,7 +102,7 @@ type CounterProps = {
 
 export default function Counter({ initialCount = 0, label = 'Counter' }: CounterProps) {
   const [count, setCount] = useState(initialCount);
-  const doubled = useMemo(() => count * 2, [count]);
+  const doubled = count * 2;
 
   return (
     <section>
@@ -132,7 +132,7 @@ Add a controller action if you do not already have one:
 bin/rails generate controller Dashboard show
 ```
 
-In `app/controllers/dashboard_controller.rb`, set props for React:
+In `app/controllers/dashboard_controller.rb`, set props for React. The Quick Start installer creates `react_on_rails_default`, which includes the generated bundle placeholders:
 
 ```ruby
 class DashboardController < ApplicationController
@@ -162,6 +162,8 @@ If your app sets `config.auto_load_bundle = true` in `config/initializers/react_
 ```
 
 The generated `react_on_rails_default` layout includes the Shakapacker tags that auto-bundling needs. If you render from your application's default layout instead, add the same `stylesheet_pack_tag` and `javascript_pack_tag` placeholders there.
+
+If `app/views/layouts/react_on_rails_default.html.erb` is not present in your app, remove the `layout` line from the controller and add the pack-tag placeholders to the layout that renders this view.
 
 ## Run The App With HMR
 
@@ -218,7 +220,7 @@ Then add `prerender: true` in the Rails view:
 <%= react_component("Counter", props: @counter_props, prerender: true, auto_load_bundle: true) %>
 ```
 
-Server rendering runs in Node or ExecJS, so browser globals such as `window`, `document`, and `localStorage` must stay inside effects or client-only branches:
+Server rendering runs in Node or ExecJS, so browser globals such as `window`, `document`, and `localStorage` must stay inside effects or client-only branches. This standalone example shows the pattern; you do not need to add it for the Counter tutorial:
 
 ```tsx
 import React, { useEffect, useState } from 'react';
