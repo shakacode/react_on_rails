@@ -87,6 +87,10 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
     rspack: webpackRequested ? false : (rawOpts.rspack ?? true) === true,
     pro,
     rsc,
+    // Commander's `--no-agent-files` declares a default of true on rawOpts.agentFiles,
+    // so undefined (no flag) and true (default) both map to true; only --no-agent-files
+    // sets it false.
+    agentFiles: (rawOpts.agentFiles ?? true) === true,
     cliVersion: packageJson.version,
   };
 
@@ -158,6 +162,7 @@ program
   .option('--standard', 'Generate open-source React on Rails setup (skip prompt)')
   .option('--pro', 'Generate React on Rails Pro setup (installs react_on_rails_pro)')
   .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)')
+  .option('--no-agent-files', 'Skip AI-agent guidance files (AGENTS.md + editor pointers)')
   .addHelpText(
     'after',
     `
@@ -171,6 +176,7 @@ Examples:
   $ npx create-react-on-rails-app my-app --webpack               # same as --no-rspack
   $ npx create-react-on-rails-app my-app --no-rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
+  $ npx create-react-on-rails-app my-app --no-agent-files            # skip AGENTS.md + editor pointers
 
 When no mode flag (--standard, --pro, or --rsc) is given, an interactive prompt
 lets you choose between Standard, Pro, and RSC modes (default: RSC). When stdin

@@ -100,6 +100,68 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "agent guidance files" do
+    # Exercise add_agent_files directly (like the CI-workflow fixture above) so the
+    # idempotency/flag behavior is covered without running the full Shakapacker install.
+    let(:agent_file_paths) do
+      %w[AGENTS.md CLAUDE.md .cursor/rules/react-on-rails.mdc .github/copilot-instructions.md]
+    end
+
+    before { prepare_destination }
+
+    def run_add_agent_files(options = {})
+      generator = install_generator_fixture({ agent_files: true }.merge(options))
+      Dir.chdir(destination_root) { generator.send(:add_agent_files) }
+    end
+
+    it "writes the consumer AGENTS.md and editor pointer files by default" do
+      run_add_agent_files
+
+      agent_file_paths.each { |relative_path| assert_file(relative_path) }
+
+      assert_file "AGENTS.md" do |content|
+        expect(content).to include("react_component")
+        expect(content).to include("ror_components")
+        expect(content).to include("react_on_rails:doctor")
+        expect(content).to include("Component '<Name>' Not Registered")
+      end
+
+      assert_file "CLAUDE.md" do |content|
+        expect(content).to include("AGENTS.md")
+      end
+    end
+
+    it "does not clobber agent files that already exist" do
+      existing = "# Pre-existing project file — keep me\n"
+      agent_file_paths.each { |relative_path| simulate_existing_file(relative_path, existing) }
+
+      run_add_agent_files
+
+      agent_file_paths.each do |relative_path|
+        assert_file(relative_path) { |content| expect(content).to include("keep me") }
+      end
+    end
+
+    it "skips all agent files when --no-agent-files is passed" do
+      run_add_agent_files(agent_files: false)
+
+      agent_file_paths.each { |relative_path| assert_no_file(relative_path) }
+    end
+
+    it "skips the editor pointer files when the app already has its own AGENTS.md" do
+      simulate_existing_file("AGENTS.md", "# App's own AGENTS.md — keep me\n")
+
+      run_add_agent_files
+
+      # The existing AGENTS.md is left untouched and no pointer files are written, so we never
+      # emit editor guidance referencing an AGENTS.md we did not author.
+      assert_file("AGENTS.md") { |content| expect(content).to include("keep me") }
+      %w[CLAUDE.md .cursor/rules/react-on-rails.mdc .github/copilot-instructions.md].each do |pointer|
+        assert_no_file(pointer)
+      end
+    end
+  end
+
   context "without args" do
     before(:all) { run_generator_test_with_args(%w[], package_json: true) }
 
