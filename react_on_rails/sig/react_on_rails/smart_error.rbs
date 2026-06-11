@@ -13,15 +13,15 @@ module ReactOnRails
 
     def self.error_definitions: () -> Hash[Symbol, error_definition]
     def self.error_definition_for: (Symbol | String error_type) -> error_definition
-    def self.docs_url_for: (Symbol | String error_type) -> String
+    def self.docs_url_for: (Symbol | String error_type) -> String?
 
-    attr_reader error_type: Symbol
+    attr_reader error_type: Symbol | String
     attr_reader component_name: String?
     attr_reader props: String?
     attr_reader js_code: String?
     attr_reader additional_context: Hash[Symbol, untyped]
 
-    def initialize: (error_type: Symbol, ?component_name: String?, ?props: String?, ?js_code: String?, **untyped additional_context) -> void
+    def initialize: (error_type: Symbol | String, ?component_name: String?, ?props: String?, ?js_code: String?, **untyped additional_context) -> void
     def code: () -> String
     def docs_url: () -> String?
     def solution: () -> String
@@ -36,6 +36,8 @@ module ReactOnRails
     def error_description: () -> String
     def component_not_registered_solution: () -> String
     def missing_auto_loaded_bundle_solution: () -> String
+    def missing_auto_loaded_store_bundle_solution: () -> String
+    def packer_source_path_for_message: () -> String
     def hydration_mismatch_solution: () -> String
     def server_rendering_error_solution: () -> String
     def redux_store_not_found_solution: () -> String

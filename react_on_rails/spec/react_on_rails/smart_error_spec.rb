@@ -35,6 +35,26 @@ module ReactOnRails
         end
       end
 
+      context "with a string error type" do
+        subject(:error) do
+          described_class.new(
+            error_type: "component_not_registered",
+            component_name: "ProductCard",
+            available_components: %w[ProductList ProductDetails UserProfile]
+          )
+        end
+
+        it "normalizes the type for the code, title, description, and solution" do
+          message = error.message
+
+          expect(error.code).to eq("ROR001")
+          expect(error.docs_url).to eq("https://reactonrails.com/docs/reference/error-reference#ror001")
+          expect(message).to include("Component 'ProductCard' Not Registered")
+          expect(message).to include("Component 'ProductCard' was not found in the component registry.")
+          expect(message).to include("ReactOnRails.register({ ProductCard: ProductCard })")
+        end
+      end
+
       context "with missing_auto_loaded_bundle error" do
         subject(:error) do
           described_class.new(

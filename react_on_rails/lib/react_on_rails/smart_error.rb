@@ -82,10 +82,14 @@ module ReactOnRails
     end
 
     def self.error_definition_for(error_type)
-      ERROR_DEFINITIONS.fetch(error_type.to_sym)
+      normalized_error_type = error_type.respond_to?(:to_sym) ? error_type.to_sym : error_type
+      ERROR_DEFINITIONS.fetch(normalized_error_type, UNKNOWN_ERROR_DEFINITION)
     end
 
     def self.docs_url_for(error_type)
+      normalized_error_type = error_type.respond_to?(:to_sym) ? error_type.to_sym : error_type
+      return unless error_definitions.key?(normalized_error_type)
+
       "#{DOCS_BASE_URL}##{error_definition_for(error_type).fetch(:code).downcase}"
     end
 
@@ -113,7 +117,7 @@ module ReactOnRails
     end
 
     def solution
-      case error_type
+      case normalized_error_type
       when :component_not_registered
         component_not_registered_solution
       when :missing_auto_loaded_bundle
@@ -170,7 +174,7 @@ module ReactOnRails
     end
 
     def error_type_title
-      case error_type
+      case normalized_error_type
       when :component_not_registered
         "Component '#{component_name}' Not Registered"
       when :missing_auto_loaded_bundle
@@ -192,7 +196,7 @@ module ReactOnRails
 
     # rubocop:disable Metrics/CyclomaticComplexity
     def error_description
-      case error_type
+      case normalized_error_type
       when :component_not_registered
         <<~DESC
           Component '#{component_name}' was not found in the component registry.
