@@ -115,11 +115,14 @@ while IFS=$'\t' read -r sha subject; do
   if [ -n "$pr_number" ]; then
     printf '%s\t%s\t%s\n' "$pr_number" "$sha" "$subject"
   else
-    mapped_rows=$(gh api -H "Accept: application/vnd.github+json" \
+    mapped_rows=$(SHA="$sha" gh api -H "Accept: application/vnd.github+json" \
       "repos/shakacode/react_on_rails/commits/${sha}/pulls" \
-      --arg sha "$sha" \
-      --jq '.[] | select(.merged_at != null and .base.ref == "main") | [.number, $sha, .title] | @tsv' || true)
-    if [ -n "$mapped_rows" ]; then
+      --jq '.[] | select(.merged_at != null and .base.ref == "main") | [.number, env.SHA, .title] | @tsv' 2>&1)
+    api_status=$?
+    if [ "$api_status" -ne 0 ]; then
+      printf 'warning: commit-to-PR API lookup failed for %s: %s\n' "$sha" "$mapped_rows" >&2
+      printf 'UNKNOWN\t%s\t%s\n' "$sha" "$subject"
+    elif [ -n "$mapped_rows" ]; then
       printf '%s\n' "$mapped_rows"
     else
       printf 'UNKNOWN\t%s\t%s\n' "$sha" "$subject"
