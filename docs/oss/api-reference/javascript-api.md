@@ -82,6 +82,7 @@ reactHydrateOrRender(domNode, reactElement, hydrate);
  * `rootErrorHandlers: { onRecoverableError, onCaughtError, onUncaughtError }` React root error
  *   callbacks applied to every React root created by React on Rails. Each callback receives
  *   React's (error, errorInfo) plus a context object with the componentName and domNodeId.
+ *   Partial updates merge per key (setting one callback later keeps the others).
  *   onRecoverableError requires React 18+; onCaughtError/onUncaughtError require React 19.
  *   See https://reactonrails.com/docs/building-features/debugging-hydration-mismatches
  */

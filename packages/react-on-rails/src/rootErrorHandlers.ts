@@ -2,6 +2,7 @@ import type { RootErrorContext, RootErrorHandler, RootErrorHandlers } from './ty
 import type { ReactHydrateOptions } from './reactApis.cts';
 import { supportsRootApi, supportsReact19RootErrorCallbacks } from './reactApis.cts';
 import { getRailsContext } from './context.ts';
+import { isThenable } from './isThenable.ts';
 
 /**
  * Guide linked from the development-mode hydration-mismatch message.
@@ -25,6 +26,13 @@ let registeredHandlers: RootErrorHandlers = {};
 
 /**
  * Validates and stores the user's root error callbacks. Called by `ReactOnRails.setOptions`.
+ *
+ * Updates MERGE per key (matching how the other `setOptions` keys update independently): passing
+ * only `onCaughtError` keeps a previously registered `onRecoverableError`/`onUncaughtError`.
+ * Passing an explicit `undefined` for a key clears that key; `resetRootErrorHandlers` (via
+ * `ReactOnRails.resetOptions`) clears all of them. Combined with the capture-at-root-creation
+ * semantics in `buildRootErrorCallbackOptions`, changes only affect roots created afterwards.
+ *
  * On React runtimes without root error callback support this still stores the handlers (so a
  * later React upgrade picks them up) but warns that they will never be called.
  */
@@ -54,7 +62,18 @@ export function setRootErrorHandlers(handlers: RootErrorHandlers): void {
     }
   }
 
-  registeredHandlers = { ...handlers };
+  // Per-key merge: keys absent from `handlers` keep their previous registration; keys explicitly
+  // set to `undefined` are cleared.
+  const merged: RootErrorHandlers = {};
+  HANDLER_KEYS.forEach((key) => {
+    const next = Object.prototype.hasOwnProperty.call(handlers, key)
+      ? handlers[key]
+      : registeredHandlers[key];
+    if (typeof next === 'function') {
+      merged[key] = next;
+    }
+  });
+  registeredHandlers = merged;
 }
 
 /** Clears the registered root error callbacks. Called by `ReactOnRails.resetOptions`. */
@@ -62,18 +81,12 @@ export function resetRootErrorHandlers(): void {
   registeredHandlers = {};
 }
 
-/** Returns the currently registered root error callbacks. */
+/**
+ * Returns a snapshot copy of the currently registered root error callbacks. A copy is returned so
+ * callers cannot mutate the internal registration and bypass `setRootErrorHandlers` validation.
+ */
 export function getRootErrorHandlers(): RootErrorHandlers {
-  return registeredHandlers;
-}
-
-/** Narrows an unknown value to a thenable (has a callable `.then`) without assuming a native Promise. */
-function isThenable(value: unknown): value is PromiseLike<unknown> {
-  return (
-    value != null &&
-    (typeof value === 'object' || typeof value === 'function') &&
-    typeof (value as { then?: unknown }).then === 'function'
-  );
+  return { ...registeredHandlers };
 }
 
 // A failing user callback must not break React's own error recovery, so failures are logged
@@ -113,12 +126,38 @@ function inDevelopmentEnv(): boolean {
   return getRailsContext()?.railsEnv === 'development';
 }
 
-function logDevHydrationError(context: RootErrorContext, error: unknown): void {
+/**
+ * Mirrors React's own default `onRecoverableError` (`reportError` where available, else
+ * `console.error`). Attaching a root callback replaces React's default reporting, so the
+ * dev-mode logger must re-emit it itself — otherwise window-'error'-based tooling (dev overlays,
+ * error trackers) goes silent in development.
+ */
+function defaultReportRecoverableError(error: unknown): void {
+  if (typeof globalThis.reportError === 'function') {
+    globalThis.reportError(error);
+  } else {
+    console.error(error);
+  }
+}
+
+function extractComponentStack(errorInfo: unknown): string | undefined {
+  const componentStack = (errorInfo as { componentStack?: unknown } | null | undefined)?.componentStack;
+  return typeof componentStack === 'string' && componentStack.length > 0 ? componentStack : undefined;
+}
+
+/**
+ * Branded, supplemental development-mode line: component name, dom id, component stack (when
+ * React provides one), and the debugging-guide link. Deliberately does NOT dump the error object
+ * itself — the error is default-reported exactly once elsewhere (by `defaultReportRecoverableError`
+ * on core paths, or by Pro's internal recoverable-error handler on chained paths).
+ */
+function logDevHydrationError(context: RootErrorContext, errorInfo: unknown): void {
   const componentName = context.componentName || 'unknown';
   const domNodeId = context.domNodeId || 'unknown';
+  const componentStack = extractComponentStack(errorInfo);
+  const componentStackSuffix = componentStack ? `\nComponent stack:${componentStack}` : '';
   console.error(
-    `[ReactOnRails] Recoverable hydration error in component "${componentName}" (dom id: "${domNodeId}"). The server-rendered HTML did not match what React rendered on the client, so React threw away the server HTML and re-rendered on the client. Common Rails-specific causes and fixes: ${HYDRATION_MISMATCH_GUIDE_URL}`,
-    error,
+    `[ReactOnRails] Recoverable hydration error in component "${componentName}" (dom id: "${domNodeId}"). The server-rendered HTML did not match what React rendered on the client, so React threw away the server HTML and re-rendered on the client. Common Rails-specific causes and fixes: ${HYDRATION_MISMATCH_GUIDE_URL}${componentStackSuffix}`,
   );
 }
 
@@ -126,6 +165,16 @@ type RootErrorCallbackOptions = Pick<
   ReactHydrateOptions,
   'onRecoverableError' | 'onCaughtError' | 'onUncaughtError'
 >;
+
+interface BuildRootErrorCallbackOptionsExtras {
+  /**
+   * Set by callers (the Pro RSC-wrapped hydrate paths) that chain their own default reporting
+   * around the returned `onRecoverableError`. When true, the dev-mode logger emits only its
+   * branded supplemental line and skips `defaultReportRecoverableError`, so each recoverable
+   * error is default-reported exactly once.
+   */
+  defaultReportingHandledInternally?: boolean;
+}
 
 /**
  * Builds the `hydrateRoot`/`createRoot` error callback options for one React root, wrapping the
@@ -137,9 +186,11 @@ type RootErrorCallbackOptions = Pick<
  * would silently swallow errors. Roots therefore keep the handlers they were created with;
  * re-registering affects only roots created afterwards.
  *
- * When hydrating in Rails development mode, a React on Rails-branded hydration-mismatch logger is
- * attached in addition to (and before) any user `onRecoverableError`, replacing React's bare
- * console line with an actionable message linking to the debugging guide.
+ * When hydrating in Rails development mode, a React on Rails-branded hydration-mismatch line
+ * (component name, dom id, component stack, guide link) is attached in addition to (and before)
+ * any user `onRecoverableError`. React's default reporting is preserved: the error itself is
+ * still default-reported once — via `defaultReportRecoverableError` here, or by the caller's own
+ * reporting when `defaultReportingHandledInternally` is set.
  *
  * Returns `{}` when nothing needs to be attached so React's default error reporting stays
  * untouched, and on React <18 (the legacy `hydrate`/`render` APIs have no such options).
@@ -147,6 +198,7 @@ type RootErrorCallbackOptions = Pick<
 export function buildRootErrorCallbackOptions(
   context: RootErrorContext,
   hydrating: boolean,
+  { defaultReportingHandledInternally = false }: BuildRootErrorCallbackOptionsExtras = {},
 ): RootErrorCallbackOptions {
   if (!supportsRootApi) {
     return {};
@@ -159,7 +211,10 @@ export function buildRootErrorCallbackOptions(
   if (logDevDefault || onRecoverableError) {
     options.onRecoverableError = (error, errorInfo) => {
       if (logDevDefault) {
-        logDevHydrationError(context, error);
+        if (!defaultReportingHandledInternally) {
+          defaultReportRecoverableError(error);
+        }
+        logDevHydrationError(context, errorInfo);
       }
       if (onRecoverableError) {
         safeInvoke(onRecoverableError, 'onRecoverableError', error, errorInfo, context);

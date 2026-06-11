@@ -8,11 +8,15 @@ Rails apps hit a set of systematic causes that JavaScript-only frameworks rarely
 
 ### Development default
 
-When `Rails.env.development?`, React on Rails automatically logs every recoverable hydration error with the component name, the DOM id, and a link to this guide — replacing React's bare console line:
+When `Rails.env.development?`, React on Rails automatically logs every recoverable hydration error with the component name, the DOM id, the component stack (when React provides one), and a link to this guide:
 
 ```text
 [ReactOnRails] Recoverable hydration error in component "MyComponent" (dom id: "MyComponent-react-component-0"). ...
+Component stack:
+    at MyComponent
 ```
+
+React's default error reporting is preserved: the error itself is still reported once via `reportError` (falling back to `console.error`), so dev overlays and other window-`'error'`-based tooling keep working. The branded line is supplemental context. On React on Rails Pro RSC hydration paths, Pro's internal handler already reports the error, so only the supplemental line is added — each error is reported exactly once either way.
 
 No setup is required. The default logger runs in addition to any callback you register.
 
@@ -51,7 +55,8 @@ Each callback receives React's original `(error, errorInfo)` arguments plus a `c
 
 Notes:
 
-- **Register before rendering.** Callbacks apply to roots created after registration; register them in the same pack file where you call `ReactOnRails.register`.
+- **Register before rendering.** Each root captures the callbacks registered at the moment it is created; register them in the same pack file where you call `ReactOnRails.register`.
+- **Partial updates merge per key.** A later `setOptions({ rootErrorHandlers: { onCaughtError } })` keeps a previously registered `onRecoverableError`/`onUncaughtError`. Pass an explicit `undefined` for a key to clear just that callback; `ReactOnRails.resetOptions()` clears all of them.
 - **React version support:** `onRecoverableError` requires React 18+; `onCaughtError`/`onUncaughtError` require React 19. On older React versions, registration is a graceful no-op and React on Rails logs a one-time `console.warn`.
 - **React on Rails Pro:** on RSC/streaming hydration paths, Pro installs an internal `onRecoverableError` for its own bookkeeping. Your callback is chained after it — both always run, and Pro's internal control-flow signals (such as the `RSCRoute` `ssr: false` bailout) are filtered out of both so they never reach your error reporter.
 - **Per-component overrides** are not currently supported; the global registration above is the blessed route.

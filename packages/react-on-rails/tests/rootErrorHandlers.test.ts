@@ -60,6 +60,49 @@ describe('rootErrorHandlers', () => {
       resetRootErrorHandlers();
       expect(getRootErrorHandlers()).toEqual({});
     });
+
+    it('merges partial updates per key instead of replacing the whole set', () => {
+      const { setRootErrorHandlers, getRootErrorHandlers, buildRootErrorCallbackOptions } =
+        loadModule('19.0.0');
+      const onRecoverableError = jest.fn();
+      const onCaughtError = jest.fn();
+      setRootErrorHandlers({ onRecoverableError });
+      // A later partial update must keep the earlier registration (matching how the other
+      // setOptions keys update independently).
+      setRootErrorHandlers({ onCaughtError });
+
+      expect(getRootErrorHandlers()).toEqual({ onRecoverableError, onCaughtError });
+
+      // Both survive into the options built for new roots.
+      const context = { componentName: 'X', domNodeId: 'x' };
+      const options = buildRootErrorCallbackOptions(context, true);
+      const error = new Error('merged');
+      options.onRecoverableError?.(error, undefined);
+      expect(onRecoverableError).toHaveBeenCalledWith(error, undefined, context);
+      options.onCaughtError?.(error, undefined);
+      expect(onCaughtError).toHaveBeenCalledWith(error, undefined, context);
+    });
+
+    it('clears a single key when it is explicitly passed as undefined', () => {
+      const { setRootErrorHandlers, getRootErrorHandlers } = loadModule('19.0.0');
+      const onRecoverableError = jest.fn();
+      const onUncaughtError = jest.fn();
+      setRootErrorHandlers({ onRecoverableError, onUncaughtError });
+      setRootErrorHandlers({ onRecoverableError: undefined });
+      expect(getRootErrorHandlers()).toEqual({ onUncaughtError });
+    });
+
+    it('returns a snapshot copy so callers cannot mutate the internal registration', () => {
+      const { setRootErrorHandlers, getRootErrorHandlers } = loadModule('19.0.0');
+      const onRecoverableError = jest.fn();
+      setRootErrorHandlers({ onRecoverableError });
+
+      const snapshot = getRootErrorHandlers();
+      snapshot.onRecoverableError = 'tampered' as unknown as () => void;
+      delete snapshot.onRecoverableError;
+
+      expect(getRootErrorHandlers().onRecoverableError).toBe(onRecoverableError);
+    });
   });
 
   describe('legacy React (<18)', () => {
@@ -186,7 +229,25 @@ describe('rootErrorHandlers', () => {
   });
 
   describe('development-mode default hydration-mismatch logger', () => {
-    it('attaches on the hydrate path in development even without a user callback', () => {
+    // jsdom's lib types declare a non-optional `reportError`, so write through a loose record to
+    // be able to install/remove the spy.
+    const setGlobalReportError = (value: ((error: unknown) => void) | undefined) => {
+      (globalThis as Record<string, unknown>).reportError = value;
+    };
+    let originalReportError: ((error: unknown) => void) | undefined;
+    let reportErrorSpy: jest.Mock;
+
+    beforeEach(() => {
+      originalReportError = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+      reportErrorSpy = jest.fn();
+      setGlobalReportError(reportErrorSpy);
+    });
+
+    afterEach(() => {
+      setGlobalReportError(originalReportError);
+    });
+
+    it('default-reports the error and logs the branded supplemental line with the component stack', () => {
       const module = loadModule('19.0.0');
       setRailsContext('development');
       const options = module.buildRootErrorCallbackOptions(
@@ -196,23 +257,61 @@ describe('rootErrorHandlers', () => {
       expect(options.onRecoverableError).toEqual(expect.any(Function));
 
       const error = new Error('Hydration failed');
-      options.onRecoverableError?.(error, undefined);
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Recoverable hydration error in component "DevComponent" (dom id: "dev-dom-id")',
-        ),
-        error,
+      const errorInfo = { componentStack: '\n    at DevComponent' };
+      options.onRecoverableError?.(error, errorInfo);
+
+      // React's default reporting is preserved so window-'error' tooling still fires.
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      expect(reportErrorSpy).toHaveBeenCalledWith(error);
+
+      // The branded line is supplemental: context + componentStack + guide link, no error dump.
+      expect(console.error).toHaveBeenCalledTimes(1);
+      const [message] = (console.error as jest.Mock).mock.calls[0] as [string];
+      expect(message).toContain(
+        'Recoverable hydration error in component "DevComponent" (dom id: "dev-dom-id")',
       );
+      expect(message).toContain(module.HYDRATION_MISMATCH_GUIDE_URL);
+      expect(message).toContain('Component stack:');
+      expect(message).toContain('at DevComponent');
+    });
+
+    it('falls back to console.error for default reporting when reportError is unavailable', () => {
+      const module = loadModule('19.0.0');
+      setRailsContext('development');
+      setGlobalReportError(undefined);
+      const options = module.buildRootErrorCallbackOptions({ componentName: 'X', domNodeId: 'x' }, true);
+
+      const error = new Error('Hydration failed');
+      options.onRecoverableError?.(error, undefined);
+
+      expect(console.error).toHaveBeenCalledWith(error);
       expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining(module.HYDRATION_MISMATCH_GUIDE_URL),
-        error,
+        expect.stringContaining('Recoverable hydration error in component "X"'),
       );
     });
 
-    it('runs alongside (before) a registered user onRecoverableError', () => {
+    it('skips default reporting (but keeps the branded line) when defaultReportingHandledInternally is set', () => {
+      const module = loadModule('19.0.0');
+      setRailsContext('development');
+      const options = module.buildRootErrorCallbackOptions({ componentName: 'X', domNodeId: 'x' }, true, {
+        defaultReportingHandledInternally: true,
+      });
+
+      const error = new Error('Hydration failed');
+      options.onRecoverableError?.(error, undefined);
+
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledTimes(1);
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Recoverable hydration error in component "X"'),
+      );
+    });
+
+    it('default-reports, then logs the branded line, then runs the user onRecoverableError', () => {
       const module = loadModule('19.0.0');
       setRailsContext('development');
       const callOrder: string[] = [];
+      reportErrorSpy.mockImplementation(() => callOrder.push('defaultReport'));
       (console.error as jest.Mock).mockImplementation(() => callOrder.push('devLog'));
       module.setRootErrorHandlers({
         onRecoverableError: jest.fn(() => callOrder.push('user')),
@@ -220,7 +319,7 @@ describe('rootErrorHandlers', () => {
 
       const options = module.buildRootErrorCallbackOptions({ componentName: 'X', domNodeId: 'x' }, true);
       options.onRecoverableError?.(new Error('boom'), undefined);
-      expect(callOrder).toEqual(['devLog', 'user']);
+      expect(callOrder).toEqual(['defaultReport', 'devLog', 'user']);
     });
 
     it('does not attach on the non-hydrate (createRoot) path', () => {

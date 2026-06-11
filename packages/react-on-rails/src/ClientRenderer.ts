@@ -17,6 +17,7 @@ import { onPageUnloaded } from './pageLifecycle.ts';
 import { supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 import { isRendererTeardownResult } from './rendererTeardown.ts';
 import { buildRootErrorCallbackOptions } from './rootErrorHandlers.ts';
+import { isThenable } from './isThenable.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
@@ -34,15 +35,6 @@ type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
 type RenderedEntry =
   | { kind: 'react'; root: RenderReturnType; domNode: Element }
   | { kind: 'renderer'; teardown?: RendererTeardown; domNode: Element };
-
-/** Narrows an unknown value to a thenable (has a callable `.then`) without assuming a native Promise. */
-function isThenable(value: unknown): value is PromiseLike<unknown> {
-  return (
-    value != null &&
-    (typeof value === 'object' || typeof value === 'function') &&
-    typeof (value as { then?: unknown }).then === 'function'
-  );
-}
 
 // Track all rendered roots for cleanup
 const renderedRoots = new Map<string, RenderedEntry>();

@@ -110,6 +110,23 @@ describe('ReactOnRails', () => {
     );
   });
 
+  it('setOptions merges partial rootErrorHandlers updates per key', () => {
+    // eslint-disable-next-line global-require
+    const { getRootErrorHandlers } = require('../src/rootErrorHandlers.ts');
+    ReactOnRails.resetOptions();
+    const onRecoverableError = jest.fn();
+    const onUncaughtError = jest.fn();
+    ReactOnRails.setOptions({ rootErrorHandlers: { onRecoverableError } });
+    // A later call that sets only another key must not drop the earlier registration
+    // (consistent with how traceTurbolinks/turbo update independently).
+    ReactOnRails.setOptions({ rootErrorHandlers: { onUncaughtError } });
+
+    expect(getRootErrorHandlers()).toEqual({ onRecoverableError, onUncaughtError });
+    expect(ReactOnRails.option('rootErrorHandlers')).toEqual({ onRecoverableError, onUncaughtError });
+
+    ReactOnRails.resetOptions();
+  });
+
   it('registerStore throws if passed a falsey object (null, undefined, etc)', () => {
     expect(() => ReactOnRails.registerStore(null)).toThrow(/null or undefined/);
 

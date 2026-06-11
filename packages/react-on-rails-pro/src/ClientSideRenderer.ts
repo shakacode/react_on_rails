@@ -33,6 +33,7 @@ import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from 'react-
 import reactHydrateOrRender from 'react-on-rails/reactHydrateOrRender';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
 import { buildRootErrorCallbackOptions } from 'react-on-rails/@internal/rootErrorHandlers';
+import { isThenable } from 'react-on-rails/@internal/isThenable';
 import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderRegistry.ts';
 import { chainRecoverableErrorHandlers } from './handleRecoverableError.client.ts';
 
@@ -41,15 +42,6 @@ import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
-/** Narrows an unknown value to a thenable (has a callable `.then`) without assuming a native Promise. */
-function isThenable(value: unknown): value is PromiseLike<unknown> {
-  return (
-    value != null &&
-    (typeof value === 'object' || typeof value === 'function') &&
-    typeof (value as { then?: unknown }).then === 'function'
-  );
-}
-
 /**
  * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
  * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch.
@@ -57,8 +49,7 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
  * Intentionally re-implemented (not imported) from the OSS `react-on-rails` `invokeRendererTeardown`:
  * the OSS module does not export it, so re-implementing keeps the Pro client renderer decoupled from
  * OSS internals (no reliance on a non-public export) instead of widening the OSS public API just to
- * share it. Keep the local thenable guard in sync with the OSS helper so non-native thenables are
- * handled the same way in both packages. The shared `RendererFunction`/`RendererTeardown`/
+ * share it. The thenable guard (`isThenable`) and the shared `RendererFunction`/`RendererTeardown`/
  * `RendererTeardownResult` *types* are imported, so only this small runtime helper is duplicated.
  * MUST SYNC: A sibling helper exists in packages/react-on-rails/src/ClientRenderer.ts. If you
  * change the error-handling logic or log format here, update that copy too.
@@ -259,10 +250,12 @@ You should return a React.Component always for the client side entry point.`);
           // component name and dom id. Applied to every root; on the RSC-wrapped hydrate path the
           // user onRecoverableError is CHAINED after Pro's internal recoverable-error handler so
           // both run (the internal handler must never be clobbered, and the user callback must
-          // never be dropped).
+          // never be dropped). On that chained path the internal handler already default-reports
+          // the error, so the dev-mode logger must emit only its supplemental branded line.
           const userErrorCallbackOptions = buildRootErrorCallbackOptions(
             { componentName: name, domNodeId },
             shouldHydrate,
+            { defaultReportingHandledInternally: wrappedByDefaultRSCProvider && shouldHydrate },
           );
           let renderOptions: Parameters<typeof reactHydrateOrRender>[3] = userErrorCallbackOptions;
           if (wrappedByDefaultRSCProvider) {

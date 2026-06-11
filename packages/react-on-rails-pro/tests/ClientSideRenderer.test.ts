@@ -396,6 +396,58 @@ describe('ClientSideRenderer', () => {
     }
   });
 
+  it('emits one internal report plus the supplemental branded dev line on the chained dev hydrate path', async () => {
+    // railsEnv 'development' + RSC-wrapped hydrate: the chained handler must default-report the
+    // error exactly once (Pro's internal handler), with the dev logger adding only its branded
+    // supplemental line — never a second full error dump.
+    const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
+    const defaultProviderFactory = jest.fn(({ reactElement }: DefaultRSCProviderFactoryArgs) => reactElement);
+    const globalWithReportError = globalThis as typeof globalThis & {
+      reportError?: (error: unknown) => void;
+    };
+    const originalReportError = globalWithReportError.reportError;
+    const reportErrorSpy = jest.fn();
+    globalWithReportError.reportError = reportErrorSpy;
+    const userOnRecoverableError = jest.fn();
+    setRootErrorHandlers({ onRecoverableError: userOnRecoverableError });
+    ComponentRegistry.register({ TestComponent });
+    const componentSpec = setupTestComponentDom('dom-id-dev', '<div>Server fallback</div>');
+    addRailsContext({ railsEnv: 'development', rscPayloadGenerationUrlPath: '/rsc_payload' });
+    setDefaultRSCProviderFactory(defaultProviderFactory);
+
+    try {
+      await renderOrHydrateComponent(componentSpec);
+
+      const recoverableError = new Error('dev chained recoverable error');
+      const errorInfo = { componentStack: '\n    at TestComponent' };
+      const onRecoverableError = expectRecoverableHandlerFromLastRender();
+      (onRecoverableError as (error: unknown, errorInfo: unknown) => void)(recoverableError, errorInfo);
+
+      // Exactly one default report — Pro's internal handler.
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      expect(reportErrorSpy).toHaveBeenCalledWith(recoverableError);
+
+      // Exactly one console.error: the branded supplemental line (context + stack + guide link),
+      // not a second full error dump.
+      const consoleErrorCalls = (console.error as jest.Mock).mock.calls;
+      expect(consoleErrorCalls).toHaveLength(1);
+      const [message] = consoleErrorCalls[0] as [unknown];
+      expect(message).toEqual(expect.stringContaining('[ReactOnRails] Recoverable hydration error'));
+      expect(message).toEqual(expect.stringContaining('"TestComponent"'));
+      expect(message).toEqual(expect.stringContaining('dom-id-dev'));
+      expect(message).toEqual(expect.stringContaining('Component stack:'));
+      expect(consoleErrorCalls[0]).toHaveLength(1);
+
+      // The user callback still runs with the enriched context.
+      expect(userOnRecoverableError).toHaveBeenCalledWith(recoverableError, errorInfo, {
+        componentName: 'TestComponent',
+        domNodeId: 'dom-id-dev',
+      });
+    } finally {
+      globalWithReportError.reportError = originalReportError;
+    }
+  });
+
   it('passes user root error callbacks on non-RSC-wrapped hydrate paths without the internal handler', async () => {
     const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
     const globalWithReportError = globalThis as typeof globalThis & {

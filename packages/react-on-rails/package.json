@@ -54,6 +54,7 @@
     "./@internal/sanitizeNonce": "./lib/sanitizeNonce.js",
     "./@internal/rendererTeardown": "./lib/rendererTeardown.js",
     "./@internal/rootErrorHandlers": "./lib/rootErrorHandlers.js",
+    "./@internal/isThenable": "./lib/isThenable.js",
     "./@internal/base/client": "./lib/base/client.js",
     "./@internal/base/full": {
       "react-server": "./lib/base/full.rsc.js",

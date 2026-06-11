@@ -15,6 +15,7 @@ import createReactOutput from '../createReactOutput.ts';
 import componentRegistrationMetric from '../componentRegistrationMetric.ts';
 import {
   buildRootErrorCallbackOptions,
+  getRootErrorHandlers,
   resetRootErrorHandlers,
   setRootErrorHandlers,
 } from '../rootErrorHandlers.ts';
@@ -101,9 +102,11 @@ export function createCoreCapability(registries: Registries) {
       }
 
       if (typeof rootErrorHandlers !== 'undefined') {
-        // Validates and stores the handlers; warns when the React runtime cannot support them.
+        // Validates and merges the handlers per key (partial updates keep previously registered
+        // callbacks); warns when the React runtime cannot support them. Store the merged result so
+        // `option('rootErrorHandlers')` reflects the effective registration.
         setRootErrorHandlers(rootErrorHandlers);
-        this.options.rootErrorHandlers = rootErrorHandlers;
+        this.options.rootErrorHandlers = getRootErrorHandlers();
       }
 
       if (Object.keys(rest).length > 0) {
