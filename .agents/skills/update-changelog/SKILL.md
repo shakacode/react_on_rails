@@ -108,8 +108,14 @@ Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to th
 ```bash
 BASE_REF="${BASE_REF:?set BASE_REF, e.g. v17.0.0.rc.1}"
 TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/main}"
-REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
-DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)"
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)" || {
+  printf 'error: gh repo view failed; run: gh auth status\n' >&2
+  exit 1
+}
+DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)" || {
+  printf 'error: gh repo view failed; run: gh auth status\n' >&2
+  exit 1
+}
 
 git log --first-parent --reverse --format='%H%x09%s' "${BASE_REF}..${TARGET_REF}" |
 while IFS=$'\t' read -r sha subject; do
@@ -137,15 +143,17 @@ If any commit in the range cannot be mapped to a PR, the command prints an expli
 
 A sudden spike of `UNKNOWN` rows can indicate stale GitHub authentication, API rate limits, or a temporary API failure rather than genuinely unmapped commits. Run `gh auth status` and retry the PR-listing command when the UNKNOWN count looks suspicious.
 
+The fallback makes one GitHub API call per commit whose subject lacks `(#NNNN)`. Typical RC ranges complete quickly, but large ranges with many direct commits can hit rate limits. Direct version-bump commits, bot commits, and release-automation commits may be expected `UNKNOWN` rows; keep them in the table with `Result` set to `UNKNOWN`, choose `internal` or `release-process`, and explain that no PR-backed changelog entry exists.
+
 ### Required Sweep Output
 
 Print the full Markdown table. No silent caps, no "top N", and no filtering to only likely changelog entries. Every row from the PR-listing command must appear, including `no-entry` rows.
 
 ```markdown
-| PR    | Title                                     | Result       | Category        | Reason                                                                                             |
-| ----- | ----------------------------------------- | ------------ | --------------- | -------------------------------------------------------------------------------------------------- |
-| #3595 | Async RSC manifest signature verification | entry-needed | Pro runtime     | Moves RSC manifest signature checks async, removing blocking filesystem work from the render path. |
-| #3597 | Document release-gate tracker workflow    | no-entry     | release-process | Defines release-gate tracking docs; no product behavior changes.                                   |
+| PR    | Title                                     | Result       | Category         | Reason                                                                                             |
+| ----- | ----------------------------------------- | ------------ | ---------------- | -------------------------------------------------------------------------------------------------- |
+| #3595 | Async RSC manifest signature verification | entry-needed | perf-reliability | Moves RSC manifest signature checks async, removing blocking filesystem work from the render path. |
+| #3597 | Document release-gate tracker workflow    | no-entry     | release-process  | Defines release-gate tracking docs; no product behavior changes.                                   |
 ```
 
 Allowed `Result` values for mapped PRs are exactly:
@@ -164,6 +172,7 @@ Allowed `Category` values are exactly:
 - `internal`
 
 Each row needs a one-line reason specific enough for review. Avoid generic reasons like "not user-visible" unless the row also says why.
+Copy category values exactly as listed, including spaces, hyphens, and casing.
 
 ### Classification Rubric
 
