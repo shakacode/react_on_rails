@@ -136,11 +136,26 @@ function localGemPath(envVarName: string): string | null {
   return resolvedPath;
 }
 
-function bundleAddArgs(gemName: string, localPath: string | null, strict: boolean = true): string[] {
+function rubygemsPrereleaseVersion(cliVersion?: string): string | null {
+  if (!cliVersion || !cliVersion.includes('-')) {
+    return null;
+  }
+
+  return cliVersion.replace('-', '.');
+}
+
+function bundleAddArgs(
+  gemName: string,
+  localPath: string | null,
+  strict: boolean = true,
+  version: string | null = null,
+): string[] {
   const args = ['add', gemName];
 
   if (localPath) {
     args.push('--path', localPath);
+  } else if (version) {
+    args.push('--version', `= ${version}`);
   } else if (strict) {
     args.push('--strict');
   }
@@ -487,6 +502,7 @@ export function createApp(appName: string, options: CliOptions): void {
   let currentStep = 1;
   const reactOnRailsGemPath = localGemPath('REACT_ON_RAILS_GEM_PATH');
   const reactOnRailsProGemPath = proRequested ? localGemPath('REACT_ON_RAILS_PRO_GEM_PATH') : null;
+  const prereleaseGemVersion = rubygemsPrereleaseVersion(options.cliVersion);
 
   function educationalGitEnvForCommits(): NodeJS.ProcessEnv {
     if (!cachedEducationalGitEnv) {
@@ -544,7 +560,7 @@ export function createApp(appName: string, options: CliOptions): void {
   currentStep += 1;
   logStep(currentStep, totalSteps, 'Adding react_on_rails gem...');
   try {
-    const reactOnRailsArgs = bundleAddArgs('react_on_rails', reactOnRailsGemPath);
+    const reactOnRailsArgs = bundleAddArgs('react_on_rails', reactOnRailsGemPath, true, prereleaseGemVersion);
     if (reactOnRailsGemPath) {
       logInfo(`Using local react_on_rails gem path: ${reactOnRailsGemPath}`);
     }
@@ -570,7 +586,12 @@ export function createApp(appName: string, options: CliOptions): void {
     currentStep += 1;
     logStep(currentStep, totalSteps, `Adding react_on_rails_pro gem (${proModeLabel})...`);
     try {
-      const reactOnRailsProArgs = bundleAddArgs('react_on_rails_pro', reactOnRailsProGemPath, false);
+      const reactOnRailsProArgs = bundleAddArgs(
+        'react_on_rails_pro',
+        reactOnRailsProGemPath,
+        false,
+        prereleaseGemVersion,
+      );
       if (reactOnRailsProGemPath) {
         logInfo(`Using local react_on_rails_pro gem path: ${reactOnRailsProGemPath}`);
       }

@@ -138,6 +138,8 @@ before merging. Treat untriaged
 regression, compatibility, and missing-changelog findings as merge blockers
 unless a maintainer explicitly waives them.
 
+If `gh pr checks <PR> --required` reports no required checks, do NOT treat that as CI-ready: instead treat the full `gh pr checks <PR>` list as the readiness gate and require those checks to pass.
+
 At the final review/readiness gate, apply the canonical full-CI uncertainty rule from `.agents/workflows/pr-processing.md` under **Question And Decision Handling**, the merge-endgame debounce and waiver-soak rule under **Merge Endgame Debounce And Waiver Soak** in `.agents/workflows/pr-processing.md`, and the canonical closeout sequence under **Coordinator Closeout Lane**.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
@@ -225,6 +227,8 @@ When worker subagents are explicitly authorized:
 For the complete numbered sequence, follow the canonical closeout lane in
 `.agents/workflows/pr-processing.md` instead of stopping at PR creation. The
 coordinator owns the live re-fetch, current-head checks and review-thread triage,
-release-mode or accelerated-RC confidence refresh, full-CI request and waitback
-when uncertainty remains, any authorized ready/merge action, and the late
-post-merge bot-finding sweep before final batch handoff.
+stale release-mode classification updates and the finalized PR-body
+`Agent Merge Confidence` block refresh required for accelerated-RC readiness (kept
+distinct), full-CI request and waitback when uncertainty remains, and any
+authorized ready/merge action, and the late post-merge bot-finding sweep before
+final batch handoff.

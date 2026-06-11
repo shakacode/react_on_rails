@@ -16,19 +16,12 @@
 import type { BundleManifest } from 'react-on-rails-rsc';
 import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
 import loadJsonFile from '../loadJsonFile.ts';
-import { getClientManifestFileName, getManifestCacheKey } from './manifestLoader.ts';
+import { getClientManifestFileName } from './manifestLoader.ts';
 
 let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
-let serverRendererManifestCacheKey: string | undefined;
 
 // eslint-disable-next-line import/prefer-default-export -- named export for consistency with manifestLoader
 export function getServerRenderer(): Promise<ReturnType<typeof buildServerRenderer>> {
-  const currentManifestCacheKey = getManifestCacheKey();
-  if (currentManifestCacheKey !== serverRendererManifestCacheKey) {
-    serverRendererManifestCacheKey = currentManifestCacheKey;
-    serverRendererPromise = undefined;
-  }
-
   if (!serverRendererPromise) {
     const clientManifest = getClientManifestFileName();
     if (!clientManifest) {

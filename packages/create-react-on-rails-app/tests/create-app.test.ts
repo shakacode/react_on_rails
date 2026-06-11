@@ -585,6 +585,35 @@ describe('createApp', () => {
     expect(processExitSpy).not.toHaveBeenCalled();
   });
 
+  it('pins react_on_rails to the matching RubyGems prerelease when create-app is a prerelease', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    createApp('my-app', { ...baseOptions, cliVersion: '17.0.0-rc.2' });
+
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
+      'bundle',
+      ['add', 'react_on_rails', '--version', '= 17.0.0.rc.2'],
+      appPath,
+    );
+  });
+
+  it('pins react_on_rails_pro to the matching RubyGems prerelease when create-app is a prerelease', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    createApp('my-app', { ...baseOptions, rsc: true, cliVersion: '17.0.0-rc.2' });
+
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
+      'bundle',
+      ['add', 'react_on_rails', '--version', '= 17.0.0.rc.2'],
+      appPath,
+    );
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
+      'bundle',
+      ['add', 'react_on_rails_pro', '--version', '= 17.0.0.rc.2'],
+      appPath,
+    );
+  });
+
   it('creates a standard app without rsc', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
 

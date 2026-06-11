@@ -58,7 +58,7 @@ pnpm start format.listDifferent                                  # Check Prettie
 (cd react_on_rails && bundle exec rake lint)                     # Package lint task (Ruby + JS + formatting)
 
 # Optional Ruby diagnostic from the repo root (not the CI contract)
-BUNDLE_GEMFILE=Gemfile bundle exec rubocop
+BUNDLE_GEMFILE="$(git rev-parse --show-toplevel)/Gemfile" bundle exec rubocop
 
 # Auto-fix formatting
 (cd react_on_rails && bundle exec rake autofix) # Preferred for all formatting

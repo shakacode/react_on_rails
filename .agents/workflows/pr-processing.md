@@ -298,24 +298,26 @@ evidence as `current-head` only when it applies to that SHA; otherwise classify
 it as stale/advisory and do not cite it as a merge gate. Poll CI with bounded
 commands and timeouts; use narrow required-check commands such as `gh pr checks
 <PR> --required` for required CI readiness, then also fetch all checks or
-explicit review-agent checks so non-required reviewers are not hidden. Avoid
-long-lived `gh ... --watch`. Ignore superseded cancelled workflow rows unless
-they are current required checks or current configured review-agent checks. If
-live state cannot be verified, report it as `UNKNOWN` instead of guessing. AI
-review systems are advisory unless they identify a confirmed blocker:
-correctness regression, failing test, security issue, API contract break,
-data-loss risk, or missing required maintainer approval. Their approvals,
-positive issue comments, and "no actionable comments" summaries are useful
-evidence, but they do not count as required GitHub approval objects. For
-high-risk or concurrent-batch PRs, run or request the adversarial PR review
-workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is
-not enough when review comments exist: fetch unresolved review threads with the
-GraphQL command under [**Initial GitHub Commands**](#initial-github-commands),
-then classify and resolve or explicitly waive actionable findings
-before merging. Treat untriaged `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes
-Requested`, correctness, security, regression, compatibility, and
-missing-changelog findings as merge blockers unless a maintainer explicitly
-waives them.
+explicit review-agent checks so non-required reviewers are not hidden. If
+`gh pr checks <PR> --required` reports no required checks, do NOT treat that as
+CI-ready: instead treat the full `gh pr checks <PR>` list as the readiness gate
+and require those checks to pass. Avoid long-lived `gh ... --watch`. Ignore
+superseded cancelled workflow rows unless they are current required checks or
+current configured review-agent checks. If live state cannot be verified, report
+it as `UNKNOWN` instead of guessing. AI review systems are advisory unless they
+identify a confirmed blocker: correctness regression, failing test, security
+issue, API contract break, data-loss risk, or missing required maintainer
+approval. Their approvals, positive issue comments, and "no actionable comments"
+summaries are useful evidence, but they do not count as required GitHub approval
+objects. For high-risk or concurrent-batch PRs, run or request the adversarial PR
+review workflow in `.agents/workflows/adversarial-pr-review.md`. A completed
+check is not enough when review comments exist: fetch unresolved review threads
+with the GraphQL command under
+[**Initial GitHub Commands**](#initial-github-commands), then classify and
+resolve or explicitly waive actionable findings before merging. Treat untriaged
+`BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security,
+regression, compatibility, and missing-changelog findings as merge blockers
+unless a maintainer explicitly waives them.
 
 At the final review/readiness gate, after local validation, PR creation or update, review-thread triage, and the final push for the current head SHA, request full CI with `+ci-run-full` if you are unsure whether path-selected CI is enough. Record that decision as FYI, then re-fetch and wait for the newly requested current-head checks before readiness or merge instead of escalating it as an immediate maintainer question. Also apply the merge-endgame debounce and waiver-soak rule under **Merge Endgame Debounce And Waiver Soak** before the final merge/readiness decision.
 
@@ -592,6 +594,12 @@ current tool's timeout or a shell timeout when available:
 gh pr checks <PR> --required
 gh pr checks <PR>
 ```
+
+If `gh pr checks <PR> --required` reports no required checks, do NOT treat that
+as CI-ready. Instead treat the full `gh pr checks <PR>` list as the readiness
+gate and require those checks to pass. (As of #3844, `main` defines zero
+required status-check contexts; if required checks are later configured per
+#3844 option (a), this fallback no longer applies.)
 
 Avoid long-lived `gh ... --watch` commands in agent sessions. Avoid relying on
 `statusCheckRollup` alone when `gh pr checks` can answer the readiness question more
