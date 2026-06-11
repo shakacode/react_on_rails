@@ -64,9 +64,9 @@ class ErrorReferenceGenerator
         record_failure("#{error_type} is missing #{key}") unless definition.key?(key)
       end
 
-      code = definition[:code]
       next unless definition.key?(:code)
 
+      code = definition[:code]
       record_failure("#{error_type} has invalid code #{code.inspect}; expected ROR001-style format") unless
         code.is_a?(String) && CODE_PATTERN.match?(code)
 

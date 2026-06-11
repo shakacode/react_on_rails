@@ -82,15 +82,18 @@ module ReactOnRails
     end
 
     def self.error_definition_for(error_type)
-      normalized_error_type = error_type.respond_to?(:to_sym) ? error_type.to_sym : error_type
-      ERROR_DEFINITIONS.fetch(normalized_error_type, UNKNOWN_ERROR_DEFINITION)
+      ERROR_DEFINITIONS.fetch(normalize_error_type(error_type), UNKNOWN_ERROR_DEFINITION)
     end
 
     def self.docs_url_for(error_type)
-      normalized_error_type = error_type.respond_to?(:to_sym) ? error_type.to_sym : error_type
+      normalized_error_type = normalize_error_type(error_type)
       return unless error_definitions.key?(normalized_error_type)
 
-      "#{DOCS_BASE_URL}##{error_definition_for(error_type).fetch(:code).downcase}"
+      "#{DOCS_BASE_URL}##{error_definition_for(normalized_error_type).fetch(:code).downcase}"
+    end
+
+    def self.normalize_error_type(error_type)
+      error_type.respond_to?(:to_sym) ? error_type.to_sym : error_type
     end
 
     attr_reader :component_name, :error_type, :props, :js_code, :additional_context
@@ -160,7 +163,7 @@ module ReactOnRails
     end
 
     def normalized_error_type
-      error_type.respond_to?(:to_sym) ? error_type.to_sym : error_type
+      self.class.normalize_error_type(error_type)
     end
 
     def error_definition

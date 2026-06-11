@@ -14,6 +14,7 @@ module ReactOnRails
     def self.error_definitions: () -> Hash[Symbol, error_definition]
     def self.error_definition_for: (Symbol | String error_type) -> error_definition
     def self.docs_url_for: (Symbol | String error_type) -> String?
+    def self.normalize_error_type: (Symbol | String error_type) -> Symbol
 
     attr_reader error_type: Symbol | String
     attr_reader component_name: String?

@@ -9,7 +9,6 @@ module ReactOnRails
 
       # Extend this exhaustive list when adding a new SmartError code.
       expect(codes).to eq(%w[ROR001 ROR002 ROR003 ROR004 ROR005 ROR006 ROR007])
-      expect(codes.uniq).to eq(codes)
     end
 
     it "builds a canonical docs URL for each published code" do
