@@ -144,7 +144,9 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   const forceKillSurvivingWorkers = (workers: Worker[]) => {
     workers.forEach((worker) => {
       const workerProcess = worker.process;
-      if (worker.isDead() || workerProcess.killed) return;
+      // isDead() only: ChildProcess.killed means a signal was sent, not that
+      // the process died — e.g. a blocked worker surviving destroy()'s SIGTERM.
+      if (worker.isDead()) return;
 
       try {
         workerProcess.kill('SIGKILL');
