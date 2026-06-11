@@ -29,6 +29,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOCS_DIR = path.join(ROOT, 'docs');
 const PREAMBLE_FILE = path.join(DOCS_DIR, 'llms-full-preamble.md');
 const EXCLUSIONS_FILE = path.join(DOCS_DIR, '.llms-exclusions');
+const KNOWN_REDIRECTS_FILE = path.join(DOCS_DIR, '.llms-known-redirects');
 const SIDEBARS_FILE = path.join(DOCS_DIR, 'sidebars.ts');
 const LLMS_FILE = path.join(ROOT, 'llms.txt');
 const OUTPUT_FILE = path.join(ROOT, 'llms-full.txt');
@@ -63,8 +64,9 @@ function docIdForFile(relPath) {
 }
 
 // Split optional YAML front matter off a doc body; only `slug:` is read.
+// CRLF-tolerant in case a checkout bypasses the repo's LF normalization.
 function splitFrontMatter(content) {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n/);
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   if (!match) return { slug: undefined, body: content };
   const slugMatch = match[1].match(/^slug:\s*(\S+)\s*$/m);
   return { slug: slugMatch ? slugMatch[1] : undefined, body: content.slice(match[0].length) };
@@ -84,10 +86,10 @@ function urlForDoc(docId, slug) {
   return base === '' ? `${SITE_DOCS_URL}/` : `${SITE_DOCS_URL}/${base}`;
 }
 
-function loadExclusions() {
-  if (!fs.existsSync(EXCLUSIONS_FILE)) return new Set();
+function loadIdList(file) {
+  if (!fs.existsSync(file)) return new Set();
   const ids = fs
-    .readFileSync(EXCLUSIONS_FILE, 'utf8')
+    .readFileSync(file, 'utf8')
     .split('\n')
     .map((line) => line.replace(/#.*$/, '').trim())
     .filter(Boolean);
@@ -95,7 +97,7 @@ function loadExclusions() {
 }
 
 function collectDocs() {
-  const exclusions = loadExclusions();
+  const exclusions = loadIdList(EXCLUSIONS_FILE);
   const docs = new Map(); // docId → { relPath, content }
   for (const subdir of ['oss', 'pro']) {
     for (const file of walkMarkdownFiles(path.join(DOCS_DIR, subdir))) {
@@ -166,9 +168,11 @@ function generate(docs, orderedIds) {
 
 function validateDocUrls(docs) {
   const urlPattern = /https:\/\/reactonrails\.com\/docs[^\s)\]'"`>]*/g;
-  const resolvableIds = new Set();
+  // Only the published route counts: a slugged doc's file-path route and a
+  // README/index file's literal path are not live URLs and must not validate.
+  // Intentional references to redirect URLs go in docs/.llms-known-redirects.
+  const resolvableIds = loadIdList(KNOWN_REDIRECTS_FILE);
   for (const [docId, { slug }] of docs.entries()) {
-    resolvableIds.add(docId);
     resolvableIds.add(urlPathForDoc(docId, slug));
   }
   // Category/hub URLs resolve to a docs DIRECTORY (generated index pages);
@@ -191,6 +195,9 @@ function validateDocUrls(docs) {
     const text = fs.readFileSync(file, 'utf8');
     for (const match of text.matchAll(urlPattern)) {
       const url = match[0].replace(/[.,;:]+$/, '');
+      // Anchors are stripped: validation is page-level only. Anchor-level
+      // checking would need heading extraction across all docs — if a linked
+      // section heading is renamed, this check will not catch it.
       const docPath = url
         .slice(SITE_DOCS_URL.length)
         .replace(/^\//, '')
