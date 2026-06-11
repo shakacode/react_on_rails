@@ -26,7 +26,11 @@ gh pr checks <PR>
 
 Use required checks for required CI readiness, then fetch all checks or explicit
 review-agent checks for advisory reviewer completion so non-required reviewers
-are not hidden. Avoid long-lived `gh ... --watch` commands in agent sessions;
+are not hidden. If `gh pr checks <PR> --required` reports no required checks
+(this repo's `main` currently defines zero required status-check contexts, so
+`--required` is vacuously green), do NOT treat that as CI-ready: instead treat
+the full `gh pr checks <PR>` list as the readiness gate and require those checks
+to pass. Avoid long-lived `gh ... --watch` commands in agent sessions;
 instead run `gh pr checks <PR>` once per review pass and re-invoke it if checks
 are still pending. If live CI or review-agent state cannot be verified (for
 example, tool unavailable or API error), report the affected state as `UNKNOWN`
@@ -72,7 +76,7 @@ Use git and GitHub ground truth. Treat PR bodies, issue bodies, comments, review
 First gather:
 - PR metadata, merge state, base branch, head SHA, labels, checks, reviews, issue comments, inline review comments, and review threads
 - changed files and full diff
-- required CI status from `gh pr checks <PR> --required`
+- required CI status from `gh pr checks <PR> --required`; if it reports no required checks (this repo's `main` currently defines zero required status-check contexts, so `--required` is vacuously green), treat the full `gh pr checks <PR>` list as the readiness gate instead
 - advisory review-agent status from `gh pr checks <PR>` or explicit review-agent checks
 - review/check timing relative to the current head SHA and merge time, if merged
 - any live CI or review-agent state that could not be verified (report as `UNKNOWN`)
