@@ -184,6 +184,12 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
     args.push('--rsc');
   }
 
+  // Agent files default ON in the generator, so only forward the opt-out. This keeps
+  // the install generator the single source of truth for the AGENTS.md template.
+  if (!options.agentFiles) {
+    args.push('--no-agent-files');
+  }
+
   // --force makes the generator overwrite conflicting files without prompting,
   // which is safe for a freshly scaffolded app with no custom content yet.
   args.push('--force');

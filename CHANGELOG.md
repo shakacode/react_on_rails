@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **Consumer-facing AI-agent guidance scaffolded into generated and installed apps**: `rails generate react_on_rails:install` (and therefore `create-react-on-rails-app`, which delegates to it) now writes a concise, app-scoped `AGENTS.md` plus thin editor-pointer files (`CLAUDE.md`, `.cursor/rules/react-on-rails.mdc`, `.github/copilot-instructions.md`) so an AI coding agent dropped into a fresh app already knows how to register a component, use the `react_component` view helper, choose `.client`/`.server` bundles, recover from the top runtime errors (sourced from `SmartError`), and run `bin/rails react_on_rails:doctor`. The errors section tracks the live `SmartError` messages, and the editor files are pointers (not copies). Emission is gated by `--agent-files`/`--no-agent-files` (default on) in both paths and never overwrites an existing file. Cross-links the eval-harness work in [Issue 3832](https://github.com/shakacode/react_on_rails/issues/3832). Closes [Issue 3868](https://github.com/shakacode/react_on_rails/issues/3868).
+
 ### [17.0.0.rc.2] - 2026-06-09
 
 #### Added

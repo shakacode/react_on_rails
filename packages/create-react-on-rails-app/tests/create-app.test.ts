@@ -38,6 +38,7 @@ const baseOptions: CliOptions = {
   rspack: false,
   pro: false,
   rsc: false,
+  agentFiles: true,
 };
 
 describe('validateAppName', () => {
@@ -223,6 +224,21 @@ describe('buildGeneratorArgs', () => {
       '--new-app',
       '--no-rspack',
       '--rsc',
+      '--force',
+      '--ignore-warnings',
+    ]);
+  });
+
+  it('does not forward an agent-files flag by default (generator default is ON)', () => {
+    expect(buildGeneratorArgs(baseOptions)).not.toContain('--no-agent-files');
+    expect(buildGeneratorArgs(baseOptions)).not.toContain('--agent-files');
+  });
+
+  it('forwards --no-agent-files when agent files are disabled', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, agentFiles: false })).toEqual([
+      '--new-app',
+      '--no-rspack',
+      '--no-agent-files',
       '--force',
       '--ignore-warnings',
     ]);
