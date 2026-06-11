@@ -277,7 +277,7 @@ Fetch/prune main first, confirm the expected repo root, and verify any nested re
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
-For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor PRs, commit the intended implementation locally before pushing so there is a clean branch diff. Run repo-specific validation, formatter/lint/type checks as applicable, then run the primary local/adversarial self-review gate, normally `codex review --base origin/<base>` or the PR's real base, before PR creation or update. When requested by a maintainer or when the change is high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor scoped, run one additional Claude Code review pass if available, such as `/code-review` or `/code-review ultra`. For workflow/build/dependency/lockfile gate changes, include the audit evidence for new-gate stale-base controls and Dependabot ecosystem/directory compatibility when applicable.
+For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor PRs, commit the intended implementation locally before pushing so there is a clean branch diff. Run repo-specific validation, formatter/lint/type checks as applicable, then run the primary local/adversarial self-review gate, normally `codex review --base origin/<base>` or the PR's real base, before PR creation or update. When requested by a maintainer or when the change is high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor scoped, run one additional Claude Code review pass if available, such as `/code-review` or `/code-review ultra`. For workflow/build/dependency/lockfile gate changes, include the audit evidence for new-gate stale-base controls; for lockfile changes, include Dependabot ecosystem/directory compatibility unless the repo has no Dependabot configuration and none is being added.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 
@@ -429,10 +429,13 @@ The closeout lane is:
    reason as FYI, then loop back to re-fetch and wait for the newly requested
    current-head checks before readiness or merge.
 6. Under the current release mode, mark ready or merge PRs that satisfy the
-   merge qualification rules; report only remaining blockers, questions, or
-   `UNKNOWN` live state.
+   merge qualification rules, including the merge-endgame debounce and
+   waiver-soak rules before merge; report only remaining blockers, questions,
+   or `UNKNOWN` live state.
 7. After any closeout-lane merge action, sweep merged PRs for late post-merge
-   bot findings before the final batch handoff. Route findings that arrive
+   bot findings before the final batch handoff using
+   `.agents/skills/post-merge-audit/SKILL.md` when skills are available, or
+   `.agents/workflows/post-merge-audit.md` directly. Route findings that arrive
    after this closeout sweep into the next post-merge audit intake.
 
 ## Self-Review Gate
@@ -622,7 +625,7 @@ remaining must-fix file changes into one final push and restart the current-head
 otherwise waive or record the optional item in a triage reply or decision log instead of spending
 another CI/review cycle.
 
-During accelerated-RC auto-merge, the default contestability window is 10 minutes after the latest
+During accelerated-RC auto-merge, the default waiver-soak window is 10 minutes after the latest
 final waiver or triage reply before merge. A distinct finalizer or maintainer may override that
 default only with an explicit auditable acknowledgement of the final waiver set and immediate-merge
 decision. For auto-merge, that acknowledgement must satisfy the independent-finalizer rule in
@@ -732,7 +735,7 @@ maintainer release decision before publishing.
 
 Auto-merge requires all of the following:
 
-- The PR body contains the latest finalized `Agent Merge Confidence` block for the current `headRefOid`; do not rely on a PR comment for the final state.
+- The PR body contains the latest finalized `Agent Merge Confidence` block for the current head SHA; do not rely on a PR comment for the final state.
 - Once `Finalized by:` is populated, any later confidence-block edit also has a PR comment with a `Confidence Block Updated:` header, the previous score/finalizer, and the reason for the edit.
 - The authoring agent did not finalize its own `8/10` or higher score. The `Finalized by` value names a different GitHub account or named GitHub check/app identity, verifiable from the git log or GitHub review/check record. Two sessions running under the same GitHub account, including separate invocations of the same GitHub App bot, do not satisfy this requirement.
 - Score is at least `8/10`; `7/10` permits human merge after review, but not auto-merge.
