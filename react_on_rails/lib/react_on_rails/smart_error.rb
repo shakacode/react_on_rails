@@ -327,9 +327,13 @@ module ReactOnRails
     end
 
     def packer_source_path_for_message
-      ReactOnRails::PackerUtils.packer_source_path
-    rescue StandardError
-      "app/javascript"
+      return "app/javascript" unless defined?(::Shakapacker) && ::Shakapacker.respond_to?(:config)
+
+      config = ::Shakapacker.config
+      return "app/javascript" unless config.respond_to?(:config_path) && config.config_path.exist?
+      return "app/javascript" unless config.respond_to?(:source_path)
+
+      config.source_path
     end
 
     def hydration_mismatch_solution
