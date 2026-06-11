@@ -296,6 +296,8 @@ Example shape for Vanilla Extract, appended inside your existing generated Pro c
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const { VanillaExtractPlugin } = require('@vanilla-extract/webpack-plugin');
 
+// Shakapacker normally provides MiniCssExtractPlugin. Add it explicitly only if
+// your package manager setup makes the transitive dependency unavailable.
 const vanillaExtractCssRule = {
   test: /\.vanilla\.css$/i,
   use: [
@@ -350,6 +352,7 @@ export const card = style({
 // app/javascript/components/ProductCard.tsx
 'use client';
 
+// Vanilla Extract resolves this import to productCard.css.ts at build time.
 import { card } from './productCard.css';
 
 type Product = { name: string };
