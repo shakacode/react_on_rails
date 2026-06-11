@@ -1,0 +1,16 @@
+<h1>React Compiler Example</h1>
+
+<p>
+  This page server-renders (<code>prerender: true</code>) and then hydrates the
+  <code>ReactCompilerExample</code> component. The component is built with the
+  <a href="https://react.dev/learn/react-compiler">React Compiler</a> Babel plugin,
+  scoped to just this component's file via the <code>sources</code> filter in
+  <code>babel.config.js</code>. See
+  <code>docs/oss/building-features/react-compiler.md</code>.
+</p>
+
+<%= react_component("ReactCompilerExample",
+  props: { initialCount: 3 },
+  prerender: true,
+  trace: true,
+  id: "ReactCompilerExample-react-component-0") %>
