@@ -1,4 +1,4 @@
-import { promptForMode } from '../src/prompt';
+import { promptForMode, promptForTailwind } from '../src/prompt';
 import { validateAll } from '../src/validators';
 import { createApp, validateAppName } from '../src/create-app';
 import { detectPackageManager, logError, logInfo } from '../src/utils';
@@ -17,6 +17,7 @@ jest.mock('../src/utils', () => ({
 }));
 
 const mockedPromptForMode = jest.mocked(promptForMode);
+const mockedPromptForTailwind = jest.mocked(promptForTailwind);
 const mockedValidateAll = jest.mocked(validateAll);
 const mockedValidateAppName = jest.mocked(validateAppName);
 const mockedCreateApp = jest.mocked(createApp);
@@ -29,6 +30,7 @@ function setupMocks() {
   mockedValidateAll.mockReturnValue({ allValid: true, results: [] });
   mockedCreateApp.mockImplementation(() => {});
   mockedDetectPackageManager.mockReturnValue('npm');
+  mockedPromptForTailwind.mockResolvedValue(false);
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 }
@@ -77,6 +79,19 @@ describe('TTY detection branching in run()', () => {
     await loadIndex();
 
     expect(mockedPromptForMode).toHaveBeenCalled();
+    expect(mockedPromptForTailwind).toHaveBeenCalled();
+  });
+
+  it('passes the prompted Tailwind choice when no mode flag is passed', async () => {
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true });
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, writable: true });
+    mockedPromptForMode.mockResolvedValue({ pro: false, rsc: false });
+    mockedPromptForTailwind.mockResolvedValue(true);
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app'];
+
+    await loadIndex();
+
+    expect(mockedCreateApp).toHaveBeenCalledWith('my-app', expect.objectContaining({ tailwind: true }));
   });
 
   it('does not call promptForMode when stdin is not a TTY', async () => {
@@ -87,6 +102,7 @@ describe('TTY detection branching in run()', () => {
     await loadIndex();
 
     expect(mockedPromptForMode).not.toHaveBeenCalled();
+    expect(mockedPromptForTailwind).not.toHaveBeenCalled();
     expect(mockedLogInfo).toHaveBeenCalledWith(expect.stringContaining('not running interactively'));
   });
 
@@ -98,6 +114,7 @@ describe('TTY detection branching in run()', () => {
     await loadIndex();
 
     expect(mockedPromptForMode).not.toHaveBeenCalled();
+    expect(mockedPromptForTailwind).not.toHaveBeenCalled();
     expect(mockedLogInfo).toHaveBeenCalledWith(expect.stringContaining('not running interactively'));
   });
 
@@ -109,6 +126,7 @@ describe('TTY detection branching in run()', () => {
     await loadIndex();
 
     expect(mockedPromptForMode).not.toHaveBeenCalled();
+    expect(mockedPromptForTailwind).not.toHaveBeenCalled();
   });
 
   it('does not call promptForMode when --standard is explicitly passed', async () => {
@@ -119,6 +137,7 @@ describe('TTY detection branching in run()', () => {
     await loadIndex();
 
     expect(mockedPromptForMode).not.toHaveBeenCalled();
+    expect(mockedPromptForTailwind).not.toHaveBeenCalled();
   });
 
   it('exits with error when --standard is combined with --pro', async () => {
@@ -194,5 +213,13 @@ describe('bundler flag resolution in run()', () => {
       'Conflicting bundler flags: pass either --rspack or --webpack (alias for --no-rspack), not both.',
     );
     expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('passes tailwind option when --tailwind is passed', async () => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--tailwind'];
+
+    await loadIndex();
+
+    expect(mockedCreateApp).toHaveBeenCalledWith('my-app', expect.objectContaining({ tailwind: true }));
   });
 });

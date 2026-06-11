@@ -121,6 +121,13 @@ module GeneratorHelper
     options[:rsc]
   end
 
+  # Check if Tailwind CSS should be installed and wired into the generated example.
+  #
+  # @return [Boolean] true if --tailwind is set
+  def use_tailwind?
+    options[:tailwind]
+  end
+
   # Determine if the project is using rspack as the bundler.
   #
   # Detection priority:

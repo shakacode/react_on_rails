@@ -23,6 +23,66 @@ describe InstallGenerator, type: :generator do
     base_generator_fixture(options).send(:rendered_template_for_cleanup, template_path)
   end
 
+  def tailwind_dependency_requirements
+    {
+      "tailwindcss" => "^4.3.0",
+      "@tailwindcss/postcss" => "^4.3.0",
+      "postcss" => "^8.5.15",
+      "postcss-loader" => "^8.2.1"
+    }
+  end
+
+  def assert_tailwind_dependencies
+    assert_file "package.json" do |content|
+      dependencies = JSON.parse(content).fetch("dependencies")
+
+      tailwind_dependency_requirements.each do |name, version|
+        exact_version = version.delete_prefix("^")
+        expect(dependencies[name]).to match(/\A\^?#{Regexp.escape(exact_version)}\z/)
+      end
+    end
+  end
+
+  def assert_tailwind_ssr_setup(config_dir:, extension:)
+    assert_tailwind_dependencies
+    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+    assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
+
+    assert_tailwind_component(extension)
+    assert_tailwind_bundler_config(config_dir)
+    assert_tailwind_ssr_stylesheet_placeholder
+  end
+
+  def assert_tailwind_component(extension)
+    assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{extension}" do |content|
+      expect(content).to include("../../../stylesheets/application.css")
+      expect(content).to include("React on Rails + Tailwind CSS")
+      expect(content).to include("rounded-lg")
+    end
+  end
+
+  def assert_tailwind_bundler_config(config_dir)
+    assert_file "#{config_dir}/commonWebpackConfig.js" do |content|
+      expect(content).to include("postcss-loader")
+      expect(content).to include("@tailwindcss/postcss")
+      expect(content).to include("addTailwindPostcssLoader")
+    end
+  end
+
+  def assert_tailwind_ssr_stylesheet_placeholder
+    assert_file "app/views/hello_world/index.html.erb" do |content|
+      expect(content).to include('react_component("HelloWorld", props: @hello_world_props, prerender: true)')
+    end
+
+    assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+      stylesheet_index = content.index("<%= stylesheet_pack_tag %>")
+      javascript_index = content.index("<%= javascript_pack_tag %>")
+
+      expect(stylesheet_index).to be < javascript_index
+      expect(content).to include("React on Rails injects component CSS/JS here")
+    end
+  end
+
   def simulate_managed_stock_webpack_files(options = {})
     # MANAGED_WEBPACK_FILE_TEMPLATES is private_constant; this fixture helper
     # intentionally introspects it so tests track managed-file coverage.
@@ -82,6 +142,21 @@ describe InstallGenerator, type: :generator do
         expect(rendered).to include("RSCRspackPlugin")
         expect(rendered).to include("react-on-rails-rsc/RspackPlugin")
       end
+    end
+  end
+
+  describe "Tailwind managed-template cleanup rendering" do
+    render_failed_sentinel = ReactOnRails::Generators::BaseGenerator.const_get(:TEMPLATE_RENDER_FAILED)
+
+    it "renders commonWebpackConfig.js for Tailwind during cleanup" do
+      rendered = render_stock_webpack_template(
+        "base/base/config/webpack/commonWebpackConfig.js.tt",
+        tailwind: true
+      )
+
+      expect(rendered).not_to equal(render_failed_sentinel)
+      expect(rendered).to include("@tailwindcss/postcss")
+      expect(rendered).to include("addTailwindPostcssLoader")
     end
   end
 
@@ -385,6 +460,28 @@ describe InstallGenerator, type: :generator do
         expect(content).to match(/React\.FC<HelloWorldProps>/)
         expect(content).to match(/onChange=\{.*e.*=>.*setName\(e\.target\.value\).*\}/)
       end
+    end
+  end
+
+  context "with --tailwind --no-rspack" do
+    before(:all) { run_generator_test_with_args(%w[--tailwind --no-rspack], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "no_redux_generator"
+
+    it "generates a Tailwind v4 SSR setup for Webpack with extracted CSS enabled" do
+      assert_tailwind_ssr_setup(config_dir: "config/webpack", extension: "jsx")
+    end
+  end
+
+  context "with --tailwind --rspack --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--tailwind --rspack --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "no_redux_generator"
+
+    it "generates a Tailwind v4 SSR setup for Rspack with extracted CSS enabled" do
+      assert_tailwind_ssr_setup(config_dir: "config/rspack", extension: "tsx")
     end
   end
 

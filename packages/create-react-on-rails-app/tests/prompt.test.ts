@@ -1,5 +1,5 @@
 import readline from 'readline';
-import { PROMPT_CANCELLED, promptForMode } from '../src/prompt';
+import { PROMPT_CANCELLED, promptForMode, promptForTailwind } from '../src/prompt';
 
 jest.mock('readline');
 
@@ -108,5 +108,29 @@ describe('promptForMode', () => {
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Standard'));
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Pro'));
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('RSC'));
+  });
+
+  it('defaults Tailwind prompt to enabled when user presses Enter', async () => {
+    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb(''));
+
+    const result = await promptForTailwind();
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when user declines Tailwind', async () => {
+    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('n'));
+
+    const result = await promptForTailwind();
+
+    expect(result).toBe(false);
+  });
+
+  it('displays Tailwind options to the user', async () => {
+    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('y'));
+
+    await promptForTailwind();
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Tailwind CSS v4'));
   });
 });

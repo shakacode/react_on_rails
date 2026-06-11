@@ -64,6 +64,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       attr_writer :use_rsc
 
+      def use_tailwind?
+        @use_tailwind == true
+      end
+
+      attr_writer :use_tailwind
+
       # Test helpers
       attr_writer :add_npm_dependencies_result
 
@@ -136,6 +142,15 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
         eq(%w[css-loader@^7.0.0 css-minimizer-webpack-plugin@^8.0.0 mini-css-extract-plugin@^2.0.0
               style-loader@^4.0.0])
       )
+    end
+
+    it "defines TAILWIND_DEPENDENCIES" do
+      expect(ReactOnRails::Generators::JsDependencyManager::TAILWIND_DEPENDENCIES).to eq(%w[
+                                                                                           tailwindcss@^4.3.0
+                                                                                           @tailwindcss/postcss@^4.3.0
+                                                                                           postcss@^8.5.15
+                                                                                           postcss-loader@^8.2.1
+                                                                                         ])
     end
 
     it "defines DEV_DEPENDENCIES" do
@@ -546,6 +561,35 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     end
   end
 
+  describe "#add_tailwind_dependencies" do
+    it "adds Tailwind dependencies successfully" do
+      instance.send(:add_tailwind_dependencies)
+      expect(instance.add_npm_dependencies_called?).to be(true)
+    end
+
+    it "passes version-pinned Tailwind packages to add_npm_dependencies" do
+      instance.send(:add_tailwind_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(
+          packages: ReactOnRails::Generators::JsDependencyManager::TAILWIND_DEPENDENCIES,
+          dev: false
+        )
+      )
+    end
+
+    it "adds warning when add_packages fails" do
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
+
+      instance.send(:add_tailwind_dependencies)
+
+      expect(warnings.size).to be > 0
+      expect(warnings.first.to_s).to include("Failed to add Tailwind CSS dependencies")
+      expect(warnings.first.to_s).to include("npm install")
+    end
+  end
+
   describe "#add_dev_dependencies" do
     it "adds Webpack dev dependencies by default" do
       instance.send(:add_dev_dependencies)
@@ -822,13 +866,14 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_react_on_rails_package)
       instance.send(:add_react_dependencies)
       instance.send(:add_css_dependencies)
+      instance.send(:add_tailwind_dependencies)
       instance.send(:add_rspack_dependencies)
       instance.send(:add_typescript_dependencies)
       instance.send(:add_babel_react_dependencies)
       instance.send(:add_dev_dependencies)
 
       # All should add warnings, not errors
-      expect(warnings.count).to be >= 7
+      expect(warnings.count).to be >= 8
       expect(errors.size).to eq(0)
     end
 
@@ -867,6 +912,27 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
         call[:packages].include?("@babel/preset-react@^7.0.0")
       end
       expect(babel_calls).to eq([])
+    end
+
+    it "adds Tailwind dependencies when Tailwind is enabled" do
+      instance.use_tailwind = true
+
+      instance.send(:add_js_dependencies)
+
+      tailwind_calls = instance.add_npm_dependencies_calls.select do |call|
+        call[:packages] == ReactOnRails::Generators::JsDependencyManager::TAILWIND_DEPENDENCIES
+      end
+      expect(tailwind_calls.size).to be > 0
+      expect(tailwind_calls.all? { |call| call[:dev] }).to be(false)
+    end
+
+    it "does not add Tailwind dependencies by default" do
+      instance.send(:add_js_dependencies)
+
+      tailwind_calls = instance.add_npm_dependencies_calls.select do |call|
+        call[:packages] == ReactOnRails::Generators::JsDependencyManager::TAILWIND_DEPENDENCIES
+      end
+      expect(tailwind_calls).to eq([])
     end
 
     it "passes version-pinned SWC packages when SWC is used" do

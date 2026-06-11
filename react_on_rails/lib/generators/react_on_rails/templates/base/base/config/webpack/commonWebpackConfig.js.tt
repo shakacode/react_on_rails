@@ -11,7 +11,45 @@ const commonOptions = {
   },
 };
 
+<% if use_tailwind? -%>
+const tailwindPostcssLoader = {
+  loader: 'postcss-loader',
+  options: {
+    postcssOptions: {
+      plugins: [require('@tailwindcss/postcss')],
+    },
+  },
+};
+
+const loaderName = (loader) => {
+  if (typeof loader === 'string') return loader;
+  if (loader && typeof loader.loader === 'string') return loader.loader;
+  return '';
+};
+
+const addTailwindPostcssLoader = (webpackConfig) => {
+  webpackConfig.module.rules.forEach((rule) => {
+    if (!Array.isArray(rule.use)) return;
+    if (rule.use.some((loader) => loaderName(loader).includes('postcss-loader'))) return;
+
+    const cssLoaderIndex = rule.use.findIndex((loader) => loaderName(loader).includes('css-loader'));
+    if (cssLoaderIndex === -1) return;
+
+    rule.use.splice(cssLoaderIndex + 1, 0, tailwindPostcssLoader);
+  });
+
+  return webpackConfig;
+};
+
+<% end -%>
 // Copy the object using merge b/c the baseClientWebpackConfig and commonOptions are mutable globals
-const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions);
+const commonWebpackConfig = () => {
+  const webpackConfig = merge({}, baseClientWebpackConfig, commonOptions);
+<% if use_tailwind? -%>
+  return addTailwindPostcssLoader(webpackConfig);
+<% else -%>
+  return webpackConfig;
+<% end -%>
+};
 
 module.exports = commonWebpackConfig;

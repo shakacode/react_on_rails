@@ -43,6 +43,12 @@ module ReactOnRails
                    desc: "Generate TypeScript files and install TypeScript dependencies. Default: false",
                    aliases: "-T"
 
+      # --tailwind
+      class_option :tailwind,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install Tailwind CSS v4 and style the generated SSR example. Default: false"
+
       # --rspack / --no-rspack (Rspack is the default on fresh installs; --no-rspack selects Webpack)
       # IMPORTANT: do NOT add a `default:` here. The absence of a default is load-bearing — Thor
       # only includes :rspack in the options hash when the flag is explicitly passed, which is how
@@ -237,7 +243,7 @@ module ReactOnRails
         # --pretend/--force/--skip must be forwarded explicitly at each boundary.
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: using_rspack?,
-                 pro: use_pro?, rsc: use_rsc?, new_app: options.new_app?,
+                 pro: use_pro?, rsc: use_rsc?, tailwind: use_tailwind?, new_app: options.new_app?,
                  shakapacker_just_installed: shakapacker_just_installed?,
                  force: options[:force], skip: options[:skip], pretend: options[:pretend] }
 
@@ -256,6 +262,7 @@ module ReactOnRails
           # Only generate HelloWorld if RSC is not enabled
           # For RSC, HelloServer replaces HelloWorld as the example component
           invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript?,
+                                                        tailwind: use_tailwind?,
                                                         new_app: options.new_app?,
                                                         force: options[:force], skip: options[:skip],
                                                         pretend: options[:pretend] }

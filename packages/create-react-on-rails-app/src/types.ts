@@ -2,6 +2,7 @@ export interface CliOptions {
   template: 'javascript' | 'typescript';
   packageManager: 'npm' | 'pnpm';
   rspack: boolean;
+  tailwind: boolean;
   pro: boolean;
   rsc: boolean;
   // Emit AI-agent guidance files (AGENTS.md + editor pointers) into the generated app.

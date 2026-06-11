@@ -85,6 +85,7 @@ const sidebars: SidebarsConfig = {
           label: 'Integrations',
           items: [
             'building-features/react-and-redux',
+            'building-features/styling-with-tailwind',
             'building-features/i18n',
             'building-features/images',
             'building-features/fonts',
