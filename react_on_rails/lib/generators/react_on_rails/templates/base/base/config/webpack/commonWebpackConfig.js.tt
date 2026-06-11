@@ -12,11 +12,13 @@ const commonOptions = {
 };
 
 <% if use_tailwind? -%>
+const tailwindPostcssPlugin = require('@tailwindcss/postcss');
+
 const tailwindPostcssLoader = {
   loader: 'postcss-loader',
   options: {
     postcssOptions: {
-      plugins: [require('@tailwindcss/postcss')],
+      plugins: [tailwindPostcssPlugin],
     },
   },
 };
@@ -27,10 +29,40 @@ const loaderName = (loader) => {
   return '';
 };
 
+const postcssLoaderUsesTailwind = (loader) => {
+  const plugins = loader?.options?.postcssOptions?.plugins || [];
+  return plugins.includes(tailwindPostcssPlugin);
+};
+
+const mergeTailwindPostcssLoader = (loader) => {
+  if (typeof loader === 'string') return tailwindPostcssLoader;
+  if (postcssLoaderUsesTailwind(loader)) return loader;
+
+  const existingOptions = loader.options || {};
+  const existingPostcssOptions = existingOptions.postcssOptions || {};
+  const existingPlugins = existingPostcssOptions.plugins || [];
+
+  return {
+    ...loader,
+    options: {
+      ...existingOptions,
+      postcssOptions: {
+        ...existingPostcssOptions,
+        plugins: [...existingPlugins, tailwindPostcssPlugin],
+      },
+    },
+  };
+};
+
 const addTailwindPostcssLoader = (webpackConfig) => {
   webpackConfig.module.rules.forEach((rule) => {
     if (!Array.isArray(rule.use)) return;
-    if (rule.use.some((loader) => loaderName(loader).includes('postcss-loader'))) return;
+
+    const postcssLoaderIndex = rule.use.findIndex((loader) => loaderName(loader).includes('postcss-loader'));
+    if (postcssLoaderIndex !== -1) {
+      rule.use[postcssLoaderIndex] = mergeTailwindPostcssLoader(rule.use[postcssLoaderIndex]);
+      return;
+    }
 
     const cssLoaderIndex = rule.use.findIndex((loader) => loaderName(loader).includes('css-loader'));
     if (cssLoaderIndex === -1) return;

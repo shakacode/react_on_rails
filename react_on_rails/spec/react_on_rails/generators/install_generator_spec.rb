@@ -66,6 +66,7 @@ describe InstallGenerator, type: :generator do
       expect(content).to include("postcss-loader")
       expect(content).to include("@tailwindcss/postcss")
       expect(content).to include("addTailwindPostcssLoader")
+      expect(content).to include("mergeTailwindPostcssLoader")
     end
   end
 
@@ -157,6 +158,7 @@ describe InstallGenerator, type: :generator do
       expect(rendered).not_to equal(render_failed_sentinel)
       expect(rendered).to include("@tailwindcss/postcss")
       expect(rendered).to include("addTailwindPostcssLoader")
+      expect(rendered).to include("mergeTailwindPostcssLoader")
     end
   end
 
