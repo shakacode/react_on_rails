@@ -29,9 +29,10 @@ import type { ReactComponent, ReactComponentRenderFunction, RendererFunction } f
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { isRendererTeardownResult } from 'react-on-rails/@internal/rendererTeardown';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
+import { buildRootErrorCallbackOptions } from 'react-on-rails/@internal/rootErrorHandlers';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
-import handleRecoverableError from '../handleRecoverableError.client.ts';
+import { chainRecoverableErrorHandlers } from '../handleRecoverableError.client.ts';
 
 ensureReactUseAvailable();
 
@@ -121,13 +122,25 @@ const wrapServerComponentRenderer = (
       </RSCProvider>
     );
 
-    const reactRoot = domNode.innerHTML
+    // User-registered root error callbacks (rootErrorHandlers), wrapped with this mount's
+    // component name and dom id. On the hydrate path the user onRecoverableError is CHAINED after
+    // Pro's internal recoverable-error handler so both run.
+    const shouldHydrate = !!domNode.innerHTML;
+    const userErrorCallbackOptions = buildRootErrorCallbackOptions(
+      { componentName, domNodeId },
+      shouldHydrate,
+    );
+    const reactRoot = shouldHydrate
       ? ReactDOMClient.hydrateRoot(domNode, rootElement, {
+          ...userErrorCallbackOptions,
           identifierPrefix: domNodeId,
-          onRecoverableError: handleRecoverableError,
+          onRecoverableError: chainRecoverableErrorHandlers(userErrorCallbackOptions.onRecoverableError),
         })
       : (() => {
-          const root = ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId });
+          const root = ReactDOMClient.createRoot(domNode, {
+            ...userErrorCallbackOptions,
+            identifierPrefix: domNodeId,
+          });
           root.render(rootElement);
           return root;
         })();

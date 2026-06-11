@@ -32,8 +32,9 @@ import { isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from 'react-on-rails/reactApis';
 import reactHydrateOrRender from 'react-on-rails/reactHydrateOrRender';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
+import { buildRootErrorCallbackOptions } from 'react-on-rails/@internal/rootErrorHandlers';
 import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderRegistry.ts';
-import handleRecoverableError from './handleRecoverableError.client.ts';
+import { chainRecoverableErrorHandlers } from './handleRecoverableError.client.ts';
 
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -254,14 +255,26 @@ You should return a React.Component always for the client side entry point.`);
             railsContext,
             domNodeId,
           );
-          let renderOptions: Parameters<typeof reactHydrateOrRender>[3];
+          // User-registered root error callbacks (rootErrorHandlers), wrapped with this mount's
+          // component name and dom id. Applied to every root; on the RSC-wrapped hydrate path the
+          // user onRecoverableError is CHAINED after Pro's internal recoverable-error handler so
+          // both run (the internal handler must never be clobbered, and the user callback must
+          // never be dropped).
+          const userErrorCallbackOptions = buildRootErrorCallbackOptions(
+            { componentName: name, domNodeId },
+            shouldHydrate,
+          );
+          let renderOptions: Parameters<typeof reactHydrateOrRender>[3] = userErrorCallbackOptions;
           if (wrappedByDefaultRSCProvider) {
             renderOptions = shouldHydrate
               ? {
+                  ...userErrorCallbackOptions,
                   ...(this.ssrIdentifierPrefix ? { identifierPrefix: this.ssrIdentifierPrefix } : {}),
-                  onRecoverableError: handleRecoverableError,
+                  onRecoverableError: chainRecoverableErrorHandlers(
+                    userErrorCallbackOptions.onRecoverableError,
+                  ),
                 }
-              : { identifierPrefix: domNodeId };
+              : { ...userErrorCallbackOptions, identifierPrefix: domNodeId };
           }
           const rootOrElement = reactHydrateOrRender(domNode, reactElement, shouldHydrate, renderOptions);
           this.state = 'rendered';

@@ -16,6 +16,7 @@ import { isServerRenderHash } from './isServerRenderResult.ts';
 import { onPageUnloaded } from './pageLifecycle.ts';
 import { supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 import { isRendererTeardownResult } from './rendererTeardown.ts';
+import { buildRootErrorCallbackOptions } from './rootErrorHandlers.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
@@ -291,7 +292,14 @@ function renderElement(el: Element, railsContext: RailsContext): void {
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
       } else {
-        const root = reactHydrateOrRender(domNode, reactElementOrRouterResult as ReactElement, shouldHydrate);
+        const root = reactHydrateOrRender(
+          domNode,
+          reactElementOrRouterResult as ReactElement,
+          shouldHydrate,
+          // Attach user-registered root error callbacks (and the dev-mode hydration-mismatch
+          // logger) to every root, enriched with this mount's component name and dom id.
+          buildRootErrorCallbackOptions({ componentName: name, domNodeId }, shouldHydrate),
+        );
         // Track the root for cleanup
         renderedRoots.set(domNodeId, { kind: 'react', root, domNode });
       }

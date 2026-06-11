@@ -20,6 +20,7 @@
 import * as React from 'react';
 import { resetRailsContext } from 'react-on-rails/context';
 import type { RailsContext, RendererFunction } from 'react-on-rails/types';
+import { resetRootErrorHandlers, setRootErrorHandlers } from 'react-on-rails/@internal/rootErrorHandlers';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import * as StoreRegistry from '../src/StoreRegistry.ts';
 import { renderOrHydrateComponent, hydrateStore, unmountAll } from '../src/ClientSideRenderer.ts';
@@ -45,6 +46,7 @@ describe('ClientSideRenderer', () => {
     unmountAll();
     clearDefaultRSCProviderFactory();
     resetRailsContext();
+    resetRootErrorHandlers();
     document.body.innerHTML = '';
     document.head.innerHTML = '';
     jest.clearAllMocks();
@@ -55,6 +57,7 @@ describe('ClientSideRenderer', () => {
     unmountAll();
     clearDefaultRSCProviderFactory();
     resetRailsContext();
+    resetRootErrorHandlers();
   });
 
   function setupTestComponentDom(
@@ -316,6 +319,127 @@ describe('ClientSideRenderer', () => {
 
       expect(reportErrorSpy).toHaveBeenCalledTimes(1);
       expect(reportErrorSpy).toHaveBeenCalledWith(recoverableError);
+    } finally {
+      globalWithReportError.reportError = originalReportError;
+    }
+  });
+
+  // Issue #3892: user-registered rootErrorHandlers must CHAIN with Pro's internal recoverable-error
+  // handler on the RSC-wrapped hydrate path — both must run; the internal handler is never
+  // clobbered and the user callback is never dropped.
+  it('chains the user onRecoverableError with the internal handler in hydrated default-provider roots', async () => {
+    const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
+    const defaultProviderFactory = jest.fn(({ reactElement }: DefaultRSCProviderFactoryArgs) => reactElement);
+    const globalWithReportError = globalThis as typeof globalThis & {
+      reportError?: (error: unknown) => void;
+    };
+    const originalReportError = globalWithReportError.reportError;
+    const reportErrorSpy = jest.fn();
+    globalWithReportError.reportError = reportErrorSpy;
+    const userOnRecoverableError = jest.fn();
+    setRootErrorHandlers({ onRecoverableError: userOnRecoverableError });
+    ComponentRegistry.register({ TestComponent });
+    const componentSpec = setupTestComponentDom('dom-id-123', '<div>Server fallback</div>');
+    addRailsContext({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    setDefaultRSCProviderFactory(defaultProviderFactory);
+
+    try {
+      await renderOrHydrateComponent(componentSpec);
+
+      const recoverableError = new Error('real recoverable hydration error');
+      const errorInfo = { componentStack: 'at TestComponent' };
+      const onRecoverableError = expectRecoverableHandlerFromLastRender();
+      (onRecoverableError as (error: unknown, errorInfo: unknown) => void)(recoverableError, errorInfo);
+
+      // Internal handler ran (never clobbered by the user callback)...
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      expect(reportErrorSpy).toHaveBeenCalledWith(recoverableError);
+      // ...AND the user callback ran with the React on Rails-enriched context.
+      expect(userOnRecoverableError).toHaveBeenCalledTimes(1);
+      expect(userOnRecoverableError).toHaveBeenCalledWith(recoverableError, errorInfo, {
+        componentName: 'TestComponent',
+        domNodeId: 'dom-id-123',
+      });
+    } finally {
+      globalWithReportError.reportError = originalReportError;
+    }
+  });
+
+  it('suppresses the RSCRoute ssr=false bailout from BOTH the internal handler and the user callback', async () => {
+    const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
+    const defaultProviderFactory = jest.fn(({ reactElement }: DefaultRSCProviderFactoryArgs) => reactElement);
+    const globalWithReportError = globalThis as typeof globalThis & {
+      reportError?: (error: unknown) => void;
+    };
+    const originalReportError = globalWithReportError.reportError;
+    const reportErrorSpy = jest.fn();
+    globalWithReportError.reportError = reportErrorSpy;
+    const userOnRecoverableError = jest.fn();
+    setRootErrorHandlers({ onRecoverableError: userOnRecoverableError });
+    ComponentRegistry.register({ TestComponent });
+    const componentSpec = setupTestComponentDom('dom-id-123', '<div>Server fallback</div>');
+    addRailsContext({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    setDefaultRSCProviderFactory(defaultProviderFactory);
+
+    try {
+      await renderOrHydrateComponent(componentSpec);
+
+      const onRecoverableError = expectRecoverableHandlerFromLastRender();
+      onRecoverableError({ digest: RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST });
+
+      // The bailout is Pro control flow, not an application error: neither internal reporting nor
+      // the user's callback (e.g. Sentry) should see it.
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+      expect(userOnRecoverableError).not.toHaveBeenCalled();
+    } finally {
+      globalWithReportError.reportError = originalReportError;
+    }
+  });
+
+  it('passes user root error callbacks on non-RSC-wrapped hydrate paths without the internal handler', async () => {
+    const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
+    const globalWithReportError = globalThis as typeof globalThis & {
+      reportError?: (error: unknown) => void;
+    };
+    const originalReportError = globalWithReportError.reportError;
+    const reportErrorSpy = jest.fn();
+    globalWithReportError.reportError = reportErrorSpy;
+    const userOnRecoverableError = jest.fn();
+    const userOnCaughtError = jest.fn();
+    const userOnUncaughtError = jest.fn();
+    setRootErrorHandlers({
+      onRecoverableError: userOnRecoverableError,
+      onCaughtError: userOnCaughtError,
+      onUncaughtError: userOnUncaughtError,
+    });
+    ComponentRegistry.register({ TestComponent });
+    // No default RSC provider registered: this is the plain (non-RSC-wrapped) Pro path.
+    const componentSpec = setupTestComponentDom('dom-id-plain', '<div>Server fallback</div>');
+    addRailsContext();
+
+    try {
+      await renderOrHydrateComponent(componentSpec);
+
+      expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+      const renderOptions =
+        mockReactHydrateOrRender.mock.calls[0][2] === true && mockReactHydrateOrRender.mock.calls[0][3];
+      expect(renderOptions).toEqual({
+        onRecoverableError: expect.any(Function),
+        onCaughtError: expect.any(Function),
+        onUncaughtError: expect.any(Function),
+      });
+
+      const recoverableError = new Error('plain hydrate recoverable error');
+      (
+        renderOptions as { onRecoverableError: (error: unknown, errorInfo: unknown) => void }
+      ).onRecoverableError(recoverableError, undefined);
+      // The user callback runs with context; Pro's internal RSC handler is not attached here
+      // (matching pre-existing behavior for non-RSC-wrapped roots).
+      expect(userOnRecoverableError).toHaveBeenCalledWith(recoverableError, undefined, {
+        componentName: 'TestComponent',
+        domNodeId: 'dom-id-plain',
+      });
+      expect(reportErrorSpy).not.toHaveBeenCalled();
     } finally {
       globalWithReportError.reportError = originalReportError;
     }

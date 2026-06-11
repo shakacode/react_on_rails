@@ -40,9 +40,47 @@ if (useStrictMode && !reactOnRailsWithStrictModeFlag[STRICT_MODE_PATCHED]) {
   Object.defineProperty(reactOnRailsWithStrictModeFlag, STRICT_MODE_PATCHED, { value: true });
 }
 
+// Issue #3892: record React root error callback invocations on `window` so Playwright e2e tests
+// (e2e/playwright/e2e/react_on_rails/root_error_callbacks.spec.js) can assert that the callbacks
+// fire for client-rendered and server-rendered+hydrated components. The handlers also mirror the
+// error to console.error so default error visibility is preserved (registering a callback
+// replaces React's own default reporting for that callback).
+type RootErrorCallbackEvent = {
+  kind: 'recoverable' | 'caught' | 'uncaught';
+  message: string;
+  componentName?: string;
+  domNodeId?: string;
+};
+
+declare global {
+  interface Window {
+    __ROOT_ERROR_CALLBACK_EVENTS__?: RootErrorCallbackEvent[];
+  }
+}
+
+const recordRootErrorEvent =
+  (kind: RootErrorCallbackEvent['kind']) =>
+  (error: unknown, _errorInfo: unknown, context: { componentName?: string; domNodeId?: string }) => {
+    /* eslint-disable no-underscore-dangle -- double-underscore marks the test-only window global */
+    window.__ROOT_ERROR_CALLBACK_EVENTS__ ||= [];
+    window.__ROOT_ERROR_CALLBACK_EVENTS__.push({
+      kind,
+      message: error instanceof Error ? error.message : String(error),
+      componentName: context.componentName,
+      domNodeId: context.domNodeId,
+    });
+    /* eslint-enable no-underscore-dangle */
+    console.error(`[dummy] rootErrorHandlers ${kind} error callback fired:`, error);
+  };
+
 ReactOnRails.setOptions({
   traceTurbolinks: true,
   turbo: true,
+  rootErrorHandlers: {
+    onRecoverableError: recordRootErrorEvent('recoverable'),
+    onCaughtError: recordRootErrorEvent('caught'),
+    onUncaughtError: recordRootErrorEvent('uncaught'),
+  },
 });
 
 ReactOnRails.register({

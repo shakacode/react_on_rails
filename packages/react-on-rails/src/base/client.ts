@@ -19,6 +19,11 @@ import buildConsoleReplay, { consoleReplay } from '../buildConsoleReplay.ts';
 import reactHydrateOrRender from '../reactHydrateOrRender.ts';
 import createReactOutput from '../createReactOutput.ts';
 import componentRegistrationMetric from '../componentRegistrationMetric.ts';
+import {
+  buildRootErrorCallbackOptions,
+  resetRootErrorHandlers,
+  setRootErrorHandlers,
+} from '../rootErrorHandlers.ts';
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
@@ -138,7 +143,9 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
     },
 
     reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType {
-      return reactHydrateOrRender(domNode, reactElement, hydrate);
+      // The component name is unknown on this low-level path; the dom id still ties errors to a mount.
+      const rootErrorCallbackOptions = buildRootErrorCallbackOptions({ domNodeId: domNode.id }, hydrate);
+      return reactHydrateOrRender(domNode, reactElement, hydrate, rootErrorCallbackOptions);
     },
 
     setOptions(newOptions: Partial<ReactOnRailsOptions>): void {
@@ -172,6 +179,14 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
         delete newOptions.logComponentRegistration;
       }
 
+      if (typeof newOptions.rootErrorHandlers !== 'undefined') {
+        // Validates and stores the handlers; warns when the React runtime cannot support them.
+        setRootErrorHandlers(newOptions.rootErrorHandlers);
+        this.options.rootErrorHandlers = newOptions.rootErrorHandlers;
+        // eslint-disable-next-line no-param-reassign
+        delete newOptions.rootErrorHandlers;
+      }
+
       if (Object.keys(newOptions).length > 0) {
         throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
       }
@@ -191,6 +206,7 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
 
     resetOptions(): void {
       this.options = { ...DEFAULT_OPTIONS };
+      resetRootErrorHandlers();
     },
 
     // ===================================================================
@@ -284,10 +300,11 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
       const componentObj = ComponentRegistry.get(name);
       const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
-      return this.reactHydrateOrRender(
+      return reactHydrateOrRender(
         document.getElementById(domNodeId) as Element,
         reactElement as ReactElement,
         hydrate,
+        buildRootErrorCallbackOptions({ componentName: name, domNodeId }, hydrate),
       );
     },
 

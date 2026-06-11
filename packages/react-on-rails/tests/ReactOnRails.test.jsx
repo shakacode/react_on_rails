@@ -85,6 +85,31 @@ describe('ReactOnRails', () => {
     expect(() => ReactOnRails.setOptions({ foobar: true })).toThrow(/Invalid option/);
   });
 
+  it('setOptions accepts rootErrorHandlers and resetOptions clears them', () => {
+    // eslint-disable-next-line global-require
+    const { getRootErrorHandlers } = require('../src/rootErrorHandlers.ts');
+    ReactOnRails.resetOptions();
+    const onRecoverableError = jest.fn();
+    const onUncaughtError = jest.fn();
+    ReactOnRails.setOptions({ rootErrorHandlers: { onRecoverableError, onUncaughtError } });
+
+    expect(ReactOnRails.option('rootErrorHandlers')).toEqual({ onRecoverableError, onUncaughtError });
+    // setOptions writes through to the module-level registration the renderers read.
+    expect(getRootErrorHandlers().onRecoverableError).toBe(onRecoverableError);
+    expect(getRootErrorHandlers().onUncaughtError).toBe(onUncaughtError);
+
+    ReactOnRails.resetOptions();
+    expect(ReactOnRails.option('rootErrorHandlers')).toBeUndefined();
+    expect(getRootErrorHandlers()).toEqual({});
+  });
+
+  it('setOptions throws when a rootErrorHandlers entry is not a function', () => {
+    ReactOnRails.resetOptions();
+    expect(() => ReactOnRails.setOptions({ rootErrorHandlers: { onCaughtError: 'nope' } })).toThrow(
+      /onCaughtError must be a function/,
+    );
+  });
+
   it('registerStore throws if passed a falsey object (null, undefined, etc)', () => {
     expect(() => ReactOnRails.registerStore(null)).toThrow(/null or undefined/);
 
