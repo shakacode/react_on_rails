@@ -109,13 +109,13 @@ extends: [
 
 ### Ignore generated files
 
-If you use [auto-bundling](https://www.shakacode.com/react-on-rails/docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation/), React on Rails writes generated entry points to `<source_entry_path>/generated/` (typically `app/javascript/packs/generated/`) and a generated server bundle under a `generated/` directory. These files are machine-written and regenerated on every build — linting them produces noise and CI churn. The `globalIgnores` block above excludes them, along with Shakapacker's compiled output in `public/packs/` and `public/packs-test/`.
+If you use [auto-bundling](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md), React on Rails writes generated entry points to `<source_entry_path>/generated/` (typically `app/javascript/packs/generated/`) and a generated server bundle under a `generated/` directory. These files are machine-written and regenerated on every build — linting them produces noise and CI churn. The `globalIgnores` block above excludes them, along with Shakapacker's compiled output in `public/packs/` and `public/packs-test/`.
 
 ### Globals for server-side rendering
 
 With server-side rendering, the same component code executes in two environments: the browser, and a JavaScript runtime on the server (Node renderer or ExecJS). Code guarded by environment checks (e.g., `typeof window === 'undefined'`) legitimately references both browser globals (`window`, `document`) and Node globals (`process`, `global`). Enabling both `globals.browser` and `globals.node` for `app/javascript` avoids false `no-undef` errors in either direction.
 
-If you keep [separate client and server entry files](https://www.shakacode.com/react-on-rails/docs/building-features/how-to-use-different-files-for-client-and-server-rendering/) (e.g., `*.client.jsx` / `*.server.jsx`), you can tighten this with per-pattern overrides — browser globals only for `**/*.client.*`, Node globals only for `**/*.server.*`.
+If you keep [separate client and server entry files](./how-to-use-different-files-for-client-and-server-rendering.md) (e.g., `*.client.jsx` / `*.server.jsx`), you can tighten this with per-pattern overrides — browser globals only for `**/*.client.*`, Node globals only for `**/*.server.*`.
 
 ## `useEffectEvent` and the linter
 
