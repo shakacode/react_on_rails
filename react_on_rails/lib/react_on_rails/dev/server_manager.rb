@@ -515,7 +515,7 @@ module ReactOnRails
           when "webpack"
             "config/webpack/development.js: ReactRefreshWebpackPlugin (enabled when WEBPACK_SERVE=true)"
           when "rspack"
-            "config/rspack/development.js: @rspack/plugin-react-refresh / ReactRefreshPlugin " \
+            "config/rspack/development.js: @rspack/plugin-react-refresh / ReactRefreshRspackPlugin " \
             "(enabled for the dev server)"
           else
             "Check your bundler's React Refresh plugin documentation"

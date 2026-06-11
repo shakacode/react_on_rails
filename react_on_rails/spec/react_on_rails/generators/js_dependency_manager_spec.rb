@@ -168,7 +168,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "defines RSPACK_DEV_DEPENDENCIES" do
       expect(ReactOnRails::Generators::JsDependencyManager::RSPACK_DEV_DEPENDENCIES).to(
-        eq(%w[@rspack/cli@^2.0.0-0 @rspack/plugin-react-refresh@^2.0.0 react-refresh])
+        eq(%w[@rspack/cli@^2.0.0-0 @rspack/dev-server@^2.0.0 @rspack/plugin-react-refresh@^2.0.0 react-refresh])
       )
     end
 
