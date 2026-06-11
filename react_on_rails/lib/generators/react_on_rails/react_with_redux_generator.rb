@@ -73,6 +73,10 @@ module ReactOnRails
 
         stylesheet_import = "import '../../../stylesheets/application.css';\n"
         ror_client_file_path = File.join(destination_root, ror_client_file)
+        if options[:pretend]
+          say_status :pretend, "Would add Tailwind stylesheet import to #{ror_client_file}", :yellow
+          return
+        end
         return if File.read(ror_client_file_path).include?(stylesheet_import)
 
         prepend_to_file(ror_client_file, stylesheet_import)

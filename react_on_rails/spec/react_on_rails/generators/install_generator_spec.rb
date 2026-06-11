@@ -15,6 +15,10 @@ describe InstallGenerator, type: :generator do
     described_class.new([], options, destination_root:)
   end
 
+  def redux_generator_fixture(options = {})
+    ReactOnRails::Generators::ReactWithReduxGenerator.new([], options, destination_root:)
+  end
+
   def gem_root_ci_workflow_path
     File.expand_path("../../../.github/workflows/ci.yml", __dir__)
   end
@@ -87,6 +91,8 @@ describe InstallGenerator, type: :generator do
       expect(content).to include("@tailwindcss/postcss")
       expect(content).to include("addTailwindPostcssLoader")
       expect(content).to include("mergeTailwindPostcssLoader")
+      expect(content).to include("plugin?.postcssPlugin")
+      expect(content).to include("webpackConfig.module?.rules")
     end
   end
 
@@ -99,6 +105,8 @@ describe InstallGenerator, type: :generator do
       stylesheet_index = content.index("<%= stylesheet_pack_tag %>")
       javascript_index = content.index("<%= javascript_pack_tag %>")
 
+      expect(stylesheet_index).not_to be_nil
+      expect(javascript_index).not_to be_nil
       expect(stylesheet_index).to be < javascript_index
       expect(content).to include("React on Rails injects component CSS/JS here")
     end
@@ -3288,6 +3296,21 @@ describe InstallGenerator, type: :generator do
         .with("react_on_rails:rsc", [], hash_including(pretend: true))
 
       redux_pro_rsc_install_generator.send(:invoke_generators)
+    end
+
+    it "does not read the copied Redux Tailwind entry in pretend mode" do
+      redux_generator = redux_generator_fixture(pretend: true, tailwind: true)
+      client_entry = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
+
+      allow(redux_generator).to receive(:copy_file)
+      allow(redux_generator).to receive(:gsub_file)
+      allow(redux_generator).to receive(:prepend_to_file)
+
+      expect(File).not_to receive(:read)
+      expect(redux_generator).to receive(:say_status)
+        .with(:pretend, "Would add Tailwind stylesheet import to #{client_entry}", :yellow)
+
+      redux_generator.send(:copy_base_files)
     end
   end
 

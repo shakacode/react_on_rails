@@ -31,8 +31,14 @@ const loaderName = (loader) => {
 
 const postcssLoaderUsesTailwind = (loader) => {
   const plugins = loader?.options?.postcssOptions?.plugins || [];
-  // Relies on Node module caching returning the same instance for require('@tailwindcss/postcss').
-  return plugins.includes(tailwindPostcssPlugin);
+  const tailwindPluginName = tailwindPostcssPlugin.postcssPlugin || tailwindPostcssPlugin.name;
+
+  return plugins.some((plugin) => {
+    if (plugin === tailwindPostcssPlugin) return true;
+    if (!tailwindPluginName) return false;
+
+    return plugin?.postcssPlugin === tailwindPluginName || plugin?.name === tailwindPluginName;
+  });
 };
 
 const mergeTailwindPostcssLoader = (loader) => {
@@ -56,7 +62,10 @@ const mergeTailwindPostcssLoader = (loader) => {
 };
 
 const addTailwindPostcssLoader = (webpackConfig) => {
-  webpackConfig.module.rules.forEach((rule) => {
+  const rules = webpackConfig.module?.rules;
+  if (!Array.isArray(rules)) return webpackConfig;
+
+  rules.forEach((rule) => {
     if (!Array.isArray(rule.use)) return;
 
     const postcssLoaderIndex = rule.use.findIndex((loader) => loaderName(loader).includes('postcss-loader'));

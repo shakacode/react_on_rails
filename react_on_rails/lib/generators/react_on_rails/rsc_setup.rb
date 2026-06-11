@@ -206,8 +206,13 @@ module ReactOnRails
         # Check if HelloServer already exists (check both jsx and tsx)
         if File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.jsx")) ||
            File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.tsx"))
-          add_tailwind_import_to_rsc_client_component(components_dir)
-          say "ℹ️  HelloServer component already exists, skipping", :yellow
+          tailwind_import_added = add_tailwind_import_to_rsc_client_component(components_dir)
+          message = if tailwind_import_added
+                      "ℹ️  HelloServer component already exists; added Tailwind stylesheet import to LikeButton"
+                    else
+                      "ℹ️  HelloServer component already exists, skipping"
+                    end
+          say message, :yellow
           return
         end
 
@@ -230,7 +235,7 @@ module ReactOnRails
       end
 
       def add_tailwind_import_to_rsc_client_component(components_dir)
-        return unless use_tailwind?
+        return false unless use_tailwind?
 
         candidate_entry_paths = %w[jsx tsx].map do |extension|
           "#{components_dir}/LikeButton.#{extension}"
@@ -239,13 +244,14 @@ module ReactOnRails
         relative_entry_path = candidate_entry_paths.find do |entry_path|
           File.exist?(File.join(destination_root, entry_path))
         end
-        return unless relative_entry_path
+        return false unless relative_entry_path
 
         # Path is relative to app/javascript/src/HelloServer/components/.
         stylesheet_import = "import '../../../stylesheets/application.css';"
-        return if File.read(File.join(destination_root, relative_entry_path)).include?(stylesheet_import)
+        return false if File.read(File.join(destination_root, relative_entry_path)).include?(stylesheet_import)
 
         insert_into_file(relative_entry_path, "#{stylesheet_import}\n", after: "'use client';\n")
+        true
       end
 
       def create_hello_server_controller
