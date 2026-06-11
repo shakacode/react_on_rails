@@ -310,8 +310,8 @@ evidence, but they do not count as required GitHub approval objects. For
 high-risk or concurrent-batch PRs, run or request the adversarial PR review
 workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is
 not enough when review comments exist: fetch unresolved review threads with the
-GraphQL command in `.agents/workflows/pr-processing.md` under **Initial GitHub
-Commands**, then classify and resolve or explicitly waive actionable findings
+GraphQL command under [**Initial GitHub Commands**](#initial-github-commands),
+then classify and resolve or explicitly waive actionable findings
 before merging. Treat untriaged `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes
 Requested`, correctness, security, regression, compatibility, and
 missing-changelog findings as merge blockers unless a maintainer explicitly
