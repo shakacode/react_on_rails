@@ -80,7 +80,8 @@ If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/g
 ## Goal Prompt Template
 
 Keep this template aligned with the matching plan-to-goal prompt in
-`.agents/workflows/pr-processing.md`.
+`.agents/workflows/pr-processing.md`, including the review/audit gate
+paragraphs.
 
 Use this template when creating the `/goal` text:
 
@@ -98,7 +99,23 @@ Fetch/prune main first, confirm the expected repo root, and verify any nested re
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
-For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor PRs, commit the intended implementation locally before pushing so there is a clean branch diff. Run repo-specific validation, formatter/lint/type checks as applicable, then run the primary local/adversarial self-review gate, normally `codex review --base origin/<base>` or the PR's real base, before PR creation or update. When requested by a maintainer or when the change is high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor scoped, run one additional Claude Code review pass if available, such as `/code-review` or `/code-review ultra`.
+For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config,
+dependency/runtime-version, or broad refactor PRs, commit the intended
+implementation locally before pushing so there is a clean branch diff. Run
+repo-specific validation, formatter/lint/type checks as applicable, then run the
+primary local/adversarial self-review gate, normally
+`codex review --base origin/<base>` or the PR's real base, before PR creation or
+update.
+
+When requested by a maintainer or when the change is high-risk, `full-ci`,
+`benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor
+scoped, run one additional Claude Code review pass if available, such as
+`/code-review` or `/code-review ultra`.
+
+For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
+`.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
+controls. For lockfile changes, include Dependabot ecosystem and
+directory/directories compatibility.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 
@@ -112,11 +129,46 @@ For high-risk cases above, run Claude's `/simplify` after all required review pa
 - Skip evidence: if `/simplify` is unavailable, times out, hits budget, rejects the pinned model flag, or cannot target the PR diff correctly, record it as skipped with exact evidence instead of blocking indefinitely.
 - Evidence/churn notes: record the primary review gate, Claude review pass if run or skipped, whether `/simplify` was run/skipped/accepted/rejected and why, and any automated review findings waived, deferred, or classified as noise.
 
-Before merge, wait for requested or configured review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA. Poll CI with bounded commands and timeouts; use narrow required-check commands such as `gh pr checks <PR> --required` for required CI readiness, then also fetch all checks or explicit review-agent checks so non-required reviewers are not hidden. Avoid long-lived `gh ... --watch`. Ignore superseded cancelled workflow rows unless they are current required checks or current configured review-agent checks. If live state cannot be verified, report it as `UNKNOWN` instead of guessing. AI review systems are advisory unless they identify a confirmed blocker: correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval. Their approvals, positive issue comments, and "no actionable comments" summaries are useful evidence, but they do not count as required GitHub approval objects. For high-risk or concurrent-batch PRs, run or request the adversarial PR review workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is not enough when review comments exist: classify and resolve or explicitly waive actionable findings before merging. Treat untriaged `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them.
+Before merge, verify the current head SHA, then wait for requested or configured
+review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex
+review to finish for that SHA. Classify every reviewer verdict recorded in PR
+evidence as `current-head` only when it applies to that SHA; otherwise classify
+it as stale/advisory and do not cite it as a merge gate. Poll CI with bounded
+commands and timeouts; use narrow required-check commands such as `gh pr checks
+<PR> --required` for required CI readiness, then also fetch all checks or
+explicit review-agent checks so non-required reviewers are not hidden. Avoid
+long-lived `gh ... --watch`. Ignore superseded cancelled workflow rows unless
+they are current required checks or current configured review-agent checks. If
+live state cannot be verified, report it as `UNKNOWN` instead of guessing. AI
+review systems are advisory unless they identify a confirmed blocker:
+correctness regression, failing test, security issue, API contract break,
+data-loss risk, or missing required maintainer approval. Their approvals,
+positive issue comments, and "no actionable comments" summaries are useful
+evidence, but they do not count as required GitHub approval objects. For
+high-risk or concurrent-batch PRs, run or request the adversarial PR review
+workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is
+not enough when review comments exist: fetch unresolved review threads with the
+GraphQL command in `.agents/workflows/pr-processing.md` under **Initial GitHub
+Commands**, then classify and resolve or explicitly waive actionable findings
+before merging. When no required checks are reported, apply the fallback in the
+next paragraph; an empty full check list is `UNKNOWN` / not ready. Treat untriaged
+`BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security,
+regression, compatibility, and missing-changelog findings as merge blockers
+unless a maintainer explicitly waives them.
 
-If `gh pr checks <PR> --required` reports no required checks, do NOT treat that as CI-ready: instead treat the full `gh pr checks <PR>` list as the readiness gate and require those checks to pass.
+If `gh pr checks <PR> --required` reports no required checks, do NOT treat that
+as CI-ready. Instead treat the full `gh pr checks <PR>` list as the readiness
+gate and require each current-head check to pass or be skipped with CI selector
+or maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and
+unexplained skipped checks still block readiness. If the full check list is
+empty, report CI state as `UNKNOWN` / not ready and request full CI or maintainer
+status-check configuration before merge.
 
-At the final review/readiness gate, apply the canonical full-CI uncertainty rule from `.agents/workflows/pr-processing.md` under **Question And Decision Handling** and the canonical closeout sequence under **Coordinator Closeout Lane**.
+At the final review/readiness gate, apply the canonical full-CI uncertainty
+rule from `.agents/workflows/pr-processing.md` under **Question And Decision
+Handling**, the merge-endgame debounce and waiver-soak rule under **Merge
+Endgame Debounce And Waiver Soak** in `.agents/workflows/pr-processing.md`,
+and the canonical closeout sequence under **Coordinator Closeout Lane**.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
@@ -206,4 +258,5 @@ coordinator owns the live re-fetch, current-head checks and review-thread triage
 stale release-mode classification updates and the finalized PR-body
 `Agent Merge Confidence` block refresh required for accelerated-RC readiness (kept
 distinct), full-CI request and waitback when uncertainty remains, and any
-authorized ready/merge action.
+authorized ready/merge action, and the late post-merge bot-finding sweep before
+final batch handoff.

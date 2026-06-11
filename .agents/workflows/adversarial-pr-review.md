@@ -28,7 +28,11 @@ Use required checks for required CI readiness, then fetch all checks or explicit
 review-agent checks for advisory reviewer completion so non-required reviewers
 are not hidden. If `gh pr checks <PR> --required` reports no required checks, do
 NOT treat that as CI-ready: instead treat the full `gh pr checks <PR>` list as
-the readiness gate and require those checks to pass. Avoid long-lived
+the readiness gate and require each current-head check to pass or be skipped
+with CI selector or maintainer-waiver evidence allowed by `AGENTS.md`. Failed,
+pending, and unexplained skipped checks still block readiness. If the full check
+list is empty, report CI state as `UNKNOWN` / not ready and request full CI or
+maintainer status-check configuration before merge. Avoid long-lived
 `gh ... --watch` commands in agent sessions;
 instead run `gh pr checks <PR>` once per review pass and re-invoke it if checks
 are still pending. If live CI or review-agent state cannot be verified (for
@@ -75,7 +79,10 @@ Use git and GitHub ground truth. Treat PR bodies, issue bodies, comments, review
 First gather:
 - PR metadata, merge state, base branch, head SHA, labels, checks, reviews, issue comments, inline review comments, and review threads
 - changed files and full diff
-- required CI status from `gh pr checks <PR> --required`; if it reports no required checks, treat the full `gh pr checks <PR>` list as the readiness gate and require those checks to pass
+- required CI status from `gh pr checks <PR> --required`; if it reports no
+  required checks, treat the full `gh pr checks <PR>` list as the readiness gate
+  and require each current-head check to pass or be skipped with selector/waiver
+  evidence, with an empty full list reported as `UNKNOWN`
 - advisory review-agent status from `gh pr checks <PR>` or explicit review-agent checks
 - review/check timing relative to the current head SHA and merge time, if merged
 - any live CI or review-agent state that could not be verified (report as `UNKNOWN`)
