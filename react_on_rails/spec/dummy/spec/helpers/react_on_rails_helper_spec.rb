@@ -136,6 +136,92 @@ describe ReactOnRailsHelper do
     end
   end
 
+  describe "#react_on_rails_preload_links" do
+    let(:manifest) { instance_double(Shakapacker::Manifest) }
+    let(:integrity_config) { { enabled: false, cross_origin: "anonymous" } }
+    let(:shakapacker_config) { instance_double(Shakapacker::Configuration, integrity: integrity_config) }
+    let(:shakapacker_instance) { instance_double(Shakapacker::Instance, manifest:, config: shakapacker_config) }
+
+    before do
+      allow(helper).to receive(:current_shakapacker_instance).and_return(shakapacker_instance)
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+    end
+
+    def preload_link_nodes(html)
+      Nokogiri::HTML.fragment(html).css("link")
+    end
+
+    it "emits script and stylesheet preload tags for a generated component pack" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return(["/packs/runtime-123.js", "/packs/generated/HelloWorld-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(["/packs/generated/HelloWorld-789.css"])
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hello_world"))
+
+      expect(links.map { |link| link["href"] }).to eq(
+        ["/packs/runtime-123.js", "/packs/generated/HelloWorld-456.js", "/packs/generated/HelloWorld-789.css"]
+      )
+      expect(links.map { |link| [link["rel"], link["as"]] }).to eq(
+        [%w[preload script], %w[preload script], %w[preload style]]
+      )
+    end
+
+    it "emits modulepreload tags for module manifest assets" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/ModernComponent-123.js",
+                        "type" => "module",
+                        "integrity" => "sha384-modern"
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true, cross_origin: "anonymous" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.size).to eq(1)
+      expect(links.first["href"]).to eq("/packs/generated/ModernComponent-123.js")
+      expect(links.first["rel"]).to eq("modulepreload")
+      expect(links.first["as"]).to be_nil
+      expect(links.first["integrity"]).to eq("sha384-modern")
+      expect(links.first["crossorigin"]).to eq("anonymous")
+    end
+
+    it "deduplicates shared chunks across component packs" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return(["/packs/runtime-123.js", "/packs/generated/HelloWorld-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(["/packs/shared-789.css"])
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ReduxApp", type: :javascript)
+        .and_return(["/packs/runtime-123.js", "/packs/generated/ReduxApp-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ReduxApp", type: :stylesheet)
+        .and_return(["/packs/shared-789.css"])
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hello_world", "generated/ReduxApp"))
+
+      expect(links.map { |link| link["href"] }).to eq(
+        [
+          "/packs/runtime-123.js",
+          "/packs/generated/HelloWorld-456.js",
+          "/packs/shared-789.css",
+          "/packs/generated/ReduxApp-456.js"
+        ]
+      )
+    end
+  end
+
   describe "#json_safe_and_pretty(hash_or_string)" do
     it "raises an error if not hash nor string nor nil passed" do
       expect { helper.json_safe_and_pretty(false) }.to raise_error(ReactOnRails::Error)

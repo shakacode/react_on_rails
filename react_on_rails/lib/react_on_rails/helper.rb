@@ -240,6 +240,15 @@ module ReactOnRails
       end.html_safe
     end
 
+    def react_on_rails_preload_links(*component_names)
+      pack_names = component_names.flatten.compact.map do |component_name|
+        generated_component_pack_name(component_name)
+      end
+
+      links = pack_names.flat_map { |pack_name| preload_links_for_generated_pack(pack_name) }
+      safe_join(links.uniq, "\n")
+    end
+
     def sanitized_props_string(props)
       ReactOnRails::JsonOutput.escape(props.is_a?(String) ? props : props.to_json)
     end
@@ -473,6 +482,84 @@ module ReactOnRails
 
     def generated_stores_pack_path(store_name)
       "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{store_name}.js"
+    end
+
+    def generated_component_pack_name(component_name)
+      component_name = component_name.to_s
+      return component_name if component_name.start_with?("generated/")
+
+      "generated/#{component_name.camelize}"
+    end
+
+    def preload_links_for_generated_pack(pack_name)
+      preload_links_for_javascript_pack(pack_name) + preload_links_for_stylesheet_pack(pack_name)
+    end
+
+    def preload_links_for_javascript_pack(pack_name)
+      preload_sources_for_pack(pack_name, type: :javascript, required: true).map do |source|
+        preload_link_for_javascript_source(source)
+      end
+    end
+
+    def preload_links_for_stylesheet_pack(pack_name)
+      preload_sources_for_pack(pack_name, type: :stylesheet, required: false).map do |source|
+        preload_link_for_stylesheet_source(source)
+      end
+    end
+
+    def preload_sources_for_pack(pack_name, type:, required:)
+      manifest = current_shakapacker_instance.manifest
+      sources = if required
+                  manifest.lookup_pack_with_chunks!(pack_name, type:)
+                else
+                  manifest.lookup_pack_with_chunks(pack_name, type:)
+                end
+      Array(sources).compact
+    end
+
+    def preload_link_for_javascript_source(source)
+      attributes = preload_link_attributes(source)
+      if modulepreload_source?(source)
+        tag.link(**attributes.merge(rel: "modulepreload"))
+      else
+        tag.link(**attributes.merge(rel: "preload", as: "script"))
+      end
+    end
+
+    def preload_link_for_stylesheet_source(source)
+      tag.link(**preload_link_attributes(source).merge(rel: "preload", as: "style"))
+    end
+
+    def preload_link_attributes(source)
+      attributes = { href: preload_source_path(source) }
+      integrity = preload_source_integrity(source)
+      return attributes unless integrity.present?
+
+      attributes.merge(integrity:, crossorigin: current_shakapacker_instance.config.integrity[:cross_origin])
+    end
+
+    def preload_source_path(source)
+      preload_manifest_value(source, "src") || source
+    end
+
+    def preload_source_integrity(source)
+      return unless current_shakapacker_instance.config.integrity[:enabled]
+
+      preload_manifest_value(source, "integrity")
+    end
+
+    def modulepreload_source?(source)
+      return true if preload_manifest_value(source, "module") == true
+      return true if preload_manifest_value(source, "rel").to_s == "modulepreload"
+      return true if preload_manifest_value(source, "type").to_s == "module"
+
+      File.extname(preload_source_path(source).to_s) == ".mjs"
+    end
+
+    def preload_manifest_value(source, key)
+      return if source.is_a?(String) || !source.respond_to?(:[])
+
+      source[key] || source[key.to_sym]
     end
 
     def build_react_component_result_for_server_rendered_string(
