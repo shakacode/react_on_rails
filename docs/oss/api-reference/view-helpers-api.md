@@ -59,12 +59,16 @@ Use `react_on_rails_preload_links` in a layout or view `<head>` when you know wh
 For JavaScript chunks, plain script assets render as `<link rel="preload" as="script">`. Module assets render as `<link rel="modulepreload">` when the manifest marks the asset as a module or the emitted file has an `.mjs` extension. CSS chunks render as `<link rel="preload" as="style">`. Component packs without CSS assets simply skip the stylesheet preload.
 
 ```erb
+<% content_for :body_content do %>
+  <%= react_component("ProductPage", props: @product_props, auto_load_bundle: true) %>
+<% end %>
+
 <head>
   <%= react_on_rails_preload_links("ProductPage") %>
   <%= stylesheet_pack_tag %>
 </head>
 <body>
-  <%= react_component("ProductPage", props: @product_props, auto_load_bundle: true) %>
+  <%= yield :body_content %>
   <%= javascript_pack_tag %>
 </body>
 ```

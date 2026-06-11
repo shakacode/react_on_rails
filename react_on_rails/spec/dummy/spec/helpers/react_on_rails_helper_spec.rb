@@ -195,6 +195,28 @@ describe ReactOnRailsHelper do
       expect(links.first["crossorigin"]).to eq("anonymous")
     end
 
+    it "resolves manifest sources through Rails asset paths" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HostedComponent", type: :javascript)
+        .and_return(["/packs/generated/HostedComponent-123.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HostedComponent", type: :stylesheet)
+        .and_return(["/packs/generated/HostedComponent-456.css"])
+      allow(helper).to receive(:path_to_asset) do |source, options|
+        expect(options).to eq(skip_pipeline: true)
+        "https://cdn.example.com#{source}"
+      end
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hosted_component"))
+
+      expect(links.map { |link| link["href"] }).to eq(
+        [
+          "https://cdn.example.com/packs/generated/HostedComponent-123.js",
+          "https://cdn.example.com/packs/generated/HostedComponent-456.css"
+        ]
+      )
+    end
+
     it "deduplicates shared chunks across component packs" do
       allow(manifest).to receive(:lookup_pack_with_chunks!)
         .with("generated/HelloWorld", type: :javascript)

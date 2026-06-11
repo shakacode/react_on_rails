@@ -539,6 +539,10 @@ module ReactOnRails
     end
 
     def preload_source_path(source)
+      path_to_asset(preload_manifest_source(source), skip_pipeline: true)
+    end
+
+    def preload_manifest_source(source)
       preload_manifest_value(source, "src") || source
     end
 
@@ -553,7 +557,7 @@ module ReactOnRails
       return true if preload_manifest_value(source, "rel").to_s == "modulepreload"
       return true if preload_manifest_value(source, "type").to_s == "module"
 
-      File.extname(preload_source_path(source).to_s) == ".mjs"
+      File.extname(preload_manifest_source(source).to_s) == ".mjs"
     end
 
     def preload_manifest_value(source, key)
