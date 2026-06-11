@@ -35,8 +35,9 @@ pnpm add tailwindcss@^4.3.0 @tailwindcss/postcss@^4.3.0 postcss@^8.5.15 postcss-
 
 It also creates `app/javascript/stylesheets/application.css`:
 
+<!-- prettier-ignore -->
 ```css
-@import 'tailwindcss';
+@import "tailwindcss";
 ```
 
 The generated `HelloWorld.client.jsx` or `HelloWorld.client.tsx` imports that CSS

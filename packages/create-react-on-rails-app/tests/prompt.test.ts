@@ -5,7 +5,7 @@ jest.mock('readline');
 
 const mockedReadline = jest.mocked(readline);
 
-describe('promptForMode', () => {
+describe('prompt helpers', () => {
   let consoleLogSpy: jest.SpyInstance;
   let mockRl: { question: jest.Mock; close: jest.Mock; on: jest.Mock; once: jest.Mock };
   let eventHandlers: Record<string, ((...args: unknown[]) => void)[]>;
@@ -36,101 +36,105 @@ describe('promptForMode', () => {
     consoleLogSpy.mockRestore();
   });
 
-  it('returns rsc when user enters 3', async () => {
-    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('3'));
+  describe('promptForMode', () => {
+    it('returns rsc when user enters 3', async () => {
+      mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('3'));
 
-    const result = await promptForMode();
+      const result = await promptForMode();
 
-    expect(result).toEqual({ pro: false, rsc: true });
-    expect(mockRl.close).toHaveBeenCalled();
+      expect(result).toEqual({ pro: false, rsc: true });
+      expect(mockRl.close).toHaveBeenCalled();
+    });
+
+    it('returns pro when user enters 2', async () => {
+      mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('2'));
+
+      const result = await promptForMode();
+
+      expect(result).toEqual({ pro: true, rsc: false });
+    });
+
+    it('returns standard when user enters 1', async () => {
+      mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('1'));
+
+      const result = await promptForMode();
+
+      expect(result).toEqual({ pro: false, rsc: false });
+    });
+
+    it('defaults to rsc when user presses Enter without input', async () => {
+      mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb(''));
+
+      const result = await promptForMode();
+
+      expect(result).toEqual({ pro: false, rsc: true });
+    });
+
+    it('defaults to rsc on invalid input', async () => {
+      mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('9'));
+
+      const result = await promptForMode();
+
+      expect(result).toEqual({ pro: false, rsc: true });
+    });
+
+    it('trims whitespace from input', async () => {
+      mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('  1  '));
+
+      const result = await promptForMode();
+
+      expect(result).toEqual({ pro: false, rsc: false });
+    });
+
+    it('rejects when user presses Ctrl+C (SIGINT)', async () => {
+      mockRl.question.mockImplementation(() => {});
+      const promise = promptForMode();
+      for (const handler of eventHandlers['SIGINT'] ?? []) handler();
+      await expect(promise).rejects.toThrow(PROMPT_CANCELLED);
+      expect(mockRl.close).toHaveBeenCalled();
+    });
+
+    it('rejects when stdin closes (EOF/Ctrl+D)', async () => {
+      mockRl.question.mockImplementation(() => {});
+      const promise = promptForMode();
+      for (const handler of eventHandlers['close'] ?? []) handler();
+      await expect(promise).rejects.toThrow(PROMPT_CANCELLED);
+    });
+
+    it('displays mode options to the user', async () => {
+      mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('3'));
+
+      await promptForMode();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Standard'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Pro'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('RSC'));
+    });
   });
 
-  it('returns pro when user enters 2', async () => {
-    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('2'));
+  describe('promptForTailwind', () => {
+    it('defaults Tailwind prompt to enabled when user presses Enter', async () => {
+      mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb(''));
 
-    const result = await promptForMode();
+      const result = await promptForTailwind();
 
-    expect(result).toEqual({ pro: true, rsc: false });
-  });
+      expect(result).toBe(true);
+    });
 
-  it('returns standard when user enters 1', async () => {
-    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('1'));
+    it('returns false when user declines Tailwind', async () => {
+      mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('n'));
 
-    const result = await promptForMode();
+      const result = await promptForTailwind();
 
-    expect(result).toEqual({ pro: false, rsc: false });
-  });
+      expect(result).toBe(false);
+    });
 
-  it('defaults to rsc when user presses Enter without input', async () => {
-    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb(''));
+    it('displays Tailwind options to the user', async () => {
+      mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('y'));
 
-    const result = await promptForMode();
+      await promptForTailwind();
 
-    expect(result).toEqual({ pro: false, rsc: true });
-  });
-
-  it('defaults to rsc on invalid input', async () => {
-    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('9'));
-
-    const result = await promptForMode();
-
-    expect(result).toEqual({ pro: false, rsc: true });
-  });
-
-  it('trims whitespace from input', async () => {
-    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('  1  '));
-
-    const result = await promptForMode();
-
-    expect(result).toEqual({ pro: false, rsc: false });
-  });
-
-  it('rejects when user presses Ctrl+C (SIGINT)', async () => {
-    mockRl.question.mockImplementation(() => {});
-    const promise = promptForMode();
-    for (const handler of eventHandlers['SIGINT'] ?? []) handler();
-    await expect(promise).rejects.toThrow(PROMPT_CANCELLED);
-    expect(mockRl.close).toHaveBeenCalled();
-  });
-
-  it('rejects when stdin closes (EOF/Ctrl+D)', async () => {
-    mockRl.question.mockImplementation(() => {});
-    const promise = promptForMode();
-    for (const handler of eventHandlers['close'] ?? []) handler();
-    await expect(promise).rejects.toThrow(PROMPT_CANCELLED);
-  });
-
-  it('displays mode options to the user', async () => {
-    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('3'));
-
-    await promptForMode();
-
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Standard'));
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Pro'));
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('RSC'));
-  });
-
-  it('defaults Tailwind prompt to enabled when user presses Enter', async () => {
-    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb(''));
-
-    const result = await promptForTailwind();
-
-    expect(result).toBe(true);
-  });
-
-  it('returns false when user declines Tailwind', async () => {
-    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('n'));
-
-    const result = await promptForTailwind();
-
-    expect(result).toBe(false);
-  });
-
-  it('displays Tailwind options to the user', async () => {
-    mockRl.question.mockImplementation((_prompt: string, cb: (answer: string) => void) => cb('y'));
-
-    await promptForTailwind();
-
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Tailwind CSS v4'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Tailwind CSS v4'));
+    });
   });
 });

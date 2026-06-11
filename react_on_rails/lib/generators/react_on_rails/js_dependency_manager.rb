@@ -320,7 +320,8 @@ module ReactOnRails
       end
 
       def add_tailwind_dependencies_if_requested
-        return unless respond_to?(:use_tailwind?) && use_tailwind?
+        # use_tailwind? is provided by GeneratorHelper, included alongside this module.
+        return unless use_tailwind?
 
         add_tailwind_dependencies
       end

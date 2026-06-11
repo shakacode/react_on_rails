@@ -67,6 +67,7 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
       const choice = await promptForMode();
       pro = choice.pro;
       rsc = choice.rsc;
+      // Explicit mode flags keep the command deterministic; no-flag interactive runs get the Tailwind prompt.
       if (rawOpts.tailwind === undefined) {
         tailwind = await promptForTailwind();
       }

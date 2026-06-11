@@ -53,6 +53,24 @@ describe InstallGenerator, type: :generator do
     assert_tailwind_ssr_stylesheet_placeholder
   end
 
+  def assert_tailwind_redux_setup(config_dir:, extension:)
+    assert_tailwind_dependencies
+    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+    assert_no_file "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css"
+
+    assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{extension}" do |content|
+      expect(content).to include("../../../stylesheets/application.css")
+    end
+
+    assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.#{extension}" do |content|
+      expect(content).to include("React on Rails + Redux + Tailwind CSS")
+      expect(content).to include("rounded-lg")
+      expect(content).not_to include("HelloWorld.module.css")
+    end
+
+    assert_tailwind_bundler_config(config_dir)
+  end
+
   def assert_tailwind_component(extension)
     assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{extension}" do |content|
       expect(content).to include("../../../stylesheets/application.css")
@@ -495,6 +513,16 @@ describe InstallGenerator, type: :generator do
 
     it "generates a Tailwind v4 SSR setup for Rspack with extracted CSS enabled" do
       assert_tailwind_ssr_setup(config_dir: "config/rspack", extension: "tsx")
+    end
+  end
+
+  context "with --redux --tailwind --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--redux --tailwind --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+
+    it "wires Tailwind into the Redux SSR example" do
+      assert_tailwind_redux_setup(config_dir: "config/rspack", extension: "tsx")
     end
   end
 

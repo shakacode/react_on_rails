@@ -35,6 +35,11 @@ module ReactOnRails
                    default: false,
                    hide: true
 
+      class_option :tailwind,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       def create_redux_directories
         # Create auto-bundling directory structure for Redux
         empty_directory("app/javascript/src/HelloWorldApp/ror_components")
@@ -53,18 +58,23 @@ module ReactOnRails
                   "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{ext}")
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.#{ext}",
                   "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.#{ext}")
-        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
-                  "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css")
+
+        unless use_tailwind?
+          copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
+                    "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css")
+        end
 
         # Update import paths in client component
         ror_client_file = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{ext}"
         gsub_file(ror_client_file, "../store/helloWorldStore", "../store/helloWorldStore")
         gsub_file(ror_client_file, "../containers/HelloWorldContainer",
                   "../containers/HelloWorldContainer")
+        prepend_to_file(ror_client_file, "import '../../../stylesheets/application.css';\n") if use_tailwind?
       end
 
       def copy_base_redux_files
         base_hello_world_path = "redux/base/app/javascript/bundles/HelloWorld"
+        tailwind_hello_world_path = "redux/tailwind/app/javascript/bundles/HelloWorld"
         redux_extension = options.typescript? ? "ts" : "js"
 
         # Copy Redux infrastructure files with appropriate extension
@@ -72,11 +82,15 @@ module ReactOnRails
            containers/HelloWorldContainer.#{redux_extension}
            constants/helloWorldConstants.#{redux_extension}
            reducers/helloWorldReducer.#{redux_extension}
-           store/helloWorldStore.#{redux_extension}
-           components/HelloWorld.#{component_extension(options)}].each do |file|
+           store/helloWorldStore.#{redux_extension}].each do |file|
              copy_file("#{base_hello_world_path}/#{file}",
                        "app/javascript/src/HelloWorldApp/#{file}")
            end
+
+        component_file = "components/HelloWorld.#{component_extension(options)}"
+        component_source_path = use_tailwind? ? tailwind_hello_world_path : base_hello_world_path
+        copy_file("#{component_source_path}/#{component_file}",
+                  "app/javascript/src/HelloWorldApp/#{component_file}")
       end
 
       def create_appropriate_templates

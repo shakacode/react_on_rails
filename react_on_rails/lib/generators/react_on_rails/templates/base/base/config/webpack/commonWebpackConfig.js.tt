@@ -31,6 +31,7 @@ const loaderName = (loader) => {
 
 const postcssLoaderUsesTailwind = (loader) => {
   const plugins = loader?.options?.postcssOptions?.plugins || [];
+  // Relies on Node module caching returning the same instance for require('@tailwindcss/postcss').
   return plugins.includes(tailwindPostcssPlugin);
 };
 

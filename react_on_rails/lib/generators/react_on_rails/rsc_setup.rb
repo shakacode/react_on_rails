@@ -241,6 +241,7 @@ module ReactOnRails
         end
         return unless relative_entry_path
 
+        # Path is relative to app/javascript/src/HelloServer/ror_components/.
         stylesheet_import = "import '../../../stylesheets/application.css';"
         return if File.read(File.join(destination_root, relative_entry_path)).include?(stylesheet_import)
 

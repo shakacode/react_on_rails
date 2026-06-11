@@ -253,6 +253,7 @@ module ReactOnRails
         # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
+                                                          tailwind: use_tailwind?,
                                                           invoked_by_install: true,
                                                           new_app: options.new_app?,
                                                           rsc: use_rsc?,
