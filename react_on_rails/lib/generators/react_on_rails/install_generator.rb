@@ -646,7 +646,6 @@ module ReactOnRails
 
       def add_agent_files
         return unless options.agent_files?
-        return if options[:pretend]
 
         AGENT_FILES.each do |relative_path|
           if File.exist?(File.join(destination_root, relative_path))

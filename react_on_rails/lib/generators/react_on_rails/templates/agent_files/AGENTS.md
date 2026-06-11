@@ -101,10 +101,10 @@ apply the matching fix.
 
 The component name in the view does not match a registered/auto-bundled component.
 
-- Recommended (auto-bundling): put the component at
-  `app/javascript/<components_subdirectory>/<Name>/<Name>.jsx` (or under a
-  `ror_components/` directory) with a `default` export, then regenerate packs:
-  `bundle exec rake react_on_rails:generate_packs`.
+- Recommended (auto-bundling): put the component file directly inside a
+  `ror_components/` directory, e.g.
+  `app/javascript/src/<Name>/ror_components/<Name>.client.tsx`, with a `default`
+  export, then regenerate packs: `bin/rails react_on_rails:generate_packs`.
 - Or register manually: `ReactOnRails.register({ <Name>: <Name> });` and
   `import <Name> from './components/<Name>';`.
 - Check the name matches the `react_component("<Name>", ...)` call exactly (case-sensitive).
@@ -113,7 +113,7 @@ The component name in the view does not match a registered/auto-bundled componen
 
 The component is set up for auto-loading but its bundle is missing.
 
-1. Run the pack generation task: `bundle exec rake react_on_rails:generate_packs`.
+1. Run the pack generation task: `bin/rails react_on_rails:generate_packs`.
 2. Ensure the component is in the correct directory under `app/javascript`.
 3. Check naming conventions: file is `<Name>.jsx` or `<Name>.tsx` and `export default`s.
 4. Verify nested entries are enabled in your Shakapacker/webpack config.
