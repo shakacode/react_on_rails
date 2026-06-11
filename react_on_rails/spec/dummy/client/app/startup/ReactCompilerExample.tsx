@@ -26,7 +26,7 @@ function expensiveLabel(n: number): string {
 
 const ReactCompilerExample = ({
   initialCount = 3,
-  greeting = 'React Compiler is on for this component',
+  greeting = 'React Compiler demo (opt-in)',
 }: ReactCompilerExampleProps) => {
   const [count, setCount] = useState(initialCount);
 
@@ -41,8 +41,10 @@ const ReactCompilerExample = ({
     <div className="react-compiler-example">
       <h3>{greeting}</h3>
       <p>
-        This component uses no manual <code>useMemo</code>/<code>useCallback</code>; the React Compiler adds
-        memoization at build time.
+        This component uses no manual <code>useMemo</code>/<code>useCallback</code>. The React Compiler is{' '}
+        <strong>opt-in</strong>: it only memoizes this component when the app is built with{' '}
+        <code>REACT_COMPILER=1</code> (Babel path). The default build uses SWC with the compiler off, so this
+        renders uncompiled.
       </p>
       <button type="button" onClick={increment}>
         Add item (count: {count})

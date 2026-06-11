@@ -60,7 +60,9 @@ module.exports = function createBabelConfig(api) {
 
 ### 3. (Recommended) Scope the compiler with `sources`
 
-You usually do not want to flip the compiler on for your entire app in one step — it changes the output of every component and can surface latent Rules-of-React violations. The plugin's `sources` option accepts **either an array of glob strings or a predicate `(filename) => boolean`**. Returning `true` opts a file in:
+You usually do not want to flip the compiler on for your entire app in one step — it changes the output of every component and can surface latent Rules-of-React violations. The plugin's `sources` option accepts **either an array of strings or a predicate `(filename) => boolean`**.
+
+The array form is **not glob-based**: each entry is matched as a plain filename **substring** (the plugin checks whether the absolute filename _contains_ the string), so a literal `**` glob like `client/app/**/*.tsx` matches no real path and would silently skip every component. Use the predicate form when you want precise control — it receives the absolute filename and returns `true` to opt a file in:
 
 ```js
 resultConfig.plugins = [

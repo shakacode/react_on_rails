@@ -18,7 +18,6 @@ const defaultConfigFunc = require('shakapacker/package/babel/preset.js');
 // other Babel plugin or preset. In Babel, plugins run before presets, and
 // within the plugins array they run in order, so prepending it to `plugins`
 // makes it the first transform. See docs/oss/building-features/react-compiler.md.
-const reactCompilerEnabled = process.env.REACT_COMPILER === '1' || process.env.REACT_COMPILER === 'true';
 
 // Scope the compiler to the example component only. `sources` accepts a
 // predicate `(filename) => boolean`; returning true opts a file into the
@@ -27,6 +26,15 @@ const reactCompilerSources = (filename) =>
   typeof filename === 'string' && filename.includes('client/app/startup/ReactCompilerExample');
 
 module.exports = function createBabelConfig(api) {
+  // Declare REACT_COMPILER as a cache dependency so Babel re-evaluates this
+  // config (instead of serving a stale cached result in watch mode) when the
+  // env var is toggled. Reading process.env directly without this would violate
+  // the api.cache contract. The default (REACT_COMPILER unset) resolves to
+  // false, leaving the config — and the emitted output — identical to before.
+  const reactCompilerEnabled = api.cache.using(
+    () => process.env.REACT_COMPILER === '1' || process.env.REACT_COMPILER === 'true',
+  );
+
   const resultConfig = defaultConfigFunc(api);
   const isProductionEnv = api.env('production');
   const isDevelopmentEnv = api.env('development');
