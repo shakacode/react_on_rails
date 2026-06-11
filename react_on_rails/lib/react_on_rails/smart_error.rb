@@ -6,6 +6,89 @@ module ReactOnRails
   # SmartError provides enhanced error messages with actionable suggestions
   # rubocop:disable Metrics/ClassLength
   class SmartError < Error
+    DOCS_BASE_URL = "https://reactonrails.com/docs/reference/error-reference"
+    UNKNOWN_ERROR_DEFINITION = {
+      code: "ROR000",
+      title: "Unknown Error",
+      summary: "An unexpected SmartError type was raised.",
+      sample_context: {}.freeze
+    }.freeze
+    ERROR_DEFINITIONS = {
+      component_not_registered: {
+        code: "ROR001",
+        title: "Component Not Registered",
+        summary: "React on Rails could not find the component in the client-side component registry.",
+        sample_context: {
+          component_name: "ProductCard",
+          available_components: %w[ProductList ProductDetails UserProfile].freeze
+        }.freeze
+      }.freeze,
+      missing_auto_loaded_bundle: {
+        code: "ROR002",
+        title: "Auto-loaded Bundle Missing",
+        summary: "A component is configured for auto-loading, but its generated bundle is missing.",
+        sample_context: {
+          component_name: "Dashboard",
+          expected_path: "app/javascript/packs/generated/Dashboard.js"
+        }.freeze
+      }.freeze,
+      missing_auto_loaded_store_bundle: {
+        code: "ROR003",
+        title: "Auto-loaded Store Bundle Missing",
+        summary: "A Redux store is configured for auto-loading, but its generated store bundle is missing.",
+        sample_context: {
+          component_name: "AppStore",
+          expected_path: "app/javascript/packs/generated/AppStore.js"
+        }.freeze
+      }.freeze,
+      hydration_mismatch: {
+        code: "ROR004",
+        title: "Hydration Mismatch",
+        summary: "The server-rendered HTML does not match the React tree rendered in the browser.",
+        sample_context: {
+          component_name: "UserProfile"
+        }.freeze
+      }.freeze,
+      server_rendering_error: {
+        code: "ROR005",
+        title: "Server Rendering Failed",
+        summary: "Server-side rendering failed while rendering a React component.",
+        sample_context: {
+          component_name: "ComplexComponent",
+          error_message: "window is not defined"
+        }.freeze
+      }.freeze,
+      redux_store_not_found: {
+        code: "ROR006",
+        title: "Redux Store Not Found",
+        summary: "A component requested a Redux store that was not registered.",
+        sample_context: {
+          store_name: "AppStore",
+          available_stores: %w[UserStore ProductStore].freeze
+        }.freeze
+      }.freeze,
+      configuration_error: {
+        code: "ROR007",
+        title: "Configuration Error",
+        summary: "React on Rails detected invalid or incomplete configuration.",
+        sample_context: {
+          details: "config.server_bundle_js_file points to a missing file"
+        }.freeze
+      }.freeze
+    }.freeze
+
+    def self.error_definitions
+      ERROR_DEFINITIONS
+    end
+
+    def self.error_definition_for(error_type)
+      ERROR_DEFINITIONS.fetch(error_type.to_sym)
+    end
+
+    def self.docs_url_for(error_type)
+      "#{DOCS_BASE_URL}##{error_definition_for(error_type).fetch(:code).downcase}"
+    end
+
     attr_reader :component_name, :error_type, :props, :js_code, :additional_context
 
     def initialize(error_type:, component_name: nil, props: nil, js_code: nil, **additional_context)
@@ -17,6 +100,16 @@ module ReactOnRails
 
       message = build_error_message
       super(message)
+    end
+
+    def code
+      error_definition.fetch(:code)
+    end
+
+    def docs_url
+      return unless self.class.error_definitions.key?(normalized_error_type)
+
+      self.class.docs_url_for(normalized_error_type)
     end
 
     def solution
@@ -43,12 +136,14 @@ module ReactOnRails
     private
 
     def build_error_message
-      header = Rainbow("❌ React on Rails Error: #{error_type_title}").red.bright
+      header = Rainbow("❌ React on Rails Error [#{code}]: #{error_type_title}").red.bright
 
       message = <<~MSG
         #{header}
 
         #{error_description}
+
+        #{error_reference_section}
 
         #{Rainbow('💡 Suggested Solution:').yellow.bright}
         #{solution}
@@ -58,6 +153,20 @@ module ReactOnRails
       MSG
 
       message.strip
+    end
+
+    def normalized_error_type
+      error_type.respond_to?(:to_sym) ? error_type.to_sym : error_type
+    end
+
+    def error_definition
+      self.class.error_definitions.fetch(normalized_error_type, UNKNOWN_ERROR_DEFINITION)
+    end
+
+    def error_reference_section
+      lines = ["#{Rainbow('Code:').blue} #{code}"]
+      lines << "#{Rainbow('Docs:').blue} #{docs_url}" if docs_url
+      lines.join("\n")
     end
 
     def error_type_title
@@ -192,12 +301,14 @@ module ReactOnRails
     end
 
     def missing_auto_loaded_store_bundle_solution
+      source_path = packer_source_path_for_message
+
       <<~SOLUTION
         1. Run the pack generation task:
            #{Rainbow('bundle exec rake react_on_rails:generate_packs').cyan}
 
         2. Ensure your store is in a directory matching stores_subdirectory under packer_source_path:
-           #{Rainbow("#{ReactOnRails::PackerUtils.packer_source_path}/**/#{ReactOnRails.configuration.stores_subdirectory || 'ror_stores'}/#{component_name}.js").cyan}
+           #{Rainbow("#{source_path}/**/#{ReactOnRails.configuration.stores_subdirectory || 'ror_stores'}/#{component_name}.js").cyan}
 
         3. Check that the store file follows naming conventions:
            - Store file: #{Rainbow("#{component_name}.js").cyan} or #{Rainbow("#{component_name}.ts").cyan}
@@ -206,6 +317,12 @@ module ReactOnRails
         4. Verify stores_subdirectory is configured:
            #{Rainbow("config.stores_subdirectory = 'ror_stores'").cyan}
       SOLUTION
+    end
+
+    def packer_source_path_for_message
+      ReactOnRails::PackerUtils.packer_source_path
+    rescue StandardError
+      "app/javascript"
     end
 
     def hydration_mismatch_solution

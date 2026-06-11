@@ -16,6 +16,8 @@ module ReactOnRails
 
         it "creates error with helpful message" do
           message = error.message
+          expect(message).to include("[ROR001]")
+          expect(message).to include("https://reactonrails.com/docs/reference/error-reference#ror001")
           expect(message).to include("Component 'ProductCard' Not Registered")
           expect(message).to include("ReactOnRails.register({ ProductCard: ProductCard })")
           expect(message).to include("import ProductCard from './components/ProductCard'")
@@ -108,6 +110,7 @@ module ReactOnRails
         errors = [
           { type: :component_not_registered, component: "Test" },
           { type: :missing_auto_loaded_bundle, component: "Test" },
+          { type: :missing_auto_loaded_store_bundle, component: "TestStore" },
           { type: :hydration_mismatch, component: "Test" },
           { type: :server_rendering_error, component: "Test" },
           { type: :redux_store_not_found, store_name: "TestStore" },

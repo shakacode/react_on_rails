@@ -123,6 +123,7 @@ const sidebars: SidebarsConfig = {
       label: 'Reference',
       link: { type: 'generated-index', title: 'Reference' },
       items: [
+        'reference/error-reference',
         {
           type: 'category',
           label: 'Configuration',
