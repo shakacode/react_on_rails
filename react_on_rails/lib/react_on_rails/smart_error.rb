@@ -309,13 +309,15 @@ module ReactOnRails
 
     def missing_auto_loaded_store_bundle_solution
       source_path = packer_source_path_for_message
+      store_subdirectory = ReactOnRails.configuration.stores_subdirectory || "ror_stores"
+      store_source_path = "#{source_path}/**/#{store_subdirectory}/#{component_name}.js"
 
       <<~SOLUTION
         1. Run the pack generation task:
            #{Rainbow('bundle exec rake react_on_rails:generate_packs').cyan}
 
         2. Ensure your store is in a directory matching stores_subdirectory under packer_source_path:
-           #{Rainbow("#{source_path}/**/#{ReactOnRails.configuration.stores_subdirectory || 'ror_stores'}/#{component_name}.js").cyan}
+           #{Rainbow(store_source_path).cyan}
 
         3. Check that the store file follows naming conventions:
            - Store file: #{Rainbow("#{component_name}.js").cyan} or #{Rainbow("#{component_name}.ts").cyan}

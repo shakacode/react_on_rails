@@ -36,6 +36,7 @@ module ReactOnRails
         expect(error.code).to eq(definition.fetch(:code))
         expect(error.docs_url).to eq(described_class.docs_url_for(error_type))
         expect(error.message).to include("[#{definition.fetch(:code)}]")
+        expect(error.docs_url).to be_present
         expect(error.message).to include(error.docs_url)
       end
     end
