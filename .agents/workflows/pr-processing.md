@@ -262,6 +262,9 @@ Workers should not turn product-decision blockers into speculative PRs. They sho
 
 If the user is using `/plan`, or asks to prepare a `/goal`, stop after producing the approved plan and exact `/goal` text. Do not begin implementation just because the plan was approved unless the user explicitly says to launch now.
 
+Keep this goal prompt aligned with `.agents/skills/pr-batch/SKILL.md`,
+including the review/audit gate paragraphs.
+
 Use this goal prompt shape:
 
 ```text
@@ -294,8 +297,7 @@ scoped, run one additional Claude Code review pass if available, such as
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
 controls. For lockfile changes, include Dependabot ecosystem and
-directory/directories compatibility unless the repo has no Dependabot
-configuration and none is being added.
+directory/directories compatibility.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 

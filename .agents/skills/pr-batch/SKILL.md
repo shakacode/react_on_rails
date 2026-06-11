@@ -80,7 +80,8 @@ If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/g
 ## Goal Prompt Template
 
 Keep this template aligned with the matching plan-to-goal prompt in
-`.agents/workflows/pr-processing.md`.
+`.agents/workflows/pr-processing.md`, including the review/audit gate
+paragraphs.
 
 Use this template when creating the `/goal` text:
 
@@ -114,8 +115,7 @@ scoped, run one additional Claude Code review pass if available, such as
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
 controls. For lockfile changes, include Dependabot ecosystem and
-directory/directories compatibility unless the repo has no Dependabot
-configuration and none is being added.
+directory/directories compatibility.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 

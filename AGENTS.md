@@ -229,7 +229,10 @@ GraphQL immediately before merge. Stale approvals or positive comments may be
 listed as advisory history, but they cannot be cited as merge gates. If the
 block is missing, does not name the current head SHA, cites stale verdicts as
 gates, or leaves unresolved threads untriaged, refuse auto-merge and post a PR
-comment explaining the missing mechanical precondition.
+comment explaining the missing mechanical precondition. For an in-flight PR with
+an older block that lacks `Current head SHA:`, refresh and re-finalize the block
+against the live current head before auto-merge; until then, treat the block as
+stale rather than waived.
 
 ```text
 ## Agent Merge Confidence
@@ -279,7 +282,15 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - If branch protection still reports `REVIEW_REQUIRED`, verify whether a formal GitHub approving review is missing. Positive AI issue comments such as "LGTM" or "Ready to merge" support triage but do not satisfy a required review.
 - Security-category findings such as XSS, injection, exposed secrets, or auth bypass still require investigation before dismissal, regardless of source.
 - Treat public review requests as durable GitHub writes. Do not use live PRs for reviewer-bot debugging, placeholder/test review bodies, or pasted instruction dumps; use a sandbox repo, private test repo, or clearly labeled dedicated draft PR instead.
-- For `full-ci`, `benchmark`, accelerated-RC, high-risk, concurrent-batch, or repeatedly churny PRs, avoid nit-only, comment-only, optional wording-only, or evidence-only pushes after the declared final candidate has completed its configured review pass. Batch any remaining must-fix file changes into one final push and restart the current-head review/check gate; otherwise waive or record the optional item in a triage reply or decision log instead of spending another CI/review cycle.
+- For `full-ci`, `benchmark`, accelerated-RC, high-risk, concurrent-batch, or
+  repeatedly churny PRs, avoid nit-only, comment-only, optional wording-only, or
+  evidence-only pushes after the declared final candidate has completed its
+  configured review pass. Treat a PR as repeatedly churny after two or more
+  post-final-candidate pushes, or two or more review-fix/check rerun cycles that
+  do not change the required behavior. Batch any remaining must-fix file changes
+  into one final push and restart the current-head review/check gate; otherwise
+  waive or record the optional item in a triage reply or decision log instead of
+  spending another CI/review cycle.
 - During accelerated-RC auto-merge, the default waiver-soak window is 10 minutes after the latest final waiver or triage reply before merge. A distinct finalizer or maintainer may override that default only with an explicit auditable acknowledgement: a PR comment, GitHub review, or issue/release-tracker comment that names the final waiver set and immediate-merge decision. For auto-merge, that acknowledgement must satisfy the independent-finalizer rule above.
 - The batch coordinator or merge finalizer owns the closeout sweep for late post-merge bot findings before final batch handoff. Findings that arrive after closeout route into the next post-merge audit intake by default.
 
