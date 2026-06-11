@@ -98,7 +98,24 @@ Fetch/prune main first, confirm the expected repo root, and verify any nested re
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
-For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor PRs, commit the intended implementation locally before pushing so there is a clean branch diff. Run repo-specific validation, formatter/lint/type checks as applicable, then run the primary local/adversarial self-review gate, normally `codex review --base origin/<base>` or the PR's real base, before PR creation or update. When requested by a maintainer or when the change is high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor scoped, run one additional Claude Code review pass if available, such as `/code-review` or `/code-review ultra`. For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` / `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base controls; for lockfile changes, include Dependabot ecosystem and directory/directories compatibility unless the repo has no Dependabot configuration and none is being added.
+For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config,
+dependency/runtime-version, or broad refactor PRs, commit the intended
+implementation locally before pushing so there is a clean branch diff. Run
+repo-specific validation, formatter/lint/type checks as applicable, then run the
+primary local/adversarial self-review gate, normally
+`codex review --base origin/<base>` or the PR's real base, before PR creation or
+update.
+
+When requested by a maintainer or when the change is high-risk, `full-ci`,
+`benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor
+scoped, run one additional Claude Code review pass if available, such as
+`/code-review` or `/code-review ultra`.
+
+For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
+`.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
+controls. For lockfile changes, include Dependabot ecosystem and
+directory/directories compatibility unless the repo has no Dependabot
+configuration and none is being added.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 
@@ -138,7 +155,7 @@ before merging. Treat untriaged
 regression, compatibility, and missing-changelog findings as merge blockers
 unless a maintainer explicitly waives them.
 
-If `gh pr checks <PR> --required` reports no required checks, do NOT treat that as CI-ready: instead treat the full `gh pr checks <PR>` list as the readiness gate and require each current-head check to pass or be skipped with CI selector or maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and unexplained skipped checks still block readiness.
+If `gh pr checks <PR> --required` reports no required checks, do NOT treat that as CI-ready: instead treat the full `gh pr checks <PR>` list as the readiness gate and require each current-head check to pass or be skipped with CI selector or maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and unexplained skipped checks still block readiness. If the full check list is empty, report CI state as `UNKNOWN` / not ready and request full CI or maintainer status-check configuration before merge.
 
 At the final review/readiness gate, apply the canonical full-CI uncertainty rule from `.agents/workflows/pr-processing.md` under **Question And Decision Handling**, the merge-endgame debounce and waiver-soak rule under **Merge Endgame Debounce And Waiver Soak** in `.agents/workflows/pr-processing.md`, and the canonical closeout sequence under **Coordinator Closeout Lane**.
 
