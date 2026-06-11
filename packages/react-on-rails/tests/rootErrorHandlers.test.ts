@@ -129,6 +129,24 @@ describe('rootErrorHandlers', () => {
       expect(buildRootErrorCallbackOptions({ componentName: 'X', domNodeId: 'x' }, true)).toEqual({});
     });
 
+    it('keeps the handlers captured at root creation when handlers are later reset', () => {
+      // Attaching a root callback permanently replaces React's default reporting for that
+      // callback on that root, so a wrapper that re-read the (now cleared) registration would
+      // silently swallow errors from still-mounted roots.
+      const { setRootErrorHandlers, resetRootErrorHandlers, buildRootErrorCallbackOptions } =
+        loadModule('19.0.0');
+      const onUncaughtError = jest.fn();
+      setRootErrorHandlers({ onUncaughtError });
+      const context = { componentName: 'X', domNodeId: 'x' };
+      const options = buildRootErrorCallbackOptions(context, false);
+
+      resetRootErrorHandlers();
+
+      const error = new Error('after reset');
+      options.onUncaughtError?.(error, undefined);
+      expect(onUncaughtError).toHaveBeenCalledWith(error, undefined, context);
+    });
+
     it('logs (and swallows) when an async user callback rejects', async () => {
       const { setRootErrorHandlers, buildRootErrorCallbackOptions } = loadModule('19.0.0');
       const rejection = new Error('async handler boom');

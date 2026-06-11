@@ -1,4 +1,4 @@
-import type { RootErrorContext, RootErrorHandlers } from './types/index.ts';
+import type { RootErrorContext, RootErrorHandler, RootErrorHandlers } from './types/index.ts';
 import type { ReactHydrateOptions } from './reactApis.cts';
 import { supportsRootApi, supportsReact19RootErrorCallbacks } from './reactApis.cts';
 import { getRailsContext } from './context.ts';
@@ -82,15 +82,12 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
 // thenable and swallow its rejection too — otherwise a root error could surface as an unhandled
 // promise rejection from the very callback meant to report it.
 function safeInvoke(
+  handler: RootErrorHandler,
   key: RootErrorHandlerKey,
   error: unknown,
   errorInfo: unknown,
   context: RootErrorContext,
 ): void {
-  const handler = registeredHandlers[key];
-  if (!handler) {
-    return;
-  }
   const logHandlerFailure = (handlerError: unknown) => {
     console.error(`[ReactOnRails] The registered rootErrorHandlers.${key} callback threw:`, handlerError);
   };
@@ -134,6 +131,12 @@ type RootErrorCallbackOptions = Pick<
  * Builds the `hydrateRoot`/`createRoot` error callback options for one React root, wrapping the
  * user's registered handlers so they also receive `context` (component name and dom id).
  *
+ * The handlers registered at root-creation time are CAPTURED into the returned wrappers (not
+ * re-read on every error): attaching a root callback permanently replaces React's default
+ * reporting for that callback on that root, so a wrapper that later re-read cleared handlers
+ * would silently swallow errors. Roots therefore keep the handlers they were created with;
+ * re-registering affects only roots created afterwards.
+ *
  * When hydrating in Rails development mode, a React on Rails-branded hydration-mismatch logger is
  * attached in addition to (and before) any user `onRecoverableError`, replacing React's bare
  * console line with an actionable message linking to the debugging guide.
@@ -150,24 +153,28 @@ export function buildRootErrorCallbackOptions(
   }
 
   const options: RootErrorCallbackOptions = {};
+  const { onRecoverableError, onCaughtError, onUncaughtError } = registeredHandlers;
 
   const logDevDefault = hydrating && inDevelopmentEnv();
-  if (logDevDefault || registeredHandlers.onRecoverableError) {
+  if (logDevDefault || onRecoverableError) {
     options.onRecoverableError = (error, errorInfo) => {
       if (logDevDefault) {
         logDevHydrationError(context, error);
       }
-      safeInvoke('onRecoverableError', error, errorInfo, context);
+      if (onRecoverableError) {
+        safeInvoke(onRecoverableError, 'onRecoverableError', error, errorInfo, context);
+      }
     };
   }
 
   if (supportsReact19RootErrorCallbacks) {
-    if (registeredHandlers.onCaughtError) {
-      options.onCaughtError = (error, errorInfo) => safeInvoke('onCaughtError', error, errorInfo, context);
+    if (onCaughtError) {
+      options.onCaughtError = (error, errorInfo) =>
+        safeInvoke(onCaughtError, 'onCaughtError', error, errorInfo, context);
     }
-    if (registeredHandlers.onUncaughtError) {
+    if (onUncaughtError) {
       options.onUncaughtError = (error, errorInfo) =>
-        safeInvoke('onUncaughtError', error, errorInfo, context);
+        safeInvoke(onUncaughtError, 'onUncaughtError', error, errorInfo, context);
     }
   }
 
