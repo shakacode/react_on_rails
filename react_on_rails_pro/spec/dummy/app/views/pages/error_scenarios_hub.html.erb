@@ -82,7 +82,7 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
       <label for="raise_on_prerender_error" style="display: block; font-size: 0.85em; font-weight: bold;">
         raise_on_prerender_error
       </label>
-      <select name="raise_on_prerender_error" id="raise_on_prerender_error" onchange="this.form.submit()">
+      <select name="raise_on_prerender_error" id="raise_on_prerender_error">
         <option value="true" <%= "selected" if raise_on_prerender_error %>>true</option>
         <option value="false" <%= "selected" unless raise_on_prerender_error %>>false</option>
       </select>
@@ -92,7 +92,7 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
       <label for="throw_js_errors" style="display: block; font-size: 0.85em; font-weight: bold;">
         throw_js_errors
       </label>
-      <select name="throw_js_errors" id="throw_js_errors" onchange="this.form.submit()">
+      <select name="throw_js_errors" id="throw_js_errors">
         <option value="true" <%= "selected" if throw_js_errors %>>true</option>
         <option value="false" <%= "selected" unless throw_js_errors %>>false</option>
       </select>
@@ -102,7 +102,7 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
       <label for="raise_non_shell_server_rendering_errors" style="display: block; font-size: 0.85em; font-weight: bold;">
         raise_non_shell_server_rendering_errors
       </label>
-      <select name="raise_non_shell_server_rendering_errors" id="raise_non_shell_server_rendering_errors" onchange="this.form.submit()">
+      <select name="raise_non_shell_server_rendering_errors" id="raise_non_shell_server_rendering_errors">
         <option value="true" <%= "selected" if raise_non_shell %>>true</option>
         <option value="false" <%= "selected" unless raise_non_shell %>>false</option>
       </select>
@@ -113,6 +113,15 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
         <button type="submit" style="padding: 0.4em 1.2em; font-size: 1em; cursor: pointer;">Apply</button>
       </div>
     </noscript>
+  <% end %>
+
+  <%# Inline event handlers (onchange="...") are blocked by the strict CSP
+      (script-src 'self' 'nonce-...' - see config/initializers/content_security_policy.rb),
+      so the auto-submit behavior is attached from a nonced script instead. %>
+  <%= javascript_tag nonce: true do %>
+    document.querySelectorAll('#config-override-form select').forEach(function (el) {
+      el.addEventListener('change', function () { el.form.submit(); });
+    });
   <% end %>
 
   <%= button_to "Reset to dummy defaults", reset_error_configs_path, method: :post,
