@@ -25,8 +25,12 @@ This is the verified, recommended path.
 ### 1. Install the plugin
 
 ```bash
-# pnpm (this monorepo) / yarn / npm — pick yours
+# pnpm
 pnpm add -D babel-plugin-react-compiler@^1.0.0
+# npm
+npm install --save-dev babel-plugin-react-compiler@^1.0.0
+# yarn
+yarn add --dev babel-plugin-react-compiler@^1.0.0
 ```
 
 ### 2. Add the plugin to `babel.config.js`, ordered FIRST
