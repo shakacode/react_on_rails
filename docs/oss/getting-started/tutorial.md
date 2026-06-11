@@ -102,7 +102,6 @@ type CounterProps = {
 
 export default function Counter({ initialCount = 0, label = 'Counter' }: CounterProps) {
   const [count, setCount] = useState(initialCount);
-  const doubled = count * 2;
 
   return (
     <section>
@@ -110,7 +109,6 @@ export default function Counter({ initialCount = 0, label = 'Counter' }: Counter
       <p>
         Count: <strong>{count}</strong>
       </p>
-      <p>Double: {doubled}</p>
       <button type="button" onClick={() => setCount((current) => current + 1)}>
         Increment
       </button>
@@ -140,6 +138,7 @@ class DashboardController < ApplicationController
 
   def show
     @counter_props = {
+      # React props use camelCase; react_component serializes this hash to JSON.
       initialCount: 3,
       label: "Orders ready"
     }
@@ -163,7 +162,7 @@ If your app sets `config.auto_load_bundle = true` in `config/initializers/react_
 
 The generated `react_on_rails_default` layout includes the Shakapacker tags that auto-bundling needs. If you render from your application's default layout instead, add the same `stylesheet_pack_tag` and `javascript_pack_tag` placeholders there.
 
-If `app/views/layouts/react_on_rails_default.html.erb` is not present in your app, remove the `layout` line from the controller and add the pack-tag placeholders to the layout that renders this view.
+If `app/views/layouts/react_on_rails_default.html.erb` is not present (for example, you added React on Rails manually to an existing app without running the installer), remove the `layout` line from the controller and add the pack-tag placeholders to the layout that renders this view.
 
 ## Run The App With HMR
 
@@ -214,27 +213,19 @@ The server file can re-export the same component when no special server behavior
 export { default } from './Counter.client';
 ```
 
+Auto-bundling discovers `Counter.server.tsx` and includes it in the generated server bundle. You do not need to change `config.server_bundle_js_file` when the generated `server-bundle.js` entrypoint is already in place.
+
 Then add `prerender: true` in the Rails view:
 
 ```erb
 <%= react_component("Counter", props: @counter_props, prerender: true, auto_load_bundle: true) %>
 ```
 
-Server rendering runs in Node or ExecJS, so browser globals such as `window`, `document`, and `localStorage` must stay inside effects or client-only branches. This standalone example shows the pattern; you do not need to add it for the Counter tutorial:
+> [!NOTE]
+> `prerender: true` needs a server bundle. For a first local SSR check, use `./bin/dev static` or run a production precompile. If you want the dev server to serve the prerender bundle, follow the [HMR guide](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) and set `config.same_bundle_for_client_and_server = true` for that mode.
 
-```tsx
-import React, { useEffect, useState } from 'react';
-
-export default function BrowserTime() {
-  const [timeZone, setTimeZone] = useState('UTC');
-
-  useEffect(() => {
-    setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
-  }, []);
-
-  return <p>Your browser time zone is {timeZone}.</p>;
-}
-```
+> [!WARNING]
+> Server rendering runs in Node or ExecJS, which has no browser globals (`window`, `document`, `localStorage`). Guard browser-only access inside a `useEffect` hook or a conditional on `typeof window !== 'undefined'`.
 
 For deeper SSR guidance, see [Client vs. Server Rendering](../core-concepts/client-vs-server-rendering.md) and [React Server Rendering](../core-concepts/react-server-rendering.md).
 
@@ -244,6 +235,12 @@ Before deploying, run the production asset pipeline locally once:
 
 ```bash
 RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile
+```
+
+After verifying the production build locally, remove compiled assets before returning to development:
+
+```bash
+bin/rails assets:clobber
 ```
 
 For deployment details, see:
@@ -311,6 +308,6 @@ For manually wired stores or advanced store sharing, use the [`redux_store` help
 - [Using React on Rails](./using-react-on-rails.md)
 - [Auto-Bundling](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)
 - [View Helpers API](../api-reference/view-helpers-api.md)
-- [Hot Module Replacement](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)
+- [Hot Module Replacement (HMR)](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)
 - [Server Rendering](../core-concepts/react-server-rendering.md)
 - [Production Deployment](../deployment/README.md)
