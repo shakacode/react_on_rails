@@ -17,7 +17,7 @@ class ErrorReferenceGenerator
   REGENERATE_COMMAND = "BUNDLE_GEMFILE=react_on_rails/Gemfile bundle exec ruby script/generate_error_reference.rb"
   ANSI_ESCAPE = /\e\[[0-9;]*m/
   CODE_PATTERN = /\AROR\d{3}\z/
-  REQUIRED_DEFINITION_KEYS = %i[title summary sample_context].freeze
+  REQUIRED_DEFINITION_KEYS = %i[code title summary sample_context].freeze
 
   def initialize(check_mode:)
     @check_mode = check_mode
@@ -26,12 +26,12 @@ class ErrorReferenceGenerator
 
   def run
     validate_definitions
+    return 1 if @failed
+
     output = render
 
     if @check_mode
       check_output(output)
-    elsif @failed
-      warn "✗ Not writing #{relative_output_file} while validation is failing."
     else
       FileUtils.mkdir_p(File.dirname(OUTPUT_FILE))
       File.write(OUTPUT_FILE, output)
@@ -53,25 +53,27 @@ class ErrorReferenceGenerator
   end
 
   def ordered_definitions
-    definitions.sort_by { |_error_type, definition| definition.fetch(:code) }
+    definitions.sort_by { |error_type, definition| [definition.fetch(:code, ""), error_type.to_s] }
   end
 
   def validate_definitions
     seen_codes = {}
 
     ordered_definitions.each do |error_type, definition|
-      code = definition.fetch(:code)
+      REQUIRED_DEFINITION_KEYS.each do |key|
+        record_failure("#{error_type} is missing #{key}") unless definition.key?(key)
+      end
+
+      code = definition[:code]
+      next unless definition.key?(:code)
+
       record_failure("#{error_type} has invalid code #{code.inspect}; expected ROR001-style format") unless
-        CODE_PATTERN.match?(code)
+        code.is_a?(String) && CODE_PATTERN.match?(code)
 
       if seen_codes.key?(code)
         record_failure("#{error_type} reuses #{code}; already assigned to #{seen_codes.fetch(code)}")
       else
         seen_codes[code] = error_type
-      end
-
-      REQUIRED_DEFINITION_KEYS.each do |key|
-        record_failure("#{error_type} is missing #{key}") unless definition.key?(key)
       end
     end
   end
