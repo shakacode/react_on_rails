@@ -164,7 +164,11 @@ unexplained skipped checks still block readiness. If the full check list is
 empty, report CI state as `UNKNOWN` / not ready and request full CI or maintainer
 status-check configuration before merge.
 
-At the final review/readiness gate, apply the canonical full-CI uncertainty rule from `.agents/workflows/pr-processing.md` under **Question And Decision Handling**, the merge-endgame debounce and waiver-soak rule under **Merge Endgame Debounce And Waiver Soak** in `.agents/workflows/pr-processing.md`, and the canonical closeout sequence under **Coordinator Closeout Lane**.
+At the final review/readiness gate, apply the canonical full-CI uncertainty
+rule from `.agents/workflows/pr-processing.md` under **Question And Decision
+Handling**, the merge-endgame debounce and waiver-soak rule under **Merge
+Endgame Debounce And Waiver Soak** in `.agents/workflows/pr-processing.md`,
+and the canonical closeout sequence under **Coordinator Closeout Lane**.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 

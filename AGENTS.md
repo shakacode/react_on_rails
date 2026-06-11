@@ -235,9 +235,9 @@ comment explaining the missing mechanical precondition.
 ## Agent Merge Confidence
 
 Mode: accelerated-rc
+Current head SHA: <head SHA used for this block>
 Score: X/10
 Auto-merge recommendation: <yes if score is at least 8/10, else no>
-Current head SHA: <head SHA used for this block>
 Affected areas: RSC, Pro/core boundary, CI
 CI detector: `script/ci-changes-detector origin/main` -> <summary>
 Validation run:
@@ -283,7 +283,13 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - During accelerated-RC auto-merge, the default waiver-soak window is 10 minutes after the latest final waiver or triage reply before merge. A distinct finalizer or maintainer may override that default only with an explicit auditable acknowledgement: a PR comment, GitHub review, or issue/release-tracker comment that names the final waiver set and immediate-merge decision. For auto-merge, that acknowledgement must satisfy the independent-finalizer rule above.
 - The batch coordinator or merge finalizer owns the closeout sweep for late post-merge bot findings before final batch handoff. Findings that arrive after closeout route into the next post-merge audit intake by default.
 
-For auto-merge, all GitHub checks for the current head SHA must be complete. Skipped checks count as complete only when they are explained by CI selector output, such as `script/ci-changes-detector origin/main`, or explicitly waived by a maintainer in a PR comment. Failed checks block auto-merge unless a maintainer explicitly waives them. If checks are noisy or unnecessary, fix the CI selection process instead of bypassing them silently.
+For auto-merge, all GitHub checks for the current head SHA must be complete.
+An empty full `gh pr checks <PR>` list is `UNKNOWN` / not ready, not a
+vacuous pass. Skipped checks count as complete only when they are explained by
+CI selector output, such as `script/ci-changes-detector origin/main`, or
+explicitly waived by a maintainer in a PR comment. Failed checks block
+auto-merge unless a maintainer explicitly waives them. If checks are noisy or
+unnecessary, fix the CI selection process instead of bypassing them silently.
 
 For auto-merge, use the GitHub `claude-review` check as the preferred independent review gate. Wait while it is queued or running for the current head SHA. If it fails due to quota exhaustion, hard usage-limit enforcement, or a provider-reported capacity error such as HTTP 503, fall back to Cursor Bugbot or a completed Codex review (`codex review --base origin/main`, or the PR's real base branch) only when that fallback review completes and its findings meet the same blocker-triage bar. For HTTP 429, wait 60 seconds and retry once; if the 429 persists, treat it as a capacity block and use the fallback path. The fallback must leave a named reviewer identity in the GitHub review record or a timestamped PR comment; verify that identity before treating the fallback as complete, and record the exact Claude error evidence plus fallback result in the PR body. Any other Claude failure blocks auto-merge until understood. CodeRabbit remains advisory and is not a required approval gate.
 

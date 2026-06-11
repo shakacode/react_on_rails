@@ -341,7 +341,14 @@ resolve or explicitly waive actionable findings before merging. Treat untriaged
 regression, compatibility, and missing-changelog findings as merge blockers
 unless a maintainer explicitly waives them.
 
-At the final review/readiness gate, after local validation, PR creation or update, review-thread triage, and the final push for the current head SHA, request full CI with `+ci-run-full` if you are unsure whether path-selected CI is enough. Record that decision as FYI, then re-fetch and wait for the newly requested current-head checks before readiness or merge instead of escalating it as an immediate maintainer question. Also apply the merge-endgame debounce and waiver-soak rule under **Merge Endgame Debounce And Waiver Soak** before the final merge/readiness decision.
+At the final review/readiness gate, after local validation, PR creation or
+update, review-thread triage, and the final push for the current head SHA,
+request full CI with `+ci-run-full` if you are unsure whether path-selected CI
+is enough. Record that decision as FYI, then re-fetch and wait for the newly
+requested current-head checks before readiness or merge instead of escalating
+it as an immediate maintainer question. Also apply the merge-endgame debounce
+and waiver-soak rule under **Merge Endgame Debounce And Waiver Soak** before
+the final merge/readiness decision.
 
 After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, update stale release-mode classification, refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it, request full CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
 
@@ -783,7 +790,7 @@ Auto-merge requires all of the following:
 - The authoring agent did not finalize its own `8/10` or higher score. The `Finalized by` value names a different GitHub account or named GitHub check/app identity, verifiable from the git log or GitHub review/check record. Two sessions running under the same GitHub account, including separate invocations of the same GitHub App bot, do not satisfy this requirement.
 - Score is at least `8/10`; `7/10` permits human merge after review, but not auto-merge.
 - Before triggering auto-merge, the merge actor verifies `Finalized by` against the GitHub review record, checks, or git log, not only the PR body text.
-- All GitHub checks for the current head SHA are complete. Skipped checks count as complete only when CI selector output explains them or a maintainer explicitly waives them.
+- All GitHub checks for the current head SHA are complete. An empty full `gh pr checks <PR>` list is `UNKNOWN` / not ready. Skipped checks count as complete only when CI selector output explains them or a maintainer explicitly waives them.
 - The GitHub `claude-review` check is complete for the current head SHA, or it failed because of quota exhaustion, hard usage-limit enforcement, provider-reported capacity such as HTTP 503, or persistent HTTP 429 after one 60-second retry, and Cursor Bugbot or Codex review (`codex review --base origin/main`, or the PR's real base branch) completed as the fallback with the same blocker-triage bar and exact error evidence recorded in the PR body.
 - Any fallback review leaves a named reviewer identity in the GitHub review record or a timestamped PR comment. Before treating the fallback as complete, the merge actor confirms the reviewer is either a named GitHub check/app identity visible in the Checks API for the current head SHA or a collaborator with `write`, `maintain`, or `admin` permission.
 - Claude failures not caused by capacity limits are understood before merge.
