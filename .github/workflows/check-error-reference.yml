@@ -10,6 +10,7 @@ on:
       - 'docs/oss/reference/error-reference.md'
       - 'docs/sidebars.ts'
       - 'react_on_rails/lib/react_on_rails/smart_error.rb'
+      - 'react_on_rails/lib/react_on_rails/utils.rb'
       - 'script/generate_error_reference.rb'
       - '.github/workflows/check-error-reference.yml'
   pull_request:
@@ -17,6 +18,7 @@ on:
       - 'docs/oss/reference/error-reference.md'
       - 'docs/sidebars.ts'
       - 'react_on_rails/lib/react_on_rails/smart_error.rb'
+      - 'react_on_rails/lib/react_on_rails/utils.rb'
       - 'script/generate_error_reference.rb'
       - '.github/workflows/check-error-reference.yml'
   workflow_dispatch:
