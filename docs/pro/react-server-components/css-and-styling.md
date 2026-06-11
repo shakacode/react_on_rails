@@ -69,7 +69,9 @@ Recommended pattern:
 ```tsx
 // app/javascript/components/ProductSummary.tsx
 // No 'use client'. This is a Server Component.
-export default function ProductSummary({ product }) {
+type Product = { name: string; description: string };
+
+export default function ProductSummary({ product }: { product: Product }) {
   return (
     <article className="product-summary">
       <h2>{product.name}</h2>
@@ -106,7 +108,7 @@ boundary:
 
 import styles from './FavoriteButton.module.scss';
 
-export default function FavoriteButton({ active }) {
+export default function FavoriteButton({ active }: { active: boolean }) {
   return (
     <button className={active ? styles.activeButton : styles.button} type="button">
       Favorite
@@ -119,7 +121,9 @@ export default function FavoriteButton({ active }) {
 // app/javascript/components/ProductPage.tsx
 import FavoriteButton from './FavoriteButton';
 
-export default async function ProductPage({ product }) {
+type Product = { favorite: boolean; name: string };
+
+export default async function ProductPage({ product }: { product: Product }) {
   return (
     <section>
       <h1>{product.name}</h1>
@@ -285,36 +289,51 @@ Static extraction libraries are the best fit when you want authored-in-JS styles
 RSC pages. Configure the package so CSS is emitted into a stylesheet that Shakapacker can extract and Rails can
 serve.
 
-Example shape for Vanilla Extract, appended to your existing client config:
+Example shape for Vanilla Extract, appended inside your existing generated Pro client config:
 
 ```js
 // config/webpack/clientWebpackConfig.js
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const { VanillaExtractPlugin } = require('@vanilla-extract/webpack-plugin');
-const commonWebpackConfig = require('./commonWebpackConfig');
+
+const vanillaExtractCssRule = {
+  test: /\.vanilla\.css$/i,
+  use: [
+    MiniCssExtractPlugin.loader,
+    {
+      loader: require.resolve('css-loader'),
+      options: { url: false },
+    },
+  ],
+};
+
+const excludeVanillaExtractCss = (rule) => {
+  if (!rule || typeof rule !== 'object') return;
+
+  if (Array.isArray(rule.oneOf)) {
+    rule.oneOf.forEach(excludeVanillaExtractCss);
+  }
+
+  if (rule.test instanceof RegExp && rule.test.test('app.css')) {
+    rule.exclude = [rule.exclude, /\.vanilla\.css$/i].flat().filter(Boolean);
+  }
+};
 
 const configureClient = () => {
   const clientConfig = commonWebpackConfig();
 
-  // Keep your existing React on Rails Pro plugins. Add Vanilla Extract to the
-  // browser/client build so authored .css.ts modules emit stylesheet assets.
+  // Keep the generated Pro client setup before this point, including:
+  // - deleting the server-bundle entry
+  // - installing the RSC client-manifest plugin
+  // - preserving LoadablePlugin and browser resolve fallbacks
+
   clientConfig.plugins.push(new VanillaExtractPlugin());
 
-  clientConfig.module.rules.push({
-    test: /\.vanilla\.css$/i,
-    use: [
-      MiniCssExtractPlugin.loader,
-      {
-        loader: require.resolve('css-loader'),
-        options: { url: false },
-      },
-    ],
-  });
+  clientConfig.module.rules.forEach(excludeVanillaExtractCss);
+  clientConfig.module.rules.push(vanillaExtractCssRule);
 
   return clientConfig;
 };
-
-module.exports = configureClient;
 ```
 
 ```tsx
@@ -329,30 +348,31 @@ export const card = style({
 
 ```tsx
 // app/javascript/components/ProductCard.tsx
+'use client';
+
 import { card } from './productCard.css';
 
-export default function ProductCard({ product }) {
+type Product = { name: string };
+
+export default function ProductCard({ product }: { product: Product }) {
   return <article className={card}>{product.name}</article>;
 }
-```
-
-If `ProductCard` stays a Server Component, also import the extracted style module from a browser-loaded pack so
-the CSS is emitted for Rails to serve:
-
-```ts
-// app/javascript/packs/client-bundle.ts
-import '../components/productCard.css';
-import '../styles/application.css';
 ```
 
 The authored Vanilla Extract module is `productCard.css.ts`, but the import specifier intentionally omits the
 `.ts` extension and uses `productCard.css`. That is the Vanilla Extract convention: the bundler plugin resolves
 the authored module and emits `.vanilla.css`. Shakapacker must still handle that generated CSS with a CSS
-extraction rule so Rails can serve the asset. Treat this as a starting point. Confirm the package's
-webpack/Rspack plugin supports the bundler you use and then verify the emitted CSS in your client assets. If
-the styled component is a Client Component instead, keep the style import behind that `'use client'` boundary
-and verify the CSS appears in `react-client-manifest.json`. If you import Vanilla Extract modules directly from
-the RSC bundle, also check the [third-party library compatibility notes](../../oss/migrating/rsc-third-party-libs.md#zero-runtime-css-in-js-rsc-compatible)
+extraction rule so Rails can serve the asset, and the generated `.vanilla.css` file should be excluded from any
+broader CSS rule so it is processed exactly once. Treat this as a starting point. Confirm the package's
+webpack/Rspack plugin supports the bundler you use and then verify the emitted CSS in your client assets and in
+`react-client-manifest.json`.
+
+This client-boundary shape is the recommended copyable setup for RSC pages because the authored `.css.ts`
+import stays in the browser/client graph. If you import Vanilla Extract modules directly from a Server
+Component or any other RSC/server graph module, the server and RSC build must also understand those imports and
+the extracted CSS must still be loaded by a browser pack. This repo has not verified that package-specific
+server/RSC configuration; also check the
+[third-party library compatibility notes](../../oss/migrating/rsc-third-party-libs.md#zero-runtime-css-in-js-rsc-compatible)
 for the current `.css.ts` workaround caveat.
 
 ### 5. Treat runtime CSS-in-JS as package-specific
