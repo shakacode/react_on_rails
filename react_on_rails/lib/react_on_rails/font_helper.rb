@@ -44,6 +44,10 @@ module ReactOnRails
   module FontHelper
     extend ActiveSupport::Concern
 
+    # CSS/HTML metacharacters that would let an argument break out of the
+    # `<style>` / `<link>` context this helper emits.
+    UNSAFE_TOKEN = /[<>"\r\n]/
+
     # Emits the preload `<link>`, the primary `@font-face`, and (when `fallback:`
     # is supplied) a metric-matched fallback `@font-face`.
     #
@@ -60,6 +64,11 @@ module ReactOnRails
     #   :name (the generated face name, default "#{family} Fallback"),
     #   :size_adjust, :ascent_override, :descent_override, :line_gap_override.
     # @return [ActiveSupport::SafeBuffer] head markup, ready for `content_for :head`.
+    #
+    # @note SECURITY: arguments are interpolated verbatim into the trusted CSS/HTML
+    #   emitted into `<head>` and the result is marked `html_safe`. Pass only
+    #   developer-controlled values (font names, asset paths), never end-user input.
+    #   Values containing `<`, `>`, `"`, or a newline raise `ArgumentError`.
     def react_on_rails_font_face(family:, src:, weight: 400, style: "normal", display: "swap",
                                  unicode_range: nil, preload: true, fallback: nil)
       ReactOnRails::FontHelper.font_face_markup(
@@ -72,6 +81,12 @@ module ReactOnRails
     # Returns a plain (not html_safe) String.
     def self.font_face_markup(family:, src:, weight: 400, style: "normal", display: "swap",
                               unicode_range: nil, preload: true, fallback: nil)
+      ensure_safe!("family", family)
+      ensure_safe!("src", src)
+      if fallback
+        ensure_safe!("fallback[:family]", fallback.fetch(:family))
+        ensure_safe!("fallback[:name]", fallback[:name]) if fallback[:name]
+      end
       rule = font_face_rule(family:, src:, weight:, style:, display:, unicode_range:)
       parts = []
       parts << preload_link(src) if preload
@@ -79,6 +94,17 @@ module ReactOnRails
       parts[-1] << "\n#{fallback_font_face_rule(family, fallback)}" if fallback
       parts[-1] << "\n</style>"
       parts.join("\n")
+    end
+
+    # Rejects values that could break out of the CSS/HTML context. Font helper
+    # arguments are emitted into trusted `<head>` markup, so they must be
+    # developer-controlled, not end-user input.
+    def self.ensure_safe!(name, value)
+      return unless value.to_s.match?(UNSAFE_TOKEN)
+
+      raise ArgumentError,
+            "react_on_rails_font_face: #{name}=#{value.inspect} contains an unsafe character " \
+            "(<, >, \", or newline); font arguments must be developer-controlled, not end-user input."
     end
 
     def self.preload_link(src)

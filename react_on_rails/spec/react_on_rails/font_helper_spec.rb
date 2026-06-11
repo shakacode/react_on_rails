@@ -104,6 +104,14 @@ module ReactOnRails
           )
         end.to raise_error(KeyError)
       end
+
+      it "raises if a value contains markup-breaking characters" do
+        expect do
+          described_class.font_face_markup(
+            family: 'Inter"></style><script>alert(1)</script>', src: "/assets/inter.woff2"
+          )
+        end.to raise_error(ArgumentError, /unsafe character/)
+      end
     end
   end
 end

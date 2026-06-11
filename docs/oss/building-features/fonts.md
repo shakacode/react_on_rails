@@ -86,6 +86,8 @@ body {
 | `preload:`       | `true`     | Emit the preload `<link>`.                                     |
 | `fallback:`      | `nil`      | Metric-matched fallback face (see below).                      |
 
+> **Trusted input only.** Every argument is interpolated verbatim into the CSS/HTML this helper emits into `<head>`, and the result is marked HTML-safe. Pass developer-controlled values (font names, asset paths) — never end-user input. Values containing `<`, `>`, `"`, or a newline raise `ArgumentError`.
+
 ## Self-hosting through the asset pipeline
 
 Commit the `.woff2` file into your asset pipeline so it is fingerprinted and
