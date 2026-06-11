@@ -214,10 +214,23 @@ fi
 
 # Map CI job names to identifiers
 # NOTE: Version numbers below must match .github/workflows/main.yml matrix configuration
+job_name_matches() {
+  local check="$1"
+  local job_pattern="$2"
+
+  # Preserve historical prefix matching for exact keys; glob keys that already
+  # end in * match through the first condition.
+  [[ "$check" == $job_pattern ]] || [[ "$check" == $job_pattern* ]]
+}
+
 declare -A JOB_MAP
 JOB_MAP["lint-js-and-ruby"]="lint-js-and-ruby"
 JOB_MAP["rspec-package-tests"]="rspec-package-tests"
 JOB_MAP["package-js-tests"]="package-js-tests"
+# Split dummy app callers include build jobs too, so only match the reusable integration job.
+JOB_MAP["webpack-dummy-app-tests / dummy-app-integration-tests*"]="dummy-app-integration-tests"
+JOB_MAP["webpack-minimum-dummy-app-tests / dummy-app-integration-tests*"]="dummy-app-integration-tests"
+JOB_MAP["rspack-dummy-app-tests / dummy-app-integration-tests*"]="dummy-app-integration-tests"
 JOB_MAP["dummy-app-integration-tests (4.0, 22, latest)"]="dummy-app-integration-tests"
 JOB_MAP["dummy-app-integration-tests (3.3, 20, minimum)"]="dummy-app-integration-tests"
 JOB_MAP["examples"]="examples"
@@ -256,6 +269,9 @@ run_command() {
 # Map CI job names to human-readable versions.
 # Keep Shakapacker versions in sync with bin/ci-switch-config and SWITCHING_CI_CONFIGS.md.
 declare -A JOB_VERSION_MAP
+JOB_VERSION_MAP["webpack-dummy-app-tests / dummy-app-integration-tests*"]="Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"
+JOB_VERSION_MAP["webpack-minimum-dummy-app-tests / dummy-app-integration-tests*"]="Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18"
+JOB_VERSION_MAP["rspack-dummy-app-tests / dummy-app-integration-tests*"]="Ruby 4.0, Node 22, React 19 (rspack)"
 JOB_VERSION_MAP["dummy-app-integration-tests (4.0, 22, latest)"]="Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"
 JOB_VERSION_MAP["dummy-app-integration-tests (3.3, 20, minimum)"]="Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18"
 
@@ -263,7 +279,7 @@ JOB_VERSION_MAP["dummy-app-integration-tests (3.3, 20, minimum)"]="Ruby 3.3, Nod
 get_version_info() {
   local job_name="$1"
   for mapped_job_name in "${!JOB_VERSION_MAP[@]}"; do
-    if [[ "$job_name" == "$mapped_job_name"* ]]; then
+    if job_name_matches "$job_name" "$mapped_job_name"; then
       echo " (${JOB_VERSION_MAP[$mapped_job_name]})"
       return
     fi
@@ -283,8 +299,8 @@ declare -A COMMANDS_TO_RUN
 
 while IFS= read -r check; do
   for job_name in "${!JOB_MAP[@]}"; do
-    if [[ "$check" == "$job_name"* ]]; then
-      COMMANDS_TO_RUN["${JOB_MAP[$job_name]}"]="$job_name"
+    if job_name_matches "$check" "$job_name"; then
+      COMMANDS_TO_RUN["${JOB_MAP[$job_name]}"]="$check"
       break
     fi
   done
