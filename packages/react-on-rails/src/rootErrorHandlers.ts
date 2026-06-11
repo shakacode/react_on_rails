@@ -67,8 +67,20 @@ export function getRootErrorHandlers(): RootErrorHandlers {
   return registeredHandlers;
 }
 
-// A throwing user callback must not break React's own error recovery, so failures are logged
-// rather than propagated.
+/** Narrows an unknown value to a thenable (has a callable `.then`) without assuming a native Promise. */
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
+// A failing user callback must not break React's own error recovery, so failures are logged
+// rather than propagated. Handlers are typed to return void, but an `async` handler (or one
+// returning a rejecting thenable) is still assignable to that type, so adopt any returned
+// thenable and swallow its rejection too — otherwise a root error could surface as an unhandled
+// promise rejection from the very callback meant to report it.
 function safeInvoke(
   key: RootErrorHandlerKey,
   error: unknown,
@@ -79,10 +91,19 @@ function safeInvoke(
   if (!handler) {
     return;
   }
-  try {
-    handler(error, errorInfo, context);
-  } catch (handlerError) {
+  const logHandlerFailure = (handlerError: unknown) => {
     console.error(`[ReactOnRails] The registered rootErrorHandlers.${key} callback threw:`, handlerError);
+  };
+  // Re-type the void-returning handler so an async handler's returned promise can be inspected.
+  const invoke = handler as (e: unknown, i: unknown, c: RootErrorContext) => unknown;
+  try {
+    const result = invoke(error, errorInfo, context);
+    if (isThenable(result)) {
+      // `Promise.resolve(...)` adopts non-native thenables that may lack `.catch`.
+      Promise.resolve(result).catch(logHandlerFailure);
+    }
+  } catch (handlerError) {
+    logHandlerFailure(handlerError);
   }
 }
 

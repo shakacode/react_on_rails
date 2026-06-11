@@ -129,6 +129,27 @@ describe('rootErrorHandlers', () => {
       expect(buildRootErrorCallbackOptions({ componentName: 'X', domNodeId: 'x' }, true)).toEqual({});
     });
 
+    it('logs (and swallows) when an async user callback rejects', async () => {
+      const { setRootErrorHandlers, buildRootErrorCallbackOptions } = loadModule('19.0.0');
+      const rejection = new Error('async handler boom');
+      setRootErrorHandlers({
+        // An async handler is assignable to the void-returning handler type; its rejection must
+        // be adopted and logged instead of escaping as an unhandled promise rejection.
+        onRecoverableError: jest.fn(() => Promise.reject(rejection)),
+      });
+      const options = buildRootErrorCallbackOptions({ componentName: 'X', domNodeId: 'x' }, true);
+      expect(() => options.onRecoverableError?.(new Error('boom'), undefined)).not.toThrow();
+
+      // Flush microtasks so the swallowing .catch runs.
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('rootErrorHandlers.onRecoverableError callback threw'),
+        rejection,
+      );
+    });
+
     it('logs (and does not rethrow) when a user callback throws', () => {
       const { setRootErrorHandlers, buildRootErrorCallbackOptions } = loadModule('19.0.0');
       const handlerError = new Error('handler boom');
