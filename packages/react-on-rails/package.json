@@ -41,6 +41,7 @@
     "./reactApis": "./lib/reactApis.cjs",
     "./webpackHelpers": "./lib/webpackHelpers.cjs",
     "./reactHydrateOrRender": "./lib/reactHydrateOrRender.js",
+    "./useRailsForm": "./lib/useRailsForm.js",
     "./turbolinksUtils": "./lib/turbolinksUtils.js",
     "./isRenderFunction": "./lib/isRenderFunction.js",
     "./ReactOnRails.client": "./lib/ReactOnRails.client.js",

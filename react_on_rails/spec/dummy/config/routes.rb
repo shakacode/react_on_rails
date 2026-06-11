@@ -51,4 +51,8 @@ Rails.application.routes.draw do
   # route only exists when the dummy app is booted with VIEW_TRANSITIONS_DEMO=true.
   # See docs/oss/building-features/view-transitions.md.
   get "view_transitions_demo" => "pages#view_transitions_demo" if ENV["VIEW_TRANSITIONS_DEMO"] == "true"
+
+  # useRailsForm example (issue #3872): client form + JSON mutation endpoint.
+  get "rails_form" => "pages#rails_form"
+  post "contact_messages" => "contact_messages#create"
 end

@@ -85,6 +85,7 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Integrations',
           items: [
+            'building-features/forms',
             'building-features/react-and-redux',
             'building-features/styling-with-tailwind',
             'building-features/i18n',

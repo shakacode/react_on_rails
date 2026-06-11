@@ -1,0 +1,10 @@
+module ReactOnRails
+  module Controller
+    # Opt-in helpers for responding to useRailsForm submissions.
+    module FormResponders
+      # Renders ActiveModel errors as `{ errors: { field: [messages] } }` JSON
+      # with HTTP 422 (by default).
+      def render_model_errors: (untyped record, ?status: Symbol | Integer) -> void
+    end
+  end
+end

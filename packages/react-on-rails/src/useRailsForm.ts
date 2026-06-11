@@ -1,0 +1,346 @@
+/**
+ * useRailsForm — a small, Inertia `useForm`-style hook for submitting React
+ * forms to plain Rails controller actions.
+ *
+ * The hook keeps Rails as the mutation layer: it wires up `fetch`, attaches the
+ * CSRF token from the standard Rails `<meta name="csrf-token">` tag (via the
+ * existing `authenticityHeaders` utility), sends/receives JSON, and maps the
+ * blessed 422 validation-error shape — `{ errors: { field: ["message"] } }` —
+ * onto per-field client state. The matching server side is the opt-in
+ * `ReactOnRails::Controller::FormResponders#render_model_errors` concern in the
+ * react_on_rails gem, but the hook works against any endpoint that returns the
+ * documented shape.
+ *
+ * v1 scope (https://github.com/shakacode/react_on_rails/issues/3872):
+ * submit verbs, `data`/`setData`, `errors`, `processing`, CSRF auto-attach, and
+ * 422 error mapping. Deferred to a follow-up: `transform`,
+ * `recentlySuccessful`, and file-upload `progress` (which requires an
+ * XMLHttpRequest or duplex-stream transport; v1 is fetch-only).
+ *
+ * Success/redirect handling is intentionally minimal and forward-compatible
+ * with the client-routing work in issue #3873: the hook never navigates on its
+ * own. It surfaces the redirect target (from a followed fetch redirect or a
+ * JSON `redirect_to` hint) through `onSuccess` / the resolved submit result so
+ * the app — or a future router integration — decides what to do.
+ */
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { authenticityHeaders } from './Authenticity.ts';
+
+/** Per-field validation errors: `{ field: ["message", ...] }`. */
+export type RailsFormErrors = Record<string, string[]>;
+
+export type RailsFormMethod = 'post' | 'put' | 'patch' | 'delete';
+
+export interface RailsFormSuccessResult {
+  ok: true;
+  /** Parsed JSON response body, or `null` when the body was empty or not JSON. */
+  responseData: unknown;
+  /**
+   * Redirect target when the server redirected (fetch follows it; we report the
+   * final URL) or replied with a JSON `redirect_to`/`redirectTo` hint.
+   * The hook never navigates — pass this to your router or `window.location`.
+   * Designed to compose with the client-routing integration in issue #3873.
+   */
+  redirectTo: string | null;
+  response: Response;
+}
+
+export interface RailsFormValidationErrorResult {
+  ok: false;
+  /** Per-field errors mapped from the 422 response body. */
+  errors: RailsFormErrors;
+  response: Response;
+}
+
+export type RailsFormSubmitResult = RailsFormSuccessResult | RailsFormValidationErrorResult;
+
+/** Thrown (as a promise rejection) for non-2xx responses other than a mappable 422. */
+export class RailsFormRequestError extends Error {
+  readonly response: Response;
+
+  constructor(response: Response) {
+    super(`useRailsForm request failed with status ${response.status}`);
+    this.name = 'RailsFormRequestError';
+    this.response = response;
+  }
+}
+
+export interface RailsFormSubmitOptions {
+  /** Extra request headers. CSRF headers are always applied on top. */
+  headers?: Record<string, string>;
+  /** Called after a 2xx response. */
+  onSuccess?: (result: RailsFormSuccessResult) => void;
+  /** Called after a 422 response whose body matched the documented errors shape. */
+  onError?: (errors: RailsFormErrors) => void;
+}
+
+export interface UseRailsForm<TData extends Record<string, unknown>> {
+  /** Current form data. */
+  data: TData;
+  /** Set a single field, merge a partial object, or apply an updater function. */
+  setData: {
+    <K extends keyof TData>(key: K, value: TData[K]): void;
+    (valuesOrUpdater: Partial<TData> | ((previousData: TData) => TData)): void;
+  };
+  /** Per-field validation errors from the last 422 response (or `setError`). */
+  errors: RailsFormErrors;
+  hasErrors: boolean;
+  /** True while a submission is in flight. */
+  processing: boolean;
+  /** True once the most recent submission succeeded. Reset when a new one starts. */
+  wasSuccessful: boolean;
+  /** Submit with an explicit HTTP method. */
+  submit: (
+    method: RailsFormMethod,
+    url: string,
+    options?: RailsFormSubmitOptions,
+  ) => Promise<RailsFormSubmitResult>;
+  post: (url: string, options?: RailsFormSubmitOptions) => Promise<RailsFormSubmitResult>;
+  put: (url: string, options?: RailsFormSubmitOptions) => Promise<RailsFormSubmitResult>;
+  patch: (url: string, options?: RailsFormSubmitOptions) => Promise<RailsFormSubmitResult>;
+  /** Named `delete` on the hook object; `delete` is reserved in some contexts. */
+  delete: (url: string, options?: RailsFormSubmitOptions) => Promise<RailsFormSubmitResult>;
+  /** Reset all data (no args) or the given fields to their initial values. Clears matching errors. */
+  reset: (...fields: Extract<keyof TData, string>[]) => void;
+  /** Clear all errors (no args) or the errors for the given fields. */
+  clearErrors: (...fields: string[]) => void;
+  /** Manually set the errors for one field (e.g. client-side pre-checks). */
+  setError: (field: string, messages: string | string[]) => void;
+}
+
+const toMessageArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map(String);
+  }
+  return [String(value)];
+};
+
+/**
+ * Normalizes a 422 response body into per-field errors. Returns `null` when the
+ * body doesn't match the documented `{ errors: { field: messages } }` shape.
+ */
+const mapValidationErrors = (body: unknown): RailsFormErrors | null => {
+  if (typeof body !== 'object' || body === null) {
+    return null;
+  }
+  const { errors } = body as { errors?: unknown };
+  if (typeof errors !== 'object' || errors === null || Array.isArray(errors)) {
+    return null;
+  }
+  const mapped: RailsFormErrors = {};
+  for (const [field, messages] of Object.entries(errors)) {
+    mapped[field] = toMessageArray(messages);
+  }
+  return mapped;
+};
+
+const parseJsonBody = async (response: Response): Promise<unknown> => {
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    return null;
+  }
+};
+
+const extractRedirectTo = (response: Response, responseData: unknown): string | null => {
+  if (response.redirected && response.url) {
+    return response.url;
+  }
+  if (typeof responseData === 'object' && responseData !== null) {
+    const { redirect_to: redirectSnake, redirectTo: redirectCamel } = responseData as {
+      redirect_to?: unknown;
+      redirectTo?: unknown;
+    };
+    if (typeof redirectSnake === 'string') {
+      return redirectSnake;
+    }
+    if (typeof redirectCamel === 'string') {
+      return redirectCamel;
+    }
+  }
+  return null;
+};
+
+/**
+ * React hook for submitting form data to a Rails controller action.
+ *
+ * ```tsx
+ * const form = useRailsForm({ name: '', email: '' });
+ * // <input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} />
+ * // {form.errors.name?.[0]}
+ * // <form onSubmit={(e) => { e.preventDefault(); void form.post('/contacts'); }}>
+ * ```
+ *
+ * Submissions send `Content-Type: application/json` / `Accept: application/json`
+ * with the CSRF token from the Rails csrf-token meta tag. A 422 response with a
+ * `{ errors: { field: ["message"] } }` body (the shape rendered by the
+ * `render_model_errors` controller concern) populates `errors`; other non-2xx
+ * responses reject with `RailsFormRequestError`.
+ */
+export function useRailsForm<TData extends Record<string, unknown>>(initialData: TData): UseRailsForm<TData> {
+  const initialDataRef = useRef(initialData);
+  const [data, setDataState] = useState<TData>(initialData);
+  const [errors, setErrors] = useState<RailsFormErrors>({});
+  const [processing, setProcessing] = useState(false);
+  const [wasSuccessful, setWasSuccessful] = useState(false);
+
+  // Latest data for submit() so callbacks never read stale state.
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  // Guards against state updates from stale (superseded) or unmounted submissions.
+  const submissionIdRef = useRef(0);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const setData = useCallback(
+    (keyOrValues: keyof TData | Partial<TData> | ((previousData: TData) => TData), value?: unknown) => {
+      if (typeof keyOrValues === 'function') {
+        setDataState(keyOrValues);
+      } else if (typeof keyOrValues === 'object') {
+        setDataState((previousData) => ({ ...previousData, ...keyOrValues }));
+      } else {
+        setDataState((previousData) => ({ ...previousData, [keyOrValues]: value }));
+      }
+    },
+    [],
+  ) as UseRailsForm<TData>['setData'];
+
+  const clearErrors = useCallback((...fields: string[]) => {
+    if (fields.length === 0) {
+      setErrors({});
+      return;
+    }
+    setErrors((previousErrors) =>
+      Object.fromEntries(Object.entries(previousErrors).filter(([field]) => !fields.includes(field))),
+    );
+  }, []);
+
+  const setError = useCallback((field: string, messages: string | string[]) => {
+    setErrors((previousErrors) => ({ ...previousErrors, [field]: toMessageArray(messages) }));
+  }, []);
+
+  const reset = useCallback(
+    (...fields: Extract<keyof TData, string>[]) => {
+      if (fields.length === 0) {
+        setDataState(initialDataRef.current);
+        clearErrors();
+        return;
+      }
+      setDataState((previousData) => {
+        const nextData = { ...previousData };
+        fields.forEach((field) => {
+          nextData[field] = initialDataRef.current[field];
+        });
+        return nextData;
+      });
+      clearErrors(...fields);
+    },
+    [clearErrors],
+  );
+
+  const submit = useCallback(
+    async (method: RailsFormMethod, url: string, options: RailsFormSubmitOptions = {}) => {
+      submissionIdRef.current += 1;
+      const submissionId = submissionIdRef.current;
+      const isCurrent = () => mountedRef.current && submissionId === submissionIdRef.current;
+
+      setProcessing(true);
+      setWasSuccessful(false);
+
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: method.toUpperCase(),
+          credentials: 'same-origin',
+          headers: authenticityHeaders({
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            ...options.headers,
+          }),
+          body: JSON.stringify(dataRef.current),
+        });
+      } catch (fetchError) {
+        if (isCurrent()) {
+          setProcessing(false);
+        }
+        throw fetchError;
+      }
+
+      if (response.status === 422) {
+        const validationErrors = mapValidationErrors(await parseJsonBody(response));
+        if (validationErrors) {
+          if (isCurrent()) {
+            setErrors(validationErrors);
+            setProcessing(false);
+          }
+          options.onError?.(validationErrors);
+          return { ok: false as const, errors: validationErrors, response };
+        }
+      }
+
+      if (!response.ok) {
+        if (isCurrent()) {
+          setProcessing(false);
+        }
+        throw new RailsFormRequestError(response);
+      }
+
+      const responseData = await parseJsonBody(response);
+      const result: RailsFormSuccessResult = {
+        ok: true,
+        responseData,
+        redirectTo: extractRedirectTo(response, responseData),
+        response,
+      };
+      if (isCurrent()) {
+        setErrors({});
+        setWasSuccessful(true);
+        setProcessing(false);
+      }
+      options.onSuccess?.(result);
+      return result;
+    },
+    [],
+  );
+
+  const post = useCallback(
+    (url: string, options?: RailsFormSubmitOptions) => submit('post', url, options),
+    [submit],
+  );
+  const put = useCallback(
+    (url: string, options?: RailsFormSubmitOptions) => submit('put', url, options),
+    [submit],
+  );
+  const patch = useCallback(
+    (url: string, options?: RailsFormSubmitOptions) => submit('patch', url, options),
+    [submit],
+  );
+  const destroy = useCallback(
+    (url: string, options?: RailsFormSubmitOptions) => submit('delete', url, options),
+    [submit],
+  );
+
+  return {
+    data,
+    setData,
+    errors,
+    hasErrors: Object.keys(errors).length > 0,
+    processing,
+    wasSuccessful,
+    submit,
+    post,
+    put,
+    patch,
+    delete: destroy,
+    reset,
+    clearErrors,
+    setError,
+  };
+}
