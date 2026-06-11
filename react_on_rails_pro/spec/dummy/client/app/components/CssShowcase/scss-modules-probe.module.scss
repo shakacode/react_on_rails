@@ -1,0 +1,14 @@
+$probe-bg: rgb(255, 182, 193);
+$probe-border: rgb(200, 100, 120);
+$probe-color: rgb(80, 20, 30);
+
+.probe {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  margin: 0.25rem;
+  border: 2px solid $probe-border;
+  background-color: $probe-bg;
+  color: $probe-color;
+  font-weight: 600;
+}

@@ -37,3 +37,8 @@ ReactOnRails.setOptions({
 ReactOnRails.registerStoreGenerators({
   SharedReduxStore,
 });
+
+// CSS Showcase — registered for client-side hydration (issue #3862)
+import CssShowcaseSSR from '../ror-auto-load-components/CssShowcaseSSR.jsx';
+import CssShowcaseRSC from '../ror-auto-load-components/CssShowcaseRSC.jsx';
+ReactOnRails.register({ CssShowcaseSSR, CssShowcaseRSC });

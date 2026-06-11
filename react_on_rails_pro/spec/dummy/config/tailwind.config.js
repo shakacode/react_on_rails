@@ -19,7 +19,12 @@ const aspectRatio = require('@tailwindcss/aspect-ratio');
 const typography = require('@tailwindcss/typography');
 
 module.exports = {
-  content: ['./app/helpers/**/*.rb', './app/javascript/**/*.js', './app/views/**/*.{erb,haml,html,slim}'],
+  content: [
+    './app/helpers/**/*.rb',
+    './app/javascript/**/*.js',
+    './app/views/**/*.{erb,haml,html,slim}',
+    './client/app/**/*.{js,jsx,ts,tsx}',
+  ],
   theme: {
     extend: {
       fontFamily: {

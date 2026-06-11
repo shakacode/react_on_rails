@@ -61,6 +61,8 @@ Rails.application.routes.draw do
   get "rsc_posts_page_over_http" => "pages#rsc_posts_page_over_http", as: :rsc_posts_page_over_http
   get "rsc_posts_page_over_redis" => "pages#rsc_posts_page_over_redis", as: :rsc_posts_page_over_redis
   get "rsc_echo_props" => "pages#rsc_echo_props", as: :rsc_echo_props
+  get "css_showcase_ssr" => "pages#css_showcase_ssr", as: :css_showcase_ssr
+  get "css_showcase_rsc" => "pages#css_showcase_rsc", as: :css_showcase_rsc
   get "async_on_server_sync_on_client" => "pages#async_on_server_sync_on_client", as: :async_on_server_sync_on_client
   get "async_on_server_sync_on_client_client_render" => "pages#async_on_server_sync_on_client_client_render",
       as: :async_on_server_sync_on_client_client_render

@@ -1,0 +1,10 @@
+.probe {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  margin: 0.25rem;
+  border: 2px solid rgb(100, 150, 180);
+  background-color: rgb(173, 216, 230);
+  color: rgb(20, 50, 80);
+  font-weight: 600;
+}
