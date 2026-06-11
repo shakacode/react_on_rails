@@ -139,11 +139,13 @@ describe ReactOnRailsHelper do
   describe "#react_on_rails_preload_links" do
     let(:manifest) { instance_double(Shakapacker::Manifest) }
     let(:integrity_config) { { enabled: false, cross_origin: "anonymous" } }
-    let(:shakapacker_config) { instance_double(Shakapacker::Configuration, integrity: integrity_config) }
+    let(:shakapacker_config) do
+      instance_double(Shakapacker::Configuration, integrity: integrity_config, nested_entries?: true)
+    end
     let(:shakapacker_instance) { instance_double(Shakapacker::Instance, manifest:, config: shakapacker_config) }
 
     before do
-      allow(helper).to receive(:current_shakapacker_instance).and_return(shakapacker_instance)
+      allow(Shakapacker).to receive(:instance).and_return(shakapacker_instance)
       allow(manifest).to receive(:lookup_pack_with_chunks!)
       allow(manifest).to receive(:lookup_pack_with_chunks)
     end

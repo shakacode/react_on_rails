@@ -521,6 +521,10 @@ module ReactOnRails
       Array(sources).compact
     end
 
+    def current_shakapacker_instance
+      ::Shakapacker.instance
+    end
+
     def preload_link_for_javascript_source(source)
       attributes = preload_link_attributes(source)
       if modulepreload_source?(source)
