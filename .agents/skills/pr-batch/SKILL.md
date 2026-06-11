@@ -150,12 +150,19 @@ workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is
 not enough when review comments exist: fetch unresolved review threads with the
 GraphQL command in `.agents/workflows/pr-processing.md` under **Initial GitHub
 Commands**, then classify and resolve or explicitly waive actionable findings
-before merging. Treat untriaged
+before merging. When no required checks are reported, apply the fallback in the
+next paragraph; an empty full check list is `UNKNOWN` / not ready. Treat untriaged
 `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security,
 regression, compatibility, and missing-changelog findings as merge blockers
 unless a maintainer explicitly waives them.
 
-If `gh pr checks <PR> --required` reports no required checks, do NOT treat that as CI-ready: instead treat the full `gh pr checks <PR>` list as the readiness gate and require each current-head check to pass or be skipped with CI selector or maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and unexplained skipped checks still block readiness. If the full check list is empty, report CI state as `UNKNOWN` / not ready and request full CI or maintainer status-check configuration before merge.
+If `gh pr checks <PR> --required` reports no required checks, do NOT treat that
+as CI-ready. Instead treat the full `gh pr checks <PR>` list as the readiness
+gate and require each current-head check to pass or be skipped with CI selector
+or maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and
+unexplained skipped checks still block readiness. If the full check list is
+empty, report CI state as `UNKNOWN` / not ready and request full CI or maintainer
+status-check configuration before merge.
 
 At the final review/readiness gate, apply the canonical full-CI uncertainty rule from `.agents/workflows/pr-processing.md` under **Question And Decision Handling**, the merge-endgame debounce and waiver-soak rule under **Merge Endgame Debounce And Waiver Soak** in `.agents/workflows/pr-processing.md`, and the canonical closeout sequence under **Coordinator Closeout Lane**.
 

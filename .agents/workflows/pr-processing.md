@@ -462,7 +462,7 @@ The closeout lane is:
    around or after merge. Route release-relevant findings into the next
    post-merge audit intake. Reserve the full post-merge audit workflow for
    final-release readiness, suspected bad merges, or a lightweight sweep that
-   finds a release-risk signal.
+   finds a blocker, failed post-merge check, or credible release-readiness risk.
 
 ## Self-Review Gate
 
@@ -661,11 +661,18 @@ remaining must-fix file changes into one final push and restart the current-head
 otherwise waive or record the optional item in a triage reply or decision log instead of spending
 another CI/review cycle.
 
+The final-candidate debounce above applies to all PR classes named in this section. The
+waiver-soak window below applies only to accelerated-RC auto-merge.
+
 During accelerated-RC auto-merge, the default waiver-soak window is 10 minutes after the latest
 final waiver or triage reply before merge. A distinct finalizer or maintainer may override that
-default only with an explicit auditable acknowledgement of the final waiver set and immediate-merge
-decision. For auto-merge, that acknowledgement must satisfy the independent-finalizer rule in
-`AGENTS.md`.
+default only with an explicit auditable acknowledgement: a PR comment, GitHub review, or
+issue/release-tracker comment that names the final waiver set and immediate-merge decision. For
+auto-merge, that acknowledgement must satisfy the independent-finalizer rule in `AGENTS.md`.
+
+If a must-fix finding arrives during the waiver-soak window, fix it or obtain an explicit maintainer
+waiver, then restart local validation, the current-head review/check gate, and the waiver-soak window
+from the latest fix, waiver, or triage reply.
 
 The batch coordinator or merge finalizer owns the closeout sweep for late post-merge bot findings
 before final batch handoff. Findings that arrive after closeout route into the next post-merge audit
@@ -801,7 +808,7 @@ tracker if one exists. If the merged PR touched `.github/workflows/`, include th
 relevant `actionlint`, `yamllint .github/`, or workflow-selection evidence in the
 post-merge summary before marking it clean. Reserve full post-merge audit for
 final-release readiness, suspected bad merges, or a lightweight sweep that finds
-a release-risk signal.
+a blocker, failed post-merge check, or credible release-readiness risk.
 
 ## Multi-PR Landing Plan
 
