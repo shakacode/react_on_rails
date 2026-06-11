@@ -140,10 +140,10 @@ A sudden spike of `UNKNOWN` rows can indicate stale GitHub authentication, API r
 Print the full Markdown table. No silent caps, no "top N", and no filtering to only likely changelog entries. Every row from the PR-listing command must appear, including `no-entry` rows.
 
 ```markdown
-| PR    | Result       | Category        | Reason                                                                                             |
-| ----- | ------------ | --------------- | -------------------------------------------------------------------------------------------------- |
-| #3595 | entry-needed | Pro runtime     | Moves RSC manifest signature checks async, removing blocking filesystem work from the render path. |
-| #3597 | no-entry     | release-process | Defines release-gate tracking docs; no product behavior changes.                                   |
+| PR    | Title                                     | Result       | Category        | Reason                                                                                             |
+| ----- | ----------------------------------------- | ------------ | --------------- | -------------------------------------------------------------------------------------------------- |
+| #3595 | Async RSC manifest signature verification | entry-needed | Pro runtime     | Moves RSC manifest signature checks async, removing blocking filesystem work from the render path. |
+| #3597 | Document release-gate tracker workflow    | no-entry     | release-process | Defines release-gate tracking docs; no product behavior changes.                                   |
 ```
 
 Allowed `Result` values for mapped PRs are exactly:
@@ -172,7 +172,7 @@ Each row needs a one-line reason specific enough for review. Avoid generic reaso
 - Categorize by the primary surface changed, not by the changelog section it might eventually use:
   - `product code`: OSS gem/npm package runtime, generators, public types, public config, or user-facing examples.
   - `Pro runtime`: proprietary Pro package/runtime behavior, RSC integration, Node renderer behavior, Pro-generated config, Pro package compatibility.
-  - `perf-reliability`: runtime performance/reliability fixes, benchmark/regression systems, crash recovery, and failure classification. Use `entry-needed` only when users benefit directly; benchmark machinery itself is usually `no-entry`.
+  - `perf-reliability`: runtime performance/reliability fixes, benchmark/regression systems, crash recovery, and failure classification. Category applies regardless of result. Use `entry-needed` when the change directly benefits users at runtime, such as removing blocking work from the render path. Use `no-entry` for internal benchmark harnesses or regression tooling that contributors use.
   - `release-process`: release tasks, CI selection, dependency pins used only for releasing/testing, changelog mechanics, PR batch mechanics, agent skills, GitHub Actions, and maintainer workflow.
   - `internal`: docs/planning, tests, fixtures, refactors, cleanup, diagnostics for contributors, and non-user-facing maintenance.
 
