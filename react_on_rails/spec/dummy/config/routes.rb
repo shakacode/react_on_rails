@@ -40,6 +40,7 @@ Rails.application.routes.draw do
   get "react_helmet_broken" => "pages#react_helmet_broken"
   get "broken_app" => "pages#broken_app"
   get "image_example" => "pages#image_example"
+  get "font_optimization_example" => "pages#font_optimization_example"
   get "context_function_return_jsx" => "pages#context_function_return_jsx"
   get "pure_component_wrapped_in_function" => "pages#pure_component_wrapped_in_function"
   get "turbo_frame_tag_hello_world" => "pages#turbo_frame_tag_hello_world"

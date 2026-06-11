@@ -87,6 +87,7 @@ const sidebars: SidebarsConfig = {
             'building-features/react-and-redux',
             'building-features/i18n',
             'building-features/images',
+            'building-features/fonts',
             'building-features/rails-engine-integration',
             'building-features/turbolinks',
           ],

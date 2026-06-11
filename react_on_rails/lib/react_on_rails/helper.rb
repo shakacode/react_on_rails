@@ -13,11 +13,13 @@ require "react_on_rails/utils"
 require "react_on_rails/json_output"
 require "active_support/concern"
 require "react_on_rails/pro_helper"
+require "react_on_rails/font_helper"
 
 module ReactOnRails
   module Helper
     include ReactOnRails::Utils::Required
     include ReactOnRails::ProHelper
+    include ReactOnRails::FontHelper
 
     COMPONENT_HTML_KEY = "componentHtml"
     IMMEDIATE_HYDRATION_WARNING_MUTEX = Mutex.new
