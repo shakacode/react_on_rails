@@ -92,6 +92,8 @@ export default function QueryProvider({ children }) {
 
 CSS-in-JS is the most impactful compatibility challenge for RSC migration. Runtime CSS-in-JS libraries depend on React Context and re-rendering, which Server Components fundamentally lack.
 
+For React on Rails Pro bundle and asset-loading patterns, see [CSS and Styling with React Server Components](../../pro/react-server-components/css-and-styling.md).
+
 ### Runtime CSS-in-JS (Problematic)
 
 | Library               | RSC Status                                                                                                                                                                                                                         | Notes                                                                                                                                              |
