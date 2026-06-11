@@ -76,7 +76,7 @@ Use Quick Start when the user wants the shortest path to a working install. Use 
 
 ### Existing Rails app integration
 
-- Install into an Existing Rails App: https://reactonrails.com/docs/getting-started/installation-into-an-existing-rails-app
+- Install into an Existing Rails App: https://reactonrails.com/docs/getting-started/existing-rails-app
 - Using React on Rails: https://reactonrails.com/docs/getting-started/using-react-on-rails
 - React server rendering: https://reactonrails.com/docs/core-concepts/react-server-rendering
 
@@ -1124,13 +1124,9 @@ Now that you have React on Rails running, here are ways to level up:
 Feedback is greatly appreciated! As are stars on GitHub. If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).
 
 ================================================================================
-PAGE: https://reactonrails.com/docs/getting-started/installation-into-an-existing-rails-app
+PAGE: https://reactonrails.com/docs/getting-started/existing-rails-app
 SOURCE: docs/oss/getting-started/installation-into-an-existing-rails-app.md
 ================================================================================
-
----
-slug: existing-rails-app
----
 
 # Install into an Existing Rails App
 
@@ -1750,11 +1746,6 @@ The friendly license model lets you evaluate Pro without a token in development,
 PAGE: https://reactonrails.com/docs/getting-started/comparing-react-on-rails-to-alternatives
 SOURCE: docs/oss/getting-started/comparing-react-on-rails-to-alternatives.md
 ================================================================================
-
----
-sidebar_label: 'Decision Guide'
-description: Narrative decision guide for choosing React on Rails vs Hotwire, Inertia, Next.js, Vite, and react-rails.
----
 
 # Comparing React on Rails to Alternatives
 
@@ -3067,13 +3058,9 @@ ReactOnRails.register({ RouterShell });
 By understanding these return types and which helper to use with each, you can create sophisticated server-rendered React components that fully integrate with your Rails views.
 
 ================================================================================
-PAGE: https://reactonrails.com/docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation
+PAGE: https://reactonrails.com/docs/core-concepts/auto-bundling
 SOURCE: docs/oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md
 ================================================================================
-
----
-slug: auto-bundling
----
 
 # Auto-Bundling: File-System-Based Automated Bundle Generation
 
@@ -5942,13 +5929,9 @@ end
 For implementation steps, compression middleware compatibility, script loading strategies, metadata handling, immediate hydration, and best practices, see the [Streaming SSR guide](../../pro/streaming-ssr.md).
 
 ================================================================================
-PAGE: https://reactonrails.com/docs/building-features/how-to-conditionally-server-render-based-on-device-type
+PAGE: https://reactonrails.com/docs/building-features/conditional-server-rendering
 SOURCE: docs/oss/building-features/how-to-conditionally-server-render-based-on-device-type.md
 ================================================================================
-
----
-slug: conditional-server-rendering
----
 
 # How to conditionally render server side based on the device type
 
@@ -5992,13 +5975,9 @@ Note, full details of the React on Rails configuration are [available here](../c
 See the doc file [render-functions-and-railscontext.md](../core-concepts/render-functions-and-railscontext.md#rails-context) for how your client-side code uses the device information
 
 ================================================================================
-PAGE: https://reactonrails.com/docs/building-features/how-to-use-different-files-for-client-and-server-rendering
+PAGE: https://reactonrails.com/docs/building-features/client-server-files
 SOURCE: docs/oss/building-features/how-to-use-different-files-for-client-and-server-rendering.md
 ================================================================================
-
----
-slug: client-server-files
----
 
 ## How to use different versions of a file for client and server rendering
 
@@ -16649,11 +16628,6 @@ PAGE: https://reactonrails.com/docs/upgrading/release-notes
 SOURCE: docs/oss/upgrading/release-notes/index.md
 ================================================================================
 
----
-sidebar_label: Release Notes Archive
-description: Archive of React on Rails OSS release notes that remain available at their existing routes.
----
-
 # React on Rails Release Notes
 
 This archive keeps the major React on Rails OSS release notes easy to browse without listing every version directly in the sidebar.
@@ -17332,11 +17306,6 @@ _Building the future of Rails + React performance_
 PAGE: https://reactonrails.com/docs/pro/release-notes
 SOURCE: docs/pro/release-notes/index.md
 ================================================================================
-
----
-sidebar_label: Pro Release Notes Archive
-description: Central index for React on Rails Pro release notes, including legacy pre-monorepo notes.
----
 
 # React on Rails Pro Release Notes
 
@@ -18906,13 +18875,9 @@ The big question when doing the migration from AngularJS to React is whether you
 2. Larger deploys of a full screen can yield efficiencies such as converting the whole screen to use one Redux store. However, this can be a large chunk of code to test and deploy.
 
 ================================================================================
-PAGE: https://reactonrails.com/docs/pro/react-on-rails-pro
+PAGE: https://reactonrails.com/docs/pro
 SOURCE: docs/pro/react-on-rails-pro.md
 ================================================================================
-
----
-slug: /pro
----
 
 # React on Rails Pro
 
@@ -31963,11 +31928,6 @@ The standard RSC advice -- "make everything a Server Component unless it needs i
 PAGE: https://reactonrails.com/docs/getting-started/comparison-with-alternatives
 SOURCE: docs/oss/getting-started/comparison-with-alternatives.md
 ================================================================================
-
----
-sidebar_label: 'Feature Matrix & Benchmarks'
-description: Side-by-side feature matrix and performance-oriented comparison of Rails + React integration options.
----
 
 # Comparison with Alternatives
 

@@ -14,10 +14,11 @@
  * Doc ID rules mirror script/check-docs-sidebar:
  *   docs/oss/getting-started/quick-start.md → getting-started/quick-start
  *   docs/pro/installation.md                → pro/installation
- * URL rules (see llms.txt for the conventions in use):
- *   <id>            → https://reactonrails.com/docs/<id>
- *   <dir>/index     → https://reactonrails.com/docs/<dir>
- *   <dir>/README    → https://reactonrails.com/docs/<dir>
+ * URL rules (Docusaurus conventions; see llms.txt for examples):
+ *   <id>                                    → https://reactonrails.com/docs/<id>
+ *   <dir>/index, <dir>/README               → https://reactonrails.com/docs/<dir>
+ *   front-matter `slug: <name>` (relative)  → replaces the last path segment
+ *   front-matter `slug: /<path>` (absolute) → replaces the whole path
  */
 
 import fs from 'node:fs';
@@ -61,8 +62,25 @@ function docIdForFile(relPath) {
   return withoutExt.startsWith('oss/') ? withoutExt.slice('oss/'.length) : withoutExt;
 }
 
-function urlForDocId(docId) {
-  const base = docId.replace(/\/(index|README)$/, '');
+// Split optional YAML front matter off a doc body; only `slug:` is read.
+function splitFrontMatter(content) {
+  const match = content.match(/^---\n([\s\S]*?)\n---\n/);
+  if (!match) return { slug: undefined, body: content };
+  const slugMatch = match[1].match(/^slug:\s*(\S+)\s*$/m);
+  return { slug: slugMatch ? slugMatch[1] : undefined, body: content.slice(match[0].length) };
+}
+
+function urlPathForDoc(docId, slug) {
+  if (slug) {
+    if (slug.startsWith('/')) return slug.replace(/^\/+/, '');
+    const dir = path.posix.dirname(docId);
+    return dir === '.' ? slug : `${dir}/${slug}`;
+  }
+  return docId.replace(/\/(index|README)$/, '');
+}
+
+function urlForDoc(docId, slug) {
+  const base = urlPathForDoc(docId, slug);
   return base === '' ? `${SITE_DOCS_URL}/` : `${SITE_DOCS_URL}/${base}`;
 }
 
@@ -84,7 +102,8 @@ function collectDocs() {
       const relPath = path.relative(DOCS_DIR, file);
       const docId = docIdForFile(relPath);
       if (!exclusions.has(docId)) {
-        docs.set(docId, { relPath: `docs/${relPath}`, content: fs.readFileSync(file, 'utf8') });
+        const { slug, body } = splitFrontMatter(fs.readFileSync(file, 'utf8'));
+        docs.set(docId, { relPath: `docs/${relPath}`, slug, content: body });
       }
     }
   }
@@ -131,10 +150,10 @@ function generate(docs, orderedIds) {
     '',
   ];
   for (const docId of orderedIds) {
-    const { relPath, content } = docs.get(docId);
+    const { relPath, slug, content } = docs.get(docId);
     parts.push(
       '================================================================================',
-      `PAGE: ${urlForDocId(docId)}`,
+      `PAGE: ${urlForDoc(docId, slug)}`,
       `SOURCE: ${relPath}`,
       '================================================================================',
       '',
@@ -148,16 +167,24 @@ function generate(docs, orderedIds) {
 function validateDocUrls(docs) {
   const urlPattern = /https:\/\/reactonrails\.com\/docs[^\s)\]'"`>]*/g;
   const resolvableIds = new Set();
-  for (const docId of docs.keys()) {
+  for (const [docId, { slug }] of docs.entries()) {
     resolvableIds.add(docId);
-    resolvableIds.add(docId.replace(/\/(index|README)$/, ''));
+    resolvableIds.add(urlPathForDoc(docId, slug));
   }
-  // Category/hub URLs resolve to a docs directory (generated index pages).
+  // Category/hub URLs resolve to a docs DIRECTORY (generated index pages);
+  // plain files under docs/ (configs, this script's inputs) must not count.
+  const isDocsDirectory = (candidate) => {
+    try {
+      return fs.statSync(candidate).isDirectory();
+    } catch {
+      return false;
+    }
+  };
   const resolves = (docPath) =>
     docPath === '' ||
     resolvableIds.has(docPath) ||
-    fs.existsSync(path.join(DOCS_DIR, 'oss', docPath)) ||
-    fs.existsSync(path.join(DOCS_DIR, docPath));
+    isDocsDirectory(path.join(DOCS_DIR, 'oss', docPath)) ||
+    isDocsDirectory(path.join(DOCS_DIR, docPath));
 
   let validated = 0;
   for (const file of [LLMS_FILE, PREAMBLE_FILE]) {
@@ -190,6 +217,8 @@ if (checkMode) {
   if (existing !== output) {
     fail('llms-full.txt is stale. Run `node script/generate-llms-full.mjs` and commit the result.');
   }
+} else if (process.exitCode === 1) {
+  console.error('✗ Not writing llms-full.txt while URL validation is failing; fix the URLs above first.');
 } else {
   fs.writeFileSync(OUTPUT_FILE, output);
 }
