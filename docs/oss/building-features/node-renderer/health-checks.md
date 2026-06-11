@@ -96,21 +96,15 @@ containers:
       periodSeconds: 5
       failureThreshold: 6
       timeoutSeconds: 1
-    # Readiness: gate traffic on the built-in /ready endpoint (worker online
-    # AND at least one bundle compiled). httpGet cannot be used: the renderer
-    # listener is h2c-only.
+    # Readiness: shallow TCP check. Do NOT gate readiness on /ready unless you
+    # also pre-warm the renderer — see "Gating traffic on /ready" below.
+    # (httpGet cannot be used in any case: the renderer listener is h2c-only.)
     readinessProbe:
-      exec:
-        command:
-          - curl
-          - -sf
-          - --max-time
-          - '3'
-          - --http2-prior-knowledge
-          - http://localhost:3800/ready
+      tcpSocket:
+        port: 3800
       periodSeconds: 5
       failureThreshold: 3
-      timeoutSeconds: 5
+      timeoutSeconds: 1
     # Liveness: shallow by default so CPU/GC pauses don't restart the pod.
     livenessProbe:
       tcpSocket:
@@ -120,18 +114,48 @@ containers:
       timeoutSeconds: 1
 ```
 
+### Gating traffic on `/ready`
+
+`/ready` reports `503` until the answering worker has compiled at least one bundle, and each worker compiles its
+first bundle when it serves its first render request. If the readiness probe is the only thing standing between a
+fresh pod and its first render — a standalone renderer behind a Service, or a sidecar (pod readiness requires
+**all** containers to be ready, so an unready renderer container blocks traffic to the Rails container too) — then
+gating readiness on `/ready` deadlocks the rollout: no traffic → no first render → never ready.
+
+Only use `/ready` as the readiness gate when something other than probe-gated traffic delivers the first render,
+for example a deployment pipeline step or Rails initializer that POSTs a warm-up render to each new replica
+directly (bypassing the Service), or a container `postStart` hook that does the same. With a warm-up path in place:
+
+```yaml
+readinessProbe:
+  exec:
+    command:
+      - curl
+      - -sf
+      - --max-time
+      - '3'
+      - --http2-prior-knowledge
+      - http://localhost:3800/ready
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 5
+```
+
+Without a warm-up path, keep the shallow `tcpSocket` readiness probe and use `/ready` for monitoring, dashboards,
+and post-deploy verification instead.
+
 For stricter hung-process detection, replace the `tcpSocket` liveness probe with an `exec` probe against `/health`
-(same curl command as readiness, with the path changed). A fully blocked event loop still accepts TCP connections, so
+(same curl command as the `/ready` example above, with the path changed). A fully blocked event loop still accepts TCP connections, so
 only the `exec` form catches it. Use the stricter form deliberately — it restarts the container on slow event loops,
 not just dead ones.
 
 > **Cold-start note:** Each worker compiles its first bundle when it serves its first render request, so `/ready`
-> stays `503` until then — pre-seeding the bundle cache on disk does not by itself flip `/ready`. In the recommended
-> co-located and sidecar topologies this is harmless: Rails reaches the renderer over `localhost`, so the first render
-> arrives regardless of probe state and `/ready` flips immediately afterward. In a separate-workload topology where a
-> Service or load balancer routes traffic only to ready replicas, a fresh replica cannot receive the first render that
-> would make it ready — there, keep the shallow `tcpSocket` readiness probe (or use `/ready` as a monitoring signal
-> rather than a traffic gate). A `503` from `/ready` during the cold-start window is correct behavior, not a failure.
+> stays `503` until then — pre-seeding the bundle cache on disk does not by itself flip `/ready`. This is harmless
+> wherever the check does not gate the traffic that would deliver that first render (Docker Compose healthchecks,
+> ECS container health checks with no ALB dependency, monitoring). Wherever it does gate that traffic — a Kubernetes
+> Service routing only to ready replicas, a sidecar whose unready state blocks pod readiness, an ALB target group —
+> see "Gating traffic on `/ready`" above before using it as the gate. A `503` from `/ready` during the cold-start
+> window is correct behavior, not a failure.
 
 ## ECS Health Check
 
