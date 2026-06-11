@@ -52,8 +52,11 @@ class ApplicationController < ActionController::Base
     # The strict CSP (config/initializers/content_security_policy.rb) blocks
     # inline scripts without the per-request nonce, so this late-streamed error
     # script must carry it. The meta refresh below stays as a no-JS fallback.
+    # html_escape guards against a custom nonce generator emitting characters
+    # (e.g. `"` or `>`) that could break out of the attribute; Rails' built-in
+    # base64/session generators are already safe.
     nonce = content_security_policy_nonce
-    nonce_attribute = nonce.present? ? %( nonce="#{nonce}") : ""
+    nonce_attribute = nonce.present? ? %( nonce="#{ERB::Util.html_escape(nonce)}") : ""
     js_redirect = <<~JAVASCRIPT
       <script#{nonce_attribute}>
         document.getElementById('page-container').innerHTML = #{ActiveSupport::JSON.encode(error_message)};

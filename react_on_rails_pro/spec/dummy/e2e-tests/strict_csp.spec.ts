@@ -135,6 +135,15 @@ test.describe('Strict CSP (script-src self + per-request nonce, no unsafe-inline
   test('the policy is enforced: a nonce-less inline script is blocked (canary)', async ({ page }) => {
     await page.goto(STREAMED_RSC_PAGE);
 
+    // Wait for the streamed content (including the late Suspense boundaries)
+    // to be fully delivered before asserting the empty baseline — otherwise
+    // chunks still in transit could make the pre-canary assertion vacuous.
+    await expect(page.getByText('Header for AsyncComponentsTreeForTesting')).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(page.getByText('branch1 (level 0)')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('branch2 (level 0)')).toBeVisible({ timeout: 30000 });
+
     // The page itself must be violation-free before the canary.
     expect(await getUnexpectedCspViolations(page)).toEqual([]);
 
