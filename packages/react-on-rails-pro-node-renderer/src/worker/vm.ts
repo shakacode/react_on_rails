@@ -40,8 +40,21 @@ import {
   handleStreamError,
 } from '../shared/utils.js';
 import * as errorReporter from '../shared/errorReporter.js';
+import {
+  PREPARE_STACK_TRACE_INSTALL_SCRIPT,
+  SOURCE_MAP_RESOLVER_CONTEXT_KEY,
+  registerBundleForSourceMaps,
+  unregisterBundleForSourceMaps,
+  resetSourceMapSupport,
+  resolveOriginalPosition,
+} from './vmSourceMapSupport.js';
 
 const readFileAsync = promisify(fs.readFile);
+
+// Length of the `Module.wrap` prefix that is prepended to the first line of a
+// wrapped bundle. Needed to correct first-line stack-frame columns before
+// source map lookups.
+const MODULE_WRAP_FIRST_LINE_PREFIX_LENGTH = m.wrap('\n').indexOf('\n');
 const writeFileAsync = promisify(fs.writeFile);
 
 export interface VMContext {
@@ -112,6 +125,7 @@ function manageVMPoolSize() {
     const oldestPath = sortedEntries.shift()?.[0];
     if (oldestPath) {
       vmContexts.delete(oldestPath);
+      unregisterBundleForSourceMaps(oldestPath);
       log.debug(`Removed VM for bundle ${oldestPath} due to pool size limit (max: ${maxVMPoolSize})`);
     }
   }
@@ -153,7 +167,13 @@ async function buildVM(filePath: string): Promise<VMContext> {
         additionalContext !== null && additionalContext.constructor === Object;
       const sharedConsoleHistory = new SharedConsoleHistory();
 
-      const contextObject = { sharedConsoleHistory };
+      // Host callback used by the in-VM `Error.prepareStackTrace` hook (see
+      // vmSourceMapSupport.ts) to remap bundle stack frames to original
+      // TS/JS sources. Only resolves positions for registered bundle paths.
+      const contextObject = {
+        sharedConsoleHistory,
+        [SOURCE_MAP_RESOLVER_CONTEXT_KEY]: resolveOriginalPosition,
+      };
 
       if (supportModules) {
         // IMPORTANT: When adding anything to this object, update:
@@ -239,13 +259,21 @@ async function buildVM(filePath: string): Promise<VMContext> {
         vm.runInContext(`function queueMicrotask() {}`, context);
       }
 
+      // Install lazy source-mapped stack traces for errors created inside the
+      // VM. Must run before the bundle is evaluated so the bundle's own error
+      // handling (e.g. react-on-rails `handleError`) sees remapped stacks.
+      vm.runInContext(PREPARE_STACK_TRACE_INSTALL_SCRIPT, context);
+
       // Run bundle code in created context:
       const bundleContents = await readFileAsync(filePath, 'utf8');
 
       // If node-specific code is provided then it must be wrapped into a module wrapper. The bundle
       // may need the `require` function, which is not available when running in vm unless passed in.
+      // Pass `filename` so stack frames point at the real bundle path (instead of
+      // `evalmachine.<anonymous>`), which also keys lazy source map resolution.
       if (additionalContextIsObject || supportModules) {
-        vm.runInContext(m.wrap(bundleContents), context)(
+        registerBundleForSourceMaps(filePath, MODULE_WRAP_FIRST_LINE_PREFIX_LENGTH);
+        vm.runInContext(m.wrap(bundleContents), context, { filename: filePath })(
           exports,
           require,
           module,
@@ -253,7 +281,8 @@ async function buildVM(filePath: string): Promise<VMContext> {
           path.dirname(filePath),
         );
       } else {
-        vm.runInContext(bundleContents, context);
+        registerBundleForSourceMaps(filePath);
+        vm.runInContext(bundleContents, context, { filename: filePath });
       }
 
       // Only now, after VM is fully initialized, store the context
@@ -285,6 +314,11 @@ async function buildVM(filePath: string): Promise<VMContext> {
 
       return newVmContext;
     } catch (error) {
+      // NOTE: the bundle intentionally stays registered for source map
+      // resolution: the error's `.stack` is materialized lazily (possibly by
+      // the caller, after this catch), and unregistering here would leave
+      // bundle-evaluation errors unmapped. The registration is only a small
+      // allowlist entry keyed by the bundle path.
       log.error({ error }, 'Caught Error when creating context in buildVM');
       errorReporter.error(error as Error);
       throw error;
@@ -465,6 +499,7 @@ export async function buildExecutionContext(
 export function resetVM() {
   vmContexts.clear();
   vmCreationPromises.clear();
+  resetSourceMapSupport();
 }
 
 // Optional: Add a method to remove a specific VM if needed
@@ -474,4 +509,5 @@ export function resetVM() {
 export function removeVM(bundlePath: string) {
   vmContexts.delete(bundlePath);
   vmCreationPromises.delete(bundlePath);
+  unregisterBundleForSourceMaps(bundlePath);
 }
