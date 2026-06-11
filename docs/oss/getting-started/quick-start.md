@@ -58,7 +58,7 @@ Take a look at the files created by the generator.
 
 - Component files (`.tsx` for TypeScript, `.jsx` for JavaScript)
 - Shakapacker install
-- React component files in `client/`
+- React component files in `app/javascript/src/`
 - A sample controller and view
 - Bundler configuration
 

@@ -140,7 +140,7 @@ app/javascript/
 
 - Shakapacker handles Rspack or Webpack setup
 - Config in `config/shakapacker.yml`
-- For custom webpack needs, see [Webpack Configuration Guide](../core-concepts/webpack-configuration.md)
+- For custom bundler needs, see [Webpack/Rspack Configuration Guide](../core-concepts/webpack-configuration.md)
 
 ### Development Workflow
 

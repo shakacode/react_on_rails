@@ -228,7 +228,6 @@ Then add `prerender: true` in the Rails view:
 
 > [!NOTE]
 > `prerender: true` needs a server bundle. For a first local SSR check, use `./bin/dev static` or run a production precompile. If you want the dev server to serve the prerender bundle, follow the [HMR guide](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) and set `config.same_bundle_for_client_and_server = true` for that mode.
-
 > [!WARNING]
 > Server rendering runs in Node or ExecJS, which has no browser globals (`window`, `document`, `localStorage`). Guard browser-only access inside a `useEffect` hook or a conditional on `typeof window !== 'undefined'`.
 
