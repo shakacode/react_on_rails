@@ -232,8 +232,11 @@ Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical
 # Generate React on Rails files with TypeScript support
 bin/rails generate react_on_rails:install --typescript
 
-# Create a new component
-bin/rails generate react_on_rails:component MyComponent
+# Add a new component: create a file under a `ror_components` directory, then
+# render it with `<%= react_component("MyComponent") %>` in any Rails view.
+# With auto-bundling there's no generator and no manual registration step.
+mkdir -p app/javascript/src/MyComponent/ror_components
+touch app/javascript/src/MyComponent/ror_components/MyComponent.tsx
 
 # Build for production (use your package manager)
 pnpm run build  # or: yarn run build, npm run build
