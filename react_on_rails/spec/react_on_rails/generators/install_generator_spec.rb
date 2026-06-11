@@ -106,8 +106,9 @@ describe InstallGenerator, type: :generator do
     assert_tailwind_dependencies
     assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
 
-    assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.#{extension}" do |content|
+    assert_file "app/javascript/src/HelloServer/components/LikeButton.#{extension}" do |content|
       expect(content).to include("../../../stylesheets/application.css")
+      expect(content).to start_with("'use client';")
     end
 
     assert_tailwind_bundler_config(config_dir)
@@ -2628,7 +2629,7 @@ describe InstallGenerator, type: :generator do
 
     include_examples "rsc_common_files"
 
-    it "wires Tailwind into the generated HelloServer entry" do
+    it "wires Tailwind into the generated RSC client component" do
       assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
       assert_tailwind_rsc_setup(config_dir: "config/rspack", extension: "tsx")
     end
