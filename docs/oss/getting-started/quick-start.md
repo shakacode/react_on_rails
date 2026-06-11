@@ -35,7 +35,7 @@ bundle add react_on_rails --strict
 # Run the installer for TypeScript
 bin/rails generate react_on_rails:install --typescript
 
-# Fresh installs use Rspack by default when supported.
+# Fresh installs use Rspack by default when supported (Shakapacker 9+).
 # To force Webpack instead, pass --no-rspack:
 # bin/rails generate react_on_rails:install --typescript --no-rspack
 
@@ -62,7 +62,7 @@ Take a look at the files created by the generator.
 - A sample controller and view
 - Bundler configuration
 
-> 💡 **Performance Tip:** Fresh installs use Rspack by default when supported for significantly faster builds. To compare or temporarily force Webpack, run the installer with `--no-rspack`; you can also switch bundlers later with `bin/switch-bundler webpack` or `bin/switch-bundler rspack`.
+> 💡 **Performance Tip:** Fresh installs use Rspack by default when supported by your Shakapacker version (9+) for significantly faster builds. To compare or temporarily force Webpack, run the installer with `--no-rspack`; you can also switch bundlers later with `bin/switch-bundler webpack` or `bin/switch-bundler rspack`.
 >
 > **Note on `bin/switch-bundler`:** This utility safely switches between webpack and rspack by updating `shakapacker.yml` and managing dependencies. However, it does not modify custom webpack configuration code. If you have custom webpack plugins or loaders, you may need to update those manually to work with rspack. See [Rspack documentation](../api-reference/generator-details.md#rspack-support) for details on unified configuration patterns.
 

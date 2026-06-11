@@ -167,7 +167,7 @@ The generated `react_on_rails_default` layout includes the Shakapacker tags that
 <%= javascript_pack_tag %>
 ```
 
-If `app/views/layouts/react_on_rails_default.html.erb` is not present (for example, you added React on Rails manually to an existing app without running the installer), remove the `layout` line from the controller and add the pack-tag placeholders to the layout that renders this view.
+If `app/views/layouts/react_on_rails_default.html.erb` is not present (for example, you added React on Rails manually to an existing app without running the installer), remove the `layout` line from the controller and add the pack-tag placeholders to your `application.html.erb` or whichever layout renders this view.
 
 ## Run The App With HMR
 
@@ -228,6 +228,7 @@ Then add `prerender: true` in the Rails view:
 
 > [!NOTE]
 > `prerender: true` needs a server bundle. For a first local SSR check, use `./bin/dev static` or run a production precompile. If you want the dev server to serve the prerender bundle, follow the [HMR guide](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) and set `config.same_bundle_for_client_and_server = true` for that mode.
+>
 > Server rendering runs in Node or ExecJS, which has no browser globals (`window`, `document`, `localStorage`). Guard browser-only access inside a `useEffect` hook or a conditional on `typeof window !== 'undefined'`.
 
 For deeper SSR guidance, see [Client vs. Server Rendering](../core-concepts/client-vs-server-rendering.md) and [React Server Rendering](../core-concepts/react-server-rendering.md).
