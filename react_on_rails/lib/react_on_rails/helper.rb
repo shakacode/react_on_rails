@@ -528,7 +528,7 @@ module ReactOnRails
     def preload_link_for_javascript_source(source)
       attributes = preload_link_attributes(source)
       if modulepreload_source?(source)
-        tag.link(**attributes.merge(rel: "modulepreload"))
+        tag.link(**attributes.merge(rel: "modulepreload", crossorigin: preload_crossorigin))
       else
         tag.link(**attributes.merge(rel: "preload", as: "script"))
       end
@@ -563,6 +563,10 @@ module ReactOnRails
       preload_manifest_value(source, "integrity")
     end
 
+    def preload_crossorigin
+      current_shakapacker_instance.config.integrity[:cross_origin].presence || "anonymous"
+    end
+
     def modulepreload_source?(source)
       # Priority order: explicit module metadata, rel/type metadata, then the .mjs extension heuristic.
       module_value = preload_manifest_value(source, "module")
@@ -572,7 +576,8 @@ module ReactOnRails
       return true if preload_manifest_value(source, "rel").to_s == "modulepreload"
       return true if preload_manifest_value(source, "type").to_s == "module"
 
-      File.extname(preload_manifest_source(source).to_s) == ".mjs"
+      source_path = preload_manifest_source(source).to_s.split(/[?#]/, 2).first
+      File.extname(source_path) == ".mjs"
     end
 
     def preload_manifest_value(source, key)
