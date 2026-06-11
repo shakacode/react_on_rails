@@ -1,7 +1,7 @@
 ---
 name: update-changelog
 description: Analyze merged PRs and update CHANGELOG.md, optionally stamping release, rc, beta, or explicit version headers. Use before releases or when changelog entries are missing.
-argument-hint: '[release|rc|beta|version]'
+argument-hint: '[classification-sweep BASE_REF..TARGET_REF|release|rc|beta|version]'
 ---
 
 # Update Changelog
@@ -16,16 +16,23 @@ This skill accepts an optional mode argument from the invocation text:
 - **`release`** (`/update-changelog release`): Add entries and stamp a version header. Auto-compute the next version based on changes (breaking -> major, added features -> minor, fixes -> patch). Then `rake release` (with no args) will pick up this version automatically.
 - **`rc`** (`/update-changelog rc`): Same as `release`, but stamps an RC prerelease version (e.g., `16.5.0.rc.0`). Auto-increments the RC index if prior RCs exist for the same base version.
 - **`beta`** (`/update-changelog beta`): Same as `rc`, but stamps a beta prerelease version (e.g., `16.5.0.beta.0`).
+- **`classification-sweep`** (`/update-changelog classification-sweep BASE_REF..TARGET_REF`): Print a mechanical review table for every merged PR in the selected range before deciding which changelog entries to add. This read-only agent workflow runs git and GitHub API commands directly; it does not edit `CHANGELOG.md` and does not invoke `bundle exec rake` or any header-stamping task.
 - **Explicit version** (`/update-changelog 16.5.0.rc.10`): Add entries and stamp the exact version provided. Skips auto-computation — use this when you already know the target version. The version string must look like a semver version (with optional `.rc.N` or `.beta.N` suffix).
 
 ## When to Use This
 
-This skill serves three use cases at different points in the release lifecycle:
+This skill serves four use cases at different points in the release lifecycle:
 
 **During development** -- Add entries to `[Unreleased]` as PRs merge:
 
 - Run `/update-changelog` to find merged PRs missing from the changelog
 - Entries accumulate under `### [Unreleased]`
+
+**Before each RC/release changelog edit** -- Sweep classifications mechanically:
+
+- Run `/update-changelog classification-sweep BASE_REF..TARGET_REF` before adding entries or stamping a version
+- Print a full table for every merged PR in the selected range, including `no-entry` rows, so reviewers can spot missed classifications
+- Use the table to decide which `entry-needed` rows become changelog entries
 
 **Before a release** -- Stamp a version header and prepare for release:
 
@@ -89,6 +96,100 @@ When stamping a version header (`release`, `rc`, or `beta`), compute the next ve
    - Test updates
    - Documentation fixes (unless they fix incorrect docs about behavior)
    - CI/CD changes
+
+## Classification Sweep Mode
+
+Use `classification-sweep` before every RC/release changelog edit, and whenever a prior changelog pass might have missed a merged PR. This is a mechanical coverage pass: it classifies every merged PR in the selected range, then humans review the classifications before entries are written.
+
+### Exact PR-Listing Command
+
+Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to the release tag, `origin/main`, or upper bound being audited. Then run this exact command to list merged PRs in first-parent order. It extracts PR numbers from squash titles, falls back to GitHub's commit-to-PR API for commits that lack `(#NNNN)` in the title, and emits an explicit `UNKNOWN` row for any commit that still cannot be mapped.
+
+```bash
+BASE_REF="${BASE_REF:?set BASE_REF, e.g. v17.0.0.rc.1}"
+TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/main}"
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)" || {
+  printf 'error: gh repo view failed; run: gh auth status\n' >&2
+  exit 1
+}
+DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)" || {
+  printf 'error: gh repo view failed; run: gh auth status\n' >&2
+  exit 1
+}
+
+git log --first-parent --reverse --format='%H%x09%s' "${BASE_REF}..${TARGET_REF}" |
+while IFS=$'\t' read -r sha subject; do
+  pr_number=$(printf '%s\n' "$subject" | sed -nE 's/.*\(#([0-9]+)\)[[:space:]]*$/\1/p')
+  if [ -n "$pr_number" ]; then
+    printf '%s\t%s\t%s\n' "$pr_number" "$sha" "$subject"
+  else
+    mapped_rows=$(SHA="$sha" DEFAULT_BRANCH="$DEFAULT_BRANCH" gh api -H "Accept: application/vnd.github+json" \
+      "repos/${REPO}/commits/${sha}/pulls" \
+      --jq '.[] | select(.merged_at != null and .base.ref == env.DEFAULT_BRANCH) | [.number, env.SHA, .title] | @tsv' 2>&1)
+    api_status=$?
+    if [ "$api_status" -ne 0 ]; then
+      printf 'warning: commit-to-PR API lookup failed for %s: %s\n' "$sha" "$mapped_rows" >&2
+      printf 'UNKNOWN\t%s\t%s\n' "$sha" "$subject"
+    elif [ -n "$mapped_rows" ]; then
+      printf '%s\n' "$mapped_rows"
+    else
+      printf 'UNKNOWN\t%s\t%s\n' "$sha" "$subject"
+    fi
+  fi
+done | awk -F '\t' '{ key = ($1 == "UNKNOWN" ? $1 FS $2 : $1); if (!seen[key]++) print }'
+```
+
+If any commit in the range cannot be mapped to a PR, the command prints an explicit `UNKNOWN` row for that commit. Carry that row into the full table with `Result` set to `UNKNOWN`, investigate it, and do not finish the sweep until the row is resolved to a merged PR classification or explicitly reported as a blocker. Do not silently drop it.
+
+A sudden spike of `UNKNOWN` rows can indicate stale GitHub authentication, API rate limits, or a temporary API failure rather than genuinely unmapped commits. Run `gh auth status` and retry the PR-listing command when the UNKNOWN count looks suspicious.
+
+The fallback makes one GitHub API call per commit whose subject lacks `(#NNNN)`. Typical RC ranges complete quickly, but large ranges with many direct commits can hit rate limits. Direct version-bump commits, bot commits, and release-automation commits may be expected `UNKNOWN` rows; keep them in the table with `Result` set to `UNKNOWN`, choose `internal` or `release-process`, and explain that no PR-backed changelog entry exists.
+
+### Required Sweep Output
+
+Print the full Markdown table. No silent caps, no "top N", and no filtering to only likely changelog entries. Every row from the PR-listing command must appear, including `no-entry` rows.
+
+```markdown
+| PR    | Title                                     | Result       | Category         | Reason                                                                                             |
+| ----- | ----------------------------------------- | ------------ | ---------------- | -------------------------------------------------------------------------------------------------- |
+| #3595 | Async RSC manifest signature verification | entry-needed | perf-reliability | Moves RSC manifest signature checks async, removing blocking filesystem work from the render path. |
+| #3597 | Document release-gate tracker workflow    | no-entry     | release-process  | Defines release-gate tracking docs; no product behavior changes.                                   |
+```
+
+Allowed `Result` values for mapped PRs are exactly:
+
+- `entry-needed`
+- `no-entry`
+
+Use `UNKNOWN` only for unmapped commit rows emitted by the PR-listing command; resolve or report those rows before finishing.
+
+Allowed `Category` values are exactly:
+
+- `product code`
+- `Pro runtime`
+- `perf-reliability`
+- `release-process`
+- `internal`
+
+Each row needs a one-line reason specific enough for review. Avoid generic reasons like "not user-visible" unless the row also says why.
+Copy category values exactly as listed, including spaces, hyphens, and casing.
+
+### Classification Rubric
+
+- Use `entry-needed` for user-visible product behavior: public API/config/generator changes, runtime bug fixes, compatibility changes, breaking changes, security fixes, and performance or reliability changes users would care about.
+- Use `entry-needed` for Pro runtime changes that affect React Server Components, the Node renderer, caching, routing, package compatibility, generated Pro configs, or observable logging/error behavior. Pro-only is still user-visible for Pro users.
+- Use `entry-needed` for `perf-reliability` when the PR changes runtime performance, removes blocking work, improves production recovery, or makes user-visible failures diagnosable. For example, a PR that moves Pro RSC manifest signature checks from synchronous filesystem calls to async checks is `entry-needed`.
+- Use `no-entry` for docs-only, tests-only, formatting, lint, internal refactors, CI, benchmark harnesses, release automation, agent/process docs, and other contributor-only changes. Keep docs-only PRs as `entry-needed` when they correct incorrect public behavior documentation; use Category `product code` for docs-only PRs that correct public OSS behavior docs, or `Pro runtime` when they correct public Pro behavior docs.
+- Categorize by the primary surface changed, not by the changelog section it might eventually use:
+  - `product code`: OSS gem/npm package runtime, generators, public types, public config, or user-facing examples.
+  - `Pro runtime`: proprietary Pro package/runtime behavior, RSC integration, Node renderer behavior, Pro-generated config, Pro package compatibility.
+  - `perf-reliability`: runtime performance/reliability fixes, benchmark/regression systems, crash recovery, and failure classification. Category applies regardless of result. Use `entry-needed` when the change directly benefits users at runtime, such as removing blocking work from the render path. Use `no-entry` for internal benchmark harnesses or regression tooling that contributors use.
+  - `release-process`: release tasks, CI selection, dependency pins used only for releasing/testing, changelog mechanics, PR batch mechanics, agent skills, GitHub Actions, and maintainer workflow.
+  - `internal`: docs/planning, tests, fixtures, refactors, cleanup, diagnostics for contributors, and non-user-facing maintenance.
+
+### Reverts and Re-Runs
+
+When a revert lands in the selected RC/release window, re-run the sweep or revisit affected classifications and changelog entries before stamping. Reverts can invalidate earlier `entry-needed` rows or require the original entry to be rewritten. For example, if a revert like #3860 lands after #3587, revisit the #3587 classification and changelog entry instead of carrying the original entry forward unchanged.
 
 ## Formatting Requirements
 
