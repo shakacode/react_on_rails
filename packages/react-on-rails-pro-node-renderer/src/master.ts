@@ -36,6 +36,10 @@ const ORPHAN_CLEANUP_INTERVAL_MS = 5 * MILLISECONDS_IN_MINUTE;
 // Set well above the longest realistic upload duration so that large bundle
 // uploads in progress are never deleted by the cleanup timer.
 const ORPHAN_AGE_THRESHOLD_MS = 30 * MILLISECONDS_IN_MINUTE;
+// Hard deadline for the master to exit after it begins draining workers. If a
+// worker is stuck (leaked handle, blocking syscall, etc.) this guarantees the
+// master still exits, following the same pattern as restartWorkers.ts.
+const MASTER_SHUTDOWN_TIMEOUT_MS = 5000;
 
 export default function masterRun(runningConfig?: Partial<Config>) {
   // This is memoized after the wrapper path runs, but still protects direct `./master` entrypoint users.
@@ -100,13 +104,36 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
   let isAbortingForStartupFailure = false;
   let fatalStartupFailure: { workerId: number; failure: WorkerStartupFailureMessage } | null = null;
-  let hasInitiatedShutdown = false;
+  // Set as soon as any shutdown path (external signal or startup-failure abort)
+  // begins. Read by the `cluster.on('exit')` handler to suppress re-forking
+  // workers that exit because we are intentionally tearing the cluster down.
+  let isShuttingDown = false;
+
+  // Drain every live worker, then exit with `exitCode`. Idempotent: only the
+  // first call performs the disconnect + exit; later calls are no-ops so that
+  // an external signal and a near-simultaneous startup-failure abort can't both
+  // disconnect or schedule duplicate exits.
+  //
+  // cluster.disconnect() is async — the callback fires once every worker has
+  // disconnected (Node closes each worker's servers and waits for in-flight
+  // connections to finish before severing the IPC channel). A hard-deadline
+  // timer guarantees the master still exits if a worker is stuck.
+  const shutdownGracefully = (exitCode: number) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    const shutdownTimer = setTimeout(() => process.exit(exitCode), MASTER_SHUTDOWN_TIMEOUT_MS);
+    if (typeof shutdownTimer.unref === 'function') shutdownTimer.unref();
+    cluster.disconnect(() => {
+      clearTimeout(shutdownTimer);
+      process.exit(exitCode);
+    });
+  };
 
   const abortForStartupFailure = (): boolean => {
     if (!(isAbortingForStartupFailure && fatalStartupFailure)) return false;
 
-    if (!hasInitiatedShutdown) {
-      hasInitiatedShutdown = true;
+    if (!isShuttingDown) {
       // Note: the exiting worker may differ from the one that sent the
       // failure message if multiple workers exit in rapid succession.
       // We always report the first failure received.
@@ -117,18 +144,8 @@ export default function masterRun(runningConfig?: Partial<Config>) {
           : `Node renderer startup failed in worker ${failedWorkerId}: ${failure.message}`;
 
       errorReporter.message(msg);
-      // Disconnect all live workers so they release their ports before the
-      // master exits. cluster.disconnect() is async — the callback fires
-      // once every worker has disconnected. A hard-deadline timer guarantees
-      // the master still exits if a worker is stuck (leaked handle, blocking
-      // syscall, etc.), following the same pattern as restartWorkers.ts.
-      const MASTER_SHUTDOWN_TIMEOUT_MS = 5000;
-      const shutdownTimer = setTimeout(() => process.exit(1), MASTER_SHUTDOWN_TIMEOUT_MS);
-      if (typeof shutdownTimer.unref === 'function') shutdownTimer.unref();
-      cluster.disconnect(() => {
-        clearTimeout(shutdownTimer);
-        process.exit(1);
-      });
+      // Exit non-zero so supervisors (Foreman/systemd/k8s) see the failed start.
+      shutdownGracefully(1);
     }
 
     return true;
@@ -149,6 +166,14 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
   // Listen for dying workers:
   cluster.on('exit', (worker) => {
+    // If we are intentionally tearing the cluster down (external SIGTERM/SIGINT
+    // or a startup-failure abort), workers are expected to exit — never re-fork
+    // them, or we would resurrect the processes we are trying to drain and leave
+    // them orphaned after the master exits.
+    if (isShuttingDown) {
+      return;
+    }
+
     // Once a startup failure has been detected, abort regardless of whether
     // this particular exit was from the failing worker, a scheduled restart,
     // or an unrelated crash. Don't fork any more workers.
@@ -165,7 +190,9 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     // Give in-flight startup-failure IPC messages one event-loop turn to be
     // processed before classifying this as an ordinary runtime crash.
     setImmediate(() => {
-      if (abortForStartupFailure()) return;
+      // A shutdown signal may have arrived during this event-loop turn; if so,
+      // don't resurrect the worker we are intentionally draining.
+      if (isShuttingDown || abortForStartupFailure()) return;
 
       // TODO: Track last rendering request per worker.id
       // TODO: Consider blocking a given rendering request if it kills a worker more than X times
@@ -174,6 +201,18 @@ export default function masterRun(runningConfig?: Partial<Config>) {
       cluster.fork();
     });
   });
+
+  // Drain workers on external shutdown signals. Process managers (Foreman,
+  // systemd, Kubernetes, Docker) send SIGTERM (and SIGINT on Ctrl-C in a
+  // foreground terminal) to the master. Without these handlers the master is
+  // killed immediately and its forked workers are left orphaned, holding their
+  // ports. Exit 0 because a clean external shutdown is not an error.
+  const handleShutdownSignal = (signal: NodeJS.Signals) => {
+    log.info('Received %s, draining workers before shutting down the node renderer master', signal);
+    shutdownGracefully(0);
+  };
+  process.on('SIGTERM', () => handleShutdownSignal('SIGTERM'));
+  process.on('SIGINT', () => handleShutdownSignal('SIGINT'));
 
   // Schedule regular restarts of workers
   if (allWorkersRestartInterval && delayBetweenIndividualWorkerRestarts) {

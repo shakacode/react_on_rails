@@ -51,6 +51,9 @@ function buildStartupFailureMessage(
 function setupMasterRunHarness() {
   const operations: string[] = [];
   const clusterHandlers: Partial<ClusterHandlers> = {};
+  // Capture process signal handlers instead of letting masterRun attach them to
+  // the real process (which would leak across tests and fire on a real SIGTERM).
+  const signalHandlers: Partial<Record<NodeJS.Signals, () => void>> = {};
   const mockFork = jest.fn(() => {
     operations.push('fork');
     return {};
@@ -93,6 +96,16 @@ function setupMasterRunHarness() {
   const processExitSpy = jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
     throw new Error(`process.exit:${code}`);
   }) as typeof process.exit);
+  const realProcessOn = process.on.bind(process);
+  const processOnSpy = jest
+    .spyOn(process, 'on')
+    .mockImplementation((event: string | symbol, listener: (...args: unknown[]) => void) => {
+      if (event === 'SIGTERM' || event === 'SIGINT') {
+        signalHandlers[event] = listener as () => void;
+        return process;
+      }
+      return realProcessOn(event as never, listener as never);
+    });
 
   jest.doMock('cluster', () => ({
     __esModule: true,
@@ -147,6 +160,7 @@ function setupMasterRunHarness() {
   return {
     operations,
     clusterHandlers: clusterHandlers as ClusterHandlers,
+    signalHandlers,
     mockFork,
     mockCluster,
     mockErrorReporterMessage,
@@ -154,6 +168,7 @@ function setupMasterRunHarness() {
     setIntervalSpy,
     setTimeoutSpy,
     processExitSpy,
+    processOnSpy,
   };
 }
 
@@ -320,5 +335,77 @@ describe('master startup failure handling via masterRun wiring', () => {
     );
     expect(harness.mockFork).toHaveBeenCalledTimes(3);
     expect(harness.processExitSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('master graceful shutdown on external signals via masterRun wiring', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.resetModules();
+  });
+
+  it('registers SIGTERM and SIGINT handlers', () => {
+    const harness = setupMasterRunHarness();
+
+    expect(harness.processOnSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+    expect(harness.processOnSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+    expect(typeof harness.signalHandlers.SIGTERM).toBe('function');
+    expect(typeof harness.signalHandlers.SIGINT).toBe('function');
+  });
+
+  it.each(['SIGTERM', 'SIGINT'] as const)('drains workers and exits 0 on %s', (signal) => {
+    const harness = setupMasterRunHarness();
+
+    expect(() => harness.signalHandlers[signal]!()).toThrow('process.exit:0');
+    expect(harness.mockCluster.disconnect).toHaveBeenCalledTimes(1);
+    expect(harness.processExitSpy).toHaveBeenCalledWith(0);
+    // No error is reported for a clean external shutdown.
+    expect(harness.mockErrorReporterMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not re-fork workers that exit while shutting down', () => {
+    const harness = setupMasterRunHarness();
+    // disconnect does not invoke its callback so we can observe later exits
+    // without the harness throwing on process.exit.
+    harness.mockCluster.disconnect.mockImplementation(() => {});
+
+    harness.signalHandlers.SIGTERM!();
+    expect(harness.mockCluster.disconnect).toHaveBeenCalledTimes(1);
+
+    const forkCountAtShutdown = harness.mockFork.mock.calls.length;
+
+    // An ordinary exit during shutdown must NOT be reforked...
+    harness.clusterHandlers.exit({ id: 1, process: { exitCode: 0 } });
+    // ...nor a scheduled-restart worker that happens to exit mid-drain.
+    harness.clusterHandlers.exit({ id: 2, isScheduledRestart: true, process: { exitCode: 0 } });
+
+    expect(harness.mockFork).toHaveBeenCalledTimes(forkCountAtShutdown);
+    expect(harness.mockErrorReporterMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not classify a worker exit during shutdown as an unexpected crash', async () => {
+    const harness = setupMasterRunHarness();
+    harness.mockCluster.disconnect.mockImplementation(() => {});
+
+    harness.signalHandlers.SIGTERM!();
+    const forkCountAtShutdown = harness.mockFork.mock.calls.length;
+
+    harness.clusterHandlers.exit({ id: 3, process: { exitCode: 1 } });
+    // The deferred crash classification runs on the next tick; it must bail out
+    // because we are shutting down.
+    await waitForSetImmediate();
+
+    expect(harness.mockErrorReporterMessage).not.toHaveBeenCalled();
+    expect(harness.mockFork).toHaveBeenCalledTimes(forkCountAtShutdown);
+  });
+
+  it('is idempotent: a second signal does not disconnect or exit again', () => {
+    const harness = setupMasterRunHarness();
+    harness.mockCluster.disconnect.mockImplementation(() => {});
+
+    harness.signalHandlers.SIGTERM!();
+    harness.signalHandlers.SIGINT!();
+
+    expect(harness.mockCluster.disconnect).toHaveBeenCalledTimes(1);
   });
 });
