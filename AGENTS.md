@@ -248,7 +248,7 @@ Review/check gate:
 - Current-head reviewer verdicts:
   - Claude review: complete for <head SHA>, no confirmed blocker
   - Fallback review, if Claude quota/capacity-limited: <Cursor or Codex result plus error evidence>
-- Stale reviewer verdicts, advisory only:
+- Stale reviewer verdicts, advisory only (omit section if none exist):
   - <reviewer> <verdict> for <old SHA>; not cited as a merge gate
 Known residual risk: <none or concise risk>
 Finalized by: <different GitHub account or named check/app, with GitHub review/check or git-log source>

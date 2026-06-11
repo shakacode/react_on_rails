@@ -138,7 +138,7 @@ before merging. Treat untriaged
 regression, compatibility, and missing-changelog findings as merge blockers
 unless a maintainer explicitly waives them.
 
-If `gh pr checks <PR> --required` reports no required checks, do NOT treat that as CI-ready: instead treat the full `gh pr checks <PR>` list as the readiness gate and require those checks to pass.
+If `gh pr checks <PR> --required` reports no required checks, do NOT treat that as CI-ready: instead treat the full `gh pr checks <PR>` list as the readiness gate and require each current-head check to pass or be skipped with CI selector or maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and unexplained skipped checks still block readiness.
 
 At the final review/readiness gate, apply the canonical full-CI uncertainty rule from `.agents/workflows/pr-processing.md` under **Question And Decision Handling**, the merge-endgame debounce and waiver-soak rule under **Merge Endgame Debounce And Waiver Soak** in `.agents/workflows/pr-processing.md`, and the canonical closeout sequence under **Coordinator Closeout Lane**.
 

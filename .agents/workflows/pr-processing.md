@@ -302,7 +302,10 @@ commands and timeouts; use narrow required-check commands such as `gh pr checks
 explicit review-agent checks so non-required reviewers are not hidden. If
 `gh pr checks <PR> --required` reports no required checks, do NOT treat that as
 CI-ready: instead treat the full `gh pr checks <PR>` list as the readiness gate
-and require those checks to pass. Avoid long-lived `gh ... --watch`. Ignore
+and require each current-head check to pass or be skipped with CI selector or
+maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and
+unexplained skipped checks still block readiness. Avoid long-lived
+`gh ... --watch`. Ignore
 superseded cancelled workflow rows unless they are current required checks or
 current configured review-agent checks. If live state cannot be verified, report
 it as `UNKNOWN` instead of guessing. AI review systems are advisory unless they
@@ -435,11 +438,13 @@ The closeout lane is:
    merge qualification rules, including the merge-endgame debounce and
    waiver-soak rules before merge; report only remaining blockers, questions,
    or `UNKNOWN` live state.
-7. After any closeout-lane merge action, sweep merged PRs for late post-merge
-   bot findings before the final batch handoff using
-   `.agents/skills/post-merge-audit/SKILL.md` when skills are available, or
-   `.agents/workflows/post-merge-audit.md` directly. Route findings that arrive
-   after this closeout sweep into the next post-merge audit intake.
+7. After any closeout-lane merge action, run a lightweight sweep for late
+   post-merge bot findings before the final batch handoff: confirm the PR landed,
+   check `main` status, and inspect late review/check comments that arrived
+   around or after merge. Route release-relevant findings into the next
+   post-merge audit intake. Reserve the full post-merge audit workflow for
+   final-release readiness, suspected bad merges, or a lightweight sweep that
+   finds a release-risk signal.
 
 ## Self-Review Gate
 
@@ -598,8 +603,10 @@ gh pr checks <PR>
 
 If `gh pr checks <PR> --required` reports no required checks, do NOT treat that
 as CI-ready. Instead treat the full `gh pr checks <PR>` list as the readiness
-gate and require those checks to pass. (As of #3844, `main` defines zero
-required status-check contexts; if required checks are later configured per
+gate and require each current-head check to pass or be skipped with CI selector
+or maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and
+unexplained skipped checks still block readiness. (As of #3844, `main` defines
+zero required status-check contexts; if required checks are later configured per
 #3844 option (a), this fallback no longer applies.)
 
 Avoid long-lived `gh ... --watch` commands in agent sessions. Avoid relying on
@@ -768,11 +775,13 @@ Comment tiers (`MUST-FIX`, `DISCUSS`, `OPTIONAL`, `SKIPPED`) are assigned by
 If approved and green but not merging immediately, use the repository's standard `ready-to-merge` label when available.
 
 After an accelerated RC auto-merge, do a lightweight post-merge check: confirm
-the PR landed on `main`, check `main` status, and update the active release
+the PR landed on `main`, check `main` status, inspect late review/check comments
+or bot findings that arrived around or after merge, and update the active release
 tracker if one exists. If the merged PR touched `.github/workflows/`, include the
 relevant `actionlint`, `yamllint .github/`, or workflow-selection evidence in the
 post-merge summary before marking it clean. Reserve full post-merge audit for
-final-release readiness or suspected bad merges.
+final-release readiness, suspected bad merges, or a lightweight sweep that finds
+a release-risk signal.
 
 ## Multi-PR Landing Plan
 
