@@ -108,6 +108,8 @@ Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to th
 ```bash
 BASE_REF="${BASE_REF:?set BASE_REF, e.g. v17.0.0.rc.1}"
 TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/main}"
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)"
 
 git log --first-parent --reverse --format='%H%x09%s' "${BASE_REF}..${TARGET_REF}" |
 while IFS=$'\t' read -r sha subject; do
@@ -115,9 +117,9 @@ while IFS=$'\t' read -r sha subject; do
   if [ -n "$pr_number" ]; then
     printf '%s\t%s\t%s\n' "$pr_number" "$sha" "$subject"
   else
-    mapped_rows=$(SHA="$sha" gh api -H "Accept: application/vnd.github+json" \
-      "repos/shakacode/react_on_rails/commits/${sha}/pulls" \
-      --jq '.[] | select(.merged_at != null and .base.ref == "main") | [.number, env.SHA, .title] | @tsv' 2>&1)
+    mapped_rows=$(SHA="$sha" DEFAULT_BRANCH="$DEFAULT_BRANCH" gh api -H "Accept: application/vnd.github+json" \
+      "repos/${REPO}/commits/${sha}/pulls" \
+      --jq '.[] | select(.merged_at != null and .base.ref == env.DEFAULT_BRANCH) | [.number, env.SHA, .title] | @tsv' 2>&1)
     api_status=$?
     if [ "$api_status" -ne 0 ]; then
       printf 'warning: commit-to-PR API lookup failed for %s: %s\n' "$sha" "$mapped_rows" >&2
