@@ -128,13 +128,16 @@
       "Generated via pnpm audit --fix, with manual caps added to prevent major version jumps.",
       "These force patched versions of transitive dev dependencies. Remove when upstream packages update.",
       "ajv overrides were intentionally excluded: ajv v8 breaks webpack's schema-utils/ajv-keywords.",
-      "The 2 moderate ajv alerts (ReDoS in $data option) are tolerable — ajv only validates our own config files."
+      "The 2 moderate ajv alerts (ReDoS in $data option) are tolerable — ajv only validates our own config files.",
+      "react_on_rails>react(-dom) scopes React 19.2 to the OSS dummy app only (for the <Activity> demo, #3883); the workspace-wide pin stays at ~19.0.4 until #3865 lifts the RSC pin."
     ],
     "overrides": {
       "react": "$react",
       "react-dom": "$react-dom",
       "app>react": "^18.3.1",
       "app>react-dom": "^18.3.1",
+      "react_on_rails>react": "^19.2.0",
+      "react_on_rails>react-dom": "^19.2.0",
       "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",
       "sentry-testkit>express": "npm:empty-npm-package@1.0.0",
       "lodash@>=4.0.0 <=4.17.22": ">=4.17.23 <5",

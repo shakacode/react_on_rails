@@ -1,0 +1,14 @@
+<h1>React 19.2 &lt;Activity&gt; — Client Side Rendering</h1>
+
+<p>
+  This page client-renders (<code>prerender: false</code>) the
+  <code>ActivityTabSwitcher</code> component. The inactive tab stays mounted inside
+  <code>&lt;Activity mode="hidden"&gt;</code>, so its input state survives tab switches
+  while its effects are unmounted. Requires React 19.2+ in the app bundle.
+  See <code>docs/oss/building-features/react-19-activity.md</code>.
+</p>
+
+<%= react_component("ActivityTabSwitcher",
+  props: { initialTab: "profile" },
+  prerender: false,
+  id: "ActivityTabSwitcher-react-component-0") %>
