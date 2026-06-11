@@ -19,6 +19,10 @@ describe InstallGenerator, type: :generator do
     ReactOnRails::Generators::ReactWithReduxGenerator.new([], options, destination_root:)
   end
 
+  def rsc_generator_fixture(options = {})
+    ReactOnRails::Generators::RscGenerator.new([], options, destination_root:)
+  end
+
   def gem_root_ci_workflow_path
     File.expand_path("../../../.github/workflows/ci.yml", __dir__)
   end
@@ -2642,6 +2646,24 @@ describe InstallGenerator, type: :generator do
     it "wires Tailwind into the generated RSC client component" do
       assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
       assert_tailwind_rsc_setup(config_dir: "config/rspack", extension: "tsx")
+    end
+  end
+
+  describe "RSC Tailwind client component import insertion" do
+    let(:components_dir) { "app/javascript/src/HelloServer/components" }
+    let(:client_component_path) { "#{components_dir}/LikeButton.jsx" }
+
+    it "anchors after quote and semicolon variants of the use client directive" do
+      simulate_existing_file(client_component_path, "\"use client\"\n\nexport default function LikeButton() {}\n")
+
+      Dir.chdir(destination_root) do
+        expect(rsc_generator_fixture(tailwind: true).send(:add_tailwind_import_to_rsc_client_component, components_dir))
+          .to be(true)
+      end
+
+      expect(File.read(File.join(destination_root, client_component_path))).to start_with(
+        "\"use client\"\nimport '../../../stylesheets/application.css';\n\n"
+      )
     end
   end
 

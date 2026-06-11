@@ -248,9 +248,16 @@ module ReactOnRails
 
         # Path is relative to app/javascript/src/HelloServer/components/.
         stylesheet_import = "import '../../../stylesheets/application.css';"
-        return false if File.read(File.join(destination_root, relative_entry_path)).include?(stylesheet_import)
+        entry_path = File.join(destination_root, relative_entry_path)
+        entry_content = File.read(entry_path)
+        return false if entry_content.include?(stylesheet_import)
 
-        insert_into_file(relative_entry_path, "#{stylesheet_import}\n", after: "'use client';\n")
+        client_directive_pattern = /\A\s*['"]use client['"];?[^\S\r\n]*(?:\r?\n|$)/
+        if entry_content.match?(client_directive_pattern)
+          insert_into_file(relative_entry_path, "#{stylesheet_import}\n", after: client_directive_pattern)
+        else
+          prepend_to_file(relative_entry_path, "#{stylesheet_import}\n")
+        end
         true
       end
 
