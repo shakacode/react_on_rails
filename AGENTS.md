@@ -220,20 +220,36 @@ During `accelerated-rc`, affected areas such as SSR, RSC, hydration, package rel
 
 Auto-merge during accelerated RC requires a finalized PR-body confidence block. The authoring agent may draft it, but a separate coordinator, finalizer, or review agent must finalize it. The finalizer must be a different GitHub account or named GitHub check/app identity than the PR authoring agent, verifiable from the git log or GitHub review/check record. Two sessions running under the same GitHub account, including separate invocations of the same GitHub App bot, do not satisfy this requirement. A named check/app identity qualifies only when it runs unconditionally on the PR and was not triggered, configured, or selected by the authoring agent; a check triggered by the authoring agent or by the same workflow that authored the commit does not satisfy this requirement. Prefer human maintainer finalization for high-risk changes. Before auto-merge, verify the `Finalized by` identity against that record, not only the PR body text. Keep only the latest finalized block in the PR body. Once `Finalized by:` is populated, any later confidence-block edit must first post a PR comment with a `Confidence Block Updated:` header, the previous score/finalizer, and the reason for the edit.
 
+Before accelerated-RC auto-merge, the merge actor must verify the confidence gate
+from live GitHub state, not from narrative confidence alone. The latest PR body
+must contain an `Agent Merge Confidence` block for the current `headRefOid`;
+reviewer verdicts must be classified as current-head or stale with the head SHA
+each verdict covers; and unresolved review threads must be fetched with `gh` or
+GraphQL immediately before merge. Stale approvals or positive comments may be
+listed as advisory history, but they cannot be cited as merge gates. If the
+block is missing, does not name the current head SHA, cites stale verdicts as
+gates, or leaves unresolved threads untriaged, refuse auto-merge and post a PR
+comment explaining the missing mechanical precondition.
+
 ```text
 ## Agent Merge Confidence
 
 Mode: accelerated-rc
 Score: X/10
 Auto-merge recommendation: <yes if score is at least 8/10, else no>
+Current head SHA: <head SHA used for this block>
 Affected areas: RSC, Pro/core boundary, CI
 CI detector: `script/ci-changes-detector origin/main` -> <summary>
 Validation run:
 - <command> -> <result>
 Review/check gate:
-- Claude review: complete for <head SHA>, no confirmed blocker
-- Fallback review, if Claude quota/capacity-limited: <Cursor or Codex result plus error evidence>
 - GitHub checks: complete for <head SHA>, failures/skips explained
+- Review threads: `gh`/GraphQL unresolved count is 0, or <N> unresolved threads each triaged with links
+- Current-head reviewer verdicts:
+  - Claude review: complete for <head SHA>, no confirmed blocker
+  - Fallback review, if Claude quota/capacity-limited: <Cursor or Codex result plus error evidence>
+- Stale reviewer verdicts, advisory only:
+  - <reviewer> <verdict> for <old SHA>; not cited as a merge gate
 Known residual risk: <none or concise risk>
 Finalized by: <different GitHub account or named check/app, with GitHub review/check or git-log source>
 ```
@@ -262,6 +278,10 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - Do not wait for CodeRabbit.ai, Claude, or any other AI system to approve when CI is green, blocking review feedback is addressed, and no major question or discussion item remains.
 - If branch protection still reports `REVIEW_REQUIRED`, verify whether a formal GitHub approving review is missing. Positive AI issue comments such as "LGTM" or "Ready to merge" support triage but do not satisfy a required review.
 - Security-category findings such as XSS, injection, exposed secrets, or auth bypass still require investigation before dismissal, regardless of source.
+- Treat public review requests as durable GitHub writes. Do not use live PRs for reviewer-bot debugging, placeholder/test review bodies, or pasted instruction dumps; use a sandbox repo, private test repo, or clearly labeled dedicated draft PR instead.
+- For `full-ci`, `benchmark`, accelerated-RC, high-risk, concurrent-batch, or repeatedly churny PRs, avoid nit-only, comment-only, optional wording-only, or evidence-only pushes after the declared final candidate has completed its configured review pass. Batch any remaining must-fix file changes into one final push and restart the current-head review/check gate; otherwise waive or record the optional item in a triage reply or decision log instead of spending another CI/review cycle.
+- During accelerated-RC auto-merge, the default contestability window is 10 minutes after the latest final waiver or triage reply before merge. A distinct finalizer or maintainer may override that default only with an explicit auditable acknowledgement of the final waiver set and immediate-merge decision. For auto-merge, that acknowledgement must satisfy the independent-finalizer rule above.
+- The batch coordinator or merge finalizer owns the closeout sweep for late post-merge bot findings before final batch handoff. Findings that arrive after closeout route into the next post-merge audit intake by default.
 
 For auto-merge, all GitHub checks for the current head SHA must be complete. Skipped checks count as complete only when they are explained by CI selector output, such as `script/ci-changes-detector origin/main`, or explicitly waived by a maintainer in a PR comment. Failed checks block auto-merge unless a maintainer explicitly waives them. If checks are noisy or unnecessary, fix the CI selection process instead of bypassing them silently.
 
@@ -298,7 +318,9 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Let Prettier and RuboCop handle formatting — never format manually
 - When adding docs under `docs/oss/` or `docs/pro/`, also add the doc ID to `docs/sidebars.ts` and run `script/check-docs-sidebar` — CI will fail otherwise. To intentionally exclude a doc from the sidebar, add its ID to `docs/.sidebar-exclusions` with a reason comment.
 - Pro package, build-configuration, package-script, dependency, and lockfile edits do not require special approval. Keep the diff focused on the assigned issue/PR/batch and run validation for the changed surface, such as Pro-specific lint/tests, package-script smoke checks, dependency consistency checks, and `script/ci-changes-detector origin/main`.
-- CI workflow edits (`.github/workflows/`) are also allowed on trusted assignments, but require extra scrutiny: inspect secret exposure, permission changes, trigger changes, and third-party action execution even when the assignment is trusted. Run `actionlint`, `yamllint .github/`, and `script/ci-changes-detector origin/main`. Before merge, post a PR comment with a `Workflow Change Audit:` header listing before/after changes for secret references, `permissions:`, `on:` triggers, and third-party actions added or version-changed. The audit comment is the human-readable summary; CI check results for the current head SHA are the objective verification record.
+- When adding or broadening a repo-wide lint, CI, release, review, or merge gate, add a new-gate rollout note to the PR evidence. Before merge, use at least one concrete stale-base race control: sweep open PRs that touch the newly enforced surface before landing the gate, require affected in-flight PRs to update to current `main` and re-run the new checker/current CI before merge, or have the coordinator re-check stale-based PR heads for newly added gates immediately before merge and hold or rerun them when needed. If none is practical, get an explicit maintainer waiver before merging.
+- When a lockfile is added, moved, renamed, unignored, or newly committed, including `Gemfile.lock` and other allowed lockfiles, verify Dependabot compatibility before merge. Check that `.github/dependabot.yml` has matching `package-ecosystem` and `directory` coverage, that Bundler `eval_gemfile` usage is compatible with Dependabot's supported static string form, and that npm/pnpm workspace layout matches the configured Dependabot directory.
+- CI workflow edits (`.github/workflows/`) are also allowed on trusted assignments, but require extra scrutiny: inspect secret exposure, permission changes, trigger changes, and third-party action execution even when the assignment is trusted. Run `actionlint`, `yamllint .github/`, and `script/ci-changes-detector origin/main`. Before merge, post a PR comment with a `Workflow Change Audit:` header listing before/after changes for secret references, `permissions:`, `on:` triggers, third-party actions added or version-changed, and any applicable new-gate rollout or Dependabot/lockfile compatibility results. The audit comment is the human-readable summary; CI check results for the current head SHA are the objective verification record.
 
 The assignment itself must still be trusted: direct user or maintainer instruction,
 a maintainer-approved exact target list, or a trusted existing PR branch. Public
