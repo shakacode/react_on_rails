@@ -170,6 +170,14 @@ describe ReactOnRailsHelper do
       )
     end
 
+    it "raises the standard nested entries error when generated packs cannot be looked up" do
+      allow(ReactOnRails::PackerUtils).to receive(:nested_entries?).and_return(false)
+
+      expect { helper.react_on_rails_preload_links("hello_world") }
+        .to raise_error(ReactOnRails::Error, /nested_entries/)
+      expect(manifest).not_to have_received(:lookup_pack_with_chunks!)
+    end
+
     it "emits modulepreload tags for module manifest assets" do
       allow(manifest).to receive(:lookup_pack_with_chunks!)
         .with("generated/ModernComponent", type: :javascript)
@@ -195,6 +203,26 @@ describe ReactOnRailsHelper do
       expect(links.first["crossorigin"]).to eq("anonymous")
     end
 
+    it "preserves explicit false manifest values when classifying module assets" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/LegacyModule", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/LegacyModule-123.js",
+                        "module" => false,
+                        module: true
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/LegacyModule", type: :stylesheet)
+        .and_return(nil)
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("legacy_module"))
+
+      expect(links.first["rel"]).to eq("preload")
+      expect(links.first["as"]).to eq("script")
+    end
+
     it "resolves manifest sources through Rails asset paths" do
       allow(manifest).to receive(:lookup_pack_with_chunks!)
         .with("generated/HostedComponent", type: :javascript)
@@ -215,6 +243,31 @@ describe ReactOnRailsHelper do
           "https://cdn.example.com/packs/generated/HostedComponent-456.css"
         ]
       )
+    end
+
+    it "normalizes prefixed generated pack names consistently" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return(["/packs/generated/HelloWorld-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(nil)
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("generated/hello_world"))
+
+      expect(links.first["href"]).to eq("/packs/generated/HelloWorld-456.js")
+    end
+
+    it "raises a clear error for hash manifest sources without src" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/BrokenComponent", type: :javascript)
+        .and_return([{ "integrity" => "sha384-broken" }])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/BrokenComponent", type: :stylesheet)
+        .and_return(nil)
+
+      expect { helper.react_on_rails_preload_links("broken_component") }
+        .to raise_error(ArgumentError, /manifest source without src/)
     end
 
     it "deduplicates shared chunks across component packs" do

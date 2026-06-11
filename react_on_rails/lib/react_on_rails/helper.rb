@@ -241,6 +241,8 @@ module ReactOnRails
     end
 
     def react_on_rails_preload_links(*component_names)
+      ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
+
       pack_names = component_names.flatten.compact.map do |component_name|
         generated_component_pack_name(component_name)
       end
@@ -486,7 +488,9 @@ module ReactOnRails
 
     def generated_component_pack_name(component_name)
       component_name = component_name.to_s
-      return component_name if component_name.start_with?("generated/")
+      if component_name.start_with?("generated/")
+        return "generated/#{component_name.delete_prefix('generated/').camelize}"
+      end
 
       "generated/#{component_name.camelize}"
     end
@@ -543,7 +547,10 @@ module ReactOnRails
     end
 
     def preload_manifest_source(source)
-      preload_manifest_value(source, "src") || source
+      return source if source.is_a?(String)
+      return preload_manifest_value(source, "src") if preload_manifest_key?(source, "src")
+
+      raise ArgumentError, "Unexpected Shakapacker manifest source without src: #{source.inspect}"
     end
 
     def preload_source_integrity(source)
@@ -563,7 +570,14 @@ module ReactOnRails
     def preload_manifest_value(source, key)
       return if source.is_a?(String) || !source.respond_to?(:[])
 
-      source[key] || source[key.to_sym]
+      return source[key] if preload_manifest_key?(source, key)
+      return source[key.to_sym] if preload_manifest_key?(source, key.to_sym)
+
+      nil
+    end
+
+    def preload_manifest_key?(source, key)
+      source.respond_to?(:key?) && source.key?(key)
     end
 
     def build_react_component_result_for_server_rendered_string(

@@ -65,15 +65,17 @@ For JavaScript chunks, plain script assets render as `<link rel="preload" as="sc
 
 <head>
   <%= react_on_rails_preload_links("ProductPage") %>
-  <%= stylesheet_pack_tag %>
+  <%= stylesheet_pack_tag "application" %>
 </head>
 <body>
   <%= yield :body_content %>
-  <%= javascript_pack_tag %>
+  <%= javascript_pack_tag "application" %>
 </body>
 ```
 
 This helper only emits HTML link tags. Keep the normal `stylesheet_pack_tag` and `javascript_pack_tag` calls in the layout so the browser still applies and executes the assets.
+
+When using a CDN asset host, keep Shakapacker's Subresource Integrity and `crossorigin` settings consistent between preload tags and the final script/style tags so the browser can reuse the preloaded response.
 
 ---
 
