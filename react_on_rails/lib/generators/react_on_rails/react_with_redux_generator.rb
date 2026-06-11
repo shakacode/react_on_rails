@@ -69,7 +69,13 @@ module ReactOnRails
         gsub_file(ror_client_file, "../store/helloWorldStore", "../store/helloWorldStore")
         gsub_file(ror_client_file, "../containers/HelloWorldContainer",
                   "../containers/HelloWorldContainer")
-        prepend_to_file(ror_client_file, "import '../../../stylesheets/application.css';\n") if use_tailwind?
+        return unless use_tailwind?
+
+        stylesheet_import = "import '../../../stylesheets/application.css';\n"
+        ror_client_file_path = File.join(destination_root, ror_client_file)
+        return if File.read(ror_client_file_path).include?(stylesheet_import)
+
+        prepend_to_file(ror_client_file, stylesheet_import)
       end
 
       def copy_base_redux_files

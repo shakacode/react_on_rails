@@ -83,8 +83,8 @@ module ReactOnRails
         style-loader@^4.0.0
       ].freeze
 
-      # Tailwind v4 CSS-first setup. These versions were verified as published
-      # npm releases before adding the generator option.
+      # Tailwind v4 CSS-first setup. The patch-level floors match published
+      # releases verified with the generator's SSR smoke app.
       TAILWIND_DEPENDENCIES = %w[
         tailwindcss@^4.3.0
         @tailwindcss/postcss@^4.3.0
