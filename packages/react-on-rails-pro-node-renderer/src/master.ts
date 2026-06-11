@@ -18,7 +18,7 @@
  * @module master
  */
 import path from 'path';
-import cluster from 'cluster';
+import cluster, { type Worker } from 'cluster';
 import { readdir, stat, rm } from 'fs/promises';
 import log from './shared/log.js';
 import packageJson from './shared/packageJson.js';
@@ -28,6 +28,8 @@ import * as errorReporter from './shared/errorReporter.js';
 import { getLicenseStatus } from './shared/licenseValidator.js';
 import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
 import { isWorkerStartupFailureMessage, type WorkerStartupFailureMessage } from './shared/workerMessages.js';
+import { SHUTDOWN_WORKER_MESSAGE } from './shared/utils.js';
+import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS } from './worker/shutdownHooks.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 // How often to scan for orphaned upload directories.
@@ -36,10 +38,18 @@ const ORPHAN_CLEANUP_INTERVAL_MS = 5 * MILLISECONDS_IN_MINUTE;
 // Set well above the longest realistic upload duration so that large bundle
 // uploads in progress are never deleted by the cleanup timer.
 const ORPHAN_AGE_THRESHOLD_MS = 30 * MILLISECONDS_IN_MINUTE;
-// Hard deadline for the master to exit after it begins draining workers. If a
-// worker is stuck (leaked handle, blocking syscall, etc.) this guarantees the
-// master still exits, following the same pattern as restartWorkers.ts.
-const MASTER_SHUTDOWN_TIMEOUT_MS = 5000;
+// Give workers a short window to receive SHUTDOWN_WORKER_MESSAGE and enter
+// their own graceful shutdown path before the master falls back to disconnect().
+const MASTER_WORKER_SHUTDOWN_MESSAGE_GRACE_MS = 1000;
+// Hard deadline for the master to exit after it begins draining workers. It
+// starts before workers receive SHUTDOWN_WORKER_MESSAGE, so it must include the
+// message grace window plus the worker hook budget. If a worker is stuck after
+// that point, this guarantees the master still exits.
+const MASTER_SHUTDOWN_TIMEOUT_MS = MASTER_WORKER_SHUTDOWN_MESSAGE_GRACE_MS + WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS;
+const SIGNAL_EXIT_CODES: Partial<Record<NodeJS.Signals, number>> = {
+  SIGINT: 130,
+  SIGTERM: 143,
+};
 
 export default function masterRun(runningConfig?: Partial<Config>) {
   // This is memoized after the wrapper path runs, but still protects direct `./master` entrypoint users.
@@ -103,6 +113,7 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   }, ORPHAN_CLEANUP_INTERVAL_MS);
 
   let isAbortingForStartupFailure = false;
+  let hasReportedStartupFailure = false;
   let fatalStartupFailure: { workerId: number; failure: WorkerStartupFailureMessage } | null = null;
   // Set as soon as any shutdown path (external signal or startup-failure abort)
   // begins. Read by the `cluster.on('exit')` handler to suppress re-forking
@@ -114,36 +125,119 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   // an external signal and a near-simultaneous startup-failure abort can't both
   // disconnect or schedule duplicate exits.
   //
-  // cluster.disconnect() is async — the callback fires once every worker has
-  // disconnected (Node closes each worker's servers and waits for in-flight
-  // connections to finish before severing the IPC channel). A hard-deadline
-  // timer guarantees the master still exits if a worker is stuck.
-  const shutdownGracefully = (exitCode: number) => {
+  // cluster.disconnect() is async, but its callback only proves workers have
+  // disconnected from IPC. Workers may still be draining in-flight requests, so
+  // external signal shutdown also waits for their exit events before the master
+  // exits. A hard-deadline timer guarantees the master still exits if a worker
+  // is stuck.
+  const currentWorkers = (): Worker[] =>
+    Object.values(cluster.workers ?? {}).filter((worker): worker is Worker => Boolean(worker));
+
+  const forceKillSurvivingWorkers = (workers: Worker[]) => {
+    workers.forEach((worker) => {
+      const workerProcess = worker.process;
+      if (worker.isDead() || workerProcess.killed) return;
+
+      try {
+        workerProcess.kill('SIGKILL');
+      } catch (err: unknown) {
+        log.warn({ msg: 'Error sending SIGKILL to worker during node renderer master shutdown', err });
+      }
+    });
+  };
+
+  const sendGracefulShutdownMessageToWorkers = (workers: Worker[]) => {
+    workers.forEach((worker) => {
+      try {
+        worker.send(SHUTDOWN_WORKER_MESSAGE);
+      } catch (err: unknown) {
+        log.warn({ msg: 'Error sending graceful shutdown message to worker', err });
+      }
+    });
+  };
+
+  const waitForWorkerExits = (workers: Worker[], onAllWorkersExited: () => void) => {
+    let remainingWorkers = 0;
+    let hasFinished = false;
+
+    const finishIfComplete = () => {
+      if (hasFinished || remainingWorkers > 0) return;
+      hasFinished = true;
+      onAllWorkersExited();
+    };
+
+    workers.forEach((worker) => {
+      if (worker.isDead()) return;
+
+      remainingWorkers += 1;
+      const markWorkerExited = () => {
+        remainingWorkers -= 1;
+        finishIfComplete();
+      };
+      worker.once('exit', markWorkerExited);
+
+      if (worker.isDead()) {
+        worker.off('exit', markWorkerExited);
+        markWorkerExited();
+      }
+    });
+
+    finishIfComplete();
+  };
+
+  const shutdownGracefully = (exitCode: number, notifyWorkersBeforeDisconnect = false) => {
     if (isShuttingDown) return;
     isShuttingDown = true;
+    const workersAtShutdown = currentWorkers();
 
-    const shutdownTimer = setTimeout(() => process.exit(exitCode), MASTER_SHUTDOWN_TIMEOUT_MS);
+    const shutdownTimer = setTimeout(() => {
+      forceKillSurvivingWorkers(workersAtShutdown);
+      process.exit(exitCode);
+    }, MASTER_SHUTDOWN_TIMEOUT_MS);
     if (typeof shutdownTimer.unref === 'function') shutdownTimer.unref();
-    cluster.disconnect(() => {
+
+    const finishShutdown = () => {
       clearTimeout(shutdownTimer);
       process.exit(exitCode);
-    });
+    };
+
+    const disconnectCluster = () => {
+      cluster.disconnect(() => {
+        if (notifyWorkersBeforeDisconnect) {
+          waitForWorkerExits(workersAtShutdown, finishShutdown);
+          return;
+        }
+
+        finishShutdown();
+      });
+    };
+
+    if (notifyWorkersBeforeDisconnect) {
+      sendGracefulShutdownMessageToWorkers(workersAtShutdown);
+      setTimeout(disconnectCluster, MASTER_WORKER_SHUTDOWN_MESSAGE_GRACE_MS);
+      return;
+    }
+
+    disconnectCluster();
   };
 
   const abortForStartupFailure = (): boolean => {
     if (!(isAbortingForStartupFailure && fatalStartupFailure)) return false;
+    if (hasReportedStartupFailure) return true;
+
+    // Note: the exiting worker may differ from the one that sent the
+    // failure message if multiple workers exit in rapid succession.
+    // We always report the first failure received.
+    const { failure, workerId: failedWorkerId } = fatalStartupFailure;
+    const msg =
+      failure.code === 'EADDRINUSE'
+        ? `Node renderer startup failed: ${failure.host}:${failure.port} is already in use`
+        : `Node renderer startup failed in worker ${failedWorkerId}: ${failure.message}`;
+
+    errorReporter.message(msg);
+    hasReportedStartupFailure = true;
 
     if (!isShuttingDown) {
-      // Note: the exiting worker may differ from the one that sent the
-      // failure message if multiple workers exit in rapid succession.
-      // We always report the first failure received.
-      const { failure, workerId: failedWorkerId } = fatalStartupFailure;
-      const msg =
-        failure.code === 'EADDRINUSE'
-          ? `Node renderer startup failed: ${failure.host}:${failure.port} is already in use`
-          : `Node renderer startup failed in worker ${failedWorkerId}: ${failure.message}`;
-
-      errorReporter.message(msg);
       // Exit non-zero so supervisors (Foreman/systemd/k8s) see the failed start.
       shutdownGracefully(1);
     }
@@ -160,24 +254,22 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     fatalStartupFailure = { workerId: worker.id, failure: message };
   });
 
-  for (let i = 0; i < workersCount; i += 1) {
-    cluster.fork();
-  }
-
   // Listen for dying workers:
   cluster.on('exit', (worker) => {
+    // Once a startup failure has been detected, abort regardless of whether
+    // this particular exit was from the failing worker, a scheduled restart,
+    // or an unrelated crash. Don't fork any more workers. If an external signal
+    // already started shutdown, still report the recorded failure once while
+    // preserving the signal-style exit code and avoiding duplicate disconnects.
+    if (abortForStartupFailure()) {
+      return;
+    }
+
     // If we are intentionally tearing the cluster down (external SIGTERM/SIGINT
     // or a startup-failure abort), workers are expected to exit — never re-fork
     // them, or we would resurrect the processes we are trying to drain and leave
     // them orphaned after the master exits.
     if (isShuttingDown) {
-      return;
-    }
-
-    // Once a startup failure has been detected, abort regardless of whether
-    // this particular exit was from the failing worker, a scheduled restart,
-    // or an unrelated crash. Don't fork any more workers.
-    if (abortForStartupFailure()) {
       return;
     }
 
@@ -190,9 +282,9 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     // Give in-flight startup-failure IPC messages one event-loop turn to be
     // processed before classifying this as an ordinary runtime crash.
     setImmediate(() => {
-      // A shutdown signal may have arrived during this event-loop turn; if so,
-      // don't resurrect the worker we are intentionally draining.
-      if (isShuttingDown || abortForStartupFailure()) return;
+      // A startup failure may have arrived during this event-loop turn; report
+      // it before any signal-shutdown bail-out suppresses crash classification.
+      if (abortForStartupFailure() || isShuttingDown) return;
 
       // TODO: Track last rendering request per worker.id
       // TODO: Consider blocking a given rendering request if it kills a worker more than X times
@@ -206,13 +298,17 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   // systemd, Kubernetes, Docker) send SIGTERM (and SIGINT on Ctrl-C in a
   // foreground terminal) to the master. Without these handlers the master is
   // killed immediately and its forked workers are left orphaned, holding their
-  // ports. Exit 0 because a clean external shutdown is not an error.
+  // ports.
   const handleShutdownSignal = (signal: NodeJS.Signals) => {
     log.info('Received %s, draining workers before shutting down the node renderer master', signal);
-    shutdownGracefully(0);
+    shutdownGracefully(SIGNAL_EXIT_CODES[signal] ?? 0, true);
   };
   process.on('SIGTERM', () => handleShutdownSignal('SIGTERM'));
   process.on('SIGINT', () => handleShutdownSignal('SIGINT'));
+
+  for (let i = 0; i < workersCount; i += 1) {
+    cluster.fork();
+  }
 
   // Schedule regular restarts of workers
   if (allWorkersRestartInterval && delayBetweenIndividualWorkerRestarts) {
