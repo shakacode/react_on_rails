@@ -49,8 +49,13 @@ class ApplicationController < ActionController::Base
       <a href="#{server_side_log_throw_raise_invoker_path}">click here</a>.</p>
     HTML
 
+    # The strict CSP (config/initializers/content_security_policy.rb) blocks
+    # inline scripts without the per-request nonce, so this late-streamed error
+    # script must carry it. The meta refresh below stays as a no-JS fallback.
+    nonce = content_security_policy_nonce
+    nonce_attribute = nonce.present? ? %( nonce="#{nonce}") : ""
     js_redirect = <<~JAVASCRIPT
-      <script>
+      <script#{nonce_attribute}>
         document.getElementById('page-container').innerHTML = #{ActiveSupport::JSON.encode(error_message)};
         setTimeout(function() {
           window.location.href = '#{server_side_log_throw_raise_invoker_path}';
