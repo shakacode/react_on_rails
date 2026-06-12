@@ -28,9 +28,6 @@ export default [
         __SERVER_ERRORS__: true,
       },
     },
-    plugins: {
-      import: importPlugin,
-    },
     settings: {
       react: {
         version: 'detect',
