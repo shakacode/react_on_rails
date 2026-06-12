@@ -108,7 +108,9 @@ Treat request-time generation as a fallback, not the plan:
 
 - **Run `analyze` on attach** (Active Storage does this by default via a job)
   so `metadata[:width]`/`metadata[:height]` are available for CLS attributes
-  without downloading the blob.
+  without downloading the blob. Until that job has run, `attachment.analyzed?`
+  is `false` and the dimensions are missing — guard for it and fall back to a
+  default aspect ratio, as the snippets below do.
 
 - **Serve through a CDN.** Put a CDN in front of your storage service (or use
   [proxy mode](https://guides.rubyonrails.org/active_storage_overview.html#putting-a-cdn-in-front-of-active-storage)
@@ -124,11 +126,15 @@ analyzed metadata instead of hardcoding:
 # app/models/product.rb
 def photo_aspect_ratio
   meta = photo.metadata
-  return 2.0 / 3 unless meta["width"].to_i.positive?
+  return 2.0 / 3 unless meta["width"].to_i.positive? && meta["height"].to_i.positive?
 
   meta["height"].to_f / meta["width"]
 end
 ```
+
+Guard on **both** dimensions: until the analyzer job has run
+(`photo.analyzed?` is `false`), either value can be missing, and a zero height
+would emit `height="0"` and an `aspect-ratio` of 0.
 
 ## Passing image props to a React component
 
@@ -139,20 +145,28 @@ hash via `react_component`. Compute the props in a helper:
 ```ruby
 # app/helpers/images_helper.rb
 module ImagesHelper
+  # Must match the named variants on the model (:w400, :w800, :w1600),
+  # pre-generated at upload time with preprocessed: true — see the
+  # variant-generation warning above.
   RESPONSIVE_WIDTHS = [400, 800, 1600].freeze
 
   # Returns {src:, srcSet:, sizes:, width:, height:} for an Active Storage attachment.
   def responsive_image_props(attachment, sizes: "100vw", display_width: 800)
-    variants = RESPONSIVE_WIDTHS.index_with do |w|
-      attachment.variant(resize_to_limit: [w, nil]).processed
-    end
-    width = attachment.metadata["width"].to_i
-    height = attachment.metadata["height"].to_i
-    aspect_ratio = width.positive? ? height.to_f / width : 2.0 / 3
+    # Snap to the closest generated width so an unlisted value can't produce
+    # a nil variant lookup.
+    display_width = RESPONSIVE_WIDTHS.min_by { |w| (w - display_width).abs }
+    meta = attachment.metadata
+    aspect_ratio =
+      if meta["width"].to_i.positive? && meta["height"].to_i.positive?
+        meta["height"].to_f / meta["width"]
+      else
+        2.0 / 3 # analysis hasn't run yet — see the warning above
+      end
+    srcset = RESPONSIVE_WIDTHS.map { |w| "#{url_for(attachment.variant(:"w#{w}"))} #{w}w" }
 
     {
-      src: url_for(variants[display_width]),
-      srcSet: RESPONSIVE_WIDTHS.map { |w| "#{url_for(variants[w])} #{w}w" }.join(", "),
+      src: url_for(attachment.variant(:"w#{display_width}")),
+      srcSet: srcset.join(", "),
       sizes: sizes,
       width: display_width,
       height: (display_width * aspect_ratio).round
@@ -160,6 +174,12 @@ module ImagesHelper
   end
 end
 ```
+
+If you cannot define named variants (or are on Rails < 7.1), the request-time
+form — `attachment.variant(resize_to_limit: [w, nil]).processed` — is a drop-in
+replacement for `attachment.variant(:"w#{w}")`. But it transforms on first
+request, which is exactly the footgun the warning above describes: acceptable
+for a low-traffic admin page, not for anything user-facing.
 
 ```erb
 <%# app/views/products/show.html.erb %>
