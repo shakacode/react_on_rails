@@ -89,6 +89,7 @@ const sidebars: SidebarsConfig = {
             'building-features/styling-with-tailwind',
             'building-features/i18n',
             'building-features/images',
+            'building-features/fast-images',
             'building-features/fonts',
             'building-features/rails-engine-integration',
             'building-features/turbolinks',
