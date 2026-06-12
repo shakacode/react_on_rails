@@ -37,12 +37,13 @@ rescue LoadError
 end
 
 namespace :react_on_rails do
-  desc "Diagnose React on Rails setup and configuration"
+  desc "Diagnose React on Rails setup and configuration (FORMAT=json for machine-readable output)"
   task :doctor do
     verbose = ENV["VERBOSE"] == "true"
     fix = ENV["FIX"] == "true"
+    format = ENV["FORMAT"] == "json" ? :json : :text
 
-    doctor = ReactOnRails::Doctor.new(verbose:, fix:)
+    doctor = ReactOnRails::Doctor.new(verbose:, fix:, format:)
     doctor.run_diagnosis
   end
 end

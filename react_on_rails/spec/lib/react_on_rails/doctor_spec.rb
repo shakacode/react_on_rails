@@ -98,6 +98,162 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "JSON output format" do
+    let(:json_doctor) { described_class.new(format: :json) }
+
+    # All check section methods are stubbed so no real system inspection runs;
+    # messages_by_id injects SystemChecker-style messages for specific sections.
+    def stub_check_sections(doctor, messages_by_id = {})
+      checker = doctor.instance_variable_get(:@checker)
+      described_class::CHECK_SECTIONS.each do |section|
+        allow(doctor).to receive(section[:method]) do
+          (messages_by_id[section[:id]] || []).each { |message| checker.messages << message }
+        end
+      end
+    end
+
+    def run_and_parse_json(doctor)
+      output = []
+      allow(doctor).to receive(:exit)
+      allow(doctor).to receive(:puts) { |arg| output << arg.to_s }
+      doctor.run_diagnosis
+      JSON.parse(output.join("\n"))
+    end
+
+    it "rejects unknown formats" do
+      expect { described_class.new(format: :xml) }.to raise_error(ArgumentError, /Invalid doctor format/)
+    end
+
+    it "emits valid JSON with schema_version and ror_version" do
+      stub_check_sections(json_doctor)
+      report = run_and_parse_json(json_doctor)
+
+      expect(report["schema_version"]).to eq(1)
+      expect(report["ror_version"]).to eq(ReactOnRails::VERSION)
+    end
+
+    it "emits one entry per check section with stable snake_case ids" do
+      stub_check_sections(json_doctor)
+      report = run_and_parse_json(json_doctor)
+
+      expect(report["checks"].map { |check| check["id"] }).to eq(
+        %w[
+          environment_prerequisites
+          react_on_rails_versions
+          react_on_rails_packages
+          javascript_package_dependencies
+          key_configuration_files
+          configuration_analysis
+          bin_dev_launcher_setup
+          rails_integration
+          bundler_configuration
+          testing_setup
+          development_environment
+          react_on_rails_pro_setup
+          react_server_components
+        ]
+      )
+    end
+
+    it "maps message severities to pass/warn/fail statuses with summary counts" do
+      stub_check_sections(
+        json_doctor,
+        "environment_prerequisites" => [
+          { type: :success, content: "Node OK" },
+          { type: :error, content: "Missing package manager" }
+        ],
+        "react_on_rails_versions" => [{ type: :warning, content: "Version drift" }],
+        "rails_integration" => [{ type: :success, content: "Rails detected" }]
+      )
+      report = run_and_parse_json(json_doctor)
+      checks_by_id = report["checks"].to_h { |check| [check["id"], check] }
+
+      expect(checks_by_id["environment_prerequisites"]["status"]).to eq("fail")
+      expect(checks_by_id["react_on_rails_versions"]["status"]).to eq("warn")
+      expect(checks_by_id["rails_integration"]["status"]).to eq("pass")
+      expect(report["status"]).to eq("fail")
+      expect(report["summary"]).to eq("pass" => 11, "warn" => 1, "fail" => 1)
+      expect(report["checks"].map { |check| check["status"] }.uniq).to all(match(/\A(pass|warn|fail)\z/))
+    end
+
+    it "surfaces the most severe message and full details per check" do
+      stub_check_sections(
+        json_doctor,
+        "environment_prerequisites" => [
+          { type: :info, content: "Checking environment" },
+          { type: :warning, content: "Old Node version" },
+          { type: :error, content: "Missing package manager" }
+        ]
+      )
+      report = run_and_parse_json(json_doctor)
+      check = report["checks"].first
+
+      expect(check["message"]).to eq("Missing package manager")
+      expect(check["details"]).to eq(
+        [
+          { "level" => "info", "content" => "Checking environment" },
+          { "level" => "warning", "content" => "Old Node version" },
+          { "level" => "error", "content" => "Missing package manager" }
+        ]
+      )
+    end
+
+    it "reports warn overall status and exit code 0 when only warnings exist" do
+      stub_check_sections(json_doctor, "testing_setup" => [{ type: :warning, content: "No test helper" }])
+      allow(json_doctor).to receive(:puts)
+
+      expect(json_doctor).to receive(:exit).with(0)
+      json_doctor.run_diagnosis
+    end
+
+    it "exits with status 1 when any check fails" do
+      stub_check_sections(json_doctor, "rails_integration" => [{ type: :error, content: "No Rails app" }])
+      allow(json_doctor).to receive(:puts)
+
+      expect(json_doctor).to receive(:exit).with(1)
+      json_doctor.run_diagnosis
+    end
+
+    it "redirects stray check output to stderr so stdout stays valid JSON" do
+      stub_check_sections(json_doctor)
+      checker = json_doctor.instance_variable_get(:@checker)
+      allow(json_doctor).to receive(:check_environment) do
+        puts "stray check output"
+        checker.messages << { type: :success, content: "Node OK" }
+      end
+      allow(json_doctor).to receive(:exit)
+
+      output = []
+      allow(json_doctor).to receive(:puts) { |arg| output << arg.to_s }
+
+      expect { json_doctor.run_diagnosis }.to output(/stray check output/).to_stderr
+      expect { JSON.parse(output.join("\n")) }.not_to raise_error
+      expect(output.join).not_to include("stray check output")
+    end
+
+    it "captures fd-level stdout writes (STDOUT/subprocesses), not just $stdout" do
+      stub_check_sections(json_doctor)
+      allow(json_doctor).to receive(:check_environment) do
+        STDOUT.puts "fd-level stray output" # rubocop:disable Style/GlobalStdStream
+        system("echo subprocess stray output")
+      end
+      allow(json_doctor).to receive(:exit)
+
+      output = []
+      allow(json_doctor).to receive(:puts) { |arg| output << arg.to_s }
+
+      expect { json_doctor.run_diagnosis }
+        .to output(/fd-level stray output.*subprocess stray output/m).to_stderr
+      expect { JSON.parse(output.join("\n")) }.not_to raise_error
+      expect(output.join).not_to include("stray output")
+    end
+
+    it "keeps the human-readable text format as the default" do
+      default_doctor = described_class.new
+      expect(default_doctor.send(:format)).to eq(:text)
+    end
+  end
+
   describe "#dev_server_label" do
     it "uses the canonical webpack-dev-server spelling for webpack apps" do
       allow(doctor).to receive(:configured_assets_bundler).and_return("webpack")

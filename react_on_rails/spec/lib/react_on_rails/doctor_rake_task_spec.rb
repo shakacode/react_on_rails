@@ -31,5 +31,26 @@ RSpec.describe "doctor rake task" do
       task = Rake::Task["react_on_rails:doctor"]
       expect { task.invoke }.not_to raise_error
     end
+
+    it "defaults to the human-readable text format" do
+      doctor_instance = instance_double(ReactOnRails::Doctor, run_diagnosis: nil)
+      allow(ReactOnRails::Doctor).to receive(:new).and_return(doctor_instance)
+
+      Rake::Task["react_on_rails:doctor"].invoke
+
+      expect(ReactOnRails::Doctor).to have_received(:new).with(verbose: false, fix: false, format: :text)
+    end
+
+    it "passes format: :json when FORMAT=json is set" do
+      doctor_instance = instance_double(ReactOnRails::Doctor, run_diagnosis: nil)
+      allow(ReactOnRails::Doctor).to receive(:new).and_return(doctor_instance)
+
+      ENV["FORMAT"] = "json"
+      Rake::Task["react_on_rails:doctor"].invoke
+
+      expect(ReactOnRails::Doctor).to have_received(:new).with(verbose: false, fix: false, format: :json)
+    ensure
+      ENV.delete("FORMAT")
+    end
   end
 end

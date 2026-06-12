@@ -3,9 +3,11 @@
 require "json"
 require "erb"
 require "stringio"
+require "tempfile"
 require "timeout"
 require "yaml"
 require_relative "utils"
+require_relative "version"
 require_relative "config_path_resolver"
 require_relative "shakapacker_config_helpers"
 require_relative "dev/server_mode"
@@ -116,15 +118,69 @@ module ReactOnRails
     # than this is a sign of an unexpectedly broad pattern, not legitimate config.
     RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES = 100
 
-    def initialize(verbose: false, fix: false)
+    # Supported output formats. :text is the human-readable default; :json emits
+    # a machine-readable report (see JSON_SCHEMA_VERSION below).
+    OUTPUT_FORMATS = %i[text json].freeze
+
+    # Version of the machine-readable doctor report schema (FORMAT=json).
+    # Bump ONLY on breaking changes to the shape below. Schema (v1):
+    #
+    #   {
+    #     "schema_version": 1,
+    #     "ror_version": "<ReactOnRails::VERSION>",
+    #     "status": "pass" | "warn" | "fail",          // worst check status
+    #     "checks": [
+    #       {
+    #         "id": "<stable snake_case id from CHECK_SECTIONS>",
+    #         "title": "<human section title>",
+    #         "status": "pass" | "warn" | "fail",
+    #         "message": "<most severe message content, or null>",
+    #         "details": [ { "level": "success|warning|error|info", "content": "..." } ]
+    #       }
+    #     ],
+    #     "summary": { "pass": <count>, "warn": <count>, "fail": <count> }
+    #   }
+    #
+    # No timestamp is included so output is deterministic for a given app state.
+    # Exit code semantics match text mode: 1 if any check fails, else 0.
+    JSON_SCHEMA_VERSION = 1
+
+    # Doctor check sections. The :id values are part of the stable JSON schema
+    # contract (consumed by agents/tooling) — never rename or reuse them; add new
+    # sections with new ids instead.
+    CHECK_SECTIONS = [
+      { id: "environment_prerequisites", title: "Environment Prerequisites", method: :check_environment },
+      { id: "react_on_rails_versions", title: "React on Rails Versions", method: :check_react_on_rails_versions },
+      { id: "react_on_rails_packages", title: "React on Rails Packages", method: :check_packages },
+      { id: "javascript_package_dependencies", title: "JavaScript Package Dependencies",
+        method: :check_dependencies },
+      { id: "key_configuration_files", title: "Key Configuration Files", method: :check_key_files },
+      { id: "configuration_analysis", title: "Configuration Analysis", method: :check_configuration_details },
+      { id: "bin_dev_launcher_setup", title: "bin/dev Launcher Setup", method: :check_bin_dev_launcher },
+      { id: "rails_integration", title: "Rails Integration", method: :check_rails },
+      { id: "bundler_configuration", title: "Bundler Configuration", method: :check_bundler_configuration },
+      { id: "testing_setup", title: "Testing Setup", method: :check_testing_setup },
+      { id: "development_environment", title: "Development Environment", method: :check_development },
+      { id: "react_on_rails_pro_setup", title: "React on Rails Pro Setup", method: :check_pro_setup },
+      { id: "react_server_components", title: "React Server Components", method: :check_rsc_setup }
+    ].freeze
+
+    def initialize(verbose: false, fix: false, format: :text)
       @verbose = verbose
       @fix = fix
+      @format = format.to_sym
+      unless OUTPUT_FORMATS.include?(@format)
+        raise ArgumentError, "Invalid doctor format #{format.inspect}; expected one of #{OUTPUT_FORMATS.join(', ')}"
+      end
+
       @checker = SystemChecker.new
       @test_output_path_strategy = :unknown
       @rails_environment_loaded = false
     end
 
     def run_diagnosis
+      return run_json_diagnosis if format == :json
+
       print_header
       run_all_checks
       print_summary
@@ -135,7 +191,7 @@ module ReactOnRails
 
     private
 
-    attr_reader :verbose, :fix, :checker
+    attr_reader :verbose, :fix, :format, :checker
 
     def print_header
       puts Rainbow("\n#{'=' * 80}").cyan
@@ -156,33 +212,123 @@ module ReactOnRails
     end
 
     def run_all_checks
-      checks = [
-        ["Environment Prerequisites", :check_environment],
-        ["React on Rails Versions", :check_react_on_rails_versions],
-        ["React on Rails Packages", :check_packages],
-        ["JavaScript Package Dependencies", :check_dependencies],
-        ["Key Configuration Files", :check_key_files],
-        ["Configuration Analysis", :check_configuration_details],
-        ["bin/dev Launcher Setup", :check_bin_dev_launcher],
-        ["Rails Integration", :check_rails],
-        ["Bundler Configuration", :check_bundler_configuration],
-        ["Testing Setup", :check_testing_setup],
-        ["Development Environment", :check_development],
-        ["React on Rails Pro Setup", :check_pro_setup],
-        ["React Server Components", :check_rsc_setup]
-      ]
-
-      checks.each do |section_name, check_method|
+      CHECK_SECTIONS.each do |section|
         initial_message_count = checker.messages.length
-        send(check_method)
+        send(section[:method])
 
         # Only print header if messages were added
         next unless checker.messages.length > initial_message_count
 
-        print_section_header(section_name)
+        print_section_header(section[:title])
         print_recent_messages(initial_message_count)
         puts
       end
+    end
+
+    # JSON output mode: stdout carries ONLY the JSON report (schema documented
+    # at JSON_SCHEMA_VERSION); any stray output produced by checks is routed to
+    # stderr so the report stays parseable.
+    def run_json_diagnosis
+      results = nil
+      stray_output = capture_stdout { results = collect_check_results }
+      $stderr.print(stray_output) unless stray_output.empty?
+
+      puts JSON.pretty_generate(build_json_report(results))
+      exit(diagnosis_exit_code)
+    end
+
+    def collect_check_results
+      CHECK_SECTIONS.map do |section|
+        initial_message_count = checker.messages.length
+        send(section[:method])
+
+        {
+          id: section[:id],
+          title: section[:title],
+          messages: checker.messages[initial_message_count..]
+        }
+      end
+    end
+
+    # Captures everything written to the stdout file descriptor (fd 1) while the
+    # block runs — including direct STDOUT writes, child processes inheriting
+    # fd 1, and C extensions — not just Ruby-level $stdout. Reassigning $stdout
+    # to a StringIO would miss those, letting stray bytes corrupt the JSON report.
+    # rubocop:disable Style/GlobalStdStream
+    def capture_stdout
+      captured_file = Tempfile.new("react_on_rails_doctor_stdout")
+      original_stdout = $stdout
+      original_fd = STDOUT.dup
+      STDOUT.flush
+      STDOUT.reopen(captured_file.path, "w")
+      $stdout = STDOUT
+      yield
+      STDOUT.flush
+      File.read(captured_file.path)
+    ensure
+      if original_fd
+        STDOUT.reopen(original_fd)
+        original_fd.close
+      end
+      $stdout = original_stdout if original_stdout
+      captured_file&.close!
+    end
+    # rubocop:enable Style/GlobalStdStream
+
+    def build_json_report(results)
+      checks = results.map { |result| build_check_entry(result) }
+      statuses = checks.map { |check| check[:status] }
+
+      {
+        schema_version: JSON_SCHEMA_VERSION,
+        ror_version: ReactOnRails::VERSION,
+        status: overall_status(statuses),
+        checks:,
+        summary: {
+          pass: statuses.count("pass"),
+          warn: statuses.count("warn"),
+          fail: statuses.count("fail")
+        }
+      }
+    end
+
+    def build_check_entry(result)
+      messages = result[:messages]
+      status = check_status(messages)
+
+      {
+        id: result[:id],
+        title: result[:title],
+        status:,
+        message: primary_message(messages, status),
+        details: messages.map { |message| { level: message[:type].to_s, content: message[:content] } }
+      }
+    end
+
+    def check_status(messages)
+      if messages.any? { |message| message[:type] == :error }
+        "fail"
+      elsif messages.any? { |message| message[:type] == :warning }
+        "warn"
+      else
+        "pass"
+      end
+    end
+
+    def overall_status(statuses)
+      if statuses.include?("fail")
+        "fail"
+      elsif statuses.include?("warn")
+        "warn"
+      else
+        "pass"
+      end
+    end
+
+    def primary_message(messages, status)
+      severity = { "fail" => :error, "warn" => :warning }[status]
+      message = severity ? messages.find { |msg| msg[:type] == severity } : messages.first
+      message && message[:content]
     end
 
     def print_section_header(section_name)
@@ -1765,14 +1911,17 @@ module ReactOnRails
     def exit_with_status
       if checker.errors?
         puts Rainbow("❌ Doctor found critical issues. Please address errors above.").red.bold
-        exit(1)
       elsif checker.warnings?
         puts Rainbow("⚠️  Doctor found some issues. Consider addressing warnings above.").yellow
-        exit(0)
       else
         puts Rainbow("🎉 All checks passed! Your React on Rails setup is healthy.").green.bold
-        exit(0)
       end
+
+      exit(diagnosis_exit_code)
+    end
+
+    def diagnosis_exit_code
+      checker.errors? ? 1 : 0
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
