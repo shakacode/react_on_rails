@@ -181,6 +181,7 @@ const sidebars: SidebarsConfig = {
           items: [
             'migrating/example-migrations',
             'migrating/migrating-from-react-rails',
+            'migrating/migrating-from-inertia-rails',
             'migrating/migrating-from-vite-rails',
             'migrating/migrating-from-webpack-to-rspack',
             'migrating/babel-to-swc-migration',
