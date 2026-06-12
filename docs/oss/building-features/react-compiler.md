@@ -11,6 +11,7 @@ React on Rails delegates JavaScript/TypeScript transforms to your app's build to
 - **Babel path is canonical and verified.** Add `babel-plugin-react-compiler` to your `babel.config.js`, ordered **first**. The compiler-memoized output builds and server-renders correctly.
 - **SWC path is experimental — not recommended for production yet.** As of June 2026 there is no first-party SWC React Compiler plugin; only a brand-new, pre-1.0 third-party Wasm plugin exists. See [Rspack + SWC path](#rspack--swc-path-experimental).
 - **Scope it.** Both paths let you gate the compiler to specific files via the `sources` option. Start scoped to a few components, verify SSR, then widen.
+- **RSC boundaries are opt-in from the client side.** Compile the `'use client'` components that hydrate or manage state, keep Server Components directive-free, and verify the RSC payload path separately.
 
 ## Prerequisites
 
@@ -115,6 +116,64 @@ This was verified end-to-end: a compiler-memoized example component (`ReactCompi
 
 If you adopt the compiler, keep verifying SSR for your own components — especially any that read browser-only globals at render time, which is a Rules-of-React violation independent of the compiler.
 
+## RSC boundary example
+
+React Server Components do not change where you configure the Compiler: it still runs in the JavaScript transform pipeline. What changes is the scope you choose. Start with a small `'use client'` island that sits at the RSC boundary, then leave the Server Component itself without a directive so React on Rails can register it as a Server Component.
+
+Client island compiled by the Babel `sources` predicate:
+
+```tsx
+// client/app/components/compiler-ready/RscQuantityPicker.client.tsx
+'use client';
+
+import { useState } from 'react';
+
+export default function RscQuantityPicker({ initialQuantity }: { initialQuantity: number }) {
+  const [quantity, setQuantity] = useState(initialQuantity);
+
+  return (
+    <button type="button" onClick={() => setQuantity((value) => value + 1)}>
+      Quantity: {quantity}
+    </button>
+  );
+}
+```
+
+Server Component that streams data and renders the compiled client island:
+
+```tsx
+// client/app/ror-auto-load-components/CompilerReadyRscProduct.tsx
+import RscQuantityPicker from '../components/compiler-ready/RscQuantityPicker.client';
+
+export default async function CompilerReadyRscProduct({ productId }: { productId: string }) {
+  const product = await loadProduct(productId);
+
+  return (
+    <section>
+      <h2>{product.name}</h2>
+      <RscQuantityPicker initialQuantity={1} />
+    </section>
+  );
+}
+```
+
+Scope the Compiler to the client island, not to every RSC file at once:
+
+```js
+resultConfig.plugins = [
+  [
+    'babel-plugin-react-compiler',
+    {
+      sources: (filename) =>
+        typeof filename === 'string' && filename.includes('client/app/components/compiler-ready/'),
+    },
+  ],
+  ...resultConfig.plugins,
+];
+```
+
+That keeps the first RSC rollout focused on the browser component that benefits from automatic memoization. The Server Component remains a normal RSC entry point: no `'use client'` directive, no browser-only hooks, and registration through `registerServerComponent()` / auto-registration as usual.
+
 ## Rspack + SWC path (experimental)
 
 Many React on Rails teams use Rspack with SWC for build speed (see the [Babel → SWC migration guide](../migrating/babel-to-swc-migration.md)). Unfortunately, the SWC React Compiler story is **not production-viable as of June 2026**:
@@ -133,6 +192,7 @@ The standard dummy app (`react_on_rails/spec/dummy`) ships a scoped, runnable re
 - **Component:** `client/app/startup/ReactCompilerExample.tsx` — a non-RSC component written with **no** manual memoization.
 - **Babel wiring:** `babel.config.js` adds `babel-plugin-react-compiler` **first**, gated behind `REACT_COMPILER=1` and scoped via `sources` to just `ReactCompilerExample`, so the default build (which uses SWC) and the existing test suite are unaffected.
 - **View / route:** `app/views/pages/react_compiler_example.html.erb` + the `react_compiler_example` route render it with `prerender: true` (SSR + hydration).
+- **Lint wiring:** the root flat ESLint config uses `eslint-plugin-react-hooks` v6 and enables the compiler Rules-of-React checks for this scoped compiler example.
 
 Build it with the compiler on (Babel path):
 
@@ -148,8 +208,6 @@ The compiler is **off by default**, so nothing changes for the normal SWC build.
 
 These are intentionally deferred and tracked separately:
 
-- **ESLint v6 / compiler lint rules.** The Compiler's "Rules of React" lint rules ship in `eslint-plugin-react-hooks` **v6**; this repo is on `^5.2.0`. Bumping ESLint and wiring the rules is a separate change (it has flat-config implications) and is not part of this recipe.
-- **RSC (React Server Components).** Auto-memoization across the `'use client'` / `'use server'` boundary is the highest-risk surface and needs a real RSC dummy build, not extrapolation. A non-RSC recipe ships first; the RSC example/verification is a follow-up.
 - **Performance benchmark.** A concrete before/after re-render / interaction-latency benchmark to quantify the win is a follow-up.
 
 ## References
