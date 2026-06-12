@@ -35818,6 +35818,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.0.0.rc.3] - 2026-06-11
+
 #### Added
 
 - **Machine-readable doctor output (`FORMAT=json`)**: `bin/rails react_on_rails:doctor FORMAT=json` (and `ReactOnRails::Doctor.new(format: :json)`) now emits a stable, versioned JSON report — `schema_version`, `ror_version`, overall `status`, per-check entries with stable snake_case ids (`pass`/`warn`/`fail` status, most-severe `message`, full `details`), and a `summary` of check counts — so coding agents and tooling can consume diagnosis results without parsing the human-formatted text. Stray check output is routed to stderr so stdout stays valid JSON; the default human-readable output and exit-code semantics are unchanged. Split out from the MCP-server RFC in [Issue 3870](https://github.com/shakacode/react_on_rails/issues/3870). Closes [Issue 3943](https://github.com/shakacode/react_on_rails/issues/3943). [PR 3948](https://github.com/shakacode/react_on_rails/pull/3948) by [justin808](https://github.com/justin808).
@@ -35826,6 +35828,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **Stable SmartError codes and generated error reference**: SmartError messages now include stable `ROR###` codes and canonical documentation URLs, and `docs/oss/reference/error-reference.md` is generated from the SmartError definitions with a drift check. Fixes [Issue 3894](https://github.com/shakacode/react_on_rails/issues/3894). [PR 3936](https://github.com/shakacode/react_on_rails/pull/3936) by [justin808](https://github.com/justin808).
 - **Preload link helper for generated component packs**: Added `react_on_rails_preload_links` so layouts can emit preload, modulepreload, and stylesheet preload tags for auto-bundled component packs from the Shakapacker manifest. Fixes [Issue 3889](https://github.com/shakacode/react_on_rails/issues/3889). [PR 3935](https://github.com/shakacode/react_on_rails/pull/3935) by [justin808](https://github.com/justin808).
 - **Tailwind CSS v4 generator option**: `rails generate react_on_rails:install --tailwind` and `create-react-on-rails-app --tailwind` now install Tailwind CSS v4, wire `@tailwindcss/postcss` for Webpack or Rspack, and style the generated server-rendered HelloWorld example with extracted component CSS support. Interactive `create-react-on-rails-app` runs recommend Tailwind by default while still allowing users to opt out. Fixes [Issue 3895](https://github.com/shakacode/react_on_rails/issues/3895). [PR 3937](https://github.com/shakacode/react_on_rails/pull/3937) by [justin808](https://github.com/justin808).
+
+#### Fixed
+
+- **[Pro]** **Node renderer drains workers on `SIGTERM`/`SIGINT` instead of orphaning them**: The Pro Node renderer master now installs `SIGTERM` and `SIGINT` handlers before forking workers, so supervisors (Foreman, local dev, process managers) that signal the master gracefully drain workers — sending the shutdown message, waiting a short grace period, calling `cluster.disconnect()`, then awaiting each worker's `exit` event — instead of killing only the master and leaving orphaned worker processes behind. Shutdown uses signal-style exit codes (`SIGINT` → 130, `SIGTERM` → 143), reuses a shutdown-time worker snapshot for the hard `SIGKILL` fallback so disconnected-but-still-running workers are not missed, and suppresses reforks while a shutdown is in progress. Fixes [Issue 3863](https://github.com/shakacode/react_on_rails/issues/3863). [PR 3882](https://github.com/shakacode/react_on_rails/pull/3882) by [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.2] - 2026-06-09
 
@@ -38085,7 +38091,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.2...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.3...main
+[17.0.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.2...v17.0.0.rc.3
 [17.0.0.rc.2]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.1...v17.0.0.rc.2
 [17.0.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.0...v17.0.0.rc.1
 [17.0.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v17.0.0.rc.0
