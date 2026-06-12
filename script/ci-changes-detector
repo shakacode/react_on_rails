@@ -324,13 +324,11 @@ while IFS= read -r file; do
         SOURCE_COMMENT_ONLY_CHANGED=true
       else
         RSPEC_CHANGED=true
-        # Mirrors the existing benchmark behavior: a core gem-spec change runs the
-        # core+pro suites (run_ruby_tests fed them). The gem-tests.yml workflow in
-        # this arm is guarded out — editing it can't move performance.
-        if ! is_benchmark_irrelevant_path "$file"; then
-          BENCH_CORE_CHANGED=true
-          BENCH_PRO_CHANGED=true
-        fi
+        # Spec-only changes set no BENCH_* flag: specs are never shipped in the
+        # gem, so they cannot move runtime performance (e.g. #3854 changed only
+        # CI-config specs yet ran the core+pro suites). Benchmarks are driven by
+        # the lib/app source arms above; the `benchmark` label still forces a run
+        # when a spec change is paired with a perf concern.
       fi
       ;;
 
@@ -411,10 +409,9 @@ while IFS= read -r file; do
         PRO_SOURCE_COMMENT_ONLY_CHANGED=true
       else
         PRO_RSPEC_CHANGED=true
-        # pro-gem-tests.yml in this arm is guarded out (a workflow edit can't move perf).
-        if ! is_benchmark_irrelevant_path "$file"; then
-          BENCH_PRO_CHANGED=true
-        fi
+        # Spec-only changes set no BENCH_* flag (see the core gem-spec arm above):
+        # Pro specs are not shipped, so they cannot move runtime performance. The
+        # `benchmark` label still forces a run when needed.
       fi
       ;;
 
@@ -478,16 +475,20 @@ while IFS= read -r file; do
       ;;
 
     # Catch-all: any file not explicitly categorized above
-    # Philosophy: When in doubt, run everything to ensure safety
-    # This prevents new file types or directories from being silently ignored by CI
+    # Philosophy: When in doubt, run every TEST suite to ensure safety. This
+    # prevents new file types or directories from being silently ignored by CI.
+    #
+    # Deliberately does NOT set any BENCH_* flag: an uncategorized file is almost
+    # always tooling/config (e.g. .ci-dependency-versions, .tool-versions,
+    # packages/create-react-on-rails-app/**, knip.ts), not a hot runtime path, so
+    # benchmarking it on a PR just burns a 30+ minute suite and ships meaningless
+    # Bencher data (the #3855 / #3915 / #3785 spurious runs). The `benchmark` PR
+    # label still forces a run for a genuinely new runtime path, and every push to
+    # main benchmarks unconditionally (generate_matrix.rb), so main remains the
+    # regression backstop for anything that slips through here.
     *)
       DOCS_ONLY=false
       UNCATEGORIZED_CHANGED=true
-      # Unknown file: benchmark every suite too (safety, matching the full-suite
-      # test run below). A new runtime path must never silently skip benchmarks.
-      BENCH_CORE_CHANGED=true
-      BENCH_PRO_CHANGED=true
-      BENCH_PRO_NODE_RENDERER_CHANGED=true
       ;;
   esac
 done <<< "$CHANGED_FILES"

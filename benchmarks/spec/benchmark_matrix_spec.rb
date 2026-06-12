@@ -81,6 +81,39 @@ RSpec.describe "benchmark matrix generation" do
     end
   end
 
+  describe "the full-ci-no-benchmarks suppression label" do
+    it "suppresses every suite even when change detection requested them" do
+      expect(suite_ids_for(
+               "BENCHMARK_EVENT_NAME" => "pull_request",
+               "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "shakacode/react_on_rails",
+               "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
+               "RUN_CORE_BENCHMARKS" => "true",
+               "RUN_PRO_BENCHMARKS" => "true",
+               "RUN_PRO_NODE_RENDERER_BENCHMARKS" => "true",
+               "BENCHMARK_PULL_REQUEST_LABELS" => '["full-ci-no-benchmarks"]'
+             )).to eq(["none"])
+    end
+
+    it "beats an explicit benchmark label on the same PR" do
+      expect(suite_ids_for(
+               "BENCHMARK_EVENT_NAME" => "pull_request",
+               "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "shakacode/react_on_rails",
+               "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
+               "BENCHMARK_PULL_REQUEST_LABELS" => '["benchmark","full-ci-no-benchmarks"]'
+             )).to eq(["none"])
+    end
+
+    it "is honored even from a fork (it only turns benchmarks off)" do
+      expect(suite_ids_for(
+               "BENCHMARK_EVENT_NAME" => "pull_request",
+               "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "contributor/react_on_rails",
+               "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
+               "RUN_CORE_BENCHMARKS" => "true",
+               "BENCHMARK_PULL_REQUEST_LABELS" => '["full-ci-no-benchmarks"]'
+             )).to eq(["none"])
+    end
+  end
+
   describe "app_version input filtering" do
     it "restricts a workflow_dispatch to the node-renderer suite for pro_node_renderer_only" do
       expect(suite_ids_for(

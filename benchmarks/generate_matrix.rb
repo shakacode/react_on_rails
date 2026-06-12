@@ -75,6 +75,17 @@ SUITES = [
 # selecting no suites (which would skip benchmarks while CI stays green).
 VALID_APP_VERSIONS = SUITES.flat_map { |suite| suite.fetch(:app_versions) }.uniq.freeze
 
+# A PR label that forces every benchmark suite OFF for this run, even when change
+# detection, a suite-specific benchmark label, or the broad `benchmark` label
+# would otherwise select suites. This is the "full CI but skip benchmarks"
+# escape hatch, paired with the `full-ci` label (which only governs the TEST
+# matrix, never benchmarks): use it on PRs that need broad test coverage but
+# cannot move runtime performance — CI plumbing, lint/config, or tooling — so
+# Bencher does not record a meaningless run (the #3919 / #3855 class of spurious
+# runs). Honored from forks too: it only ever turns benchmarks off, so there is
+# no fork-safety concern.
+BENCHMARK_SUPPRESS_LABEL = "full-ci-no-benchmarks"
+
 def truthy_env?(name)
   ENV.fetch(name, "false") == "true"
 end
@@ -207,7 +218,7 @@ end
 
 def build_matrix
   labels = pull_request_labels
-  rows = if truthy_env?("BENCHMARK_NON_RUNTIME_ONLY")
+  rows = if truthy_env?("BENCHMARK_NON_RUNTIME_ONLY") || labels.include?(BENCHMARK_SUPPRESS_LABEL)
            []
          else
            SUITES.select { |suite| suite_enabled?(suite, labels) }.flat_map { |suite| suite_rows(suite) }
