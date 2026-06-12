@@ -84,7 +84,7 @@ const ShellLayout = () => {
       <nav>
         <Link to="/dashboard">Home</Link>
         <Link to="/dashboard/reports">Reports</Link>
-        <button type="button" onClick={() => setCount(count + 1)}>
+        <button type="button" onClick={() => setCount((c) => c + 1)}>
           Clicks: {count} {/* survives navigation — the shell never unmounts */}
         </button>
       </nav>

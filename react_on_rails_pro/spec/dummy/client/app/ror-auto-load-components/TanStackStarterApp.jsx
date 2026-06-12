@@ -57,7 +57,7 @@ const ShellLayout = () => {
   return (
     <div className="container">
       <h1 id="tanstack-starter-shell">TanStack Router Starter</h1>
-      <button id="tanstack-starter-counter" type="button" onClick={() => setCount(count + 1)}>
+      <button id="tanstack-starter-counter" type="button" onClick={() => setCount((c) => c + 1)}>
         Shell counter: {count}
       </button>
       <nav>

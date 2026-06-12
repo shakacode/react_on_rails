@@ -100,7 +100,7 @@ describe "TanStack Router Starter" do
     # goog:loggingPrefs browser=ALL option set on rails_helper's
     # *_with_logging drivers). Without this probe, a broken log channel would
     # return [] and the hydration-error assertion would pass vacuously.
-    log_probe_message = "tanstack-starter-console-log-probe"
+    let(:log_probe_message) { "tanstack-starter-console-log-probe" }
 
     before do
       # Drain console entries left over from earlier examples in the shared
@@ -117,7 +117,7 @@ describe "TanStack Router Starter" do
       expect(page).to have_css("section#tanstack-starter-server-data")
       expect(page).to have_text("Server data from Rails RSC payload endpoint")
 
-      page.execute_script("console.error('#{log_probe_message}')")
+      page.execute_script("console.error(arguments[0])", log_probe_message)
       console_entries = page.driver.browser.logs.get(:browser)
       expect(console_entries.map(&:message)).to include(a_string_including(log_probe_message)),
                                                 "Browser console log channel is unavailable; cannot assert " \
