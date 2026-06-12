@@ -141,11 +141,15 @@ disclosure if you expose the port publicly — one more reason never to do so.
 
 ### Authentication between Rails and the renderer
 
-Authentication is a single shared secret, compared in constant time:
+Authentication is a single shared secret:
 
-- The renderer checks the password from the request body with `crypto.timingSafeEqual`
-  (`authenticate` in `packages/react-on-rails-pro-node-renderer/src/worker/authHandler.ts`), rejecting
-  mismatched lengths and comparison errors with `401`.
+- The renderer checks the password from the request body
+  (`authenticate` in `packages/react-on-rails-pro-node-renderer/src/worker/authHandler.ts`). A
+  submitted password whose byte length differs from the configured secret is rejected with `401`
+  _before_ any comparison; only same-length candidates are then compared with
+  `crypto.timingSafeEqual`. The comparison is therefore timing-safe for same-length guesses, but the
+  early length check means the secret's length is not protected — use a long random secret, not a
+  short passphrase. Comparison errors are also rejected with `401`.
 - **Production-like environments fail closed on both sides.** If neither `RAILS_ENV` nor `NODE_ENV` is a
   development/test value, the renderer refuses to start without a password
   (`validatePasswordForProduction` in `configBuilder.ts`), and the Rails side raises at configuration time
@@ -198,8 +202,10 @@ Every item below maps to a configuration option or behavior verified in this rep
    checker.
 3. **Treat the link as plaintext.** The renderer speaks cleartext h2c; use a private network or external
    TLS termination, and prefer an `https://` `config.renderer_url` when a TLS hop exists.
-4. **Run the renderer as an unprivileged OS user / minimal container.** The bundle typically runs with
-   host `require` (see above), so the renderer process's OS privileges are the effective blast radius.
+4. **Run the renderer as an unprivileged OS user / minimal container, with resource limits.** The
+   bundle typically runs with host `require` (see above), so the renderer process's OS privileges and
+   resource ceiling are the effective blast radius. Set `--max-old-space-size` on the Node process and
+   enforce container `memory` + `cpu` limits to bound the impact of a rogue or compromised bundle.
 5. **Don't expose `GET /info`** beyond your monitoring network; it is unauthenticated version disclosure.
 6. **Rotate the shared secret on a schedule** by redeploying both sides with a new value; there is no
    built-in rotation.
@@ -232,8 +238,9 @@ packages therefore apply to this stack, and the project's response is enforced i
     called from the renderer's master, worker, and wrapper entry points in
     `packages/react-on-rails-pro-node-renderer/src/`). Incompatible `react`, `react-dom`, or
     `react-on-rails-rsc` versions **fail startup**; an older-but-compatible `react-on-rails-rsc` only
-    logs a warning. Setting `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` downgrades the hard failure to
-    a warning — leave it unset in production.
+    logs a warning. Setting `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` downgrades the hard startup
+    failure to a warning — **do not set this in production: it allows the renderer to boot on React
+    versions with known critical vulnerabilities (CVE-2025-55182 and related).**
 
 ### How to verify your own status
 
