@@ -247,7 +247,9 @@ choice. Two common paths:
 ### Option 1: ActiveRecord table
 
 ```ruby
-class CreateWebVitalMetrics < ActiveRecord::Migration[8.0]
+# Generate with `bin/rails generate migration CreateWebVitalMetrics` so the
+# migration version matches your app's Rails version.
+class CreateWebVitalMetrics < ActiveRecord::Migration[7.1]
   def change
     create_table :web_vital_metrics do |t|
       t.string :name, null: false
