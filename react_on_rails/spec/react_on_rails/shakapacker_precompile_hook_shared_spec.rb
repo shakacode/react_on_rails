@@ -21,6 +21,17 @@ RSpec.describe "Shakapacker precompile hook shared script" do
     end
   end
 
+  def with_default_external(encoding)
+    original_verbose = $VERBOSE
+    $VERBOSE = nil
+    original = Encoding.default_external
+    Encoding.default_external = encoding
+    yield
+  ensure
+    Encoding.default_external = original
+    $VERBOSE = original_verbose
+  end
+
   it "preserves setup failures while cleaning any captured env keys" do
     bad_overrides = Object.new
 
@@ -41,6 +52,55 @@ RSpec.describe "Shakapacker precompile hook shared script" do
     expect(self).to have_received(:build_rescript_if_needed)
     expect(self).to have_received(:generate_packs_if_needed)
     expect(self).to have_received(:generate_rsc_manifest_client_references_if_needed)
+  end
+
+  # Without LANG/LC_ALL (C/POSIX locale), Encoding.default_external is US-ASCII, and File.read
+  # of files containing non-ASCII characters returns strings that raise on regex match or encode.
+  describe "non-UTF-8 default external encoding" do
+    it "generates packs when the initializer contains non-ASCII characters" do
+      Dir.mktmpdir(nil, "/tmp") do |rails_root|
+        initializer_path = File.join(rails_root, "config", "initializers", "react_on_rails.rb")
+        FileUtils.mkdir_p(File.dirname(initializer_path))
+        File.write(initializer_path, <<~RUBY)
+          # ⚠️ auto bundling enabled
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+          end
+        RUBY
+
+        allow(self).to receive_messages(find_rails_root: rails_root, puts: nil)
+        allow(Dir).to receive(:chdir)
+
+        # The buggy behavior is warn + exit 1, so guard against SystemExit explicitly —
+        # otherwise the exit would abort the whole RSpec process instead of failing the example.
+        with_default_external(Encoding::US_ASCII) do
+          expect { generate_packs_if_needed }.not_to raise_error
+        end
+
+        expect(Dir).to have_received(:chdir).with(rails_root)
+      end
+    end
+
+    it "builds ReScript when package.json contains non-ASCII characters" do
+      Dir.mktmpdir(nil, "/tmp") do |rails_root|
+        File.write(File.join(rails_root, "rescript.json"), "{}\n")
+        File.write(File.join(rails_root, "package.json"), <<~JSON)
+          {
+            "description": "ReScript app — non-ASCII description",
+            "scripts": { "build:rescript": "rescript build" }
+          }
+        JSON
+
+        allow(self).to receive_messages(find_rails_root: rails_root, puts: nil)
+        allow(Dir).to receive(:chdir)
+
+        with_default_external(Encoding::US_ASCII) do
+          expect { build_rescript_if_needed }.not_to raise_error
+        end
+
+        expect(Dir).to have_received(:chdir).with(rails_root)
+      end
+    end
   end
 
   describe "valid_rsc_registration_entry_path?" do
