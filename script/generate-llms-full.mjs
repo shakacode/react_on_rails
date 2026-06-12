@@ -144,6 +144,8 @@ function matchingDelimiterIndex(content, openIndex, openChar, closeChar) {
   let quote;
   let escaped = false;
 
+  // This scanner is intentionally small for static sidebars.ts content. It
+  // treats template literals as strings and does not parse `${...}` expressions.
   for (let index = openIndex; index < content.length; index += 1) {
     const char = content[index];
     if (quote) {
@@ -188,6 +190,8 @@ function splitTopLevelSidebarEntries(arrayBody) {
   let quote;
   let escaped = false;
 
+  // Keep this in sync with matchingDelimiterIndex: static sidebar config only,
+  // not a full TypeScript parser for template-literal expressions.
   for (let index = 0; index < arrayBody.length; index += 1) {
     const char = arrayBody[index];
     if (quote) {
@@ -333,6 +337,8 @@ function validateSidebarTopLevelSections(docs) {
     const representativePaths = new Set(sectionDocPaths);
     const firstSegments = sectionDocPaths.map((docPath) => docPath.split('/')[0]).filter(Boolean);
     if (firstSegments.length > 0 && firstSegments.every((segment) => segment === firstSegments[0])) {
+      // Future generated-index/category URLs can represent a section by its
+      // first path segment, such as /docs/core-concepts.
       representativePaths.add(firstSegments[0]);
     }
 

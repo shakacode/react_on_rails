@@ -49,7 +49,11 @@ run_test() {
     "$test_fn"
   )
   local rc=$?
-  rm -rf "$tmpdir"
+  if [ "$rc" -ne 0 ] && [ "${KEEP_GENERATE_LLMS_FULL_TEST_TMP:-}" = "1" ]; then
+    echo "  Keeping failed fixture at $tmpdir" >&2
+  else
+    rm -rf "$tmpdir"
+  fi
 
   if [ "$rc" -ne 0 ] && [ "$TESTS_FAILED" -eq "$before_failed" ]; then
     TESTS_FAILED=$((TESTS_FAILED + 1))
