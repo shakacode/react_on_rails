@@ -91,6 +91,11 @@ server {
   # response with an `X-Accel-Buffering: no` header.
   proxy_buffering off;
 
+  # Streaming SSR and RSC async-props responses can hold connections open
+  # longer than nginx's default 60s proxy_read_timeout. Tune to match your
+  # slowest expected stream.
+  # proxy_read_timeout 120s;
+
   # Forward the browser-facing origin so both apps generate correct URLs
   # and the shared session cookie stays on example.com.
   proxy_set_header Host $host;
@@ -114,11 +119,6 @@ server {
     proxy_pass http://nextjs;
     proxy_buffering on;
   }
-
-  # Streaming SSR and RSC async-props responses can hold connections open
-  # longer than nginx's default 60s proxy_read_timeout. Tune to match your
-  # slowest expected stream.
-  # proxy_read_timeout 120s;
 }
 ```
 
@@ -132,7 +132,15 @@ nginx only inherits `server`-level `proxy_set_header` directives into `location`
 
 Pick the Rails session as the source of truth for authentication:
 
-- Set the Rails session cookie on the shared domain. Since the proxy serves both apps from one origin, the browser sends the same cookie to both upstreams.
+- Set the Rails session cookie on the shared domain. Since the proxy serves both apps from one origin, the browser sends the same cookie to both upstreams. If the cookie was previously scoped to an API subdomain, set the domain explicitly:
+
+  ```ruby
+  # config/initializers/session_store.rb
+  Rails.application.config.session_store :cookie_store,
+                                          key: "_example_session",
+                                          domain: "example.com" # the shared, browser-facing domain
+  ```
+
 - Next.js pages that need auth state already forward cookies to the Rails API for data fetching; that keeps working unchanged.
 - Avoid migrating _half_ of an auth flow. Move login/logout/signup to Rails early (they are usually plain forms — the easiest pages to port), so there is exactly one place that writes the session.
 
