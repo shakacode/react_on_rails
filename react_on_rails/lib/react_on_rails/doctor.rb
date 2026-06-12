@@ -168,7 +168,7 @@ module ReactOnRails
     def initialize(verbose: false, fix: false, format: :text)
       @verbose = verbose
       @fix = fix
-      @format = format.to_sym
+      @format = format.respond_to?(:to_sym) ? format.to_sym : format
       unless OUTPUT_FORMATS.include?(@format)
         raise ArgumentError, "Invalid doctor format #{format.inspect}; expected one of #{OUTPUT_FORMATS.join(', ')}"
       end
@@ -254,6 +254,10 @@ module ReactOnRails
     # block runs — including direct STDOUT writes, child processes inheriting
     # fd 1, and C extensions — not just Ruby-level $stdout. Reassigning $stdout
     # to a StringIO would miss those, letting stray bytes corrupt the JSON report.
+    #
+    # NOT thread-safe: STDOUT.reopen redirects fd 1 process-wide, so any
+    # concurrent thread writing to stdout is captured too. Doctor runs only as
+    # a single-threaded rake task today; revisit before using in threaded code.
     # rubocop:disable Style/GlobalStdStream
     def capture_stdout
       captured_file = Tempfile.new("react_on_rails_doctor_stdout")
@@ -266,9 +270,17 @@ module ReactOnRails
       STDOUT.flush
       File.read(captured_file.path)
     ensure
+      begin
+        STDOUT.flush
+      rescue IOError, SystemCallError
+        nil
+      end
       if original_fd
-        STDOUT.reopen(original_fd)
-        original_fd.close
+        begin
+          STDOUT.reopen(original_fd)
+        ensure
+          original_fd.close
+        end
       end
       $stdout = original_stdout if original_stdout
       captured_file&.close!
@@ -327,7 +339,9 @@ module ReactOnRails
 
     def primary_message(messages, status)
       severity = { "fail" => :error, "warn" => :warning }[status]
-      message = severity ? messages.find { |msg| msg[:type] == severity } : messages.first
+      return nil unless severity
+
+      message = messages.find { |msg| msg[:type] == severity }
       message && message[:content]
     end
 

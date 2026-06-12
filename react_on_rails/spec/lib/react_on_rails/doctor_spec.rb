@@ -124,6 +124,15 @@ RSpec.describe ReactOnRails::Doctor do
       expect { described_class.new(format: :xml) }.to raise_error(ArgumentError, /Invalid doctor format/)
     end
 
+    it "rejects nil and other non-symbolizable formats with ArgumentError" do
+      expect { described_class.new(format: nil) }.to raise_error(ArgumentError, /Invalid doctor format/)
+      expect { described_class.new(format: 42) }.to raise_error(ArgumentError, /Invalid doctor format/)
+    end
+
+    it "accepts the format as a string" do
+      expect(described_class.new(format: "json").send(:format)).to eq(:json)
+    end
+
     it "emits valid JSON with schema_version and ror_version" do
       stub_check_sections(json_doctor)
       report = run_and_parse_json(json_doctor)
@@ -196,6 +205,22 @@ RSpec.describe ReactOnRails::Doctor do
           { "level" => "error", "content" => "Missing package manager" }
         ]
       )
+    end
+
+    it "reports a null message for passing checks even when info/success details exist" do
+      stub_check_sections(
+        json_doctor,
+        "rails_integration" => [
+          { type: :info, content: "Checking Rails" },
+          { type: :success, content: "Rails detected" }
+        ]
+      )
+      report = run_and_parse_json(json_doctor)
+      check = report["checks"].find { |entry| entry["id"] == "rails_integration" }
+
+      expect(check["status"]).to eq("pass")
+      expect(check["message"]).to be_nil
+      expect(check["details"].length).to eq(2)
     end
 
     it "reports warn overall status and exit code 0 when only warnings exist" do
