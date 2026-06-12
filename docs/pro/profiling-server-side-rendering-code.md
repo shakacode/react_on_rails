@@ -180,7 +180,7 @@ end
 After adding the code, run the app and open the pages you want to profile. You will find log files named `isolate-0x*.log` in the root of your app. Use these commands to analyze a log:
 
 ```bash
-node --prof-process --preprocess -j isolate*.log > profile.v8log.json
+node --prof-process --preprocess -j isolate-0x*.log > profile.v8log.json
 pnpm dlx speedscope /path/to/profile.v8log.json
 # or with npm:
 npx speedscope /path/to/profile.v8log.json

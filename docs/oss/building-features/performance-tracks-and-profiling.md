@@ -23,7 +23,7 @@ React Performance Tracks are most useful when you can reproduce a slow interacti
 
 Use this workflow for browser-side interaction, hydration, Suspense, and RSC timing investigations.
 
-1. Run the app in development with React 19.2 or newer.
+1. Run the app in development with React 19.2 or newer when your app supports that React line. For React on Rails Pro RSC apps, keep the React version supported by the current RSC guide and release notes; do not upgrade a generated RSC app only to capture Performance Tracks.
 2. Install and enable the React Developer Tools browser extension when you want the Components track to include the full component tree.
 3. Open Chrome DevTools, then open the **Performance** panel.
 4. Start recording, reload the page or perform the slow interaction, then stop recording.
