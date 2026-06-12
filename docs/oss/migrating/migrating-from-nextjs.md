@@ -73,7 +73,15 @@ upstream nextjs { server 127.0.0.1:3000; }
 upstream rails  { server 127.0.0.1:3001; }
 
 server {
+  listen 443 ssl;
   server_name example.com;
+  # Terminate TLS at the proxy (point ssl_certificate / ssl_certificate_key
+  # at your certs) so both upstreams speak plain HTTP internally.
+
+  # nginx proxies upstream over HTTP/1.0 by default, which disables
+  # keep-alive; use HTTP/1.1 and clear the Connection header.
+  proxy_http_version 1.1;
+  proxy_set_header Connection "";
 
   # Forward the browser-facing origin so both apps generate correct URLs
   # and the shared session cookie stays on example.com.
@@ -98,6 +106,10 @@ server {
 ```
 
 Each migrated route group is a two-line proxy change — and a two-line rollback if something goes wrong.
+
+:::caution proxy_set_header inheritance
+nginx only inherits `server`-level `proxy_set_header` directives into `location` blocks that define **none** of their own. If you later add a `proxy_set_header` inside a `location`, repeat all of the headers above in that block.
+:::
 
 ### Step 2: Share the session
 
