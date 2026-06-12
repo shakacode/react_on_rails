@@ -135,7 +135,9 @@ Pick the Rails session as the source of truth for authentication:
   # config/initializers/session_store.rb
   Rails.application.config.session_store :cookie_store,
                                           key: "_example_session",
-                                          domain: "example.com" # the shared, browser-facing domain
+                                          domain: "example.com", # the shared, browser-facing domain
+                                          secure: true, # HTTPS only — TLS terminates at the proxy
+                                          same_site: :lax
   ```
 
 - Next.js pages that need auth state already forward cookies to the Rails API for data fetching; that keeps working unchanged.
