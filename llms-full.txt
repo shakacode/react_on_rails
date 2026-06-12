@@ -6086,6 +6086,7 @@ Server Component that streams data and renders the compiled client island:
 
 ```tsx
 // client/app/ror-auto-load-components/CompilerReadyRscProduct.tsx
+import { loadProduct } from '../lib/products'; // replace with your own data-fetching helper
 import RscQuantityPicker from '../components/compiler-ready/RscQuantityPicker.client';
 
 export default async function CompilerReadyRscProduct({ productId }: { productId: string }) {
