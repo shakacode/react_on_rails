@@ -12,21 +12,21 @@ When you install React on Rails, several things happen:
 
 1. **Ruby gem installed** - Provides Rails integration, view helpers, and SSR support
 2. **NPM package installed** - Client-side JavaScript library for registering components
-3. **Generator creates files** - Component structure, webpack config, sample code
-4. **Shakapacker configured** - Webpack integration for Rails (required dependency)
+3. **Generator creates files** - Component structure, bundler config, sample code
+4. **Shakapacker configured** - Bundler integration for Rails (required dependency)
 
 The generator sets up:
 
 - Component directories (typically `app/javascript/bundles/` or with auto-bundling in `app/javascript/src/*/ror_components/`)
 - Rails integration (controllers, views, initializer)
-- Webpack configuration for building JavaScript bundles
+- Bundler configuration for building JavaScript bundles
 - Development workflow with hot module replacement
 
 **For detailed installation instructions, see:**
 
 - **[Quick Start Guide](./quick-start.md)** - Fastest path (15 minutes)
 - **[Installation Guide](./installation-into-an-existing-rails-app.md)** - For existing Rails apps
-- **[Complete Tutorial](./tutorial.md)** - Step-by-step with Redux and routing
+- **[Complete Tutorial](./tutorial.md)** - Step-by-step with TypeScript, hooks, and auto-bundling
 
 ---
 
@@ -83,7 +83,7 @@ import HelloWorld from '../components/HelloWorld';
 ReactOnRails.register({ HelloWorld });
 ```
 
-You must configure webpack entry points and manually register each component.
+You must configure bundler entry points and manually register each component.
 
 ### Modern Auto-Bundling (Recommended)
 
@@ -95,7 +95,7 @@ With auto-bundling enabled:
 
 1. Place components in designated directories (e.g., `app/javascript/src/*/ror_components/`)
 2. React on Rails automatically finds and bundles them
-3. No manual webpack configuration needed
+3. No manual bundler configuration needed
 4. No manual `ReactOnRails.register()` calls
 5. Components are loaded on-demand per page
 
@@ -136,18 +136,18 @@ app/javascript/
 - **Route**: Added to `config/routes.rb`
 - **Initializer**: `config/initializers/react_on_rails.rb` - Configuration
 
-### Webpack Configuration
+### Bundler Configuration
 
-- Shakapacker handles webpack setup
+- Shakapacker handles Rspack or Webpack setup
 - Config in `config/shakapacker.yml`
-- For custom webpack needs, see [Webpack Configuration Guide](../core-concepts/webpack-configuration.md)
+- For custom bundler needs, see [Webpack/Rspack Configuration Guide](../core-concepts/webpack-configuration.md)
 
 ### Development Workflow
 
 The generator creates `bin/dev` for starting both:
 
 - Rails server (port 3000)
-- Webpack dev server (for hot reloading)
+- Bundler dev server (for hot reloading)
 
 > **Note:** You need `overmind` or `foreman` installed to run `bin/dev`. Install with `brew install overmind` (macOS) or `gem install foreman` (globally). See the [Quick Start Guide](./quick-start.md#-step-2-start-the-development-server-1-minute) for detailed installation instructions.
 
@@ -263,4 +263,4 @@ Now that you understand the core concepts, here are recommended paths forward:
 
 ---
 
-**Ready to build something?** The [Tutorial](./tutorial.md) walks you through building a complete app with Redux, routing, and testing.
+**Ready to build something?** The [Tutorial](./tutorial.md) walks you through building a TypeScript component with hooks, Rails props, auto-bundling, and optional server rendering.

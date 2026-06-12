@@ -1,267 +1,327 @@
-# React on Rails Basic Tutorial
+# React on Rails Tutorial
 
-_See also [Examples and migration references](./examples-and-references.md) for the maintained tutorial demo, migration references, and current React on Rails Pro + RSC demos._
+_See also [Examples and migration references](./examples-and-references.md) for maintained demo apps, migration references, and current React on Rails Pro + RSC demos._
 
----
+This tutorial starts from the [Quick Start](./quick-start.md) app and builds a small TypeScript component using the modern React on Rails workflow:
 
-_Updated for Ruby 3.3+, Rails 7, React on Rails v17, and Shakapacker v7_
+- TypeScript function components and React Hooks
+- Auto-bundling from files in `ror_components`
+- `bin/dev` with HMR during development
+- Optional server rendering with `prerender: true`
 
-This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
-
-After finishing this tutorial you will get an application that can do the following (live on Heroku):
-
-![example](https://cloud.githubusercontent.com/assets/371302/17368567/111cc722-596b-11e6-9b72-ac5967a60e42.gif)
-
-You can find it here:
-
-- [Source code for this app in PR, using the --redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/17) and [for Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/18).
-- [Live on Heroku](https://www.reactrails.com/)
-
-By the time you read this, the latest may have changed. Be sure to check the versions here:
-
-- [https://rubygems.org/gems/react_on_rails](https://rubygems.org/gems/react_on_rails)
-- [https://www.npmjs.com/package/react-on-rails](https://www.npmjs.com/package/react-on-rails)
+Redux is still supported, but it is no longer the main path for a first React on Rails app. See [Appendix: Redux Integration](#appendix-redux-integration) when you need a shared client store or you are maintaining an existing Redux setup.
 
 ## Table of Contents
 
-- [Installation](#installation)
-  - [Setting up your environment](#setting-up-your-environment)
-  - [Create a new Ruby on Rails App](#create-a-new-ruby-on-rails-app)
-  - [Add the Shakapacker and react_on_rails gems](#add-the-shakapacker-and-react_on_rails-gems)
-  - [Run the Shakapacker generator](#run-the-shakapacker-generator)
-  - [Run the React on Rails Generator](#run-the-react-on-rails-generator)
-  - [Setting up your environment variables](#setting-up-your-environment-variables)
-  - [Running the app](#running-the-app)
-- [HMR vs. React Hot Reloading](#hmr-vs-react-hot-reloading)
-- [Deployment](#deployment)
-- [Going Further](#going-further)
-  - [Turning on Server Rendering](#turning-on-server-rendering)
-  - [Optional Configuration](#optional-configuration)
-    - [Moving from the Rails default `/app/javascript` to the recommended `/client` structure](#moving-from-the-rails-default-appjavascript-to-the-recommended-client-structure)
-    - [Custom IP & PORT setup (Cloud9 example)](#custom-ip--port-setup-cloud9-example)
-    - [RubyMine performance tip](#rubymine-performance-tip)
+- [Prerequisites](#prerequisites)
+- [Start From The Quick-Start App](#start-from-the-quick-start-app)
+- [Understand The Generated Files](#understand-the-generated-files)
+- [Create A TypeScript Counter Component](#create-a-typescript-counter-component)
+- [Render The Component From Rails](#render-the-component-from-rails)
+- [Run The App With HMR](#run-the-app-with-hmr)
+- [Pass Props From Rails](#pass-props-from-rails)
+- [Optional: Turn On Server Rendering](#optional-turn-on-server-rendering)
+- [Production Build And Deployment](#production-build-and-deployment)
+- [Troubleshooting](#troubleshooting)
+- [Appendix: Redux Integration](#appendix-redux-integration)
 - [What's Next?](#whats-next)
 
-## Installation
+## Prerequisites
 
-### Setting up your environment
+Use current, maintained versions for new apps:
 
-Trying out **React on Rails** is super easy, so long as you have the basic prerequisites.
+- Ruby 3.3+
+- Rails 7+
+- Node.js 18+ and your preferred package manager
+- Foreman or Overmind for `bin/dev`
 
-- **Ruby:** We support Ruby 3.3+ and recommend using the latest stable Ruby version. Solutions like [rvm](https://rvm.io) or [rbenv](https://github.com/rbenv/rbenv) make it easy to have multiple Ruby versions on your machine.
-- **Rails:** React on Rails supports Rails 5.2 and later. This tutorial targets Rails 7.0+ for new apps, so some steps may differ for older existing apps.
-- **Node.js:** We support all [active Node versions](https://github.com/nodejs/release#release-schedule) but recommend using the latest LTS release of Nodejs for the longest support. Older inactive node versions might still work but is not guaranteed. We also recommend using [nvm](https://github.com/nvm-sh/nvm/) to ease using different node versions in different projects.
-- **Node Package manager:** You can use [npm](https://npmjs.com/), Yarn ([Classic](https://classic.yarnpkg.com/) or [Berry](https://yarnpkg.com/)), or [pnpm](https://pnpm.io/).
-- You need to have either [Overmind](https://github.com/DarthSim/overmind) or [Foreman](https://rubygems.org/gems/foreman) as a process manager.
+React on Rails is published as both a Ruby gem and an npm package. For exact current versions, check:
 
-### Create a new Ruby on Rails App
+- [react_on_rails on RubyGems](https://rubygems.org/gems/react_on_rails)
+- [react-on-rails on npm](https://www.npmjs.com/package/react-on-rails)
 
-Then we need to create a fresh Rails application as follows.
+## Start From The Quick-Start App
 
-First, be sure to run `rails -v` and check you are using Rails 7.0 or above for this new tutorial app.
-Pass `--skip-javascript` so React on Rails can install Shakapacker for the JavaScript setup.
-
-> [!NOTE]
-> **Rails 5.2 / 6.x users:** Rails 6.x uses the same `--skip-javascript` flag. Rails 5.2 is outside
-> the scope of this Rails 7+ tutorial. For Webpacker-era setup guidance, see the
-> [legacy Webpacker migration shims](../building-features/rails-webpacker-react-integration-options.md#legacy-webpacker--webpack-4-migration-shims)
-> and [migrating from react-rails](../migrating/migrating-from-react-rails.md).
+If you already completed the [Quick Start](./quick-start.md), keep using that app. Otherwise, create a Rails app and run the TypeScript installer:
 
 ```bash
 rails new test-react-on-rails --skip-javascript
-
 cd test-react-on-rails
-```
 
-Note: You can use `--database=postgresql` option to use Postgresql for the database.
-
-### Add the Shakapacker and react_on_rails gems
-
-We recommend using the latest version of these gems. Otherwise, specify the
-exact versions of both the gem and npm packages. In other words, don't use
-the `^` or `~` in the version specifications.
-
-```bash
 bundle add react_on_rails --strict
-bundle add shakapacker --strict
+bin/rails generate react_on_rails:install --typescript
 ```
 
-Note: The latest released React On Rails version is considered stable. Please use the latest
-version to ensure you get all the security patches and the best support.
+The installer sets up Shakapacker, React, TypeScript, the React on Rails initializer, a sample controller, and a `bin/dev` process file. Fresh installs use Rspack by default when the installed Shakapacker version supports it. To force Webpack instead, pass `--no-rspack`.
 
-### Run the Shakapacker generator
+> [!TIP]
+> Commit or stash your app before running generators. The diff is much easier to review when generated changes are isolated.
 
-```bash
-bundle exec rails shakapacker:install
-```
+There is no `react_on_rails:component` generator. For new components, create the files manually under the configured `ror_components` directory and let auto-bundling discover them.
 
-Commit all the changes so far to avoid getting errors in the next step.
+## Understand The Generated Files
 
-```bash
-git add . && git commit -m "Initial commit"
-```
-
-Alternatively, you can use `--ignore-warnings` in the next step.
-
-### Run the React on Rails Generator
-
-```bash
-rails generate react_on_rails:install
-```
-
-You will be prompted to approve changes in certain files. Press `enter` to proceed
-one by one or enter `a` to replace all configuration files required by the project.
-You can check the diffs before you commit to see what changed.
-
-**Note on Redux:** The basic installer uses React Hooks for state management. However, this tutorial demonstrates Redux integration (as used in the [live example](https://www.reactrails.com/)). To follow this tutorial with Redux, run:
-
-```bash
-rails generate react_on_rails:install --redux
-```
-
-If you prefer to use React Hooks instead of Redux, run the basic installer without the `--redux` flag.
-
-### Setting up your environment variables
-
-Add the following variable to your environment:
+The TypeScript installer creates a structure like this:
 
 ```text
-EXECJS_RUNTIME=Node
+app/javascript/
+└── src/
+    └── HelloWorld/
+        └── ror_components/
+            ├── HelloWorld.client.tsx
+            ├── HelloWorld.module.css
+            └── HelloWorld.server.tsx
 ```
 
-Then run the server with one of the following options:
+The important pieces are:
 
-### Running the app
+- `config/initializers/react_on_rails.rb` configures React on Rails.
+- `config/shakapacker.yml` configures the bundler and enables nested entries for generated packs.
+- `app/javascript/src/**/ror_components/*` contains components that React on Rails can auto-register.
+- Rails views call `react_component` to render those components.
+
+Auto-bundling means you do not manually create a pack for every component and you do not manually call `ReactOnRails.register` for the basic component case. React on Rails generates the per-component bundles and loads the right bundle when the view helper asks for it.
+
+## Create A TypeScript Counter Component
+
+Create a new component directory:
 
 ```bash
-./bin/dev # For HMR
-# or
-./bin/dev static # Without HMR, statically creating the bundles
+mkdir -p app/javascript/src/Counter/ror_components
 ```
 
-Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!
+Add `app/javascript/src/Counter/ror_components/Counter.client.tsx`:
 
-## HMR vs. React Hot Reloading
+```tsx
+import React, { useState } from 'react';
 
-First, check that the `hmr` and the `inline` options are `true` in your `config/shakapacker.yml` file.
+type CounterProps = {
+  initialCount?: number;
+  label?: string;
+};
 
-The basic setup will have HMR working with the default Shakapacker setup. When you run `./bin/dev` and change a JSX file, the browser will automatically refresh!
+export default function Counter({ initialCount = 0, label = 'Counter' }: CounterProps) {
+  const [count, setCount] = useState(initialCount);
 
-The basic [HMR](https://webpack.js.org/concepts/hot-module-replacement/), without a special React setup, will cause a full page refresh each time you save a file.
-
-If you want to go further with HMR, take a look at these links:
-
-- [webpack-dev-server](https://github.com/rails/webpacker/blob/5-x-stable/docs/webpack-dev-server.md)
-- [DevServer](https://webpack.js.org/configuration/dev-server/)
-- [Hot Module Replacement](https://webpack.js.org/concepts/hot-module-replacement/)
-
-React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by `shakapacker`.
-
-## Deployment
-
-Now that you have React on Rails working locally, you're ready to deploy to production!
-
-For detailed deployment instructions, see:
-
-- **[Heroku Deployment Guide](../deployment/heroku-deployment.md)** - Step-by-step Heroku deployment
-- **[General Deployment Guide](../deployment/README.md)** - Production deployment strategies for any platform
-
-These guides cover:
-
-- Configuring buildpacks
-- Database setup (PostgreSQL)
-- Asset compilation
-- Environment variables
-- Troubleshooting common deployment issues
-
-## Going Further
-
-### Turning on Server Rendering
-
-You can turn on server rendering by simply changing the `prerender` option to `true`:
-
-```erb
-<%= react_component("HelloWorld", props: @hello_world_props, prerender: true) %>
+  return (
+    <section>
+      <h2>{label}</h2>
+      <p>
+        Count: <strong>{count}</strong>
+      </p>
+      <button type="button" onClick={() => setCount((current) => current + 1)}>
+        Increment
+      </button>
+      <button type="button" onClick={() => setCount(initialCount)}>
+        Reset
+      </button>
+    </section>
+  );
+}
 ```
 
-If you want to test this out with HMR, then you also need to add this line to your
-`config/intializers/react_on_rails.rb`
+The file name controls the component name. `Counter.client.tsx` is rendered from Rails as `"Counter"`. The `.client` suffix tells auto-bundling this is the browser entry point.
+
+## Render The Component From Rails
+
+Add a controller action if you do not already have one:
+
+```bash
+bin/rails generate controller Dashboard show
+```
+
+In `app/controllers/dashboard_controller.rb`, set props for React. The Quick Start installer creates `react_on_rails_default`, which includes the generated bundle placeholders. If that layout is missing, use the fallback note below before copying this controller:
 
 ```ruby
-  config.same_bundle_for_client_and_server = true
+class DashboardController < ApplicationController
+  layout "react_on_rails_default"
+
+  def show
+    @counter_props = {
+      # React props use camelCase; react_component serializes this hash to JSON.
+      initialCount: 3,
+      label: "Orders ready"
+    }
+  end
+end
 ```
 
-More likely, you will create a different build file for server rendering. However, if you want to
-use the same file from the shakapacker-dev-server, you'll need to add that line.
+In `app/views/dashboard/show.html.erb`, render the component:
 
-When you look at the source code for the page (right click, view source in Chrome), you can see the difference between non-server rendering, where your DIV containing your React looks like this:
+```erb
+<h1>Dashboard</h1>
 
-```html
-<div id="HelloWorld-react-component-b7ae1dc6-396c-411d-886a-269633b3f604"></div>
+<%= react_component("Counter", props: @counter_props, auto_load_bundle: true) %>
 ```
 
-versus with server rendering:
+If your app sets `config.auto_load_bundle = true` in `config/initializers/react_on_rails.rb`, you can omit `auto_load_bundle: true` from individual helper calls:
 
-```html
-<div id="HelloWorld-react-component-d846ce53-3b82-4c4a-8f32-ffc347c8444a">
-  <div data-reactroot="">
-    <h3>
-      Hello,
-      <!-- -->Stranger<!-- -->!
-    </h3>
-    <hr />
-    <form><label for="name">Say hello to:</label><input type="text" id="name" value="Stranger" /></form>
-  </div>
-</div>
+```erb
+<%= react_component("Counter", props: @counter_props) %>
 ```
 
-For more details on server rendering, see:
+The generated `react_on_rails_default` layout includes the Shakapacker tags that auto-bundling needs. If you render from your application's default layout instead, add the same argless pack-tag calls there:
 
-- [Client vs. Server Rendering](../core-concepts/client-vs-server-rendering.md)
-- [React Server Rendering](../core-concepts/react-server-rendering.md)
+```erb
+<%= stylesheet_pack_tag %>
+<%= javascript_pack_tag %>
+```
 
-### Optional Configuration
+With no pack name, Shakapacker renders every bundle accumulated by `append_javascript_pack_tag` and `append_stylesheet_pack_tag`, which lets auto-bundling load per-component packs without hardcoding generated pack names in the layout.
 
-#### Moving from the Rails default `/app/javascript` to the recommended `/client` structure
+If `app/views/layouts/react_on_rails_default.html.erb` is not present (for example, you added React on Rails manually to an existing app without running the installer), remove the `layout` line from the controller and add the pack-tag placeholders to your `application.html.erb` or whichever layout renders this view.
 
-ShakaCode recommends that you use `/client` for your client side app. This way a non-Rails, front-end developer can be at home just by opening up the `/client` directory.
+## Run The App With HMR
 
-1. Move the directory:
+Start Rails and the bundler dev server together:
 
 ```bash
-mv app/javascript client
+./bin/dev
 ```
 
-2. Edit your `/config/shakapacker.yml` file. Change the `default/source_path`:
+Visit the route for your controller, such as [http://localhost:3000/dashboard/show](http://localhost:3000/dashboard/show). Edit `Counter.client.tsx`, save, and the page should update through HMR.
 
-```yml
-source_path: client
+Use static bundling when you want to test the production-style compiled assets locally:
+
+```bash
+./bin/dev static
 ```
 
-#### Custom IP & PORT setup (Cloud9 example)
+## Pass Props From Rails
 
-In case you are running some custom setup with different IP or PORT you should also edit Procfile.dev. For example, to be able to run on free Cloud9 IDE we are putting IP 0.0.0.0 and PORT 8080. The default generated file `Procfile.dev` uses `-p 3000`.
+`props:` accepts a Ruby hash or a JSON string. Prefer hashes in normal Rails views so the code stays readable:
 
-```Procfile.dev
-web: rails s -p 8080 -b 0.0.0.0
+```erb
+<%= react_component(
+      "Counter",
+      props: {
+        initialCount: current_user.notifications.unread.count,
+        label: "Unread notifications"
+      },
+      auto_load_bundle: true
+    ) %>
 ```
 
-Then visit https://your-shared-addr.c9users.io:8080/hello_world
+Keep props serializable. Pass IDs, strings, numbers, booleans, arrays, and hashes; fetch richer client-side data through your usual Rails JSON endpoints or GraphQL layer.
 
-#### RubyMine performance tip
+## Optional: Turn On Server Rendering
 
-It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
+For a component that can render without browser-only APIs, add a server entry before you enable prerendering. Keep both files in the same `ror_components` directory:
 
-- Generated files, per the settings in your `config/shakapacker.yml`, which default to `public/packs` and `public/packs-test` (kept separate so test and development manifests do not overwrite each other)
-- `node_modules`
+```text
+app/javascript/src/Counter/ror_components/
+├── Counter.client.tsx
+└── Counter.server.tsx
+```
+
+The server file can re-export the same component when no special server behavior is needed:
+
+```tsx
+export { default } from './Counter.client';
+```
+
+The generated TypeScript config uses bundler module resolution, so the extensionless re-export matches the installer defaults. If your app uses a stricter custom Node ESM TypeScript setup, use the relative import extension style required by that config.
+
+Auto-bundling discovers `Counter.server.tsx` and includes it in the generated server bundle. You do not need to change `config.server_bundle_js_file` when the generated `server-bundle.js` entrypoint is already in place.
+
+Then add `prerender: true` in the Rails view:
+
+```erb
+<%= react_component("Counter", props: @counter_props, prerender: true, auto_load_bundle: true) %>
+```
+
+> [!NOTE]
+> `prerender: true` needs a server bundle. For a first local SSR check, use `./bin/dev static` or run a production precompile. If you want the dev server to serve the prerender bundle, follow the [HMR guide](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) and set `config.same_bundle_for_client_and_server = true` for that mode.
+>
+> Server rendering runs in Node or ExecJS, which has no browser globals (`window`, `document`, `localStorage`). Guard browser-only access inside a `useEffect` hook or a conditional on `typeof window !== 'undefined'`.
+
+For deeper SSR guidance, see [Client vs. Server Rendering](../core-concepts/client-vs-server-rendering.md) and [React Server Rendering](../core-concepts/react-server-rendering.md).
+
+## Production Build And Deployment
+
+Before deploying, run the production asset pipeline locally once:
+
+```bash
+RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile
+```
+
+After verifying the production build locally, remove compiled assets before returning to development:
+
+```bash
+bin/rails assets:clobber
+```
+
+For deployment details, see:
+
+- [Heroku Deployment Guide](../deployment/heroku-deployment.md)
+- [General Deployment Guide](../deployment/README.md)
+
+## Troubleshooting
+
+### The Component Is Not Found
+
+Check that the component lives under a directory matching `config.components_subdirectory`, which is usually `ror_components`:
+
+```text
+app/javascript/src/Counter/ror_components/Counter.client.tsx
+```
+
+Then make sure the view uses the component name without the `.client` or `.tsx` suffix:
+
+```erb
+<%= react_component("Counter", props: @counter_props, auto_load_bundle: true) %>
+```
+
+### The Bundle Is Not Loaded
+
+Use `auto_load_bundle: true` on the helper call or set it globally:
+
+```ruby
+# config/initializers/react_on_rails.rb
+config.auto_load_bundle = true
+```
+
+Also confirm that `nested_entries: true` remains enabled in `config/shakapacker.yml`.
+
+### HMR Does Not Update The Page
+
+Run `./bin/dev`, not only `bin/rails server`. The dev command starts both Rails and the bundler dev server.
+
+### Server Rendering Fails
+
+Temporarily set `prerender: false` to confirm the browser render works, then remove browser-only APIs from the server render path. You can also enable `trace: true` on `react_component` while debugging:
+
+```erb
+<%= react_component("Counter", props: @counter_props, prerender: true, auto_load_bundle: true, trace: true) %>
+```
+
+## Appendix: Redux Integration
+
+Use Redux when your app already has Redux conventions, needs a shared client store across many React islands, or benefits from Redux middleware and DevTools. For local UI state, React Hooks are usually simpler.
+
+To generate the Redux example for a new app, run the installer with both TypeScript and Redux:
+
+```bash
+bin/rails generate react_on_rails:install --typescript --redux
+```
+
+The Redux installer creates a larger structure with actions, reducers, store setup, presentational components, containers, and auto-registered entry points under `ror_components`.
+
+When rendering a Redux-backed component, the Rails side still uses the same view helper style:
+
+```erb
+<%= react_component("HelloWorldApp", props: @hello_world_props, auto_load_bundle: true) %>
+```
+
+The component is named `HelloWorldApp` because that is what the Redux installer generates. Adjust the component name and props key to match your app's controller setup.
+
+For manually wired stores or advanced store sharing, use the [`redux_store` helper](../api-reference/redux-store-api.md) and the [Redux integration guide](../building-features/react-and-redux.md).
 
 ## What's Next?
 
-Now that you have React on Rails running, here are ways to level up:
-
-- **Add server-side rendering** — [SSR guide](../core-concepts/react-server-rendering.md)
-- **See the feature comparison** — [OSS vs Pro](./oss-vs-pro.md)
-- **Upgrade to Pro** for React Server Components, streaming SSR, and 3-10x faster SSR — [3-step upgrade guide](../../pro/upgrading-to-pro.md)
-- **Explore the full docs** — [Documentation index](../../README.md)
-
-Feedback is greatly appreciated! As are stars on GitHub. If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).
+- [Using React on Rails](./using-react-on-rails.md)
+- [Auto-Bundling](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)
+- [View Helpers API](../api-reference/view-helpers-api.md)
+- [Hot Module Replacement (HMR)](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)
+- [Server Rendering](../core-concepts/react-server-rendering.md)
+- [Production Deployment](../deployment/README.md)

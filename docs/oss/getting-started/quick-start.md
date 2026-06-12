@@ -12,8 +12,8 @@ This guide will have you rendering React components in your Rails app as quickly
 Before starting, make sure you have:
 
 - **🚨 React on Rails 17.0.0+** (this guide)
-- **🚨 Shakapacker 6+** (7+ recommended for React on Rails 17)
-- **Rails 7+** application (Rails 5.2+ supported)
+- **Shakapacker 6+** — installed automatically by the React on Rails generator (7+ recommended for React on Rails 17)
+- **Rails 7+** application
 - **Ruby 3.3+** (required)
 - **Node.js 18+** and a package manager (**npm**, **pnpm**, **Yarn**, or **bun**)
 - **Foreman or Overmind** (for running `bin/dev`)
@@ -35,8 +35,9 @@ bundle add react_on_rails --strict
 # Run the installer for TypeScript
 bin/rails generate react_on_rails:install --typescript
 
-# Optional: Use Rspack for faster builds
-# bin/rails generate react_on_rails:install --typescript --rspack
+# Fresh installs use Rspack by default when supported (Shakapacker 9+).
+# To force Webpack instead, pass --no-rspack:
+# bin/rails generate react_on_rails:install --typescript --no-rspack
 
 # For JavaScript instead of TypeScript, omit --typescript
 # bin/rails generate react_on_rails:install
@@ -57,11 +58,11 @@ Take a look at the files created by the generator.
 
 - Component files (`.tsx` for TypeScript, `.jsx` for JavaScript)
 - Shakapacker install
-- React component files in `client/`
+- React component files in `app/javascript/src/`
 - A sample controller and view
-- Webpack configuration
+- Bundler configuration
 
-> 💡 **Performance Tip:** Add the `--rspack` flag for significantly faster builds (~20x improvement). You can also switch bundlers later with `bin/switch-bundler rspack`.
+> 💡 **Performance Tip:** Fresh installs use Rspack by default when supported by your Shakapacker version (9+) for significantly faster builds. To compare or temporarily force Webpack, run the installer with `--no-rspack`; you can also switch bundlers later with `bin/switch-bundler webpack` or `bin/switch-bundler rspack`.
 >
 > **Note on `bin/switch-bundler`:** This utility safely switches between webpack and rspack by updating `shakapacker.yml` and managing dependencies. However, it does not modify custom webpack configuration code. If you have custom webpack plugins or loaders, you may need to update those manually to work with rspack. See [Rspack documentation](../api-reference/generator-details.md#rspack-support) for details on unified configuration patterns.
 
@@ -72,7 +73,7 @@ Take a look at the files created by the generator.
 > - **overmind**: `brew install overmind` (macOS) or see [installation guide](https://github.com/DarthSim/overmind#installation)
 > - **foreman**: `gem install foreman` (install globally, not in your project bundle - [details](https://github.com/ddollar/foreman/wiki/Don't-Bundle-Foreman))
 
-Start both Rails and the Webpack dev server:
+Start both Rails and the bundler dev server:
 
 ```bash
 ./bin/dev
@@ -81,7 +82,7 @@ Start both Rails and the Webpack dev server:
 This starts both:
 
 - Rails server on `http://localhost:3000`
-- Webpack dev server for hot reloading
+- Bundler dev server for hot reloading
 
 ## 🎨 Step 3: See Your Component (2 minutes)
 
@@ -196,7 +197,7 @@ Now that you have React on Rails working, here's what to explore next:
 
 ### Dive Deeper
 
-1. **[Complete Tutorial](../getting-started/tutorial.md)** - Build a full app with Redux
+1. **[Complete Tutorial](../getting-started/tutorial.md)** - Build a TypeScript component with hooks and auto-bundling
 2. **[Server-Side Rendering](../core-concepts/react-server-rendering.md)** - Optimize for SEO and performance
 3. **[Production Deployment](../deployment/README.md)** - Deploy to production
 
