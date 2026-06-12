@@ -15,4 +15,8 @@ module ReactOnRailsPro
   def self.configure: () { (Configuration) -> void } -> void
 
   def self.configuration: () -> Configuration
+
+  def self.revalidate_tag: (untyped tag) -> Integer
+
+  def self.revalidate_tags: (*untyped tags) -> Integer
 end

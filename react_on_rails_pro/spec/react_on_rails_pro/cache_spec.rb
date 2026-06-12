@@ -102,6 +102,32 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(Rails.cache.fetch(string_cache_key)).to eq(result)
     end
 
+    it "registers cache_tags on a miss and re-renders after revalidate_tag" do
+      result = "<div>Something</div>"
+      create_component_code = instance_double(TestingCache, call: result)
+
+      fetch = lambda do
+        described_class.fetch_react_component("MyComponent",
+                                              cache_key: "the_cache_key",
+                                              cache_tags: ["post:42"],
+                                              cache_options: { expires_in: 3600 }) do
+          create_component_code.call
+        end
+      end
+
+      fetch.call
+      fetch.call
+      expect(create_component_code).to have_received(:call).once
+
+      expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(1)
+      string_cache_key = "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/the_cache_key"
+      expect(Rails.cache.read(string_cache_key)).to be_nil
+
+      fetch.call
+      expect(create_component_code).to have_received(:call).twice
+      expect(Rails.cache.read(string_cache_key)).to eq(result)
+    end
+
     it "skips the cache if option :if is false" do
       result = "<div>Something</div>"
       create_component_code = instance_double(TestingCache, call: result)

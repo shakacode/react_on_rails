@@ -22,5 +22,26 @@ module ReactOnRailsPro
     def self.dependencies_cache_key: () -> String?
 
     def self.react_component_cache_key: (String component_name, Hash[Symbol, untyped] options) -> Array[untyped]
+
+    def self.register_tags: (untyped tags, untyped cache_key, Hash[Symbol, untyped]? cache_options) -> void
+
+    def self.revalidate_tags: (*untyped tags) -> Integer
+
+    class TagIndex
+      INDEX_KEY_PREFIX: String
+      INDEX_TTL_SLACK: Integer
+
+      def self.register: (untyped tags, untyped cache_key, Hash[Symbol, untyped] cache_options) -> void
+
+      def self.revalidate: (*untyped tags) -> Integer
+
+      def self.normalize_tags: (untyped tags) -> Array[String]
+
+      def self.index_key: (String tag) -> String
+    end
+
+    module Revalidates
+      def self.included: (Module base) -> void
+    end
   end
 end

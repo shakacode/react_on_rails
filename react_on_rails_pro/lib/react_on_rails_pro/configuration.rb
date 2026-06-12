@@ -51,7 +51,9 @@ module ReactOnRailsPro
       rsc_bundle_js_file: Configuration::DEFAULT_RSC_BUNDLE_JS_FILE,
       react_client_manifest_file: Configuration::DEFAULT_REACT_CLIENT_MANIFEST_FILE,
       react_server_client_manifest_file: Configuration::DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE,
-      concurrent_component_streaming_buffer_size: Configuration::DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE
+      concurrent_component_streaming_buffer_size: Configuration::DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
+      cache_tag_index_expires_in: Configuration::DEFAULT_CACHE_TAG_INDEX_EXPIRES_IN,
+      cache_tag_index_max_keys: Configuration::DEFAULT_CACHE_TAG_INDEX_MAX_KEYS
     )
   end
 
@@ -92,6 +94,12 @@ module ReactOnRailsPro
     DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
     DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
     DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE = 64
+    # Ceiling TTL for a tag->cache-key index entry when the tagged cache entry
+    # has no :expires_in of its own (see ReactOnRailsPro::Cache::TagIndex).
+    DEFAULT_CACHE_TAG_INDEX_EXPIRES_IN = 604_800 # 7 days, in seconds
+    # Maximum cache-entry keys recorded per tag; the oldest keys are dropped
+    # (with a warning) beyond this, and drop out of tag revalidation.
+    DEFAULT_CACHE_TAG_INDEX_MAX_KEYS = 5_000
     ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS = %i[req opt rest].freeze
     ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS = %i[key keyreq].freeze
     ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
@@ -107,7 +115,7 @@ module ReactOnRailsPro
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
                   :profile_server_rendering_js_code, :raise_non_shell_server_rendering_errors, :enable_rsc_support,
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
-                  :react_server_client_manifest_file
+                  :react_server_client_manifest_file, :cache_tag_index_expires_in, :cache_tag_index_max_keys
 
     attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
                 :renderer_http_pool_size
@@ -174,7 +182,9 @@ module ReactOnRailsPro
                    enable_rsc_support: nil, rsc_payload_generation_url_path: nil,
                    rsc_bundle_js_file: nil, react_client_manifest_file: nil,
                    react_server_client_manifest_file: nil,
-                   concurrent_component_streaming_buffer_size: DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE)
+                   concurrent_component_streaming_buffer_size: DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
+                   cache_tag_index_expires_in: DEFAULT_CACHE_TAG_INDEX_EXPIRES_IN,
+                   cache_tag_index_max_keys: DEFAULT_CACHE_TAG_INDEX_MAX_KEYS)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
       self.server_renderer = server_renderer
@@ -209,6 +219,8 @@ module ReactOnRailsPro
       self.react_client_manifest_file = react_client_manifest_file
       self.react_server_client_manifest_file = react_server_client_manifest_file
       self.concurrent_component_streaming_buffer_size = concurrent_component_streaming_buffer_size
+      self.cache_tag_index_expires_in = cache_tag_index_expires_in
+      self.cache_tag_index_max_keys = cache_tag_index_max_keys
     end
 
     def setup_config_values

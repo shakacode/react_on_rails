@@ -32,6 +32,7 @@ module ReactOnRailsProHelper
         cache_hit = false
         yield
       end
+      ReactOnRailsPro::Cache.register_tags(options[:cache_tags], cache_key, cache_options) unless cache_hit
       if cache_hit
         render_options = ReactOnRails::ReactComponent::RenderOptions.new(
           react_component_name: component_name,
@@ -62,6 +63,10 @@ module ReactOnRailsProHelper
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
   # 4. Provide boolean values for `:if` or `:unless` to conditionally use caching.
+  # 5. Optionally provide the `:cache_tags` option: String or Array (or Proc, or any object responding
+  #    to `cache_key`, such as an ActiveRecord model) of revalidation tags. Tagged cache entries can be
+  #    deleted later with `ReactOnRailsPro.revalidate_tag(tag)`. Tag revalidation is best-effort, so
+  #    also set `cache_options: { expires_in: ... }` to bound staleness.
   def cached_react_component(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
@@ -89,6 +94,10 @@ module ReactOnRailsProHelper
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
   # 4. Provide boolean values for `:if` or `:unless` to conditionally use caching.
+  # 5. Optionally provide the `:cache_tags` option: String or Array (or Proc, or any object responding
+  #    to `cache_key`, such as an ActiveRecord model) of revalidation tags. Tagged cache entries can be
+  #    deleted later with `ReactOnRailsPro.revalidate_tag(tag)`. Tag revalidation is best-effort, so
+  #    also set `cache_options: { expires_in: ... }` to bound staleness.
   def cached_react_component_hash(component_name, raw_options = {}, &block)
     raw_options[:prerender] = true
 
@@ -251,6 +260,10 @@ module ReactOnRailsProHelper
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
   # 4. Provide boolean values for `:if` or `:unless` to conditionally use caching.
+  # 5. Optionally provide the `:cache_tags` option: String or Array (or Proc, or any object responding
+  #    to `cache_key`, such as an ActiveRecord model) of revalidation tags. Tagged cache entries can be
+  #    deleted later with `ReactOnRailsPro.revalidate_tag(tag)`. Tag revalidation is best-effort, so
+  #    also set `cache_options: { expires_in: ... }` to bound staleness.
   def cached_stream_react_component(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
@@ -298,6 +311,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   # 3. Optionally provide :cache_options for Rails.cache (expires_in, etc.)
   # 4. Provide :if or :unless for conditional caching
+  # 5. Optionally provide :cache_tags for revalidation via ReactOnRailsPro.revalidate_tag
   #
   # @param component_name [String] Name of your registered component
   # @param options [Hash] Options including cache_key and cache_options
@@ -371,7 +385,9 @@ module ReactOnRailsProHelper
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &)
     cache_aware_options = raw_options.merge(
       on_complete: lambda { |chunks|
-        Rails.cache.write(view_cache_key, chunks, raw_options[:cache_options] || {})
+        cache_options = raw_options[:cache_options] || {}
+        Rails.cache.write(view_cache_key, chunks, cache_options)
+        ReactOnRailsPro::Cache.register_tags(raw_options[:cache_tags], view_cache_key, cache_options)
       }
     )
 
@@ -454,6 +470,7 @@ module ReactOnRailsProHelper
     task = @react_on_rails_async_barrier.async do
       result = react_component(component_name, options)
       Rails.cache.write(cache_key, result, cache_options)
+      ReactOnRailsPro::Cache.register_tags(raw_options[:cache_tags], cache_key, cache_options)
       result
     end
 

@@ -30,6 +30,7 @@ module ReactOnRailsPro
             cache_hit = false
             yield
           end
+          register_tags(options[:cache_tags], cache_key, cache_options) unless cache_hit
           # Pass back the cache key in the results only if the result is a Hash
           if result.is_a?(Hash)
             result[:RORP_CACHE_KEY] = cache_key
@@ -39,6 +40,25 @@ module ReactOnRailsPro
         else
           yield
         end
+      end
+
+      # Registers cache tags for an already-written cache entry so a later
+      # ReactOnRailsPro.revalidate_tag can delete it. Call after a successful
+      # cache write (never on a cache hit). No-op when tags are blank.
+      # See ReactOnRailsPro::Cache::TagIndex for the v1 index semantics
+      # (best-effort, lossy-OK; correctness bounded by :expires_in).
+      def register_tags(tags, cache_key, cache_options)
+        return if tags.blank?
+
+        TagIndex.register(tags, cache_key, cache_options || {})
+      end
+
+      # Deletes every cached component entry registered under the given tags
+      # and clears the tag index entries. Tags accept the same forms as the
+      # `cache_tags:` helper option. Missing/evicted index entries are a no-op.
+      # Returns the number of cache entries deleted.
+      def revalidate_tags(*tags)
+        TagIndex.revalidate(*tags)
       end
 
       def use_cache?(options)
