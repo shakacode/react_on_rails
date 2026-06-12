@@ -83,6 +83,15 @@ module ReactOnRails
         style-loader@^4.0.0
       ].freeze
 
+      # Tailwind v4 CSS-first setup. The patch-level floors match published
+      # releases verified with the generator's SSR smoke app.
+      TAILWIND_DEPENDENCIES = %w[
+        tailwindcss@^4.3.0
+        @tailwindcss/postcss@^4.3.0
+        postcss@^8.5.15
+        postcss-loader@^8.2.1
+      ].freeze
+
       # Development-only dependencies for hot reloading (Webpack)
       # Both packages are pre-1.0, so left bare (see pinning note above).
       DEV_DEPENDENCIES = %w[
@@ -175,6 +184,7 @@ module ReactOnRails
         add_react_on_rails_package unless using_pro
         add_react_dependencies
         add_css_dependencies
+        add_tailwind_dependencies_if_requested
         add_rspack_dependencies if using_rspack?
         add_transpiler_dependencies
         add_pro_dependencies if using_pro
@@ -288,6 +298,32 @@ module ReactOnRails
           You can install them manually by running:
             #{manual_add_packages_command(CSS_DEPENDENCIES)}
         MSG
+      end
+
+      def add_tailwind_dependencies
+        say "Installing Tailwind CSS v4 dependencies..."
+        return if add_packages(TAILWIND_DEPENDENCIES)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add Tailwind CSS dependencies.
+
+          You can install them manually by running:
+            #{manual_add_packages_command(TAILWIND_DEPENDENCIES)}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding Tailwind CSS dependencies: #{e.message}
+
+          You can install them manually by running:
+            #{manual_add_packages_command(TAILWIND_DEPENDENCIES)}
+        MSG
+      end
+
+      def add_tailwind_dependencies_if_requested
+        # use_tailwind? is provided by GeneratorHelper, included alongside this module.
+        return unless use_tailwind?
+
+        add_tailwind_dependencies
       end
 
       def add_rspack_dependencies

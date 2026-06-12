@@ -29,6 +29,8 @@ Use this file as the short machine-readable route map. Use `./llms-full.txt` for
 - Existing Rails app:
   - Install into an Existing Rails App: https://reactonrails.com/docs/getting-started/existing-rails-app
   - Using React on Rails: https://reactonrails.com/docs/getting-started/using-react-on-rails
+- Styling:
+  - Tailwind CSS v4 recipe: https://reactonrails.com/docs/building-features/styling-with-tailwind
 - Choosing OSS vs Pro:
   - OSS vs Pro: https://reactonrails.com/docs/getting-started/oss-vs-pro
   - Pro hub: https://reactonrails.com/docs/pro

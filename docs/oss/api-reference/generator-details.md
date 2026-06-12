@@ -13,6 +13,7 @@ Options:
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
       [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
       [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack)
+      [--tailwind], [--no-tailwind]                # Install Tailwind CSS v4 and style the generated SSR example. Default: false
       [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer. Default: false
       [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro). Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
@@ -38,6 +39,13 @@ can pass the redux option if you'd like to have redux setup for you automaticall
 
     Passing the --typescript generator option generates TypeScript files (.tsx)
     instead of JavaScript files (.jsx) and sets up TypeScript configuration.
+
+* Tailwind CSS v4
+
+    Passing the --tailwind generator option installs Tailwind CSS v4,
+    configures `@tailwindcss/postcss` for Webpack or Rspack, and styles the
+    generated SSR HelloWorld page. See
+    [Styling with Tailwind CSS v4](../building-features/styling-with-tailwind.md).
 
 * Rspack (default)
 

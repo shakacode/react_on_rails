@@ -4,7 +4,7 @@ import { CliOptions } from './types.js';
 import { validateAll } from './validators.js';
 import { createApp, validateAppName } from './create-app.js';
 import { detectPackageManager, logError, logInfo } from './utils.js';
-import { promptForMode, PROMPT_CANCELLED } from './prompt.js';
+import { promptForMode, promptForTailwind, PROMPT_CANCELLED } from './prompt.js';
 
 // Use require() for CJS compatibility - avoids __dirname + fs.readFileSync
 // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
@@ -46,6 +46,7 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
 
   let pro = Boolean(rawOpts.pro);
   let rsc = Boolean(rawOpts.rsc);
+  let tailwind = Boolean(rawOpts.tailwind);
 
   console.log('');
   console.log(`${chalk.bold('create-react-on-rails-app')} v${packageJson.version}`);
@@ -66,6 +67,10 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
       const choice = await promptForMode();
       pro = choice.pro;
       rsc = choice.rsc;
+      // Explicit mode flags keep the command deterministic; no-flag interactive runs get the Tailwind prompt.
+      if (rawOpts.tailwind === undefined) {
+        tailwind = await promptForTailwind();
+      }
     } else {
       logInfo(
         'No mode flag specified and not running interactively (stdin/stdout is not a TTY); using standard mode.',
@@ -85,6 +90,7 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
     // generator, so the generator's own fresh-install fallback (fresh_install_rspack_default,
     // which consults the Shakapacker version) is never reached via create-react-on-rails-app.
     rspack: webpackRequested ? false : (rawOpts.rspack ?? true) === true,
+    tailwind,
     pro,
     rsc,
     // Commander's `--no-agent-files` declares a default of true on rawOpts.agentFiles,
@@ -136,8 +142,9 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
   } else if (options.pro) {
     modeLabel = ', mode: pro';
   }
+  const tailwindLabel = options.tailwind ? ', Tailwind CSS v4' : '';
   logInfo(
-    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}, bundler: ${options.rspack ? 'rspack' : 'webpack'}${modeLabel}`,
+    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}, bundler: ${options.rspack ? 'rspack' : 'webpack'}${modeLabel}${tailwindLabel}`,
   );
 
   createApp(appName, options);
@@ -159,6 +166,7 @@ program
   .option('--rspack', 'Use Rspack as the bundler (default, ~20x faster builds)')
   .option('--no-rspack', 'Use Webpack instead of Rspack')
   .option('--webpack', 'Use Webpack as the bundler (alias for --no-rspack)')
+  .option('--tailwind', 'Install Tailwind CSS v4 and style the generated SSR example')
   .option('--standard', 'Generate open-source React on Rails setup (skip prompt)')
   .option('--pro', 'Generate React on Rails Pro setup (installs react_on_rails_pro)')
   .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)')
@@ -174,6 +182,7 @@ Examples:
   $ npx create-react-on-rails-app my-app --template javascript
   $ npx create-react-on-rails-app my-app --no-rspack             # use Webpack instead of Rspack
   $ npx create-react-on-rails-app my-app --webpack               # same as --no-rspack
+  $ npx create-react-on-rails-app my-app --tailwind
   $ npx create-react-on-rails-app my-app --no-rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
   $ npx create-react-on-rails-app my-app --no-agent-files            # skip AGENTS.md + editor pointers
