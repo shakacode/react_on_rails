@@ -38,13 +38,9 @@ run_test() {
   TESTS_RUN=$((TESTS_RUN + 1))
   echo "-> $test_fn"
 
-  local tmpdir before_failed had_errexit=false
+  local tmpdir before_failed
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/generate-llms-full-test.XXXXXX")"
   before_failed="$TESTS_FAILED"
-
-  case "$-" in
-    *e*) had_errexit=true ;;
-  esac
 
   set +e
   (
@@ -53,9 +49,6 @@ run_test() {
     "$test_fn"
   )
   local rc=$?
-  if [ "$had_errexit" = true ]; then
-    set -e
-  fi
   rm -rf "$tmpdir"
 
   if [ "$rc" -ne 0 ] && [ "$TESTS_FAILED" -eq "$before_failed" ]; then

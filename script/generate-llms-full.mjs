@@ -271,8 +271,20 @@ function generate(docs, orderedIds) {
   return `${parts.join('\n')}\n`;
 }
 
-function validateDocUrls(docs) {
+function docsUrlsFromFile(file) {
   const urlPattern = /https:\/\/reactonrails\.com\/docs[^\s)\]'"`>]*/g;
+  const text = fs.readFileSync(file, 'utf8');
+  return [...text.matchAll(urlPattern)].map((match) => {
+    const url = match[0].replace(/[.,;:]+$/, '');
+    // Anchors are stripped: validation is page-level only. Anchor-level
+    // checking would need heading extraction across all docs — if a linked
+    // section heading is renamed, this check will not catch it.
+    const docPath = url.slice(SITE_DOCS_URL.length).replace(/^\//, '').replace(/#.*$/, '').replace(/\/$/, '');
+    return { url, docPath };
+  });
+}
+
+function validateDocUrls(docs) {
   // Only the published route counts: a slugged doc's file-path route and a
   // README/index file's literal path are not live URLs and must not validate.
   // Intentional references to redirect URLs go in docs/.llms-known-redirects.
@@ -297,17 +309,7 @@ function validateDocUrls(docs) {
 
   let validated = 0;
   for (const file of [LLMS_FILE, PREAMBLE_FILE]) {
-    const text = fs.readFileSync(file, 'utf8');
-    for (const match of text.matchAll(urlPattern)) {
-      const url = match[0].replace(/[.,;:]+$/, '');
-      // Anchors are stripped: validation is page-level only. Anchor-level
-      // checking would need heading extraction across all docs — if a linked
-      // section heading is renamed, this check will not catch it.
-      const docPath = url
-        .slice(SITE_DOCS_URL.length)
-        .replace(/^\//, '')
-        .replace(/#.*$/, '')
-        .replace(/\/$/, '');
+    for (const { url, docPath } of docsUrlsFromFile(file)) {
       validated += 1;
       if (!resolves(docPath)) {
         fail(
@@ -317,16 +319,6 @@ function validateDocUrls(docs) {
     }
   }
   return validated;
-}
-
-function docsUrlsFromFile(file) {
-  const urlPattern = /https:\/\/reactonrails\.com\/docs[^\s)\]'"`>]*/g;
-  const text = fs.readFileSync(file, 'utf8');
-  return [...text.matchAll(urlPattern)].map((match) => {
-    const url = match[0].replace(/[.,;:]+$/, '');
-    const docPath = url.slice(SITE_DOCS_URL.length).replace(/^\//, '').replace(/#.*$/, '').replace(/\/$/, '');
-    return { url, docPath };
-  });
 }
 
 function validateSidebarTopLevelSections(docs) {

@@ -1,15 +1,17 @@
 # React on Rails Agent User Guide
 
-> Start with [llms.txt](https://www.reactonrails.com/llms.txt) for the short route map. Use [llms-full.txt](https://www.reactonrails.com/llms-full.txt) when you need the expanded machine-readable reference. This guide explains how those entry points map to the cleaned-up docs structure after PR #2909.
+> Start with [llms.txt](https://www.reactonrails.com/llms.txt) for the short route map. Use [llms-full.txt](https://www.reactonrails.com/llms-full.txt) when you need the expanded machine-readable reference. If the hosted endpoints are not live yet, use the in-repo [llms.txt](./llms.txt) and [llms-full.txt](./llms-full.txt) fallbacks. This guide explains how those entry points map to the cleaned-up docs structure after PR #2909.
 
 ## Machine-Readable Entry Points
 
 - [`llms.txt`](https://www.reactonrails.com/llms.txt)
   - Short routing layer for machine readers
   - Use it first when you need to decide which docs hub to open
+  - In-repo fallback: [`llms.txt`](./llms.txt)
 - [`llms-full.txt`](https://www.reactonrails.com/llms-full.txt)
   - Expanded machine-readable reference
   - Use it when you need stable recommendation rules, package-pairing rules, and common task routing
+  - In-repo fallback: [`llms-full.txt`](./llms-full.txt)
 - Human docs overview: [`docs/oss/introduction.md`](./docs/oss/introduction.md)
   - Canonical OSS hub
 - Canonical Pro hub: [`docs/pro/react-on-rails-pro.md`](./docs/pro/react-on-rails-pro.md)
