@@ -366,6 +366,42 @@ test_node_renderer_source_change_runs_node_renderer_benchmark() {
   assert_contains "$out" '"run_core_benchmarks": false' "node renderer output"
 }
 
+# An uncategorized file (e.g. a new CI/tooling dotfile like .ci-dependency-versions,
+# the #3855 case) runs the full TEST suite for safety, but must NOT benchmark:
+# unknown files are almost always tooling, not a hot runtime path, so a Bencher
+# run here is pure noise. Main pushes benchmark unconditionally, so a genuinely
+# new runtime path is still measured once it lands.
+test_uncategorized_file_runs_tests_but_skips_benchmarks() {
+  setup_repo
+  write_file_change ".ci-dependency-versions" "ruby: 3.2"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "uncategorized output"
+  # Full test suite still runs (the safety the catch-all is there for).
+  assert_contains "$out" '"run_ruby_tests": true' "uncategorized output"
+  assert_contains "$out" '"run_pro_tests": true' "uncategorized output"
+  # ... but no benchmark suite.
+  assert_contains "$out" '"run_core_benchmarks": false' "uncategorized output"
+  assert_contains "$out" '"run_pro_benchmarks": false' "uncategorized output"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "uncategorized output"
+}
+
+# Spec-only changes run the gem tests but never benchmark: specs are not shipped,
+# so they cannot move runtime performance (#3854 changed only CI-config specs yet
+# ran the core+pro suites).
+test_rspec_only_change_skips_benchmarks() {
+  setup_repo
+  write_file_change "react_on_rails/spec/react_on_rails/some_bench_spec.rb"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_ruby_tests": true' "rspec-bench output"
+  assert_contains "$out" '"run_core_benchmarks": false' "rspec-bench output"
+  assert_contains "$out" '"run_pro_benchmarks": false' "rspec-bench output"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "rspec-bench output"
+}
+
 test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint() {
   setup_repo
   perl -0pi -e 's/class Example/class Example\n    # Explain the fixture./' \
@@ -798,6 +834,8 @@ run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
 run_test test_ci_infra_plus_runtime_source_still_benchmarks
 run_test test_node_renderer_source_change_runs_node_renderer_benchmark
+run_test test_uncategorized_file_runs_tests_but_skips_benchmarks
+run_test test_rspec_only_change_skips_benchmarks
 run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_ruby_block_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_wrapping_ruby_code_with_block_comment_delimiters_remains_runtime_affecting

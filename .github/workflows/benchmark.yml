@@ -80,6 +80,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          # On pull_request events GitHub's default checkout ref is the merge
+          # commit (PR merged into the CURRENT main). Diffing that against the
+          # PR's recorded base.sha — which is main as of PR creation and can lag
+          # several commits — sweeps in every change merged to main in between,
+          # miscategorizing an unrelated runtime/JS change onto a CI-only PR and
+          # firing benchmarks spuriously (#3919: a bin/-only PR ran all four
+          # suites because eight intervening main commits leaked into the diff).
+          # Check out the PR head SHA instead so change detection sees only the
+          # PR's own commits. On push, this falls back to the pushed SHA.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 50
           persist-credentials: false
       - name: Read runtime versions
