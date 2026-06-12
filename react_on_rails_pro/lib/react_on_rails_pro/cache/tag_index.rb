@@ -203,16 +203,21 @@ module ReactOnRailsPro
         end
 
         def normalized_entry_key(cache_key, cache_options)
-          # Mirror the store's own key normalization (expansion plus any
-          # :namespace from the entry's cache_options or the store default) so
-          # revalidate-time delete_multi targets exactly the key the entry was
-          # written under. The public ActiveSupport::Cache.expand_cache_key is
-          # NOT equivalent: it prefers #cache_key_with_version and prepends
-          # RAILS_CACHE_ID, both of which would record a string the store
-          # never used. Reaching into the two private Store methods is the
-          # only way to reproduce the store's storage key; both have been
-          # stable across ActiveSupport versions for years.
-          Rails.cache.send(:normalize_key, cache_key, Rails.cache.send(:merged_options, cache_options))
+          # Record the store's *logical* cache name: the expanded key plus any
+          # :namespace from the entry's cache_options or the store default —
+          # exactly what the store's own normalize_key computes BEFORE
+          # store-specific encoding (FileStore paths, MemCacheStore escaping).
+          # Revalidate-time delete_multi(keys, namespace: nil) then applies
+          # that store-specific encoding exactly once, targeting the key the
+          # entry was written under. The public
+          # ActiveSupport::Cache.expand_cache_key is NOT equivalent: it
+          # prefers #cache_key_with_version and prepends RAILS_CACHE_ID, both
+          # of which would record a name the store never used. Reaching into
+          # these private Store methods is the only way to reproduce the
+          # store's naming; all three have been stable across ActiveSupport
+          # versions for years.
+          expanded = Rails.cache.send(:expanded_key, cache_key)
+          Rails.cache.send(:namespace_key, expanded, Rails.cache.send(:merged_options, cache_options))
         end
       end
     end

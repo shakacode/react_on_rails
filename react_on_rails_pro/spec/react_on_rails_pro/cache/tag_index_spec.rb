@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require_relative "../spec_helper"
+require "tmpdir"
 
 # Minimal stand-in for an ActiveRecord model: a stable version-less #cache_key
 # plus the #cache_key_with_version that Rails' default cache_versioning adds.
@@ -146,6 +147,22 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
 
       expect(described_class.revalidate("t")).to eq(1)
       expect(Rails.cache.read(key)).to be_nil
+    end
+
+    it "round-trips on a FileStore, whose normalize_key applies store-specific encoding" do
+      Dir.mktmpdir do |dir|
+        file_store = ActiveSupport::Cache::FileStore.new(dir)
+        allow(Rails).to receive(:cache).and_return(file_store)
+
+        # Spaces and % exercise FileStore's URL-encoding: the index must
+        # record the logical name so deletion encodes it exactly once.
+        key = ["ror_component", "App", "key with spaces/%"]
+        Rails.cache.write(key, "value")
+        described_class.register(["t"], key, {})
+
+        expect(described_class.revalidate("t")).to eq(1)
+        expect(Rails.cache.read(key)).to be_nil
+      end
     end
 
     it "deletes entries written under a cache_options namespace" do
