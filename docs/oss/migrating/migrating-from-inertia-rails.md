@@ -8,7 +8,7 @@ This guide is for Rails apps that currently use [Inertia Rails](https://inertia-
 
 For the "why" comparison (architecture, SSR, streaming, RSC tradeoffs), see [Comparing React on Rails to Alternatives](../getting-started/comparing-react-on-rails-to-alternatives.md#react-on-rails-vs-inertia-rails). This page is the "how."
 
-> **Scope note:** This is the v1 of the migration guide. A full step-by-step playbook (forms, shared state, SSR cutover, removing Inertia) and a worked example app are planned as follow-ups, tracked in [#3899](https://github.com/shakacode/react_on_rails/issues/3899). Two parity features that affect the mapping table — a first-class `useForm`-style helper ([#3872](https://github.com/shakacode/react_on_rails/issues/3872)) and an opinionated routing/prefetch starter ([#3873](https://github.com/shakacode/react_on_rails/issues/3873)) — are in progress and **not shipped yet**; the table gives you the interim answer for each.
+> **Scope note:** This is the v1 of the migration guide. A full step-by-step playbook (forms, shared state, SSR cutover, removing Inertia) and a worked example app are planned as follow-ups, tracked in [#3899](https://github.com/shakacode/react_on_rails/issues/3899). Two parity features that affect the mapping table — a first-class `useForm`-style helper ([#3872](https://github.com/shakacode/react_on_rails/issues/3872)) and an opinionated routing/prefetch starter ([#3873](https://github.com/shakacode/react_on_rails/issues/3873)) — are **not shipped as of this writing**; check those issues for current status. The table gives you the interim answer for each.
 
 ## Concept mapping
 
