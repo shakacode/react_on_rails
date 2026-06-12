@@ -16747,10 +16747,30 @@ containers:
         value: '0.0.0.0'
       - name: RENDERER_PORT
         value: '3800'
-    readinessProbe:
-      httpGet:
-        path: /health
+    startupProbe:
+      tcpSocket:
         port: 3800
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 6
+      timeoutSeconds: 1
+    readinessProbe:
+      # Omits initialDelaySeconds: startupProbe above defers readiness/liveness until boot succeeds (K8s 1.20+).
+      # If you skip startupProbe or run an older cluster, add initialDelaySeconds to cover the boot window.
+      # tcpSocket is a shallow fallback: port reachability only, not application readiness.
+      tcpSocket:
+        port: 3800
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 1
+    livenessProbe:
+      # tcpSocket is port-open only; a hung event loop can still pass. For stricter hung-process
+      # detection, use an exec probe with curl --http2-prior-knowledge and a short --max-time.
+      tcpSocket:
+        port: 3800
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 1
 ```
 
 > **Note:** `REACT_RENDERER_URL` must be read in your initializer for it to take effect:
@@ -16769,7 +16789,8 @@ When running the Node Renderer in containers:
 - Set `host` to `0.0.0.0` so health checks and the Rails container can reach it. See [Node Renderer configuration](../building-features/node-renderer/js-configuration.md).
 - On Control Plane, use `process.env.PORT` for the port — Control Plane assigns the port dynamically. See the [Control Plane port docs](https://docs.controlplane.com/reference/workload/containers#port-variable).
 - Set `workersCount` explicitly rather than relying on CPU auto-detection, which can over-allocate workers in constrained containers.
-- Add a `/health` endpoint for container orchestrator probes. See [Adding a Health Check Endpoint](../building-features/node-renderer/js-configuration.md#adding-a-health-check-endpoint).
+- Use `tcpSocket` probes for shallow Kubernetes startup, readiness, and liveness checks. Kubernetes `httpGet` probes use HTTP/1.1 and cannot check the h2c-only Node Renderer listener directly.
+- The manifest above uses portable `tcpSocket` checks. For application-level readiness, use an `exec` probe with an h2c-capable client packaged in the renderer image, or expose a separate HTTP/1.1 health endpoint in your own application code. See [Configuring Startup, Readiness, and Liveness Probes](../building-features/node-renderer/js-configuration.md#configuring-startup-readiness-and-liveness-probes) for timing values and `curl --http2-prior-knowledge` examples.
 
 ## Static assets and CDN
 
