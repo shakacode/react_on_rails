@@ -33,6 +33,16 @@ describe "TanStack Router Starter" do
 
       expect(page).to have_css('div[data-turbo="false"] h1#tanstack-starter-shell')
     end
+
+    it "renders the not-found page inside the shell for unknown starter paths" do
+      # The Rails catch-all forwards every /tanstack_starter/* sub-path to the
+      # router; defaultNotFoundComponent keeps unknown URLs from rendering a
+      # blank Outlet.
+      visit "/tanstack_starter/this_page_does_not_exist"
+
+      expect(page).to have_css("h1#tanstack-starter-shell")
+      expect(page).to have_css("h2#tanstack-starter-not-found", text: "Starter page not found")
+    end
   end
 
   describe "client-side navigation", :js do
@@ -85,11 +95,20 @@ describe "TanStack Router Starter" do
   end
 
   describe "direct visit to the RSCRoute-backed route", :js do
-    it "renders the route by resolving the server component on the client without hydration errors" do
+    # Marker logged after the page settles so the test can prove the browser
+    # console log channel is actually capturing entries (it requires the
+    # goog:loggingPrefs browser=ALL option set on rails_helper's
+    # *_with_logging drivers). Without this probe, a broken log channel would
+    # return [] and the hydration-error assertion would pass vacuously.
+    log_probe_message = "tanstack-starter-console-log-probe"
+
+    before do
       # Drain console entries left over from earlier examples in the shared
       # browser session (reading the log buffer clears it).
       page.driver.browser.logs.get(:browser)
+    end
 
+    it "renders the route by resolving the server component on the client without hydration errors" do
       # The route is client-resolved: SSR emits a placeholder (RSCRoute is
       # kept out of the server render by a mounted guard) and the client
       # fetches the RSC payload over HTTP after hydration.
@@ -98,11 +117,19 @@ describe "TanStack Router Starter" do
       expect(page).to have_css("section#tanstack-starter-server-data")
       expect(page).to have_text("Server data from Rails RSC payload endpoint")
 
+      page.execute_script("console.error('#{log_probe_message}')")
+      console_entries = page.driver.browser.logs.get(:browser)
+      expect(console_entries.map(&:message)).to include(a_string_including(log_probe_message)),
+                                                "Browser console log channel is unavailable; cannot assert " \
+                                                "absence of hydration errors. Check the goog:loggingPrefs " \
+                                                "setup in rails_helper.rb."
+
       # Deep-linking must not surface recoverable hydration errors
       # (e.g. "Switched to client rendering because the server rendering
-      # errored") in the browser console.
-      hydration_errors = page.driver.browser.logs.get(:browser).select do |entry|
-        entry.level == "SEVERE" &&
+      # errored"). React reports hydration problems at SEVERE or WARNING
+      # level depending on version.
+      hydration_errors = console_entries.select do |entry|
+        entry.level.match?(/SEVERE|WARNING/) &&
           (entry.message.include?("Switched to client rendering") || entry.message.match?(/hydrat/i))
       end
       expect(hydration_errors).to be_empty,

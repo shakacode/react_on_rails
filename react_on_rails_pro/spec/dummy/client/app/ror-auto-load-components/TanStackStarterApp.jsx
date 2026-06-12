@@ -83,6 +83,12 @@ const HomePage = () => <h2 id="tanstack-starter-home">Starter Home Page</h2>;
 
 const AboutPage = () => <h2 id="tanstack-starter-about">Starter About Page</h2>;
 
+// Rendered inside the shell's Outlet for any /tanstack_starter/* path the
+// route tree doesn't match. The Rails catch-all route forwards every
+// sub-path here, so without this the router would render a blank Outlet for
+// unknown URLs.
+const NotFoundPage = () => <h2 id="tanstack-starter-not-found">Starter page not found</h2>;
+
 // RSCRoute renders a React Server Component (StarterServerData) inside this
 // client-routed page; the RSC payload is fetched over HTTP from the Rails
 // rsc_payload endpoint. The mounted guard keeps RSCRoute out of the server
@@ -133,7 +139,7 @@ const routeTree = rootRoute.addChildren([homeRoute, aboutRoute, serverDataRoute]
 
 const TanStackStarterApp = createTanStackRouterRenderFunction(
   {
-    createRouter: () => createRouter({ routeTree }),
+    createRouter: () => createRouter({ routeTree, defaultNotFoundComponent: NotFoundPage }),
   },
   {
     RouterProvider,

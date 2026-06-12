@@ -130,7 +130,15 @@ const routeTree = rootRoute.addChildren([
 ]);
 
 const DashboardApp = createTanStackRouterRenderFunction(
-  { createRouter: () => createRouter({ routeTree }) },
+  {
+    createRouter: () =>
+      createRouter({
+        routeTree,
+        // The Rails catch-all forwards every /dashboard/* path to this app,
+        // so give unmatched URLs a real page instead of a blank Outlet.
+        defaultNotFoundComponent: () => <h2>Page not found</h2>,
+      }),
+  },
   { RouterProvider, createMemoryHistory, createBrowserHistory },
 );
 
@@ -146,8 +154,16 @@ With [auto-bundling](../core-concepts/auto-bundling-file-system-based-automated-
 ```jsx
 import React from 'react';
 
+// Demo data resolved inside the RSC bundle so the example is runnable as-is.
+// In a real app, pass Rails-owned data in through `componentProps` or async
+// props instead of fetching it here — see the note below.
+const loadReports = async (reportGroup) => [
+  { id: 1, title: `${reportGroup} report: revenue` },
+  { id: 2, title: `${reportGroup} report: signups` },
+];
+
 const Reports = async ({ reportGroup }) => {
-  const reports = await loadReports(reportGroup); // see data-fetching note below
+  const reports = await loadReports(reportGroup);
   return (
     <ul>
       {reports.map((r) => (
