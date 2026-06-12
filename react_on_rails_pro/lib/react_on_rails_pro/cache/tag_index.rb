@@ -46,7 +46,7 @@ module ReactOnRailsPro
           return if normalized.empty?
 
           warn_if_expires_in_missing(cache_options)
-          entry_key = expanded_entry_key(cache_key)
+          entry_key = normalized_entry_key(cache_key, cache_options)
           normalized.each { |tag| append_entry_key(tag, entry_key, cache_options) }
         end
 
@@ -141,15 +141,28 @@ module ReactOnRailsPro
         end
 
         def index_ttl(cache_options)
-          entry_expires_in = cache_options[:expires_in]
-          return entry_expires_in.to_f + INDEX_TTL_SLACK if entry_expires_in
+          entry_expires_in = entry_ttl(cache_options)
+          return entry_expires_in + INDEX_TTL_SLACK if entry_expires_in
 
           ReactOnRailsPro.configuration.cache_tag_index_expires_in.to_f
         end
 
+        # Remaining lifetime of the tagged entry in seconds, from either of the
+        # Rails cache expiry options, or nil when the entry has no expiry.
+        def entry_ttl(cache_options)
+          expires_in = cache_options[:expires_in]
+          return expires_in.to_f if expires_in
+
+          expires_at = cache_options[:expires_at]
+          return nil unless expires_at
+
+          remaining = expires_at.to_time.to_f - Time.now.to_f
+          remaining.positive? ? remaining : nil
+        end
+
         def warn_if_expires_in_missing(cache_options)
           return unless Rails.env.development?
-          return if cache_options[:expires_in].present?
+          return if cache_options[:expires_in].present? || cache_options[:expires_at].present?
 
           Rails.logger.warn(
             "[ReactOnRailsPro] cache_tags: used without cache_options[:expires_in]. Tag revalidation is " \
@@ -161,7 +174,10 @@ module ReactOnRailsPro
         def revalidate_tag(tag)
           key = index_key(tag)
           keys, _expires_at = read_index(key)
-          deleted = keys.empty? ? 0 : Rails.cache.delete_multi(keys)
+          # The recorded keys are already fully normalized (including any
+          # :namespace the entry was written with), so suppress the store's
+          # default namespace to avoid prefixing them a second time.
+          deleted = keys.empty? ? 0 : Rails.cache.delete_multi(keys, namespace: nil)
           Rails.cache.delete(key)
           Rails.logger.debug do
             "[ReactOnRailsPro] revalidate_tag #{tag.inspect}: deleted #{deleted} of #{keys.size} indexed entries"
@@ -169,13 +185,17 @@ module ReactOnRailsPro
           deleted
         end
 
-        def expanded_entry_key(cache_key)
-          # Mirror the store's own key expansion so revalidate-time
-          # delete_multi targets exactly the key the entry was written under.
-          # The public ActiveSupport::Cache.expand_cache_key is NOT equivalent:
-          # it prefers #cache_key_with_version and prepends RAILS_CACHE_ID,
-          # both of which would record a string the store never used.
-          Rails.cache.send(:expanded_key, cache_key)
+        def normalized_entry_key(cache_key, cache_options)
+          # Mirror the store's own key normalization (expansion plus any
+          # :namespace from the entry's cache_options or the store default) so
+          # revalidate-time delete_multi targets exactly the key the entry was
+          # written under. The public ActiveSupport::Cache.expand_cache_key is
+          # NOT equivalent: it prefers #cache_key_with_version and prepends
+          # RAILS_CACHE_ID, both of which would record a string the store
+          # never used. Reaching into the two private Store methods is the
+          # only way to reproduce the store's storage key; both have been
+          # stable across ActiveSupport versions for years.
+          Rails.cache.send(:normalize_key, cache_key, Rails.cache.send(:merged_options, cache_options))
         end
       end
     end

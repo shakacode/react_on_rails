@@ -265,7 +265,7 @@ On every tagged cache write, the final cache key is appended to a per-tag index 
 
 **Tag revalidation is best-effort; correctness is bounded by `expires_in`.** `ActiveSupport::Cache` has no atomic set-append, so the index append is a read-modify-write: two processes caching different entries under the same tag at the same moment can race, and one entry can be lost _from the index_ (the cached data itself is never lost). A lost index entry simply survives `revalidate_tag` and expires via its own `expires_in`. The same applies when the index entry itself is LRU-evicted. Therefore:
 
-- **Always set `expires_in` on tagged entries.** It is the upper bound on how long a missed invalidation can serve stale HTML. In development, React on Rails Pro logs a warning when `cache_tags:` is used without it.
+- **Always set `expires_in` (or `expires_at`) on tagged entries.** It is the upper bound on how long a missed invalidation can serve stale HTML. In development, React on Rails Pro logs a warning when `cache_tags:` is used without an expiry.
 - **Use a shared cache store in production** — Redis or Memcached. With `:memory_store` the index is per-process, so `revalidate_tag` in one process cannot see entries written by another; with `:null_store` tags are inert.
 
 Two config knobs bound the index (defaults shown):

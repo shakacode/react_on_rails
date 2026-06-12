@@ -120,6 +120,14 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(Rails.cache.read(key)).to be_nil
     end
 
+    it "deletes entries written under a cache_options namespace" do
+      Rails.cache.write("entry/one", "one", namespace: "rorp-test")
+      described_class.register(["t"], "entry/one", { namespace: "rorp-test" })
+
+      expect(described_class.revalidate("t")).to eq(1)
+      expect(Rails.cache.read("entry/one", namespace: "rorp-test")).to be_nil
+    end
+
     it "returns 0 and does not raise for tags that were never written" do
       expect(described_class.revalidate("never-written")).to eq(0)
     end
@@ -165,6 +173,23 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       described_class.register(["t"], "k1", {})
 
       expect(index_payload("t")["expires_at"]).to be_within(5).of(now + 123)
+    end
+
+    it "covers entries that use expires_at instead of expires_in" do
+      now = Time.now.to_f
+
+      described_class.register(["t"], "k1", { expires_at: Time.now + 3600 })
+
+      expected = now + 3600 + described_class::INDEX_TTL_SLACK
+      expect(index_payload("t")["expires_at"]).to be_within(5).of(expected)
+    end
+
+    it "does not warn in development when expires_at is set" do
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
+
+      described_class.register(["t"], "k1", { expires_at: Time.now + 60 })
+
+      expect(logger_mock).not_to have_received(:warn)
     end
 
     it "warns in development when cache_tags are used without expires_in" do
