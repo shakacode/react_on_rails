@@ -31,7 +31,7 @@ The examples below use the sample app in `react_on_rails_pro/spec/dummy`.
    RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect renderer/node-renderer.js
    ```
 
-   Keep this terminal open while you profile. In the dummy app you can also use `pnpm run node-renderer:debug`, which runs the same renderer entry point with `--inspect`.
+   Keep this terminal open while you profile. In the repository dummy app you can also use `pnpm run node-renderer:debug`, which runs the same renderer entry point with `--inspect`. In another app, use the same package script with your package manager, such as `npm run node-renderer:debug` or `yarn node-renderer:debug`.
 
 1. Visit `chrome://inspect` in Chrome. You should see the Node renderer process:
 
@@ -49,7 +49,7 @@ The examples below use the sample app in `react_on_rails_pro/spec/dummy`.
 
    ![RORP Dummy App](https://github.com/shakacode/react_on_rails_pro/assets/7099193/8dc1ef3d-62e4-492d-a5b4-c693b7f7e08c)
 
-1. If the page raises a `Timeout Error`, temporarily increase `ssr_timeout`. Running the renderer with `--inspect` slows SSR enough that a normal development timeout can be too short.
+1. If the page raises a `Timeout Error`, temporarily increase `ssr_timeout` in `config/initializers/react_on_rails_pro.rb`. Running the renderer with `--inspect` slows SSR enough that a normal development timeout can be too short.
 
    ```ruby
    config.ssr_timeout = 10
@@ -137,6 +137,10 @@ You can analyze the `profile.v8log.json` file with `speedscope`:
 
 ```bash
 pnpm dlx speedscope /path/to/profile.v8log.json
+# or with npm:
+npx speedscope /path/to/profile.v8log.json
+# or with Yarn:
+yarn dlx speedscope /path/to/profile.v8log.json
 ```
 
 ### Profiling ExecJS with Older Versions of React on Rails Pro
@@ -178,4 +182,8 @@ After adding the code, run the app and open the pages you want to profile. You w
 ```bash
 node --prof-process --preprocess -j isolate*.log > profile.v8log.json
 pnpm dlx speedscope /path/to/profile.v8log.json
+# or with npm:
+npx speedscope /path/to/profile.v8log.json
+# or with Yarn:
+yarn dlx speedscope /path/to/profile.v8log.json
 ```

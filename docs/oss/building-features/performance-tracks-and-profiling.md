@@ -1,6 +1,6 @@
 # React Performance Tracks and Profiling
 
-React on Rails apps have three different performance questions that look similar but need different tools:
+React on Rails apps have three broad performance questions that look similar but need different tool clusters:
 
 1. **What did the browser do?** Use Chrome DevTools Performance recordings with [React Performance Tracks](https://react.dev/reference/dev-tools/react-performance-tracks).
 2. **What did the React on Rails Pro Node Renderer do?** Use the Node inspector and the renderer tracing integrations.
@@ -57,7 +57,7 @@ Profiles are only useful when component and function names survive the build.
 - Prefer named functions and named component exports over anonymous inline components.
 - Set `displayName` on components wrapped by helpers such as `memo` or `forwardRef` when the wrapper hides the useful name.
 - Use a development build first. It gives the clearest component names and enables the full React development instrumentation.
-- For a production-like profiling build, alias `react-dom/client` to `react-dom/profiling` at build time as described in the React docs, and preserve function/class names in that temporary build if minification erases useful labels. For Terser-style minifiers, that means profiling-only `keep_fnames` and `keep_classnames` settings or the equivalent setting in your bundler/minifier. Do not turn those knobs on blindly for production, since they can increase bundle size and reduce minification.
+- For a production-like profiling build, alias `react-dom/client` to `react-dom/profiling` at build time as described in the [React Performance Tracks docs](https://react.dev/reference/dev-tools/react-performance-tracks#using-profiling-builds), and preserve function/class names in that temporary build if minification erases useful labels. For Terser-style minifiers, that means profiling-only `keep_fnames` and `keep_classnames` settings or the equivalent setting in your bundler/minifier. Do not turn those knobs on blindly for production, since they can increase bundle size and reduce minification.
 
 ## Correlate browser and server work
 
