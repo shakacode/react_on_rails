@@ -113,13 +113,17 @@ them to render components. This is its purpose, not a flaw — but it has a dire
 Concretely, the worker exposes these HTTP endpoints
 (`packages/react-on-rails-pro-node-renderer/src/worker.ts`):
 
-| Endpoint                                                                 | Auth                                     | Purpose                                                     |
-| ------------------------------------------------------------------------ | ---------------------------------------- | ----------------------------------------------------------- |
-| `POST /bundles/:bundleTimestamp/render/:renderRequestDigest`             | password (via `performRequestPrechecks`) | Evaluate a rendering request; may also carry bundle uploads |
-| `POST /bundles/:bundleTimestamp/incremental-render/:renderRequestDigest` | password (via `performRequestPrechecks`) | Streaming/incremental rendering                             |
-| `POST /upload-assets`                                                    | password (via `performRequestPrechecks`) | Upload server bundles and assets                            |
-| `POST /asset-exists`                                                     | password (via `authenticate`)            | Check whether an uploaded asset exists                      |
-| `GET /info`                                                              | **none**                                 | Returns `node_version` and `renderer_version`               |
+| Endpoint                                                                 | Auth                                                     | Purpose                                                     |
+| ------------------------------------------------------------------------ | -------------------------------------------------------- | ----------------------------------------------------------- |
+| `POST /bundles/:bundleTimestamp/render/:renderRequestDigest`             | password (via `performRequestPrechecks`)                 | Evaluate a rendering request; may also carry bundle uploads |
+| `POST /bundles/:bundleTimestamp/incremental-render/:renderRequestDigest` | password (via `performRequestPrechecks`)                 | Streaming/incremental rendering                             |
+| `POST /upload-assets`                                                    | password (via `performRequestPrechecks`)                 | Upload server bundles and assets                            |
+| `POST /asset-exists`                                                     | password (via `authenticate`, no protocol-version check) | Check whether an uploaded asset exists                      |
+| `GET /info`                                                              | **none**                                                 | Returns `node_version` and `renderer_version`               |
+
+Note for reviewers: unlike the other authenticated endpoints, `/asset-exists` calls `authenticate`
+directly rather than through `performRequestPrechecks`, so it skips the protocol-version check — a
+compatibility control, not a security control.
 
 Known limitation: `GET /info` is unauthenticated and discloses the Node and renderer versions
 (`worker.ts`, the `app.get('/info', ...)` route). This is harmless on a private network but is version
@@ -158,8 +162,11 @@ Authentication is a single shared secret:
   code treats the environment as production-like and still requires a password.
 - Both sides warn at startup if the password matches a known-default value or is shorter than 16
   characters (`KNOWN_WEAK_PASSWORDS` / `MIN_PASSWORD_LENGTH` in `configBuilder.ts`;
-  `warn_if_renderer_password_weak` in the Pro gem's `configuration.rb`). The literal password value is
-  never logged; the renderer masks it in config diagnostics.
+  `warn_if_renderer_password_weak` in the Pro gem's `configuration.rb`). In these audited paths the
+  literal password value is not logged: the weak-password warnings report only length/known-default
+  status, and the renderer masks the password in its config diagnostics. Other logging or
+  error-reporting paths in your app (e.g. exception trackers capturing config objects) are outside
+  this guarantee — audit them yourself.
 - Rails resolves the password in this order: `config.renderer_password`, then a password embedded in
   `config.renderer_url` (`https://:password@host:3800`), then `ENV["RENDERER_PASSWORD"]`
   (documented in the error message in `configuration.rb`).
