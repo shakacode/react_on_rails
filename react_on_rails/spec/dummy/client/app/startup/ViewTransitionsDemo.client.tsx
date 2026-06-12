@@ -43,8 +43,12 @@ const ViewTransitionsDemo = (): React.ReactElement => {
       });
     };
 
-    if (supportsViewTransitions) {
-      (document as DocumentWithViewTransition).startViewTransition?.(applyUpdate);
+    // Inline detection (the doc's withViewTransition pattern): the fallback
+    // always fires, so the toggle never silently no-ops. The state above is
+    // only for the display text.
+    const doc = document as DocumentWithViewTransition;
+    if (typeof doc.startViewTransition === 'function') {
+      doc.startViewTransition(applyUpdate);
     } else {
       applyUpdate();
     }
