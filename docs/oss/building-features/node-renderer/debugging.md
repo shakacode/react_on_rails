@@ -3,7 +3,9 @@
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
 > Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
-Because the renderer communicates over a port to the server, you can start a renderer instance locally in your application and debug it.
+Because the renderer communicates over a port to Rails, you can start a local renderer instance with Node's inspector and debug the server-rendered JavaScript directly.
+
+Use this page for breakpoints, renderer logs, and memory snapshots. For CPU flamegraphs, use [Profiling Server-Side Rendering Code](../../../pro/profiling-server-side-rendering-code.md). For React 19.2 Performance Tracks, hydration traces, and choosing the right profiling tool, use [React Performance Tracks and Profiling](../performance-tracks-and-profiling.md).
 
 ## Monorepo Workflow
 
@@ -14,11 +16,22 @@ It is a `pnpm` workspace app and already points at the local packages in this mo
 
 ### Quick start: debugging with the full stack running
 
-If you already have the dummy app running via `bin/dev` (which uses `Procfile.dev`), the node renderer is listening on port 3800 but without `--inspect`. To attach a debugger you first need to restart it with `--inspect` — either stop the renderer process and run `pnpm run node-renderer:debug`, or temporarily add `--inspect` to the `node-renderer:` entry in `Procfile.dev` and `overmind restart node-renderer`. Then:
+If you already have the dummy app running via `bin/dev` (which uses `Procfile.dev`), the node renderer is listening on port 3800 without `--inspect`. To attach a debugger, restart only the renderer with the inspector enabled:
+
+```bash
+cd react_on_rails_pro/spec/dummy
+overmind stop node-renderer
+pnpm run node-renderer:debug
+```
+
+Keep that terminal open while you debug. Then:
 
 1. Open `chrome://inspect` in Chrome and connect to the renderer process.
 2. Use overmind to isolate renderer logs: `overmind connect node-renderer` (Ctrl-B to detach).
-3. After a code change, restart just the renderer: `overmind restart node-renderer`.
+3. Set breakpoints in the inspector and reload the page that triggers SSR.
+4. After a server-bundle or renderer change, restart just the renderer.
+
+If you prefer to keep the renderer under Overmind, temporarily add `--inspect` to the `node-renderer:` entry in `Procfile.dev`, then run `overmind restart node-renderer`.
 
 ### Isolated debugging: manual per-terminal startup
 
@@ -51,6 +64,13 @@ Use this when you need full control over the renderer process — different flag
    pnpm --filter react-on-rails-pro-node-renderer run build
    ```
 1. If you are debugging an external app instead of the monorepo dummy app, refresh the installed renderer package using your local package workflow (for example `yalc`, `npm pack`, or a workspace link) before rerunning the renderer.
+
+### Breakpoints vs. profiles
+
+- Use `--inspect` breakpoints when you need to inspect props, globals, module state, or the exact branch taken during SSR.
+- Use [the SSR profiling guide](../../../pro/profiling-server-side-rendering-code.md) when the code is correct but slow.
+- Use [React Performance Tracks and Profiling](../performance-tracks-and-profiling.md) when the slow path includes browser hydration, Suspense, RSC timing, or client interactions.
+- Use [Error Reporting and Tracing](./error-reporting-and-tracing.md) or [OpenTelemetry](../../../pro/node-renderer.md#observability-with-opentelemetry) for production request spans.
 
 ## Debugging Memory Leaks
 
@@ -93,10 +113,6 @@ When diagnosing memory leaks in a containerized environment, running the Node re
 - Restart or scale the renderer without restarting Rails
 
 See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common patterns and fixes.
-
-## Debugging using the Node debugger
-
-1. See [this article](https://github.com/shakacode/react_on_rails/issues/1196) on setting up the debugger.
 
 ## Debugging Jest tests
 

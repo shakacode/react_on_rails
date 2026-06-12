@@ -104,6 +104,7 @@ const sidebars: SidebarsConfig = {
             'building-features/extensible-precompile-pattern',
             'building-features/process-managers',
             'building-features/debugging',
+            'building-features/performance-tracks-and-profiling',
             'building-features/web-vitals-and-rum',
           ],
         },
