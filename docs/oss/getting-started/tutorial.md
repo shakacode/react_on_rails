@@ -130,7 +130,7 @@ Add a controller action if you do not already have one:
 bin/rails generate controller Dashboard show
 ```
 
-In `app/controllers/dashboard_controller.rb`, set props for React. The Quick Start installer creates `react_on_rails_default`, which includes the generated bundle placeholders:
+In `app/controllers/dashboard_controller.rb`, set props for React. The Quick Start installer creates `react_on_rails_default`, which includes the generated bundle placeholders. If that layout is missing, use the fallback note below before copying this controller:
 
 ```ruby
 class DashboardController < ApplicationController
@@ -166,6 +166,8 @@ The generated `react_on_rails_default` layout includes the Shakapacker tags that
 <%= stylesheet_pack_tag %>
 <%= javascript_pack_tag %>
 ```
+
+With no pack name, Shakapacker renders every bundle accumulated by `append_javascript_pack_tag` and `append_stylesheet_pack_tag`, which lets auto-bundling load per-component packs without hardcoding generated pack names in the layout.
 
 If `app/views/layouts/react_on_rails_default.html.erb` is not present (for example, you added React on Rails manually to an existing app without running the installer), remove the `layout` line from the controller and add the pack-tag placeholders to your `application.html.erb` or whichever layout renders this view.
 
@@ -217,6 +219,8 @@ The server file can re-export the same component when no special server behavior
 ```tsx
 export { default } from './Counter.client';
 ```
+
+The generated TypeScript config uses bundler module resolution, so the extensionless re-export matches the installer defaults. If your app uses a stricter custom Node ESM TypeScript setup, use the relative import extension style required by that config.
 
 Auto-bundling discovers `Counter.server.tsx` and includes it in the generated server bundle. You do not need to change `config.server_bundle_js_file` when the generated `server-bundle.js` entrypoint is already in place.
 
