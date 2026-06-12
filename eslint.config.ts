@@ -92,10 +92,6 @@ const config = defineConfig([
   js.configs.recommended,
   compat.extends('eslint-config-shakacode'),
   {
-    files: ['react_on_rails/spec/dummy/client/app/startup/ReactCompilerExample.tsx'],
-    rules: reactCompilerRulesOfReact,
-  },
-  {
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -390,6 +386,10 @@ const config = defineConfig([
       // Some tests validate error conditions without explicit assertions
       'jest/expect-expect': 'off',
     },
+  },
+  {
+    files: ['react_on_rails/spec/dummy/client/app/startup/ReactCompilerExample.tsx'],
+    rules: reactCompilerRulesOfReact,
   },
   // must be the last config in the array
   // https://github.com/prettier/eslint-plugin-prettier?tab=readme-ov-file#configuration-new-eslintconfigjs

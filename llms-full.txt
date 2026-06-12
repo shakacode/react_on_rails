@@ -6066,6 +6066,7 @@ React Server Components do not change where you configure the Compiler: it still
 Client island compiled by the Babel `sources` predicate:
 
 ```tsx
+// Example path — adapt to your own project structure.
 // client/app/components/compiler-ready/RscQuantityPicker.client.tsx
 'use client';
 
