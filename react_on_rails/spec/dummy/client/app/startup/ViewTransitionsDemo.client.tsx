@@ -61,7 +61,7 @@ const ViewTransitionsDemo = (): React.ReactElement => {
           ? 'This browser supports document.startViewTransition — toggling below animates.'
           : 'This browser lacks document.startViewTransition — toggling below updates without animation.'}
       </p>
-      <button type="button" onClick={toggle}>
+      <button type="button" onClick={toggle} aria-expanded={expanded} aria-controls="vt-demo-box">
         Toggle panel
       </button>
       <div
