@@ -37,12 +37,15 @@ rescue LoadError
 end
 
 namespace :react_on_rails do
-  desc "Diagnose React on Rails setup and configuration"
+  desc "Diagnose React on Rails setup and configuration (FORMAT=json for machine-readable output)"
   task :doctor do
     verbose = ENV["VERBOSE"] == "true"
     fix = ENV["FIX"] == "true"
+    # Pass unknown values through so Doctor#initialize fails fast with
+    # ArgumentError instead of silently falling back to text output.
+    format = ENV["FORMAT"].to_s.empty? ? :text : ENV["FORMAT"].to_sym
 
-    doctor = ReactOnRails::Doctor.new(verbose:, fix:)
+    doctor = ReactOnRails::Doctor.new(verbose:, fix:, format:)
     doctor.run_diagnosis
   end
 end

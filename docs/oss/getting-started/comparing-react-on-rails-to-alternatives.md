@@ -80,6 +80,8 @@ Choose Inertia Rails if you are building a new app from scratch, want SPA-style 
 
 Choose React on Rails if you want to integrate React into existing Rails views incrementally, need server rendering with code splitting or streaming, or want the upgrade path to React on Rails Pro features like React Server Components.
 
+Ready to switch? See the [Inertia Rails migration guide](../migrating/migrating-from-inertia-rails.md) — both gems can coexist in one app, so you can migrate route by route.
+
 Official docs:
 
 - [Inertia Rails documentation](https://inertia-rails.dev/)

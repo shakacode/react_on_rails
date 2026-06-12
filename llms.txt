@@ -43,6 +43,8 @@ Use this file as the short machine-readable route map. Use `./llms-full.txt` for
   - Pro overview: https://reactonrails.com/docs/pro/node-renderer
   - Technical basics: https://reactonrails.com/docs/building-features/node-renderer/basics
   - JS configuration: https://reactonrails.com/docs/building-features/node-renderer/js-configuration
+- View transitions (experimental, unsupported):
+  - View Transitions recipe + Turbo interplay: https://reactonrails.com/docs/building-features/view-transitions
 - Configuration and deployment:
   - Configuration overview: https://reactonrails.com/docs/configuration
   - Pro configuration: https://reactonrails.com/docs/configuration/configuration-pro
@@ -54,6 +56,7 @@ Use this file as the short machine-readable route map. Use `./llms-full.txt` for
   - OSS release notes: https://reactonrails.com/docs/upgrading/release-notes
   - Pro release notes: https://reactonrails.com/docs/pro/release-notes
   - Migrate from react-rails: https://reactonrails.com/docs/migrating/migrating-from-react-rails
+  - Migrate from Inertia Rails: https://reactonrails.com/docs/migrating/migrating-from-inertia-rails
   - Migrate to RSC: https://reactonrails.com/docs/migrating/migrating-to-rsc
 
 ## Routing notes

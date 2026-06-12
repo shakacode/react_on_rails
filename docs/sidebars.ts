@@ -73,6 +73,7 @@ const sidebars: SidebarsConfig = {
             'building-features/react-helmet',
             'building-features/react-19-native-metadata',
             'building-features/react-compiler',
+            'building-features/view-transitions',
             'building-features/streaming-server-rendering',
             'building-features/how-to-conditionally-server-render-based-on-device-type',
             'building-features/how-to-use-different-files-for-client-and-server-rendering',
@@ -124,6 +125,7 @@ const sidebars: SidebarsConfig = {
       label: 'Reference',
       link: { type: 'generated-index', title: 'Reference' },
       items: [
+        'reference/error-reference',
         {
           type: 'category',
           label: 'Configuration',
@@ -182,6 +184,7 @@ const sidebars: SidebarsConfig = {
           items: [
             'migrating/example-migrations',
             'migrating/migrating-from-react-rails',
+            'migrating/migrating-from-inertia-rails',
             'migrating/migrating-from-vite-rails',
             'migrating/migrating-from-webpack-to-rspack',
             'migrating/babel-to-swc-migration',

@@ -1,21 +1,44 @@
 module ReactOnRails
   class SmartError < Error
-    attr_reader error_type: Symbol
+    type error_definition = {
+      code: String,
+      title: String,
+      summary: String,
+      sample_context: Hash[Symbol, untyped]
+    }
+
+    DOCS_BASE_URL: String
+    UNKNOWN_ERROR_DEFINITION: error_definition
+    ERROR_DEFINITIONS: Hash[Symbol, error_definition]
+
+    def self.error_definitions: () -> Hash[Symbol, error_definition]
+    def self.error_definition_for: (Symbol | String error_type) -> error_definition
+    def self.docs_url_for: (Symbol | String error_type) -> String?
+    def self.normalize_error_type: (Symbol | String error_type) -> Symbol
+
+    attr_reader error_type: Symbol | String
     attr_reader component_name: String?
     attr_reader props: String?
     attr_reader js_code: String?
     attr_reader additional_context: Hash[Symbol, untyped]
 
-    def initialize: (error_type: Symbol, ?component_name: String?, ?props: String?, ?js_code: String?, **untyped additional_context) -> void
+    def initialize: (error_type: Symbol | String, ?component_name: String?, ?props: String?, ?js_code: String?, **untyped additional_context) -> void
+    def code: () -> String
+    def docs_url: () -> String?
     def solution: () -> String
 
     private
 
     def build_error_message: () -> String
+    def normalized_error_type: () -> Symbol
+    def error_definition: () -> error_definition
+    def error_reference_section: () -> String
     def error_type_title: () -> String
     def error_description: () -> String
     def component_not_registered_solution: () -> String
     def missing_auto_loaded_bundle_solution: () -> String
+    def missing_auto_loaded_store_bundle_solution: () -> String
+    def packer_source_path_for_message: () -> String
     def hydration_mismatch_solution: () -> String
     def server_rendering_error_solution: () -> String
     def redux_store_not_found_solution: () -> String

@@ -240,6 +240,18 @@ module ReactOnRails
       end.html_safe
     end
 
+    def react_on_rails_preload_links(*component_names)
+      ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
+
+      pack_names = component_names.flatten.compact.map do |component_name|
+        generated_component_pack_name(component_name)
+      end
+
+      sources = pack_names.flat_map { |pack_name| preload_sources_for_generated_pack(pack_name) }
+      links = unique_preload_sources_by_href(sources).map { |source| preload_link_for_source(source) }
+      safe_join(links, "\n")
+    end
+
     def sanitized_props_string(props)
       ReactOnRails::JsonOutput.escape(props.is_a?(String) ? props : props.to_json)
     end
@@ -473,6 +485,142 @@ module ReactOnRails
 
     def generated_stores_pack_path(store_name)
       "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{store_name}.js"
+    end
+
+    def generated_component_pack_name(component_name)
+      component_name = component_name.to_s
+      component_name = component_name.delete_prefix("generated/")
+
+      unless component_name.match?(/\A[A-Za-z0-9_]+\z/)
+        raise ArgumentError,
+              "react_on_rails_preload_links component names must use PascalCase, camelCase, or snake_case " \
+              "without hyphens: #{component_name.inspect}"
+      end
+
+      "generated/#{component_name.camelize}"
+    end
+
+    def preload_sources_for_generated_pack(pack_name)
+      preload_sources_for_javascript_pack(pack_name) + preload_sources_for_stylesheet_pack(pack_name)
+    end
+
+    def preload_sources_for_javascript_pack(pack_name)
+      preload_sources_for_pack(pack_name, type: :javascript, required: true).map do |source|
+        { source:, source_type: :javascript }
+      end
+    end
+
+    def preload_sources_for_stylesheet_pack(pack_name)
+      preload_sources_for_pack(pack_name, type: :stylesheet, required: false).map do |source|
+        { source:, source_type: :stylesheet }
+      end
+    end
+
+    def preload_sources_for_pack(pack_name, type:, required:)
+      manifest = current_shakapacker_instance.manifest
+      sources = if required
+                  manifest.lookup_pack_with_chunks!(pack_name, type:)
+                else
+                  manifest.lookup_pack_with_chunks(pack_name, type:)
+                end
+      Array(sources).compact
+    end
+
+    def current_shakapacker_instance
+      ::Shakapacker.instance
+    end
+
+    def unique_preload_sources_by_href(sources)
+      seen_hrefs = {}
+      sources.filter_map do |source|
+        href = preload_source_path(source.fetch(:source))
+        next if seen_hrefs.key?(href)
+
+        seen_hrefs[href] = true
+        source.merge(href:)
+      end
+    end
+
+    def preload_link_for_source(source)
+      case source.fetch(:source_type)
+      when :javascript
+        preload_link_for_javascript_source(source.fetch(:source), href: source.fetch(:href))
+      when :stylesheet
+        preload_link_for_stylesheet_source(source.fetch(:source), href: source.fetch(:href))
+      else
+        raise ArgumentError, "Unexpected preload source type: #{source.fetch(:source_type).inspect}"
+      end
+    end
+
+    def preload_link_for_javascript_source(source, href:)
+      attributes = preload_link_attributes(source, href:)
+      if modulepreload_source?(source)
+        attributes[:crossorigin] = preload_crossorigin if attributes[:crossorigin].nil?
+        tag.link(**attributes.merge(rel: "modulepreload"))
+      else
+        tag.link(**attributes.merge(rel: "preload", as: "script"))
+      end
+    end
+
+    def preload_link_for_stylesheet_source(source, href:)
+      tag.link(**preload_link_attributes(source, href:).merge(rel: "preload", as: "style"))
+    end
+
+    def preload_link_attributes(source, href:)
+      attributes = { href: }
+      integrity = preload_source_integrity(source)
+      return attributes unless integrity.present?
+
+      cross_origin = current_shakapacker_instance.config.integrity[:cross_origin]
+      attributes.merge(integrity:, crossorigin: cross_origin.nil? ? preload_crossorigin : cross_origin)
+    end
+
+    def preload_source_path(source)
+      path_to_asset(preload_manifest_source(source), skip_pipeline: true)
+    end
+
+    def preload_manifest_source(source)
+      return source if source.is_a?(String)
+      return preload_manifest_value(source, "src") if preload_manifest_key?(source, "src")
+
+      raise ArgumentError, "Unexpected Shakapacker manifest source without src: #{source.inspect}"
+    end
+
+    def preload_source_integrity(source)
+      return unless current_shakapacker_instance.config.integrity[:enabled]
+
+      preload_manifest_value(source, "integrity")
+    end
+
+    def preload_crossorigin
+      cross_origin = current_shakapacker_instance.config.integrity[:cross_origin]
+      cross_origin.nil? ? "anonymous" : cross_origin
+    end
+
+    def modulepreload_source?(source)
+      # Priority order: explicit module metadata, rel/type metadata, then the .mjs extension heuristic.
+      module_value = preload_manifest_value(source, "module")
+      return true if module_value == true
+      return false if module_value == false
+
+      return true if preload_manifest_value(source, "rel").to_s == "modulepreload"
+      return true if preload_manifest_value(source, "type").to_s == "module"
+
+      source_path = preload_manifest_source(source).to_s.split(/[?#]/, 2).first
+      File.extname(source_path) == ".mjs"
+    end
+
+    def preload_manifest_value(source, key)
+      return if source.is_a?(String) || !source.respond_to?(:[])
+
+      return source[key] if preload_manifest_key?(source, key)
+      return source[key.to_sym] if preload_manifest_key?(source, key.to_sym)
+
+      nil
+    end
+
+    def preload_manifest_key?(source, key)
+      source.respond_to?(:key?) && source.key?(key)
     end
 
     def build_react_component_result_for_server_rendered_string(
