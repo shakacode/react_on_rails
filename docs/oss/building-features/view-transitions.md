@@ -114,6 +114,9 @@ router-level integrations are experimental in the same sense as the rest of this
   running. Rapid clicks fall back to the final state — that is by design, but don't queue your own.
 - **Duplicate `view-transition-name`s abort the transition.** Each name must be unique on the page at
   snapshot time (watch out for lists; derive names from item ids if you animate list items).
+- **Names must be valid CSS custom identifiers.** A `view-transition-name` cannot start with a digit
+  and cannot be a CSS-wide keyword (`none`, `inherit`, …) — prefix derived names, e.g. `item-42`, not
+  `42`.
 
 ## SSR-hydrate recipe (Experimental)
 
