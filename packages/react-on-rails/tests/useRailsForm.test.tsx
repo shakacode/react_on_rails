@@ -342,7 +342,7 @@ describe('useRailsForm', () => {
       const { result } = renderHook(() => useRailsForm({ count: 1 }));
 
       act(() => {
-        result.current.setData((previous) => ({ count: previous.count + 1 }));
+        result.current.setData((previous: { count: number }) => ({ count: previous.count + 1 }));
       });
 
       expect(result.current.data).toEqual({ count: 2 });

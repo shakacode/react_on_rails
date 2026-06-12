@@ -81,5 +81,9 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://reactonrails.com/docs/"
+  "homepage": "https://reactonrails.com/docs/",
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.2.0"
+  }
 }
