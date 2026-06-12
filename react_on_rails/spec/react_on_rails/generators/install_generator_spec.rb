@@ -1417,6 +1417,7 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("@rspack/cli@^2.0.0-0")
         expect(content).to include("@rspack/dev-server@^2.0.0")
         expect(content).to include("@rspack/plugin-react-refresh@^2.0.0")
+        expect(content).to match(%r{@rspack/plugin-react-refresh@\^2\.0\.0\s+react-refresh})
         expect(content).to include("webpack@^5.0.0")
         # Version-stripping regex is used for package.json key deletion
         expect(content).to include('dep[%r{\A(@[^/]+/[^@]+|[^@]+)}]')
