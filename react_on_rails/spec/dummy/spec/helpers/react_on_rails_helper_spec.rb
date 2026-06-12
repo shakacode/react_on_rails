@@ -260,6 +260,26 @@ describe ReactOnRailsHelper do
       expect(links.first["crossorigin"]).to eq("")
     end
 
+    it "defaults missing crossorigin values on modulepreload tags with integrity" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/ModernComponent-123.mjs",
+                        "integrity" => "sha384-modern"
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["integrity"]).to eq("sha384-modern")
+      expect(links.first["crossorigin"]).to eq("anonymous")
+    end
+
     it "resolves manifest sources through Rails asset paths" do
       allow(manifest).to receive(:lookup_pack_with_chunks!)
         .with("generated/HostedComponent", type: :javascript)

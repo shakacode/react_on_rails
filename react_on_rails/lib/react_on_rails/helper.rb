@@ -555,7 +555,7 @@ module ReactOnRails
     def preload_link_for_javascript_source(source, href:)
       attributes = preload_link_attributes(source, href:)
       if modulepreload_source?(source)
-        attributes[:crossorigin] = preload_crossorigin unless attributes.key?(:crossorigin)
+        attributes[:crossorigin] = preload_crossorigin if attributes[:crossorigin].nil?
         tag.link(**attributes.merge(rel: "modulepreload"))
       else
         tag.link(**attributes.merge(rel: "preload", as: "script"))
@@ -571,7 +571,8 @@ module ReactOnRails
       integrity = preload_source_integrity(source)
       return attributes unless integrity.present?
 
-      attributes.merge(integrity:, crossorigin: current_shakapacker_instance.config.integrity[:cross_origin])
+      cross_origin = current_shakapacker_instance.config.integrity[:cross_origin]
+      attributes.merge(integrity:, crossorigin: cross_origin.nil? ? preload_crossorigin : cross_origin)
     end
 
     def preload_source_path(source)
