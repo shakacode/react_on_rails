@@ -221,7 +221,9 @@ packages therefore apply to this stack, and the project's response is enforced i
   React on Rails Pro shipped corresponding dependency floors; see the `CHANGELOG.md` security entries for
   CVE-2025-55182 ([PR 2175](https://github.com/shakacode/react_on_rails/pull/2175)) and
   CVE-2025-55183/55184/67779 ([PR 2233](https://github.com/shakacode/react_on_rails/pull/2233)).
-- **The React ≥ 19.0.4 floor is checked, not just documented:**
+- **The patched-version requirement is checked, not just documented.** For RSC, the supported React range
+  is `19.0.x` with patch `>= 19.0.4` (`~19.0.4`) — not an open-ended `>= 19.0.4` floor; newer minors such
+  as 19.1.x are flagged as unverified by the doctor and rejected by the renderer's startup check:
   - `rake react_on_rails:doctor` warns when the installed React is 19.0.x below 19.0.4, citing the known
     security vulnerabilities (`check_rsc_react_version` in `react_on_rails/lib/react_on_rails/doctor.rb`).
   - The RSC generator emits the same warning at setup time, naming CVE-2025-55182, CVE-2025-67779, and
