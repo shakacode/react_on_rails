@@ -1,5 +1,10 @@
 # Configuring Images and Assets with Webpack
 
+This page covers the **bundling** side of images: configuring webpack so images
+imported from your JavaScript/SCSS resolve correctly. For the **performance**
+side — responsive `srcset`, lazy loading, CLS prevention, LCP preloading, and
+AVIF/WebP — see [Fast Images in React on Rails](./fast-images.md).
+
 A leading slash is necessary on the `name` option for file-loader/url-loader and the `publicPath` option for output.
 
 ```javascript
@@ -48,6 +53,9 @@ to `app/javascript/images/foobar.jpg` with a custom alias like this:
 
 ## See also
 
-For self-hosting and optimizing web fonts (preload, `font-display`, and a
-`size-adjust` metric-matched fallback to eliminate layout shift), see
-[Font Optimization](./fonts.md).
+- [Fast Images in React on Rails](./fast-images.md) — responsive `srcset`,
+  lazy loading, CLS prevention, LCP preloading, and modern formats using Rails
+  primitives.
+- [Font Optimization](./fonts.md) — self-hosting and optimizing web fonts
+  (preload, `font-display`, and a `size-adjust` metric-matched fallback to
+  eliminate layout shift).
