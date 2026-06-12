@@ -19,6 +19,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - When the user wants an adversarial PR review, red-team review, Claude/Codex comparison review, or a stricter pre-merge gate, use `.agents/skills/adversarial-pr-review/SKILL.md`; reusable prompts live in `.agents/workflows/adversarial-pr-review.md`
 - When the user assigns an issue, PR, review-fix pass, or merge queue to an agent, follow `.agents/workflows/pr-processing.md`
 - When the user asks to address PR review comments, use `.agents/skills/address-review/SKILL.md`; `.agents/workflows/address-review.md` remains a copy/paste prompt for assistants without skill support
+- When the user wants to manually verify a bug-fix PR by reproducing the failure before the fix and confirming it is gone after (with captured evidence or screenshots, optionally posted to the PR and issue), use `.agents/skills/verify-pr-fix/SKILL.md`; a short invocation is `$verify-pr-fix` or "manually verify this fix"
 - Default simplify model: `claude-opus-4-8`
 
 ## Canonical Agent Policy
