@@ -171,7 +171,7 @@ v6+ also ships the React Compiler-powered diagnostics (purity, immutability, set
 extends: [js.configs.recommended, react.configs.flat.recommended, reactHooks.configs['recommended-latest']],
 ```
 
-`recommended-latest` includes everything in `recommended` plus the compiler rules. These diagnostics are useful even if you have not adopted the compiler itself; if you have, see [React Compiler with React on Rails](https://www.shakacode.com/react-on-rails/docs/building-features/react-compiler/) for build-side setup.
+`recommended-latest` includes everything in `recommended` plus the compiler rules. These diagnostics are useful even if you have not adopted the compiler itself; if you have, see [React Compiler with React on Rails](./react-compiler.md) for build-side setup.
 
 ## References
 
