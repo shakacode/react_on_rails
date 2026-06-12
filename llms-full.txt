@@ -6804,6 +6804,91 @@ case you have, React on Rails handles it.
 
 ---
 
+## Tag-Based Revalidation
+
+Cache keys answer "is this entry still current?" at read time. Tags answer a different question: "delete everything that depends on this data, right now." With `cache_tags:`, you attach declarative invalidation handles to fragment-cached components and bust them all with one call — the React on Rails Pro analog of Next.js `revalidateTag`.
+
+```erb
+<%= cached_react_component("PostShow",
+      cache_key: [@post, I18n.locale],
+      cache_tags: ["post:#{@post.id}", @post.author],
+      cache_options: { expires_in: 12.hours }) do
+      { post: @post.to_props }
+    end %>
+```
+
+```ruby
+# Anywhere in Ruby — controller, job, service object, console:
+ReactOnRailsPro.revalidate_tag("post:42")   # => number of cache entries deleted
+ReactOnRailsPro.revalidate_tags("post:42", post.author)
+```
+
+`cache_tags:` is accepted by all four cached helpers — `cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, and `cached_async_react_component` — and is purely additive: `cache_key:` semantics are unchanged, and `cache_key:` is still required.
+
+### Tag forms and normalization
+
+A tag can be:
+
+- a **String** (or Symbol/Numeric) — passed through as-is (`"post:42"`)
+- an object responding to **`#cache_key`** (any ActiveRecord model) — normalized to the stable, version-less `record.cache_key` (e.g. `posts/42`), never `cache_key_with_version`, so the tag stays valid as the record changes
+- a **Proc** (arity 0) returning any accepted form
+- an **Array** of any mix of the above
+
+Tags that normalize to blank raise `ReactOnRailsPro::Error`. Tag coarsely (`post:42`, `tenant:7`, `posts:index`) — never per-user or per-request; see the index bounds below.
+
+### Revalidating from the model layer
+
+Include the `Revalidates` concern so the model that owns the data also owns cache invalidation. It runs in `after_commit`, so it never fires for a rolled-back transaction and fires only after the new data is visible to the re-rendering request:
+
+```ruby
+class Post < ApplicationRecord
+  include ReactOnRailsPro::Cache::Revalidates
+
+  revalidates_react_cache # default tag: record.cache_key, e.g. "posts/42"
+  # or custom / additional tags:
+  # revalidates_react_cache { |post| ["post:#{post.id}", "author:#{post.author_id}"] }
+end
+```
+
+This covers create/update/destroy and `touch` — so `belongs_to ..., touch: true` composes for free: touching the parent fires the parent's revalidation. The standard Rails callback caveat applies: `update_column`, `update_all`, `delete_all`, and other callback-skipping writes do not trigger revalidation; call `ReactOnRailsPro.revalidate_tags(record)` yourself after such writes.
+
+### How it works, and the contract
+
+On every tagged cache write, the final cache key is appended to a per-tag index entry in `Rails.cache` (keyed `rorp:tag:v1:<tag>`). `revalidate_tag` reads the index, deletes the recorded entries with `delete_multi`, then deletes the index entry. A missing index (never-written tag, evicted entry, `:null_store`) means "nothing to revalidate" — never an error.
+
+**Tag revalidation is best-effort; correctness is bounded by `expires_in`.** `ActiveSupport::Cache` has no atomic set-append, so the index append is a read-modify-write: two processes caching different entries under the same tag at the same moment can race, and one entry can be lost _from the index_ (the cached data itself is never lost). A lost index entry simply survives `revalidate_tag` and expires via its own `expires_in`. The same applies when the index entry itself is LRU-evicted. Therefore:
+
+- **Always set `expires_in` on tagged entries.** It is the upper bound on how long a missed invalidation can serve stale HTML. In development, React on Rails Pro logs a warning when `cache_tags:` is used without it.
+- **Use a shared cache store in production** — Redis or Memcached. With `:memory_store` the index is per-process, so `revalidate_tag` in one process cannot see entries written by another; with `:null_store` tags are inert.
+
+Two config knobs bound the index (defaults shown):
+
+```ruby
+ReactOnRailsPro.configure do |config|
+  config.cache_tag_index_expires_in = 7.days # index TTL ceiling for entries without expires_in
+  config.cache_tag_index_max_keys = 5_000    # keys recorded per tag; oldest dropped beyond this
+end
+```
+
+When a tagged entry has `expires_in`, the index entry's TTL automatically covers it (plus slack). When a tag exceeds the per-tag key cap, the oldest keys are dropped with a logged warning — those entries fall back to plain TTL expiration.
+
+Note that tags solve **data**-driven invalidation only. Deploy invalidation is already handled by the server-bundle digest in the cache key (see [Cache Warming](#cache-warming)) — a deploy cold-starts prerendered fragment caches regardless of tags.
+
+### Next.js mapping
+
+| Next.js 16 (Cache Components)                       | React on Rails Pro                                                                      |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `'use cache'` on a function/component               | `cached_react_component` / `cached_react_component_hash` / streaming and async variants |
+| `cacheTag('post-42')` inside the cached scope       | `cache_tags: ["post:42"]` helper option                                                 |
+| `revalidateTag('post-42')` in a Server Action       | `ReactOnRailsPro.revalidate_tag("post:42")` — anywhere in Ruby, incl. `after_commit`    |
+| Manually wiring `revalidateTag` into every mutation | `include ReactOnRailsPro::Cache::Revalidates` — invalidation rides the AR transaction   |
+| `cacheLife` profiles                                | `cache_options: { expires_in: ... }`                                                    |
+| `revalidateTag(tag, 'max')` / SWR profiles          | Not yet supported (stale-while-revalidate is a possible future addition)                |
+
+Like Next.js's default `revalidateTag`, revalidation deletes: the next request re-renders and re-registers. There is no background refresh.
+
+---
+
 ## Cache Warming
 
 Fragment cache keys include the server bundle digest, which means every deploy creates new cache keys. This is correct — rendered output must match the current bundle — but it means every deploy starts with a cold cache. Under live traffic, this creates a synchronized storm of cache misses: every user request triggers full SSR, database queries for props assembly, and JS evaluation simultaneously.
@@ -27006,6 +27091,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro]** **Tag-based cache revalidation (a Next.js `revalidateTag` analog)**: The fragment-caching helpers (`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, `cached_async_react_component`) now accept an optional `cache_tags:` option (String, Proc, any object responding to `cache_key` such as an ActiveRecord model, or an Array of any mix), and the new `ReactOnRailsPro.revalidate_tag(tag)` / `revalidate_tags(*tags)` API deletes every cached entry registered under a tag via a `Rails.cache`-backed tag→key index. A new `ReactOnRailsPro::Cache::Revalidates` ActiveRecord concern (`revalidates_react_cache`) drives revalidation from `after_commit`, so the model that owns the data also owns cache invalidation (and composes with `touch:`). Revalidation is best-effort with correctness bounded by `expires_in` (a development-mode warning fires when `cache_tags:` is used without it); index growth is bounded by the new `config.cache_tag_index_expires_in` (default 7 days) and `config.cache_tag_index_max_keys` (default 5,000) settings. Existing `cache_key:`-only behavior is unchanged. Closes [Issue 3871](https://github.com/shakacode/react_on_rails/issues/3871). [PR 3959](https://github.com/shakacode/react_on_rails/pull/3959) by [justin808](https://github.com/justin808).
 - **Machine-readable doctor output (`FORMAT=json`)**: `bin/rails react_on_rails:doctor FORMAT=json` (and `ReactOnRails::Doctor.new(format: :json)`) now emits a stable, versioned JSON report — `schema_version`, `ror_version`, overall `status`, per-check entries with stable snake_case ids (`pass`/`warn`/`fail` status, most-severe `message`, full `details`), and a `summary` of check counts — so coding agents and tooling can consume diagnosis results without parsing the human-formatted text. Stray check output is routed to stderr so stdout stays valid JSON; the default human-readable output and exit-code semantics are unchanged. Split out from the MCP-server RFC in [Issue 3870](https://github.com/shakacode/react_on_rails/issues/3870). Closes [Issue 3943](https://github.com/shakacode/react_on_rails/issues/3943). [PR 3948](https://github.com/shakacode/react_on_rails/pull/3948) by [justin808](https://github.com/justin808).
 - **Consumer-facing AI-agent guidance scaffolded into generated and installed apps**: `rails generate react_on_rails:install` (and therefore `create-react-on-rails-app`, which delegates to it) now writes a concise, app-scoped `AGENTS.md` plus thin editor-pointer files (`CLAUDE.md`, `.cursor/rules/react-on-rails.mdc`, `.github/copilot-instructions.md`) so an AI coding agent dropped into a fresh app already knows how to register a component, use the `react_component` view helper, choose `.client`/`.server` bundles, recover from the top runtime errors (sourced from `SmartError`), and run `bin/rails react_on_rails:doctor`. The errors section tracks the live `SmartError` messages, and the editor files are pointers (not copies). Emission is gated by `--agent-files`/`--no-agent-files` (default on) in both paths and never overwrites an existing file. Cross-links the eval-harness work in [Issue 3832](https://github.com/shakacode/react_on_rails/issues/3832). Closes [Issue 3868](https://github.com/shakacode/react_on_rails/issues/3868). [PR 3924](https://github.com/shakacode/react_on_rails/pull/3924) by [justin808](https://github.com/justin808).
 - **First-party font optimization helper (a `next/font/local` analog)**: New `ReactOnRails::FontHelper#react_on_rails_font_face` view helper returns `<head>` markup for a committed, self-hosted `.woff2` font: a `<link rel="preload" as="font" type="font/woff2" crossorigin>`, an `@font-face` with `font-display: swap`, and an optional metric-matched fallback `@font-face` (`size-adjust` plus `ascent-override` / `descent-override` / `line-gap-override`) so the system fallback occupies the same space as the web font and the swap produces no layout shift (CLS). Self-hosting through the asset pipeline avoids any third-party font-host request. Includes a new [Font Optimization](docs/oss/building-features/fonts.md) docs page (self-hosting, preload, `font-display`, the `size-adjust` fallback technique with a worked Inter-over-Arial derivation, subsetting guidance, and a CLS note) and a runnable dummy-app example. v1 covers the `next/font/local` committed-file path and the non-streaming `react_component_hash` head-injection path. Closes [Issue 3875](https://github.com/shakacode/react_on_rails/issues/3875) (partial). Deferred sub-tasks tracked in [Issue 3921](https://github.com/shakacode/react_on_rails/issues/3921). [PR 3923](https://github.com/shakacode/react_on_rails/pull/3923) by [justin808](https://github.com/justin808).
