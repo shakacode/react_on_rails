@@ -52,5 +52,14 @@ RSpec.describe "doctor rake task" do
     ensure
       ENV.delete("FORMAT")
     end
+
+    it "fails fast with ArgumentError when FORMAT is an unrecognized value" do
+      ENV["FORMAT"] = "jsno"
+
+      expect { Rake::Task["react_on_rails:doctor"].invoke }
+        .to raise_error(ArgumentError, /Invalid doctor format/)
+    ensure
+      ENV.delete("FORMAT")
+    end
   end
 end
