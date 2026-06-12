@@ -12,9 +12,9 @@ module ReactOnRails
         "@eslint/js" => "^9.0.0",
         "eslint" => "^9.0.0",
         "eslint-config-prettier" => "^10.0.0",
-        "eslint-plugin-import" => "^2.0.0",
+        "eslint-plugin-import" => "^2.29.0",
         "eslint-plugin-react" => "^7.37.5",
-        "eslint-plugin-react-hooks" => "^6.1.0",
+        "eslint-plugin-react-hooks" => "^6.1.1",
         "globals" => "^16.0.0"
       }.freeze
 

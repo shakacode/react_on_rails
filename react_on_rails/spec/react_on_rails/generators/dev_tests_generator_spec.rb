@@ -26,6 +26,7 @@ describe DevTestsGenerator, type: :generator do
       assert_file("eslint.config.mjs") do |contents|
         expect(contents).to include("import js from '@eslint/js';")
         expect(contents).to include("import reactHooks from 'eslint-plugin-react-hooks';")
+        expect(contents).to include("importPlugin.flatConfigs.recommended")
         expect(contents).to include("reactHooksRecommendedLatestConfigs")
         expect(contents).to include("__DEBUG_SERVER_ERRORS__: true")
         expect(contents).to include("'import/no-unresolved': 'off'")
@@ -41,9 +42,9 @@ describe DevTestsGenerator, type: :generator do
           "@eslint/js" => "^9.0.0",
           "eslint" => "^9.0.0",
           "eslint-config-prettier" => "^10.0.0",
-          "eslint-plugin-import" => "^2.0.0",
+          "eslint-plugin-import" => "^2.29.0",
           "eslint-plugin-react" => "^7.37.5",
-          "eslint-plugin-react-hooks" => "^6.1.0",
+          "eslint-plugin-react-hooks" => "^6.1.1",
           "globals" => "^16.0.0"
         )
       end

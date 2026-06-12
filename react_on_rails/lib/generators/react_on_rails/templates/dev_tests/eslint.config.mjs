@@ -13,6 +13,7 @@ const reactHooksRecommendedLatestConfigs = Array.isArray(reactHooksRecommendedLa
 export default [
   js.configs.recommended,
   react.configs.flat.recommended,
+  importPlugin.flatConfigs.recommended,
   ...reactHooksRecommendedLatestConfigs,
   {
     files: ['**/*.{js,jsx,mjs,cjs}'],
