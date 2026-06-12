@@ -54,16 +54,19 @@ Memorable invocation: `$verify-pr-fix <PR>` or "manually verify this fix and rep
      node-renderer uses, rather than booting the whole renderer.
    - For renderer/process changes, see `.claude/docs/validating-node-renderer-changes.md`.
 4. **Reproduce the bug (the "before").** Run the reproduction against pre-fix behavior. Get pre-fix code by
-   the least invasive means: check out the parent commit in a scratch worktree, or `git stash` the change,
-   or (for a harness) model the pre-fix path explicitly. Capture the failure. If it does not fail, you have
-   not reproduced it — recreate the triggering condition (input, timing, blocking, concurrency) and retry
+   the least invasive means: check out the parent commit in a scratch worktree, `git stash` an uncommitted
+   change, check out one file at its pre-fix revision (`git checkout <fix-commit>~1 -- <file>`), or (for a
+   harness) model the pre-fix path explicitly. Capture the failure. If it does not fail, you have not
+   reproduced it — recreate the triggering condition (input, timing, blocking, concurrency) and retry
    before concluding anything.
-5. **Verify the fix (the "after").** Run the identical reproduction against the post-fix code. Capture the
-   now-passing result. Confirm the specific signal flipped (orphans 6/6 -> 0/6, exit code, status, DOM).
-6. **Capture evidence.** Save real terminal output. For UI/browser changes take screenshots via the
-   `/browse` skill or Playwright MCP. For a shareable visual of terminal results you may render the
-   captured output with the visualize tool, but the render must reproduce real output verbatim — never
-   stage numbers.
+5. **Verify the fix (the "after").** Restore the post-fix code first (`git stash pop`,
+   `git checkout HEAD -- <file>`, or leave the worktree), then run the identical reproduction. Capture the
+   now-passing result and confirm the specific signal flipped (orphans 6/6 -> 0/6, exit code, status, DOM).
+   Confirm `git status` is clean so the "after" really ran against post-fix code.
+6. **Capture evidence.** Save real terminal output. For UI/browser changes take screenshots via Playwright
+   MCP (see `.claude/docs/playwright-e2e-testing.md`). For a shareable visual of terminal results you may
+   render the captured output with the visualize tool, but the render must reproduce real output verbatim —
+   never stage numbers.
 7. **Clean up.** Kill spawned processes, remove scratch dirs/worktrees, and confirm nothing leaked
    (`pgrep -fl <marker>` should report none).
 8. **Report to the PR.** Post a comment with the structured format below. Before posting to GitHub (an
@@ -80,7 +83,7 @@ Memorable invocation: `$verify-pr-fix <PR>` or "manually verify this fix and rep
   the real supervisor (e.g. Foreman: signal only the master PID, SIGKILL after its ~5s window).
 - **SSR / hydration / RSC** (render output, FOUC, streaming, cache keys): boot the relevant dummy app,
   hit the affected route, compare server HTML vs hydrated DOM, watch the renderer log, diff cache keys.
-  Browser-visible? Screenshot before/after with `/browse` or Playwright.
+  Browser-visible? Screenshot before/after with Playwright MCP.
 - **Generators / installers / scaffolding**: run the generator into a temp app and diff the produced files
   against expectation; for behavioral output, boot the generated app.
 - **Caching / dedupe / digests**: construct the colliding or repeated inputs and assert hit/miss and that
@@ -129,14 +132,11 @@ Memorable invocation: `$verify-pr-fix <PR>` or "manually verify this fix and rep
 ```text
 <real captured output, before and after>
 ```
-````
 
 ### Caveat
 
 <what was NOT exercised; the residual-risk path that remains UNKNOWN>
-
-```
+````
 
 Keep the comment evidence-first and honest about scope. End behavioral claims with the captured proof, not
 adjectives.
-```
