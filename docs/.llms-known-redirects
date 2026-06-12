@@ -1,0 +1,6 @@
+# Site URL paths (after /docs/) that are redirects, intentionally referenced
+# from llms.txt / docs/llms-full-preamble.md (e.g. routing notes that document
+# the redirect itself). One path per line; inline comments (after #) allowed.
+# Used by script/generate-llms-full.mjs URL validation.
+
+pro/react-on-rails-pro # redirects to /docs/pro (slug on docs/pro/react-on-rails-pro.md); documented in the llms routing notes
