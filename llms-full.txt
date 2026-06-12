@@ -16755,6 +16755,8 @@ containers:
       failureThreshold: 6
       timeoutSeconds: 1
     readinessProbe:
+      # Omits initialDelaySeconds: startupProbe above defers readiness/liveness until boot succeeds (K8s 1.20+).
+      # If you skip startupProbe or run an older cluster, add initialDelaySeconds to cover the boot window.
       # tcpSocket is a shallow fallback: port reachability only, not application readiness.
       tcpSocket:
         port: 3800
