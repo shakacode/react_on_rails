@@ -79,14 +79,16 @@ server {
   server_name example.com;
   # Terminate TLS at the proxy so both upstreams speak plain HTTP internally.
 
-  # nginx proxies upstream over HTTP/1.0 by default, which disables
-  # keep-alive; use HTTP/1.1 and clear the Connection header.
+  # nginx proxies upstream over HTTP/1.0 by default, which lacks chunked
+  # transfer encoding (required for streaming SSR) and disables keep-alive.
+  # Use HTTP/1.1 and clear the Connection header.
   proxy_http_version 1.1;
   proxy_set_header Connection "";
 
   # Required for streaming SSR (stream_react_component, RSC async props):
-  # nginx buffers the full response by default, defeating streaming.
-  # Set X-Accel-Buffering: no in individual responses for finer control.
+  # nginx buffers the full response by default, defeating streaming. If you
+  # prefer to keep buffering on globally, Rails can instead disable it per
+  # response with an `X-Accel-Buffering: no` header.
   proxy_buffering off;
 
   # Forward the browser-facing origin so both apps generate correct URLs
@@ -106,8 +108,17 @@ server {
   # Rails also keeps serving the existing API for not-yet-migrated pages
   location /api/ { proxy_pass http://rails; }
 
-  # Everything else stays on Next.js until migrated
-  location / { proxy_pass http://nextjs; }
+  # Everything else stays on Next.js until migrated. Re-enable buffering
+  # here: only the Rails streaming responses need it off.
+  location / {
+    proxy_pass http://nextjs;
+    proxy_buffering on;
+  }
+
+  # Streaming SSR and RSC async-props responses can hold connections open
+  # longer than nginx's default 60s proxy_read_timeout. Tune to match your
+  # slowest expected stream.
+  # proxy_read_timeout 120s;
 }
 ```
 
