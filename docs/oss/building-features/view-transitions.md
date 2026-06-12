@@ -174,8 +174,8 @@ How this relates to React-driven transitions:
 - **Turbo's preview cache can confuse pairing.** Turbo may first render a cached preview of the next
   page and then the fresh response. Elements with `view-transition-name` that appear in both the old
   page and the preview can pair unexpectedly or abort (duplicate names). Test with the cache in play
-  before shipping, or disable preview for transitioned pages (`<meta name="turbo-cache-control"
-content="no-preview">`).
+  before shipping, or disable preview for transitioned pages
+  (`<meta name="turbo-cache-control" content="no-preview">`).
 
 ## In-repo demo (Experimental)
 

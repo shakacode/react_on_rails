@@ -7,11 +7,11 @@
 // the same update without animation.
 //
 // This demo is inert by default: its route only exists when the dummy app is
-// booted with VIEW_TRANSITIONS_DEMO=true (see config/routes.rb). The page
-// renders client-side only (prerender: false), so it is safe to feature-detect
-// the browser API during render here; server-rendered components must only
-// touch the API inside event handlers or effects.
-import React, { useState } from 'react';
+// booted with VIEW_TRANSITIONS_DEMO=true (see config/routes.rb). Feature
+// detection happens in a useEffect after mount, so the pattern is also safe to
+// copy into SSR-hydrated components (document does not exist during server
+// render).
+import React, { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 // document.startViewTransition may be missing from older TS DOM libs and from
@@ -22,9 +22,16 @@ type DocumentWithViewTransition = Document & {
 
 const ViewTransitionsDemo = (): React.ReactElement => {
   const [expanded, setExpanded] = useState(false);
+  const [supportsViewTransitions, setSupportsViewTransitions] = useState(false);
 
-  const supportsViewTransitions =
-    typeof (document as DocumentWithViewTransition).startViewTransition === 'function';
+  // Detect after mount so this pattern is safe to copy for SSR-hydrated
+  // components too. The handler below only runs post-mount, so branching on
+  // the state value is reliable; the initial false value is harmless.
+  useEffect(() => {
+    setSupportsViewTransitions(
+      typeof (document as DocumentWithViewTransition).startViewTransition === 'function',
+    );
+  }, []);
 
   const toggle = () => {
     const applyUpdate = () => {
@@ -36,9 +43,8 @@ const ViewTransitionsDemo = (): React.ReactElement => {
       });
     };
 
-    const doc = document as DocumentWithViewTransition;
-    if (typeof doc.startViewTransition === 'function') {
-      doc.startViewTransition(applyUpdate);
+    if (supportsViewTransitions) {
+      (document as DocumentWithViewTransition).startViewTransition?.(applyUpdate);
     } else {
       applyUpdate();
     }
