@@ -47,7 +47,8 @@ module ReactOnRailsPro
 
       class_methods do
         # Registers the after_commit revalidation callback. With no block, the
-        # record's own version-less +cache_key+ (e.g. "posts/42") is the tag.
+        # record's stable identity (e.g. "posts/42" — the version-less
+        # +cache_key+ form, stable even with cache_versioning off) is the tag.
         # An optional block receives the record and returns a tag or Array of
         # tags in any form accepted by `cache_tags:`.
         def revalidates_react_cache(&resolver)

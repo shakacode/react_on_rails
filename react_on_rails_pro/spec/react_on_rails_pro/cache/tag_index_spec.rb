@@ -26,6 +26,26 @@ class TaggableRecord
   end
 end
 
+# AR-style record whose #cache_key embeds updated_at — the shape produced by
+# ActiveRecord when cache_versioning = false.
+class TimestampedTaggableRecord
+  attr_reader :id
+
+  def initialize(id)
+    @id = id
+  end
+
+  # The lib only calls model_name.cache_key (ActiveModel::Name#cache_key
+  # returns the collection name, e.g. "posts").
+  def model_name
+    Struct.new(:cache_key).new("posts")
+  end
+
+  def cache_key
+    "posts/#{id}-20260611120000"
+  end
+end
+
 describe ReactOnRailsPro::Cache::TagIndex, :caching do
   let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
 
@@ -48,6 +68,14 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
 
     it "normalizes objects responding to #cache_key without the version" do
       record = TaggableRecord.new(cache_key: "posts/42", cache_key_with_version: "posts/42-20260611120000")
+
+      expect(described_class.normalize_tags([record])).to eq(["posts/42"])
+    end
+
+    it "derives a stable identity for AR-style records even when cache_key embeds a timestamp" do
+      # With ActiveRecord::Base.cache_versioning = false, AR#cache_key changes
+      # on every update; the tag must not.
+      record = TimestampedTaggableRecord.new(42)
 
       expect(described_class.normalize_tags([record])).to eq(["posts/42"])
     end

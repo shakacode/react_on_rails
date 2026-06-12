@@ -82,10 +82,13 @@ module ReactOnRailsPro
         end
 
         def tag_value(resolved)
-          # Check #cache_key first so ActiveRecord models normalize to the
-          # stable, version-less identity handle (e.g. "posts/42") — never
-          # cache_key_with_version, which would silently break revalidation
-          # under the Rails default cache_versioning = true.
+          # A tag must be a *stable* identity handle: the same record must
+          # normalize to the same tag at registration time and revalidation
+          # time, regardless of intervening updates.
+          stable = stable_record_identity(resolved)
+          return stable if stable
+          # Other objects exposing #cache_key (never #cache_key_with_version,
+          # which embeds the recyclable version) pass their cache_key through.
           return resolved.cache_key.to_s if resolved.respond_to?(:cache_key)
 
           case resolved
@@ -98,6 +101,20 @@ module ReactOnRailsPro
                   "cache_tags values must be Strings, Symbols, Numerics, Procs, Arrays, or objects " \
                   "responding to #cache_key. Got #{resolved.class}: #{resolved.inspect}"
           end
+        end
+
+        # Stable identity for ActiveModel/ActiveRecord-style records, e.g.
+        # "posts/42" — identical to AR#cache_key under the Rails default
+        # cache_versioning = true, but derived directly because with
+        # cache_versioning = false AR#cache_key embeds updated_at, which would
+        # change between registration and revalidation and orphan the entry.
+        def stable_record_identity(resolved)
+          return nil unless resolved.respond_to?(:model_name) && resolved.respond_to?(:id)
+
+          id = resolved.id
+          return nil if id.nil?
+
+          "#{resolved.model_name.cache_key}/#{id}"
         end
 
         def append_entry_key(tag, entry_key, cache_options)
