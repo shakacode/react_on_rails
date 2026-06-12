@@ -29,12 +29,12 @@
  *      navigations (the counter state below proves the shell never unmounts).
  *   3. Client-side navigation between routes without a full Rails page load.
  *   4. An RSCRoute-backed route that streams a React Server Component's
- *      payload from a Rails endpoint during client navigation (ssr={false}:
- *      the route renders its Suspense fallback in server HTML and resolves
- *      on the client through the RSC provider).
+ *      payload from a Rails endpoint during client navigation (the route is
+ *      client-resolved: server HTML carries a placeholder and the client
+ *      fetches the payload through the RSC provider after mount).
  */
 
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import {
   Link,
   Outlet,
@@ -84,17 +84,34 @@ const HomePage = () => <h2 id="tanstack-starter-home">Starter Home Page</h2>;
 const AboutPage = () => <h2 id="tanstack-starter-about">Starter About Page</h2>;
 
 // RSCRoute renders a React Server Component (StarterServerData) inside this
-// client-routed page. With ssr={false}, the route is skipped during server
-// rendering (the Suspense fallback is emitted instead) and the RSC payload is
-// fetched over HTTP from the Rails rsc_payload endpoint on the client.
-const ServerDataPage = () => (
-  <section id="tanstack-starter-server-data">
-    <h2>Starter Server Data Page</h2>
-    <Suspense fallback={<p id="tanstack-starter-server-data-loading">Loading server data...</p>}>
-      <RSCRoute componentName="StarterServerData" componentProps={{}} ssr={false} />
-    </Suspense>
-  </section>
-);
+// client-routed page; the RSC payload is fetched over HTTP from the Rails
+// rsc_payload endpoint. The mounted guard keeps RSCRoute out of the server
+// render and the hydration pass entirely: react_component's non-streaming
+// SSR cannot generate RSC payloads (that needs the wrapServerComponentRenderer
+// + stream_react_component entry point), and SSR-rendering the route's
+// bailout would surface a recoverable hydration error on deep links. With the
+// guard, a deep link server-renders the placeholder and the client fetches
+// the payload after mount — the same HTTP-streaming path used on client
+// navigation.
+const ServerDataPage = () => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  return (
+    <section id="tanstack-starter-server-data">
+      <h2>Starter Server Data Page</h2>
+      {mounted ? (
+        <Suspense fallback={<p id="tanstack-starter-server-data-loading">Loading server data...</p>}>
+          <RSCRoute componentName="StarterServerData" componentProps={{}} />
+        </Suspense>
+      ) : (
+        <p id="tanstack-starter-server-data-loading">Loading server data...</p>
+      )}
+    </section>
+  );
+};
 
 const rootRoute = createRootRoute({ component: ShellLayout });
 const homeRoute = createRoute({

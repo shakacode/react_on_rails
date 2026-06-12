@@ -85,14 +85,28 @@ describe "TanStack Router Starter" do
   end
 
   describe "direct visit to the RSCRoute-backed route", :js do
-    it "renders the route by resolving the server component on the client" do
-      # ssr={false} skips the server component during SSR (the Suspense
-      # fallback is server-rendered instead); the client then fetches the RSC
-      # payload over HTTP.
+    it "renders the route by resolving the server component on the client without hydration errors" do
+      # Drain console entries left over from earlier examples in the shared
+      # browser session (reading the log buffer clears it).
+      page.driver.browser.logs.get(:browser)
+
+      # The route is client-resolved: SSR emits a placeholder (RSCRoute is
+      # kept out of the server render by a mounted guard) and the client
+      # fetches the RSC payload over HTTP after hydration.
       visit "/tanstack_starter/server_data"
 
       expect(page).to have_css("section#tanstack-starter-server-data")
       expect(page).to have_text("Server data from Rails RSC payload endpoint")
+
+      # Deep-linking must not surface recoverable hydration errors
+      # (e.g. "Switched to client rendering because the server rendering
+      # errored") in the browser console.
+      hydration_errors = page.driver.browser.logs.get(:browser).select do |entry|
+        entry.level == "SEVERE" &&
+          (entry.message.include?("Switched to client rendering") || entry.message.match?(/hydrat/i))
+      end
+      expect(hydration_errors).to be_empty,
+                                  "Expected no hydration errors, got:\n#{hydration_errors.map(&:message).join("\n")}"
     end
   end
 end

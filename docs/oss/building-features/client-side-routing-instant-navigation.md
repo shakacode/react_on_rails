@@ -60,7 +60,7 @@ The `data-turbo="false"` boundary keeps Turbo Drive from intercepting link click
 ```jsx
 'use client';
 
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import {
   Link,
   Outlet,
@@ -99,11 +99,29 @@ const HomePage = () => <h2>Home</h2>;
 // Component, streamed from a Rails endpoint when the user navigates here.
 // componentProps are serialized into the payload request, so the server
 // component receives them when the payload is generated (see step 4).
-const ReportsPage = () => (
-  <Suspense fallback={<p>Loading reports...</p>}>
-    <RSCRoute componentName="Reports" componentProps={{ reportGroup: 'monthly' }} ssr={false} />
-  </Suspense>
-);
+//
+// The mounted guard keeps RSCRoute out of the server render: with the
+// react_component entry point, RSC payloads cannot be generated during the
+// initial SSR (that needs wrapServerComponentRenderer +
+// stream_react_component), so deep links server-render the placeholder and
+// the client fetches the payload after mount — the same path used on
+// client-side navigation.
+const ReportsPage = () => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <p>Loading reports...</p>;
+  }
+
+  return (
+    <Suspense fallback={<p>Loading reports...</p>}>
+      <RSCRoute componentName="Reports" componentProps={{ reportGroup: 'monthly' }} />
+    </Suspense>
+  );
+};
 
 const rootRoute = createRootRoute({ component: ShellLayout });
 const routeTree = rootRoute.addChildren([
@@ -150,7 +168,7 @@ export default Reports;
 - **Initial page load**: Rails serves SSR HTML for whatever route the URL matches; the client hydrates it. Deep links work because the Rails catch-all route renders the same component for the whole subtree.
 - **Client navigation**: TanStack Router swaps only the route outlet. The shell stays mounted, and no Rails page load happens.
 - **Navigating to an `RSCRoute` route**: the client fetches the server component's RSC payload over HTTP from the Rails `rsc_payload` endpoint and streams it into the outlet — server-driven data with no separate JSON API layer.
-- **`ssr={false}`** on the `RSCRoute` means a direct visit to that URL server-renders the Suspense fallback and resolves the server component on the client. Server-rendering the RSC payload during the initial page load requires the `wrapServerComponentRenderer` + `stream_react_component` setup described in [the RSC guide](../../pro/react-server-components/inside-client-components.md), which is a different entry point than the TanStack SSR helper.
+- **Direct visit to the `RSCRoute` route**: the mounted guard means the server renders the placeholder and the client fetches the RSC payload after hydration. Server-rendering the RSC payload during the initial page load requires the `wrapServerComponentRenderer` + `stream_react_component` setup described in [the RSC guide](../../pro/react-server-components/inside-client-components.md), which is a different entry point than the TanStack SSR helper.
 
 ## How This Compares
 
