@@ -182,6 +182,7 @@ const sidebars: SidebarsConfig = {
           label: 'Migration Guides',
           items: [
             'migrating/example-migrations',
+            'migrating/migrating-from-nextjs',
             'migrating/migrating-from-react-rails',
             'migrating/migrating-from-inertia-rails',
             'migrating/migrating-from-vite-rails',
