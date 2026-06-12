@@ -810,6 +810,16 @@ For most React on Rails applications, you won't need `React.cache()` for data fe
 
 > **Important:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which is a rendering server -- it has no access to Rails models, sessions, cookies, or CSRF protection. Do not use `'use server'` in React on Rails applications.
 
+This is a deliberate, settled design decision, not a temporary gap (see the decision record in
+[#3867](https://github.com/shakacode/react_on_rails/issues/3867)): Rails controllers are the mutation
+layer, and the ergonomics gap with Next.js Server Actions is being closed by a first-class Rails-native
+bridge -- a `useRailsForm` hook paired with controller conveniences -- tracked in
+[#3872](https://github.com/shakacode/react_on_rails/issues/3872) and **in development, not yet shipped**.
+Until it ships, the `fetch` + CSRF pattern below is the supported approach. An optional
+`'use server'`-shaped authoring syntax that compiles down to the Rails bridge (for Next.js-migration
+familiarity only) is a deferred follow-up RFC, tracked in
+[#3956](https://github.com/shakacode/react_on_rails/issues/3956).
+
 All mutations in React on Rails should go through Rails controllers via standard forms or API endpoints:
 
 ```jsx
