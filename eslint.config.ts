@@ -32,6 +32,7 @@ const reactCompilerRulesOfReact = {
   'react-hooks/purity': 'error',
   'react-hooks/set-state-in-render': 'error',
   'react-hooks/unsupported-syntax': 'warn',
+  // Included from the v6.1.1 compiler-era recommended-latest rule set.
   'react-hooks/config': 'error',
   'react-hooks/gating': 'error',
 } as const;
@@ -388,6 +389,8 @@ const config = defineConfig([
     },
   },
   {
+    // Mirrors the Babel `sources` predicate in react_on_rails/spec/dummy/babel.config.js.
+    // Keep these two in sync if the component is renamed or moved.
     files: ['react_on_rails/spec/dummy/client/app/startup/ReactCompilerExample.tsx'],
     rules: reactCompilerRulesOfReact,
   },
