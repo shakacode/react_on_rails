@@ -46,6 +46,8 @@ Add the [`web-vitals`](https://github.com/GoogleChrome/web-vitals) package:
 
 ```bash
 npm install web-vitals
+# or: yarn add web-vitals
+# or: pnpm add web-vitals
 ```
 
 Then add the following to a Shakapacker entry — either a dedicated pack or your
@@ -215,7 +217,7 @@ real trade-off:
   audit log.
 - **Alternative that keeps CSRF protection**: skip `sendBeacon` entirely and
   always use `fetch(..., { keepalive: true })` with the `X-CSRF-Token` header
-  read from the `csrf_token` meta tag. `keepalive` requests survive unload in
+  read from the `csrf-token` meta tag (emitted by `csrf_meta_tags`). `keepalive` requests survive unload in
   modern browsers, though delivery is somewhat less reliable than `sendBeacon`
   (keepalive requests share a small per-origin in-flight budget). Pick this if
   your security posture rules out any unprotected endpoint.
@@ -234,7 +236,7 @@ percentile statistics, so you need volume, not completeness. Guidance:
   otherwise a page view contributes CLS but not LCP and your per-page
   correlations break.
 - To tune the rate without rebuilding the bundle, emit it from Rails (e.g.
-  `<meta name="web-vitals-sample-rate" content="<%= ENV.fetch("WEB_VITALS_SAMPLE_RATE", "0.1") %>">`)
+  `<meta name="web-vitals-sample-rate" content="<%= ENV.fetch('WEB_VITALS_SAMPLE_RATE', '0.1') %>">`)
   and read it in the snippet instead of hardcoding the constant.
 
 ## Storage and aggregation
