@@ -85,10 +85,11 @@ server {
   proxy_http_version 1.1;
   proxy_set_header Connection "";
 
-  # Required for streaming SSR (stream_react_component, RSC async props):
-  # nginx buffers the full response by default, defeating streaming. If you
-  # prefer to keep buffering on globally, Rails can instead disable it per
-  # response with an `X-Accel-Buffering: no` header.
+  # Disabled globally because BOTH stacks stream during the migration:
+  # Next.js (loading.tsx, async server components) and Rails
+  # (stream_react_component, RSC async props). nginx buffers the full
+  # response by default, defeating streaming. Alternatively, keep buffering
+  # on and have each app send `X-Accel-Buffering: no` on streaming responses.
   proxy_buffering off;
 
   # Streaming SSR and RSC async-props responses can hold connections open
@@ -113,12 +114,8 @@ server {
   # Rails also keeps serving the existing API for not-yet-migrated pages
   location /api/ { proxy_pass http://rails; }
 
-  # Everything else stays on Next.js until migrated. Re-enable buffering
-  # here: only the Rails streaming responses need it off.
-  location / {
-    proxy_pass http://nextjs;
-    proxy_buffering on;
-  }
+  # Everything else stays on Next.js until migrated
+  location / { proxy_pass http://nextjs; }
 }
 ```
 
