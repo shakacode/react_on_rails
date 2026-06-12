@@ -154,6 +154,7 @@ const sidebars: SidebarsConfig = {
         'deployment/docker-deployment',
         'deployment/heroku-deployment',
         'deployment/review-app-security',
+        'deployment/security-model-and-hardening',
         'deployment/server-rendering-tips',
         'deployment/troubleshooting',
         'deployment/troubleshooting-build-errors',
