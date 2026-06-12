@@ -38,6 +38,19 @@ module ReactOnRailsPro
     # delete_all, and other callback-skipping writes do not trigger
     # revalidation. Call ReactOnRailsPro.revalidate_tags yourself after such
     # writes.
+    #
+    # Mutable custom tags caveat: the block runs in after_commit and sees only
+    # the record's NEW values. If a custom tag derives from a mutable
+    # attribute (e.g. "author:#{post.author_id}" and the post changes author),
+    # the OLD grouping's entries are not revalidated — they expire via
+    # :expires_in. Prefer tags derived from the record's own immutable
+    # identity, or revalidate the old grouping explicitly (previous_changes
+    # in after_commit has the prior value):
+    #
+    #   after_commit do
+    #     old_author_id = previous_changes["author_id"]&.first
+    #     ReactOnRailsPro.revalidate_tag("author:#{old_author_id}") if old_author_id
+    #   end
     module Revalidates
       extend ActiveSupport::Concern
 

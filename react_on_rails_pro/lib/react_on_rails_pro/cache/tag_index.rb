@@ -191,15 +191,25 @@ module ReactOnRailsPro
         def revalidate_tag(tag)
           key = index_key(tag)
           keys, _expires_at = read_index(key)
-          # The recorded keys are already fully normalized (including any
-          # :namespace the entry was written with), so suppress the store's
-          # default namespace to avoid prefixing them a second time.
-          deleted = keys.empty? ? 0 : Rails.cache.delete_multi(keys, namespace: nil)
+          deleted = keys.empty? ? 0 : delete_entries(keys)
           Rails.cache.delete(key)
           Rails.logger.debug do
             "[ReactOnRailsPro] revalidate_tag #{tag.inspect}: deleted #{deleted} of #{keys.size} indexed entries"
           end
           deleted
+        end
+
+        # The recorded keys carry their full logical name (including any
+        # :namespace the entry was written with), so suppress the store's
+        # default namespace to avoid prefixing them a second time.
+        # delete_multi only exists on ActiveSupport >= 6.1; fall back to
+        # per-key deletes on older stores.
+        def delete_entries(keys)
+          if Rails.cache.respond_to?(:delete_multi)
+            Rails.cache.delete_multi(keys, namespace: nil)
+          else
+            keys.count { |key| Rails.cache.delete(key, namespace: nil) }
+          end
         end
 
         def normalized_entry_key(cache_key, cache_options)

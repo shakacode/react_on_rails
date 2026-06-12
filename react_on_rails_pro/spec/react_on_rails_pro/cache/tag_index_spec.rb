@@ -173,6 +173,22 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(Rails.cache.read("entry/one", namespace: "rorp-test")).to be_nil
     end
 
+    it "falls back to per-key deletes when the store lacks delete_multi" do
+      legacy_store = ActiveSupport::Cache::MemoryStore.new
+      allow(legacy_store).to receive(:respond_to?).and_call_original
+      allow(legacy_store).to receive(:respond_to?).with(:delete_multi).and_return(false)
+      allow(Rails).to receive(:cache).and_return(legacy_store)
+
+      Rails.cache.write("entry/one", "one")
+      Rails.cache.write("entry/two", "two")
+      described_class.register(["t"], "entry/one", {})
+      described_class.register(["t"], "entry/two", {})
+
+      expect(described_class.revalidate("t")).to eq(2)
+      expect(Rails.cache.read("entry/one")).to be_nil
+      expect(Rails.cache.read("entry/two")).to be_nil
+    end
+
     it "returns 0 and does not raise for tags that were never written" do
       expect(described_class.revalidate("never-written")).to eq(0)
     end

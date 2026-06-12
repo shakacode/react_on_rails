@@ -6852,6 +6852,8 @@ end
 
 This covers create/update/destroy and `touch` — so `belongs_to ..., touch: true` composes for free: touching the parent fires the parent's revalidation. The standard Rails callback caveat applies: `update_column`, `update_all`, `delete_all`, and other callback-skipping writes do not trigger revalidation; call `ReactOnRailsPro.revalidate_tags(record)` yourself after such writes.
 
+One more caveat for custom tag blocks: the block runs in `after_commit` and sees only the record's **new** values. If a custom tag derives from a mutable attribute (e.g. `"author:#{post.author_id}"` and a post moves to a different author), the old grouping's entries are not revalidated — they expire via `expires_in`. Prefer tags derived from the record's own identity, or revalidate the old grouping explicitly (`previous_changes` in `after_commit` has the prior value).
+
 ### How it works, and the contract
 
 On every tagged cache write, the final cache key is appended to a per-tag index entry in `Rails.cache` (keyed `rorp:tag:v1:<tag>`). `revalidate_tag` reads the index, deletes the recorded entries with `delete_multi`, then deletes the index entry. A missing index (never-written tag, evicted entry, `:null_store`) means "nothing to revalidate" — never an error.
