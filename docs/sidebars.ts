@@ -73,6 +73,7 @@ const sidebars: SidebarsConfig = {
             'building-features/react-helmet',
             'building-features/react-19-native-metadata',
             'building-features/react-compiler',
+            'building-features/view-transitions',
             'building-features/streaming-server-rendering',
             'building-features/how-to-conditionally-server-render-based-on-device-type',
             'building-features/how-to-use-different-files-for-client-and-server-rendering',
