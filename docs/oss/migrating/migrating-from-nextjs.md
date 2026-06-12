@@ -74,14 +74,20 @@ upstream rails  { server 127.0.0.1:3001; }
 
 server {
   listen 443 ssl;
+  ssl_certificate     /etc/ssl/certs/example.com.pem;   # replace with your cert path
+  ssl_certificate_key /etc/ssl/private/example.com.key; # replace with your key path
   server_name example.com;
-  # Terminate TLS at the proxy (point ssl_certificate / ssl_certificate_key
-  # at your certs) so both upstreams speak plain HTTP internally.
+  # Terminate TLS at the proxy so both upstreams speak plain HTTP internally.
 
   # nginx proxies upstream over HTTP/1.0 by default, which disables
   # keep-alive; use HTTP/1.1 and clear the Connection header.
   proxy_http_version 1.1;
   proxy_set_header Connection "";
+
+  # Required for streaming SSR (stream_react_component, RSC async props):
+  # nginx buffers the full response by default, defeating streaming.
+  # Set X-Accel-Buffering: no in individual responses for finer control.
+  proxy_buffering off;
 
   # Forward the browser-facing origin so both apps generate correct URLs
   # and the shared session cookie stays on example.com.
