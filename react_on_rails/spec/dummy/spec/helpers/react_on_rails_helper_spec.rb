@@ -220,6 +220,20 @@ describe ReactOnRailsHelper do
       expect(links.first["crossorigin"]).to eq("anonymous")
     end
 
+    it "preserves configured crossorigin values on modulepreload tags without integrity" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([{ "src" => "/packs/generated/ModernComponent-123.mjs" }])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: false, cross_origin: "" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["crossorigin"]).to eq("")
+    end
+
     it "preserves explicit false manifest values when classifying module assets" do
       allow(manifest).to receive(:lookup_pack_with_chunks!)
         .with("generated/LegacyModule", type: :javascript)

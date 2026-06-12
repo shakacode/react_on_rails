@@ -493,8 +493,8 @@ module ReactOnRails
 
       unless component_name.match?(/\A[A-Za-z0-9_]+\z/)
         raise ArgumentError,
-              "react_on_rails_preload_links component names must use PascalCase or snake_case without hyphens: " \
-              "#{component_name.inspect}"
+              "react_on_rails_preload_links component names must use PascalCase, camelCase, or snake_case " \
+              "without hyphens: #{component_name.inspect}"
       end
 
       "generated/#{component_name.camelize}"
@@ -593,7 +593,8 @@ module ReactOnRails
     end
 
     def preload_crossorigin
-      current_shakapacker_instance.config.integrity[:cross_origin].presence || "anonymous"
+      cross_origin = current_shakapacker_instance.config.integrity[:cross_origin]
+      cross_origin.nil? ? "anonymous" : cross_origin
     end
 
     def modulepreload_source?(source)
