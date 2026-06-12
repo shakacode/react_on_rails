@@ -124,6 +124,9 @@ analyzed metadata instead of hardcoding:
 
 ```ruby
 # app/models/product.rb
+# Height ÷ width (≈0.667 for a 3:2 landscape photo) — the multiplier that
+# turns a display width into the matching height attribute. Note that CSS
+# `aspect-ratio` is the inverse: width / height.
 def photo_aspect_ratio
   meta = photo.metadata
   return 2.0 / 3 unless meta["width"].to_i.positive? && meta["height"].to_i.positive?
@@ -269,12 +272,14 @@ element, invert the defaults:
       height: 900,
       loading: "eager",
       fetchpriority: "high",
-      alt: "") %>
+      alt: "Hand-thrown ceramic mugs lined up on a workbench") %>
 ```
 
 - `fetchpriority="high"` tells the browser to fight for bandwidth for this
   request.
 - `loading="eager"` (the default, but explicit beats accidental `lazy`).
+- Give the hero real `alt` text — it is usually meaningful content. Reserve
+  `alt: ""` for purely decorative images.
 
 Additionally, preload it from your **layout's `<head>`**, so the fetch starts
 before the browser has parsed down to the `<img>` (or, for client-rendered
@@ -331,16 +336,21 @@ prioritize.
 ## Modern formats: AVIF/WebP with fallback
 
 AVIF and WebP are typically 30–50% smaller than JPEG at equivalent quality.
-Active Storage variants can transcode on the fly (libvips must be built with
-AVIF support for `:avif`):
+Active Storage variants can transcode formats too (libvips must be built with
+AVIF support for `:avif`). Define them as named, pre-generated variants, like
+the width variants earlier:
+
+```ruby
+# app/models/product.rb — add format variants next to the width variants
+attachable.variant :w800_avif, resize_to_limit: [800, nil], format: :avif, preprocessed: true
+attachable.variant :w800_webp, resize_to_limit: [800, nil], format: :webp, preprocessed: true
+```
 
 ```erb
-<% avif = @product.photo.variant(resize_to_limit: [800, nil], format: :avif) %>
-<% webp = @product.photo.variant(resize_to_limit: [800, nil], format: :webp) %>
 <picture>
-  <source srcset="<%= url_for(avif.processed) %>" type="image/avif" />
-  <source srcset="<%= url_for(webp.processed) %>" type="image/webp" />
-  <%= image_tag url_for(@product.photo.variant(resize_to_limit: [800, nil]).processed),
+  <source srcset="<%= url_for(@product.photo.variant(:w800_avif)) %>" type="image/avif" />
+  <source srcset="<%= url_for(@product.photo.variant(:w800_webp)) %>" type="image/webp" />
+  <%= image_tag url_for(@product.photo.variant(:w800)),
         width: 800, height: 533, loading: "lazy", decoding: "async",
         alt: @product.name %>
 </picture>
@@ -353,8 +363,15 @@ Rails 7.1+ you can also use the
 helper. In JSX the same markup is `<picture>` + `<source>` elements with
 `srcSet`/`type` props.
 
-The same request-time-generation warning applies doubly here: a `<picture>`
-with two formats × three widths is six variants per image. Pre-generate them.
+For brevity this example is **fixed-width** — one 800px candidate per format.
+In production, make each `<source>` responsive exactly like
+[the plain `<img>` above](#responsive-srcset-from-active-storage-variants):
+define the format variants at every width (`:w400_avif`, `:w800_avif`,
+`:w1600_avif`, …) and give each `<source>` the multi-width `srcset` plus the
+same `sizes` value. Otherwise the browser always downloads the one listed
+candidate and you lose the responsive savings. Note the multiplication — two
+formats × three widths is six variants per image — which is why these are
+defined with `preprocessed: true` rather than transformed at request time.
 
 ## Putting it together
 
