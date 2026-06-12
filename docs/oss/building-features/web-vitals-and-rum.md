@@ -69,8 +69,19 @@ const isSampled = Math.random() < SAMPLE_RATE;
 
 const queue = new Set();
 
-function addToQueue(metric) {
-  queue.add(metric);
+function addToQueue({ name, value, id, rating, delta, navigationType }) {
+  queue.add({
+    name,
+    value,
+    id,
+    rating,
+    delta,
+    navigation_type: navigationType,
+    // Capture the path when the metric is observed, not when the queue is
+    // flushed -- with Turbo Drive one flush can carry metrics from several
+    // routes. Send the pathname only: query strings can contain tokens or PII.
+    page: window.location.pathname,
+  });
 }
 
 function flushQueue() {
@@ -78,18 +89,7 @@ function flushQueue() {
     return;
   }
 
-  const body = JSON.stringify({
-    // Send the pathname only — query strings can contain tokens or PII.
-    page: window.location.pathname,
-    metrics: [...queue].map(({ name, value, id, rating, delta, navigationType }) => ({
-      name,
-      value,
-      id,
-      rating,
-      delta,
-      navigation_type: navigationType,
-    })),
-  });
+  const body = JSON.stringify({ metrics: [...queue] });
   queue.clear();
 
   // sendBeacon queues delivery even while the page unloads. Wrap the payload in
@@ -98,13 +98,14 @@ function flushQueue() {
   const blob = new Blob([body], { type: 'application/json' });
   if (!(navigator.sendBeacon && navigator.sendBeacon(VITALS_ENDPOINT, blob))) {
     // Fallback for browsers without sendBeacon: keepalive lets the request
-    // outlive the page.
+    // outlive the page. Telemetry is fire-and-forget -- swallow delivery
+    // errors instead of surfacing them.
     fetch(VITALS_ENDPOINT, {
       method: 'POST',
       body,
       headers: { 'Content-Type': 'application/json' },
       keepalive: true,
-    });
+    }).catch(() => {});
   }
 }
 
@@ -124,6 +125,9 @@ addEventListener('visibilitychange', () => {
 // pagehide covers older Safari, which does not reliably fire visibilitychange
 // on unload.
 addEventListener('pagehide', flushQueue);
+// Turbo Drive swaps the page without firing visibilitychange or pagehide, so
+// also flush before each Turbo visit. Harmless no-op in apps without Turbo.
+addEventListener('turbo:before-visit', flushQueue);
 ```
 
 Why this shape:
@@ -136,13 +140,26 @@ Why this shape:
   routinely cancelled by the browser; `sendBeacon` hands the payload to the
   browser to deliver asynchronously even after the page is gone. The
   `keepalive: true` fetch is the fallback for the rare browser without it.
+- **Turbo Drive** — Turbo navigations swap the `<body>` without firing
+  `visibilitychange` or `pagehide`, so several routes can share one flush.
+  That is why the snippet stamps each metric with the pathname **at
+  observation time** (one `page` per metric, not per POST) and also flushes on
+  `turbo:before-visit`. Registering that listener in a non-Turbo app is a
+  harmless no-op — the event simply never fires.
+- **Back/forward cache** — `web-vitals` treats a
+  [bfcache](https://web.dev/articles/bfcache) restore as a separate page view
+  and reports all metrics again with new `id`s (and
+  `navigationType: 'back-forward-cache'`). The listeners and queue survive the
+  restore, so those metrics are delivered on the next hide — no extra code
+  needed.
 - **Payload fields** mirror the `web-vitals`
   [`Metric` type](https://github.com/GoogleChrome/web-vitals#metric): `name`
   (`'CLS' | 'FCP' | 'INP' | 'LCP' | 'TTFB'`), `value`, `id` (unique per metric
   per page load — use it to deduplicate), `rating`
   (`'good' | 'needs-improvement' | 'poor'`), `delta` (change since the last
   report of this metric), and `navigationType` (e.g. `'navigate'`,
-  `'reload'`, `'back-forward'`, `'prerender'`).
+  `'reload'`, `'back-forward'`, `'prerender'`) — plus the `page` pathname the
+  snippet captures per metric.
 
 ## Server: a first-party ingestion endpoint
 
@@ -168,38 +185,54 @@ class WebVitalsController < ApplicationController
   VALID_RATINGS = %w[good needs-improvement poor].freeze
 
   def create
-    vitals_params[:metrics].to_a.each do |metric|
+    rows = coerced_rows
+    return head :unprocessable_entity if rows.nil?
+
+    # insert_all! (Rails 6+) writes every row in one all-or-nothing statement,
+    # skipping per-row callbacks/validations -- fine for telemetry. On older
+    # Rails, wrap per-row creates in a single transaction instead.
+    WebVitalMetric.insert_all!(rows) if rows.any?
+    head :no_content
+  end
+
+  private
+
+  # Coerce and validate every metric BEFORE persisting anything, so a
+  # malformed beacon is rejected whole instead of half-persisted.
+  # Returns attribute hashes, or nil when any value is malformed.
+  def coerced_rows
+    now = Time.current
+    vitals_params[:metrics].to_a.filter_map do |metric|
       next unless VALID_NAMES.include?(metric[:name])
       next unless VALID_RATINGS.include?(metric[:rating])
 
-      WebVitalMetric.create!(
+      {
         name: metric[:name],
         value: Float(metric[:value]),
         delta: Float(metric[:delta]),
         metric_id: metric[:id].to_s,
         rating: metric[:rating],
         navigation_type: metric[:navigation_type].to_s,
-        page: vitals_params[:page].to_s.byteslice(0, 255)
-      )
+        page: metric[:page].to_s.byteslice(0, 255),
+        created_at: now
+      }
     end
-
-    head :no_content
   rescue ArgumentError, TypeError
-    # Float() raises on non-numeric values -- reject malformed beacons.
-    head :unprocessable_entity
+    # Float() raises on non-numeric values.
+    nil
   end
 
-  private
-
   def vitals_params
-    params.permit(:page, metrics: %i[name value id rating delta navigation_type])
+    params.permit(metrics: %i[name value id rating delta navigation_type page])
   end
 end
 ```
 
 The strong-params schema matches the client payload (and the `web-vitals`
 `Metric` type): `name`, `value`, `id`, `rating`, `delta`, `navigation_type`,
-plus the page path. Everything else in the request is dropped.
+plus the per-metric page path. Everything else in the request is dropped, and
+all metrics are coerced up front and written in a single atomic insert — a
+malformed beacon never half-persists.
 
 ### CSRF and abuse considerations
 
