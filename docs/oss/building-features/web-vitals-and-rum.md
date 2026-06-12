@@ -67,10 +67,10 @@ const VITALS_ENDPOINT = '/web_vitals';
 const SAMPLE_RATE = 0.1; // 10%
 const isSampled = Math.random() < SAMPLE_RATE;
 
-const queue = new Set();
+const queue = [];
 
 function addToQueue({ name, value, id, rating, delta, navigationType }) {
-  queue.add({
+  queue.push({
     name,
     value,
     id,
@@ -85,12 +85,12 @@ function addToQueue({ name, value, id, rating, delta, navigationType }) {
 }
 
 function flushQueue() {
-  if (!isSampled || queue.size === 0) {
+  if (!isSampled || queue.length === 0) {
     return;
   }
 
-  const body = JSON.stringify({ metrics: [...queue] });
-  queue.clear();
+  // splice(0) drains the queue and returns its contents in one step.
+  const body = JSON.stringify({ metrics: queue.splice(0) });
 
   // sendBeacon queues delivery even while the page unloads. Wrap the payload in
   // a Blob so the request carries a JSON content type and Rails parses the
@@ -197,9 +197,11 @@ class WebVitalsController < ApplicationController
 
   private
 
-  # Coerce and validate every metric BEFORE persisting anything, so a
-  # malformed beacon is rejected whole instead of half-persisted.
-  # Returns attribute hashes, or nil when any value is malformed.
+  # Coerce and validate every metric before persisting anything. Metrics with
+  # an unknown name or rating are silently dropped (skipped, not an error);
+  # any non-numeric value rejects the whole beacon by returning nil. Either
+  # way, nothing half-persists. String fields are length-clamped because this
+  # endpoint skips CSRF protection -- never trust client-supplied sizes.
   def coerced_rows
     now = Time.current
     vitals_params[:metrics].to_a.filter_map do |metric|
@@ -210,9 +212,9 @@ class WebVitalsController < ApplicationController
         name: metric[:name],
         value: Float(metric[:value]),
         delta: Float(metric[:delta]),
-        metric_id: metric[:id].to_s,
+        metric_id: metric[:id].to_s.byteslice(0, 64),
         rating: metric[:rating],
-        navigation_type: metric[:navigation_type].to_s,
+        navigation_type: metric[:navigation_type].to_s.byteslice(0, 32),
         page: metric[:page].to_s.byteslice(0, 255),
         created_at: now
       }
@@ -315,6 +317,10 @@ WHERE name = 'LCP'
 GROUP BY page
 ORDER BY p75_lcp_ms DESC;
 ```
+
+`percentile_cont` is PostgreSQL-specific — on MySQL or SQLite, compute the
+percentile with a window function (`PERCENT_RANK()`/`NTILE`) or load the sorted
+values and pick the p75 index in Ruby.
 
 Prune old rows on a schedule (a nightly
 `WebVitalMetric.where("created_at < ?", 90.days.ago).delete_all` job) or roll
