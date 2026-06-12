@@ -88,6 +88,19 @@ Memorable invocation: `$verify-pr-fix <PR>` or "manually verify this fix and rep
 - **Types-only changes**: usually covered by `pnpm run type-check`; behavioral reproduction is normally not
   warranted — say so rather than staging a fake one.
 
+## Environment notes
+
+- **Pro RSpec encoding**: `react_on_rails_pro`'s `Gemfile.loader` can die with
+  `invalid byte sequence in US-ASCII`. Run Pro specs with a UTF-8 locale:
+  `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 RUBYOPT="-EUTF-8" bundle exec rspec <file>`.
+- **Pre-fix-on-one-file tactic** (cheap before/after for an already-merged PR): when the fix is in a single
+  file and the PR added regression specs, run the post-fix spec against the pre-fix file —
+  `git checkout <fix-commit>~1 -- <file>`, run the spec (it should fail on exactly the new tests), then
+  **always restore** with `git checkout HEAD -- <file>` and confirm `git status` is clean before moving on.
+- **Read the changed function from git, not from memory**: when a harness needs the exact pre/post logic
+  (a regex, a digest, a key format), extract it verbatim with `git show <rev>:<file>` so the reproduction
+  can't drift from the real code.
+
 ## When NOT to use this skill
 
 - Docs, comments, CHANGELOG, CI/workflow plumbing, benchmark tooling, refactors with no behavioral change,
