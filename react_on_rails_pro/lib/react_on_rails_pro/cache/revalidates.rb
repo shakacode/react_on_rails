@@ -56,6 +56,7 @@ module ReactOnRailsPro
 
       included do
         class_attribute :_react_on_rails_cache_tags_resolver, instance_writer: false, default: nil
+        class_attribute :_react_on_rails_revalidates_registered, instance_writer: false, default: false
       end
 
       class_methods do
@@ -64,8 +65,13 @@ module ReactOnRailsPro
         # +cache_key+ form, stable even with cache_versioning off) is the tag.
         # An optional block receives the record and returns a tag or Array of
         # tags in any form accepted by `cache_tags:`.
+        # Calling it again (same class or a subclass) replaces the resolver
+        # without stacking a duplicate after_commit callback.
         def revalidates_react_cache(&resolver)
           self._react_on_rails_cache_tags_resolver = resolver
+          return if _react_on_rails_revalidates_registered
+
+          self._react_on_rails_revalidates_registered = true
           after_commit :revalidate_react_on_rails_cache_tags
         end
       end

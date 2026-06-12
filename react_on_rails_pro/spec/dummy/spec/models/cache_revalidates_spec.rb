@@ -116,4 +116,25 @@ RSpec.describe "ReactOnRailsPro::Cache::Revalidates", :caching do
       expect(Rails.cache.read(index_key)).to be_nil
     end
   end
+
+  context "when revalidates_react_cache is called more than once" do
+    let(:model) do
+      Class.new(ApplicationRecord) do
+        self.table_name = "posts"
+        include ReactOnRailsPro::Cache::Revalidates
+        revalidates_react_cache { |post| ["first:#{post.id}"] }
+        revalidates_react_cache { |post| ["second:#{post.id}"] }
+      end
+    end
+
+    before { stub_const("RevalidatingPost", model) }
+
+    it "registers a single callback and the last resolver wins" do
+      allow(ReactOnRailsPro).to receive(:revalidate_tags)
+
+      post = RevalidatingPost.create!(title: "Hello", body: "World")
+
+      expect(ReactOnRailsPro).to have_received(:revalidate_tags).once.with("second:#{post.id}")
+    end
+  end
 end
