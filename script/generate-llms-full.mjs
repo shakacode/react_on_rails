@@ -154,10 +154,7 @@ function matchingDelimiterIndex(content, openIndex, openChar, closeChar) {
       } else if (char === quote) {
         quote = undefined;
       }
-      continue;
-    }
-
-    if (char === "'" || char === '"' || char === '`') {
+    } else if (char === "'" || char === '"' || char === '`') {
       quote = char;
     } else if (char === openChar) {
       depth += 1;
@@ -201,10 +198,7 @@ function splitTopLevelSidebarEntries(arrayBody) {
       } else if (char === quote) {
         quote = undefined;
       }
-      continue;
-    }
-
-    if (char === "'" || char === '"' || char === '`') {
+    } else if (char === "'" || char === '"' || char === '`') {
       quote = char;
     } else if (char === '{' || char === '[' || char === '(') {
       depth += 1;
