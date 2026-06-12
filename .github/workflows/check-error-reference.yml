@@ -1,0 +1,57 @@
+---
+name: Check Error Reference
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-error-reference-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+"on":
+  push:
+    branches: [main]
+    paths:
+      - 'docs/oss/reference/error-reference.md'
+      - 'docs/sidebars.ts'
+      - 'react_on_rails/lib/react_on_rails/configuration.rb'
+      - 'react_on_rails/lib/react_on_rails/packer_utils.rb'
+      - 'react_on_rails/lib/react_on_rails/smart_error.rb'
+      - 'react_on_rails/lib/react_on_rails/utils.rb'
+      - 'script/generate_error_reference.rb'
+      - '.github/workflows/check-error-reference.yml'
+  pull_request:
+    paths:
+      - 'docs/oss/reference/error-reference.md'
+      - 'docs/sidebars.ts'
+      - 'react_on_rails/lib/react_on_rails/configuration.rb'
+      - 'react_on_rails/lib/react_on_rails/packer_utils.rb'
+      - 'react_on_rails/lib/react_on_rails/smart_error.rb'
+      - 'react_on_rails/lib/react_on_rails/utils.rb'
+      - 'script/generate_error_reference.rb'
+      - '.github/workflows/check-error-reference.yml'
+  workflow_dispatch:
+
+jobs:
+  check-error-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Setup bundle
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+
+      - name: Check error reference is current
+        run: >-
+          BUNDLE_GEMFILE=react_on_rails/Gemfile bundle exec ruby
+          script/generate_error_reference.rb --check
