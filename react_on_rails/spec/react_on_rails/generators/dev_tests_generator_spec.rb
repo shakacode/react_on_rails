@@ -16,7 +16,37 @@ describe DevTestsGenerator, type: :generator do
       %w[spec/spec_helper.rb
          spec/rails_helper.rb
          spec/simplecov_helper.rb
+         eslint.config.mjs
          .rspec].each { |file| assert_file(file) }
+
+      assert_no_file(".eslintrc")
+    end
+
+    it "copies the internal flat ESLint config" do
+      assert_file("eslint.config.mjs") do |contents|
+        expect(contents).to include("import js from '@eslint/js';")
+        expect(contents).to include("import reactHooks from 'eslint-plugin-react-hooks';")
+        expect(contents).to include("reactHooksRecommendedLatestConfigs")
+        expect(contents).to include("__DEBUG_SERVER_ERRORS__: true")
+        expect(contents).to include("'import/no-unresolved': 'off'")
+        expect(contents).to include("'react/prop-types': 'off'")
+      end
+    end
+
+    it "adds internal ESLint development dependencies" do
+      assert_file("package.json") do |contents|
+        dev_dependencies = JSON.parse(contents).fetch("devDependencies")
+
+        expect(dev_dependencies).to include(
+          "@eslint/js" => "^9.0.0",
+          "eslint" => "^9.0.0",
+          "eslint-config-prettier" => "^10.0.0",
+          "eslint-plugin-import" => "^2.0.0",
+          "eslint-plugin-react" => "^7.37.5",
+          "eslint-plugin-react-hooks" => "^6.1.0",
+          "globals" => "^16.0.0"
+        )
+      end
     end
 
     it "enables the default RSpec test asset hook in copied helpers" do
