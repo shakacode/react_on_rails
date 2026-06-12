@@ -16762,6 +16762,8 @@ containers:
       failureThreshold: 3
       timeoutSeconds: 1
     livenessProbe:
+      # tcpSocket is port-open only; a hung event loop can still pass. For stricter hung-process
+      # detection, use an exec probe with curl --http2-prior-knowledge and a short --max-time.
       tcpSocket:
         port: 3800
       periodSeconds: 10
