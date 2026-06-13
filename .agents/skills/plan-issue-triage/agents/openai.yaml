@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plan Issue Triage"
+  short_description: "Generate issue audit prompts"
+  default_prompt: "Use $plan-issue-triage to draft a read-only issue audit prompt for shakacode/react_on_rails."

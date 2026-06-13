@@ -10,10 +10,11 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `.agents/skills/`: agent skills; `.claude/skills` is a symlink here so Claude Code exposes the same workflows as slash commands
 - `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
 - `internal/contributor-info/agent-workflow-adoption.md`: guide for copying these agent workflows into other repositories
-- `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-pr-batch` and `$pr-batch`
+- `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
 - `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing
 - When deciding whether an issue or proposed fix is worth doing, use `.agents/skills/evaluate-issue/SKILL.md`; a short invocation is `$evaluate-issue` or "Is this issue worth fixing?"
+- When the user wants a ready prompt for review-only GitHub issue triage or an all-open-issues audit, use `.agents/skills/plan-issue-triage/SKILL.md`; a short invocation is `$plan-issue-triage` or "Plan an issue triage"
 - When the user wants to choose issues or PRs for a future Codex batch, use `.agents/skills/plan-pr-batch/SKILL.md` to produce a ready `$pr-batch` goal; a short invocation is `$plan-pr-batch` or "Plan a Codex batch"
 - When the user wants a multi-issue or multi-PR Codex batch, use `.agents/skills/pr-batch/SKILL.md`; a short invocation is `$pr-batch` or "Run a Codex batch"
 - When the user wants to audit merged batch work, missed reviews, release-candidate risk, or possible bad merges, use `.agents/skills/post-merge-audit/SKILL.md`; reusable prompts live in `.agents/workflows/post-merge-audit.md`
