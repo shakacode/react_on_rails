@@ -209,6 +209,13 @@ contract unless a maintainer explicitly narrows the run.
   inline without asking when they stay inside the PR scope, are low-risk, and are
   before the final-candidate debounce point: once a merge-readiness review cycle
   has started, do not introduce new nit commits that would restart it.
+  Inside the PR scope means the file, section, or workflow copy is already part
+  of the PR diff, directly cited by current review feedback, or required to keep
+  touched copies synchronized; it excludes unrelated cleanup, other machine
+  lanes, reserved files, and generated output not already in scope.
+  The final-candidate debounce point is the first point after the agent starts
+  the final local validation/review gate for merge readiness or after
+  current-head configured review/check gates are already running or complete.
   Behavior-preserving means wording, formatting, or equivalent cleanup that does
   not alter public APIs, generated output, runtime behavior, validation scope, or
   reviewer obligations. Low-risk means local and mechanically checkable.
@@ -218,11 +225,18 @@ contract unless a maintainer explicitly narrows the run.
   generated content, altering CI or release policy, adding/removing validation,
   or touching another lane's files. If the nit is not worth fixing, record it as
   deferred or declined with rationale instead of asking "OK to fix this nit?".
+  If an autonomous nit fix fails local validation or self-review, repair it in
+  the same batch only when the repair is still mechanical and in scope;
+  otherwise drop or revert that nit, record the failed validation and rationale,
+  and promote the underlying concern to `DISCUSS` only if it still matters.
+  Never push a failing autonomous nit or ask the maintainer to debug it.
   Escalate only when the item changes behavior, expands scope, conflicts with
   policy, or has unclear risk.
 - **CI-wait protocol**: while checks or review bots are running, do bounded
-  useful work such as self-review, queued autonomous cleanup, documentation sync,
-  or another independent lane. Do not interrupt the maintainer for routine
+  useful work such as self-review, local-only cleanup notes, documentation sync
+  that does not require pushing the active PR head, or another independent lane.
+  Do not introduce optional cleanup commits that restart current-head gates after
+  the final-candidate debounce point. Do not interrupt the maintainer for routine
   "CI is still running", "CI is green", or "review arrived" updates.
 - **One decision point per lane**: batch genuine judgment calls into one decision
   block at lane completion or hard block. The block must include the question,
