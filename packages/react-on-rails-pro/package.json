@@ -40,6 +40,7 @@
     "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
     "./ReactOnRails.node": "./lib/ReactOnRails.node.js",
+    "./useRailsForm": "./lib/useRailsForm.js",
     "./tanstack-router": {
       "types": "./lib/tanstack-router.d.ts",
       "default": "./lib/tanstack-router.js"

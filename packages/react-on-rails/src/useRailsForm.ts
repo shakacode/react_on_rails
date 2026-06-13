@@ -20,8 +20,8 @@
  * Success/redirect handling is intentionally minimal and forward-compatible
  * with the client-routing work in issue #3873: the hook never navigates on its
  * own. It surfaces the redirect target (from a followed fetch redirect or a
- * JSON `redirect_to` hint) through `onSuccess` / the resolved submit result so
- * the app — or a future router integration — decides what to do.
+ * safe JSON `redirect_to` hint) through `onSuccess` / the resolved submit result
+ * so the app — or a future router integration — decides what to do.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -38,7 +38,9 @@ export interface RailsFormSuccessResult {
   responseData: unknown;
   /**
    * Redirect target when the server redirected (fetch follows it; we report the
-   * final URL) or replied with a JSON `redirect_to`/`redirectTo` hint.
+   * final URL) or replied with a safe JSON `redirect_to`/`redirectTo` hint.
+   * JSON hints are accepted only when they resolve to the current origin over
+   * HTTP(S); non-HTTP schemes such as `javascript:` are ignored.
    * The hook never navigates — pass this to your router or `window.location`.
    * Designed to compose with the client-routing integration in issue #3873.
    */
@@ -156,6 +158,32 @@ const parseJsonBody = async (response: Response): Promise<unknown> => {
   }
 };
 
+const safeJsonRedirectHint = (redirectTo: string): string | null => {
+  const normalizedRedirect = redirectTo.trim();
+  if (normalizedRedirect.length === 0) {
+    return null;
+  }
+
+  const currentOrigin = typeof window === 'undefined' ? null : window.location.origin;
+  if (currentOrigin === null) {
+    return null;
+  }
+
+  try {
+    const parsedRedirect = new URL(normalizedRedirect, currentOrigin);
+    if (
+      (parsedRedirect.protocol === 'http:' || parsedRedirect.protocol === 'https:') &&
+      parsedRedirect.origin === currentOrigin
+    ) {
+      return normalizedRedirect;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
 const extractRedirectTo = (response: Response, responseData: unknown): string | null => {
   if (response.redirected && response.url) {
     return response.url;
@@ -166,10 +194,10 @@ const extractRedirectTo = (response: Response, responseData: unknown): string | 
       redirectTo?: unknown;
     };
     if (typeof redirectSnake === 'string') {
-      return redirectSnake;
+      return safeJsonRedirectHint(redirectSnake);
     }
     if (typeof redirectCamel === 'string') {
-      return redirectCamel;
+      return safeJsonRedirectHint(redirectCamel);
     }
   }
   return null;
@@ -280,6 +308,7 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
 
       setProcessing(true);
       setWasSuccessful(false);
+      setErrors({});
 
       if (process.env.NODE_ENV !== 'production' && authenticityToken() === null) {
         console.warn(

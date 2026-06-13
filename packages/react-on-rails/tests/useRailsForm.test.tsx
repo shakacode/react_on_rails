@@ -294,6 +294,40 @@ describe('useRailsForm', () => {
       expect(result.current.hasErrors).toBe(false);
       expect(result.current.wasSuccessful).toBe(true);
     });
+
+    it('clears stale errors as soon as a new submit starts', async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ status: 422, body: { errors: { name: ["can't be blank"] } } }),
+      );
+      const { result } = renderHook(() => useRailsForm({ name: '' }));
+
+      await act(async () => {
+        await result.current.post('/contact_messages');
+      });
+      expect(result.current.errors).toEqual({ name: ["can't be blank"] });
+
+      let resolveFetch!: (response: Response) => void;
+      fetchMock.mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+      );
+
+      let submitPromise: Promise<unknown>;
+      act(() => {
+        submitPromise = result.current.post('/contact_messages');
+      });
+
+      await waitFor(() => expect(result.current.processing).toBe(true));
+      expect(result.current.errors).toEqual({});
+
+      act(() => {
+        resolveFetch(mockResponse({ status: 201, body: { message: 'ok' } }));
+      });
+      await act(async () => {
+        await submitPromise;
+      });
+    });
   });
 
   describe('success handling', () => {
@@ -316,6 +350,43 @@ describe('useRailsForm', () => {
         redirectTo: '/posts/1',
       });
       expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ ok: true, redirectTo: '/posts/1' }));
+    });
+
+    it('exposes same-origin JSON redirect hints and ignores unsafe schemes', async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          mockResponse({ status: 201, body: { message: 'created', redirectTo: 'http://localhost/posts/1' } }),
+        )
+        .mockResolvedValueOnce(
+          mockResponse({ status: 201, body: { message: 'created', redirect_to: 'javascript:alert(1)' } }),
+        )
+        .mockResolvedValueOnce(
+          mockResponse({
+            status: 201,
+            body: { message: 'created', redirect_to: 'https://example.com/posts/1' },
+          }),
+        );
+
+      const { result } = renderHook(() => useRailsForm({ title: 'Hi' }));
+
+      await act(async () => {
+        await expect(result.current.post('/posts')).resolves.toMatchObject({
+          ok: true,
+          redirectTo: 'http://localhost/posts/1',
+        });
+      });
+      await act(async () => {
+        await expect(result.current.post('/posts')).resolves.toMatchObject({
+          ok: true,
+          redirectTo: null,
+        });
+      });
+      await act(async () => {
+        await expect(result.current.post('/posts')).resolves.toMatchObject({
+          ok: true,
+          redirectTo: null,
+        });
+      });
     });
 
     it('reports the followed redirect URL when fetch followed a redirect', async () => {
