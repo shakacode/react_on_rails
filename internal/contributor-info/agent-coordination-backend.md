@@ -16,7 +16,14 @@ gh repo clone shakacode/agent-coordination
 cd agent-coordination
 ruby -Itest test/agent_coord_test.rb
 bin/agent-coord --help
+mkdir -p "$HOME/.local/bin"
+ln -sf "$PWD/bin/agent-coord" "$HOME/.local/bin/agent-coord"
+agent-coord --help
 ```
+
+The workflow docs assume `agent-coord` is available on `PATH`. Add
+`$HOME/.local/bin` to the shell `PATH` if needed, or run the command by its full
+path inside the private clone.
 
 Use a temporary local state directory for smoke checks that should not write to
 GitHub:
