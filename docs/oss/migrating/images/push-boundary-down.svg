@@ -74,50 +74,55 @@
   <rect x="20" y="74" width="400" height="12" class="bad-header"/>
   <text x="220" y="78" text-anchor="middle" font-size="12" font-weight="700" class="bad-text">❌ Before — Everything Client</text>
 
-  <!-- ProductPage (root, use client) -->
-  <rect x="100" y="96" width="240" height="28" rx="6" class="all-client" stroke-width="2"/>
-  <text x="220" y="114" text-anchor="middle" font-size="10" font-weight="600" class="all-client-text">ProductPage</text>
-  <rect x="270" y="100" width="62" height="18" rx="9" class="badge-uc" stroke-width="1"/>
-  <text x="301" y="113" text-anchor="middle" font-size="7" font-weight="700" class="badge-text">'use client'</text>
+  <!-- ProductPage (root, 'use client') -->
+  <rect x="140" y="96" width="150" height="28" rx="6" class="all-client" stroke-width="2"/>
+  <text x="215" y="114" text-anchor="middle" font-size="10" font-weight="600" class="all-client-text">ProductPage</text>
+  <rect x="295" y="100" width="56" height="18" rx="9" class="badge-uc" stroke-width="1"/>
+  <text x="323" y="113" text-anchor="middle" font-size="7" font-weight="700" class="badge-text">'use client'</text>
 
-  <!-- Children -->
-  <line x1="150" y1="124" x2="150" y2="146" class="tree-line" stroke-width="1"/>
-  <line x1="290" y1="124" x2="290" y2="146" class="tree-line" stroke-width="1"/>
+  <!-- Fork: root → 3 children (right-angle connectors) -->
+  <line x1="215" y1="124" x2="215" y2="136" class="tree-line" stroke-width="1.5"/>
+  <line x1="105" y1="136" x2="325" y2="136" class="tree-line" stroke-width="1.5"/>
+  <line x1="105" y1="136" x2="105" y2="150" class="tree-line" stroke-width="1.5"/>
+  <line x1="215" y1="136" x2="215" y2="150" class="tree-line" stroke-width="1.5"/>
+  <line x1="325" y1="136" x2="325" y2="150" class="tree-line" stroke-width="1.5"/>
 
-  <rect x="60" y="146" width="180" height="28" rx="6" class="all-client" stroke-width="1.5"/>
-  <text x="150" y="164" text-anchor="middle" font-size="10" class="all-client-text">ProductHeader</text>
+  <!-- ProductHeader -->
+  <rect x="48" y="150" width="114" height="24" rx="6" class="all-client" stroke-width="1.5"/>
+  <text x="105" y="166" text-anchor="middle" font-size="9" class="all-client-text">ProductHeader</text>
 
-  <line x1="100" y1="174" x2="100" y2="192" class="tree-line" stroke-width="1"/>
-  <line x1="200" y1="174" x2="200" y2="192" class="tree-line" stroke-width="1"/>
+  <!-- ReviewList -->
+  <rect x="167" y="150" width="96" height="24" rx="6" class="all-client" stroke-width="1.5"/>
+  <text x="215" y="166" text-anchor="middle" font-size="9" class="all-client-text">ReviewList</text>
 
-  <rect x="40" y="192" width="120" height="24" rx="6" class="all-client" stroke-width="1"/>
-  <text x="100" y="208" text-anchor="middle" font-size="9" class="all-client-text">ProductImage</text>
+  <!-- AddToCartButton -->
+  <rect x="268" y="150" width="114" height="24" rx="6" class="all-client" stroke-width="1.5"/>
+  <text x="325" y="166" text-anchor="middle" font-size="9" class="all-client-text">AddToCartButton</text>
 
-  <rect x="170" y="192" width="120" height="24" rx="6" class="all-client" stroke-width="1"/>
-  <text x="230" y="208" text-anchor="middle" font-size="9" class="all-client-text">ShareButton</text>
+  <!-- Fork: ProductHeader → 2 children -->
+  <line x1="105" y1="174" x2="105" y2="186" class="tree-line" stroke-width="1"/>
+  <line x1="65" y1="186" x2="150" y2="186" class="tree-line" stroke-width="1"/>
+  <line x1="65" y1="186" x2="65" y2="198" class="tree-line" stroke-width="1"/>
+  <line x1="150" y1="186" x2="150" y2="198" class="tree-line" stroke-width="1"/>
 
-  <rect x="220" y="146" width="180" height="28" rx="6" class="all-client" stroke-width="1.5"/>
-  <text x="310" y="164" text-anchor="middle" font-size="10" class="all-client-text">ProductSpecs</text>
+  <!-- ProductImage -->
+  <rect x="25" y="198" width="80" height="22" rx="5" class="all-client" stroke-width="1"/>
+  <text x="65" y="213" text-anchor="middle" font-size="8" class="all-client-text">ProductImage</text>
 
-  <rect x="60" y="232" width="120" height="24" rx="6" class="all-client" stroke-width="1"/>
-  <text x="120" y="248" text-anchor="middle" font-size="9" class="all-client-text">ReviewList</text>
-
-  <rect x="200" y="232" width="160" height="24" rx="6" class="all-client" stroke-width="1"/>
-  <text x="280" y="248" text-anchor="middle" font-size="9" class="all-client-text">AddToCartButton</text>
-
-  <line x1="220" y1="124" x2="120" y2="232" class="tree-line" stroke-width="1"/>
-  <line x1="220" y1="124" x2="280" y2="232" class="tree-line" stroke-width="1"/>
+  <!-- ShareButton -->
+  <rect x="110" y="198" width="80" height="22" rx="5" class="all-client" stroke-width="1"/>
+  <text x="150" y="213" text-anchor="middle" font-size="8" class="all-client-text">ShareButton</text>
 
   <!-- Bundle bar -->
-  <text x="220" y="286" text-anchor="middle" font-size="10" font-weight="600" class="label-text">Client Bundle</text>
-  <rect x="60" y="296" width="320" height="12" rx="6" class="bundle-bar-bad"/>
-  <text x="220" y="324" text-anchor="middle" font-size="10" font-weight="700" class="bad-text">100% in client bundle</text>
-  <text x="220" y="340" text-anchor="middle" font-size="9" class="label-sub">All 6 components ship as JavaScript</text>
+  <text x="215" y="258" text-anchor="middle" font-size="10" font-weight="600" class="label-text">Client Bundle</text>
+  <rect x="60" y="268" width="320" height="12" rx="6" class="bundle-bar-bad"/>
+  <text x="215" y="296" text-anchor="middle" font-size="10" font-weight="700" class="bad-text">100% in client bundle</text>
+  <text x="215" y="312" text-anchor="middle" font-size="9" class="label-sub">All 6 components ship as JavaScript</text>
 
   <!-- Arrow between panels -->
-  <rect x="426" y="190" width="48" height="30" rx="6" class="arrow-body" opacity="0.3"/>
-  <polygon points="450,230 438,220 462,220" class="arrow-body"/>
-  <text x="450" y="250" text-anchor="middle" font-size="9" font-weight="600" class="label-text">migrate</text>
+  <line x1="425" y1="168" x2="468" y2="168" class="tree-line" stroke-width="2"/>
+  <polygon points="468,164 480,168 468,174" class="arrow-body"/>
+  <text x="452" y="186" text-anchor="middle" font-size="9" font-weight="600" class="label-text">migrate</text>
 
   <!-- ============ RIGHT: After (selective) ============ -->
   <rect x="480" y="58" width="400" height="336" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
@@ -126,52 +131,57 @@
   <text x="680" y="78" text-anchor="middle" font-size="12" font-weight="700" class="good-text">✅ After — Only Interactive Leaves</text>
 
   <!-- ProductPage (server now) -->
-  <rect x="560" y="96" width="240" height="28" rx="6" class="server-node" stroke-width="2"/>
-  <text x="680" y="114" text-anchor="middle" font-size="10" font-weight="600" class="server-text">ProductPage</text>
-  <rect x="730" y="100" width="60" height="18" rx="9" class="badge-rsc" stroke-width="1"/>
-  <text x="760" y="113" text-anchor="middle" font-size="7" font-weight="700" class="badge-rsc-text">Server</text>
+  <rect x="600" y="96" width="150" height="28" rx="6" class="server-node" stroke-width="2"/>
+  <text x="675" y="114" text-anchor="middle" font-size="10" font-weight="600" class="server-text">ProductPage</text>
+  <rect x="755" y="100" width="48" height="18" rx="9" class="badge-rsc" stroke-width="1"/>
+  <text x="779" y="113" text-anchor="middle" font-size="7" font-weight="700" class="badge-rsc-text">Server</text>
 
-  <!-- Children -->
-  <line x1="610" y1="124" x2="610" y2="146" class="tree-line" stroke-width="1"/>
-  <line x1="750" y1="124" x2="750" y2="146" class="tree-line" stroke-width="1"/>
+  <!-- Fork: root → 3 children (right-angle connectors) -->
+  <line x1="675" y1="124" x2="675" y2="136" class="tree-line" stroke-width="1.5"/>
+  <line x1="565" y1="136" x2="785" y2="136" class="tree-line" stroke-width="1.5"/>
+  <line x1="565" y1="136" x2="565" y2="150" class="tree-line" stroke-width="1.5"/>
+  <line x1="675" y1="136" x2="675" y2="150" class="tree-line" stroke-width="1.5"/>
+  <line x1="785" y1="136" x2="785" y2="150" class="tree-line" stroke-width="1.5"/>
 
-  <rect x="520" y="146" width="180" height="28" rx="6" class="server-node" stroke-width="1.5"/>
-  <text x="610" y="164" text-anchor="middle" font-size="10" class="server-text">ProductHeader</text>
+  <!-- ProductHeader (server) -->
+  <rect x="508" y="150" width="114" height="24" rx="6" class="server-node" stroke-width="1.5"/>
+  <text x="565" y="166" text-anchor="middle" font-size="9" class="server-text">ProductHeader</text>
 
-  <line x1="560" y1="174" x2="560" y2="192" class="tree-line" stroke-width="1"/>
-  <line x1="660" y1="174" x2="660" y2="192" class="tree-line" stroke-width="1"/>
+  <!-- ReviewList (server) -->
+  <rect x="627" y="150" width="96" height="24" rx="6" class="server-node" stroke-width="1.5"/>
+  <text x="675" y="166" text-anchor="middle" font-size="9" class="server-text">ReviewList</text>
 
-  <rect x="500" y="192" width="120" height="24" rx="6" class="server-node" stroke-width="1"/>
-  <text x="560" y="208" text-anchor="middle" font-size="9" class="server-text">ProductImage</text>
+  <!-- AddToCartButton (client) -->
+  <rect x="728" y="150" width="114" height="24" rx="6" class="client-node" stroke-width="2"/>
+  <text x="785" y="166" text-anchor="middle" font-size="9" class="client-text">AddToCartButton</text>
+  <rect x="759" y="176" width="52" height="14" rx="7" class="badge-uc" stroke-width="1"/>
+  <text x="785" y="187" text-anchor="middle" font-size="6" font-weight="700" class="badge-text">'use client'</text>
 
-  <rect x="630" y="192" width="150" height="24" rx="6" class="client-node" stroke-width="2"/>
-  <text x="642" y="208" font-size="9" class="client-text">ShareButton</text>
-  <rect x="724" y="194" width="50" height="14" rx="7" class="badge-uc" stroke-width="1"/>
-  <text x="749" y="204" text-anchor="middle" font-size="6" font-weight="700" class="badge-text">'use client'</text>
+  <!-- Fork: ProductHeader → 2 children -->
+  <line x1="565" y1="174" x2="565" y2="186" class="tree-line" stroke-width="1"/>
+  <line x1="525" y1="186" x2="610" y2="186" class="tree-line" stroke-width="1"/>
+  <line x1="525" y1="186" x2="525" y2="198" class="tree-line" stroke-width="1"/>
+  <line x1="610" y1="186" x2="610" y2="198" class="tree-line" stroke-width="1"/>
 
-  <rect x="680" y="146" width="180" height="28" rx="6" class="server-node" stroke-width="1.5"/>
-  <text x="770" y="164" text-anchor="middle" font-size="10" class="server-text">ProductSpecs</text>
+  <!-- ProductImage (server) -->
+  <rect x="485" y="198" width="80" height="22" rx="5" class="server-node" stroke-width="1"/>
+  <text x="525" y="213" text-anchor="middle" font-size="8" class="server-text">ProductImage</text>
 
-  <rect x="520" y="232" width="120" height="24" rx="6" class="server-node" stroke-width="1"/>
-  <text x="580" y="248" text-anchor="middle" font-size="9" class="server-text">ReviewList</text>
-
-  <rect x="660" y="232" width="190" height="24" rx="6" class="client-node" stroke-width="2"/>
-  <text x="672" y="248" font-size="9" class="client-text">AddToCartButton</text>
-  <rect x="792" y="234" width="50" height="14" rx="7" class="badge-uc" stroke-width="1"/>
-  <text x="817" y="244" text-anchor="middle" font-size="6" font-weight="700" class="badge-text">'use client'</text>
-
-  <line x1="680" y1="124" x2="580" y2="232" class="tree-line" stroke-width="1"/>
-  <line x1="680" y1="124" x2="740" y2="232" class="tree-line" stroke-width="1"/>
+  <!-- ShareButton (client) -->
+  <rect x="570" y="198" width="80" height="22" rx="5" class="client-node" stroke-width="2"/>
+  <text x="610" y="213" text-anchor="middle" font-size="8" class="client-text">ShareButton</text>
+  <rect x="584" y="222" width="52" height="14" rx="7" class="badge-uc" stroke-width="1"/>
+  <text x="610" y="233" text-anchor="middle" font-size="6" font-weight="700" class="badge-text">'use client'</text>
 
   <!-- Bundle bar -->
-  <text x="680" y="286" text-anchor="middle" font-size="10" font-weight="600" class="label-text">Client Bundle</text>
-  <rect x="520" y="296" width="320" height="12" rx="6" class="bundle-bar-bg"/>
-  <rect x="520" y="296" width="106" height="12" rx="6" class="bundle-bar-good"/>
-  <text x="680" y="324" text-anchor="middle" font-size="10" font-weight="700" class="good-text">~33% in client bundle (2 of 6 components)</text>
-  <text x="680" y="340" text-anchor="middle" font-size="9" class="label-sub">Only interactive leaves ship as JavaScript</text>
+  <text x="675" y="258" text-anchor="middle" font-size="10" font-weight="600" class="label-text">Client Bundle</text>
+  <rect x="520" y="268" width="320" height="12" rx="6" class="bundle-bar-bg"/>
+  <rect x="520" y="268" width="106" height="12" rx="6" class="bundle-bar-good"/>
+  <text x="675" y="296" text-anchor="middle" font-size="10" font-weight="700" class="good-text">~33% in client bundle (2 of 6)</text>
+  <text x="675" y="312" text-anchor="middle" font-size="9" class="label-sub">Only interactive leaves ship as JavaScript</text>
 
   <!-- Bottom callout -->
   <rect x="100" y="410" width="700" height="38" rx="8" class="note-box" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="450" y="428" text-anchor="middle" font-size="10" font-weight="600" class="note-text">Display-only components (images, specs, reviews) become Server Components — zero client JS</text>
+  <text x="450" y="428" text-anchor="middle" font-size="10" font-weight="600" class="note-text">Display-only components (images, reviews) become Server Components — zero client JS</text>
   <text x="450" y="442" text-anchor="middle" font-size="9" class="note-text">Only components with hooks, state, or event handlers need 'use client'</text>
 </svg>
