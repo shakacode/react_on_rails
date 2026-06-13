@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 440" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
   <title>Flight Payload Composition Breakdown</title>
-  <desc>Animated diagram showing what makes up the RSC Flight payload: className strings (~48%), structural JSON (~25%), and content data (~27%). Includes expansion ratio benchmarks for real components like StarRating (16:1) and ReviewSnippets (9.3:1).</desc>
+  <desc>Diagram showing what makes up the RSC Flight payload: className strings (~48%), structural JSON (~25%), and content data (~27%). Includes expansion ratio benchmarks for real components like StarRating (16:1) and ReviewSnippets (9.3:1).</desc>
   <defs>
     <filter id="shadow">
       <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
@@ -51,19 +51,7 @@
         .note-text { fill: #93C5FD; }
       }
 
-      .reveal1 { opacity: 0; animation: r1 12s ease 0.3s infinite; }
-      .reveal2 { opacity: 0; animation: r2 12s ease 1.0s infinite; }
-      .reveal3 { opacity: 0; animation: r3 12s ease 1.8s infinite; }
-      .reveal4 { opacity: 0; animation: r4 12s ease 2.6s infinite; }
-
-      @keyframes r1 { 0% { opacity: 0; } 5% { opacity: 1; } 85% { opacity: 1; } 93% { opacity: 0; } 100% { opacity: 0; } }
-      @keyframes r2 { 0% { opacity: 0; } 10% { opacity: 1; } 85% { opacity: 1; } 93% { opacity: 0; } 100% { opacity: 0; } }
-      @keyframes r3 { 0% { opacity: 0; } 16% { opacity: 1; } 85% { opacity: 1; } 93% { opacity: 0; } 100% { opacity: 0; } }
-      @keyframes r4 { 0% { opacity: 0; } 22% { opacity: 1; } 85% { opacity: 1; } 93% { opacity: 0; } 100% { opacity: 0; } }
-
-      @media (prefers-reduced-motion: reduce) {
-        * { animation: none !important; opacity: 1 !important; }
-      }
+      .reveal1, .reveal2, .reveal3, .reveal4 { opacity: 1; }
     </style>
   </defs>
 
