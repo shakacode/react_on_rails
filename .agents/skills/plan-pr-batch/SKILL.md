@@ -45,6 +45,9 @@ Plan a PR batch
      lane a stable agent id and a lane name; for dependency-ordered work, define
      explicit `depends_on` refs in the form `<batch-id>:<lane-name>` so
      `agent-coord status` can show whether the lane is blocked.
+     Coordinators must create or update the private backend
+     `batches/<batch-id>.json` with those lane refs before dependent workers
+     start; otherwise `agent-coord status` cannot report `blocked_on` lanes.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
@@ -97,7 +100,8 @@ Execution rules:
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
 - For concurrent or dependency-sensitive batches, assign a stable agent id and
   lane name per lane. Declare lane dependencies with `depends_on` refs such as
-  `<batch-id>:<lane-name>`. When the private coordination backend is available,
+  `<batch-id>:<lane-name>`, and create or update the private backend
+  `batches/<batch-id>.json` before dispatching dependent workers. When the private coordination backend is available,
   use `agent-coord claim` before creating worktrees/branches,
   `agent-coord heartbeat` at phase transitions, and `agent-coord status` at
   lane start and before rebase or push. If the lane shows unmet `blocked_on`

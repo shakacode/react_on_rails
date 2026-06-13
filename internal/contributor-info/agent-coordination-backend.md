@@ -8,10 +8,10 @@ React on Rails repository should only carry this pointer and the public workflow
 rules in [AGENTS.md](../../AGENTS.md), [.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md),
 and [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md).
 
-This pointer was validated against private backend commit `ed339f2`. Until the
-private repo has tagged releases, pull the private repo and rerun the smoke
-checks below after backend CLI or schema changes. Update this hash in the same
-PR whenever the private CLI interface, schema, or smoke-check procedure changes.
+Until the private repo has tagged releases, pull the private repo and rerun the
+smoke checks below after backend CLI or schema changes. Record the validated
+private backend commit in the PR body or batch handoff, not in this stable
+public pointer.
 
 ## Setup
 
@@ -44,7 +44,9 @@ posting a structured public claim comment that names the override. Do not use an
 override to bypass a live or stale holder that can be contacted.
 
 Use a temporary local state directory for smoke checks that should not write to
-GitHub:
+GitHub. `AGENT_COORD_STATE_ROOT` sets the directory where `agent-coord` reads
+and writes JSON state; override it here so dry runs stay local instead of using
+the default state root documented in the private repo README.
 
 ```bash
 STATE_ROOT=$(mktemp -d)
@@ -65,15 +67,17 @@ Workers refresh heartbeats at every phase transition:
 - blocked state
 - done state
 
-Use stable agent ids that identify machine, tool, and lane, for example
-`m5-codex-batch2` or `m1-claude-fable-lane1`.
+Use stable agent ids that identify machine role, tool, and lane, for example
+`mobile-codex-batch2` or `desktop-claude-fable-lane1`.
 
 ```bash
+BATCH_ID=agent-coord-YYYY-MM-DD # Set once at kickoff and reuse for this batch.
+
 bin/agent-coord heartbeat \
-  --agent-id m5-codex-batch2 \
+  --agent-id mobile-codex-batch2 \
   --repo shakacode/react_on_rails \
   --target 3970 \
-  --batch-id "agent-coord-$(date +%Y-%m-%d)" \
+  --batch-id "$BATCH_ID" \
   --branch jg-codex/3970-agent-heartbeats
 bin/agent-coord status
 ```
@@ -86,12 +90,11 @@ liveness is missing or invalid. Use the private repo's launchd template for
 desktop sessions that need out-of-band renewal while an agent is between tool
 calls.
 
-For `batches/<batch-id>.json`, the dependency-complete heartbeat statuses at
-private backend commit `ed339f2` are `complete`, `completed`, `done`, `merged`,
-and `ready`. A released claim is audit state and does not unblock dependent
-lanes by itself. The `complete` and `completed` aliases are both accepted in v1
-so humans and older agents can use either wording while the operating model
-settles.
+For dependency-sensitive lanes, coordinators create or update
+`batches/<batch-id>.json` in the private backend before dispatching dependent
+workers. The private backend README and CLI are authoritative for the terminal
+heartbeat statuses that unblock `depends_on` refs. A released claim is audit
+state and does not unblock dependent lanes by itself.
 
 Do not store secrets, `.env` files, credentials, patches, customer data, or Pro
 source code in the coordination backend. It is only for minimal JSON state files.

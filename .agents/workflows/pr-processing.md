@@ -290,20 +290,12 @@ Goal name: <concrete goal name, not the pasted prompt text>.
 Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
-Coordination: assign a stable agent id per lane. When `shakacode/agent-coordination`
-is available (`agent-coord status` exits 0), acquire `agent-coord claim` for
-each issue/PR lane before creating that lane's worktree or branch; hard-stop if
-refused and report the holder plus heartbeat liveness. Run `agent-coord
-heartbeat` at every phase transition. For lanes declared in
-`batches/<batch-id>.json` with `depends_on`, run `agent-coord status` at lane
-start and before rebase or push; if unmet `blocked_on` refs remain, set that
-lane heartbeat `--status blocked`, report the blocked refs, and move to another
-independent lane until the dependency reports a backend terminal heartbeat
-status. Also use `agent-coord status` before dependency-sensitive readiness or
-closeout decisions. If `agent-coord status` cannot be checked, report `UNKNOWN`
-private state and use structured public claim comments as an advisory fallback.
-Structured public claim comments are fallback/advisory only; the private claim
-is the coordination source of truth.
+Coordination: follow the canonical coordination protocol in
+`.agents/workflows/pr-processing.md` under Coordination State and Worker Rules
+before creating worktrees or branches. Assign stable agent ids, claim before
+branching when the backend is available, heartbeat at phase transitions, create
+private `batches/<batch-id>.json` files for dependency lanes, and check status
+before dependency-sensitive rebase, push, readiness, or closeout decisions.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -439,7 +431,7 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
 - Use a temporary `codex-wip` label only as a visible hint; do not treat it as the durable lock.
 - For concurrent or multi-machine batches, use the private `shakacode/agent-coordination`
   backend when available. Each lane gets a stable agent id such as
-  `m5-codex-batch2` or `m1-claude-fable-lane1`.
+  `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
 - Treat the backend as available when `agent-coord status` exits 0. If the
   command is missing, auth fails, or status exits non-zero, report private state
   as `UNKNOWN` and use advisory public claim comments. A refused
@@ -455,6 +447,9 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
   minutes; do not model liveness with sticky labels.
 - Use `agent-coord status` before starting dependency-sensitive lanes and before
   rebase, push, readiness, or closeout decisions that depend on another lane.
+- Coordinators create or update private backend `batches/<batch-id>.json` files
+  before dispatching workers for dependency-sensitive lanes; declared
+  `depends_on` refs are only enforceable after that state exists.
 - For lanes declared in `batches/<batch-id>.json` with `depends_on`, treat
   non-empty `blocked_on` refs as an unmet dependency. The worker should refresh
   its own heartbeat with `--status blocked`, switch to another independent lane

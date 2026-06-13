@@ -12,13 +12,14 @@ lane.
 
 ## Baseline Topology
 
-The current coordination model assumes this host map as of 2026-06-13; update
-the table when the active machine pool or launch surfaces change:
+The current coordination model assumes these durable host and surface roles.
+Keep specific hardware inventory in the private operations runbook and update
+that inventory when the active machine pool or launch surfaces change:
 
 | Surface or host              | Primary role                  | Notes                                                                                       |
 | ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
-| M5 128GB mobile laptop       | High-memory mobile batch host | Useful for heavy local context, but treat power, network, and travel as availability risks. |
-| M1 64GB wired desktop        | Stable wired batch host       | Prefer for long-running desktop sessions and lanes that benefit from steady network/power.  |
+| Mobile high-memory host      | High-memory mobile batch host | Useful for heavy local context, but treat power, network, and travel as availability risks. |
+| Stable wired host            | Stable wired batch host       | Prefer for long-running desktop sessions and lanes that benefit from steady network/power.  |
 | Claude Desktop               | Batch kickoff surface         | Best for long-running multi-lane work when Claude Fable should own the hardest items.       |
 | Codex Desktop                | Batch kickoff surface         | Best for long-running Codex batches, local validation, commits, and repo-aware finishing.   |
 | conductor.build              | Single-PR focus and finishing | Best when one PR needs concentrated Claude plus Codex chats on the same PR.                 |
@@ -34,7 +35,7 @@ surfaces are intentionally disjoint:
   needs both Claude and Codex attention.
 
 Machine choice is an operational decision, not a policy label. Prefer the wired
-desktop when continuity matters more than local memory, and prefer the M5 laptop
+host when continuity matters more than local memory, and prefer the mobile host
 when mobility or local capacity is the better fit. If either machine is likely
 to disappear during a lane, route dependency-sensitive work elsewhere.
 
@@ -62,7 +63,7 @@ of truth for concurrent batches. Public issue or PR claim comments are human
 hints and recovery aids only.
 
 Use stable agent ids with the base format `<machine>-<tool>-<batch>`, for
-example `m5-codex-batch2`, `m1-claude-fable`, or `m1-conductor-finish`. If one
+example `mobile-codex-batch2`, `desktop-claude-fable`, or `desktop-conductor-finish`. If one
 batch runs multiple simultaneously-heartbeating lanes on the same machine and
 tool, add a short lane suffix after the batch id so each heartbeat remains
 distinguishable.
