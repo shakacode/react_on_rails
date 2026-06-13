@@ -10,7 +10,8 @@ and [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.m
 
 This pointer was validated against private backend commit `ed339f2`. Until the
 private repo has tagged releases, pull the private repo and rerun the smoke
-checks below after backend CLI or schema changes.
+checks below after backend CLI or schema changes. Update this hash in the same
+PR whenever the private CLI interface, schema, or smoke-check procedure changes.
 
 ## Setup
 

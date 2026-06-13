@@ -11,7 +11,8 @@ reader without asking Justin which machine, tool, or repository owns a lane.
 
 ## Baseline Topology
 
-The current coordination model assumes:
+The current coordination model assumes this host map as of 2026-06-13; update
+the table when the active machine pool or launch surfaces change:
 
 | Surface or host              | Primary role                  | Notes                                                                                       |
 | ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------- |

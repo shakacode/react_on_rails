@@ -96,7 +96,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
 
 5. Adopt cross-repo coordination when needed.
    - Copy `agent-coordination-backend.md` and `multi-batch-operations.md` only if the target repo will participate in multi-machine, multi-batch, or cross-repo work.
-   - Point operators at the same private shakacode/agent-coordination backend used by React on Rails.
+   - For ShakaCode-internal repos, point operators at the same private shakacode/agent-coordination backend used by React on Rails. External adopters should host their own private backend with the same schema or rely on public claim comments.
    - Use full repository names in every claim and heartbeat so `owner/repo#123` remains distinct from another repo's `#123`.
    - Keep private backend schema examples in the private coordination repo. Public/adopter repos should document only operator rules, setup pointers, and safe fallbacks.
    - Define which packages or directories must not be split across simultaneous batches, then add that routing rule to the target repo's copy of `multi-batch-operations.md`.

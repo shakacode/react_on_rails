@@ -102,7 +102,8 @@ Execution rules:
   `agent-coord heartbeat` at phase transitions, and `agent-coord status` at
   lane start and before rebase or push. If the lane shows unmet `blocked_on`
   refs, set heartbeat `--status blocked`, report the blocked refs, and move to
-  another independent lane until dependencies report terminal status.
+  another independent lane until dependencies report a backend terminal
+  heartbeat status.
 - Final handoff must include links, tests, blockers, next action, and merged/ready/blocked/deferred/UNKNOWN sections.
 ```
 
