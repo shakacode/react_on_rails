@@ -1,0 +1,948 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "open3"
+require "optparse"
+require "time"
+require "timeout"
+
+# rubocop:disable Metrics/ClassLength
+class PrMergeLedger
+  SCHEMA_VERSION = "pr-merge-ledger/v1"
+  UNKNOWN = "UNKNOWN"
+  SCHEMA_PATH = File.expand_path("pr-merge-ledger.schema.json", __dir__)
+  CHANGELOG_CLASSIFICATIONS = %w[
+    changelog_present
+    changelog_missing
+    deferred_to_update_changelog
+    not_user_visible
+    UNKNOWN
+  ].freeze
+  DISPOSITIONS = %w[fixed explicitly_waived follow_up_issue not_applicable UNKNOWN].freeze
+  LOCKFILE_BASENAMES = %w[
+    Gemfile.lock
+    package-lock.json
+    pnpm-lock.yaml
+    yarn.lock
+    bun.lock
+    bun.lockb
+  ].freeze
+  GITHUB_API_TIMEOUT_SECONDS = 30
+  MAX_GRAPHQL_PAGES = 500
+  FINDING_BADGE_PREFIX = %r{
+    \A\s*(?:[-*]\s*)?(?:\*\*)?
+    <sub><sub>!\[%<severity>s\s+Badge\]\([^)]+\)</sub></sub>
+    (?:\*\*)?(?:\s|:|-|$)
+  }ix
+  BADGE_FINDING_PATTERNS = %w[P0 P1 P2].to_h do |severity|
+    [
+      severity,
+      Regexp.new(format(FINDING_BADGE_PREFIX.source, severity:), Regexp::IGNORECASE | Regexp::EXTENDED)
+    ]
+  end.freeze
+  FINDING_PATTERNS = {
+    "MUST_FIX" => /\A\s*(?:[-*]\s*)?(?:\*\*)?MUST[- ]?FIX(?:\*\*)?(?:\s|:|-|$)/i,
+    "P0" => Regexp.union(
+      BADGE_FINDING_PATTERNS.fetch("P0"),
+      /\A\s*(?:[-*]\s*)?(?:\*\*)?\[?P0\]?(?:\*\*)?(?:\s|:|-|$)/i
+    ),
+    "P1" => Regexp.union(
+      BADGE_FINDING_PATTERNS.fetch("P1"),
+      /\A\s*(?:[-*]\s*)?(?:\*\*)?\[?P1\]?(?:\*\*)?(?:\s|:|-|$)/i
+    ),
+    "P2" => Regexp.union(
+      BADGE_FINDING_PATTERNS.fetch("P2"),
+      /\A\s*(?:[-*]\s*)?(?:\*\*)?\[?P2\]?(?:\*\*)?(?:\s|:|-|$)/i
+    )
+  }.freeze
+  NON_ACTIONABLE_FINDING_PATTERN =
+    /\A\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-)+
+      (?:findings?|issues?|items?)\b.*\b(?:none|resolved|waived|previous review)\b/ix
+  ACTIONABLE_NEGATED_RESOLUTION_PATTERN = /\bnot\s+(?:yet\s+)?(?:resolved|waived)\b/i
+
+  class Error < StandardError; end
+
+  def self.run(argv)
+    new(argv).run
+  end
+
+  def initialize(argv)
+    @argv = argv.dup
+    @options = {
+      changelog_classification: UNKNOWN,
+      pretty: false,
+      strict: false
+    }
+  end
+
+  def run
+    parse_options
+
+    if @options[:schema]
+      puts File.read(SCHEMA_PATH)
+      return 0
+    end
+
+    report = build_report
+    write_report(report)
+
+    return 0 unless @options[:strict] && !report.fetch("complete_allowed")
+
+    warn "ledger violations: #{report.fetch('violations').length}; " \
+         "unknown fields: #{report.fetch('unknown_fields').length}"
+    1
+  rescue Error, JSON::ParserError, Errno::ENOENT, Errno::EACCES, KeyError => e
+    warn "pr-merge-ledger: #{e.message}"
+    2
+  end
+
+  private
+
+  def parse_options
+    build_option_parser.parse!(@argv)
+    validate_options
+  rescue OptionParser::InvalidOption, OptionParser::InvalidArgument => e
+    raise Error, e.message
+  end
+
+  def validate_options
+    return unless @argv.length > 1 && @options[:changelog_classification_provided]
+
+    raise Error,
+          "--changelog-classification applies to one PR at a time; run multi-PR ledgers separately"
+  end
+
+  def build_option_parser
+    OptionParser.new do |opts|
+      opts.banner = "Usage: script/pr-merge-ledger [PR ...] [options]"
+      opts.on("--repo OWNER/REPO", "GitHub repository. Defaults to gh repo view.") do |repo|
+        @options[:repo] = repo
+      end
+      opts.on("--fixture PATH", "Read one normalized fixture instead of live GitHub state.") do |path|
+        @options[:fixture] = path
+      end
+      opts.on("--schema", "Print the fixed JSON schema and exit.") do
+        @options[:schema] = true
+      end
+      opts.on("--strict", "Exit non-zero when violations or UNKNOWN fields block closeout.") do
+        @options[:strict] = true
+      end
+      opts.on("--pretty", "Pretty-print JSON output.") do
+        @options[:pretty] = true
+      end
+      opts.on("--finding-dispositions FILE", "JSON map from finding URL/id to disposition evidence.") do |path|
+        @options[:finding_dispositions] = path
+      end
+      opts.on("--changelog-classification CLASS", CHANGELOG_CLASSIFICATIONS) do |classification|
+        @options[:changelog_classification] = classification
+        @options[:changelog_classification_provided] = true
+      end
+      add_help_option(opts)
+    end
+  end
+
+  def add_help_option(opts)
+    opts.on("-h", "--help", "Show this help.") do
+      puts opts
+      exit 0
+    end
+  end
+
+  def build_report
+    datasets = @options[:fixture] ? [load_fixture(@options[:fixture])] : fetch_live_pull_requests
+    dispositions = load_dispositions(@options[:finding_dispositions])
+    ledgers = datasets.map { |dataset| ledger_for(dataset, dispositions) }
+
+    violations = ledgers.flat_map { |ledger| ledger.fetch("violations") }
+    unknown_fields = ledgers.flat_map { |ledger| ledger.fetch("unknown_fields") }
+
+    {
+      "$schema" => "script/pr-merge-ledger.schema.json",
+      "schema_version" => SCHEMA_VERSION,
+      "generated_at" => Time.now.utc.iso8601,
+      "repository" => datasets.first.fetch("repository"),
+      "source" => source_summary,
+      "pull_requests" => ledgers,
+      "violations" => violations,
+      "unknown_fields" => unknown_fields,
+      "complete_allowed" => violations.empty? && unknown_fields.empty?
+    }
+  end
+
+  def fetch_live_pull_requests
+    raise Error, "provide at least one PR number or --fixture" if @argv.empty?
+
+    repo = @options[:repo] || detect_repo
+    owner, name = repo.split("/", 2)
+    raise Error, "repo must look like OWNER/REPO: #{repo.inspect}" unless owner && name
+
+    collector = GitHubCollector.new(owner, name)
+    @argv.map do |pr_number|
+      collector.fetch(Integer(pr_number, 10)).merge("repository" => repo)
+    rescue ArgumentError
+      raise Error, "PR number must be an integer: #{pr_number.inspect}"
+    end
+  end
+
+  def detect_repo
+    stdout, stderr, status = Open3.capture3("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
+    raise Error, "could not detect gh repo: #{stderr.strip}" unless status.success?
+
+    stdout.strip
+  end
+
+  def load_fixture(path)
+    JSON.parse(File.read(path)).tap do |dataset|
+      raise Error, "fixture is missing repository" unless dataset["repository"]
+      raise Error, "fixture is missing pull_request" unless dataset["pull_request"]
+    end
+  end
+
+  def load_dispositions(path)
+    return {} unless path
+
+    JSON.parse(File.read(path)).tap do |dispositions|
+      raise Error, "--finding-dispositions must contain a JSON object" unless dispositions.is_a?(Hash)
+    end
+  end
+
+  def source_summary
+    if @options[:fixture]
+      { "mode" => "fixture", "path" => @options[:fixture] }
+    else
+      { "mode" => "live_github", "repo" => @options[:repo] || "auto", "prs" => @argv.map(&:to_i) }
+    end
+  end
+
+  # rubocop:disable Metrics/AbcSize
+  def ledger_for(dataset, dispositions)
+    pull_request = normalize_pull_request(dataset.fetch("pull_request"))
+    files = file_paths(dataset)
+    review_threads = normalized_review_threads(dataset, pull_request)
+    reviews = normalized_reviews(dataset, pull_request)
+    issue_comments = normalized_issue_comments(dataset)
+
+    unresolved_threads = review_threads.select { |thread| unresolved_current_head_thread?(thread) }
+    output_reviews = reviews.map { |review| review.except("body_text") }
+    output_issue_comments = issue_comments.map { |comment| comment.except("body") }
+    latest_reviews = latest_reviews_by_reviewer(output_reviews)
+    all_changes_requested = output_reviews.select { |review| review.fetch("state") == "CHANGES_REQUESTED" }
+    changes_requested = latest_reviews.select { |review| review.fetch("state") == "CHANGES_REQUESTED" }
+    finding_dispositions = finding_dispositions(review_threads, reviews, issue_comments, dispositions)
+    changelog = changelog_classification
+    lockfile = lockfile_diff(files)
+
+    ledger = {
+      "pr" => pull_request,
+      "unresolved_current_head_review_threads" => {
+        "status" => "known",
+        "count" => unresolved_threads.length,
+        "threads" => unresolved_threads
+      },
+      "review_objects" => {
+        "status" => "known",
+        "review_decision" => pull_request.fetch("review_decision"),
+        "latest_by_reviewer" => latest_reviews,
+        "changes_requested" => changes_requested,
+        "all_changes_requested" => all_changes_requested
+      },
+      "issue_comments" => output_issue_comments,
+      "p1_p2_must_fix_dispositions" => finding_dispositions,
+      "changelog_classification" => changelog,
+      "lockfile_diff" => lockfile
+    }
+
+    unknown_fields = unknown_fields_for(pull_request, review_threads, finding_dispositions, changelog, lockfile)
+    violations = violations_for(pull_request, unresolved_threads, changes_requested, changelog, unknown_fields)
+    ledger.merge(
+      "violations" => violations,
+      "unknown_fields" => unknown_fields,
+      "complete_allowed" => violations.empty? && unknown_fields.empty?
+    )
+  end
+  # rubocop:enable Metrics/AbcSize
+
+  def file_paths(dataset)
+    Array(dataset["files"]).map { |file| file.is_a?(Hash) ? file.fetch("path") : file }
+  end
+
+  def normalized_review_threads(dataset, pull_request)
+    Array(dataset["review_threads"]).map { |thread| normalize_review_thread(thread, pull_request) }
+  end
+
+  def normalized_reviews(dataset, pull_request)
+    Array(dataset["reviews"]).map { |review| normalize_review(review, pull_request) }
+  end
+
+  def normalized_issue_comments(dataset)
+    Array(dataset["comments"]).map { |comment| normalize_issue_comment(comment) }
+  end
+
+  def normalize_pull_request(raw_pr)
+    {
+      "number" => raw_pr.fetch("number"),
+      "title" => raw_pr["title"],
+      "url" => raw_pr["url"],
+      "state" => raw_pr["state"],
+      "is_draft" => raw_pr["isDraft"],
+      "base_ref" => raw_pr["baseRefName"],
+      "head_ref" => raw_pr["headRefName"],
+      "head_sha" => raw_pr["headRefOid"] || UNKNOWN,
+      "merged_at" => raw_pr["mergedAt"],
+      "review_decision" => raw_pr["reviewDecision"] || UNKNOWN
+    }
+  end
+
+  def normalize_review_thread(thread, pull_request)
+    comments, comments_complete = review_thread_comments(thread)
+    normalized_comments = comments.map { |comment| normalize_thread_comment(comment, pull_request) }
+    latest_comment = normalized_comments.max_by { |comment| comment["created_at"].to_s }
+
+    {
+      "id" => thread.fetch("id"),
+      "is_resolved" => thread["isResolved"] == true,
+      "is_outdated" => thread["isOutdated"] == true,
+      "path" => thread["path"] || latest_comment&.fetch("path", nil),
+      "line" => thread["line"] || latest_comment&.fetch("line", nil),
+      "url" => latest_comment&.fetch("url", nil),
+      "author" => latest_comment&.fetch("author", nil),
+      "created_at" => latest_comment&.fetch("created_at", nil),
+      "body_excerpt" => excerpt(latest_comment&.fetch("body", nil)),
+      "review_state" => latest_comment&.fetch("review_state", nil),
+      "review_head_sha" => latest_comment&.fetch("review_head_sha", nil),
+      "comment_head_sha" => latest_comment&.fetch("comment_head_sha", nil),
+      "current_head" => current_thread?(thread, normalized_comments, pull_request),
+      "comments_complete" => comments_complete,
+      "comments" => normalized_comments
+    }
+  end
+
+  def review_thread_comments(thread)
+    raw_comments = thread["comments"]
+    comments = Array(raw_comments.is_a?(Hash) ? raw_comments["nodes"] : raw_comments)
+
+    [comments, review_thread_comments_complete?(raw_comments)]
+  end
+
+  def review_thread_comments_complete?(raw_comments)
+    !raw_comments.is_a?(Hash) || raw_comments.dig("pageInfo", "hasNextPage") != true
+  end
+
+  def normalize_thread_comment(comment, pull_request)
+    review = comment["pullRequestReview"] || {}
+
+    {
+      "id" => comment["id"] || comment["databaseId"].to_s,
+      "url" => comment["url"],
+      "path" => comment["path"],
+      "line" => comment["line"],
+      "created_at" => comment["createdAt"],
+      "author" => comment.dig("author", "login"),
+      "body" => comment["body"].to_s,
+      "outdated" => comment["outdated"] == true,
+      "review_state" => review["state"],
+      "review_head_sha" => review.dig("commit", "oid"),
+      "comment_head_sha" => comment.dig("commit", "oid"),
+      "current_head" => comment.dig("commit", "oid") == pull_request.fetch("head_sha")
+    }
+  end
+
+  def normalize_review(review, pull_request)
+    {
+      "id" => review.fetch("id"),
+      "reviewer" => review.dig("author", "login") || UNKNOWN,
+      "state" => review["state"] || UNKNOWN,
+      "submitted_at" => review["submittedAt"],
+      "head_sha" => review.dig("commit", "oid") || UNKNOWN,
+      "url" => review["url"],
+      "body_excerpt" => excerpt(review["body"]),
+      "body_text" => review["body"].to_s,
+      "current_head" => review.dig("commit", "oid") == pull_request.fetch("head_sha")
+    }
+  end
+
+  def normalize_issue_comment(comment)
+    {
+      "id" => comment.fetch("id"),
+      "url" => comment["url"],
+      "author" => comment.dig("author", "login"),
+      "created_at" => comment["createdAt"],
+      "body_excerpt" => excerpt(comment["body"]),
+      "body" => comment["body"].to_s
+    }
+  end
+
+  def latest_reviews_by_reviewer(reviews)
+    reviews
+      .group_by { |review| review.fetch("reviewer") }
+      .map { |_reviewer, reviewer_reviews| reviewer_reviews.max_by { |review| review["submitted_at"].to_s } }
+      .sort_by { |review| review.fetch("reviewer") }
+  end
+
+  def current_thread?(thread, comments, pull_request)
+    return !thread["isOutdated"] if comments.empty?
+
+    comments.any? { |comment| comment.fetch("current_head") && !comment.fetch("outdated") } ||
+      comments.any? { |comment| comment.fetch("comment_head_sha") == pull_request.fetch("head_sha") }
+  end
+
+  def unresolved_current_head_thread?(thread)
+    thread.fetch("comments_complete") && !thread.fetch("is_resolved") && thread.fetch("current_head")
+  end
+
+  def finding_dispositions(review_threads, reviews, issue_comments, dispositions)
+    findings = []
+
+    thread_comments_for_findings(review_threads).each do |comment|
+      findings.concat(
+        findings_from_text(comment.fetch("body"), comment.fetch("url"), comment.fetch("id"), dispositions)
+      )
+    end
+
+    reviews_for_findings(reviews).each do |review|
+      findings.concat(
+        findings_from_text(review.fetch("body_text"), review.fetch("url"), review.fetch("id"), dispositions)
+      )
+    end
+
+    issue_comments.each do |comment|
+      findings.concat(
+        findings_from_text(comment.fetch("body"), comment.fetch("url"), comment.fetch("id"), dispositions)
+      )
+    end
+
+    unique_findings = findings.uniq do |finding|
+      [
+        finding.fetch("id"),
+        finding.fetch("url"),
+        finding.fetch("severity"),
+        finding.fetch("source_line"),
+        finding.fetch("text_excerpt")
+      ]
+    end
+    {
+      "status" => "known",
+      "findings" => unique_findings
+    }
+  end
+
+  def thread_comments_for_findings(review_threads)
+    review_threads
+      .select { |thread| unresolved_current_head_thread?(thread) }
+      .flat_map { |thread| thread.fetch("comments") }
+  end
+
+  def reviews_for_findings(reviews)
+    latest_reviews_by_reviewer(reviews).select { |review| review.fetch("current_head") }
+  end
+
+  def findings_from_text(text, url, id, dispositions)
+    text.to_s.each_line.with_index.flat_map do |line, index|
+      next [] if non_actionable_finding_summary?(line)
+
+      severity = finding_severity(line)
+      next [] unless severity
+
+      disposition = disposition_for(url, id, dispositions)
+      [{
+        "id" => id,
+        "url" => url,
+        "severity" => severity,
+        "source_line" => index + 1,
+        "text_excerpt" => excerpt(line),
+        "disposition" => disposition.fetch("disposition"),
+        "evidence" => disposition["evidence"]
+      }]
+    end
+  end
+
+  def finding_severity(line)
+    FINDING_PATTERNS.find { |_severity, pattern| line.match?(pattern) }&.first
+  end
+
+  def non_actionable_finding_summary?(line)
+    return false if line.match?(ACTIONABLE_NEGATED_RESOLUTION_PATTERN)
+
+    line.match?(NON_ACTIONABLE_FINDING_PATTERN)
+  end
+
+  def disposition_for(url, id, dispositions)
+    override = dispositions[url] || dispositions[id]
+
+    case override
+    when String
+      validate_disposition(override)
+      { "disposition" => override }
+    when Hash
+      disposition = override.fetch("disposition")
+      validate_disposition(disposition)
+      { "disposition" => disposition, "evidence" => override["evidence"] }
+    when nil
+      { "disposition" => UNKNOWN }
+    else
+      raise Error, "finding disposition for #{url || id} must be a string or object"
+    end
+  end
+
+  def validate_disposition(disposition)
+    return if DISPOSITIONS.include?(disposition)
+
+    raise Error, "finding disposition must be one of #{DISPOSITIONS.join(', ')}"
+  end
+
+  def changelog_classification
+    {
+      "status" => @options[:changelog_classification] == UNKNOWN ? UNKNOWN : "known",
+      "classification" => @options[:changelog_classification]
+    }
+  end
+
+  def lockfile_diff(files)
+    lockfiles = files.select { |path| lockfile_path?(path) }
+    {
+      "status" => "known",
+      "has_lockfile_diff" => !lockfiles.empty?,
+      "files" => lockfiles
+    }
+  end
+
+  def lockfile_path?(path)
+    basename = File.basename(path)
+    LOCKFILE_BASENAMES.include?(basename) || basename.end_with?(".lock")
+  end
+
+  def unknown_fields_for(pull_request, review_threads, finding_dispositions, changelog, lockfile)
+    unknowns = pull_request_unknown_fields(pull_request)
+
+    review_threads.each do |thread|
+      next if thread.fetch("comments_complete")
+
+      unknowns << unknown_field(
+        pull_request,
+        "review_threads.comments",
+        "review thread comments were truncated by GitHub pagination",
+        thread["url"]
+      )
+    end
+
+    finding_dispositions.fetch("findings").each do |finding|
+      next unless finding.fetch("disposition") == UNKNOWN
+
+      unknowns << unknown_field(
+        pull_request,
+        "p1_p2_must_fix_dispositions.findings",
+        "P0/P1/P2/Must-Fix finding has no fixed/waived/follow-up disposition",
+        finding["url"]
+      )
+    end
+
+    if changelog.fetch("classification") == UNKNOWN
+      unknowns << unknown_field(
+        pull_request,
+        "changelog_classification.classification",
+        "changelog classification is UNKNOWN"
+      )
+    end
+
+    if lockfile.fetch("status") == UNKNOWN
+      unknowns << unknown_field(pull_request, "lockfile_diff.has_lockfile_diff", "lockfile diff flag is UNKNOWN")
+    end
+
+    unknowns
+  end
+
+  def pull_request_unknown_fields(pull_request)
+    unknowns = []
+    if pull_request.fetch("review_decision") == UNKNOWN
+      unknowns << unknown_field(pull_request, "pr.review_decision", "GitHub reviewDecision is UNKNOWN")
+    end
+    if pull_request["head_sha"].to_s.empty? || pull_request["head_sha"] == UNKNOWN
+      unknowns << unknown_field(pull_request, "pr.head_sha", "GitHub headRefOid is UNKNOWN")
+    end
+
+    unknowns
+  end
+
+  def unknown_field(pull_request, field, message, url = nil)
+    {
+      "pr_number" => pull_request.fetch("number"),
+      "field" => field,
+      "message" => message,
+      "url" => url
+    }.compact
+  end
+
+  def violations_for(pull_request, unresolved_threads, changes_requested, changelog, unknown_fields)
+    [
+      review_decision_violation(pull_request),
+      draft_pr_violation(pull_request),
+      changelog_violation(pull_request, changelog),
+      *changes_requested_violations(pull_request, changes_requested),
+      *unresolved_thread_violations(pull_request, unresolved_threads),
+      *unknown_field_violations(pull_request, unknown_fields)
+    ].compact
+  end
+
+  def review_decision_violation(pull_request)
+    case pull_request.fetch("review_decision")
+    when "CHANGES_REQUESTED"
+      violation(
+        pull_request,
+        "review_decision_changes_requested",
+        "GitHub reviewDecision is CHANGES_REQUESTED",
+        pull_request["url"]
+      )
+    when "REVIEW_REQUIRED"
+      violation(
+        pull_request,
+        "review_decision_review_required",
+        "GitHub reviewDecision is REVIEW_REQUIRED",
+        pull_request["url"]
+      )
+    end
+  end
+
+  def draft_pr_violation(pull_request)
+    return unless pull_request["is_draft"]
+
+    violation(
+      pull_request,
+      "draft_pr",
+      "PR is still a draft",
+      pull_request["url"]
+    )
+  end
+
+  def changelog_violation(pull_request, changelog)
+    return unless changelog.fetch("classification") == "changelog_missing"
+
+    violation(
+      pull_request,
+      "changelog_missing",
+      "Changelog classification is changelog_missing",
+      pull_request["url"]
+    )
+  end
+
+  def changes_requested_violations(pull_request, changes_requested)
+    changes_requested.map do |review|
+      violation(
+        pull_request,
+        "changes_requested_review_object",
+        "Review object requested changes",
+        review["url"],
+        "reviewer" => review.fetch("reviewer"),
+        "head_sha" => review.fetch("head_sha"),
+        "current_head" => review.fetch("current_head")
+      )
+    end
+  end
+
+  def unresolved_thread_violations(pull_request, unresolved_threads)
+    unresolved_threads.map do |thread|
+      violation(
+        pull_request,
+        "unresolved_current_head_review_thread",
+        "Unresolved current-head review thread",
+        thread["url"],
+        "path" => thread["path"],
+        "line" => thread["line"]
+      )
+    end
+  end
+
+  def unknown_field_violations(pull_request, unknown_fields)
+    unknown_fields.map do |unknown|
+      violation(
+        pull_request,
+        unknown_violation_code(unknown.fetch("field")),
+        unknown.fetch("message"),
+        unknown["url"]
+      )
+    end
+  end
+
+  def unknown_violation_code(field)
+    case field
+    when /\Ap1_p2_must_fix_dispositions/
+      "unknown_p1_p2_must_fix_disposition"
+    when /\Achangelog_classification/
+      "unknown_changelog_classification"
+    when /\Alockfile_diff/
+      "unknown_lockfile_diff"
+    when /\Areview_threads\.comments/
+      "unknown_review_thread_comments"
+    when /\Apr\.head_sha/
+      "unknown_head_sha"
+    when /\Apr\.review_decision/
+      "unknown_review_decision"
+    else
+      "unknown_ledger_field"
+    end
+  end
+
+  def violation(pull_request, code, message, url, extra = {})
+    {
+      "pr_number" => pull_request.fetch("number"),
+      "code" => code,
+      "message" => message,
+      "url" => url
+    }.merge(extra).compact
+  end
+
+  def excerpt(text)
+    text.to_s.gsub(/\s+/, " ").strip[0, 180]
+  end
+
+  def write_report(report)
+    puts(@options[:pretty] ? JSON.pretty_generate(report) : JSON.generate(report))
+  end
+
+  class GitHubCollector
+    def initialize(owner, name)
+      @owner = owner
+      @name = name
+    end
+
+    def fetch(pr_number)
+      metadata, files = fetch_metadata_and_files(pr_number)
+      {
+        "pull_request" => metadata,
+        "files" => files,
+        "review_threads" => fetch_review_threads(pr_number),
+        "reviews" => fetch_reviews(pr_number),
+        "comments" => fetch_comments(pr_number)
+      }
+    end
+
+    private
+
+    def fetch_metadata_and_files(pr_number)
+      files = []
+      metadata = nil
+      cursor = nil
+      page_count = 0
+
+      loop do
+        page_count += 1
+        raise Error, "pagination exceeded #{MAX_GRAPHQL_PAGES} pages for files" if page_count > MAX_GRAPHQL_PAGES
+
+        response = graphql(metadata_query, pr: pr_number, endCursor: cursor)
+        pull_request = response.dig("data", "repository", "pullRequest")
+        raise Error, "PR ##{pr_number} was not found" unless pull_request
+
+        metadata ||= pull_request.except("files")
+        file_connection = pull_request.fetch("files")
+        files.concat(file_connection.fetch("nodes").map { |file| file.fetch("path") })
+        page_info = file_connection.fetch("pageInfo")
+        break unless page_info.fetch("hasNextPage")
+
+        cursor = next_cursor(page_info, "files", cursor)
+      end
+
+      [metadata, files]
+    end
+
+    def fetch_review_threads(pr_number)
+      fetch_paginated_connection(pr_number, review_threads_query, "reviewThreads")
+    end
+
+    def fetch_reviews(pr_number)
+      fetch_paginated_connection(pr_number, reviews_query, "reviews")
+    end
+
+    def fetch_comments(pr_number)
+      fetch_paginated_connection(pr_number, comments_query, "comments")
+    end
+
+    def fetch_paginated_connection(pr_number, query, connection_name)
+      nodes = []
+      cursor = nil
+      page_count = 0
+
+      loop do
+        page_count += 1
+        if page_count > MAX_GRAPHQL_PAGES
+          raise Error, "pagination exceeded #{MAX_GRAPHQL_PAGES} pages for #{connection_name}"
+        end
+
+        response = graphql(query, pr: pr_number, endCursor: cursor)
+        pull_request = response.dig("data", "repository", "pullRequest")
+        raise Error, "PR ##{pr_number} was not found" unless pull_request
+
+        connection = pull_request.fetch(connection_name)
+        nodes.concat(connection.fetch("nodes"))
+        page_info = connection.fetch("pageInfo")
+        break unless page_info.fetch("hasNextPage")
+
+        cursor = next_cursor(page_info, connection_name, cursor)
+      end
+
+      nodes
+    end
+
+    def next_cursor(page_info, connection_name, previous_cursor)
+      cursor = page_info.fetch("endCursor")
+      if cursor.nil? || cursor == previous_cursor
+        raise Error, "pagination cursor did not advance for #{connection_name}"
+      end
+
+      cursor
+    end
+
+    def graphql(query, variables)
+      args = ["api", "graphql", "-f", "owner=#{@owner}", "-f", "name=#{@name}", "-f", "query=#{query}"]
+      variables.each do |key, value|
+        next if value.nil?
+
+        flag = value.is_a?(Integer) ? "-F" : "-f"
+        args.push(flag, "#{key}=#{value}")
+      end
+
+      stdout, stderr, status = capture_gh(args)
+      raise Error, "gh api graphql failed: #{stderr.strip}" unless status.success?
+
+      JSON.parse(stdout).tap do |parsed|
+        next unless parsed["errors"]
+
+        messages = parsed.fetch("errors").map { |error| error.fetch("message", error.inspect) }
+        raise Error, "gh api graphql returned errors: #{messages.join('; ')}"
+      end
+    end
+
+    def capture_gh(args)
+      Timeout.timeout(github_api_timeout) do
+        Open3.capture3("gh", *args)
+      end
+    rescue Timeout::Error
+      raise Error, "gh api graphql timed out after #{github_api_timeout} seconds"
+    end
+
+    def github_api_timeout
+      raw_timeout = ENV["GITHUB_API_TIMEOUT"].to_s.strip
+      raw_timeout = GITHUB_API_TIMEOUT_SECONDS.to_s if raw_timeout.empty?
+
+      match = raw_timeout.match(/\A(?<seconds>\d+)(?:s)?\z/)
+      raise Error, "GITHUB_API_TIMEOUT must be an integer number of seconds" unless match
+
+      Integer(match[:seconds], 10)
+    end
+
+    def metadata_query
+      <<~GRAPHQL
+        query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
+          repository(owner:$owner, name:$name) {
+            pullRequest(number:$pr) {
+              number
+              title
+              url
+              state
+              isDraft
+              baseRefName
+              headRefName
+              headRefOid
+              mergedAt
+              reviewDecision
+              files(first:100, after:$endCursor) {
+                nodes { path }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+      GRAPHQL
+    end
+
+    def review_threads_query
+      <<~GRAPHQL
+        query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
+          repository(owner:$owner, name:$name) {
+            pullRequest(number:$pr) {
+              reviewThreads(first:100, after:$endCursor) {
+                nodes {
+                  id
+                  isResolved
+                  isOutdated
+                  path
+                  line
+                  comments(first:100) {
+                    nodes {
+                      id
+                      databaseId
+                      body
+                      author { login }
+                      url
+                      path
+                      line
+                      createdAt
+                      outdated
+                      commit { oid }
+                      originalCommit { oid }
+                      pullRequestReview {
+                        id
+                        state
+                        submittedAt
+                        commit { oid }
+                        author { login }
+                      }
+                    }
+                    pageInfo { hasNextPage endCursor }
+                  }
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+      GRAPHQL
+    end
+
+    def reviews_query
+      <<~GRAPHQL
+        query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
+          repository(owner:$owner, name:$name) {
+            pullRequest(number:$pr) {
+              reviews(first:100, after:$endCursor) {
+                nodes {
+                  id
+                  state
+                  submittedAt
+                  author { login }
+                  commit { oid }
+                  url
+                  body
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+      GRAPHQL
+    end
+
+    def comments_query
+      <<~GRAPHQL
+        query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
+          repository(owner:$owner, name:$name) {
+            pullRequest(number:$pr) {
+              comments(first:100, after:$endCursor) {
+                nodes {
+                  id
+                  body
+                  author { login }
+                  url
+                  createdAt
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+      GRAPHQL
+    end
+  end
+end
+# rubocop:enable Metrics/ClassLength
+
+exit PrMergeLedger.run(ARGV)

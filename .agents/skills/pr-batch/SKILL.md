@@ -166,6 +166,14 @@ next paragraph; an empty full check list is `UNKNOWN` / not ready. Treat untriag
 regression, compatibility, and missing-changelog findings as merge blockers
 unless a maintainer explicitly waives them.
 
+At merge readiness and batch closeout, run the machine-checkable per-PR merge
+ledger with `script/pr-merge-ledger <PR> --strict`, supplying explicit changelog
+classification and any P0/P1/P2/Must-Fix disposition evidence. Do not report a
+target `complete` while the ledger has any `UNKNOWN` field, unresolved
+current-head review thread, `CHANGES_REQUESTED` review object, or
+`complete_allowed: false`. Include the ledger JSON artifact path or table in the
+final handoff.
+
 If `gh pr checks <PR> --required` reports no required checks, do NOT treat that
 as CI-ready. Instead treat the full `gh pr checks <PR>` list as the readiness
 gate and require each current-head check to pass or be skipped with CI selector
@@ -231,7 +239,9 @@ Use the canonical Batch Handoff Format in
 **Immediate maintainer attention** for true blockers and questions only, and
 **FYI / decisions made** for decisions, validations, review state, full-CI
 requests already handled, no-PR rationales, autonomous nit outcomes,
-confidence notes, and decision-point counts per PR.
+confidence notes, decision-point counts per PR, and per-PR merge-ledger summaries.
+Do not call a target `complete` while its ledger has `UNKNOWN` fields or
+`complete_allowed: false`.
 
 ## Coordination State
 
@@ -259,7 +269,7 @@ reporting, full-CI decisions, and merge sequencing.
 For the complete numbered sequence, follow the canonical closeout lane in
 `.agents/workflows/pr-processing.md` instead of stopping at PR creation. The
 coordinator owns the live re-fetch, current-head checks and review-thread triage,
-stale release-mode classification updates and the finalized PR-body
+per-PR merge-ledger run, stale release-mode classification updates and the finalized PR-body
 `Agent Merge Confidence` block refresh required for accelerated-RC readiness (kept
 distinct), full-CI request and waitback when uncertainty remains, and any
 authorized ready/merge action, and the late post-merge bot-finding sweep before
