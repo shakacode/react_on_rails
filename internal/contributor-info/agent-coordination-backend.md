@@ -9,11 +9,10 @@ rules in [AGENTS.md](../../AGENTS.md), [.agents/skills/pr-batch/SKILL.md](../../
 and [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md).
 
 Until the private repo has tagged releases, pull the private repo and rerun the
-smoke checks below after backend CLI or schema changes. The command examples and
-default TTL values in this page were verified against private backend commit
-`ed339f2000d3639eca03298a22d7c600a04e20f7`; update that anchor when the private
-CLI contract changes. The private README and `bin/agent-coord --help` output are
-authoritative if they differ from this public pointer.
+smoke checks below after backend CLI or schema changes. The command examples in
+this page were verified at the initial backend rollout; the private README and
+`bin/agent-coord --help` output are authoritative if they differ from this
+public pointer.
 
 ## Setup
 
@@ -84,10 +83,12 @@ Use stable agent ids that identify machine role, tool, and lane, for example
 `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
 
 ```bash
-BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$$-coord-layer"
+BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)-coord-layer"
+BATCH_ID_FILE="${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer"
 # Set once at kickoff, include a short batch slug plus a unique suffix, and reuse for this batch.
-printf '%s\n' "$BATCH_ID" > .agent-coord-batch-id
-# In a fresh shell, restore with: BATCH_ID=$(cat .agent-coord-batch-id)
+printf '%s\n' "$BATCH_ID" > "$BATCH_ID_FILE"
+# In a fresh shell, restore with: BATCH_ID=$(cat "$BATCH_ID_FILE")
+# At batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
 
 bin/agent-coord heartbeat \
   --agent-id mobile-codex-batch2 \
@@ -99,25 +100,22 @@ bin/agent-coord status
 ```
 
 Heartbeat liveness is derived from timestamps: `live` before the TTL expires,
-`stale` until 4x TTL, and `dead` after that. The default heartbeat TTL is 15
-minutes, so the default dead threshold is 60 minutes after the heartbeat update.
-Verify these defaults against the private README or CLI help when updating the
-private backend; the values above were current at private commit
-`ed339f2000d3639eca03298a22d7c600a04e20f7`.
-Dependent lanes blocked on a dead-heartbeat takeover should expect up to that
-60-minute window before takeover is safe under default TTL settings.
-The default claim lease TTL is 4 hours, used only as a fallback when heartbeat
-liveness is missing or invalid. Use the private repo's launchd template for
-desktop sessions that need out-of-band renewal while an agent is between tool
-calls.
+`stale` until 4x TTL, and `dead` after that. See the private backend README and
+CLI help for current default TTL values and the dead-threshold calculation.
+Dependent lanes blocked on a dead-heartbeat takeover should wait until current
+backend liveness marks the holder `dead` before takeover is safe. The default
+claim lease TTL is only a fallback when heartbeat liveness is missing or invalid.
+Use the private repo's launchd template for desktop sessions that need
+out-of-band renewal while an agent is between tool calls.
 
 For dependency-sensitive lanes, coordinators create or update
 `batches/<batch-id>.json` in the private backend before dispatching dependent
-workers. Use the private backend README and schema files for that JSON layout;
-this public pointer intentionally omits the batch-state schema. The private
-backend README and CLI are authoritative for the terminal heartbeat statuses
-that unblock `depends_on` refs. A released claim is audit state and does not
-unblock dependent lanes by itself.
+workers. Batch files are edited as JSON in the private repo in v1. Use the
+private backend README and schema files for that JSON layout; this public pointer
+intentionally omits the batch-state schema. The private backend README and CLI
+are authoritative for the terminal heartbeat statuses that unblock `depends_on`
+refs, currently `complete`, `completed`, `done`, `merged`, and `ready`. A
+released claim is audit state and does not unblock dependent lanes by itself.
 
 If a worker lane declares `depends_on` but `agent-coord status` shows no matching
 batch file or lane state, the worker must treat dependency state as `UNKNOWN` and

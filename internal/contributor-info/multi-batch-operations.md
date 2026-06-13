@@ -27,8 +27,10 @@ machine names or an enforced scheduler policy:
 | shakacode/react_on_rails     | Main gem/npm/Pro monorepo     | Claims use this full repo name in the coordination backend.                                 |
 | shakacode/react_on_rails_rsc | RSC integration/adoption repo | Uses the same coordination backend, with claims namespaced by repo.                         |
 
-Prefer no more than three concurrent batches, and only when their packages,
-branches, and risk surfaces are intentionally disjoint:
+Prefer no more than three concurrent batches as a soft operating limit before
+backend enforcement exists. A fourth batch requires an explicit human decision
+with package and risk separation recorded in the batch handoff. Keep concurrent
+batch packages, branches, and risk surfaces intentionally disjoint:
 
 - one Claude Fable batch for the hardest, most ambiguous, or highest-risk items;
 - two Codex batches for simpler, parallel-friendly, well-scoped items;

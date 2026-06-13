@@ -84,6 +84,8 @@ Keep this template aligned with the matching plan-to-goal prompt in
 paragraphs. Keep the `Coordination:` paragraph in sync with the same paragraph
 there.
 
+<!-- Keep the Coordination paragraph inside the prompt below in sync with `.agents/workflows/pr-processing.md`. -->
+
 Use this template when creating the `/goal` text:
 
 ```text
