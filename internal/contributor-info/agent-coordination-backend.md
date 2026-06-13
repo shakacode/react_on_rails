@@ -39,9 +39,11 @@ refused `agent-coord claim` is not unavailability; it is a hard stop.
 Machine agents must not override a refused private claim on their own. A human
 coordinator may authorize a one-off manual override only after running
 `agent-coord status`, recording why the private state is wrong or degraded in
-the issue, PR, or batch handoff, and either repairing the private state or
-posting a structured public claim comment that names the override. Do not use an
-override to bypass a live or stale holder that can be contacted.
+the batch handoff as the authoritative incident note, and either repairing the
+private state or posting a structured public claim comment that names the
+override. Mirror the same note to the issue or PR when that is the active lane
+discussion, but do not use an override to bypass a live or stale holder that can
+be contacted.
 
 Use a temporary local state directory for smoke checks that should not write to
 GitHub. `AGENT_COORD_STATE_ROOT` sets the directory where `agent-coord` reads
@@ -65,6 +67,7 @@ Workers refresh heartbeats at every phase transition:
 - branch or PR update
 - review pass
 - blocked state
+- resumed state
 - done state
 
 Use stable agent ids that identify machine role, tool, and lane, for example
@@ -73,6 +76,8 @@ Use stable agent ids that identify machine role, tool, and lane, for example
 ```bash
 BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M)-coord-layer"
 # Set once at kickoff, include a short batch slug, and reuse for this batch.
+printf '%s\n' "$BATCH_ID" > .agent-coord-batch-id
+# In a fresh shell, restore with: BATCH_ID=$(cat .agent-coord-batch-id)
 
 bin/agent-coord heartbeat \
   --agent-id mobile-codex-batch2 \
@@ -86,6 +91,8 @@ bin/agent-coord status
 Heartbeat liveness is derived from timestamps: `live` before the TTL expires,
 `stale` until 4x TTL, and `dead` after that. The default heartbeat TTL is 15
 minutes, so the default dead threshold is 60 minutes after the heartbeat update.
+Dependent lanes blocked on a dead-heartbeat takeover should expect up to that
+60-minute window before takeover is safe under default TTL settings.
 The default claim lease TTL is 4 hours, used only as a fallback when heartbeat
 liveness is missing or invalid. Use the private repo's launchd template for
 desktop sessions that need out-of-band renewal while an agent is between tool

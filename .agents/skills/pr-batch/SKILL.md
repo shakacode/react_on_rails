@@ -95,12 +95,14 @@ Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
 Coordination: follow the canonical coordination protocol in
-`.agents/workflows/pr-processing.md`: assign stable agent ids, run
-`agent-coord claim` before creating worktrees or branches when
-`agent-coord status` exits 0, hard-stop on refused claims, heartbeat at phase
-transitions, run `agent-coord status` before dependency-sensitive rebase, push,
-readiness, or closeout decisions, and use structured public claim comments only
-as an advisory fallback when private status cannot be checked.
+`.agents/workflows/pr-processing.md` under Coordination State and Worker Rules
+before creating worktrees or branches. Assign stable agent ids, claim before
+branching when the backend is available, heartbeat at phase transitions, create
+private `batches/<batch-id>.json` files for dependency lanes, and check
+`agent-coord status` at lane start and before dependency-sensitive rebase, push,
+readiness, or closeout decisions. Treat non-empty `blocked_on` refs as unmet
+dependencies; if a lane declares `depends_on` but status shows no matching
+private batch state, report dependency state as `UNKNOWN` and stop that lane.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -228,9 +230,10 @@ routing entry point; do not duplicate the full protocol here.
 
 In short: exact lane assignments beat labels; private `agent-coord` state is the
 source of truth when `agent-coord status` exits 0; refused claims hard-stop
-machine agents; workers heartbeat at phase transitions; dependency-sensitive
-lanes run `agent-coord status` before rebase, push, readiness, and closeout; and
-structured public claim comments are only advisory fallback state.
+machine agents; workers heartbeat at phase transitions; coordinators create
+private batch files before dependency lanes start; dependency-sensitive lanes run
+`agent-coord status` before rebase, push, readiness, and closeout; and structured
+public claim comments are only advisory fallback state.
 
 ## Worker Rules
 

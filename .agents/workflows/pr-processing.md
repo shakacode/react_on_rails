@@ -297,8 +297,11 @@ Coordination: follow the canonical coordination protocol in
 `.agents/workflows/pr-processing.md` under Coordination State and Worker Rules
 before creating worktrees or branches. Assign stable agent ids, claim before
 branching when the backend is available, heartbeat at phase transitions, create
-private `batches/<batch-id>.json` files for dependency lanes, and check status
-before dependency-sensitive rebase, push, readiness, or closeout decisions.
+private `batches/<batch-id>.json` files for dependency lanes, and check
+`agent-coord status` at lane start and before dependency-sensitive rebase, push,
+readiness, or closeout decisions. Treat non-empty `blocked_on` refs as unmet
+dependencies; if a lane declares `depends_on` but status shows no matching
+private batch state, report dependency state as `UNKNOWN` and stop that lane.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -444,7 +447,8 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
   report the holder, heartbeat liveness, and target instead of creating a
   competing branch.
 - Refresh heartbeats with `agent-coord heartbeat` at phase transitions: item
-  start, branch or PR update, review pass, blocked state, and done state.
+  start, branch or PR update, review pass, blocked state, resumed state, and
+  done state.
   Heartbeat liveness is timestamp-derived: `live` before the TTL expires,
   `stale` until 4x TTL, and `dead` after that. The default heartbeat TTL is 15
   minutes; do not model liveness with sticky labels.
