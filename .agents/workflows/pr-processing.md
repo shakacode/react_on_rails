@@ -299,7 +299,7 @@ Classify each target before assigning a worker:
 - **No-PR evidence comment**: the issue is duplicate, low-value, already fixed, or better closed with evidence. The posted comment is the deliverable; include live evidence, the no-PR rationale, and whether the issue should stay open, close, or wait.
 - **Product-decision blocker**: the issue needs a maintainer/product decision before code would be safe. The deliverable is a surfaced question or decision request, not a speculative branch.
 
-For investigation or benchmark conclusions, apply the closing-evidence bar from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md` to every outcome path. Implementation PRs, combined investigation PRs, and no-PR evidence comments that recommend close or document/work around must satisfy that canonical gate before recommending or carrying the disposition forward. When the gate cannot be satisfied, carry only a caveated no-PR `park` disposition or a product-decision blocker.
+For investigation or benchmark conclusions, apply the closing-evidence gate from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md` to every outcome path. Implementation PRs, combined investigation PRs, and no-PR evidence comments that recommend close or document/work around must satisfy that canonical gate before recommending or carrying the disposition forward. When the gate cannot be satisfied, carry only a caveated no-PR `park` disposition or a product-decision blocker.
 
 Workers should not turn product-decision blockers into speculative PRs. They should post or draft the evidence-backed question and stop that target.
 
