@@ -62,7 +62,7 @@ Rails prepares the data in the controller and passes it as props. The component 
 - No JavaScript ships to the client for this component
 
 <p align="center">
-  <img src="images/waterfall-vs-parallel.svg" alt="Animated comparison showing client-side waterfall data fetching (sequential fetch-render cycles) versus Server Component data fetching where data is already available as props — eliminating loading states, useEffect, and multiple round trips." width="840" />
+  <img src="images/waterfall-vs-parallel.svg" alt="Animated comparison showing client-side fetching requiring an extra API round trip after mount versus Server Component pattern where Rails provides data as props and HTML streams directly — no extra round trips, no client state management. For slow data, async props stream independently via Suspense boundaries." width="840" />
 </p>
 
 For pages with multiple data sources, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro) to
