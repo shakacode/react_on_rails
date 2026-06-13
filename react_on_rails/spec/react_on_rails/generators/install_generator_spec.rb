@@ -51,7 +51,10 @@ describe InstallGenerator, type: :generator do
   end
 
   def expect_npm_dependency_to_satisfy(name, actual_version, expected_requirement)
-    expect(actual_version).not_to be_nil
+    if actual_version.nil?
+      raise RSpec::Expectations::ExpectationNotMetError,
+            "expected #{name} dependency to be present and satisfy #{expected_requirement.inspect}"
+    end
 
     unless expected_requirement.start_with?("^")
       expect(actual_version).to eq(expected_requirement)
