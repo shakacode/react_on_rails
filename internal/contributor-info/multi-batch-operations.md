@@ -10,6 +10,78 @@ The goal is to make the live operating model reconstructable by a cold-start
 reader without asking the coordinator which machine, tool, or repository owns a
 lane.
 
+## Fresh Machine Quick Start
+
+Use this when a coordinator asks Codex, Claude, or conductor.build to join a
+batch from another machine or fresh checkout.
+
+The coordinator should provide the batch objective, exact targets, stable
+`batch_id`, lane names, agent ids, any `depends_on` refs, and whether the worker
+should use this PR branch or `main` for the current workflow docs.
+
+1. Authenticate GitHub and confirm access:
+
+   ```bash
+   gh auth status
+   gh repo view shakacode/react_on_rails
+   gh repo view shakacode/agent-coordination
+   ```
+
+2. Check out the public repo branch that contains the active workflow docs,
+   normally `main` after PR #3977 lands or the PR branch while it is still open.
+3. Clone or update the private backend and put `agent-coord` on `PATH`:
+
+   ```bash
+   gh repo clone shakacode/agent-coordination
+   cd agent-coordination
+   ruby -Itest test/agent_coord_test.rb
+   bin/agent-coord --help
+   mkdir -p "$HOME/.local/bin"
+   ln -sf "$PWD/bin/agent-coord" "$HOME/.local/bin/agent-coord"
+   agent-coord status
+   ```
+
+4. If `agent-coord status` exits non-zero, report private state as `UNKNOWN` and
+   use the structured public claim comment fallback. Do not start a
+   dependency-sensitive lane when the lane declares `depends_on` and private
+   status cannot be checked.
+5. Before dependent lanes start, the coordinator creates or updates
+   `batches/<batch-id>.json` in the private backend so `agent-coord status` can
+   render `blocked_on` refs.
+6. Each worker claims before creating a worktree, branch, or conductor session:
+
+   ```bash
+   agent-coord claim \
+     --agent-id <agent-id> \
+     --repo shakacode/react_on_rails \
+     --target <issue-or-pr> \
+     --batch-id <batch-id> \
+     --branch <branch>
+   ```
+
+   A refused claim after successful status is a hard stop. Report the holder,
+   heartbeat liveness, and target instead of creating competing work.
+
+7. Each worker heartbeats at item start, branch/PR update, review pass, blocked
+   state, resumed state, and done state:
+
+   ```bash
+   agent-coord heartbeat \
+     --agent-id <agent-id> \
+     --repo shakacode/react_on_rails \
+     --target <issue-or-pr> \
+     --batch-id <batch-id> \
+     --branch <branch> \
+     --status in_progress
+   ```
+
+8. Before rebase, push, readiness, or closeout, rerun `agent-coord status`. If a
+   lane shows non-empty `blocked_on`, set the worker heartbeat to
+   `--status blocked`, report the blocked refs, and move to independent work.
+9. Final handoff from the second machine must include the agent id, batch id,
+   branch/PR URL, validation run, current `agent-coord status` summary, blockers,
+   and `UNKNOWN` for anything not verified live.
+
 ## Baseline Topology
 
 The current coordination model uses these role names for a two-machine,

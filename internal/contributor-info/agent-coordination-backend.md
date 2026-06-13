@@ -16,6 +16,10 @@ public pointer.
 
 ## Setup
 
+For a fresh machine joining an active multi-machine batch, start with
+[Multi-Batch Operations](multi-batch-operations.md#fresh-machine-quick-start)
+and then run the backend setup below.
+
 ```bash
 gh auth status
 gh repo clone shakacode/agent-coordination
