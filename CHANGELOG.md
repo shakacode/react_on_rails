@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **Rspack generated apps start in HMR mode**: Fresh `rails generate react_on_rails:install --rspack` and `create-react-on-rails-app` projects now install `@rspack/dev-server`, use the `ReactRefreshRspackPlugin` export, and keep `bin/switch-bundler rspack`'s dev dependencies complete so `bin/dev` can launch Rspack serve instead of crashing during dev-server startup. Fixes [Issue 3925](https://github.com/shakacode/react_on_rails/issues/3925). [PR 3926](https://github.com/shakacode/react_on_rails/pull/3926) by [AbanoubGhadban](https://github.com/AbanoubGhadban) and [ihabadham](https://github.com/ihabadham).
+
 ### [17.0.0.rc.3] - 2026-06-11
 
 #### Added

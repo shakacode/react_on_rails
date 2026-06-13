@@ -112,6 +112,7 @@ module ReactOnRails
       # @rspack/cli uses ^2.0.0-0 to match @rspack/core's prerelease range.
       RSPACK_DEV_DEPENDENCIES = %w[
         @rspack/cli@^2.0.0-0
+        @rspack/dev-server@^2.0.0
         @rspack/plugin-react-refresh@^2.0.0
         react-refresh
       ].freeze
