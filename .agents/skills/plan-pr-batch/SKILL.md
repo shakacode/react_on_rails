@@ -50,14 +50,14 @@ Plan a PR batch
      Coordinators must create or update the private backend
      `batches/<batch-id>.json` with those lane refs before dependent workers
      start; otherwise `agent-coord status` cannot report `blocked_on` lanes.
-   - Build a file-touch map for the batch: list the files each item changes (read issue/PR bodies and grep the repo to confirm, do not guess). Items that edit the same file cannot run as parallel worktrees — they will conflict at merge. Keep only file-disjoint items in the parallel first batch; group colliding or dependency-ordered items into one sequenced sub-batch, or defer them to a later batch.
+   - Build a file-touch map for the batch: list the files each item changes and the files it intends to create (read issue/PR bodies; grep the repo to confirm existing paths, do not guess). Items that touch the same file, including creating the same new path, cannot run as parallel worktrees — they will conflict at merge. Keep only file-disjoint items in the parallel first batch; group colliding or dependency-ordered items into one sequenced sub-batch, or defer them to a later batch.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
 
 4. Output
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
-   - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan. Measure it (e.g. `wc -m`), do not eyeball it. The preflight and execution-rules boilerplate already costs ~900 characters, so keep `Worker notes`/`Done when` terse — the worker reads the issue/PR URL for full detail; push evidence and audit notes to the Batch Plan instead.
+   - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan. Measure it (e.g. `wc -m`), do not eyeball it. Reserve ~1100 characters for the preflight and execution-rules boilerplate, remeasure after template changes, and keep the file-touch map, `Worker notes`, and `Done when` terse — the worker reads the issue/PR URL for full detail; push evidence and audit notes to the Batch Plan instead.
    - If the batch will not fit, split it into smaller goals and output only the first ready goal.
    - Do not start `$pr-batch` unless the user asks; then hand them the fenced goal prompt and tell them to run `$pr-batch` with it.
 
@@ -86,6 +86,7 @@ Preflight first: if this session cannot run workers without blocking approval pr
 
 Repository: OWNER/REPO
 Batch objective: ...
+File-touch map: PR/Issue #N -> touched/created paths; deferred/reserved paths -> reason.
 
 Items:
 - PR #N: URL
@@ -100,7 +101,7 @@ Items:
 Execution rules:
 - Follow `.agents/skills/pr-batch/SKILL.md` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
 - Dispatch one subagent per independent item; group dependent items only when shared context is required.
-- Treat the items as file-disjoint: a worker must not edit a file another item owns or that a deferred batch reserves. If a worker concludes it must, stop and report instead of editing.
+- Treat the items as file-disjoint: a worker must not edit a file listed for another item in the file-touch map or reserved for a deferred batch. If a worker concludes it must, stop and report instead of editing.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
 - For concurrent or dependency-sensitive batches, assign a stable agent id and
   lane name per lane. Declare lane dependencies with `depends_on` refs such as
