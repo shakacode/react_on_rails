@@ -83,7 +83,7 @@ Use stable agent ids that identify machine role, tool, and lane, for example
 `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
 
 ```bash
-BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)-coord-layer"
+BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(python3 -c 'import uuid; print(uuid.uuid4().hex[:8])')-coord-layer"
 BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX")
 # Set once at kickoff, include a short batch slug plus a unique suffix, and reuse for this batch.
 printf '%s\n' "$BATCH_ID" > "$BATCH_ID_FILE"
@@ -118,7 +118,8 @@ workers. Batch files are edited as JSON in the private repo in v1. Use the
 private backend README and schema files for that JSON layout; this public pointer
 intentionally omits the batch-state schema. The private backend README and CLI
 are authoritative for the terminal heartbeat statuses that unblock `depends_on`
-refs, currently `complete`, `completed`, `done`, `merged`, and `ready`. A
+refs. At the initial backend rollout those statuses were `complete`, `completed`,
+`done`, `merged`, and `ready`; re-check the private CLI after backend updates. A
 released claim is audit state and does not unblock dependent lanes by itself.
 
 If a worker lane declares `depends_on` but `agent-coord status` shows no matching
