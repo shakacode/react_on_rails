@@ -81,10 +81,8 @@ If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/g
 
 Keep this template aligned with the matching plan-to-goal prompt in
 `.agents/workflows/pr-processing.md`, including the review/audit gate
-paragraphs. Keep the `Coordination:` paragraph in sync with the same paragraph
-there.
-
-<!-- Keep the Coordination paragraph inside the prompt below in sync with `.agents/workflows/pr-processing.md`. -->
+paragraphs. The `Coordination:` line below intentionally points at the canonical
+workflow rules instead of duplicating them.
 
 Use this template when creating the `/goal` text:
 
@@ -97,17 +95,10 @@ Goal name: <concrete goal name, not the pasted prompt text>.
 Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
-Coordination: follow the canonical coordination protocol in
-`.agents/workflows/pr-processing.md` under Coordination State and Worker Rules
-before creating worktrees or branches. Assign stable agent ids, claim before
-branching when the backend is available, heartbeat at phase transitions, create
-private `batches/<batch-id>.json` files for dependency lanes, and check
-`agent-coord status` at lane start and before dependency-sensitive rebase, push,
-readiness, or closeout decisions. Treat non-empty `blocked_on` refs as unmet
-dependencies; if a lane declares `depends_on` but status shows no matching
-private batch state, report dependency state as `UNKNOWN` and stop that lane.
-If status cannot be checked for a declared dependency lane, stop with dependency
-state `UNKNOWN` instead of using advisory fallback for that lane.
+Coordination: follow `.agents/workflows/pr-processing.md` under Coordination
+State and Worker Rules before creating worktrees or branches. Include stable
+agent ids, `agent-coord status` / claim outcomes, batch ids, dependency refs,
+and any `UNKNOWN` state in every worker lane and handoff.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 

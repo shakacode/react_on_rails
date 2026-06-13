@@ -286,7 +286,8 @@ If the user is using `/plan`, or asks to prepare a `/goal`, stop after producing
 Keep this goal prompt aligned with `.agents/skills/pr-batch/SKILL.md`,
 including the review/audit gate paragraphs.
 
-<!-- Keep the Coordination paragraph inside the prompt below in sync with `.agents/skills/pr-batch/SKILL.md`. -->
+The `$pr-batch` skill links to this canonical `Coordination:` paragraph instead
+of duplicating it.
 
 Use this goal prompt shape:
 

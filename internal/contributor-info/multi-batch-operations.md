@@ -28,7 +28,8 @@ should use this PR branch or `main` for the current workflow docs.
    ```
 
 2. Check out the public repo branch that contains the active workflow docs,
-   normally `main` after PR #3977 lands or the PR branch while it is still open.
+   normally `main` after the workflow docs land or the active PR branch while it
+   is still open.
 3. Clone or update the private backend and put `agent-coord` on `PATH`:
 
    ```bash
@@ -38,10 +39,13 @@ should use this PR branch or `main` for the current workflow docs.
    bin/agent-coord --help
    mkdir -p "$HOME/.local/bin"
    ln -sf "$PWD/bin/agent-coord" "$HOME/.local/bin/agent-coord"
-   agent-coord status
+   "$HOME/.local/bin/agent-coord" status
    ```
 
-4. If `agent-coord status` exits non-zero, report private state as `UNKNOWN` and
+   Add `$HOME/.local/bin` to the shell `PATH`, or keep using the full path in
+   later commands.
+
+4. If the status command exits non-zero, report private state as `UNKNOWN` and
    use the structured public claim comment fallback. Do not start a
    dependency-sensitive lane when the lane declares `depends_on` and private
    status cannot be checked.
