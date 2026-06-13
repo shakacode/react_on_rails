@@ -10,29 +10,17 @@ Fetch review comments from a GitHub PR in this repository, triage them, and crea
 
 ## Maintainer Attention Contract
 
-When a broad code-changing action is selected, apply the repository attention
-contract. Broad actions that may handle low-risk optional nits beyond an
-explicit selection are `a`, `f`, `f+i`, and `f+o`. Explicit `o <nums>` and
-`all optional` selections are code-changing only for the selected optional
-items; they must not sweep unrelated optional nits. Bare `o` is inspect/select
-only and must not edit files. No-code actions such as `m`, `r`, and
-rationale-only selections must only log, defer, decline, reply, or resolve
-threads after an allowed rationale/closeout; they must not edit files.
+Apply the Maintainer Attention Contract from `AGENTS.md` for all broad
+code-changing actions. Skill-specific routing:
 
-- Do not ask whether to fix behavior-preserving `OPTIONAL` nits. If they are
-  low-risk, in scope, and before the final-candidate debounce point, apply them
-  in the same local batch and record them in the summary. Use `AGENTS.md` for
-  the definitions of behavior-preserving, low-risk, and final-candidate debounce
-  point. If they are not worth fixing, record them as deferred or declined with
-  rationale.
-- If an optional item changes behavior, expands scope, or needs product
-  judgment, classify or promote it to `DISCUSS` instead of fixing it silently.
-  If a behavior-preserving optional nit is only deferred because fixing it would
-  restart an expensive review cycle, record it as deferred or declined with
-  rationale instead of promoting it.
-- Keep maintainer questions batched: after an action, return one decision block
-  for remaining `DISCUSS` or blocking items rather than prompting separately for
-  each optional nit.
+- Autonomous low-risk optional handling applies to `f`, `f+i`, and `f+o`.
+- Action `a` already selects every `MUST-FIX` and `OPTIONAL` item for inline
+  handling; it does not create additional autonomous optional scope.
+- Explicit `o <nums>` and `all optional` selections are scoped to selected
+  optional items only. Bare `o` is inspect/select-only.
+- No-file-edit actions have GitHub side effects only: `m` may prepare/post a
+  deferred-work bundle and create approved issues, `r` posts rationale replies,
+  and rationale-only selections must not edit local files.
 
 ## Step 1: Parse User Input
 
@@ -323,7 +311,11 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    deferred bundle, replying, resolving, or signaling readiness. Record each
    autonomous optional outcome before building the deferred bundle: fixed inline,
    declined, failed validation and dropped/reverted, or promoted to `DISCUSS`.
-2. Prepare one deferred-work bundle for all `DISCUSS` items, remaining
+2. Reply to each `MUST-FIX` or autonomous optional thread fixed or recorded
+   during the initial `f` gate, citing the pushed commit or recorded outcome,
+   and resolve threads when the concern is handled or explicitly
+   deferred/declined under the attention contract.
+3. Prepare one deferred-work bundle for all `DISCUSS` items, remaining
    `OPTIONAL` items worth tracking, and non-trivial `SKIPPED` items. Exclude
    weak "could consider" optional suggestions, trivial duplicates, factually
    incorrect suggestions, status noise, and already handled autonomous optional
@@ -331,20 +323,15 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    tracking, record the deferred/declined rationale and resolve or reply
    according to the chosen tracking/drop outcome instead of prompting
    separately. Do not create a GitHub issue yet.
-3. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Do not post replies or resolve bundled items until that tracking/drop outcome is chosen. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
-4. After the tracking/drop outcome is chosen, reply to each `MUST-FIX` or
-   autonomous optional thread fixed or recorded during the initial `f` gate,
-   citing the pushed commit or recorded outcome, and resolve threads when the
-   concern is handled or explicitly deferred/declined under the attention
-   contract.
+4. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Do not post replies or resolve bundled items until that tracking/drop outcome is chosen. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
 5. For each deferred item in the chosen tracking outcome, post a reply in the original location referencing that outcome (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists and the conversation is complete. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 6. For trivial `SKIPPED` items that are not included in the bundle (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads only when the user confirms.
 7. If the bundle is non-empty and any low-risk optional nits were excluded as
    not worth tracking, record the inline/deferred/declined rationale before
    signaling merge-ready.
 8. If there are zero deferred items, tell the user if any optional items were
-   excluded from the bundle as not worth tracking, then continue with whichever
-   of `f`'s remaining prompts still have actionable items. Do not re-prompt for
+   excluded from the bundle as not worth tracking, and continue with whichever of
+   `f`'s remaining prompts still have actionable items. Do not re-prompt for
    low-risk optional nits; apply, defer, or decline them under the attention
    contract. Continue with skipped rationale confirmation (if any `SKIPPED`
    items exist), then discuss decisions (if any `DISCUSS` items remain).
@@ -353,8 +340,11 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 
 ### Action `f+o` — Fix must-fix and optional items inline
 
-Do everything in `f` for `MUST-FIX` items, plus address all `OPTIONAL` items
-inline in the same PR. If optional fixes require a separate commit to keep the
+Use `f`'s `MUST-FIX` handling and commit/push-before-reply ordering, but do not
+run `f`'s autonomous optional defer/decline filtering. In `f+o`, every current
+`OPTIONAL` item is selected for inline handling: fix it in the same PR, or stop
+and promote it to `DISCUSS` if it turns out to need judgment, change behavior,
+or expand scope. If optional fixes require a separate commit to keep the
 must-fix commit atomic, commit them separately and ask for push confirmation
 before pushing. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts
 for those tiers. If there are zero `OPTIONAL` items, behave like `f` and note
@@ -368,7 +358,7 @@ Present the requested items with full context and ask the user for a decision on
 
 ### Action `o` — Optional items
 
-Present the requested items with full context. If the user enters bare `o`, present all `OPTIONAL` items for selection. For each selected optional item, treat it the same as a must-fix: make the code change, run relevant checks, reply, and resolve the thread. Use the same commit/push-before-reply ordering as action `f`. For optional items the user declines, offer a rationale reply via `r <nums>`.
+Present the requested items with full context. If the user enters bare `o`, present all `OPTIONAL` items for selection. For each selected optional item, treat it the same as a must-fix: make the code change, run relevant checks, reply, and resolve the thread. Use action `f`'s commit/push-before-reply ordering only; do not run `f`'s autonomous optional sweep or handle unselected optional items. For optional items the user declines, offer a rationale reply via `r <nums>`.
 
 Use `o` only when the user explicitly wants to inspect or select optional items.
 Bare `o` presents items only; do not edit files until the user chooses specific
