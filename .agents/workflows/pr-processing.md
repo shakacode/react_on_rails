@@ -37,10 +37,11 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      advisory fallback.
    - For lanes declared in `batches/<batch-id>.json` with `depends_on`, run
      `agent-coord status` at lane start and before rebase or push. If the lane
-     shows unmet `blocked_on` refs, set that lane's heartbeat to `--status
-blocked`, report the blocked refs in the handoff, and move to another
-     independent lane until the dependency reports a terminal status such as
-     `done`, `complete`, `completed`, `merged`, or `ready`.
+     shows unmet `blocked_on` refs, set that lane's heartbeat status to
+     `blocked`, report the blocked refs in the handoff, and move to another
+     independent lane until the dependency reports a backend terminal heartbeat
+     status. The current public summary lives in
+     [agent-coordination-backend.md](../../internal/contributor-info/agent-coordination-backend.md).
    - Use the current checkout for one focused task.
    - For multiple independent PRs or lanes (independent work streams with separate branch/worktree ownership), use one worktree per PR branch so agents do not overlap edits.
 4. Make a local batch:
@@ -289,7 +290,6 @@ Goal name: <concrete goal name, not the pasted prompt text>.
 Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
-<!-- Keep this Coordination block in sync with .agents/skills/pr-batch/SKILL.md. -->
 Coordination: assign a stable agent id per lane. When `shakacode/agent-coordination`
 is available (`agent-coord status` exits 0), acquire `agent-coord claim` for
 each issue/PR lane before creating that lane's worktree or branch; hard-stop if
@@ -298,13 +298,12 @@ heartbeat` at every phase transition. For lanes declared in
 `batches/<batch-id>.json` with `depends_on`, run `agent-coord status` at lane
 start and before rebase or push; if unmet `blocked_on` refs remain, set that
 lane heartbeat `--status blocked`, report the blocked refs, and move to another
-independent lane until the dependency reports a terminal status such as `done`,
-`complete`, `completed`, `merged`, or `ready`. Also use `agent-coord status`
-before dependency-sensitive readiness or closeout decisions. If `agent-coord
-status` cannot be checked, report `UNKNOWN` private state and use structured
-public claim comments as an advisory fallback. Structured public claim comments
-are fallback/advisory only; the private claim is the coordination source of
-truth.
+independent lane until the dependency reports a backend terminal heartbeat
+status. Also use `agent-coord status` before dependency-sensitive readiness or
+closeout decisions. If `agent-coord status` cannot be checked, report `UNKNOWN`
+private state and use structured public claim comments as an advisory fallback.
+Structured public claim comments are fallback/advisory only; the private claim
+is the coordination source of truth.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 

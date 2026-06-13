@@ -94,22 +94,13 @@ Goal name: <concrete goal name, not the pasted prompt text>.
 Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
-<!-- Keep this Coordination block in sync with .agents/workflows/pr-processing.md. -->
-Coordination: assign a stable agent id per lane. When `shakacode/agent-coordination`
-is available (`agent-coord status` exits 0), acquire `agent-coord claim` for
-each issue/PR lane before creating that lane's worktree or branch; hard-stop if
-refused and report the holder plus heartbeat liveness. Run `agent-coord
-heartbeat` at every phase transition. For lanes declared in
-`batches/<batch-id>.json` with `depends_on`, run `agent-coord status` at lane
-start and before rebase or push; if unmet `blocked_on` refs remain, set that
-lane heartbeat `--status blocked`, report the blocked refs, and move to another
-independent lane until the dependency reports a terminal status such as `done`,
-`complete`, `completed`, `merged`, or `ready`. Also use `agent-coord status`
-before dependency-sensitive readiness or closeout decisions. If `agent-coord
-status` cannot be checked, report `UNKNOWN` private state and use structured
-public claim comments as an advisory fallback. Structured public claim comments
-are fallback/advisory only; the private claim is the coordination source of
-truth.
+Coordination: follow the canonical coordination protocol in
+`.agents/workflows/pr-processing.md`: assign stable agent ids, run
+`agent-coord claim` before creating worktrees or branches when
+`agent-coord status` exits 0, hard-stop on refused claims, heartbeat at phase
+transitions, run `agent-coord status` before dependency-sensitive rebase, push,
+readiness, or closeout decisions, and use structured public claim comments only
+as an advisory fallback when private status cannot be checked.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 

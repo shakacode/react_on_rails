@@ -26,11 +26,14 @@ work, or the shared private coordination backend:
 - [internal/contributor-info/agent-coordination-backend.md](agent-coordination-backend.md) - pointer to the private coordination backend, heartbeat rules, and local smoke-check commands.
 - [internal/contributor-info/multi-batch-operations.md](multi-batch-operations.md) - operating model for multiple batches across machines, launch surfaces, and repos.
 
-Adopting repos should join the same private shakacode/agent-coordination repo
-instead of creating per-repo coordination stores. Claims and heartbeats are
-namespaced by full repo name, so one status table can safely include
-`shakacode/react_on_rails` and adopter repos such as
-`shakacode/react_on_rails_rsc`.
+ShakaCode-internal adopting repos should join the same private
+`shakacode/agent-coordination` repo instead of creating per-repo coordination
+stores. Claims and heartbeats are namespaced by full repo name, so one status
+table can safely include `shakacode/react_on_rails` and adopter repos such as
+`shakacode/react_on_rails_rsc`. External adopters should host their own private
+coordination backend with the same `agent-coord` schema, or skip this section and
+use the structured public claim comment fallback documented in
+[AGENTS.md](../../AGENTS.md).
 
 ### Claude support
 

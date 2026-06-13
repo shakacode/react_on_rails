@@ -78,5 +78,10 @@ liveness is missing or invalid. Use the private repo's launchd template for
 desktop sessions that need out-of-band renewal while an agent is between tool
 calls.
 
+For `batches/<batch-id>.json`, the dependency-complete heartbeat statuses at
+private backend commit `ed339f2` are `complete`, `completed`, `done`, `merged`,
+and `ready`. A released claim is audit state and does not unblock dependent
+lanes by itself.
+
 Do not store secrets, `.env` files, credentials, patches, customer data, or Pro
 source code in the coordination backend. It is only for minimal JSON state files.
