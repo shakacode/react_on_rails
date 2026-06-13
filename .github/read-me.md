@@ -40,6 +40,8 @@ The bot will:
 2. Post a confirmation message with links to the triggered workflows
 3. Start all CI jobs on your PR branch
 
+If the PR branch is from a fork or the PR head repository is unavailable, the bot posts maintainer guidance and exits without dispatching workflows.
+
 ### Why This Exists
 
 By default, PRs run a subset of CI jobs to provide fast feedback:

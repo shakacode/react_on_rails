@@ -242,7 +242,19 @@ jobs:
             }
 
             async function triggerFullCi(pr) {
-              if (pr.head.repo.full_name !== repoFullName) {
+              const headRepoFullName = pr.head.repo?.full_name;
+
+              if (!headRepoFullName) {
+                await addReaction('confused');
+                await postComment([
+                  'Unable to run full CI from this command because the PR head repository is unavailable.',
+                  '',
+                  'The repository may have been deleted or made private. A maintainer should push the branch to this repository or trigger the required workflows manually.'
+                ].join('\n'));
+                return;
+              }
+
+              if (headRepoFullName !== repoFullName) {
                 await addReaction('confused');
                 await postComment([
                   'Unable to run full CI from this command because the PR branch is from a fork.',
