@@ -45,10 +45,28 @@ describe InstallGenerator, type: :generator do
       dependencies = JSON.parse(content).fetch("dependencies")
 
       tailwind_dependency_requirements.each do |name, version|
-        exact_version = version.delete_prefix("^")
-        expect(dependencies[name]).to match(/\A\^?#{Regexp.escape(exact_version)}\z/)
+        expect_npm_dependency_to_satisfy(name, dependencies[name], version)
       end
     end
+  end
+
+  def expect_npm_dependency_to_satisfy(name, actual_version, expected_requirement)
+    expect(actual_version).not_to be_nil
+
+    unless expected_requirement.start_with?("^")
+      expect(actual_version).to eq(expected_requirement)
+      return
+    end
+
+    expected_floor = Gem::Version.new(expected_requirement.delete_prefix("^"))
+    actual = Gem::Version.new(actual_version.delete_prefix("^"))
+    upper_bound = Gem::Version.new("#{expected_floor.segments[0] + 1}.0.0")
+
+    expect(actual).to be >= expected_floor
+    expect(actual).to be < upper_bound
+  rescue ArgumentError
+    raise RSpec::Expectations::ExpectationNotMetError,
+          "expected #{name} dependency #{actual_version.inspect} to satisfy #{expected_requirement.inspect}"
   end
 
   def assert_tailwind_ssr_setup(config_dir:, extension:)
