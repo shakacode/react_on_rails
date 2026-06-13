@@ -186,9 +186,11 @@ module ReactOnRailsPro
           return if cache_options[:expires_in].present? || cache_options[:expires_at].present?
 
           Rails.logger.warn(
-            "[ReactOnRailsPro] cache_tags: used without cache_options[:expires_in]. Tag revalidation is " \
+            "[ReactOnRailsPro] cache_tags: used without cache_options[:expires_in] or " \
+            "cache_options[:expires_at]. Tag revalidation is " \
             "best-effort (index appends are lossy under concurrency, and the index itself can be evicted), " \
-            "so always set :expires_in on tagged entries to bound how long a missed invalidation can live."
+            "so always set :expires_in or :expires_at on tagged entries to bound how long a missed " \
+            "invalidation can live."
           )
         end
 

@@ -63,8 +63,8 @@ module ReactOnRailsPro
     attr_accessor rsc_bundle_js_file: String?
     attr_accessor react_client_manifest_file: String?
     attr_accessor react_server_client_manifest_file: String?
-    attr_accessor cache_tag_index_expires_in: Numeric?
-    attr_accessor cache_tag_index_max_keys: Integer?
+    attr_accessor cache_tag_index_expires_in: Numeric
+    attr_accessor cache_tag_index_max_keys: Integer
 
     def initialize: (
       ?renderer_url: String?,
@@ -91,7 +91,9 @@ module ReactOnRailsPro
       ?rsc_payload_generation_url_path: String?,
       ?rsc_bundle_js_file: String?,
       ?react_client_manifest_file: String?,
-      ?react_server_client_manifest_file: String?
+      ?react_server_client_manifest_file: String?,
+      ?cache_tag_index_expires_in: Numeric,
+      ?cache_tag_index_max_keys: Integer
     ) -> void
 
     def setup_config_values: () -> void

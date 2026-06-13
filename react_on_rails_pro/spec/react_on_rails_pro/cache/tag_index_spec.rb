@@ -253,12 +253,13 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(logger_mock).not_to have_received(:warn)
     end
 
-    it "warns in development when cache_tags are used without expires_in" do
+    it "warns in development when cache_tags are used without expires_in or expires_at" do
       allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
 
       described_class.register(["t"], "k1", {})
 
-      expect(logger_mock).to have_received(:warn).with(/without cache_options\[:expires_in\]/)
+      expected_warning = /without cache_options\[:expires_in\].*cache_options\[:expires_at\]/
+      expect(logger_mock).to have_received(:warn).with(expected_warning)
     end
 
     it "does not warn outside development" do

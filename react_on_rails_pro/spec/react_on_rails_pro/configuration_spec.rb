@@ -998,16 +998,26 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
         expect(ReactOnRailsPro.configuration.cache_tag_index_expires_in).to eq(3600)
         expect(ReactOnRailsPro.configuration.cache_tag_index_max_keys).to eq(100)
+
+        ReactOnRailsPro.configure do |config|
+          config.cache_tag_index_expires_in = 7.days
+        end
+
+        expect(ReactOnRailsPro.configuration.cache_tag_index_expires_in).to eq(7.days)
       end
 
       it "raises on a non-positive or non-numeric expires_in" do
         expect { ReactOnRailsPro.configure { |config| config.cache_tag_index_expires_in = 0 } }
+          .to raise_error(ReactOnRailsPro::Error, /cache_tag_index_expires_in/)
+        expect { ReactOnRailsPro.configure { |config| config.cache_tag_index_expires_in = Float::INFINITY } }
           .to raise_error(ReactOnRailsPro::Error, /cache_tag_index_expires_in/)
         expect { ReactOnRailsPro.configure { |config| config.cache_tag_index_expires_in = "1 day" } }
           .to raise_error(ReactOnRailsPro::Error, /cache_tag_index_expires_in/)
       end
 
       it "raises on a non-positive or non-integer max_keys" do
+        expect { ReactOnRailsPro.configure { |config| config.cache_tag_index_max_keys = 0 } }
+          .to raise_error(ReactOnRailsPro::Error, /cache_tag_index_max_keys/)
         expect { ReactOnRailsPro.configure { |config| config.cache_tag_index_max_keys = -1 } }
           .to raise_error(ReactOnRailsPro::Error, /cache_tag_index_max_keys/)
         expect { ReactOnRailsPro.configure { |config| config.cache_tag_index_max_keys = 5.5 } }
