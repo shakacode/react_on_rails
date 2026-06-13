@@ -199,6 +199,40 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 **GitHub follow-up issues**: Follow-up issues are the exception. Prefer fixing or declining review feedback in the PR. If deferred work remains valuable, present one bundled deferred-work summary and ask whether to track it. Prefer an existing issue; otherwise create at most one bundled issue per PR unless the user explicitly approves more. New follow-up issue titles must begin with `Follow-up:`. Build multi-line issue bodies as Markdown files and pass them with `gh issue create --body-file`; do not pass escaped newline strings through `--body`.
 
+## Maintainer Attention Contract
+
+Maintainer attention is for judgment, not for routine progress pings or
+machine-checkable work. Agents working PRs, reviews, or batches must apply this
+contract unless a maintainer explicitly narrows the run.
+
+- **Autonomous nits**: behavior-preserving `OPTIONAL` review nits may be fixed
+  inline without asking, when they stay inside the PR scope and do not restart a
+  final-candidate review cycle. If the nit is not worth fixing, record it as
+  deferred or declined with rationale instead of asking "OK to fix this nit?".
+  Escalate only when the item changes behavior, expands scope, conflicts with
+  policy, or has unclear risk.
+- **CI-wait protocol**: while checks or review bots are running, do bounded
+  useful work such as self-review, queued autonomous cleanup, documentation sync,
+  or another independent lane. Do not interrupt the maintainer for routine
+  "CI is still running", "CI is green", or "review arrived" updates.
+- **One decision point per lane**: batch genuine judgment calls into one decision
+  block at lane completion or hard block. The block must include the question,
+  options, recommendation, evidence links or command output, and the next action
+  after an answer. Avoid "see above" decisions that require the maintainer to
+  reconstruct context.
+- **Self-verification before escalation**: anything provable by tests, lint,
+  screenshots, repro scripts, `gh` state, or code inspection must arrive with
+  that evidence attached. Use `UNKNOWN` for facts that could not be verified.
+- **Attention metric**: batch closeouts count human decision points per PR, with
+  a target of at most one for low-risk lanes. Higher counts are reported as FYI
+  process churn, not hidden in narrative handoffs.
+- **Confidence notes**: delegated merge authority exists only when the current
+  user or batch goal grants it and the release-mode rules permit it. Before a
+  delegated merge, the worker or coordinator writes a confidence note in the
+  issue, PR body, or batch handoff covering validated commands, evidence links,
+  remaining `UNKNOWN` facts, and residual risk. When merge authority is not
+  delegated, use the same format for merge-readiness evidence without merging.
+
 ## Release Mode And Auto-Merge Coordination
 
 Use the current release tracker to decide whether PRs are in normal development, accelerated RC, strict RC, or final-release mode. The tracker is the live source of truth for the mode; committed docs define how to interpret it.
