@@ -108,7 +108,9 @@ Execution rules:
   lane start and before rebase or push. If the lane shows unmet `blocked_on`
   refs, set heartbeat `--status blocked`, report the blocked refs, and move to
   another independent lane until dependencies report a backend terminal
-  heartbeat status.
+  heartbeat status. If a lane declares `depends_on` but `agent-coord status`
+  shows no matching private batch state, treat dependency state as `UNKNOWN` and
+  stop to report the missing private batch file.
 - Final handoff must include links, tests, blockers, next action, and merged/ready/blocked/deferred/UNKNOWN sections.
 ```
 
