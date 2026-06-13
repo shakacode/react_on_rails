@@ -49,8 +49,7 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - Prefer narrow fail-fast guards, clearer errors, docs, or workarounds when they solve the real risk.
    - Be skeptical of broad identity, runtime, CI, workflow, dependency, or Pro/RSC changes unless impact justifies the complexity.
    - Split complex fixes into prerequisites and decision points; do not let a polished RFC imply immediate priority.
-
-   - For investigation or benchmark issues, recommendations to `close` or
+   - For investigation or benchmark conclusions, recommendations to `close` or
      `document/work around` require closing evidence. Cite a reproducible artifact
      (script, data file, benchmark command plus environment) or state the
      missing-artifact caveat, verify that headline numbers match the document's
