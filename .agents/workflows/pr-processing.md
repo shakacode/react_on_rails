@@ -214,7 +214,7 @@ When a committed lockfile's contents change, the PR evidence must include a
 lockfile content-diff note. Name the changed dependencies, give the one-line
 rationale for each intentional version/source change, compare the same
 dependency across sibling lockfiles in the repo, and explicitly call out
-platform-precompiled to source-build transitions or newly introduced build-time
+platform-precompiled/source-build transitions or newly introduced build-time
 dependencies. Unexplained sibling-version splits or platform/source-build
 transitions block merge-readiness until aligned or justified.
 
@@ -302,7 +302,7 @@ Classify each target before assigning a worker:
 - **No-PR evidence comment**: the issue is duplicate, low-value, already fixed, or better closed with evidence. The posted comment is the deliverable; include live evidence, the no-PR rationale, and whether the issue should stay open, close, or wait.
 - **Product-decision blocker**: the issue needs a maintainer/product decision before code would be safe. The deliverable is a surfaced question or decision request, not a speculative branch.
 
-For investigation or benchmark conclusions, apply the closing-evidence bar to every outcome path. Implementation PRs, combined investigation PRs, and no-PR evidence comments that recommend close, park, or document/work around must cite a reproducible artifact (script, data file, benchmark command plus environment) or state the missing-artifact caveat, and verify that headline numbers match the document's own tables before recommending close/park.
+For investigation or benchmark conclusions, apply the closing-evidence bar from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md` to every outcome path. Implementation PRs, combined investigation PRs, and no-PR evidence comments that recommend close, park, or document/work around must satisfy that canonical gate before recommending or carrying the disposition forward.
 
 Workers should not turn product-decision blockers into speculative PRs. They should post or draft the evidence-backed question and stop that target.
 

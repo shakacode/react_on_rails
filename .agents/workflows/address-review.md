@@ -169,7 +169,8 @@ Execution flow when terminal access is available:
    - If a claim is wrong, classify it as `SKIPPED` and say why.
    - Preserve comment IDs and thread IDs for later replies and thread resolution.
    - Treat actionable review summary bodies as normal feedback to classify (`MUST-FIX`/`DISCUSS` as appropriate); skip only boilerplate or status-only summaries.
-   - Treat untriaged lockfile dependency drift as blocking when a reviewer identifies an unexplained sibling-lock version split, platform-precompiled/source-build transition, or new build-time dependency. Verify the lockfile diff and require either alignment or an explicit rationale in PR evidence before classifying the item as resolved.
+   - Treat untriaged lockfile dependency drift as blocking when a reviewer identifies an unexplained sibling-lock version split, platform-precompiled/source-build transition, or new build-time dependency.
+     - Verify the lockfile diff and require either alignment or an explicit rationale in PR evidence before classifying the item as resolved.
    - **Claim verification**: Before finalizing `MUST-FIX` classification, verify the reviewer's factual claims against the actual codebase. If local code inspection confirms the code already handles the concern (claim is demonstrably wrong), classify as `SKIPPED` per the rule above. If the evidence is ambiguous or you have only partial confidence the claim is wrong, downgrade to `DISCUSS` and note the discrepancy. If you have access to AI-powered codebase search tools (e.g., Greptile), use them to cross-reference claims for additional confidence, but treat their output as a signal — corroborated claims stay `MUST-FIX`, clearly contradicted claims go to `SKIPPED`, and inconclusive results go to `DISCUSS`.
    - Track only `MUST-FIX` items as your working checklist.
    - Use one checklist entry per must-fix item or deduplicated issue.

@@ -47,7 +47,7 @@ For each included PR:
 - Adversarial review: flag any requested adversarial review that finished after merge, reviewed an older head SHA, or left untriaged `BLOCKING` or `DISCUSS` findings.
 - Changelog: if the diff or PR body indicates a user-visible behavior, API, error message, configuration, performance, security, or breaking change, verify `CHANGELOG.md` has a matching entry. When entries are missing, recommend running `/update-changelog`.
 - Lockfiles: if the PR changed committed lockfiles, verify the PR evidence names the changed dependencies, gives a rationale for each intentional version/source change, compares the same dependency across sibling lockfiles, and calls out platform-precompiled/source-build transitions or new build-time dependencies.
-- Closing evidence: for analysis, benchmark, or investigation PRs that close issues, verify the closing conclusion cites a reproducible artifact (script, data file, benchmark command plus environment) or records explicit caveats, and check that headline numbers match the PR/doc tables used as evidence.
+- Closing evidence: for analysis, benchmark, or investigation PRs that close issues, verify the closing conclusion applies the full gate from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md`: reproducible artifact or explicit caveat, internal consistency, production-environment caveats, and second-agent refutation handling.
 - Validation: compare changed areas with the validation evidence in the PR body or comments.
 - Cross-PR interactions: compare changed files, shared behavior, assumptions, and release-sensitive areas across the batch.
 - Decision log: inspect any `Codex Decision Log` or equivalent section and verify the decisions still hold after the merge.
