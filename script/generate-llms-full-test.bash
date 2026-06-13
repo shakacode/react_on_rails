@@ -14,9 +14,14 @@ FAILURES=()
 
 fail() {
   local message="$1"
-  TESTS_FAILED=$((TESTS_FAILED + 1))
-  FAILURES+=("$CURRENT_TEST: $message")
+  if [ -n "${FAILURE_FILE:-}" ]; then
+    printf '%s\n' "$CURRENT_TEST: $message" >> "$FAILURE_FILE"
+  else
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    FAILURES+=("$CURRENT_TEST: $message")
+  fi
   echo "  FAIL: $message" >&2
+  return 1
 }
 
 assert_contains() {
@@ -38,24 +43,35 @@ run_test() {
   TESTS_RUN=$((TESTS_RUN + 1))
   echo "-> $test_fn"
 
-  local tmpdir before_failed
+  local tmpdir failure_file new_failures
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/generate-llms-full-test.XXXXXX")"
-  before_failed="$TESTS_FAILED"
+  failure_file="$tmpdir/.failures"
+  : > "$failure_file"
 
   set +e
   (
     set -euo pipefail
     cd "$tmpdir" || exit 1
+    FAILURE_FILE="$failure_file"
     "$test_fn"
   )
   local rc=$?
+
+  if [ -s "$failure_file" ]; then
+    while IFS= read -r failure; do
+      FAILURES+=("$failure")
+    done < "$failure_file"
+    new_failures="$(wc -l < "$failure_file" | tr -d '[:space:]')"
+    TESTS_FAILED=$((TESTS_FAILED + new_failures))
+  fi
+
   if [ "$rc" -ne 0 ] && [ "${KEEP_GENERATE_LLMS_FULL_TEST_TMP:-}" = "1" ]; then
     echo "  Keeping failed fixture at $tmpdir" >&2
   else
     rm -rf "$tmpdir"
   fi
 
-  if [ "$rc" -ne 0 ] && [ "$TESTS_FAILED" -eq "$before_failed" ]; then
+  if [ "$rc" -ne 0 ] && [ "${new_failures:-0}" -eq 0 ]; then
     TESTS_FAILED=$((TESTS_FAILED + 1))
     FAILURES+=("$CURRENT_TEST: subshell exited $rc (see stderr above for details)")
     echo "  FAIL: subshell exited $rc" >&2

@@ -539,7 +539,10 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#expect_npm_dependency_to_satisfy" do
-    it "uses npm caret upper bounds for zero-major versions" do
+    it "uses npm caret upper bounds" do
+      expect { expect_npm_dependency_to_satisfy("example", "^4.3.1", "^4.3.0") }.not_to raise_error
+      expect { expect_npm_dependency_to_satisfy("example", "^5.0.0", "^4.3.0") }
+        .to raise_error(RSpec::Expectations::ExpectationNotMetError)
       expect { expect_npm_dependency_to_satisfy("example", "^0.1.9", "^0.1.0") }.not_to raise_error
       expect { expect_npm_dependency_to_satisfy("example", "^0.2.0", "^0.1.0") }
         .to raise_error(RSpec::Expectations::ExpectationNotMetError)

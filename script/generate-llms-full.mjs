@@ -295,7 +295,7 @@ function docsUrlsFromFile(file) {
   });
 }
 
-function validateDocUrls(docs) {
+function validateDocUrls(docs, docsUrlsByFile) {
   // Only the published route counts: a slugged doc's file-path route and a
   // README/index file's literal path are not live URLs and must not validate.
   // Intentional references to redirect URLs go in docs/.llms-known-redirects.
@@ -320,7 +320,7 @@ function validateDocUrls(docs) {
 
   let validated = 0;
   for (const file of [LLMS_FILE, PREAMBLE_FILE]) {
-    for (const { url, docPath } of docsUrlsFromFile(file)) {
+    for (const { url, docPath } of docsUrlsByFile.get(file)) {
       validated += 1;
       if (!resolves(docPath)) {
         fail(
@@ -332,8 +332,8 @@ function validateDocUrls(docs) {
   return validated;
 }
 
-function validateSidebarTopLevelSections(docs) {
-  const llmsDocPaths = new Set(docsUrlsFromFile(LLMS_FILE).map(({ docPath }) => docPath));
+function validateSidebarTopLevelSections(docs, llmsUrls) {
+  const llmsDocPaths = new Set(llmsUrls.map(({ docPath }) => docPath));
   const sections = sidebarTopLevelSections(docs);
 
   for (const { label, docIds } of sections) {
@@ -374,8 +374,12 @@ function validateSplitThreshold(output) {
 const docs = collectDocs();
 const orderedIds = sidebarOrderedIds(docs);
 const output = generate(docs, orderedIds);
-const validatedUrlCount = validateDocUrls(docs);
-const validatedSidebarSectionCount = validateSidebarTopLevelSections(docs);
+const docsUrlsByFile = new Map([
+  [LLMS_FILE, docsUrlsFromFile(LLMS_FILE)],
+  [PREAMBLE_FILE, docsUrlsFromFile(PREAMBLE_FILE)],
+]);
+const validatedUrlCount = validateDocUrls(docs, docsUrlsByFile);
+const validatedSidebarSectionCount = validateSidebarTopLevelSections(docs, docsUrlsByFile.get(LLMS_FILE));
 const outputSizeKib = validateSplitThreshold(output);
 
 if (checkMode) {
