@@ -16,8 +16,8 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 });
 
-// v6.1.1 does not expose a flat preset for just these compiler-era
-// Rules-of-React checks. Revisit this list when bumping eslint-plugin-react-hooks.
+// v6.1.1 does not expose a flat preset for these compiler-era Rules-of-React
+// checks. Revisit this explicit list when bumping eslint-plugin-react-hooks.
 const reactCompilerRulesOfReact = {
   'react-hooks/static-components': 'error',
   'react-hooks/use-memo': 'error',
@@ -32,7 +32,6 @@ const reactCompilerRulesOfReact = {
   'react-hooks/purity': 'error',
   'react-hooks/set-state-in-render': 'error',
   'react-hooks/unsupported-syntax': 'warn',
-  // Included from the v6.1.1 compiler-era recommended-latest rule set.
   'react-hooks/config': 'error',
   'react-hooks/gating': 'error',
 } as const;

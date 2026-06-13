@@ -6061,7 +6061,7 @@ If you adopt the compiler, keep verifying SSR for your own components — especi
 
 ## RSC boundary example
 
-React Server Components still use the same transform pipeline. Compile the client island and leave the Server Component directive-free:
+The React Compiler applies only to Client Components (`'use client'`). Keep Server Components directive-free and outside the `sources` predicate:
 
 ```tsx
 // components/compiler-ready/Picker.client.tsx
