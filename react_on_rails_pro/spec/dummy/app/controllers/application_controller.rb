@@ -57,14 +57,14 @@ class ApplicationController < ActionController::Base
     # base64/session generators are already safe.
     nonce = request.content_security_policy_nonce
     nonce_attribute = nonce.present? ? %( nonce="#{ERB::Util.html_escape(nonce)}") : ""
-    js_redirect = <<~JAVASCRIPT
+    js_redirect = <<~HTML
       <script#{nonce_attribute}>
         document.getElementById('page-container').innerHTML = #{ActiveSupport::JSON.encode(error_message)};
         setTimeout(function() {
-          window.location.href = '#{server_side_log_throw_raise_invoker_path}';
+          window.location.href = #{ActiveSupport::JSON.encode(server_side_log_throw_raise_invoker_path)};
         }, 5000);
       </script>
-    JAVASCRIPT
+    HTML
 
     meta_refresh = <<~HTML
       <meta http-equiv='refresh' content='5;url=#{server_side_log_throw_raise_invoker_path}'>
