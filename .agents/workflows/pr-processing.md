@@ -28,6 +28,12 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
    - When the value, priority, or proposed fix scope is unclear, use `.agents/skills/evaluate-issue/SKILL.md` before implementation (or `.agents/workflows/evaluate-issue.md` for agents without skill support).
 3. Isolate the work:
    - Fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
+   - When the private `shakacode/agent-coordination` backend is available, acquire
+     an `agent-coord claim` for each issue/PR lane before creating that lane's
+     worktree or branch. Machine agents must hard-stop when the claim is refused
+     and report the holder plus heartbeat liveness. Structured public claim
+     comments are fallback/advisory only; the private claim is the coordination
+     source of truth.
    - Use the current checkout for one focused task.
    - For multiple independent PRs or lanes (independent work streams with separate branch/worktree ownership), use one worktree per PR branch so agents do not overlap edits.
 4. Make a local batch:
@@ -277,8 +283,12 @@ Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
 Coordination: assign a stable agent id per lane. When `shakacode/agent-coordination`
-is available, run `agent-coord heartbeat` at every phase transition and use
-`agent-coord status` before dependency-sensitive work.
+is available, acquire `agent-coord claim` for each issue/PR lane before creating
+that lane's worktree or branch; hard-stop if refused and report the holder plus
+heartbeat liveness. Run `agent-coord heartbeat` at every phase transition and use
+`agent-coord status` before dependency-sensitive work. Structured public claim
+comments are fallback/advisory only; the private claim is the coordination source
+of truth.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -415,6 +425,10 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
 - For concurrent or multi-machine batches, use the private `shakacode/agent-coordination`
   backend when available. Each lane gets a stable agent id such as
   `m5-codex-batch2` or `m1-claude-fable-lane1`.
+- Acquire an `agent-coord claim` for each issue/PR lane before creating that
+  lane's worktree or branch. A refused claim is a hard stop for machine agents:
+  report the holder, heartbeat liveness, and target instead of creating a
+  competing branch.
 - Refresh heartbeats with `agent-coord heartbeat` at phase transitions: item
   start, branch or PR update, review pass, blocked state, and done state.
   Heartbeat liveness is timestamp-derived: `live` before the TTL expires,
@@ -422,7 +436,8 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
   sticky labels.
 - Use `agent-coord status` before starting dependency-sensitive lanes and before
   rebase, push, readiness, or closeout decisions that depend on another lane.
-- Prefer a structured claim comment for resumable coordination:
+- Use a structured public claim comment only as an advisory fallback or human
+  hint when the private backend is unavailable or explicitly mirrored:
 
 ```markdown
 <!-- codex-claim v1
@@ -438,16 +453,21 @@ expires_at: <ISO8601_UTC>
 Use any stable session, thread, or machine identifier that lets a restarted
 coordinator recognize its own work; if none exists, use `thread: unavailable`
 and rely on the machine, branch, and batch fields. Set `expires_at` to a short
-bounded lease, usually 2-4 hours for an active batch or no later than the known
-batch window. Refresh the claim when continuing beyond that window.
+bounded advisory lease, usually 2-4 hours for an active batch or no later than
+the known batch window. Refresh the comment when continuing beyond that window.
+Do not use the public comment to override or bypass a private claim refusal.
 
-On restart, search for existing claim comments. Resume your own live claim, skip another live claim, or treat expired claims as recoverable after reporting the takeover.
+On restart, prefer `agent-coord status` and the private claim/heartbeat state.
+Use claim comments only to recover context when the backend is unavailable.
 
 ### Worker Rules
 
 When worker subagents are explicitly authorized:
 
 - Assign one target or one disjoint lane per worker.
+- Acquire the lane's `agent-coord claim` before creating the worker worktree or
+  branch when the backend is available. If the claim is refused, the worker
+  reports the holder and heartbeat liveness, then stops that lane.
 - Give each worker a separate worktree and branch.
 - Tell workers they are not alone in the codebase and must not revert others' edits.
 - Keep write scopes disjoint unless the main agent serializes integration.

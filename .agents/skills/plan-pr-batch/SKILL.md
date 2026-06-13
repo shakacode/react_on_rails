@@ -26,6 +26,12 @@ Plan a PR batch
    - For every bare number, run both `gh pr view N` and `gh issue view N` when type is ambiguous.
    - For filters, run focused `gh pr list` or `gh issue list` commands and keep the query in the report.
    - Record title, URL, state, branch/author for PRs, labels, linked PR/issue refs, and blockers. If a fact cannot be verified, write `UNKNOWN`.
+   - If the private `shakacode/agent-coordination` backend is available, run
+     `agent-coord status` and exclude/report targets that already have active
+     live or stale private claims, including holder and heartbeat liveness.
+     Report dead or fallback-expired claims as recoverable before assigning
+     takeover work. If backend state cannot be checked, write `UNKNOWN`; public
+     claim comments are advisory only.
 
 3. Shape
    - Exclude issues labeled `needs-customer-feedback` from implementation batches unless the user explicitly provides customer evidence or maintainer approval for that issue; list them under "Excluded or deferred" with `needs-customer-feedback` as the reason.
@@ -51,7 +57,7 @@ Plan a PR batch
 - Excluded or deferred:
 - Dependencies and sequencing:
 - Subagent split:
-- Coordination hooks:
+- Coordination hooks, including backend claim exclusions:
 - Verification expectations:
 - Open questions:
 
@@ -81,7 +87,7 @@ Execution rules:
 - Follow `.agents/skills/pr-batch/SKILL.md` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
 - Dispatch one subagent per independent item; group dependent items only when shared context is required.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
-- For concurrent or dependency-sensitive batches, assign a stable agent id per lane and use `agent-coord heartbeat` / `agent-coord status` when the private coordination backend is available.
+- For concurrent or dependency-sensitive batches, assign a stable agent id per lane. When the private coordination backend is available, use `agent-coord claim` before creating worktrees/branches, `agent-coord heartbeat` at phase transitions, and `agent-coord status` before dependency-sensitive work.
 - Final handoff must include links, tests, blockers, next action, and merged/ready/blocked/deferred/UNKNOWN sections.
 ```
 
