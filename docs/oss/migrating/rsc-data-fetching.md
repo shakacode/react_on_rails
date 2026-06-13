@@ -40,26 +40,40 @@ export default function UserProfile({ userId }) {
 }
 ```
 
-### After: Server Component
+### After: Server Component with Async Props
 
 ```jsx
-// UserProfile.jsx -- Server Component (no directive)
+// UserPage.jsx -- Server Component (no directive needed)
+import { Suspense } from 'react';
 
-export default function UserProfile({ user }) {
+export default function UserPage({ getReactOnRailsAsyncProp }) {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <UserProfile userPromise={getReactOnRailsAsyncProp('user')} />
+    </Suspense>
+  );
+}
+
+async function UserProfile({ userPromise }) {
+  const user = await userPromise;
   return <div>{user.name}</div>;
 }
 ```
 
-Rails prepares the data in the controller and passes it as props. The component no longer fetches, manages loading states, or handles errors — it just renders.
+Rails streams the data through async props using `stream_react_component_with_async_props`. The component uses `getReactOnRailsAsyncProp` to obtain data as a Promise, and `<Suspense>` handles loading states — no client-side fetching, no `useState`, no `useEffect`.
 
 **What changed:**
 
 - No `useState` for data, loading, or error
 - No `useEffect` lifecycle management
 - No `'use client'` directive
-- Data comes from Rails as props — no client-side fetching
-- No loading spinner needed in the component itself
+- Data comes from Rails via async props — no client-side fetching
+- `<Suspense>` replaces manual loading/error checks
 - No JavaScript ships to the client for this component
+
+<p align="center">
+  <img src="images/waterfall-vs-parallel.svg" alt="Side-by-side comparison showing client-side fetching requiring an extra API round trip after mount versus Server Component pattern where Rails streams data via async props — no extra round trips, no client state management, Suspense handles loading." width="840" />
+</p>
 
 For pages with multiple data sources, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro) to
 stream the rendered HTML to the browser as React renders the component tree. When slower data sources should resolve

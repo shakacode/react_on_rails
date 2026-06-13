@@ -2,6 +2,10 @@
 
 In traditional React, `useContext` lets any component in the tree access shared data like the current user, locale, or theme. Server Components cannot use Context — they render once on the server and never re-render. This guide covers how to share per-request data across Server Components without prop drilling, using `React.cache()` as a per-request store.
 
+<p align="center">
+  <img src="images/react-cache-vs-prop-drilling.svg" alt="Animated toggle between two approaches to sharing per-request data across Server Components: prop drilling (threading data through every component) versus React.cache() with zero-arg cached getters that any component can call directly." width="840" />
+</p>
+
 ## The Problem: Prop Drilling in Server Components
 
 When multiple Server Components need the same data, the naive approach is to pass it as props through every level:

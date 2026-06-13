@@ -14,14 +14,6 @@ Every server-rendered element becomes a JSON array in the payload:
 ["$","div",null,{"className":"flex items-center justify-between px-4 py-2 bg-white shadow-sm rounded-lg","children":[...]}]
 ```
 
-In one benchmark of a Tailwind-heavy app with repeated card/list components, the Flight payload broke down approximately as:
-
-| Category              | Approximate share | Description                                                           |
-| --------------------- | ----------------- | --------------------------------------------------------------------- |
-| **className strings** | ~48%              | CSS class lists, especially verbose with utility-first CSS (Tailwind) |
-| **Structural JSON**   | ~25%              | The `["$","div",null,{...}]` wrappers around every element            |
-| **Content data**      | ~27%              | Actual text, numbers, and data values                                 |
-
 In contrast, when a Client Component is referenced from a Server Component, the payload contains only a lightweight **client reference** (module ID + chunk metadata) plus the serialized props. The browser renders the element tree locally from the JavaScript bundle it already has.
 
 ## Why "All Display-Only = Server" Is an Oversimplification
@@ -98,6 +90,18 @@ Results:
 
 The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** -- a 31:1 ratio.
 In this benchmark, the TTFB improvement came primarily from the server serializing far less Flight data before it could emit the first byte. The wire-size reduction alone would not normally explain the full change.
+
+The savings were dominated by className strings. In the Tailwind-heavy benchmark, the Flight payload broke down as:
+
+| Category              | Approximate share | Description                                                           |
+| --------------------- | ----------------- | --------------------------------------------------------------------- |
+| **className strings** | ~48%              | CSS class lists, especially verbose with utility-first CSS (Tailwind) |
+| **Structural JSON**   | ~25%              | The `["$","div",null,{...}]` wrappers around every element            |
+| **Content data**      | ~27%              | Actual text, numbers, and data values                                 |
+
+<p align="center">
+  <img src="images/flight-payload-breakdown.svg" alt="Diagram showing what makes up the RSC Flight payload: className strings (~48%), structural JSON (~25%), and content data (~27%). Includes expansion ratio benchmarks for real components like StarRating (16:1) and ReviewSnippets (9.3:1)." width="840" />
+</p>
 
 ### How to Apply It
 
@@ -227,30 +231,19 @@ In the benchmark, LCP increased by 8% (982 ms to 1,058 ms) -- a minor regression
 
 If LCP is your critical metric (e.g., for a landing page with a hero image), be more conservative about moving components to the client.
 
-## React on Rails: Double JSON.stringify Overhead
+## React on Rails: Double JSON.stringify (Resolved)
 
-React on Rails embeds the RSC payload within a Rails-rendered HTML page. In setups where Flight data is embedded into inline `<script>` tags, the Flight payload (already a serialized wire format) gets JSON-encoded again when Rails embeds it in the page response. That extra encoding can add significant overhead to already large payloads. This applies to the current inline-script embedding path discussed in issue #2522; apps that serve the payload through a separate endpoint are a different case.
+React on Rails previously double-encoded the RSC payload when embedding it in inline `<script>` tags — the Flight payload (already a serialized wire format) was JSON-encoded again, adding ~24% overhead. This was fixed in [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) with the length-prefixed streaming protocol, which sends HTML content as raw bytes with a length prefix instead of re-encoding it as JSON.
 
-For larger Flight payloads, this double-encoding can add meaningful overhead. See [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) (currently open) for measurements and progress toward a fix.
+The Flight payload optimization patterns in this guide (expansion ratios, presentational client components) remain important regardless — they address the inherent size of the serialized element tree, not the encoding overhead.
 
 ## Decision Flowchart
 
 Use this flowchart when deciding whether a presentational component should be a Server or Client Component:
 
-```text
-Is the component interactive (hooks, events, browser APIs)?
-├── Yes → Client Component (standard RSC rule)
-└── No → Does it access server-only resources (DB, API keys, server-only imports)?
-    ├── Yes → Server Component (cannot be a Client Component)
-    └── No → Is it repeated many times on the page?
-        ├── No → Server Component (standard RSC rule)
-        └── Yes → Is the element tree much larger than the data props?
-            ├── No → Server Component
-            └── Yes → Will moving to client keep JS bundle increase small?
-                ├── No → Server Component (bundle cost outweighs payload savings)
-                └── Yes → Consider Client Component (this optimization)
-                    └── Measure payload before/after to confirm savings
-```
+<p align="center">
+  <img src="images/server-client-decision-flowchart.svg" alt="Static flowchart guiding developers through the decision of whether a component should be a Server Component or Client Component, based on interactivity, server-only resources, repetition ratio, expansion ratio, and bundle cost." width="840" />
+</p>
 
 ## Summary
 

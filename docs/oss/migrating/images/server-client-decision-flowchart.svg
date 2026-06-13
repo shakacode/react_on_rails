@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 520" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Server vs Client Component Decision Flowchart</title>
+  <desc>Static flowchart guiding developers through the decision of whether a component should be a Server Component or Client Component, based on interactivity, server-only resources, repetition ratio, expansion ratio, and bundle cost.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.08"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .decision { fill: #DBEAFE; stroke: #93C5FD; }
+      .decision-text { fill: #1E40AF; }
+      .result-server { fill: #ECFDF5; stroke: #22C55E; }
+      .result-server-text { fill: #166534; }
+      .result-client { fill: #FFF7ED; stroke: #F97316; }
+      .result-client-text { fill: #9A3412; }
+      .result-measure { fill: #FEF3C7; stroke: #FCD34D; }
+      .result-measure-text { fill: #92400E; }
+      .yes-line { stroke: #22C55E; }
+      .no-line { stroke: #EF4444; }
+      .yes-text { fill: #166534; }
+      .no-text { fill: #991B1B; }
+      .arrow-yes { fill: #22C55E; }
+      .arrow-no { fill: #EF4444; }
+      .label-sub { fill: #64748B; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .decision { fill: #172554; stroke: #3B82F6; }
+        .decision-text { fill: #93C5FD; }
+        .result-server { fill: #052E16; stroke: #10B981; }
+        .result-server-text { fill: #6EE7B7; }
+        .result-client { fill: #431407; stroke: #F97316; }
+        .result-client-text { fill: #FDBA74; }
+        .result-measure { fill: #422006; stroke: #F59E0B; }
+        .result-measure-text { fill: #FCD34D; }
+        .yes-line { stroke: #10B981; }
+        .no-line { stroke: #F87171; }
+        .yes-text { fill: #6EE7B7; }
+        .no-text { fill: #FCA5A5; }
+        .arrow-yes { fill: #10B981; }
+        .arrow-no { fill: #F87171; }
+        .label-sub { fill: #94A3B8; }
+      }
+    </style>
+  </defs>
+
+  <rect width="850" height="520" class="bg"/>
+  <text x="410" y="26" text-anchor="middle" font-size="18" font-weight="700" class="title">Server or Client Component?</text>
+  <text x="410" y="44" text-anchor="middle" font-size="11" class="subtitle">Decision flowchart for RSC migration</text>
+
+  <!-- Q1: Interactive? -->
+  <g transform="translate(290, 62)">
+    <polygon points="120,0 240,35 120,70 0,35" class="decision" stroke-width="2" filter="url(#shadow)"/>
+    <text x="120" y="32" text-anchor="middle" font-size="9" font-weight="600" class="decision-text">Interactive?</text>
+    <text x="120" y="44" text-anchor="middle" font-size="8" class="decision-text">(hooks, events, browser APIs)</text>
+  </g>
+
+  <!-- Q1 → Yes → Client -->
+  <line x1="530" y1="97" x2="660" y2="97" class="yes-line" stroke-width="2"/>
+  <polygon points="660,93 672,97 660,101" class="arrow-yes"/>
+  <text x="590" y="90" font-size="9" font-weight="600" class="yes-text">Yes</text>
+
+  <rect x="674" y="80" width="130" height="34" rx="8" class="result-client" stroke-width="2"/>
+  <text x="739" y="102" text-anchor="middle" font-size="10" font-weight="700" class="result-client-text">Client Component</text>
+
+  <!-- Q1 → No → Q2 -->
+  <line x1="410" y1="132" x2="410" y2="160" class="no-line" stroke-width="2"/>
+  <polygon points="406,160 410,172 414,160" class="arrow-no"/>
+  <text x="420" y="150" font-size="9" font-weight="600" class="no-text">No</text>
+
+  <!-- Q2: Server-only resources? -->
+  <g transform="translate(290, 170)">
+    <polygon points="120,0 240,35 120,70 0,35" class="decision" stroke-width="2" filter="url(#shadow)"/>
+    <text x="120" y="32" text-anchor="middle" font-size="9" font-weight="600" class="decision-text">Uses server-only resources?</text>
+    <text x="120" y="44" text-anchor="middle" font-size="8" class="decision-text">(DB, API keys, fs, env)</text>
+  </g>
+
+  <!-- Q2 → Yes → Server -->
+  <line x1="290" y1="205" x2="160" y2="205" class="yes-line" stroke-width="2"/>
+  <polygon points="160,201 148,205 160,209" class="arrow-yes"/>
+  <text x="230" y="198" font-size="9" font-weight="600" class="yes-text">Yes</text>
+
+  <rect x="16" y="188" width="130" height="34" rx="8" class="result-server" stroke-width="2"/>
+  <text x="81" y="210" text-anchor="middle" font-size="10" font-weight="700" class="result-server-text">Server Component</text>
+
+  <!-- Q2 → No → Q3 -->
+  <line x1="410" y1="240" x2="410" y2="268" class="no-line" stroke-width="2"/>
+  <polygon points="406,268 410,280 414,268" class="arrow-no"/>
+  <text x="420" y="258" font-size="9" font-weight="600" class="no-text">No</text>
+
+  <!-- Q3: Repeated many times? -->
+  <g transform="translate(290, 278)">
+    <polygon points="120,0 240,35 120,70 0,35" class="decision" stroke-width="2" filter="url(#shadow)"/>
+    <text x="120" y="32" text-anchor="middle" font-size="9" font-weight="600" class="decision-text">Repeated many times</text>
+    <text x="120" y="44" text-anchor="middle" font-size="8" class="decision-text">on the page?</text>
+  </g>
+
+  <!-- Q3 → No → Server -->
+  <line x1="290" y1="313" x2="160" y2="313" class="no-line" stroke-width="2"/>
+  <polygon points="160,309 148,313 160,317" class="arrow-no"/>
+  <text x="230" y="306" font-size="9" font-weight="600" class="no-text">No</text>
+
+  <rect x="16" y="296" width="130" height="34" rx="8" class="result-server" stroke-width="2"/>
+  <text x="81" y="318" text-anchor="middle" font-size="10" font-weight="700" class="result-server-text">Server Component</text>
+
+  <!-- Q3 → Yes → Q4 -->
+  <line x1="410" y1="348" x2="410" y2="376" class="yes-line" stroke-width="2"/>
+  <polygon points="406,376 410,388 414,376" class="arrow-yes"/>
+  <text x="420" y="366" font-size="9" font-weight="600" class="yes-text">Yes</text>
+
+  <!-- Q4: Large expansion ratio? -->
+  <g transform="translate(290, 386)">
+    <polygon points="120,0 240,35 120,70 0,35" class="decision" stroke-width="2" filter="url(#shadow)"/>
+    <text x="120" y="28" text-anchor="middle" font-size="9" font-weight="600" class="decision-text">Large expansion ratio?</text>
+    <text x="120" y="40" text-anchor="middle" font-size="8" class="decision-text">(tree &gt;&gt; props data)</text>
+    <text x="120" y="52" text-anchor="middle" font-size="7" class="label-sub">e.g. StarRating 16:1</text>
+  </g>
+
+  <!-- Q4 → No → Server -->
+  <line x1="290" y1="421" x2="160" y2="421" class="no-line" stroke-width="2"/>
+  <polygon points="160,417 148,421 160,425" class="arrow-no"/>
+  <text x="230" y="414" font-size="9" font-weight="600" class="no-text">No</text>
+
+  <rect x="16" y="404" width="130" height="34" rx="8" class="result-server" stroke-width="2"/>
+  <text x="81" y="426" text-anchor="middle" font-size="10" font-weight="700" class="result-server-text">Server Component</text>
+
+  <!-- Q4 → Yes → Q5 -->
+  <line x1="530" y1="421" x2="560" y2="421" class="yes-line" stroke-width="2"/>
+  <polygon points="560,417 572,421 560,425" class="arrow-yes"/>
+  <text x="544" y="414" font-size="9" font-weight="600" class="yes-text">Yes</text>
+
+  <!-- Q5: Bundle cost small? -->
+  <g transform="translate(574, 396)">
+    <polygon points="100,0 200,25 100,50 0,25" class="decision" stroke-width="2" filter="url(#shadow)"/>
+    <text x="100" y="22" text-anchor="middle" font-size="8" font-weight="600" class="decision-text">JS bundle increase</text>
+    <text x="100" y="34" text-anchor="middle" font-size="8" font-weight="600" class="decision-text">stays small?</text>
+  </g>
+
+  <!-- Q5 → No → Server -->
+  <line x1="674" y1="446" x2="674" y2="480" class="no-line" stroke-width="2"/>
+  <polygon points="670,480 674,492 678,480" class="arrow-no"/>
+  <text x="684" y="470" font-size="9" font-weight="600" class="no-text">No</text>
+
+  <rect x="609" y="492" width="130" height="26" rx="6" class="result-server" stroke-width="1.5"/>
+  <text x="674" y="510" text-anchor="middle" font-size="9" font-weight="600" class="result-server-text">Server Component</text>
+
+  <!-- Q5 → Yes → Measure -->
+  <line x1="774" y1="421" x2="800" y2="421" class="yes-line" stroke-width="2"/>
+  <text x="786" y="414" font-size="9" font-weight="600" class="yes-text">Yes</text>
+
+  <rect x="674" y="330" width="130" height="56" rx="8" class="result-measure" stroke-width="2"/>
+  <text x="739" y="350" text-anchor="middle" font-size="9" font-weight="700" class="result-measure-text">Consider Client</text>
+  <text x="739" y="364" text-anchor="middle" font-size="8" class="result-measure-text">Measure payload</text>
+  <text x="739" y="376" text-anchor="middle" font-size="8" class="result-measure-text">before / after</text>
+
+  <line x1="800" y1="421" x2="800" y2="386" class="yes-line" stroke-width="2"/>
+  <polygon points="796,386 800,374 804,386" class="arrow-yes"/>
+</svg>

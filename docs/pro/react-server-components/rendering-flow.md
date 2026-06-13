@@ -71,26 +71,9 @@ For `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSign
 
 Traditional SSR without RSC is the simpler server-bundle-to-HTML path covered in the [Node Renderer](../node-renderer.md) and [Streaming SSR](../streaming-ssr.md) docs. The RSC path adds the RSC bundle and an embedded RSC payload:
 
-```mermaid
-flowchart TB
-    subgraph NodeVM["Node Renderer"]
-        direction TB
-        ServerStart["Server bundle<br/>starts the page"] --> RSC["RSC bundle<br/>builds the Server Component output"]
-        RSC --> Payload["RSC payload<br/>what to show + browser code links"]
-        Payload --> ServerHTML["Server bundle<br/>streams HTML with the payload inside"]
-    end
-    ServerHTML --> Browser["Browser<br/>receives one response"]
-    Browser --> Hydrate["React uses the payload<br/>to wake up the page"]
-    Hydrate --> Chunks["Browser code chunks<br/>load as needed"]
-    style NodeVM fill:#e6ffed,stroke:#2da44e,color:#000
-    style ServerStart fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style RSC fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Payload fill:#e6ffed,stroke:#2da44e,color:#000
-    style ServerHTML fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Browser fill:#fff4e5,stroke:#e0a000,color:#000
-    style Hydrate fill:#fff4e5,stroke:#e0a000,color:#000
-    style Chunks fill:#fff4e5,stroke:#e0a000,color:#000
-```
+<p align="center">
+  <img src="images/bundle-architecture.svg" alt="Diagram showing three distinct bundles in an RSC project: the RSC Bundle containing server components and client references running in Node VM, the Server Bundle containing both component types for SSR in Node VM, and the Client Bundle split into chunks running in the browser." width="840" />
+</p>
 
 The sequence below traces the same interaction over time.
 
@@ -124,33 +107,9 @@ This approach offers significant advantages:
 - Reduces HTTP requests by embedding the RSC payload within the initial HTML response
 - Provides faster interactivity through streamlined rendering and hydration
 
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant Rails
-    participant Renderer as Node renderer
-    participant Server as Server bundle
-    participant RSC as RSC bundle
-
-    Note over Browser,RSC: 1. Initial Request
-    Browser->>Rails: Request page
-    Rails->>Renderer: Ask renderer to render
-    Renderer->>Server: Start the page render
-    Server->>RSC: Build the Server Component output<br/>(component name + data)
-    RSC-->>Server: RSC payload<br/>(what to show + browser code links)
-    Server-->>Renderer: HTML stream with payload inside
-
-    Note over Browser,RSC: 2. Single Response
-    Renderer-->>Rails: Stream HTML with payload inside
-    Rails-->>Browser: Forward streamed response
-
-    Note over Browser: 3. Client Hydration
-    Browser->>Browser: Read the embedded payload
-    loop For each client component
-        Browser->>Browser: Load needed browser code
-        Browser->>Browser: Make that part interactive
-    end
-```
+<p align="center">
+  <img src="images/rendering-flow-sequence.svg" alt="Animated sequence diagram showing the end-to-end React Server Components rendering flow: Browser requests page from Rails, Rails asks the Node renderer, the server bundle starts the page render, the RSC bundle builds the server component output, and a single streamed response flows back through Node Renderer and Rails to the browser for hydration." width="840" />
+</p>
 
 ## Next Steps
 

@@ -20,6 +20,10 @@ A `.server.jsx` file is NOT a React Server Component. A `.client.jsx` file is NO
 
 ## Types of Components
 
+<p align="center">
+  <img src="images/server-vs-client-components.svg" alt="Animated split-screen comparison showing what Server Components and Client Components can and cannot do, and the boundary between them. Server Components can use async, heavy imports, and data props. Client Components can use state, effects, event handlers, and browser APIs." width="840" />
+</p>
+
 ### Server Components
 
 Components that run exclusively on the server (not included in the client bundle). They can:

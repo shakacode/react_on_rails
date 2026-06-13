@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 440" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Donut Composition: Children as Props</title>
+  <desc>Static diagram showing the donut or children-as-props composition pattern: a Client Component wraps Server Component children passed as props. The children stay server-rendered and are NOT included in the client bundle. Blue zones indicate server-rendered content, orange zones indicate client-rendered content.</desc>
+  <defs>
+    <linearGradient id="serverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22C55E"/><stop offset="100%" stop-color="#16A34A"/>
+    </linearGradient>
+    <linearGradient id="clientGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F97316"/><stop offset="100%" stop-color="#EA580C"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .server-zone { fill: #F0FDF4; stroke: #22C55E; }
+      .server-label { fill: #166534; }
+      .client-zone { fill: #FFF7ED; stroke: #F97316; }
+      .client-label { fill: #9A3412; }
+      .code-bg { fill: #1E293B; }
+      .code-text { fill: #E2E8F0; }
+      .code-keyword { fill: #67E8F9; }
+      .code-string { fill: #4ADE80; }
+      .code-component { fill: #C4B5FD; }
+      .code-directive { fill: #F87171; }
+      .code-comment { fill: #64748B; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+      .tree-line { stroke: #94A3B8; }
+      .arrow-body { fill: #94A3B8; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .server-zone { fill: #052E16; stroke: #10B981; }
+        .server-label { fill: #6EE7B7; }
+        .client-zone { fill: #431407; stroke: #F97316; }
+        .client-label { fill: #FDBA74; }
+        .code-bg { fill: #0F172A; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+        .tree-line { stroke: #64748B; }
+        .arrow-body { fill: #64748B; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="440" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Donut Composition: Children as Props</text>
+  <text x="450" y="46" text-anchor="middle" font-size="11" class="subtitle">Client Components can wrap Server Components passed as children — children stay server-rendered</text>
+
+  <!-- LEFT: Visual tree diagram -->
+  <g>
+    <rect x="20" y="62" width="400" height="310" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="220" y="86" text-anchor="middle" font-size="12" font-weight="600" class="label-text">Component Tree</text>
+
+    <!-- Server parent -->
+    <rect x="140" y="100" width="160" height="30" rx="8" class="server-zone" stroke-width="2"/>
+    <text x="220" y="120" text-anchor="middle" font-size="10" font-weight="600" class="server-label">ParentServerComponent</text>
+
+    <line x1="220" y1="130" x2="220" y2="150" class="tree-line" stroke-width="1.5"/>
+
+    <!-- Client wrapper (the donut) -->
+    <rect x="70" y="150" width="300" height="140" rx="10" class="client-zone" stroke-width="2.5" stroke-dasharray="0"/>
+    <text x="220" y="172" text-anchor="middle" font-size="10" font-weight="600" class="client-label">ClientComponent (the "donut")</text>
+    <text x="220" y="186" text-anchor="middle" font-size="8" class="client-label">'use client' — has state, events</text>
+
+    <!-- Server children inside the donut hole -->
+    <rect x="90" y="198" width="260" height="76" rx="8" class="server-zone" stroke-width="2"/>
+    <text x="220" y="218" text-anchor="middle" font-size="10" font-weight="600" class="server-label">{children} — Server Components</text>
+    <text x="220" y="236" text-anchor="middle" font-size="9" class="server-label">Rendered on the server</text>
+    <text x="220" y="252" text-anchor="middle" font-size="9" class="server-label">NOT in client bundle</text>
+    <text x="220" y="266" text-anchor="middle" font-size="8" class="label-sub">Passed as pre-rendered output, not imported</text>
+
+    <!-- Legend -->
+    <g transform="translate(70, 310)">
+      <rect x="0" y="0" width="14" height="14" rx="4" class="server-zone" stroke-width="1.5"/>
+      <text x="20" y="12" font-size="9" class="label-text">Server-rendered</text>
+
+      <rect x="130" y="0" width="14" height="14" rx="4" class="client-zone" stroke-width="1.5"/>
+      <text x="150" y="12" font-size="9" class="label-text">Client-rendered</text>
+    </g>
+
+    <text x="220" y="350" text-anchor="middle" font-size="9" font-weight="600" class="label-sub">The "hole" in the donut stays on the server</text>
+  </g>
+
+  <!-- RIGHT: Code example -->
+  <g>
+    <rect x="440" y="62" width="440" height="310" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="660" y="86" text-anchor="middle" font-size="12" font-weight="600" class="label-text">Code Pattern</text>
+
+    <!-- Server parent code -->
+    <rect x="454" y="96" width="412" height="80" rx="8" class="code-bg"/>
+    <text x="466" y="112" font-family="ui-monospace, monospace" font-size="9" class="code-comment">// Server Component — no 'use client'</text>
+    <text x="466" y="128" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">function</text>
+    <text x="512" y="128" font-family="ui-monospace, monospace" font-size="10" class="code-component"> Parent</text>
+    <text x="556" y="128" font-family="ui-monospace, monospace" font-size="10" class="code-text">() {</text>
+    <text x="478" y="144" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">  return</text>
+    <text x="522" y="144" font-family="ui-monospace, monospace" font-size="10" class="code-text"> (</text>
+    <text x="490" y="160" font-family="ui-monospace, monospace" font-size="10" class="code-text">    &lt;</text>
+    <text x="500" y="160" font-family="ui-monospace, monospace" font-size="10" class="code-component">ToggleContainer</text>
+    <text x="606" y="160" font-family="ui-monospace, monospace" font-size="10" class="code-text">&gt;&lt;</text>
+    <text x="618" y="160" font-family="ui-monospace, monospace" font-size="10" class="code-component">Posts</text>
+    <text x="642" y="160" font-family="ui-monospace, monospace" font-size="10" class="code-text"> /&gt;&lt;/</text>
+    <text x="670" y="160" font-family="ui-monospace, monospace" font-size="10" class="code-component">ToggleContainer</text>
+    <text x="776" y="160" font-family="ui-monospace, monospace" font-size="10" class="code-text">&gt;</text>
+
+    <!-- Client component code -->
+    <rect x="454" y="186" width="412" height="96" rx="8" class="code-bg"/>
+    <text x="466" y="202" font-family="ui-monospace, monospace" font-size="9" class="code-directive">'use client';</text>
+    <text x="466" y="220" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">function</text>
+    <text x="512" y="220" font-family="ui-monospace, monospace" font-size="10" class="code-component"> ToggleContainer</text>
+    <text x="636" y="220" font-family="ui-monospace, monospace" font-size="10" class="code-text">({ children }) {</text>
+    <text x="478" y="238" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">  const</text>
+    <text x="516" y="238" font-family="ui-monospace, monospace" font-size="10" class="code-text"> [show, setShow] = </text>
+    <text x="646" y="238" font-family="ui-monospace, monospace" font-size="10" class="code-component">useState</text>
+    <text x="698" y="238" font-family="ui-monospace, monospace" font-size="10" class="code-text">(</text>
+    <text x="704" y="238" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">false</text>
+    <text x="734" y="238" font-family="ui-monospace, monospace" font-size="10" class="code-text">);</text>
+    <text x="478" y="256" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">  return</text>
+    <text x="522" y="256" font-family="ui-monospace, monospace" font-size="10" class="code-text"> &lt;&gt;&lt;</text>
+    <text x="544" y="256" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">button</text>
+    <text x="582" y="256" font-family="ui-monospace, monospace" font-size="10" class="code-text"> onClick=...&gt;Toggle&lt;/</text>
+    <text x="718" y="256" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">button</text>
+    <text x="756" y="256" font-family="ui-monospace, monospace" font-size="10" class="code-text">&gt;</text>
+    <text x="490" y="274" font-family="ui-monospace, monospace" font-size="10" class="code-text">    {show &amp;&amp; </text>
+    <text x="574" y="274" font-family="ui-monospace, monospace" font-size="10" class="code-component">children</text>
+    <text x="626" y="274" font-family="ui-monospace, monospace" font-size="10" class="code-text">}&lt;/&gt;;</text>
+    <text x="466" y="280" font-family="ui-monospace, monospace" font-size="10" class="code-text">}</text>
+
+    <!-- Key insight note -->
+    <rect x="454" y="296" width="412" height="64" rx="8" class="note-box" stroke-width="1.5"/>
+    <text x="660" y="316" text-anchor="middle" font-size="10" font-weight="700" class="note-text">Why this works:</text>
+    <text x="660" y="332" text-anchor="middle" font-size="9" class="note-text">children are passed as pre-rendered output (props), not imported.</text>
+    <text x="660" y="348" text-anchor="middle" font-size="9" class="note-text">ToggleContainer never imports Posts — no bundle contamination.</text>
+  </g>
+
+  <!-- Bottom callout -->
+  <rect x="100" y="390" width="700" height="40" rx="10" class="note-box" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="408" text-anchor="middle" font-size="11" font-weight="700" class="note-text">Most-Misunderstood RSC Pattern</text>
+  <text x="450" y="424" text-anchor="middle" font-size="10" class="note-text">Children do NOT become client components — they stay server-rendered and excluded from the client bundle</text>
+</svg>
