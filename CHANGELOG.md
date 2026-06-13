@@ -27,6 +27,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Changed
 
 - **[Pro]** **RSC peer compatibility accepts the coordinated React 19.2 floor**: The Pro node renderer now allows React and React DOM `19.2.x` starting at `19.2.7`, matching the floor required by the `react-on-rails-rsc` 19.2 package line while preserving the existing React `19.0.x` support window. Refs [Issue 3865](https://github.com/shakacode/react_on_rails/issues/3865).
+- **[Pro]** **Pinned the RSC runtime to stable `react-on-rails-rsc@19.0.5`**: the generator and Pro dummy app now install the stable `19.0.5` package, while `react-on-rails-pro` declares an explicit optional peer range for stable `^19.0.5` plus the prior coordinated `19.0.5-rc.6` / `19.0.5-rc.7` pins so existing RC apps can upgrade far enough for the node renderer to warn them onto stable. Fixes [Issue 3965](https://github.com/shakacode/react_on_rails/issues/3965).
 
 #### Fixed
 

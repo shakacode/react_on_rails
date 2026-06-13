@@ -2478,7 +2478,6 @@ describe InstallGenerator, type: :generator do
   describe "#add_rsc_dependencies" do
     let(:install_generator) { described_class.new([], { rsc: true }, destination_root:) }
     let(:rsc_pin) { ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN }
-    let(:rsc_stable_target) { install_generator.send(:rsc_stable_package_version_target) }
 
     before do
       GeneratorMessages.clear
@@ -2486,7 +2485,7 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:fallback_package_manager).and_return("pnpm")
     end
 
-    it "explains why every RSC install is temporarily pinned to the prerelease package" do
+    it "explains why every RSC install uses the tested package pin" do
       allow(install_generator).to receive(:add_packages).and_return(true)
 
       install_generator.send(:add_rsc_dependencies)
@@ -2494,9 +2493,9 @@ describe InstallGenerator, type: :generator do
       message_text = GeneratorMessages.messages.join("\n")
       expect(message_text).to include("all --rsc installs")
       expect(message_text).to include("react-on-rails-rsc@#{rsc_pin}")
-      expect(message_text).to include("stable react-on-rails-rsc@#{rsc_stable_target}")
       expect(message_text).to include("react-on-rails-rsc/RspackPlugin")
       expect(message_text).to include("Webpack")
+      expect(message_text).not_to include("latest")
     end
 
     it "keeps the version pin and uses the detected package manager when manual RSC recovery is needed" do

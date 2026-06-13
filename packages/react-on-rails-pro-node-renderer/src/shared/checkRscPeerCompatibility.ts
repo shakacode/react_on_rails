@@ -31,18 +31,28 @@ export interface RscPeerCheckInput {
 
 type VersionTuple = [number, number, number];
 
-// Strip build metadata (`+...`) and prerelease (`-...`) so a coordinated RC such as
-// `19.0.5-rc.7` compares as `19.0.5`. We only need major/minor/patch ordering, so this
-// avoids semver's prerelease rules (and a `semver` dependency) entirely.
-const parseTuple = (version: string): VersionTuple => {
+const stripVersionPrefixAndBuild = (version: string): string => {
   // `resolveVersion` is a public injection point, so tolerate a leading `v`/`=` (e.g. `v19.0.4`).
-  // Malformed versions intentionally coerce to 0 segments so the major mismatch
-  // branch reports the original string instead of hiding it behind a parse error.
   const normalized = version.replace(/^[v=]+/, '');
   const [withoutBuild = ''] = normalized.split('+', 1);
+  return withoutBuild;
+};
+
+// Strip build metadata (`+...`) and prerelease (`-...`) for major/minor/patch ordering.
+// Stable-floor checks below separately keep prerelease awareness so `19.0.5-rc.7`
+// still warns when the recommended floor is the stable `19.0.5`.
+const parseTuple = (version: string): VersionTuple => {
+  // Malformed versions intentionally coerce to 0 segments so the major mismatch
+  // branch reports the original string instead of hiding it behind a parse error.
+  const withoutBuild = stripVersionPrefixAndBuild(version);
   const [core = ''] = withoutBuild.split('-', 1);
   const parts = core.split('.');
   return [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0];
+};
+
+const isPrereleaseVersion = (version: string): boolean => {
+  const withoutBuild = stripVersionPrefixAndBuild(version);
+  return withoutBuild.includes('-');
 };
 
 const isAtLeast = (actual: VersionTuple, floor: VersionTuple): boolean => {
@@ -182,7 +192,11 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
     }
   }
 
-  if (!isAtLeast(rscTuple, parseTuple(reactOnRailsRsc.recommendedMin))) {
+  const recommendedMinTuple = parseTuple(reactOnRailsRsc.recommendedMin);
+  if (
+    !isAtLeast(rscTuple, recommendedMinTuple) ||
+    (sameTuple(rscTuple, recommendedMinTuple) && isPrereleaseVersion(rscVersion))
+  ) {
     return { level: 'warn', message: warnMessage(rscVersion, reactOnRailsRsc.recommendedMin, proVersion) };
   }
 

@@ -182,8 +182,8 @@ importers:
         specifier: ~19.0.4
         version: 19.0.7(react@19.0.7)
       react-on-rails-rsc:
-        specifier: 19.0.5-rc.7
-        version: 19.0.5-rc.7(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: 19.0.5
+        version: 19.0.5(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
       redux:
         specifier: ^4.2.1
         version: 4.2.1
@@ -268,8 +268,8 @@ importers:
         specifier: ~19.0.4
         version: 19.0.7(react@19.0.7)
       react-on-rails-rsc:
-        specifier: 19.0.5-rc.7
-        version: 19.0.5-rc.7(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: 19.0.5
+        version: 19.0.5(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -750,8 +750,8 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
-        specifier: 19.0.5-rc.7
-        version: 19.0.5-rc.7(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.104.1)
+        specifier: 19.0.5
+        version: 19.0.5(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.104.1)
       react-proptypes:
         specifier: ^1.0.0
         version: 1.0.0
@@ -8445,8 +8445,8 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
-  react-on-rails-rsc@19.0.5-rc.7:
-    resolution: {integrity: sha512-cyQwZm7YW9FS0PEgwael5P9S5HsNeHwhnMm10ScgepZTv38dOeidf+gWf9x+z6w0wrgJ92aExZ8uLjCgpImxcQ==}
+  react-on-rails-rsc@19.0.5:
+    resolution: {integrity: sha512-EGa5ppIXMCiNRPKvIEydENGYCCbN6GD5F6g8qBlhxmFIUch4XvgJTh/VnaBJEpDNUd/W2k8PPTMzJO+0R3hmcg==}
     peerDependencies:
       react: ~19.0.4
       react-dom: ~19.0.4
@@ -13715,9 +13715,9 @@ snapshots:
     dependencies:
       acorn: 8.15.0
 
-  acorn-jsx@5.3.2(acorn@8.15.0):
+  acorn-jsx@5.3.2(acorn@8.16.0):
     dependencies:
-      acorn: 8.15.0
+      acorn: 8.16.0
 
   acorn-loose@8.5.2:
     dependencies:
@@ -15754,8 +15754,8 @@ snapshots:
 
   espree@10.4.0:
     dependencies:
-      acorn: 8.15.0
-      acorn-jsx: 5.3.2(acorn@8.15.0)
+      acorn: 8.16.0
+      acorn-jsx: 5.3.2(acorn@8.16.0)
       eslint-visitor-keys: 4.2.1
 
   esprima@4.0.1: {}
@@ -17346,7 +17346,7 @@ snapshots:
   jsdom@20.0.3:
     dependencies:
       abab: 2.0.6
-      acorn: 8.15.0
+      acorn: 8.16.0
       acorn-globals: 7.0.1
       cssom: 0.5.0
       cssstyle: 2.3.0
@@ -19063,7 +19063,7 @@ snapshots:
 
   react-is@18.3.1: {}
 
-  react-on-rails-rsc@19.0.5-rc.7(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.104.1):
+  react-on-rails-rsc@19.0.5(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.104.1):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
@@ -19072,7 +19072,7 @@ snapshots:
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-sources: 3.3.3
 
-  react-on-rails-rsc@19.0.5-rc.7(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.0.5(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
@@ -20621,7 +20621,7 @@ snapshots:
   terser@5.46.0:
     dependencies:
       '@jridgewell/source-map': 0.3.11
-      acorn: 8.15.0
+      acorn: 8.16.0
       commander: 2.20.3
       source-map-support: 0.5.21
 
