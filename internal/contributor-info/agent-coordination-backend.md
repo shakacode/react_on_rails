@@ -64,11 +64,11 @@ the default state root documented in the private repo README.
 
 ```bash
 STATE_ROOT=$(mktemp -d)
-AGENT_COORD_STATE_ROOT="$STATE_ROOT" bin/agent-coord heartbeat \
+AGENT_COORD_STATE_ROOT="$STATE_ROOT" agent-coord heartbeat \
   --agent-id smoke-test-0 \
   --repo shakacode/react_on_rails \
   --target 9999
-AGENT_COORD_STATE_ROOT="$STATE_ROOT" bin/agent-coord status
+AGENT_COORD_STATE_ROOT="$STATE_ROOT" agent-coord status
 rm -rf "$STATE_ROOT"
 ```
 
@@ -98,13 +98,13 @@ printf 'Batch id file: %s\n' "$BATCH_ID_FILE"
 # BATCH_ID=$(cat "$BATCH_ID_FILE")
 # At batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
 
-bin/agent-coord heartbeat \
+agent-coord heartbeat \
   --agent-id mobile-codex-batch2 \
   --repo shakacode/react_on_rails \
   --target 3970 \
   --batch-id "$BATCH_ID" \
   --branch jg-codex/3970-agent-heartbeats
-bin/agent-coord status
+agent-coord status
 ```
 
 Heartbeat liveness is derived from timestamps: `live` before the TTL expires,
@@ -120,12 +120,10 @@ For dependency-sensitive lanes, coordinators create or update
 `batches/<batch-id>.json` in the private backend before dispatching dependent
 workers. Batch files are edited as JSON in the private repo in v1. Use the
 private backend README and schema files for that JSON layout; this public pointer
-intentionally omits the batch-state schema. The private backend README and CLI
-are authoritative for the terminal heartbeat statuses that unblock `depends_on`
-refs. At the initial backend rollout those statuses were `complete`, `completed`,
-`done`, `merged`, and `ready`; `complete` and `completed` are intentional aliases
-for the same terminal state. Re-check the private CLI after backend updates. A
-released claim is audit state and does not unblock dependent lanes by itself.
+intentionally omits the batch-state schema and terminal-status list. The private
+backend README and CLI are authoritative for the terminal heartbeat statuses that
+unblock `depends_on` refs; re-check them after backend updates. A released claim
+is audit state and does not unblock dependent lanes by itself.
 
 If a worker lane declares `depends_on` but `agent-coord status` shows no matching
 batch file or lane state, the worker must treat dependency state as `UNKNOWN` and

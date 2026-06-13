@@ -43,9 +43,9 @@ should use this PR branch or `main` for the current workflow docs.
    agent-coord status
    ```
 
-   Keep that `PATH` entry in the active shell, or keep using the full path in
-   later commands. Add it to the shell profile if future shells should inherit
-   the same setup.
+   The remaining snippets assume that `PATH` entry is present in the active
+   shell. In another shell, add the export first or replace each `agent-coord`
+   command below with `"$HOME/.local/bin/agent-coord"`.
 
 4. If the status command exits non-zero, report private state as `UNKNOWN` and
    use the structured public claim comment fallback. Do not start a
