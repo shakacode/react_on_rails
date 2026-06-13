@@ -10,17 +10,19 @@ starting from.
 
 ## Control Plane Cost Posture
 
-For public demo and starter staging deployments on Control Plane, prefer a
-serverless web workload with `minScale: 0` when occasional cold-start latency is
-acceptable. Keep `type: standard` with `minScale: 1` only when the app is a
-production target or when always-warm live-demo latency is part of the acceptance
-criteria.
+For public demo and starter staging deployments on Control Plane, keep the app
+workload as `type: standard`, set its autoscaling metric to `disabled`, and
+enable `capacityAI: true` so Control Plane can right-size idle capacity. Avoid
+pinning CPU autoscaling to `minScale: 1` / `maxScale: 1` unless always-warm
+latency or production predictability is part of the acceptance criteria.
 
-If a workload already exists as `type: standard`, Control Plane will not change
-that workload type in place. Plan a delete/recreate migration, or create the
-environment-specific serverless workload before the first deploy. The reusable
-guidance lives in
-[Control Plane Flow: Scale the Web Workload to Zero](https://github.com/shakacode/control-plane-flow/blob/main/docs/tips.md#scale-the-web-workload-to-zero).
+This is not the same as scale-to-zero: steady RAM usage and background work can
+still drive cost, and shared Postgres should usually stay manually sized. If a
+demo explicitly needs true idle scale-to-zero, create a separate `serverless`
+workload before first deploy or plan a delete/recreate migration because Control
+Plane will not change an existing `standard` workload to `serverless` in place.
+The reusable guidance lives in
+[Control Plane Flow: Enable Capacity AI for Demo and Starter Staging Apps](https://github.com/shakacode/control-plane-flow/blob/main/docs/tips.md#enable-capacity-ai-for-demo-and-starter-staging-apps).
 
 ## Starter Repos
 
