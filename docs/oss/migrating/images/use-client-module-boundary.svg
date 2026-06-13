@@ -65,7 +65,7 @@
 
   <!-- Import line -->
   <line x1="350" y1="106" x2="350" y2="126" class="tree-line" stroke-width="1.5"/>
-  <text x="356" y="118" font-size="8" class="label-sub">imports</text>
+  <text x="356" y="113" font-size="8" class="label-sub">imports</text>
 
   <!-- Boundary line -->
   <line x1="60" y1="124" x2="640" y2="124" class="boundary-line" stroke-width="2" stroke-dasharray="8 4"/>
