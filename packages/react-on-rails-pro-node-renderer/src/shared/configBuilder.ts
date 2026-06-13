@@ -410,6 +410,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     password: env.RENDERER_PASSWORD,
     // Re-evaluate env-derived defaults at build time in case env vars are set post-import.
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
+    enableHealthEndpoints: truthy(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
   };
   config = { ...runtimeDefaultConfig, ...userConfig };
   if (explicitUndefinedPassword) {

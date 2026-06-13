@@ -124,7 +124,10 @@ gating readiness on `/ready` deadlocks the rollout: no traffic → no first rend
 
 Only use `/ready` as the readiness gate when something other than probe-gated traffic delivers the first render,
 for example a deployment pipeline step or Rails initializer that POSTs a warm-up render to each new replica
-directly (bypassing the Service), or a container `postStart` hook that does the same. With a warm-up path in place:
+directly (bypassing the Service), or a container `postStart` hook that does the same. That warm-up must reach
+every renderer worker that can answer probes; with `workersCount > 1`, one render per replica is not enough
+unless you intentionally run a single worker or fan out warm-up renders to each worker. With a warm-up path in
+place:
 
 ```yaml
 readinessProbe:

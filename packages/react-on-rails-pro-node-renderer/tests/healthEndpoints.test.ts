@@ -25,6 +25,7 @@ const testName = 'healthEndpoints';
 const gemVersion = packageJson.version;
 const { protocolVersion } = packageJson;
 const railsEnv = 'test';
+const originalEnableHealthEndpointsEnv = process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS;
 
 disableHttp2();
 
@@ -58,6 +59,7 @@ describe('built-in health endpoints', () => {
   let app: ReturnType<typeof createWorker> | undefined;
 
   beforeEach(async () => {
+    delete process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS;
     await resetForTest(testName);
   });
 
@@ -67,6 +69,11 @@ describe('built-in health endpoints', () => {
   });
 
   afterAll(async () => {
+    if (originalEnableHealthEndpointsEnv === undefined) {
+      delete process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS;
+    } else {
+      process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS = originalEnableHealthEndpointsEnv;
+    }
     await resetForTest(testName);
   });
 
@@ -88,6 +95,19 @@ describe('built-in health endpoints', () => {
     // Status only: liveness must not depend on bundles and must not leak
     // runtime version or path details.
     expect(JSON.parse(res.payload)).toEqual({ status: 'ok' });
+  });
+
+  test('GET /health and GET /ready are registered when enabled by environment variable', async () => {
+    process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS = 'true';
+    app = createWorker();
+
+    const healthRes = await app.inject().get('/health').end();
+    expect(healthRes.statusCode).toBe(200);
+    expect(JSON.parse(healthRes.payload)).toEqual({ status: 'ok' });
+
+    const readyRes = await app.inject().get('/ready').end();
+    expect(readyRes.statusCode).toBe(503);
+    expect(JSON.parse(readyRes.payload)).toEqual({ status: 'waiting_for_bundle' });
   });
 
   test('GET /ready returns 503 before a bundle is loaded and 200 after', async () => {
