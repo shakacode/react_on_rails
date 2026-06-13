@@ -40,7 +40,10 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      shows unmet `blocked_on` refs, set that lane's heartbeat status to
      `blocked`, report the blocked refs in the handoff, and move to another
      independent lane until the dependency reports a backend terminal heartbeat
-     status. The current public summary lives in
+     status. If the lane declares `depends_on` but `agent-coord status` shows no
+     matching private batch state for that lane, treat dependency state as
+     `UNKNOWN` and stop to report the missing private batch file. The current
+     public summary lives in
      [agent-coordination-backend.md](../../internal/contributor-info/agent-coordination-backend.md).
    - Use the current checkout for one focused task.
    - For multiple independent PRs or lanes (independent work streams with separate branch/worktree ownership), use one worktree per PR branch so agents do not overlap edits.
