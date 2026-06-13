@@ -31,10 +31,10 @@ pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
 > **React 19.0.x with patch >= 19.0.4** is recommended. Earlier 19.0.x versions (19.0.0--19.0.3) have known security vulnerabilities — see the [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for details.
 
 > [!NOTE]
-> The RSC generator intentionally stays on React 19.0.x and does not widen generated apps to React 19.1 or 19.2 yet. React's RSC runtime and bundler APIs can change between minor releases, so advance the React range only when the generator, docs, and package metadata policy are reviewed together.
+> The RSC generator stays on React 19.0.x until the generator, docs, and package metadata policy advance together.
 
 > [!NOTE]
-> `react-on-rails-rsc@19.0.5` is the tested stable generator pin. Pro peer metadata (see [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609)) describes the supported RSC line; the generator installs the exact tested pin.
+> `react-on-rails-rsc@19.0.5` is the tested stable generator pin. Pro peer metadata describes the supported RSC line; the generator installs the exact tested pin.
 
 ## Pre-Migration: Audit Components for Client API Usage
 

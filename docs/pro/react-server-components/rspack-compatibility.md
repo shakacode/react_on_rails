@@ -19,10 +19,8 @@ The RSC implementation depends on the `react-on-rails-rsc` npm package, which pr
 
 Generated RSC apps intentionally stay on React 19.0.x: `react@~19.0.4` and
 `react-dom@~19.0.4`. That range admits stable 19.0 patch releases with a 19.0.4
-minimum, but does not opt into React 19.1 or 19.2. The RSC runtime and bundler
-integration can change between React minor releases, so the generator range should
-advance only after the Webpack and Rspack paths are verified against the new React
-minor.
+minimum, but does not opt into React 19.1 or 19.2. Advance the generator range
+only after both Webpack and Rspack paths are verified against the new React minor.
 
 The generator separately pins `react-on-rails-rsc@19.0.5` exactly. That package
 pin is separate from Pro package peer metadata tracked in
