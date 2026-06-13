@@ -68,17 +68,6 @@ const isAtLeast = (actual: VersionTuple, floor: VersionTuple): boolean => {
 const sameTuple = (left: VersionTuple, right: VersionTuple): boolean =>
   left.every((value, index) => value === right[index]);
 
-const supportedRscRange = (
-  { supportedMajor }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
-  { supportedRanges }: typeof RSC_PEER_SUPPORT.react,
-): string => {
-  const supportedMinors = [...new Set(supportedRanges.map((range) => range.rscMinor))].sort(
-    (left, right) => left - right,
-  );
-
-  return supportedMinors.map((minor) => `${supportedMajor}.${minor}.x`).join(' or ');
-};
-
 const supportedReactRange = (
   rscTuple: VersionTuple,
   { supportedMajor, supportedRanges }: typeof RSC_PEER_SUPPORT.react,
@@ -91,6 +80,26 @@ const supportedReactRange = (
       ({ minor, minPatch }) =>
         `${supportedMajor}.${minor}.x with patch >= ${supportedMajor}.${minor}.${minPatch}`,
     )
+    .join(' or ');
+};
+
+const supportedRscRange = (
+  { allowedPrereleases, recommendedMin, supportedMajor }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
+  { supportedRanges }: typeof RSC_PEER_SUPPORT.react,
+): string => {
+  const recommendedMinMinor = parseTuple(recommendedMin)[1];
+  const supportedMinors = [...new Set(supportedRanges.map((range) => range.rscMinor))].sort(
+    (left, right) => left - right,
+  );
+
+  return supportedMinors
+    .map((minor) => {
+      if (minor !== recommendedMinMinor) return `${supportedMajor}.${minor}.x`;
+
+      return `${supportedMajor}.${minor}.x stable >= ${recommendedMin}, or ${allowedPrereleases.join(
+        ' / ',
+      )} while upgrading from the RC line`;
+    })
     .join(' or ');
 };
 
@@ -108,6 +117,20 @@ const isSupportedRscMinor = (
   rscTuple: VersionTuple,
   { supportedRanges }: typeof RSC_PEER_SUPPORT.react,
 ): boolean => supportedRanges.some((range) => rscTuple[1] === range.rscMinor);
+
+const isAllowedRscPrerelease = (
+  rscVersion: string,
+  rscTuple: VersionTuple,
+  { allowedPrereleases, recommendedMin }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
+): boolean => {
+  if (!isPrereleaseVersion(rscVersion)) return true;
+
+  const normalizedRscVersion = stripVersionPrefixAndBuild(rscVersion);
+  if (allowedPrereleases.some((allowedVersion) => allowedVersion === normalizedRscVersion)) return true;
+
+  const recommendedMinMinor = parseTuple(recommendedMin)[1];
+  return rscTuple[1] !== recommendedMinMinor;
+};
 
 const proLabel = (proVersion?: string) =>
   proVersion ? `React on Rails Pro (${proVersion})` : 'React on Rails Pro';
@@ -127,6 +150,13 @@ const warnMessage = (found: string, recommendedMin: string, proVersion?: string)
     `  Upgrade react-on-rails-rsc to ${recommendedMin} or newer.`,
   ].join('\n');
 
+const prereleaseWarnMessage = (found: string, recommendedMin: string, proVersion?: string) =>
+  [
+    `[ReactOnRails] react-on-rails-rsc ${found} is a prerelease of the recommended minimum ${recommendedMin}.`,
+    `  ${proLabel(proVersion)} may behave incorrectly until the stable RSC package is installed.`,
+    `  Upgrade react-on-rails-rsc to the stable ${recommendedMin} release or newer.`,
+  ].join('\n');
+
 export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerCheckResult {
   const { rscVersion, reactVersion, reactDomVersion, proVersion } = input;
 
@@ -144,13 +174,25 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
       message: errorMessage(
         'react-on-rails-rsc',
         rscVersion,
-        `${reactOnRailsRsc.supportedMajor}.x`,
+        supportedRscRange(reactOnRailsRsc, react),
         proVersion,
       ),
     };
   }
 
   if (!isSupportedRscMinor(rscTuple, react)) {
+    return {
+      level: 'error',
+      message: errorMessage(
+        'react-on-rails-rsc',
+        rscVersion,
+        supportedRscRange(reactOnRailsRsc, react),
+        proVersion,
+      ),
+    };
+  }
+
+  if (!isAllowedRscPrerelease(rscVersion, rscTuple, reactOnRailsRsc)) {
     return {
       level: 'error',
       message: errorMessage(
@@ -193,13 +235,12 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   }
 
   const recommendedMinTuple = parseTuple(reactOnRailsRsc.recommendedMin);
-  if (
-    !isAtLeast(rscTuple, recommendedMinTuple) ||
-    // Warn only when the installed RSC is a prerelease at the exact stable floor, e.g. 19.0.5-rc.7
-    // when 19.0.5 stable is available. Higher prerelease tuples are outside this upgrade nudge.
-    (sameTuple(rscTuple, recommendedMinTuple) && isPrereleaseVersion(rscVersion))
-  ) {
-    return { level: 'warn', message: warnMessage(rscVersion, reactOnRailsRsc.recommendedMin, proVersion) };
+  const isPrereleaseAtRecommendedMin = sameTuple(rscTuple, recommendedMinTuple) && isPrerelease;
+  if (!isAtLeast(rscTuple, recommendedMinTuple) || isPrereleaseAtRecommendedMin) {
+    const message = isPrereleaseAtRecommendedMin
+      ? prereleaseWarnMessage(rscVersion, reactOnRailsRsc.recommendedMin, proVersion)
+      : warnMessage(rscVersion, reactOnRailsRsc.recommendedMin, proVersion);
+    return { level: 'warn', message };
   }
 
   return { level: 'ok' };

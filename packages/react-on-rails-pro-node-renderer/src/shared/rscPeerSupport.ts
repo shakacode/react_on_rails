@@ -19,7 +19,11 @@
 // `recommendedMin` deliberately starts at the stable floor we currently recommend.
 // Raise it only after Pro validates a newer `react-on-rails-rsc` release.
 export const RSC_PEER_SUPPORT = {
-  reactOnRailsRsc: { recommendedMin: '19.0.5', supportedMajor: 19 },
+  reactOnRailsRsc: {
+    recommendedMin: '19.0.5',
+    supportedMajor: 19,
+    allowedPrereleases: ['19.0.5-rc.6', '19.0.5-rc.7'],
+  },
   react: {
     supportedMajor: 19,
     supportedRanges: [

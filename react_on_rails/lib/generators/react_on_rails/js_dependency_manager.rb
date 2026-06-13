@@ -486,14 +486,14 @@ module ReactOnRails
       def rsc_dependency_pin_info
         "React Server Components package pin: all --rsc installs use " \
           "react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, including Webpack projects. " \
-          "This pin keeps react-on-rails-rsc/WebpackPlugin compatible while adding " \
-          "react-on-rails-rsc/RspackPlugin."
+          "This pin keeps react-on-rails-rsc/WebpackPlugin and react-on-rails-rsc/RspackPlugin " \
+          "on the tested version."
       end
 
       def rsc_dependency_pin_failed_warning
         "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
           "All RSC projects are pinned to that tested version: the package keeps " \
-          "react-on-rails-rsc/WebpackPlugin compatible while adding react-on-rails-rsc/RspackPlugin, " \
+          "react-on-rails-rsc/WebpackPlugin and react-on-rails-rsc/RspackPlugin aligned, " \
           "so the generator left the version pin in package.json rather than install a potentially " \
           "incompatible version."
       end
