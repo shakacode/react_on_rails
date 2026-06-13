@@ -496,6 +496,9 @@ When worker subagents are explicitly authorized:
   and before rebase or push. If dependencies are unmet, the worker reports the
   `blocked_on` refs, sets heartbeat `--status blocked`, and moves to another
   independent lane instead of pushing dependent work.
+- If a worker lane declares `depends_on` but `agent-coord status` shows no
+  matching batch state for that lane, treat dependency state as `UNKNOWN` and
+  stop to report the missing private batch file.
 - The main agent owns final PR creation, status reporting, full-CI decisions, and merge sequencing.
 
 ### Coordinator Closeout Lane

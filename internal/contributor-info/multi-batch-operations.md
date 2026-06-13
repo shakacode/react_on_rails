@@ -88,9 +88,9 @@ Use this lifecycle for every lane:
    the backend policy.
 
 If the private backend is unavailable, use the structured public claim comment
-fallback from [AGENTS.md](../../AGENTS.md) and
-[pr-processing.md](../../.agents/workflows/pr-processing.md), but do not use a
-public comment to override a refused private claim.
+fallback from
+[pr-processing.md](../../.agents/workflows/pr-processing.md#coordination-state),
+but do not use a public comment to override a refused private claim.
 
 ## Batch Sizing And Routing
 
@@ -122,7 +122,7 @@ one batch wait for the other lane's done heartbeat.
 
 ## Failure Drills
 
-### M5 Laptop Goes Offline
+### Mobile Batch Host Goes Offline
 
 1. Check `agent-coord status` for the affected lane.
 2. If the heartbeat is still live, do not take over. Wait or contact the
@@ -135,7 +135,7 @@ one batch wait for the other lane's done heartbeat.
 5. If local unpushed work may exist on the laptop, mark the lane blocked instead
    of recreating a competing implementation.
 
-### M1 Desktop Session Dies
+### Stable Desktop Session Dies
 
 1. Restart the desktop app or terminal on the same machine when practical.
 2. Reuse the same agent id for the same lane so the coordinator can connect the

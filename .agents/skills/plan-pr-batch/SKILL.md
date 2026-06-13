@@ -101,7 +101,8 @@ Execution rules:
 - For concurrent or dependency-sensitive batches, assign a stable agent id and
   lane name per lane. Declare lane dependencies with `depends_on` refs such as
   `<batch-id>:<lane-name>`, and create or update the private backend
-  `batches/<batch-id>.json` before dispatching dependent workers. When the private coordination backend is available,
+  `batches/<batch-id>.json` before dispatching dependent workers.
+  When the private coordination backend is available,
   use `agent-coord claim` before creating worktrees/branches,
   `agent-coord heartbeat` at phase transitions, and `agent-coord status` at
   lane start and before rebase or push. If the lane shows unmet `blocked_on`

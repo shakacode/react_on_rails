@@ -23,7 +23,7 @@ ruby -Itest test/agent_coord_test.rb
 bin/agent-coord --help
 mkdir -p "$HOME/.local/bin"
 ln -sf "$PWD/bin/agent-coord" "$HOME/.local/bin/agent-coord"
-agent-coord --help
+"$HOME/.local/bin/agent-coord" --help
 ```
 
 The workflow docs assume `agent-coord` is available on `PATH`. Add
@@ -71,7 +71,8 @@ Use stable agent ids that identify machine role, tool, and lane, for example
 `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
 
 ```bash
-BATCH_ID=agent-coord-YYYY-MM-DD # Set once at kickoff and reuse for this batch.
+BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M)-coord-layer"
+# Set once at kickoff, include a short batch slug, and reuse for this batch.
 
 bin/agent-coord heartbeat \
   --agent-id mobile-codex-batch2 \
@@ -95,6 +96,11 @@ For dependency-sensitive lanes, coordinators create or update
 workers. The private backend README and CLI are authoritative for the terminal
 heartbeat statuses that unblock `depends_on` refs. A released claim is audit
 state and does not unblock dependent lanes by itself.
+
+If a worker lane declares `depends_on` but `agent-coord status` shows no matching
+batch file or lane state, the worker must treat dependency state as `UNKNOWN` and
+stop to report the missing private batch state instead of proceeding as
+independent.
 
 Do not store secrets, `.env` files, credentials, patches, customer data, or Pro
 source code in the coordination backend. It is only for minimal JSON state files.

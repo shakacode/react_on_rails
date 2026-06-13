@@ -34,7 +34,7 @@ table can safely include `shakacode/react_on_rails` and adopter repos such as
 use the structured public claim comment fallback until ShakaCode publishes a
 public backend spec or grants them access to the coordination backend spec.
 That fallback is documented in
-[AGENTS.md](../../AGENTS.md).
+[pr-processing.md](../../.agents/workflows/pr-processing.md#coordination-state).
 
 ### Claude support
 
@@ -97,7 +97,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
 
 5. Adopt cross-repo coordination when needed.
    - Copy `agent-coordination-backend.md` and `multi-batch-operations.md` only if the target repo will participate in multi-machine, multi-batch, or cross-repo work.
-   - For ShakaCode-internal repos, point operators at the same private shakacode/agent-coordination backend used by React on Rails. External adopters should use public claim comments until a public backend spec is available or ShakaCode grants access to the private spec.
+   - For ShakaCode-internal repos, point operators at the same private shakacode/agent-coordination backend used by React on Rails. External adopters should use public claim comments from `.agents/workflows/pr-processing.md` until a public backend spec is available or ShakaCode grants access to the private spec.
    - Use full repository names in every claim and heartbeat so `owner/repo#123` remains distinct from another repo's `#123`.
    - Keep private backend schema examples in the private coordination repo. Public/adopter repos should document only operator rules, setup pointers, and safe fallbacks.
    - Define which packages or directories must not be split across simultaneous batches, then add that routing rule to the target repo's copy of `multi-batch-operations.md`.
