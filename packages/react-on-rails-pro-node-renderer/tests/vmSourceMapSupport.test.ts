@@ -15,11 +15,16 @@
 
 import path from 'path';
 import fsPromises from 'fs/promises';
+import vm from 'vm';
 import { mkdirAsync, serverBundleCachePath, vmBundlePath, resetForTest } from './helper';
-import { buildExecutionContext, resetVM } from '../src/worker/vm';
+import { buildExecutionContext, hasVMContextForBundle, resetVM } from '../src/worker/vm';
 import { buildConfig } from '../src/shared/configBuilder';
 import { isErrorRenderResult } from '../src/shared/utils';
-import { resolveOriginalPosition } from '../src/worker/vmSourceMapSupport';
+import {
+  PREPARE_STACK_TRACE_INSTALL_SCRIPT,
+  registerBundleForSourceMaps,
+  resolveOriginalPosition,
+} from '../src/worker/vmSourceMapSupport';
 
 const testName = 'vmSourceMapSupport';
 
@@ -123,6 +128,12 @@ async function writeVmBundle(contents: string) {
   return bundlePath;
 }
 
+async function writeBundleAt(bundlePath: string, contents: string) {
+  await mkdirAsync(path.dirname(bundlePath), { recursive: true });
+  await fsPromises.writeFile(bundlePath, contents);
+  return bundlePath;
+}
+
 function configureForTest() {
   buildConfig({
     serverBundleCachePath: serverBundleCachePath(testName),
@@ -188,6 +199,41 @@ describe('source-mapped stack traces for VM errors', () => {
       throw new Error('expected exceptionMessage result');
     }
     expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+  });
+
+  test('sourceMappingURL cannot escape the bundle directory with a parent path', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const outsideMapPath = path.join(path.dirname(path.dirname(bundlePath)), 'outside.map');
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=../outside.map\n`);
+    await fsPromises.writeFile(outsideMapPath, JSON.stringify(buildThrowingBundleMap('outside.map')));
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`at boom (${bundlePath}:3:`);
+    expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+  });
+
+  test('sourceMappingURL cannot escape the bundle directory with an absolute path', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const outsideMapPath = path.join(serverBundleCachePath(testName), 'outside-absolute.map');
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${outsideMapPath}\n`);
+    await fsPromises.writeFile(
+      outsideMapPath,
+      JSON.stringify(buildThrowingBundleMap(path.basename(outsideMapPath))),
+    );
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`at boom (${bundlePath}:3:`);
+    expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
   });
 
   test('first-line columns are corrected for the Module.wrap prefix (single-line bundle)', async () => {
@@ -260,6 +306,36 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
   });
 
+  test('evicted VM contexts still remap stacks held by active execution contexts', async () => {
+    buildConfig({
+      serverBundleCachePath: serverBundleCachePath(testName),
+      supportModules: true,
+      stubTimers: false,
+      maxVMPoolSize: 1,
+    });
+
+    const bundlePath = await writeVmBundle(
+      `${buildThrowingBundleSource()}\n${inlineSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
+    );
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
+
+    const otherBundlePath = path.join(serverBundleCachePath(testName), 'other', 'other.js');
+    await writeBundleAt(otherBundlePath, 'global.otherBundleLoaded = true;');
+    await buildExecutionContext([otherBundlePath], /* buildVmsIfNeeded */ true);
+    expect(hasVMContextForBundle(bundlePath)).toBe(false);
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+  });
+
   test('bundle without a source map keeps the real bundle path in stack frames', async () => {
     const bundlePath = await writeVmBundle(`${buildThrowingBundleSource()}\n`);
     const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
@@ -289,7 +365,57 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(resolveOriginalPosition(42, 1, 1)).toBeNull();
     expect(resolveOriginalPosition('/some/path.js', '1', 1)).toBeNull();
     expect(resolveOriginalPosition('/some/path.js', 1, Number.NaN)).toBeNull();
+    expect(resolveOriginalPosition('/some/path.js', 1.5, 1)).toBeNull();
+    expect(resolveOriginalPosition('/some/path.js', 1, 1.5)).toBeNull();
+    expect(resolveOriginalPosition('/some/path.js', 0, 1)).toBeNull();
+    expect(resolveOriginalPosition('/some/path.js', 1, 0)).toBeNull();
     expect(resolveOriginalPosition('/unregistered/path.js', 1, 1)).toBeNull();
+  });
+
+  test('registering the same path invalidates cached missing source maps', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+
+    registerBundleForSourceMaps(bundlePath);
+    expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
+
+    await fsPromises.writeFile(
+      path.join(path.dirname(bundlePath), mapFileName),
+      JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))),
+    );
+
+    registerBundleForSourceMaps(bundlePath);
+    expect(resolveOriginalPosition(bundlePath, 3, 17)).toEqual({
+      source: ORIGINAL_SOURCE,
+      line: 2,
+      column: 3,
+    });
+  });
+
+  test('prepareStackTrace falls back when a call site cannot be stringified', () => {
+    const context = vm.createContext({
+      __reactOnRailsProResolveOriginalSourcePosition: () => null,
+    });
+    vm.runInContext(PREPARE_STACK_TRACE_INSTALL_SCRIPT, context);
+
+    const formattedStack = vm.runInContext(
+      `
+      Error.prepareStackTrace(
+        { toString: function () { return 'Error: format failed'; } },
+        [{
+          toString: function () { throw new Error('frame failed'); },
+          getFileName: function () { return 'bundle.js'; },
+          getLineNumber: function () { return 1; },
+          getColumnNumber: function () { return 1; }
+        }]
+      )
+      `,
+      context,
+    );
+
+    expect(formattedStack).toContain('Error: format failed');
+    expect(formattedStack).toContain('    at <frame>');
   });
 });
 

@@ -125,7 +125,10 @@ function manageVMPoolSize() {
     const oldestPath = sortedEntries.shift()?.[0];
     if (oldestPath) {
       vmContexts.delete(oldestPath);
-      unregisterBundleForSourceMaps(oldestPath);
+      // ExecutionContext instances hold direct references to VM contexts. After
+      // a context is evicted from the shared pool, an in-flight request may
+      // still format an error stack from that context, so keep its source-map
+      // registration until resetVM/removeVM explicitly clears it.
       log.debug(`Removed VM for bundle ${oldestPath} due to pool size limit (max: ${maxVMPoolSize})`);
     }
   }

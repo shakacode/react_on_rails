@@ -61,8 +61,8 @@ interface BundleSourceMapRegistration {
 const registeredBundles = new Map<string, BundleSourceMapRegistration>();
 
 // Lazily-populated cache: bundle path -> parsed SourceMap, or null when the
-// bundle has no (usable) source map. Bundles are immutable per timestamp, so
-// entries never need invalidation beyond unregistration.
+// bundle has no (usable) source map. Registration invalidates entries so a
+// same-path build retry cannot be poisoned by an earlier failed lookup.
 const sourceMapCache = new Map<string, SourceMap | null>();
 
 /**
@@ -76,11 +76,11 @@ export const SOURCE_MAP_RESOLVER_CONTEXT_KEY = '__reactOnRailsProResolveOriginal
  */
 export function registerBundleForSourceMaps(bundleFilePath: string, firstLineColumnOffset = 0) {
   registeredBundles.set(bundleFilePath, { firstLineColumnOffset });
+  sourceMapCache.delete(bundleFilePath);
 }
 
 /**
- * Drops the registration and any cached source map for a bundle (used when a
- * VM is evicted from the pool).
+ * Drops the registration and any cached source map for a bundle.
  */
 export function unregisterBundleForSourceMaps(bundleFilePath: string) {
   registeredBundles.delete(bundleFilePath);
@@ -114,6 +114,28 @@ function parseDataUrlSourceMap(url: string): string | undefined {
   return Buffer.from(url.slice(base64Index + base64Marker.length), 'base64').toString('utf8');
 }
 
+function isPathInsideOrEqual(candidatePath: string, directoryPath: string) {
+  const relativePath = path.relative(path.resolve(directoryPath), path.resolve(candidatePath));
+  return (
+    relativePath === '' ||
+    (relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath))
+  );
+}
+
+function resolveSourceMapPath(bundleFilePath: string, sourceMappingUrl: string): string | undefined {
+  const bundleDirectory = path.dirname(bundleFilePath);
+  const resolvedPath = path.resolve(bundleDirectory, sourceMappingUrl);
+  if (!isPathInsideOrEqual(resolvedPath, bundleDirectory)) {
+    log.debug(
+      'Ignoring source map outside bundle directory for bundle %s: %s',
+      bundleFilePath,
+      sourceMappingUrl,
+    );
+    return undefined;
+  }
+  return resolvedPath;
+}
+
 function loadSourceMapForBundle(bundleFilePath: string): SourceMap | null {
   try {
     const bundleContents = fs.readFileSync(bundleFilePath, 'utf8');
@@ -125,7 +147,10 @@ function loadSourceMapForBundle(bundleFilePath: string): SourceMap | null {
     } else {
       const candidatePaths: string[] = [];
       if (sourceMappingUrl) {
-        candidatePaths.push(path.resolve(path.dirname(bundleFilePath), sourceMappingUrl));
+        const sourceMapPath = resolveSourceMapPath(bundleFilePath, sourceMappingUrl);
+        if (sourceMapPath) {
+          candidatePaths.push(sourceMapPath);
+        }
       }
       // Fallback: the uploaded bundle is renamed to `<timestamp>.js`, so a map
       // uploaded alongside it under that name is also worth checking.
@@ -170,7 +195,11 @@ export function resolveOriginalPosition(
     typeof lineNumber !== 'number' ||
     typeof columnNumber !== 'number' ||
     !Number.isFinite(lineNumber) ||
-    !Number.isFinite(columnNumber)
+    !Number.isFinite(columnNumber) ||
+    !Number.isInteger(lineNumber) ||
+    !Number.isInteger(columnNumber) ||
+    lineNumber < 1 ||
+    columnNumber < 1
   ) {
     return null;
   }
@@ -236,7 +265,12 @@ Error.prepareStackTrace = function (error, callSites) {
   }
   var parts = [header];
   for (var i = 0; i < callSites.length; i++) {
-    var frameText = String(callSites[i]);
+    var frameText;
+    try {
+      frameText = String(callSites[i]);
+    } catch (formatFrameError) {
+      frameText = '<frame>';
+    }
     try {
       var fileName = callSites[i].getFileName();
       var line = callSites[i].getLineNumber();
