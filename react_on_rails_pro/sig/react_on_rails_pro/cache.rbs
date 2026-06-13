@@ -42,6 +42,14 @@ module ReactOnRailsPro
 
     module Revalidates
       def self.included: (Module base) -> void
+
+      module ClassMethods
+        def revalidates_react_cache: () ?{ (untyped record) -> untyped } -> void
+      end
+
+      private
+
+      def revalidate_react_on_rails_cache_tags: () -> void
     end
   end
 end

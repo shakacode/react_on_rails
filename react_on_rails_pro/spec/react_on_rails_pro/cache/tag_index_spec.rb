@@ -290,5 +290,30 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect { ReactOnRailsPro::Cache.register_tags(nil, "entry/one", nil) }.not_to raise_error
       expect { ReactOnRailsPro::Cache.register_tags([], "entry/one", nil) }.not_to raise_error
     end
+
+    it "treats blank tags in revalidate_tags as a no-op returning 0" do
+      expect(ReactOnRailsPro.revalidate_tag(nil)).to eq(0)
+      expect(ReactOnRailsPro.revalidate_tags(nil, "", "   ", [])).to eq(0)
+    end
+
+    it "tolerates a legacy bare-array index payload (no expires_at)" do
+      Rails.cache.write(described_class.index_key("legacy-tag"), %w[entry/one entry/two])
+      Rails.cache.write("entry/one", "one")
+
+      expect(described_class.revalidate("legacy-tag")).to eq(1)
+      expect(Rails.cache.read("entry/one")).to be_nil
+    end
+
+    it "falls back to the raw cache key with a warning when the store lacks the private key API" do
+      bare_store = ActiveSupport::Cache::MemoryStore.new
+      allow(bare_store).to receive(:respond_to?).and_call_original
+      allow(bare_store).to receive(:respond_to?).with(:expanded_key, true).and_return(false)
+      allow(Rails).to receive(:cache).and_return(bare_store)
+      allow(Rails.logger).to receive(:warn)
+      described_class.instance_variable_set(:@warned_private_key_api, nil)
+
+      expect(described_class.send(:normalized_entry_key, "entry/raw", {})).to eq("entry/raw")
+      expect(Rails.logger).to have_received(:warn)
+    end
   end
 end

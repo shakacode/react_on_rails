@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "react_on_rails/utils"
+require "react_on_rails_pro/cache/tag_index"
 
 module ReactOnRailsPro
   class Cache
@@ -55,10 +56,14 @@ module ReactOnRailsPro
 
       # Deletes every cached component entry registered under the given tags
       # and clears the tag index entries. Tags accept the same forms as the
-      # `cache_tags:` helper option. Missing/evicted index entries are a no-op.
-      # Returns the number of cache entries deleted.
+      # `cache_tags:` helper option. Blank tags (nil/empty/whitespace) are
+      # ignored, mirroring register_tags; missing/evicted index entries are a
+      # no-op. Returns the number of cache entries deleted.
       def revalidate_tags(*tags)
-        TagIndex.revalidate(*tags)
+        meaningful_tags = tags.flatten.reject(&:blank?)
+        return 0 if meaningful_tags.empty?
+
+        TagIndex.revalidate(*meaningful_tags)
       end
 
       def use_cache?(options)

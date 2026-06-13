@@ -115,10 +115,34 @@ module ReactOnRailsPro
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
                   :profile_server_rendering_js_code, :raise_non_shell_server_rendering_errors, :enable_rsc_support,
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
-                  :react_server_client_manifest_file, :cache_tag_index_expires_in, :cache_tag_index_max_keys
+                  :react_server_client_manifest_file
 
     attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
-                :renderer_http_pool_size
+                :renderer_http_pool_size, :cache_tag_index_expires_in, :cache_tag_index_max_keys
+
+    # Sets how long tag->key index entries live (see Cache::TagIndex).
+    #
+    # @param value [Numeric] A positive number of seconds (e.g. 7.days)
+    # @raise [ReactOnRailsPro::Error] if value is not a positive, finite number
+    def cache_tag_index_expires_in=(value)
+      unless value.is_a?(Numeric) && value.positive? && value.to_f.finite?
+        raise ReactOnRailsPro::Error,
+              "config.cache_tag_index_expires_in must be a positive number of seconds"
+      end
+      @cache_tag_index_expires_in = value
+    end
+
+    # Sets the maximum cache-entry keys recorded per tag (see Cache::TagIndex).
+    #
+    # @param value [Integer] A positive integer
+    # @raise [ReactOnRailsPro::Error] if value is not a positive integer
+    def cache_tag_index_max_keys=(value)
+      unless value.is_a?(Integer) && value.positive?
+        raise ReactOnRailsPro::Error,
+              "config.cache_tag_index_max_keys must be a positive integer"
+      end
+      @cache_tag_index_max_keys = value
+    end
 
     # Sets the buffer size for concurrent component streaming.
     #

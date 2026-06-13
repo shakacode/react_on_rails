@@ -76,7 +76,11 @@ module ReactOnRailsPro
           return normalize_tags(resolved) if resolved.is_a?(Array)
 
           value = tag_value(resolved)
-          raise ReactOnRailsPro::Error, "cache_tags value #{tag.inspect} normalized to a blank tag" if value.blank?
+          if value.blank?
+            raise ReactOnRailsPro::Error,
+                  "cache_tags entry resolved to a blank tag " \
+                  "(original: #{tag.inspect}, resolved: #{resolved.inspect})"
+          end
 
           [value]
         end
@@ -212,6 +216,11 @@ module ReactOnRailsPro
           end
         end
 
+        # The private Store methods normalized_entry_key reproduces. Custom or
+        # future stores missing any of these fall back to the raw cache key
+        # (with a one-time warning) instead of failing registration silently.
+        PRIVATE_KEY_METHODS = %i[expanded_key namespace_key merged_options].freeze
+
         def normalized_entry_key(cache_key, cache_options)
           # Record the store's *logical* cache name: the expanded key plus any
           # :namespace from the entry's cache_options or the store default —
@@ -226,8 +235,26 @@ module ReactOnRailsPro
           # these private Store methods is the only way to reproduce the
           # store's naming; all three have been stable across ActiveSupport
           # versions for years.
-          expanded = Rails.cache.send(:expanded_key, cache_key)
-          Rails.cache.send(:namespace_key, expanded, Rails.cache.send(:merged_options, cache_options))
+          store = Rails.cache
+          unless PRIVATE_KEY_METHODS.all? { |method_name| store.respond_to?(method_name, true) }
+            warn_missing_private_key_api(store)
+            return cache_key.to_s
+          end
+
+          expanded = store.send(:expanded_key, cache_key)
+          store.send(:namespace_key, expanded, store.send(:merged_options, cache_options))
+        end
+
+        def warn_missing_private_key_api(store)
+          @warned_private_key_api ||= {}
+          return if @warned_private_key_api[store.class]
+
+          @warned_private_key_api[store.class] = true
+          Rails.logger.warn do
+            "[ReactOnRailsPro] #{store.class} does not implement the private key-normalization API " \
+              "(#{PRIVATE_KEY_METHODS.join(', ')}); the cache tag index falls back to raw cache keys, " \
+              "so tag revalidation may miss entries written with a :namespace or expanded key forms."
+          end
         end
       end
     end
