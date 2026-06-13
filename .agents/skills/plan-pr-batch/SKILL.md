@@ -121,7 +121,19 @@ Items:
 Execution rules:
 - Follow `.agents/skills/pr-batch/SKILL.md` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
 - Dispatch one subagent per independent item; group dependent items only when shared context is required.
-- Treat the items as file-disjoint: a worker must not edit a file listed for another item in the file-touch map or reserved for a deferred batch. If a worker concludes it must, stop and report instead of editing.
+- Treat parallel items as file-disjoint: a worker must edit only files owned by
+  its lane in the File-touch map.
+  - Deferred or reserved paths block only lanes that do not own that path; the
+    lane listed as owner in the File-touch map may edit its declared files even
+    when a later deferred item will also need them.
+  - An `UNKNOWN` item may run only as a serial discovery lane. The worker must
+    identify the needed files, report or record those discovered paths with the
+    coordinator, and wait for confirmation that no active lane owns them before
+    editing.
+  - If a worker concludes it needs an unlisted file or another lane's file, stop
+    and report so the coordinator can sequence or split the work.
+  - Sequenced or dependency-ordered lanes may share declared files only in the
+    stated order.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
 - For concurrent or dependency-sensitive batches, assign a stable agent id and
   lane name per lane. Declare lane dependencies with `depends_on` refs such as
