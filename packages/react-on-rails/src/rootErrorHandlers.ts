@@ -23,6 +23,8 @@ const HANDLER_KEYS: readonly RootErrorHandlerKey[] = [
 // core ClientRenderer and the Pro ClientSideRenderer (which imports this module from the same
 // `react-on-rails` package instance) read the same registration.
 let registeredHandlers: RootErrorHandlers = {};
+let warnedMissingRootApi = false;
+let warnedMissingReact19Callbacks = false;
 
 /**
  * Validates and stores the user's root error callbacks. Called by `ReactOnRails.setOptions`.
@@ -48,17 +50,21 @@ export function setRootErrorHandlers(handlers: RootErrorHandlers): void {
 
   const providedKeys = HANDLER_KEYS.filter((key) => typeof handlers[key] === 'function');
   if (providedKeys.length > 0 && !supportsRootApi) {
-    console.warn(
-      `[ReactOnRails] rootErrorHandlers (${providedKeys.join(', ')}) require the React 18+ root APIs ` +
-        '(hydrateRoot/createRoot). The registered callbacks will never be called with the current React version.',
-    );
+    if (!warnedMissingRootApi) {
+      console.warn(
+        `[ReactOnRails] rootErrorHandlers (${providedKeys.join(', ')}) require the React 18+ root APIs ` +
+          '(hydrateRoot/createRoot). The registered callbacks will never be called with the current React version.',
+      );
+      warnedMissingRootApi = true;
+    }
   } else if (!supportsReact19RootErrorCallbacks) {
     const react19OnlyKeys = providedKeys.filter((key) => key !== 'onRecoverableError');
-    if (react19OnlyKeys.length > 0) {
+    if (react19OnlyKeys.length > 0 && !warnedMissingReact19Callbacks) {
       console.warn(
         `[ReactOnRails] rootErrorHandlers (${react19OnlyKeys.join(', ')}) require React 19. ` +
           'Only onRecoverableError is supported on React 18; the other registered callbacks will never be called.',
       );
+      warnedMissingReact19Callbacks = true;
     }
   }
 
@@ -79,6 +85,8 @@ export function setRootErrorHandlers(handlers: RootErrorHandlers): void {
 /** Clears the registered root error callbacks. Called by `ReactOnRails.resetOptions`. */
 export function resetRootErrorHandlers(): void {
   registeredHandlers = {};
+  warnedMissingRootApi = false;
+  warnedMissingReact19Callbacks = false;
 }
 
 /**

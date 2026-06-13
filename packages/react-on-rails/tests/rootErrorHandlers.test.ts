@@ -92,6 +92,20 @@ describe('rootErrorHandlers', () => {
       expect(getRootErrorHandlers()).toEqual({ onUncaughtError });
     });
 
+    it('clears all keys when they are explicitly passed as undefined', () => {
+      const { setRootErrorHandlers, getRootErrorHandlers } = loadModule('19.0.0');
+      const onRecoverableError = jest.fn();
+      const onCaughtError = jest.fn();
+      const onUncaughtError = jest.fn();
+      setRootErrorHandlers({ onRecoverableError, onCaughtError, onUncaughtError });
+      setRootErrorHandlers({
+        onRecoverableError: undefined,
+        onCaughtError: undefined,
+        onUncaughtError: undefined,
+      });
+      expect(getRootErrorHandlers()).toEqual({});
+    });
+
     it('returns a snapshot copy so callers cannot mutate the internal registration', () => {
       const { setRootErrorHandlers, getRootErrorHandlers } = loadModule('19.0.0');
       const onRecoverableError = jest.fn();
@@ -111,6 +125,18 @@ describe('rootErrorHandlers', () => {
       setRootErrorHandlers({ onRecoverableError: jest.fn(), onUncaughtError: jest.fn() });
       expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('require the React 18+ root APIs'));
       expect(buildRootErrorCallbackOptions({ componentName: 'X', domNodeId: 'x' }, true)).toEqual({});
+    });
+
+    it('warns once per reset cycle when handlers are registered repeatedly', () => {
+      const { setRootErrorHandlers, resetRootErrorHandlers } = loadModule('17.0.2');
+      const onRecoverableError = jest.fn();
+      setRootErrorHandlers({ onRecoverableError });
+      setRootErrorHandlers({ onRecoverableError });
+      expect(console.warn).toHaveBeenCalledTimes(1);
+
+      resetRootErrorHandlers();
+      setRootErrorHandlers({ onRecoverableError });
+      expect(console.warn).toHaveBeenCalledTimes(2);
     });
 
     it('does not warn when no handlers are registered', () => {
@@ -135,6 +161,19 @@ describe('rootErrorHandlers', () => {
       expect(options.onRecoverableError).toEqual(expect.any(Function));
       expect(options.onCaughtError).toBeUndefined();
       expect(options.onUncaughtError).toBeUndefined();
+    });
+
+    it('warns once per reset cycle for React 19-only callbacks', () => {
+      const { setRootErrorHandlers, resetRootErrorHandlers } = loadModule('18.3.1');
+      const onCaughtError = jest.fn();
+      const onUncaughtError = jest.fn();
+      setRootErrorHandlers({ onCaughtError });
+      setRootErrorHandlers({ onUncaughtError });
+      expect(console.warn).toHaveBeenCalledTimes(1);
+
+      resetRootErrorHandlers();
+      setRootErrorHandlers({ onUncaughtError });
+      expect(console.warn).toHaveBeenCalledTimes(2);
     });
 
     it('does not warn when only onRecoverableError is registered', () => {
