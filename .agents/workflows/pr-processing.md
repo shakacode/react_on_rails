@@ -299,8 +299,10 @@ Classify each target before assigning a worker:
 
 - **Implementation PR**: the issue has a concrete, scoped change.
 - **Combined investigation PR**: related issues share one exploratory or diagnostic change that would be harder to split safely.
-- **No-PR evidence comment**: the issue is duplicate, low-value, already fixed, or better closed with evidence. The posted comment is the deliverable; include live evidence, the no-PR rationale, and whether the issue should stay open, close, or wait. For investigation or benchmark conclusions, cite a reproducible artifact (script, data file, benchmark command plus environment) or state the missing-artifact caveat, and verify that headline numbers match the document's own tables before recommending close/park.
+- **No-PR evidence comment**: the issue is duplicate, low-value, already fixed, or better closed with evidence. The posted comment is the deliverable; include live evidence, the no-PR rationale, and whether the issue should stay open, close, or wait.
 - **Product-decision blocker**: the issue needs a maintainer/product decision before code would be safe. The deliverable is a surfaced question or decision request, not a speculative branch.
+
+For investigation or benchmark conclusions, apply the closing-evidence bar to every outcome path. Implementation PRs, combined investigation PRs, and no-PR evidence comments that recommend close, park, or document/work around must cite a reproducible artifact (script, data file, benchmark command plus environment) or state the missing-artifact caveat, and verify that headline numbers match the document's own tables before recommending close/park.
 
 Workers should not turn product-decision blockers into speculative PRs. They should post or draft the evidence-backed question and stop that target.
 

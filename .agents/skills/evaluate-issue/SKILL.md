@@ -50,8 +50,8 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - Be skeptical of broad identity, runtime, CI, workflow, dependency, or Pro/RSC changes unless impact justifies the complexity.
    - Split complex fixes into prerequisites and decision points; do not let a polished RFC imply immediate priority.
 
-   For investigation or benchmark issues, a `close`, `park`, or `document/work
-around` recommendation requires closing evidence. Cite a reproducible
+   For investigation or benchmark issues, recommendations to `close`, `park`, or
+   `document/work around` require closing evidence. Cite a reproducible
    artifact (script, data file, benchmark command plus environment) or state the
    missing-artifact caveat, verify that headline numbers match the document's
    own tables, and carry production-environment caveats when the evidence was

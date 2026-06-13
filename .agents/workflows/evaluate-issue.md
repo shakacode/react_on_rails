@@ -17,8 +17,8 @@ The authoritative rubric lives in `.agents/skills/evaluate-issue/SKILL.md`. Read
    - Convert low-value assigned issues into no-PR evidence comments rather than speculative PRs.
    - Carry the disposition into `$pr-batch` as the target outcome: implementation PR, no-PR evidence comment, `document/work around`, or product-decision blocker.
 
-For investigation or benchmark issues, a `close`, `park`, or `document/work
-around` recommendation requires closing evidence. Cite a reproducible artifact
+For investigation or benchmark issues, recommendations to `close`, `park`, or
+`document/work around` require closing evidence. Cite a reproducible artifact
 (script, data file, benchmark command plus environment) or state the
 missing-artifact caveat, verify that headline numbers match the document's own
 tables, and carry production-environment caveats when the evidence was collected
