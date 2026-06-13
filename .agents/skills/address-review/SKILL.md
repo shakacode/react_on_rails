@@ -10,12 +10,21 @@ Fetch review comments from a GitHub PR in this repository, triage them, and crea
 
 ## Maintainer Attention Contract
 
-When an action is selected, apply the repository attention contract:
+When a broad code-changing action is selected, apply the repository attention
+contract. Broad actions that may handle low-risk optional nits beyond an
+explicit selection are `a`, `f`, `f+i`, and `f+o`. Explicit `o <nums>` and
+`all optional` selections are code-changing only for the selected optional
+items; they must not sweep unrelated optional nits. Bare `o` is inspect/select
+only and must not edit files. No-code actions such as `m`, `r`, and
+rationale-only selections must only log, defer, decline, or reply; they must not
+edit files.
 
 - Do not ask whether to fix behavior-preserving `OPTIONAL` nits. If they are
   low-risk, in scope, and before the final-candidate debounce point, apply them
-  in the same local batch and record them in the summary. If they are not worth
-  fixing, record them as deferred or declined with rationale.
+  in the same local batch and record them in the summary. Use `AGENTS.md` for
+  the definitions of behavior-preserving, low-risk, and final-candidate debounce
+  point. If they are not worth fixing, record them as deferred or declined with
+  rationale.
 - If an optional item changes behavior, expands scope, creates review churn, or
   needs product judgment, classify or promote it to `DISCUSS` instead of fixing
   it silently.
@@ -243,7 +252,7 @@ After the triage list, present a **quick-action menu**:
 ```text
 Quick actions:
   f     — Fix must-fix items, autonomously handle low-risk optional nits, then prompt for skipped rationale replies and discuss decisions
-  f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/optional items (and non-trivial skipped items)
+  f+i   — Fix must-fix, autonomously handle low-risk optional nits, then prepare one deferred-work bundle for discuss/remaining optional items (and non-trivial skipped items)
   f+o   — Fix must-fix + address all optional items inline in the same PR
   a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations (local-only — no GitHub posts)
   d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
@@ -283,11 +292,15 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 2. Autonomously handle `OPTIONAL` nits that are behavior-preserving, low-risk,
    in scope, and before the final-candidate debounce point. Apply them inline
    when the fix is straightforward; otherwise record them as deferred or
-   declined with rationale. Do not ask the user to approve those nits.
+   declined with rationale. Do not ask the user to approve those nits. This
+   replaces the old explicit opt-in gate for low-risk optionals; broader
+   optional work still requires `a`, `f+o`, `f+i`, `m`, explicit `o <nums>` /
+   `all optional`, or direct selection of those optional items.
 3. If an optional item needs judgment, changes behavior, expands scope, or would
-   restart an expensive review cycle, promote it to `DISCUSS` or include it in
-   the deferred-work decision block instead of prompting separately as an
-   optional item.
+   restart an expensive review cycle, promote it to `DISCUSS` instead of
+   prompting separately as an optional item. Route deferred handling through the
+   later `DISCUSS` decision path, such as `f+i`, rather than inventing a
+   deferred bundle inside plain `f`.
 4. If local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
 5. Reply to each addressed `MUST-FIX` or `OPTIONAL` comment explaining the fix or recorded outcome.
 6. Resolve the corresponding review threads when the issue is handled or explicitly declined.
@@ -298,8 +311,17 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 
 ### Action `f+i` — Fix, deferred-work bundle, and merge-ready
 
-1. Do everything in `f` for `MUST-FIX` items. If there are no `MUST-FIX` items, skip the fix phase and continue with deferred-item handling.
-2. Prepare one deferred-work bundle for all `DISCUSS` items, `OPTIONAL` items worth tracking, and non-trivial `SKIPPED` items. Exclude weak "could consider" optional suggestions, trivial duplicates, factually incorrect suggestions, and status noise. For low-risk optional nits excluded from the bundle as not worth tracking, record the decline/defer rationale instead of prompting separately. Do not create a GitHub issue yet.
+1. Run action `f`'s fix phase, including autonomous optional handling. If there
+   are no `MUST-FIX` items, still handle low-risk behavior-preserving optional
+   nits before continuing with deferred-item handling.
+2. Prepare one deferred-work bundle for all `DISCUSS` items, remaining
+   `OPTIONAL` items worth tracking, and non-trivial `SKIPPED` items. Exclude
+   weak "could consider" optional suggestions, trivial duplicates, factually
+   incorrect suggestions, status noise, and already handled autonomous optional
+   nits. For low-risk optional nits excluded from the bundle as not worth
+   tracking, record the deferred/declined rationale and resolve or reply
+   according to the chosen tracking/drop outcome instead of prompting
+   separately. Do not create a GitHub issue yet.
 3. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Do not post replies or resolve bundled items until that tracking/drop outcome is chosen. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
 4. For each deferred item in the chosen tracking outcome, post a reply in the original location referencing that outcome (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists and the conversation is complete. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 5. For trivial `SKIPPED` items that are not included in the bundle (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads only when the user confirms.
@@ -313,7 +335,7 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    contract. Continue with skipped rationale confirmation (if any `SKIPPED`
    items exist), then discuss decisions (if any `DISCUSS` items remain).
 8. No additional commit is required unless later steps introduce local changes; if they do, commit and ask for push confirmation before pushing.
-9. Tell the user the PR is merge-ready only after the deferred bundle has an explicit tracking/drop decision, any dropped `DISCUSS` items are explicitly declined/resolved, and any optional items excluded from the bundle are handled inline or declined/resolved; if there were zero deferred items, use the `f` merge-ready rule after `f`'s remaining prompts are complete.
+9. Tell the user the PR is merge-ready only after the deferred bundle has an explicit tracking/drop decision, any dropped `DISCUSS` items are explicitly declined/resolved, and any optional items excluded from the bundle are handled inline, deferred with rationale/tracking outcome, or declined/resolved; if there were zero deferred items, use the `f` merge-ready rule after `f`'s remaining prompts are complete.
 
 ### Action `f+o` — Fix must-fix and optional items inline
 
@@ -335,6 +357,8 @@ Present the requested items with full context and ask the user for a decision on
 Present the requested items with full context. If the user enters bare `o`, present all `OPTIONAL` items for selection. For each selected optional item, treat it the same as a must-fix: make the code change, run relevant checks, reply, and resolve the thread. Use the same commit/push-before-reply ordering as action `f`. For optional items the user declines, offer a rationale reply via `r <nums>`.
 
 Use `o` only when the user explicitly wants to inspect or select optional items.
+Bare `o` presents items only; do not edit files until the user chooses specific
+optional items or `all optional`.
 The default `f` path should not ask for permission to handle low-risk optional
 nits.
 
@@ -360,7 +384,8 @@ Post rationale replies to the specified items explaining why they are being defe
 
 ### Direct item selection (e.g., "1,2", "all must-fix", "all optional", "1,3-5")
 
-Address only the selected items. After completing them:
+Address only the selected items. Direct selections do not trigger autonomous
+handling for unselected optional nits. After completing them:
 
 1. If selected items produced local changes, commit and ask for push confirmation before pushing (skip this step when there are no local changes).
 2. Reply and resolve threads for addressed items.
@@ -412,7 +437,11 @@ The response should briefly explain:
 After posting the reply, resolve the review thread when all of the following are true:
 
 - The comment belongs to a review thread and you have the thread ID
-- The concern was actually addressed in code, tests, or documentation, or it was explicitly declined with a clear explanation approved by the user
+- The concern was actually addressed in code, tests, or documentation; explicitly
+  declined with a clear explanation approved by the user; or autonomously
+  deferred/declined as a low-risk behavior-preserving `OPTIONAL` item under the
+  Maintainer Attention Contract with the rationale recorded in the reply or
+  summary
 - The thread is not already resolved
 
 Use GitHub GraphQL to resolve the thread:
@@ -650,7 +679,7 @@ PR is NOT merge-ready because must-fix items were deferred.
 If the action was direct item selection and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready. Re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`.
 If the action was `d`, `o`, or `r` and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready; re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`.
 If the action was `f+o`, tell me the PR is merge-ready once all selected work is pushed and `DISCUSS` items are resolved or explicitly deferred. `OPTIONAL` items do not block merge-readiness because they were all addressed inline.
-If the action was `f+i` or `m`, do not signal merge-ready until the deferred bundle has an explicit tracking/drop decision, any dropped `DISCUSS` items are explicitly declined/resolved, and any optional items excluded from the bundle are handled inline or declined/resolved; if there were zero deferred items, skip tracking and use the relevant no-deferred-items merge-ready rule after the remaining prompts for that action are complete.
+If the action was `f+i` or `m`, do not signal merge-ready until the deferred bundle has an explicit tracking/drop decision, any dropped `DISCUSS` items are explicitly declined/resolved, and any optional items excluded from the bundle are handled inline, deferred with rationale/tracking outcome, or declined/resolved; if there were zero deferred items, skip tracking and use the relevant no-deferred-items merge-ready rule after the remaining prompts for that action are complete.
 If the action was `a`, do not signal merge-ready automatically. Report that files are staged for review and list the remaining GitHub actions needed, such as commit, push, replies/resolutions, and decisions on `DISCUSS` recommendations.
 
 Do not automatically merge. Signal readiness (or non-readiness) and let the user decide.
@@ -691,7 +720,7 @@ SKIPPED (1):
 
 Quick actions:
   f     — Fix #1, autonomously handle low-risk optional nits, then prompt for skipped rationale replies and discuss decisions
-  f+i   — Fix #1, prepare one deferred-work bundle for #2 and optional items #3-4
+  f+i   — Fix #1, autonomously handle low-risk optional nits, then prepare one deferred-work bundle for #2 and remaining optional items #3-4
   f+o   — Fix #1 plus address all optional items #3-4 inline
   a     — Apply: fix #1 plus optional items #3-4, stage files, and recommend a decision for #2
   d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.

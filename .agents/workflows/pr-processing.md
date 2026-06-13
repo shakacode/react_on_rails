@@ -409,26 +409,12 @@ Classify every unresolved question before continuing:
 
 ### Maintainer Attention Contract
 
-Follow `AGENTS.md` under **Maintainer Attention Contract** for PR, review, and
-batch work. In this workflow that means:
-
-- Do not ask permission to fix a behavior-preserving optional nit. Apply it in
-  the same focused local batch when it is low-risk and before final-candidate
-  debounce, or record it as deferred/declined with a short rationale.
-- During CI or review waits, continue bounded useful work or move to another
-  independent lane. Consolidate routine CI and review outcomes into the next PR
-  evidence update instead of sending separate pings.
-- Surface at most one decision block per lane unless the lane is hard-blocked.
-  A decision block must include the question, options, recommendation, evidence,
-  and next action after an answer.
-- Verify machine-checkable claims before escalation and use `UNKNOWN` for facts
-  that could not be verified from local commands or live GitHub state.
-- Count human decision points per PR in batch closeouts. Low-risk lanes should
-  target at most one; higher counts belong in FYI as process churn evidence.
-- If delegated merge authority exists, write a confidence note before merging
-  with validated commands, evidence links, remaining `UNKNOWN` facts, and
-  residual risk. Without delegated merge authority, use the same structure as
-  merge-readiness evidence only.
+Follow `AGENTS.md` under **Maintainer Attention Contract** verbatim for PR,
+review, and batch work. In this workflow, apply that contract at three points:
+review triage, CI/review waits, and final handoff. Record autonomous nit
+outcomes, decision-point counts, confidence/readiness notes, and `UNKNOWN`
+facts in the PR description or handoff instead of turning them into separate
+maintainer pings.
 
 <!-- Keep this full-CI uncertainty rule in sync with `.agents/skills/pr-batch/SKILL.md`. -->
 

@@ -206,8 +206,17 @@ machine-checkable work. Agents working PRs, reviews, or batches must apply this
 contract unless a maintainer explicitly narrows the run.
 
 - **Autonomous nits**: behavior-preserving `OPTIONAL` review nits may be fixed
-  inline without asking, when they stay inside the PR scope and do not restart a
-  final-candidate review cycle. If the nit is not worth fixing, record it as
+  inline without asking when they stay inside the PR scope, are low-risk, and are
+  before the final-candidate debounce point: once a merge-readiness review cycle
+  has started, do not introduce new nit commits that would restart it.
+  Behavior-preserving means wording, formatting, or equivalent cleanup that does
+  not alter public APIs, generated output, runtime behavior, validation scope, or
+  reviewer obligations. Low-risk means local and mechanically checkable.
+  Qualifying examples: typo/comment punctuation, whitespace or trailing comma
+  cleanup, unused import removal, or unambiguous documentation wording.
+  Disqualifying examples: renaming a public method or constant, changing
+  generated content, altering CI or release policy, adding/removing validation,
+  or touching another lane's files. If the nit is not worth fixing, record it as
   deferred or declined with rationale instead of asking "OK to fix this nit?".
   Escalate only when the item changes behavior, expands scope, conflicts with
   policy, or has unclear risk.
@@ -353,7 +362,11 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Verify language, runtime, and library claims locally before changing code in response to AI review comments.
 - Deduplicate repeated bot comments before acting on them. Fix the underlying issue once, then resolve the duplicates.
 - Rebase or merge `main` once, near the end of the review cycle. For `CHANGELOG.md` conflicts, prefer resolving them as the final step before merge.
-- When asking an agent to address review comments, instruct it to classify comments into `blocking`, `optional`, and `noise`, then apply only the `blocking` items plus any explicitly selected optional items.
+- When asking an agent to address review comments, instruct it to classify
+  comments into `blocking`, `optional`, and `noise`, then apply the `blocking`
+  items plus any explicitly selected optional items. Low-risk behavior-preserving
+  optional nits remain governed by the Maintainer Attention Contract and may be
+  fixed or logged without a separate approval prompt.
 
 ## Boundaries
 
