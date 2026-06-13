@@ -32,9 +32,9 @@ Before starting, ensure you have:
 Install `react-on-rails-rsc`, which provides the webpack loader, webpack plugin, and RSC client/server runtime:
 
 ```bash
-yarn add react-on-rails-rsc
-# or: npm install react-on-rails-rsc
-# or: pnpm add react-on-rails-rsc
+yarn add react-on-rails-rsc@19.0.5
+# or: npm install react-on-rails-rsc@19.0.5
+# or: pnpm add react-on-rails-rsc@19.0.5
 ```
 
 Verify that `react` and `react-dom` are at version 19 and that the versions match:
@@ -49,7 +49,7 @@ yarn why react-on-rails-rsc
 
 If you're on React 18 or earlier, upgrade first -- RSC requires React 19.
 
-> **Version requirements:** Use `react-on-rails-rsc` **19.0.4 or later** -- earlier versions (19.0.0 through 19.0.3) vendored older builds of `react-server-dom-webpack` that were updated in 19.0.4. Check the `react-on-rails-rsc` README or changelog for the supported React version range.
+> **Version requirements:** Use stable `react-on-rails-rsc` **19.0.5**. Earlier versions miss RSC manifest fixes and will warn in Pro.
 
 ## Step 2: Configure Rails for RSC
 
@@ -608,12 +608,12 @@ These are the most frequent mistakes encountered during RSC infrastructure setup
 
 ### Mistake 1: Wrong `react-on-rails-rsc` version
 
-Versions 19.0.0 through 19.0.3 vendored older builds of `react-server-dom-webpack` that are incompatible with React 19. Symptoms include cryptic rendering errors or RSC payloads that fail to deserialize on the client.
+Versions before stable 19.0.5 miss React 19 RSC manifest fixes. Symptoms include cryptic rendering errors or client deserialization failures.
 
-**Fix:** Upgrade to `react-on-rails-rsc` 19.0.4 or later:
+**Fix:** Upgrade to stable `react-on-rails-rsc` 19.0.5:
 
 ```bash
-yarn add react-on-rails-rsc@latest
+yarn add react-on-rails-rsc@19.0.5
 ```
 
 ### Mistake 2: Forgetting the RSC bundle watcher in development

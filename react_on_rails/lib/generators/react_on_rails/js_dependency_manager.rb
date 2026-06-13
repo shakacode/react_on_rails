@@ -155,14 +155,13 @@ module ReactOnRails
       # are current on npm; React's RSC runtime and bundler integration can change between minors.
       #
       # This is intentionally distinct from RSC_PACKAGE_VERSION_PIN below, which pins
-      # `react-on-rails-rsc`. Coordination note for #3609: Pro package metadata may accept the
-      # prerelease RSC package broadly enough to keep `npm ls` healthy, but generator behavior still
-      # installs the tested React 19.0.x range and exact RSC package pin until both policies advance.
+      # `react-on-rails-rsc`. Coordination note for #3634/#3965: Pro package metadata expresses
+      # the supported stable install range, while generator behavior installs the tested React
+      # 19.0.x range and exact RSC package pin.
       RSC_REACT_VERSION_RANGE = "~19.0.4"
-      # Pinned to 19.0.5-rc.7 because the discovery plugin export, native Rspack plugin, and
-      # RSC manifest CSS fixes all ship in that prerelease.
-      # TODO(#3642): switch to a stable react-on-rails-rsc release after 19.0.5 stable ships.
-      RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.7"
+      # Pinned to the stable RSC package with the discovery plugin export, native Rspack plugin,
+      # and RSC manifest CSS fixes needed by generated RSC apps.
+      RSC_PACKAGE_VERSION_PIN = "19.0.5"
 
       private
 
@@ -484,27 +483,19 @@ module ReactOnRails
         RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }
       end
 
-      def rsc_stable_package_version_target
-        RSC_PACKAGE_VERSION_PIN.split("-", 2).first
-      end
-
       def rsc_dependency_pin_info
-        "React Server Components package pin: all --rsc installs temporarily use " \
-          "react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, including Webpack projects. " \
-          "This prerelease keeps react-on-rails-rsc/WebpackPlugin compatible while adding " \
-          "react-on-rails-rsc/RspackPlugin. Keep the pin until stable " \
-          "react-on-rails-rsc@#{rsc_stable_package_version_target} " \
-          "is published and tagged latest."
+        "React Server Components package pin: all --rsc installs use the tested " \
+          "react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN} stable release, including Webpack " \
+          "projects. This keeps react-on-rails-rsc/WebpackPlugin compatible while adding " \
+          "react-on-rails-rsc/RspackPlugin and the RSC manifest CSS fixes."
       end
 
       def rsc_dependency_pin_failed_warning
         "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
-          "All RSC projects are temporarily pinned to that version: the prerelease keeps " \
-          "react-on-rails-rsc/WebpackPlugin compatible while adding react-on-rails-rsc/RspackPlugin, " \
-          "and the unversioned `latest` tag may not include both until stable " \
-          "#{rsc_stable_package_version_target} " \
-          "is published, so the generator left the version pin in package.json rather than " \
-          "install a potentially incompatible version."
+          "All RSC projects are pinned to that stable version because it keeps " \
+          "react-on-rails-rsc/WebpackPlugin compatible while adding react-on-rails-rsc/RspackPlugin " \
+          "and the RSC manifest CSS fixes. The generator left the version pin in package.json " \
+          "rather than install a potentially incompatible future version."
       end
 
       def rsc_dependency_pin_failure_details(used_version_pins)

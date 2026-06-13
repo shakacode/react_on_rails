@@ -33,15 +33,18 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('returns ok for a supported stable rsc + react', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.0.4', reactVersion: '19.0.4' }).level).toBe('ok');
+    expect(checkRscPeerCompatibility({ rscVersion: '19.0.5', reactVersion: '19.0.4' }).level).toBe('ok');
   });
 
-  it('returns ok for a coordinated prerelease (prerelease stripped for comparison)', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.0.5-rc.6', reactVersion: '19.0.4' }).level).toBe('ok');
+  it('warns for a coordinated prerelease below the stable floor', () => {
+    const result = checkRscPeerCompatibility({ rscVersion: '19.0.5-rc.6', reactVersion: '19.0.4' });
+
+    expect(result.level).toBe('warn');
+    expect(result.message).toContain('recommended stable minimum');
   });
 
   it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: 'v19.0.4', reactVersion: '19.0.4' }).level).toBe('ok');
+    expect(checkRscPeerCompatibility({ rscVersion: 'v19.0.5', reactVersion: '19.0.4' }).level).toBe('ok');
   });
 
   it('errors when rsc major is above the supported major', () => {
@@ -55,8 +58,16 @@ describe('checkRscPeerCompatibility', () => {
     expect(checkRscPeerCompatibility({ rscVersion: '18.3.1', reactVersion: '19.0.4' }).level).toBe('error');
   });
 
+  it('errors when rsc minor is above the supported minor', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: '19.1.0', reactVersion: '19.0.4' });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('react-on-rails-rsc');
+    expect(r.message).toContain('19.1.0');
+    expect(r.message).toContain('19.0.x');
+  });
+
   it('errors when React major is below the RSC minimum', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.0.4', reactVersion: '18.3.1' });
+    const r = checkRscPeerCompatibility({ rscVersion: '19.0.5', reactVersion: '18.3.1' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('react');
     expect(r.message).toContain('18.3.1');
@@ -64,7 +75,7 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('errors when React 19.0 patch is below the supported minimum', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.0.4', reactVersion: '19.0.3' });
+    const r = checkRscPeerCompatibility({ rscVersion: '19.0.5', reactVersion: '19.0.3' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('react');
     expect(r.message).toContain('19.0.3');
@@ -72,7 +83,7 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('errors when React uses an unsupported React 19 minor', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.0.4', reactVersion: '19.1.0' });
+    const r = checkRscPeerCompatibility({ rscVersion: '19.0.5', reactVersion: '19.1.0' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('react');
     expect(r.message).toContain('19.1.0');
@@ -81,7 +92,7 @@ describe('checkRscPeerCompatibility', () => {
 
   it('errors when react-dom major is below the RSC minimum', () => {
     const r = checkRscPeerCompatibility({
-      rscVersion: '19.0.4',
+      rscVersion: '19.0.5',
       reactVersion: '19.0.4',
       reactDomVersion: '18.3.1',
     });
@@ -92,7 +103,7 @@ describe('checkRscPeerCompatibility', () => {
 
   it('errors when react-dom does not match react', () => {
     const r = checkRscPeerCompatibility({
-      rscVersion: '19.0.4',
+      rscVersion: '19.0.5',
       reactVersion: '19.0.4',
       reactDomVersion: '19.0.5',
     });
@@ -114,6 +125,6 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('skips the React check when React is not resolvable', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.0.4', reactVersion: null }).level).toBe('ok');
+    expect(checkRscPeerCompatibility({ rscVersion: '19.0.5', reactVersion: null }).level).toBe('ok');
   });
 });

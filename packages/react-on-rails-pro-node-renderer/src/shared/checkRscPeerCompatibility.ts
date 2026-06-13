@@ -31,19 +31,22 @@ export interface RscPeerCheckInput {
 
 type VersionTuple = [number, number, number];
 
-// Strip build metadata (`+...`) and prerelease (`-...`) so a coordinated RC such as
-// `19.0.5-rc.7` compares as `19.0.5`. We only need major/minor/patch ordering, so this
-// avoids semver's prerelease rules (and a `semver` dependency) entirely.
+// `resolveVersion` is a public injection point, so tolerate leading `v`/`=`
+// prefixes and build metadata here before parsing or checking prerelease status.
+const withoutBuildMetadata = (version: string): string => {
+  const [withoutBuild = ''] = version.replace(/^[v=]+/, '').split('+', 1);
+  return withoutBuild;
+};
+
 const parseTuple = (version: string): VersionTuple => {
-  // `resolveVersion` is a public injection point, so tolerate a leading `v`/`=` (e.g. `v19.0.4`).
   // Malformed versions intentionally coerce to 0 segments so the major mismatch
   // branch reports the original string instead of hiding it behind a parse error.
-  const normalized = version.replace(/^[v=]+/, '');
-  const [withoutBuild = ''] = normalized.split('+', 1);
-  const [core = ''] = withoutBuild.split('-', 1);
+  const [core = ''] = withoutBuildMetadata(version).split('-', 1);
   const parts = core.split('.');
   return [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0];
 };
+
+const hasPrerelease = (version: string): boolean => withoutBuildMetadata(version).includes('-');
 
 const isAtLeast = (actual: VersionTuple, floor: VersionTuple): boolean => {
   for (let i = 0; i < 3; i += 1) {
@@ -83,9 +86,9 @@ const errorMessage = (pkg: string, found: string, want: string, proVersion?: str
 
 const warnMessage = (found: string, recommendedMin: string, proVersion?: string) =>
   [
-    `[ReactOnRails] react-on-rails-rsc ${found} is older than the recommended minimum ${recommendedMin}.`,
+    `[ReactOnRails] react-on-rails-rsc ${found} is older than the recommended stable minimum ${recommendedMin}.`,
     `  ${proLabel(proVersion)} may behave incorrectly (missing coordinated RSC fixes).`,
-    `  Upgrade react-on-rails-rsc to ${recommendedMin} or newer.`,
+    `  Upgrade react-on-rails-rsc to ${recommendedMin} or a newer stable release.`,
   ].join('\n');
 
 export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerCheckResult {
@@ -97,15 +100,15 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
 
   const { reactOnRailsRsc, react } = RSC_PEER_SUPPORT;
   const rscTuple = parseTuple(rscVersion);
-  const [rscMajor] = rscTuple;
+  const [rscMajor, rscMinor] = rscTuple;
 
-  if (rscMajor !== reactOnRailsRsc.supportedMajor) {
+  if (rscMajor !== reactOnRailsRsc.supportedMajor || rscMinor !== reactOnRailsRsc.supportedMinor) {
     return {
       level: 'error',
       message: errorMessage(
         'react-on-rails-rsc',
         rscVersion,
-        `${reactOnRailsRsc.supportedMajor}.x`,
+        `${reactOnRailsRsc.supportedMajor}.${reactOnRailsRsc.supportedMinor}.x`,
         proVersion,
       ),
     };
@@ -141,7 +144,7 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
     }
   }
 
-  if (!isAtLeast(rscTuple, parseTuple(reactOnRailsRsc.recommendedMin))) {
+  if (hasPrerelease(rscVersion) || !isAtLeast(rscTuple, parseTuple(reactOnRailsRsc.recommendedMin))) {
     return { level: 'warn', message: warnMessage(rscVersion, reactOnRailsRsc.recommendedMin, proVersion) };
   }
 

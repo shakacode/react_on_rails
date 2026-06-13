@@ -26851,19 +26851,17 @@ yarn add --exact react-on-rails-pro@VERSION
 bundle add react_on_rails_pro --version="= VERSION"
 ```
 
-Also, install React 19.0.x, React DOM 19.0.x, and the exact `react-on-rails-rsc` release candidate currently used by the generator:
+Also, install React 19.0.x, React DOM 19.0.x, and the stable `react-on-rails-rsc` package used by the generator:
 
 ```bash
-yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
-# npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
-# pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
-# bun add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
+yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# bun add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
 ```
 
 > [!NOTE]
 > React on Rails Pro RSC currently supports React 19.0.x with patch >= 19.0.4. Do not upgrade generated RSC apps to React 19.1 or 19.2 just because those versions are newer on npm; the RSC bundler APIs used internally can change between React minor versions. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
->
-> The example above pins `react-on-rails-rsc@19.0.5-rc.7`, a release candidate. Keep that exact pin until a stable `react-on-rails-rsc@19.0.5` release is published and the generator/package metadata policy is reviewed together.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
 
@@ -28424,7 +28422,7 @@ Before running the generator, verify your environment:
 | React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version                                                                                                         |
 | React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.0.x with patch >= 19.0.4 (see [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for security context) |
 | React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version                                                                                                  |
-| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | Exact `19.0.5-rc.7` pin until stable `19.0.5` ships                                                                         |
+| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | Exact `19.0.5` pin                                                                                                          |
 | Node.js                  | `node --version`                                                                                                               | 18+                                                                                                                         |
 | Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                                                                                 |
 | Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                                                                        |
@@ -28432,9 +28430,9 @@ Before running the generator, verify your environment:
 If React is outside the supported 19.0.x range or below 19.0.4, upgrade it first:
 
 ```bash
-pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
-# or: yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
-# or: npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
+pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# or: yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# or: npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
 ```
 
 > **React 19.0.x with patch >= 19.0.4** is recommended. Earlier 19.0.x versions (19.0.0--19.0.3) have known security vulnerabilities — see the [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for details.
@@ -28443,7 +28441,7 @@ pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
 > The RSC generator intentionally stays on React 19.0.x and does not widen generated apps to React 19.1 or 19.2 yet. React's RSC runtime and bundler APIs can change between minor releases, so advance the React range only when the generator, docs, and package metadata policy are reviewed together.
 
 > [!NOTE]
-> `react-on-rails-rsc@19.0.5-rc.7` is an exact release-candidate pin. Keep that exact pin until a stable `react-on-rails-rsc@19.0.5` release is available. This is separate from the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609): metadata can allow prerelease RSC packages broadly enough for `npm ls`, while the generator still installs the tested exact RSC package pin.
+> `react-on-rails-rsc@19.0.5` is the stable floor for native RSC manifest CSS fixes. The Pro peer range stays explicit for the supported React 19.0.x RSC line.
 
 ## Pre-Migration: Audit Components for Client API Usage
 
@@ -28672,8 +28670,8 @@ Then run `bundle install` before retrying the generator.
 
 If the RSC bundle build fails but server and client builds succeed, the issue is likely in `rscWebpackConfig.js`. Common causes:
 
-- **Missing `react-on-rails-rsc` package**: Run `pnpm add react-on-rails-rsc@19.0.5-rc.7`
-- **React or `react-on-rails-rsc` version mismatch**: RSC currently requires React 19.0.x with patch >= 19.0.4 and the exact `react-on-rails-rsc@19.0.5-rc.7` pin. Check with `pnpm list react react-dom react-on-rails-rsc`
+- **Missing `react-on-rails-rsc` package**: Run `pnpm add react-on-rails-rsc@19.0.5`
+- **React or `react-on-rails-rsc` version mismatch**: RSC requires React 19.0.x with patch >= 19.0.4 and `react-on-rails-rsc@19.0.5`. Check with `pnpm list react react-dom react-on-rails-rsc`
 - **Custom webpack config incompatibility**: If your `serverWebpackConfig.js` was heavily customized, the generator's transforms may not apply cleanly. See [Preparing Your App: Step 4](../../oss/migrating/rsc-preparing-app.md#step-4-set-up-the-rsc-webpack-bundle) for the underlying intent of each webpack change
 
 ### Manifest Files Not Generated
@@ -29434,7 +29432,7 @@ The generator supports Rspack — when `assets_bundler: rspack` is detected in `
 The RSC implementation depends on the `react-on-rails-rsc` npm package, which provides bundler-specific manifest plugins plus a shared loader:
 
 - **WebpackPlugin** (`react-on-rails-rsc/WebpackPlugin`) — generates client/server component manifest files under webpack.
-- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by the exact `react-on-rails-rsc@19.0.5-rc.7` pin (switch to 19.0.5 stable once published).
+- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by `react-on-rails-rsc@19.0.5`.
 - **WebpackLoader** (`react-on-rails-rsc/WebpackLoader`) — transforms `'use client'` files into client reference proxies in the RSC bundle. Works under both webpack and rspack.
 
 ## React and Package Version Policy
@@ -29446,11 +29444,9 @@ integration can change between React minor releases, so the generator range shou
 advance only after the Webpack and Rspack paths are verified against the new React
 minor.
 
-The generator separately pins `react-on-rails-rsc@19.0.5-rc.7` exactly until a
-stable `react-on-rails-rsc@19.0.5` is published. That package pin is separate from
-the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609):
-metadata can allow prerelease RSC packages broadly enough for `npm ls`, while the
-generator still installs the tested React range and exact RSC package pin.
+The generator pins `react-on-rails-rsc@19.0.5` exactly. That package pin is separate
+from the Pro peer metadata tracked in [issue #3965](https://github.com/shakacode/react_on_rails/issues/3965):
+metadata controls install compatibility, while the generator installs the tested React/RSC tuple.
 
 ## Compatibility Matrix
 
@@ -29493,9 +29489,9 @@ two plugins share the same `{ isServer, clientReferences }` options.
 > A/B on a real app showed the webpack-plugin path producing valid-looking manifests that
 > still failed ~7/11 RSC routes at runtime under Rspack, while the native `RSCRspackPlugin`
 > rendered and hydrated every route. The native plugin is therefore the supported Rspack
-> path. The remaining work to drop the "experimental" label — publishing a stable
-> `react-on-rails-rsc` ≥ 19.0.5 and wiring the demo route-hydration gate into this repo's
-> CI — is tracked in [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488)
+> path. The remaining work to drop the "experimental" label — wiring the demo
+> route-hydration gate into this repo's CI — is tracked in
+> [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488)
 > (superseding the abandoned manifest-helper approach in
 > [PR #3385](https://github.com/shakacode/react_on_rails/pull/3385)).
 
@@ -29869,7 +29865,7 @@ Before starting any component migration, verify these items. Skipping them is th
 
 - [ ] **React 19 installed** -- both `react` and `react-dom` at 19.x, with matching versions (`yarn why react` shows no duplicates)
 - [ ] **Node renderer configured** -- RSC requires `NodeRenderer`, not ExecJS. If `config.server_renderer` is not set to `"NodeRenderer"`, migrate first
-- [ ] **`react-on-rails-rsc` 19.0.4+** -- earlier versions vendored stale React builds. Check with `yarn why react-on-rails-rsc`
+- [ ] **`react-on-rails-rsc` 19.0.5 stable** -- earlier versions miss RSC manifest fixes and will warn in Pro. Check with `yarn why react-on-rails-rsc`
 - [ ] **Three webpack bundles building** -- client, server, and RSC bundles all compile without errors
 - [ ] **RSC manifests generated** -- `react-client-manifest.json` and `react-server-client-manifest.json` exist in your webpack output directory
 - [ ] **RSC payload route mounted** -- `rsc_payload_route` in `config/routes.rb`
@@ -29951,9 +29947,9 @@ Before starting, ensure you have:
 Install `react-on-rails-rsc`, which provides the webpack loader, webpack plugin, and RSC client/server runtime:
 
 ```bash
-yarn add react-on-rails-rsc
-# or: npm install react-on-rails-rsc
-# or: pnpm add react-on-rails-rsc
+yarn add react-on-rails-rsc@19.0.5
+# or: npm install react-on-rails-rsc@19.0.5
+# or: pnpm add react-on-rails-rsc@19.0.5
 ```
 
 Verify that `react` and `react-dom` are at version 19 and that the versions match:
@@ -29968,7 +29964,7 @@ yarn why react-on-rails-rsc
 
 If you're on React 18 or earlier, upgrade first -- RSC requires React 19.
 
-> **Version requirements:** Use `react-on-rails-rsc` **19.0.4 or later** -- earlier versions (19.0.0 through 19.0.3) vendored older builds of `react-server-dom-webpack` that were updated in 19.0.4. Check the `react-on-rails-rsc` README or changelog for the supported React version range.
+> **Version requirements:** Use stable `react-on-rails-rsc` **19.0.5**. Earlier versions miss RSC manifest fixes and will warn in Pro.
 
 ## Step 2: Configure Rails for RSC
 
@@ -30527,12 +30523,12 @@ These are the most frequent mistakes encountered during RSC infrastructure setup
 
 ### Mistake 1: Wrong `react-on-rails-rsc` version
 
-Versions 19.0.0 through 19.0.3 vendored older builds of `react-server-dom-webpack` that are incompatible with React 19. Symptoms include cryptic rendering errors or RSC payloads that fail to deserialize on the client.
+Versions before stable 19.0.5 miss React 19 RSC manifest fixes. Symptoms include cryptic rendering errors or client deserialization failures.
 
-**Fix:** Upgrade to `react-on-rails-rsc` 19.0.4 or later:
+**Fix:** Upgrade to stable `react-on-rails-rsc` 19.0.5:
 
 ```bash
-yarn add react-on-rails-rsc@latest
+yarn add react-on-rails-rsc@19.0.5
 ```
 
 ### Mistake 2: Forgetting the RSC bundle watcher in development
@@ -35937,6 +35933,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 ## Versions
 
 ### [Unreleased]
+
+#### Changed
+
+- **[Pro]** **Pinned RSC installs to stable `react-on-rails-rsc@19.0.5`**: The generator default, root and Pro package manifests, Pro dummy app, lockfile, and Pro RSC install docs now use the stable `19.0.5` package instead of the `19.0.5-rc.7` rollout pin. The Pro node renderer now warns when an installed `react-on-rails-rsc` is older than the stable `19.0.5` floor or still on a prerelease, and the optional Pro peer range is explicit for the supported React 19.0.x RSC line while still letting older stable 19.0.x installs and the previous 19.0.5 prerelease tuple reach the runtime warning path. Fixes [Issue 3632](https://github.com/shakacode/react_on_rails/issues/3632), [Issue 3634](https://github.com/shakacode/react_on_rails/issues/3634), and [Issue 3965](https://github.com/shakacode/react_on_rails/issues/3965).
 
 ### [17.0.0.rc.3] - 2026-06-11
 

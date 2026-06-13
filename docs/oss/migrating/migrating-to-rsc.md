@@ -169,7 +169,7 @@ Before starting any component migration, verify these items. Skipping them is th
 
 - [ ] **React 19 installed** -- both `react` and `react-dom` at 19.x, with matching versions (`yarn why react` shows no duplicates)
 - [ ] **Node renderer configured** -- RSC requires `NodeRenderer`, not ExecJS. If `config.server_renderer` is not set to `"NodeRenderer"`, migrate first
-- [ ] **`react-on-rails-rsc` 19.0.4+** -- earlier versions vendored stale React builds. Check with `yarn why react-on-rails-rsc`
+- [ ] **`react-on-rails-rsc` 19.0.5 stable** -- earlier versions miss RSC manifest fixes and will warn in Pro. Check with `yarn why react-on-rails-rsc`
 - [ ] **Three webpack bundles building** -- client, server, and RSC bundles all compile without errors
 - [ ] **RSC manifests generated** -- `react-client-manifest.json` and `react-server-client-manifest.json` exist in your webpack output directory
 - [ ] **RSC payload route mounted** -- `rsc_payload_route` in `config/routes.rb`

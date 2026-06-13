@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **[Pro]** **Pinned RSC installs to stable `react-on-rails-rsc@19.0.5`**: The generator default, root and Pro package manifests, Pro dummy app, lockfile, and Pro RSC install docs now use the stable `19.0.5` package instead of the `19.0.5-rc.7` rollout pin. The Pro node renderer now warns when an installed `react-on-rails-rsc` is older than the stable `19.0.5` floor or still on a prerelease, and the optional Pro peer range is explicit for the supported React 19.0.x RSC line while still letting older stable 19.0.x installs and the previous 19.0.5 prerelease tuple reach the runtime warning path. Fixes [Issue 3632](https://github.com/shakacode/react_on_rails/issues/3632), [Issue 3634](https://github.com/shakacode/react_on_rails/issues/3634), and [Issue 3965](https://github.com/shakacode/react_on_rails/issues/3965).
+
 ### [17.0.0.rc.3] - 2026-06-11
 
 #### Added

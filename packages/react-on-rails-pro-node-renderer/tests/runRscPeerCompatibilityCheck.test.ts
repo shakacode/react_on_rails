@@ -21,6 +21,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   let warnSpy: jest.SpyInstance;
   let runRscPeerCompatibilityCheck: typeof import('../src/shared/runRscPeerCompatibilityCheck').runRscPeerCompatibilityCheck;
   let belowRecommendedMin: string;
+  let recommendedMin: string;
 
   const resolveVersions =
     (rscVersion: string, reactVersion = '19.0.4', reactDomVersion = reactVersion) =>
@@ -38,7 +39,7 @@ describe('runRscPeerCompatibilityCheck', () => {
     const { RSC_PEER_SUPPORT } = jest.requireActual(
       '../src/shared/rscPeerSupport',
     ) as typeof import('../src/shared/rscPeerSupport');
-    const { recommendedMin } = RSC_PEER_SUPPORT.reactOnRailsRsc;
+    ({ recommendedMin } = RSC_PEER_SUPPORT.reactOnRailsRsc);
     const [major, minor, patch] = recommendedMin.split('.').map(Number);
     belowRecommendedMin = patch > 0 ? `${major}.${minor}.${patch - 1}` : `${major}.${minor - 1}.999`;
 
@@ -108,6 +109,15 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('warns (does not throw) when on a prerelease of the stable floor', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions(`${recommendedMin}-rc.1`),
+      }),
+    ).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('recommended stable minimum'));
+  });
+
   it('does not label an existing warning as downgraded when the env hatch is set', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
@@ -143,7 +153,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   it('throws on a react-dom mismatch', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.0.4', '19.0.4', '19.0.5'),
+        resolveVersion: resolveVersions('19.0.5', '19.0.4', '19.0.5'),
       }),
     ).toThrow(/Incompatible react-dom/);
     expect(warnSpy).not.toHaveBeenCalled();
