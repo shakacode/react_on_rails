@@ -276,6 +276,9 @@ Goal name: <concrete goal name, not the pasted prompt text>.
 Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
+Coordination: assign a stable agent id per lane. When `shakacode/agent-coordination`
+is available, run `agent-coord heartbeat` at every phase transition and use
+`agent-coord status` before dependency-sensitive work.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -409,6 +412,16 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
 
 - Use a maintainer-applied eligibility label such as `codex-ready` only if the repo has adopted it.
 - Use a temporary `codex-wip` label only as a visible hint; do not treat it as the durable lock.
+- For concurrent or multi-machine batches, use the private `shakacode/agent-coordination`
+  backend when available. Each lane gets a stable agent id such as
+  `m5-codex-batch2` or `m1-claude-fable-lane1`.
+- Refresh heartbeats with `agent-coord heartbeat` at phase transitions: item
+  start, branch or PR update, review pass, blocked state, and done state.
+  Heartbeat liveness is timestamp-derived: `live` before the TTL expires,
+  `stale` until 4x TTL, and `dead` after that. Do not model liveness with
+  sticky labels.
+- Use `agent-coord status` before starting dependency-sensitive lanes and before
+  rebase, push, readiness, or closeout decisions that depend on another lane.
 - Prefer a structured claim comment for resumable coordination:
 
 ```markdown
@@ -438,6 +451,8 @@ When worker subagents are explicitly authorized:
 - Give each worker a separate worktree and branch.
 - Tell workers they are not alone in the codebase and must not revert others' edits.
 - Keep write scopes disjoint unless the main agent serializes integration.
+- Refresh that worker's heartbeat whenever it starts an item, pushes or updates a
+  PR, completes a review pass, becomes blocked, resumes, or finishes the lane.
 - The main agent owns final PR creation, status reporting, full-CI decisions, and merge sequencing.
 
 ### Coordinator Closeout Lane
@@ -449,23 +464,25 @@ PR-only output.
 The closeout lane is:
 
 1. Re-fetch every worker PR and issue state from GitHub.
-2. Wait for current-head checks and configured review agents, using bounded
+2. Run `agent-coord status` when available and reconcile blocked or stale lanes
+   before making readiness decisions.
+3. Wait for current-head checks and configured review agents, using bounded
    polling.
-3. Fetch current unresolved review threads and triage them as fixed, waived, or
+4. Fetch current unresolved review threads and triage them as fixed, waived, or
    still blocking.
-4. Refresh stale release-mode classification from the release tracker when
+5. Refresh stale release-mode classification from the release tracker when
    needed. For accelerated-RC merge readiness, refresh the latest finalized
    PR-body `Agent Merge Confidence` block required by `AGENTS.md`; keep this
    distinct from tracker mode/classification updates.
-5. After the final push, if local validation passed and the only uncertainty is
+6. After the final push, if local validation passed and the only uncertainty is
    whether full CI is needed, request full CI with `+ci-run-full` and record the
    reason as FYI, then loop back to re-fetch and wait for the newly requested
    current-head checks before readiness or merge.
-6. Under the current release mode, mark ready or merge PRs that satisfy the
+7. Under the current release mode, mark ready or merge PRs that satisfy the
    merge qualification rules, including the merge-endgame debounce and
    waiver-soak rules before merge; report only remaining blockers, questions,
    or `UNKNOWN` live state.
-7. After any closeout-lane merge action, run a lightweight sweep for late
+8. After any closeout-lane merge action, run a lightweight sweep for late
    post-merge bot findings before the final batch handoff: confirm the PR landed,
    check `main` status, and inspect late review/check comments that arrived
    around or after merge. Route release-relevant findings into the next

@@ -30,5 +30,33 @@ AGENT_COORD_STATE_ROOT="$STATE_ROOT" bin/agent-coord heartbeat \
 AGENT_COORD_STATE_ROOT="$STATE_ROOT" bin/agent-coord status
 ```
 
+## Heartbeats
+
+Workers refresh heartbeats at every phase transition:
+
+- item start
+- branch or PR update
+- review pass
+- blocked state
+- done state
+
+Use stable agent ids that identify machine, tool, and lane, for example
+`m5-codex-batch2` or `m1-claude-fable-lane1`.
+
+```bash
+bin/agent-coord heartbeat \
+  --agent-id m5-codex-batch2 \
+  --repo shakacode/react_on_rails \
+  --target 3970 \
+  --batch-id agent-coord-2026-06-13 \
+  --branch jg-codex/3970-agent-heartbeats
+bin/agent-coord status
+```
+
+Heartbeat liveness is derived from timestamps: `live` before the TTL expires,
+`stale` until 4x TTL, and `dead` after that. Use the private repo's launchd
+template for desktop sessions that need out-of-band renewal while an agent is
+between tool calls.
+
 Do not store secrets, `.env` files, credentials, patches, customer data, or Pro
 source code in the coordination backend. It is only for minimal JSON state files.

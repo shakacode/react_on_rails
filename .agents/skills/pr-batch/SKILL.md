@@ -94,6 +94,9 @@ Goal name: <concrete goal name, not the pasted prompt text>.
 Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
+Coordination: assign a stable agent id per lane. When `shakacode/agent-coordination`
+is available, run `agent-coord heartbeat` at every phase transition and use
+`agent-coord status` before dependency-sensitive work.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -219,6 +222,16 @@ Use exact lane assignments as the primary coordination mechanism. Labels are hel
 
 - Use a maintainer-applied eligibility label such as `codex-ready` only if the repo has adopted it.
 - Use a temporary `codex-wip` label only as a visible dashboard hint; do not treat it as the durable lock.
+- For concurrent or multi-machine batches, use the private `shakacode/agent-coordination`
+  backend when available. Each lane gets a stable agent id such as
+  `m5-codex-batch2` or `m1-claude-fable-lane1`.
+- Refresh heartbeats with `agent-coord heartbeat` at phase transitions: item
+  start, branch or PR update, review pass, blocked state, and done state.
+  Heartbeat liveness is timestamp-derived: `live` before the TTL expires,
+  `stale` until 4x TTL, and `dead` after that. Do not model liveness with
+  sticky labels.
+- Use `agent-coord status` before starting dependency-sensitive lanes and before
+  rebase, push, readiness, or closeout decisions that depend on another lane.
 - Prefer a structured claim comment for resumable coordination:
 
 ```markdown
@@ -248,6 +261,8 @@ When worker subagents are explicitly authorized:
 - Give each worker a separate worktree and branch.
 - Tell workers they are not alone in the codebase and must not revert others' edits.
 - Keep write scopes disjoint unless the main agent serializes integration.
+- Refresh that worker's heartbeat whenever it starts an item, pushes or updates a
+  PR, completes a review pass, becomes blocked, resumes, or finishes the lane.
 - The main agent owns final PR creation, status reporting, full-CI decisions, and merge sequencing.
 
 ## Coordinator Closeout Lane

@@ -51,6 +51,7 @@ Plan a PR batch
 - Excluded or deferred:
 - Dependencies and sequencing:
 - Subagent split:
+- Coordination hooks:
 - Verification expectations:
 - Open questions:
 
@@ -80,6 +81,7 @@ Execution rules:
 - Follow `.agents/skills/pr-batch/SKILL.md` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
 - Dispatch one subagent per independent item; group dependent items only when shared context is required.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
+- For concurrent or dependency-sensitive batches, assign a stable agent id per lane and use `agent-coord heartbeat` / `agent-coord status` when the private coordination backend is available.
 - Final handoff must include links, tests, blockers, next action, and merged/ready/blocked/deferred/UNKNOWN sections.
 ```
 
