@@ -89,6 +89,12 @@ The key insight: **only the client bundle produces browser-loadable CSS**. The s
 need just enough CSS processing to render correct class names during SSR, but they never emit
 stylesheets.
 
+> [!NOTE]
+> `sass-loader` and `postcss-loader` still run in the server and RSC bundles because `css-loader`
+> needs valid CSS input to parse class names from CSS Modules. This means SCSS compilation and
+> PostCSS processing (including Tailwind) run in all three builds, but only the client build
+> produces CSS output.
+
 ## Where to import CSS
 
 ### Server Components
@@ -684,6 +690,21 @@ CSS changes that affect the RSC manifest (new `'use client'` components with CSS
 Module files) require rebuilding all three bundles. The manifest is generated from the client build
 but consumed by the RSC renderer.
 
+### Shakapacker v9 CSS Modules default change
+
+Shakapacker v9 changed CSS Modules defaults to `namedExport: true` and
+`exportLocalsConvention: 'camelCaseOnly'`. This breaks code using the default export pattern
+(`import styles from './Foo.module.scss'`). The generated Pro configs override this to preserve
+the original behavior (`namedExport: false`, `exportLocalsConvention: 'camelCase'`). If you
+customize your webpack CSS rules, check that the overrides are still in place.
+
+### Importing global CSS in the server bundle entry point
+
+The server bundle entry (`server-bundle.js`) should **not** import `application.css` or other
+global CSS files. CSS imports in the server bundle resolve to empty modules or class-name-only
+mappings. Importing Tailwind's CSS in the server entry wastes build time without producing usable
+output.
+
 ## Known limitations
 
 - RSC stylesheet links are derived from the full client manifest, not filtered to the specific
@@ -692,8 +713,18 @@ but consumed by the RSC renderer.
   cannot produce RSC stylesheet links. Rebuild all three bundles after upgrading.
 - For client-side RSC navigation (`RSCRoute`), the RSC payload still needs stylesheet links.
   Verify this path separately for route-heavy apps.
-- Rspack is supported with the native `RSCRspackPlugin`, which emits the same manifest schema. See
+- **Rspack FOUC gap:** The `RSCRspackPlugin` emits the same manifest schema as the webpack plugin
+  for component references, but at the time of writing, the Rspack plugin's `getGroupChunks()`
+  filters to `.js` files only and does not collect `.css` files into the manifest's `css` arrays.
+  This means `resolveCssHrefs` returns an empty array for Rspack builds, and the FOUC prevention
+  pipeline is silently inactive. CSS for `'use client'` components still works via the Rails layout
+  `stylesheet_pack_tag`, but without per-component `<link precedence>` injection. See
   [Rspack compatibility](./rspack-compatibility.md) for details.
+- **Rspack CSS Module class name divergence:** When using Rspack with CSS Modules, avoid
+  `[contenthash]` in `localIdentName`. Rspack client and server builds may produce different
+  content hashes for the same file, causing SSR class name mismatches. Use a stable `getLocalIdent`
+  function based on file path and class name instead. See the
+  [webpack-to-Rspack migration guide](../../oss/migrating/migrating-from-webpack-to-rspack.md).
 - This page does not include regression fixtures for Tailwind, Vanilla Extract, Linaria, Panda CSS,
   Compiled, StyleX, styled-components, Emotion, or component-library styling systems.
 
