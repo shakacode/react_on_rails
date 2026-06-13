@@ -18,17 +18,21 @@ drills. This file stays focused on skill selection and per-batch sizing.
 
 The `agents/openai.yaml` file under a skill is optional Codex UI metadata for skill picker display text and the default prompt. Add it only for skills that need Codex picker metadata; it is not required for every skill.
 
-## Default Flow
+## Issue Audit Prompt Flow
 
 1. If the user wants an issue audit, all-open-issues review, or comment-only triage prompt, start with `$plan-issue-triage`.
-2. If the target scope is a filter, label, milestone, pasted list, or ambiguous bare number for implementation planning, start with `$plan-pr-batch`.
-3. If exact candidate issues are already known and may be hypothetical, AI/code-analysis-only, over-scoped, or better handled with a no-PR evidence comment, start with `$evaluate-issue` directly.
-4. A review-only issue triage may post high-signal GitHub issue comments when useful, but it must not change code, labels, milestones, assignees, titles, issue bodies, or issue state unless that permission is explicit.
-5. Verify every candidate through GitHub. Use `UNKNOWN` for facts that cannot be checked.
-6. After `$plan-pr-batch` resolves exact candidates, use `$evaluate-issue` for speculative, AI/code-analysis-only, over-scoped, or unclear items before assigning implementation work.
-7. Shape the batch into independent worker lanes. Cap each batch at 8 items when files or risk overlap, or 10 fully independent items; otherwise propose a smaller first batch. For multiple concurrent batches, keep this as a per-batch cap and apply the cross-batch routing guidance in [Multi-Batch Operations](multi-batch-operations.md) before launching.
-8. Give the user the Batch Plan and fenced `$pr-batch` goal prompt. Do not launch workers yet.
-9. When the user says to run it, use `$pr-batch` with the fenced goal prompt.
+2. Return the ready issue-audit prompt and stop. Do not shape worker lanes or produce a `$pr-batch` goal unless the user explicitly asks to turn audit results into implementation planning.
+3. A review-only issue triage may post high-signal GitHub issue comments when useful, but it must not change code, create issues, change labels, milestones, assignees, titles, issue bodies, or issue state unless that permission is explicit.
+
+## Implementation Batch Planning Flow
+
+1. If the target scope is a filter, label, milestone, pasted list, or ambiguous bare number for implementation planning, start with `$plan-pr-batch`.
+2. If exact candidate issues are already known and may be hypothetical, AI/code-analysis-only, over-scoped, or better handled with a no-PR evidence comment, start with `$evaluate-issue` directly.
+3. Verify every candidate through GitHub. Use `UNKNOWN` for facts that cannot be checked.
+4. After `$plan-pr-batch` resolves exact candidates, use `$evaluate-issue` for speculative, AI/code-analysis-only, over-scoped, or unclear items before assigning implementation work.
+5. Shape the batch into independent worker lanes. Cap each batch at 8 items when files or risk overlap, or 10 fully independent items; otherwise propose a smaller first batch. For multiple concurrent batches, keep this as a per-batch cap and apply the cross-batch routing guidance in [Multi-Batch Operations](multi-batch-operations.md) before launching.
+6. Give the user the Batch Plan and fenced `$pr-batch` goal prompt. Do not launch workers yet.
+7. When the user says to run it, use `$pr-batch` with the fenced goal prompt.
 
 ## Direct `$pr-batch` Flow
 

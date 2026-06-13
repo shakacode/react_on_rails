@@ -18,7 +18,7 @@ Generate a ready-to-run prompt for issue triage. Do not perform the full audit, 
 2. Choose permissions
    - Default to review-only triage.
    - Spell out that review-only allows high-signal GitHub issue comments.
-   - Spell out that review-only forbids code changes, branches, commits, PRs, label changes, milestone changes, assignee changes, title/body edits, and closing issues unless the prompt explicitly grants that permission.
+   - Spell out that review-only forbids code changes, branches, commits, issues, PRs, label changes, milestone changes, assignee changes, title/body edits, and closing issues unless the prompt explicitly grants that permission.
    - If the user asks for read-only, no-write, or no-comment triage, generate a no-comment/draft-only prompt instead.
 
 3. Build the prompt
@@ -54,7 +54,7 @@ Use the repo-local $evaluate-issue and $plan-pr-batch guidance to run a review-o
 
 Definition of review-only for this task:
 - Do not change code.
-- Do not create branches, commits, or PRs.
+- Do not create branches, commits, issues, or PRs.
 - Do not edit labels, milestones, assignees, titles, issue bodies, or close issues unless explicitly approved later.
 - You may post GitHub issue comments when useful, but avoid spam: only comment when the disposition or evidence would help maintainers or future agents.
 - If a comment is useful, make it specific, evidence-backed, and non-duplicative. Do not post generic "triaged" comments.
@@ -98,7 +98,7 @@ For every issue mentioned, include:
 ## Common Mistakes
 
 - Do not turn an issue-triage prompt into an implementation batch.
-- Do not treat "read-only" as "no comments" when the user allowed triage comments.
+- Do not treat "review-only" as "no comments" when the user allowed triage comments.
 - Do not authorize label or close actions implicitly; recommend them unless permission is explicit.
 - Do not generate one prompt per issue for a broad queue; generate one audit prompt with bucketed output.
 - Do not omit the `needs-customer-feedback` and performance-regression cluster rules.
