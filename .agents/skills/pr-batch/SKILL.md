@@ -97,10 +97,15 @@ Mode: spawn worker subagents only after the target list and lane split are confi
 Coordination: assign a stable agent id per lane. When `shakacode/agent-coordination`
 is available, acquire `agent-coord claim` for each issue/PR lane before creating
 that lane's worktree or branch; hard-stop if refused and report the holder plus
-heartbeat liveness. Run `agent-coord heartbeat` at every phase transition and use
-`agent-coord status` before dependency-sensitive work. Structured public claim
-comments are fallback/advisory only; the private claim is the coordination source
-of truth.
+heartbeat liveness. Run `agent-coord heartbeat` at every phase transition. For
+lanes declared in `batches/<batch-id>.json` with `depends_on`, run
+`agent-coord status` at lane start and before rebase or push; if unmet
+`blocked_on` refs remain, set that lane heartbeat `--status blocked`, report the
+blocked refs, and move to another independent lane until the dependency reports
+a terminal status such as `done`, `complete`, `merged`, `ready`, or `released`.
+Also use `agent-coord status` before dependency-sensitive readiness or closeout
+decisions. Structured public claim comments are fallback/advisory only; the
+private claim is the coordination source of truth.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -240,6 +245,11 @@ Use exact lane assignments as the primary coordination mechanism. Labels are hel
   sticky labels.
 - Use `agent-coord status` before starting dependency-sensitive lanes and before
   rebase, push, readiness, or closeout decisions that depend on another lane.
+- For lanes declared in `batches/<batch-id>.json` with `depends_on`, treat
+  non-empty `blocked_on` refs as an unmet dependency. The worker should refresh
+  its own heartbeat with `--status blocked`, switch to another independent lane
+  when one exists, and re-check `agent-coord status` before resuming, rebasing,
+  or pushing the blocked lane.
 - Use a structured public claim comment only as an advisory fallback or human
   hint when the private backend is unavailable or explicitly mirrored:
 
@@ -277,6 +287,10 @@ When worker subagents are explicitly authorized:
 - Keep write scopes disjoint unless the main agent serializes integration.
 - Refresh that worker's heartbeat whenever it starts an item, pushes or updates a
   PR, completes a review pass, becomes blocked, resumes, or finishes the lane.
+- For a worker lane with `depends_on`, check `agent-coord status` at lane start
+  and before rebase or push. If dependencies are unmet, the worker reports the
+  `blocked_on` refs, sets heartbeat `--status blocked`, and moves to another
+  independent lane instead of pushing dependent work.
 - The main agent owns final PR creation, status reporting, full-CI decisions, and merge sequencing.
 
 ## Coordinator Closeout Lane
