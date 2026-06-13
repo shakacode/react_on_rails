@@ -462,6 +462,9 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
   minutes; do not model liveness with sticky labels.
 - Use `agent-coord status` before starting dependency-sensitive lanes and before
   rebase, push, readiness, or closeout decisions that depend on another lane.
+  If `agent-coord status` cannot be checked for a declared dependency lane, stop
+  with dependency state `UNKNOWN` instead of using advisory fallback for that
+  lane.
 - Coordinators create or update private backend `batches/<batch-id>.json` files
   before dispatching workers for dependency-sensitive lanes, following the
   private backend README/schema rather than public examples; declared
@@ -512,6 +515,9 @@ When worker subagents are explicitly authorized:
   and before rebase or push. If dependencies are unmet, the worker reports the
   `blocked_on` refs, sets heartbeat `--status blocked`, and moves to another
   independent lane instead of pushing dependent work.
+- If `agent-coord status` cannot be checked for a worker lane with `depends_on`,
+  treat dependency state as `UNKNOWN` and stop that lane instead of using
+  advisory fallback.
 - If a worker lane declares `depends_on` but `agent-coord status` shows no
   matching batch state for that lane, treat dependency state as `UNKNOWN` and
   stop to report the missing private batch file.
