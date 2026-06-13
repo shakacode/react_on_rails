@@ -151,16 +151,17 @@ not just dead ones.
 
 > **Cold-start note:** Each worker compiles its first bundle when it serves its first render request, so `/ready`
 > stays `503` until then — pre-seeding the bundle cache on disk does not by itself flip `/ready`. This is harmless
-> wherever the check does not gate the traffic that would deliver that first render (Docker Compose healthchecks,
-> ECS container health checks with no ALB dependency, monitoring). Wherever it does gate that traffic — a Kubernetes
-> Service routing only to ready replicas, a sidecar whose unready state blocks pod readiness, an ALB target group —
-> see "Gating traffic on `/ready`" above before using it as the gate. A `503` from `/ready` during the cold-start
-> window is correct behavior, not a failure.
+> wherever the check does not gate the traffic that would deliver that first render or replace the container
+> (monitoring, dashboards, post-deploy checks). Wherever it does gate that traffic or container lifetime — a
+> Kubernetes Service routing only to ready replicas, a sidecar whose unready state blocks pod readiness, an ECS
+> container health check, an ALB target group — see "Gating traffic on `/ready`" above before using it as the gate.
+> A `503` from `/ready` during the cold-start window is correct behavior, not a failure.
 
 ## ECS Health Check
 
 ECS container health checks run **inside** the container (like a Kubernetes `exec` probe), so they work against the
-h2c listener with curl and the default `localhost` binding:
+h2c listener with curl and the default `localhost` binding. Use `/health` by default so a normal cold start cannot
+fail the task before the first render compiles a bundle:
 
 ```json
 {
@@ -173,7 +174,7 @@ h2c listener with curl and the default `localhost` binding:
       "healthCheck": {
         "command": [
           "CMD-SHELL",
-          "curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/ready || exit 1"
+          "curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/health || exit 1"
         ],
         "interval": 10,
         "timeout": 5,
@@ -184,6 +185,9 @@ h2c listener with curl and the default `localhost` binding:
   ]
 }
 ```
+
+If you intentionally warm the renderer before `startPeriod` expires and want ECS to replace a task that cannot serve
+compiled bundles, change the path to `/ready`.
 
 > **ALB note:** ALB target-group health checks are HTTP/1.1 and cannot probe the renderer's h2c port. If the renderer
 > sits behind a load balancer, prefer the ECS container health check above for renderer health, or use an NLB with the
