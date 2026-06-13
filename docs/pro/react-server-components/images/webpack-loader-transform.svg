@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 440" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
   <title>RSC Webpack Loader Transform</title>
-  <desc>Animated before/after diagram showing how the RSC Webpack Loader transforms a 'use client' file: the original file with component implementations is replaced with ClientReference proxy stubs that point to the client bundle entry.</desc>
+  <desc>Before/after diagram showing how the RSC Webpack Loader transforms a 'use client' file: the original file with component implementations is replaced with ClientReference proxy stubs that point to the client bundle entry.</desc>
   <defs>
     <filter id="shadow">
       <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
@@ -48,32 +48,7 @@
         .note-text { fill: #93C5FD; }
       }
 
-      .phase-before { opacity: 1; animation: beforeAfter 10s ease infinite; }
-      .phase-after { opacity: 0; animation: afterBefore 10s ease infinite; }
-      .arrow-anim { opacity: 0; animation: arrowPulse 10s ease infinite; }
-
-      @keyframes beforeAfter {
-        0%, 40% { opacity: 1; }
-        50%, 90% { opacity: 0; }
-        100% { opacity: 1; }
-      }
-      @keyframes afterBefore {
-        0%, 40% { opacity: 0; }
-        50%, 90% { opacity: 1; }
-        100% { opacity: 0; }
-      }
-      @keyframes arrowPulse {
-        0%, 38% { opacity: 0; }
-        42%, 48% { opacity: 1; }
-        52%, 100% { opacity: 0; }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        * { animation: none !important; }
-        .phase-before { opacity: 1 !important; }
-        .phase-after { opacity: 1 !important; }
-        .arrow-anim { opacity: 1 !important; }
-      }
+      .phase-before, .phase-after, .arrow-anim { opacity: 1; }
     </style>
   </defs>
 
