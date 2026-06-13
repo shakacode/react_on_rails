@@ -27,9 +27,9 @@ pnpm run node-renderer:debug
 Keep that terminal open while you debug. Then:
 
 1. Open `chrome://inspect` in Chrome and connect to the renderer process.
-2. Use overmind to isolate renderer logs: `overmind connect node-renderer` (Ctrl-B to detach).
+2. Watch renderer logs in that terminal. Keep `bin/dev` visible for Rails logs.
 3. Set breakpoints in the inspector and reload the page that triggers SSR.
-4. After a server-bundle or renderer change, restart just the renderer.
+4. After a server-bundle or renderer change, press Ctrl-C and rerun `pnpm run node-renderer:debug`.
 
 If you prefer to keep the renderer under Overmind, temporarily add `--inspect` to the `node-renderer:` entry in `Procfile.dev`, then run `overmind restart node-renderer`.
 
