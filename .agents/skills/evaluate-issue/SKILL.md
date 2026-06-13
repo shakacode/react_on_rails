@@ -50,6 +50,15 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - Be skeptical of broad identity, runtime, CI, workflow, dependency, or Pro/RSC changes unless impact justifies the complexity.
    - Split complex fixes into prerequisites and decision points; do not let a polished RFC imply immediate priority.
 
+   For investigation or benchmark issues, a `close`, `park`, or `document/work
+   around` recommendation requires closing evidence. Cite a reproducible
+   artifact (script, data file, benchmark command plus environment) or state the
+   missing-artifact caveat, verify that headline numbers match the document's
+   own tables, and carry production-environment caveats when the evidence was
+   collected on a different platform. If a second agent can reasonably refute
+   the conclusion from the artifacts alone, recommend a correction, follow-up,
+   or explicit caveat instead of closing as settled.
+
 5. Recommend disposition
    - `fix now / P0`: release blocker, merge-this-week severity, security/data-loss risk, or active severe regression.
    - `fix now / P1`: verified urgency with a manageable scope, but not an immediate release blocker.

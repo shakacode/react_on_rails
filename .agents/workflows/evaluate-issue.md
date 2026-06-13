@@ -16,3 +16,12 @@ The authoritative rubric lives in `.agents/skills/evaluate-issue/SKILL.md`. Read
    - Exclude `park / P3`, `close`, and `product decision` items from implementation batches unless the batch is explicitly audit/comment-only.
    - Convert low-value assigned issues into no-PR evidence comments rather than speculative PRs.
    - Carry the disposition into `$pr-batch` as the target outcome: implementation PR, no-PR evidence comment, `document/work around`, or product-decision blocker.
+
+For investigation or benchmark issues, a `close`, `park`, or `document/work
+around` recommendation requires closing evidence. Cite a reproducible artifact
+(script, data file, benchmark command plus environment) or state the
+missing-artifact caveat, verify that headline numbers match the document's own
+tables, and carry production-environment caveats when the evidence was collected
+on a different platform. If a second agent can reasonably refute the conclusion
+from the artifacts alone, recommend a correction, follow-up, or explicit caveat
+instead of closing as settled.

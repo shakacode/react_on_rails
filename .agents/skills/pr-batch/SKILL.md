@@ -125,7 +125,9 @@ scoped, run one additional Claude Code review pass if available, such as
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
 controls. For lockfile changes, include Dependabot ecosystem and
-directory/directories compatibility.
+directory/directories compatibility plus the lockfile content-diff note: changed
+dependencies, rationale, sibling-lock comparison, and any platform-precompiled /
+source-build or build-time dependency change.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 

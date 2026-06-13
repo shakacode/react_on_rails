@@ -75,6 +75,8 @@ batch work. Ask me to confirm the included and excluded PRs before deep audit.
 After confirmation, audit each included PR for:
 - risky behavior change
 - missing or weak validation
+- missing lockfile content-diff evidence when committed lockfiles changed: changed dependencies, rationale, sibling-lock comparison, and platform-precompiled/source-build or build-time dependency changes
+- weak closing evidence in analysis, benchmark, or investigation PRs that closed issues: reproducible artifact or explicit caveat, internally consistent headline/table numbers, and production-environment caveats when applicable
 - cross-PR interactions
 - overlapping files or assumptions
 - undocumented non-blocking decisions
