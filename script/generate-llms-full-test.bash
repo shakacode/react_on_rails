@@ -172,8 +172,55 @@ test_missing_sidebar_top_level_section_fails_check() {
   assert_contains "$out" "Core Concepts"
 }
 
+test_unresolvable_sidebar_top_level_entry_fails_check() {
+  write_fixture
+  awk '
+    /^  ],/ {
+      print "    {"
+      print "      type: '\''category'\'',"
+      print "      label: '\''External Only'\'',"
+      print "      items: [{ type: '\''link'\'', href: '\''https://example.com'\'', label: '\''External'\'' }],"
+      print "    },"
+    }
+    { print }
+  ' docs/sidebars.ts > docs/sidebars.ts.next
+  mv docs/sidebars.ts.next docs/sidebars.ts
+
+  local out rc
+  set +e
+  out="$(node script/generate-llms-full.mjs --check 2>&1)"
+  rc=$?
+  set -e
+
+  if [ "$rc" -eq 0 ]; then
+    fail "expected --check to fail when a sidebar top-level entry has no resolvable doc IDs"
+    return 1
+  fi
+  assert_contains "$out" "top-level entry has no resolvable doc IDs"
+  assert_contains "$out" "External Only"
+}
+
+test_split_threshold_exceeded_fails_check() {
+  write_fixture
+  node -e "process.stdout.write('x'.repeat(2100 * 1024))" >> docs/oss/introduction.md
+
+  local out rc
+  set +e
+  out="$(node script/generate-llms-full.mjs --check 2>&1)"
+  rc=$?
+  set -e
+
+  if [ "$rc" -eq 0 ]; then
+    fail "expected --check to fail when llms-full.txt exceeds the split threshold"
+    return 1
+  fi
+  assert_contains "$out" "above the 2048 KiB split threshold"
+}
+
 run_test test_complete_sidebar_top_level_sections_pass_check
 run_test test_missing_sidebar_top_level_section_fails_check
+run_test test_unresolvable_sidebar_top_level_entry_fails_check
+run_test test_split_threshold_exceeded_fails_check
 
 if [ "$TESTS_FAILED" -ne 0 ]; then
   echo

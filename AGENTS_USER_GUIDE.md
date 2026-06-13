@@ -2,6 +2,8 @@
 
 > Start with [llms.txt](https://www.reactonrails.com/llms.txt) for the short route map. Use [llms-full.txt](https://www.reactonrails.com/llms-full.txt) when you need the expanded machine-readable reference. If the hosted endpoints are not live yet, use the in-repo [llms.txt](./llms.txt) and [llms-full.txt](./llms-full.txt) fallbacks. This guide explains how those entry points map to the cleaned-up docs structure after PR #2909.
 
+<!-- TODO: Remove the in-repo fallback sentence after reactonrails.com#126 publishes the hosted llms endpoints. -->
+
 ## Machine-Readable Entry Points
 
 - [`llms.txt`](https://www.reactonrails.com/llms.txt)

@@ -234,7 +234,14 @@ function sidebarTopLevelSections(docs) {
           docIds.push(candidate);
         }
       }
-      if (docIds.length === 0) return undefined;
+      if (docIds.length === 0) {
+        fail(
+          `docs/sidebars.ts top-level entry has no resolvable doc IDs: ${entry
+            .replace(/\s+/g, ' ')
+            .slice(0, 120)}`,
+        );
+        return undefined;
+      }
 
       const labelMatch = entry.match(/\blabel\s*:\s*(['"])(.*?)\1/);
       const directDocId = entry.match(/^\s*(['"])(.*?)\1\s*$/)?.[2];
