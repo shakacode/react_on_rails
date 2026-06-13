@@ -81,9 +81,12 @@ reactHydrateOrRender(domNode, reactElement, hydrate);
  * `traceTurbolinks: true|false` Gives you debugging messages on Turbolinks events
  * `rootErrorHandlers: { onRecoverableError, onCaughtError, onUncaughtError }` React root error
  *   callbacks applied to every React root created by React on Rails. Each callback receives
- *   React's (error, errorInfo) plus a context object with the componentName and domNodeId.
+ *   React's (error, errorInfo) plus a context object whose componentName and domNodeId fields
+ *   are optional.
  *   Partial updates merge per key (setting one callback later keeps the others).
  *   onRecoverableError requires React 18+; onCaughtError/onUncaughtError require React 19.
+ *   Unsupported React versions retain registrations for future upgrades, but the current runtime
+ *   cannot invoke unsupported callbacks and logs a one-time warning.
  *   See https://reactonrails.com/docs/building-features/debugging-hydration-mismatches
  */
 setOptions(options);

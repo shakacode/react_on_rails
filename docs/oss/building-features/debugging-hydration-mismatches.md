@@ -33,31 +33,42 @@ ReactOnRails.setOptions({
   rootErrorHandlers: {
     // React recovered from an error (most commonly a hydration mismatch). React 18+.
     onRecoverableError: (error, errorInfo, context) => {
+      const rootContext = {
+        componentName: context.componentName ?? 'unknown',
+        domNodeId: context.domNodeId ?? 'unknown',
+      };
       myErrorReporter.report(error, {
         level: 'warning',
-        componentName: context.componentName,
-        domNodeId: context.domNodeId,
+        ...rootContext,
       });
     },
     // An error boundary caught an error. React 19+.
     onCaughtError: (error, errorInfo, context) => {
-      myErrorReporter.report(error, { level: 'error', handled: true, ...context });
+      const rootContext = {
+        componentName: context.componentName ?? 'unknown',
+        domNodeId: context.domNodeId ?? 'unknown',
+      };
+      myErrorReporter.report(error, { level: 'error', handled: true, ...rootContext });
     },
     // An error was NOT caught by any error boundary. React 19+.
     onUncaughtError: (error, errorInfo, context) => {
-      myErrorReporter.report(error, { level: 'fatal', handled: false, ...context });
+      const rootContext = {
+        componentName: context.componentName ?? 'unknown',
+        domNodeId: context.domNodeId ?? 'unknown',
+      };
+      myErrorReporter.report(error, { level: 'fatal', handled: false, ...rootContext });
     },
   },
 });
 ```
 
-Each callback receives React's original `(error, errorInfo)` arguments plus a `context` object with the React on Rails `componentName` and `domNodeId` of the affected root, so multi-component pages can attribute errors to the right mount.
+Each callback receives React's original `(error, errorInfo)` arguments plus a `context` object that may include the React on Rails `componentName` and `domNodeId` of the affected root. Treat both fields as optional because lower-level render paths or custom mount nodes may not supply one.
 
 Notes:
 
-- **Register before rendering.** Each root captures the callbacks registered at the moment it is created; register them in the same pack file where you call `ReactOnRails.register`.
+- **Register before rendering.** Each root captures the callbacks registered when it is created; register them in the same pack file where you call `ReactOnRails.register`.
 - **Partial updates merge per key.** A later `setOptions({ rootErrorHandlers: { onCaughtError } })` keeps a previously registered `onRecoverableError`/`onUncaughtError`. Pass an explicit `undefined` for a key to clear just that callback; `ReactOnRails.resetOptions()` clears all of them.
-- **React version support:** `onRecoverableError` requires React 18+; `onCaughtError`/`onUncaughtError` require React 19. On older React versions, registration is a graceful no-op and React on Rails logs a one-time `console.warn`.
+- **React version support:** `onRecoverableError` requires React 18+; `onCaughtError`/`onUncaughtError` require React 19. On unsupported React versions, React on Rails still stores the registered handlers so they start working after a React upgrade, but the current runtime cannot invoke them and logs a one-time `console.warn`.
 - **React on Rails Pro:** on RSC/streaming hydration paths, Pro installs an internal `onRecoverableError` for its own bookkeeping. Your callback is chained after it — both always run, and Pro's internal control-flow signals (such as the `RSCRoute` `ssr: false` bailout) are filtered out of both so they never reach your error reporter.
 - **Per-component overrides** are not currently supported; the global registration above is the blessed route.
 
@@ -72,12 +83,18 @@ ReactOnRails.setOptions({
     onRecoverableError: (error, errorInfo, context) => {
       Sentry.captureException(error, {
         level: 'warning',
-        tags: { ror_component: context.componentName, ror_dom_id: context.domNodeId },
+        tags: {
+          ror_component: context.componentName ?? 'unknown',
+          ror_dom_id: context.domNodeId ?? 'unknown',
+        },
       });
     },
     onUncaughtError: (error, errorInfo, context) => {
       Sentry.captureException(error, {
-        tags: { ror_component: context.componentName, ror_dom_id: context.domNodeId },
+        tags: {
+          ror_component: context.componentName ?? 'unknown',
+          ror_dom_id: context.domNodeId ?? 'unknown',
+        },
       });
     },
   },
