@@ -55,7 +55,7 @@ class ApplicationController < ActionController::Base
     # html_escape guards against a custom nonce generator emitting characters
     # (e.g. `"` or `>`) that could break out of the attribute; Rails' built-in
     # base64/session generators are already safe.
-    nonce = content_security_policy_nonce
+    nonce = request.content_security_policy_nonce
     nonce_attribute = nonce.present? ? %( nonce="#{ERB::Util.html_escape(nonce)}") : ""
     js_redirect = <<~JAVASCRIPT
       <script#{nonce_attribute}>
