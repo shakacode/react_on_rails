@@ -461,8 +461,9 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
   start, branch or PR update, review pass, blocked state, resumed state, and
   done state.
   Heartbeat liveness is timestamp-derived: `live` before the TTL expires,
-  `stale` until 4x TTL, and `dead` after that. The default heartbeat TTL is 15
-  minutes; do not model liveness with sticky labels.
+  `stale` until the backend dead threshold, and `dead` after that. Check the
+  private backend README and CLI help for current TTL defaults and threshold
+  calculations; do not model liveness with sticky labels.
 - Use `agent-coord status` before starting dependency-sensitive lanes and before
   rebase, push, readiness, or closeout decisions that depend on another lane.
   If `agent-coord status` cannot be checked for a declared dependency lane, stop

@@ -105,10 +105,10 @@ machine names or an enforced scheduler policy:
 | shakacode/react_on_rails     | Main gem/npm/Pro monorepo     | Claims use this full repo name in the coordination backend.                                 |
 | shakacode/react_on_rails_rsc | RSC integration/adoption repo | Uses the same coordination backend, with claims namespaced by repo.                         |
 
-Prefer no more than three concurrent batches as a soft operating limit before
-backend enforcement exists. A fourth batch requires an explicit human decision
-with package and risk separation recorded in the batch handoff. Keep concurrent
-batch packages, branches, and risk surfaces intentionally disjoint:
+Prefer no more than three concurrent batches as a soft operating limit. A fourth
+batch requires an explicit human decision with package and risk separation
+recorded in the batch handoff. Keep concurrent batch packages, branches, and
+risk surfaces intentionally disjoint:
 
 - one Claude Fable batch for the hardest, most ambiguous, or highest-risk items;
 - two Codex batches for simpler, parallel-friendly, well-scoped items;
@@ -119,9 +119,9 @@ Machine choice is an operational decision, not a policy label. Prefer the wired
 host when continuity matters more than local memory, and prefer the mobile host
 when mobility or local capacity is the better fit. If either machine is likely
 to disappear during a lane, route dependency-sensitive work elsewhere.
-If a coordinator attempts a fourth batch before backend enforcement exists, treat
-that as an explicit human decision: record the package/risk separation in the
-batch handoff and downgrade any uncertain overlap to blocked or deferred work.
+If a coordinator attempts a fourth batch, treat that as an explicit human
+decision: record the package/risk separation in the batch handoff and downgrade
+any uncertain overlap to blocked or deferred work.
 
 ## Launcher Roles
 
@@ -215,8 +215,8 @@ one batch wait for the other lane's done heartbeat.
    in the same package.
 4. If the heartbeat is dead, a replacement worker may claim the target only
    after checking the branch/PR state and recording the takeover in coordination
-   status. With the default 15-minute TTL, expect up to 60 minutes from the last
-   heartbeat before liveness reaches `dead`.
+   status. Use the private backend README and CLI help for the current TTL and
+   dead-threshold calculation.
 5. If local unpushed work may exist on the laptop, mark the lane blocked instead
    of recreating a competing implementation.
 

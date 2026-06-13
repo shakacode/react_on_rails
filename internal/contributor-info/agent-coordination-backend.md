@@ -28,7 +28,8 @@ ruby -Itest test/agent_coord_test.rb
 bin/agent-coord --help
 mkdir -p "$HOME/.local/bin"
 ln -sf "$PWD/bin/agent-coord" "$HOME/.local/bin/agent-coord"
-"$HOME/.local/bin/agent-coord" --help
+export PATH="$HOME/.local/bin:$PATH"
+agent-coord --help
 ```
 
 The workflow docs assume `agent-coord` is available on `PATH`. Add
@@ -87,7 +88,7 @@ Use stable agent ids that identify machine role, tool, and lane, for example
 `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
 
 ```bash
-BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(od -An -tx1 -N4 /dev/urandom | tr -d ' \n')-coord-layer"
+BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4)-coord-layer"
 BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX")
 # Set once at kickoff, include a short batch slug plus a unique suffix, and reuse for this batch.
 printf '%s\n' "$BATCH_ID" > "$BATCH_ID_FILE"
