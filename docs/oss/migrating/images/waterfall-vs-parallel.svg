@@ -151,32 +151,36 @@
     <polygon points="688,122 700,126 688,130" class="arrow-body"/>
     <text x="450" y="122" text-anchor="middle" font-size="9" class="label-text">1. Request page</text>
 
-    <!-- Server: Rails loads data + renders -->
-    <rect x="580" y="142" width="240" height="40" rx="5" class="seq-server" stroke-width="1.5"/>
-    <text x="700" y="158" text-anchor="middle" font-size="9" font-weight="600" class="label-text">Rails loads data from DB</text>
-    <text x="700" y="172" text-anchor="middle" font-size="8" class="label-sub">React renders with props on server</text>
+    <!-- Server: Load fast props -->
+    <rect x="580" y="140" width="240" height="16" rx="4" class="seq-server" stroke-width="1.5"/>
+    <text x="700" y="152" text-anchor="middle" font-size="8" class="label-text">Load fast props (sync: name, price)</text>
 
-    <!-- 2. HTML with content streams back (GREEN) -->
-    <line x1="690" y1="196" x2="212" y2="196" stroke="#22C55E" stroke-width="2.5"/>
-    <polygon points="212,192 200,196 212,200" fill="#22C55E"/>
-    <text x="450" y="192" text-anchor="middle" font-size="9" font-weight="600" class="good-text">2. HTML with content (streaming)</text>
+    <!-- 2. HTML shell streams with fast data (GREEN) -->
+    <line x1="690" y1="170" x2="212" y2="170" stroke="#22C55E" stroke-width="2.5"/>
+    <polygon points="212,166 200,170 212,174" fill="#22C55E"/>
+    <text x="450" y="166" text-anchor="middle" font-size="9" font-weight="600" class="good-text">2. HTML shell + fast content (streaming starts)</text>
 
-    <!-- Content visible immediately -->
-    <rect x="80" y="210" width="240" height="16" rx="4" class="seq-done" stroke-width="1.5"/>
-    <text x="200" y="222" text-anchor="middle" font-size="8" font-weight="600" class="good-text">✓ Content visible immediately</text>
+    <!-- Concurrent: browser shows shell + server loads slow data -->
+    <rect x="80" y="184" width="240" height="26" rx="4" class="seq-done" stroke-width="1.5"/>
+    <text x="200" y="195" text-anchor="middle" font-size="8" font-weight="600" class="good-text">Shell visible immediately</text>
+    <text x="200" y="206" text-anchor="middle" font-size="7" class="label-sub">Suspense fallback shown for slow data</text>
 
-    <!-- 3. Slow data streams in (async props, dashed GREEN) -->
-    <line x1="690" y1="248" x2="212" y2="248" stroke="#22C55E" stroke-width="1.5" stroke-dasharray="8 4"/>
-    <polygon points="212,244 200,248 212,252" fill="#22C55E"/>
-    <text x="450" y="244" text-anchor="middle" font-size="9" class="good-text">3. Slow data streams in (async props + Suspense)</text>
+    <rect x="580" y="184" width="240" height="26" rx="4" class="seq-server" stroke-width="1"/>
+    <text x="700" y="195" text-anchor="middle" font-size="8" class="label-text">emit block: load slow data</text>
+    <text x="700" y="206" text-anchor="middle" font-size="7" class="label-sub">(reviews, recommendations)</text>
+
+    <!-- 3. Async prop streams in (GREEN dashed) -->
+    <line x1="690" y1="226" x2="212" y2="226" stroke="#22C55E" stroke-width="1.5" stroke-dasharray="8 4"/>
+    <polygon points="212,222 200,226 212,230" fill="#22C55E"/>
+    <text x="450" y="222" text-anchor="middle" font-size="9" class="good-text">3. getReactOnRailsAsyncProp resolves → streams in</text>
 
     <!-- Suspense fills -->
-    <rect x="80" y="262" width="240" height="16" rx="4" class="seq-done" stroke-width="1"/>
-    <text x="200" y="274" text-anchor="middle" font-size="8" class="good-text">✓ Suspense boundaries fill progressively</text>
+    <rect x="80" y="240" width="240" height="16" rx="4" class="seq-done" stroke-width="1"/>
+    <text x="200" y="252" text-anchor="middle" font-size="8" font-weight="600" class="good-text">✓ Suspense fills → full content visible</text>
 
     <!-- Summary -->
-    <text x="450" y="296" text-anchor="middle" font-size="10" font-weight="600" class="good-text">1 round trip • content immediate • zero client JS for data fetching</text>
-    <text x="450" y="310" text-anchor="middle" font-size="9" class="label-sub">No useState, no useEffect, no fetch, no loading spinner — data stays server-side</text>
+    <text x="450" y="280" text-anchor="middle" font-size="10" font-weight="600" class="good-text">1 round trip • shell immediate • slow data streams via async props</text>
+    <text x="450" y="296" text-anchor="middle" font-size="9" class="label-sub">No useState, no useEffect, no fetch — data stays server-side, Suspense handles loading</text>
   </g>
 
   <!-- Legend (always visible) -->
