@@ -7,7 +7,8 @@ rules in [AGENTS.md](../../AGENTS.md),
 [Agent Coordination Backend](agent-coordination-backend.md).
 
 The goal is to make the live operating model reconstructable by a cold-start
-reader without asking Justin which machine, tool, or repository owns a lane.
+reader without asking the coordinator which machine, tool, or repository owns a
+lane.
 
 ## Baseline Topology
 

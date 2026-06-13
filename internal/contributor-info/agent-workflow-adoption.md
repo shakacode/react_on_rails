@@ -30,9 +30,10 @@ ShakaCode-internal adopting repos should join the same private
 `shakacode/agent-coordination` repo instead of creating per-repo coordination
 stores. Claims and heartbeats are namespaced by full repo name, so one status
 table can safely include `shakacode/react_on_rails` and adopter repos such as
-`shakacode/react_on_rails_rsc`. External adopters should host their own private
-coordination backend with the same `agent-coord` schema, or skip this section and
-use the structured public claim comment fallback documented in
+`shakacode/react_on_rails_rsc`. External adopters should skip this section and
+use the structured public claim comment fallback until ShakaCode publishes a
+public backend spec or grants them access to the coordination backend spec.
+That fallback is documented in
 [AGENTS.md](../../AGENTS.md).
 
 ### Claude support
@@ -96,7 +97,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
 
 5. Adopt cross-repo coordination when needed.
    - Copy `agent-coordination-backend.md` and `multi-batch-operations.md` only if the target repo will participate in multi-machine, multi-batch, or cross-repo work.
-   - For ShakaCode-internal repos, point operators at the same private shakacode/agent-coordination backend used by React on Rails. External adopters should host their own private backend with the same schema or rely on public claim comments.
+   - For ShakaCode-internal repos, point operators at the same private shakacode/agent-coordination backend used by React on Rails. External adopters should use public claim comments until a public backend spec is available or ShakaCode grants access to the private spec.
    - Use full repository names in every claim and heartbeat so `owner/repo#123` remains distinct from another repo's `#123`.
    - Keep private backend schema examples in the private coordination repo. Public/adopter repos should document only operator rules, setup pointers, and safe fallbacks.
    - Define which packages or directories must not be split across simultaneous batches, then add that routing rule to the target repo's copy of `multi-batch-operations.md`.

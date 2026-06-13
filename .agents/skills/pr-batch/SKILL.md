@@ -222,75 +222,22 @@ requests already handled, and no-PR rationales.
 
 ## Coordination State
 
-Use exact lane assignments as the primary coordination mechanism. Labels are helpful but not sufficient.
+Use [.agents/workflows/pr-processing.md](../../workflows/pr-processing.md) as the
+canonical source for coordination state and worker rules. Keep this skill as a
+routing entry point; do not duplicate the full protocol here.
 
-- Use a maintainer-applied eligibility label such as `codex-ready` only if the repo has adopted it.
-- Use a temporary `codex-wip` label only as a visible dashboard hint; do not treat it as the durable lock.
-- For concurrent or multi-machine batches, use the private `shakacode/agent-coordination`
-  backend when available. Each lane gets a stable agent id such as
-  `m5-codex-batch2` or `m1-claude-fable-lane1`.
-- Treat the backend as available when `agent-coord status` exits 0. If the
-  command is missing, auth fails, or status exits non-zero, report private state
-  as `UNKNOWN` and use advisory public claim comments. A refused
-  `agent-coord claim` after a successful status check remains a hard stop.
-- Acquire an `agent-coord claim` for each issue/PR lane before creating that
-  lane's worktree or branch. A refused claim is a hard stop for machine agents:
-  report the holder, heartbeat liveness, and target instead of creating a
-  competing branch.
-- Refresh heartbeats with `agent-coord heartbeat` at phase transitions: item
-  start, branch or PR update, review pass, blocked state, and done state.
-  Heartbeat liveness is timestamp-derived: `live` before the TTL expires,
-  `stale` until 4x TTL, and `dead` after that. The default heartbeat TTL is 15
-  minutes; do not model liveness with sticky labels.
-- Use `agent-coord status` before starting dependency-sensitive lanes and before
-  rebase, push, readiness, or closeout decisions that depend on another lane.
-- For lanes declared in `batches/<batch-id>.json` with `depends_on`, treat
-  non-empty `blocked_on` refs as an unmet dependency. The worker should refresh
-  its own heartbeat with `--status blocked`, switch to another independent lane
-  when one exists, and re-check `agent-coord status` before resuming, rebasing,
-  or pushing the blocked lane.
-- Use a structured public claim comment only as an advisory fallback or human
-  hint when the private backend is unavailable or explicitly mirrored:
-
-```markdown
-<!-- codex-claim v1
-batch: <BATCH_ID>
-machine: <MACHINE_ID>
-thread: <codex-thread-id>
-branch: <BRANCH_NAME>
-status: in_progress
-expires_at: <ISO8601_UTC>
--->
-```
-
-Use any stable session, thread, or machine identifier that lets a restarted
-coordinator recognize its own work; if none exists, use `thread: unavailable`
-and rely on the machine, branch, and batch fields. Set `expires_at` to a short
-bounded advisory lease, usually 2-4 hours for an active batch or no later than
-the known batch window. Refresh the comment when continuing beyond that window.
-Do not use the public comment to override or bypass a private claim refusal.
-
-On restart, prefer `agent-coord status` and the private claim/heartbeat state.
-Use claim comments only to recover context when the backend is unavailable.
+In short: exact lane assignments beat labels; private `agent-coord` state is the
+source of truth when `agent-coord status` exits 0; refused claims hard-stop
+machine agents; workers heartbeat at phase transitions; dependency-sensitive
+lanes run `agent-coord status` before rebase, push, readiness, and closeout; and
+structured public claim comments are only advisory fallback state.
 
 ## Worker Rules
 
-When worker subagents are explicitly authorized:
-
-- Assign one target or one disjoint lane per worker.
-- Acquire the lane's `agent-coord claim` before creating the worker worktree or
-  branch when the backend is available. If the claim is refused, the worker
-  reports the holder and heartbeat liveness, then stops that lane.
-- Give each worker a separate worktree and branch.
-- Tell workers they are not alone in the codebase and must not revert others' edits.
-- Keep write scopes disjoint unless the main agent serializes integration.
-- Refresh that worker's heartbeat whenever it starts an item, pushes or updates a
-  PR, completes a review pass, becomes blocked, resumes, or finishes the lane.
-- For a worker lane with `depends_on`, check `agent-coord status` at lane start
-  and before rebase or push. If dependencies are unmet, the worker reports the
-  `blocked_on` refs, sets heartbeat `--status blocked`, and moves to another
-  independent lane instead of pushing dependent work.
-- The main agent owns final PR creation, status reporting, full-CI decisions, and merge sequencing.
+Follow the canonical
+[Worker Rules](../../workflows/pr-processing.md#worker-rules) and keep one target
+or one disjoint lane per worker. The main agent owns final PR creation, status
+reporting, full-CI decisions, and merge sequencing.
 
 ## Coordinator Closeout Lane
 

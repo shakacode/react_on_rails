@@ -36,6 +36,13 @@ non-zero, report private state as `UNKNOWN` and use structured public claim
 comments as an advisory fallback. A successful status check followed by a
 refused `agent-coord claim` is not unavailability; it is a hard stop.
 
+Machine agents must not override a refused private claim on their own. A human
+coordinator may authorize a one-off manual override only after running
+`agent-coord status`, recording why the private state is wrong or degraded in
+the issue, PR, or batch handoff, and either repairing the private state or
+posting a structured public claim comment that names the override. Do not use an
+override to bypass a live or stale holder that can be contacted.
+
 Use a temporary local state directory for smoke checks that should not write to
 GitHub:
 
@@ -82,7 +89,9 @@ calls.
 For `batches/<batch-id>.json`, the dependency-complete heartbeat statuses at
 private backend commit `ed339f2` are `complete`, `completed`, `done`, `merged`,
 and `ready`. A released claim is audit state and does not unblock dependent
-lanes by itself.
+lanes by itself. The `complete` and `completed` aliases are both accepted in v1
+so humans and older agents can use either wording while the operating model
+settles.
 
 Do not store secrets, `.env` files, credentials, patches, customer data, or Pro
 source code in the coordination backend. It is only for minimal JSON state files.
