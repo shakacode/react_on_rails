@@ -12,10 +12,6 @@ The authoritative rubric lives in `.agents/skills/evaluate-issue/SKILL.md`. Read
 2. Filters, labels, milestones, pasted lists, or other unverified batch scopes:
    - Run `.agents/skills/plan-pr-batch/SKILL.md` first to resolve exact candidates.
    - After exact candidates are known, follow `.agents/skills/evaluate-issue/SKILL.md` for targets that are speculative, AI/code-analysis-only, over-scoped, or unclear in value, priority, or fix scope.
-3. Batch handoff:
-   - Exclude `park / P3`, `close`, and `product decision` items from implementation batches unless the batch is explicitly audit/comment-only.
-   - Convert low-value assigned issues into no-PR evidence comments rather than speculative PRs.
-   - Carry the disposition into `$pr-batch` as the target outcome: implementation PR, no-PR evidence comment, `document/work around`, or product-decision blocker.
 
 For investigation or benchmark issues, recommendations to `close`, `park`, or
 `document/work around` require closing evidence. Cite a reproducible artifact
@@ -25,3 +21,8 @@ tables, and carry production-environment caveats when the evidence was collected
 on a different platform. If a second agent can reasonably refute the conclusion
 from the artifacts alone, recommend a correction, follow-up, or explicit caveat
 instead of closing as settled.
+
+3. Batch handoff:
+   - Exclude `park / P3`, `close`, and `product decision` items from implementation batches unless the batch is explicitly audit/comment-only.
+   - Convert low-value assigned issues into no-PR evidence comments rather than speculative PRs.
+   - Carry the disposition into `$pr-batch` as the target outcome: implementation PR, no-PR evidence comment, `document/work around`, or product-decision blocker.
