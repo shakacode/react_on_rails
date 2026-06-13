@@ -28,18 +28,19 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
    - When the value, priority, or proposed fix scope is unclear, use `.agents/skills/evaluate-issue/SKILL.md` before implementation (or `.agents/workflows/evaluate-issue.md` for agents without skill support).
 3. Isolate the work:
    - Fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
-   - When the private `shakacode/agent-coordination` backend is available, acquire
-     an `agent-coord claim` for each issue/PR lane before creating that lane's
-     worktree or branch. Machine agents must hard-stop when the claim is refused
-     and report the holder plus heartbeat liveness. Structured public claim
-     comments are fallback/advisory only; the private claim is the coordination
-     source of truth.
+   - When the private `shakacode/agent-coordination` backend is available
+     (`agent-coord status` exits 0), acquire an `agent-coord claim` for each
+     issue/PR lane before creating that lane's worktree or branch. Machine
+     agents must hard-stop when the claim is refused and report the holder plus
+     heartbeat liveness. If `agent-coord status` cannot be checked, report
+     private state as `UNKNOWN` and use structured public claim comments as an
+     advisory fallback.
    - For lanes declared in `batches/<batch-id>.json` with `depends_on`, run
-     `agent-coord status` at lane start. If the lane shows unmet `blocked_on`
-     refs, set that lane's heartbeat to `--status blocked`, report the blocked
-     refs in the handoff, and move to another independent lane until the
-     dependency reports a terminal status such as `done`, `complete`, `merged`,
-     `ready`, or `released`.
+     `agent-coord status` at lane start and before rebase or push. If the lane
+     shows unmet `blocked_on` refs, set that lane's heartbeat to `--status
+blocked`, report the blocked refs in the handoff, and move to another
+     independent lane until the dependency reports a terminal status such as
+     `done`, `complete`, `completed`, `merged`, or `ready`.
    - Use the current checkout for one focused task.
    - For multiple independent PRs or lanes (independent work streams with separate branch/worktree ownership), use one worktree per PR branch so agents do not overlap edits.
 4. Make a local batch:
@@ -288,18 +289,22 @@ Goal name: <concrete goal name, not the pasted prompt text>.
 Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
+<!-- Keep this Coordination block in sync with .agents/skills/pr-batch/SKILL.md. -->
 Coordination: assign a stable agent id per lane. When `shakacode/agent-coordination`
-is available, acquire `agent-coord claim` for each issue/PR lane before creating
-that lane's worktree or branch; hard-stop if refused and report the holder plus
-heartbeat liveness. Run `agent-coord heartbeat` at every phase transition. For
-lanes declared in `batches/<batch-id>.json` with `depends_on`, run
-`agent-coord status` at lane start and before rebase or push; if unmet
-`blocked_on` refs remain, set that lane heartbeat `--status blocked`, report the
-blocked refs, and move to another independent lane until the dependency reports
-a terminal status such as `done`, `complete`, `merged`, `ready`, or `released`.
-Also use `agent-coord status` before dependency-sensitive readiness or closeout
-decisions. Structured public claim comments are fallback/advisory only; the
-private claim is the coordination source of truth.
+is available (`agent-coord status` exits 0), acquire `agent-coord claim` for
+each issue/PR lane before creating that lane's worktree or branch; hard-stop if
+refused and report the holder plus heartbeat liveness. Run `agent-coord
+heartbeat` at every phase transition. For lanes declared in
+`batches/<batch-id>.json` with `depends_on`, run `agent-coord status` at lane
+start and before rebase or push; if unmet `blocked_on` refs remain, set that
+lane heartbeat `--status blocked`, report the blocked refs, and move to another
+independent lane until the dependency reports a terminal status such as `done`,
+`complete`, `completed`, `merged`, or `ready`. Also use `agent-coord status`
+before dependency-sensitive readiness or closeout decisions. If `agent-coord
+status` cannot be checked, report `UNKNOWN` private state and use structured
+public claim comments as an advisory fallback. Structured public claim comments
+are fallback/advisory only; the private claim is the coordination source of
+truth.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -436,6 +441,10 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
 - For concurrent or multi-machine batches, use the private `shakacode/agent-coordination`
   backend when available. Each lane gets a stable agent id such as
   `m5-codex-batch2` or `m1-claude-fable-lane1`.
+- Treat the backend as available when `agent-coord status` exits 0. If the
+  command is missing, auth fails, or status exits non-zero, report private state
+  as `UNKNOWN` and use advisory public claim comments. A refused
+  `agent-coord claim` after a successful status check remains a hard stop.
 - Acquire an `agent-coord claim` for each issue/PR lane before creating that
   lane's worktree or branch. A refused claim is a hard stop for machine agents:
   report the holder, heartbeat liveness, and target instead of creating a
@@ -443,8 +452,8 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
 - Refresh heartbeats with `agent-coord heartbeat` at phase transitions: item
   start, branch or PR update, review pass, blocked state, and done state.
   Heartbeat liveness is timestamp-derived: `live` before the TTL expires,
-  `stale` until 4x TTL, and `dead` after that. Do not model liveness with
-  sticky labels.
+  `stale` until 4x TTL, and `dead` after that. The default heartbeat TTL is 15
+  minutes; do not model liveness with sticky labels.
 - Use `agent-coord status` before starting dependency-sensitive lanes and before
   rebase, push, readiness, or closeout decisions that depend on another lane.
 - For lanes declared in `batches/<batch-id>.json` with `depends_on`, treat

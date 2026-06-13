@@ -8,6 +8,10 @@ React on Rails repository should only carry this pointer and the public workflow
 rules in [AGENTS.md](../../AGENTS.md), [.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md),
 and [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md).
 
+This pointer was validated against private backend commit `ed339f2`. Until the
+private repo has tagged releases, pull the private repo and rerun the smoke
+checks below after backend CLI or schema changes.
+
 ## Setup
 
 ```bash
@@ -24,6 +28,12 @@ agent-coord --help
 The workflow docs assume `agent-coord` is available on `PATH`. Add
 `$HOME/.local/bin` to the shell `PATH` if needed, or run the command by its full
 path inside the private clone.
+
+Treat the backend as available when `agent-coord status` exits 0. If the command
+is missing, auth fails, the private repo cannot be read, or `status` exits
+non-zero, report private state as `UNKNOWN` and use structured public claim
+comments as an advisory fallback. A successful status check followed by a
+refused `agent-coord claim` is not unavailability; it is a hard stop.
 
 Use a temporary local state directory for smoke checks that should not write to
 GitHub:
@@ -55,15 +65,18 @@ bin/agent-coord heartbeat \
   --agent-id m5-codex-batch2 \
   --repo shakacode/react_on_rails \
   --target 3970 \
-  --batch-id agent-coord-2026-06-13 \
+  --batch-id "agent-coord-$(date +%Y-%m-%d)" \
   --branch jg-codex/3970-agent-heartbeats
 bin/agent-coord status
 ```
 
 Heartbeat liveness is derived from timestamps: `live` before the TTL expires,
-`stale` until 4x TTL, and `dead` after that. Use the private repo's launchd
-template for desktop sessions that need out-of-band renewal while an agent is
-between tool calls.
+`stale` until 4x TTL, and `dead` after that. The default heartbeat TTL is 15
+minutes, so the default dead threshold is 60 minutes after the heartbeat update.
+The default claim lease TTL is 4 hours, used only as a fallback when heartbeat
+liveness is missing or invalid. Use the private repo's launchd template for
+desktop sessions that need out-of-band renewal while an agent is between tool
+calls.
 
 Do not store secrets, `.env` files, credentials, patches, customer data, or Pro
 source code in the coordination backend. It is only for minimal JSON state files.

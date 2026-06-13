@@ -26,14 +26,16 @@ Plan a PR batch
    - For every bare number, run both `gh pr view N` and `gh issue view N` when type is ambiguous.
    - For filters, run focused `gh pr list` or `gh issue list` commands and keep the query in the report.
    - Record title, URL, state, branch/author for PRs, labels, linked PR/issue refs, and blockers. If a fact cannot be verified, write `UNKNOWN`.
-   - If the private `shakacode/agent-coordination` backend is available, run
-     `agent-coord status` and exclude/report targets that already have active
-     live or stale private claims, including holder and heartbeat liveness.
-     Report dead or fallback-expired claims as recoverable before assigning
-     takeover work. If backend state cannot be checked, write `UNKNOWN`; public
-     claim comments are advisory only. Include active batches, lane
-     `depends_on` refs, and current `blocked_on` refs in the plan so workers can
-     see cross-batch status before they start.
+   - Treat the private `shakacode/agent-coordination` backend as available when
+     `agent-coord status` exits 0. If available, run `agent-coord status` and
+     exclude/report targets that already have active live or stale private
+     claims, including holder and heartbeat liveness. Report dead or
+     fallback-expired claims as recoverable before assigning takeover work. If
+     backend state cannot be checked, write `UNKNOWN`; public claim comments are
+     advisory only. `UNKNOWN` applies to unavailable status checks, not live
+     claim refusals during `$pr-batch`, which remain hard stops. Include active
+     batches, lane `depends_on` refs, and current `blocked_on` refs in the plan
+     so workers can see cross-batch status before they start.
 
 3. Shape
    - Exclude issues labeled `needs-customer-feedback` from implementation batches unless the user explicitly provides customer evidence or maintainer approval for that issue; list them under "Excluded or deferred" with `needs-customer-feedback` as the reason.
