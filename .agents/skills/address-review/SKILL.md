@@ -263,12 +263,15 @@ If a range is malformed, reversed, or out of bounds, show a validation message a
 **Dynamic menu**: Generate `f`, `f+i`, `f+o`, and `a` descriptions dynamically using actual item numbers and deferred targets from the current triage set (e.g., "Fix #1, #3" instead of "Fix must-fix items"). Only show `f+o` and `o` when there is at least one `OPTIONAL` item. Show `a` when there is at least one `MUST-FIX`, `OPTIONAL`, or `DISCUSS` item. When there are no `DISCUSS`, `OPTIONAL`, or `SKIPPED` items, only show `f`, `a`, and direct item selection.
 
 This Claude slash command keeps optional polish out of the blocking merge gate.
-After an action is selected, low-risk behavior-preserving optional nits are
-autonomous: fix them inline when they stay in scope, or log them as
-deferred/declined with rationale. Post-triage actions `a`, `f+o`, and `o` remain
-explicit ways to apply broader optional work. `f+i` and `m` may bundle optional
-items that remain useful outside the immediate PR review context, but must
-exclude weak "could consider" suggestions.
+The autonomous low-risk optional-nit rule applies only to action `f` and the
+initial action `f+i` phase: fix behavior-preserving nits inline when they stay in
+scope, or log them as deferred/declined with rationale. Post-triage actions `a`,
+`f+o`, explicit `o <nums>`, and `all optional` remain inline code-changing
+choices for the selected optional items; if a selected optional item cannot be
+fixed safely, report it as unresolved instead of silently deferring it through
+the autonomous nit rule. Bare `o` presents optional items for selection only.
+`f+i` and `m` may bundle optional items that remain useful outside the immediate
+PR review context, but must exclude weak "could consider" suggestions.
 
 `autopilot` is an initiation mode, not a post-triage menu choice. Initiate it by passing `autopilot` before or after the PR reference, for example `/address-review autopilot <PR>` or `/address-review <PR> autopilot`. If the user initiated the review with `autopilot`, present the triage for transparency and immediately execute action `a` without waiting for another confirmation. A bare `a` is only the single-letter quick action shown after triage. Otherwise, wait for the user to choose an action before proceeding.
 
