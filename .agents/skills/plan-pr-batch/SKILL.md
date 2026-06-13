@@ -50,14 +50,31 @@ Plan a PR batch
      Coordinators must create or update the private backend
      `batches/<batch-id>.json` with those lane refs before dependent workers
      start; otherwise `agent-coord status` cannot report `blocked_on` lanes.
-   - Build a file-touch map for the batch: list the files each item changes and the files it intends to create (read issue/PR bodies; grep the repo to confirm existing paths, do not guess). Items that touch the same file, including creating the same new path, cannot run as parallel worktrees — they will conflict at merge. Keep only file-disjoint items in the parallel first batch; group colliding or dependency-ordered items into one sequenced sub-batch, or defer them to a later batch.
+   - Build a file-touch map for the batch: list the paths each item changes or
+     intends to affect, including creates, deletes, and renames. For PR
+     targets, fetch the PR's base/head refs and run
+     `git diff --name-status --find-renames <base>...<head>` for the
+     rename-aware changed-file list. A paginated PR Files API response is
+     acceptable only when it is proven complete and records both `.filename` and
+     `.previous_filename` when present. If the API result may have hit GitHub's
+     file-list cap, cannot prove there are no more pages, or only reports new
+     paths, record the PR paths as `UNKNOWN` and treat the item as serial rather
+     than parallel. For issue targets, read the issue body, record proposed new
+     paths from issue/design notes, and grep the repo to confirm existing paths.
+     If paths cannot be determined from the issue body or design notes, record
+     them as `UNKNOWN` and treat the item as serial rather than parallel. Do not
+     guess. Items that affect the same path cannot run as parallel worktrees;
+     keep only file-disjoint items in the parallel first batch and sequence or
+     defer collisions.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
 
 4. Output
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
-   - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan. Measure it (e.g. `wc -m`), do not eyeball it. Record the measured fixed-template budget with the short SHA used for the measurement, remeasure after template changes, and keep the filled file-touch map, `Worker notes`, and `Done when` terse (target ~150 chars per item) — the worker reads the issue/PR URL for full detail; push evidence and audit notes to the Batch Plan instead.
+   - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan. Measure it with `wc -m`; do not eyeball it.
+   - Record the measured fixed-template section size and the short SHA of the measurement in the Batch Plan so it can be compared after template edits. Remeasure whenever the template changes.
+   - Keep each filled entry terse (target ~150 chars for `Worker notes` and `Done when`). The worker reads the issue/PR URL for full detail; push evidence and audit notes to the Batch Plan instead.
    - If the batch will not fit, split it into smaller goals and output only the first ready goal.
    - Do not start `$pr-batch` unless the user asks; then hand them the fenced goal prompt and tell them to run `$pr-batch` with it.
 
@@ -88,6 +105,7 @@ Repository: OWNER/REPO
 Batch objective: ...
 File-touch map:
 - PR/Issue #N -> changed/affected paths, including create/delete/rename (owner: lane/name)
+- PR/Issue #N -> UNKNOWN (paths not determinable from issue body/design notes; treat as serial)
 - Deferred/reserved paths -> path(s) (reason: ... / later owner: lane/name)
 
 Items:
