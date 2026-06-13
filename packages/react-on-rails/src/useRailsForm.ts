@@ -25,7 +25,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { authenticityHeaders } from './Authenticity.ts';
+import { authenticityHeaders, authenticityToken } from './Authenticity.ts';
 
 /** Per-field validation errors: `{ field: ["message", ...] }`. */
 export type RailsFormErrors = Record<string, string[]>;
@@ -57,12 +57,20 @@ export type RailsFormSubmitResult = RailsFormSuccessResult | RailsFormValidation
 
 /** Thrown (as a promise rejection) for non-2xx responses other than a mappable 422. */
 export class RailsFormRequestError extends Error {
+  /** The response, with its body stream unread — `.json()`/`.text()` work. */
   readonly response: Response;
 
-  constructor(response: Response) {
+  /**
+   * Parsed JSON body when the hook already read it (a 422 whose body didn't
+   * match the documented errors shape); `undefined` otherwise.
+   */
+  readonly responseBody: unknown;
+
+  constructor(response: Response, responseBody: unknown = undefined) {
     super(`useRailsForm request failed with status ${response.status}`);
     this.name = 'RailsFormRequestError';
     this.response = response;
+    this.responseBody = responseBody;
   }
 }
 
@@ -75,7 +83,7 @@ export interface RailsFormSubmitOptions {
   onError?: (errors: RailsFormErrors) => void;
 }
 
-export interface UseRailsForm<TData extends Record<string, unknown>> {
+export interface UseRailsForm<TData extends object> {
   /** Current form data. */
   data: TData;
   /** Set a single field, merge a partial object, or apply an updater function. */
@@ -101,7 +109,12 @@ export interface UseRailsForm<TData extends Record<string, unknown>> {
   patch: (url: string, options?: RailsFormSubmitOptions) => Promise<RailsFormSubmitResult>;
   /** Named `delete` on the hook object; `delete` is reserved in some contexts. */
   delete: (url: string, options?: RailsFormSubmitOptions) => Promise<RailsFormSubmitResult>;
-  /** Reset all data (no args) or the given fields to their initial values. Clears matching errors. */
+  /**
+   * Reset all data (no args) or the given fields to their initial values.
+   * Clears matching errors and `wasSuccessful`. "Initial values" are the
+   * `initialData` captured on first render (Inertia `useForm` semantics) —
+   * later prop changes are not tracked; remount the component to re-seed.
+   */
   reset: (...fields: Extract<keyof TData, string>[]) => void;
   /** Clear all errors (no args) or the errors for the given fields. */
   clearErrors: (...fields: string[]) => void;
@@ -178,7 +191,9 @@ const extractRedirectTo = (response: Response, responseData: unknown): string | 
  * `render_model_errors` controller concern) populates `errors`; other non-2xx
  * responses reject with `RailsFormRequestError`.
  */
-export function useRailsForm<TData extends Record<string, unknown>>(initialData: TData): UseRailsForm<TData> {
+export function useRailsForm<TData extends object>(initialData: TData): UseRailsForm<TData> {
+  // Captured once on first render (Inertia useForm semantics): reset() restores
+  // these mount-time values even if the initialData prop changes later.
   const initialDataRef = useRef(initialData);
   const [data, setDataState] = useState<TData>(initialData);
   const [errors, setErrors] = useState<RailsFormErrors>({});
@@ -199,6 +214,9 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
   const submissionIdRef = useRef(0);
   const mountedRef = useRef(true);
   useEffect(() => {
+    // Re-assigning true is NOT redundant: under React StrictMode (and Fast
+    // Refresh) the cleanup runs and the effect re-runs on the same component
+    // instance, so without this the ref would stay false after the replay.
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
@@ -234,6 +252,9 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
 
   const reset = useCallback(
     (...fields: Extract<keyof TData, string>[]) => {
+      // A reset starts a fresh editing cycle: a pristine form should not still
+      // report the previous submission as successful.
+      setWasSuccessful(false);
       if (fields.length === 0) {
         commitData(() => initialDataRef.current);
         clearErrors();
@@ -260,6 +281,14 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
       setProcessing(true);
       setWasSuccessful(false);
 
+      if (process.env.NODE_ENV !== 'production' && authenticityToken() === null) {
+        console.warn(
+          '[useRailsForm] No <meta name="csrf-token"> tag found. Rails will reject the ' +
+            'request as a forgery unless CSRF protection is disabled for this action. ' +
+            'Add <%= csrf_meta_tags %> to your layout.',
+        );
+      }
+
       let response: Response;
       try {
         response = await fetch(url, {
@@ -270,7 +299,9 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
             'Content-Type': 'application/json',
             ...options.headers,
           }),
-          body: JSON.stringify(dataRef.current),
+          // DELETE bodies are legal per RFC 9110 but are stripped or rejected by
+          // many proxies/CDNs in practice — identify the resource in the URL.
+          body: method === 'delete' ? undefined : JSON.stringify(dataRef.current),
         });
       } catch (fetchError) {
         if (isCurrent()) {
@@ -280,7 +311,10 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
       }
 
       if (response.status === 422) {
-        const validationErrors = mapValidationErrors(await parseJsonBody(response));
+        // Parse a clone so `response` stays readable if we end up throwing
+        // RailsFormRequestError below (e.g. the body doesn't match the shape).
+        const body = await parseJsonBody(response.clone());
+        const validationErrors = mapValidationErrors(body);
         if (validationErrors) {
           if (isCurrent()) {
             setErrors(validationErrors);
@@ -289,6 +323,10 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
           }
           return { ok: false as const, errors: validationErrors, response };
         }
+        if (isCurrent()) {
+          setProcessing(false);
+        }
+        throw new RailsFormRequestError(response, body);
       }
 
       if (!response.ok) {
@@ -315,6 +353,9 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
       }
       return result;
     },
+    // Intentionally empty: everything read inside is stable — refs (dataRef,
+    // submissionIdRef, mountedRef), useState setters, and module-level imports.
+    // If you add a render-scoped value here, it must go in this array.
     [],
   );
 

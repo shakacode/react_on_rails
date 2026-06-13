@@ -108,12 +108,17 @@ Every submit issues a `fetch` with:
   (via the same `authenticityToken`/`authenticityHeaders` utilities exposed on
   the `ReactOnRails` object) plus `X-Requested-With: XMLHttpRequest`,
 - `credentials: 'same-origin'` so the Rails session cookie is included,
-- `JSON.stringify(data)` as the body.
+- `JSON.stringify(data)` as the body — except for `delete`, which sends **no
+  body** (DELETE bodies are legal per RFC 9110 but are stripped or rejected by
+  many proxies and CDNs in practice; put the resource identifier in the URL).
 
 The CSRF token is read from the meta tag at submit time, so a token rendered
-with the page is picked up without any configuration. If your app rotates
-tokens during long-lived sessions, refresh the meta tag (e.g., re-render it
-after sign-in) — the next submit reads the current value.
+with the page is picked up without any configuration. Your layout must render
+`<%= csrf_meta_tags %>` (the Rails default) — without the meta tag Rails
+rejects the submit as a forgery, and the hook logs a development-mode console
+warning. If your app rotates tokens during long-lived sessions, refresh the
+meta tag (e.g., re-render it after sign-in) — the next submit reads the
+current value.
 
 Field keys are passed through untouched: if your Rails model says
 `errors: { first_name: [...] }`, the hook gives you
@@ -127,20 +132,20 @@ parameters (a `transform` option for key mapping is planned — see
 const form = useRailsForm(initialData);
 ```
 
-| Member                                 | Description                                                                                |
-| -------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `data`                                 | Current form data (typed from `initialData`).                                              |
-| `setData(key, value)`                  | Set one field. Also accepts a partial object (`setData({ a, b })`) or an updater function. |
-| `errors`                               | `{ field: ["message", ...] }` from the last 422 response.                                  |
-| `hasErrors`                            | `true` when `errors` is non-empty.                                                         |
-| `processing`                           | `true` while a submission is in flight.                                                    |
-| `wasSuccessful`                        | `true` once the most recent submission succeeded.                                          |
-| `post/put/patch/delete(url, options?)` | Submit `data` with that verb. Returns a promise of the submit result.                      |
-| `submit(method, url, options?)`        | Submit with an explicit method.                                                            |
-| `reset(...fields)`                     | Restore all (or the given) fields to their initial values; clears matching errors.         |
-| `clearErrors(...fields)`               | Clear all (or the given) field errors.                                                     |
-| `setError(field, messages)`            | Set errors for one field manually.                                                         |
-| `RailsFormRequestError`                | Rejection error for non-2xx responses other than a mappable 422; carries the `Response`.   |
+| Member                                 | Description                                                                                                                                                                                                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data`                                 | Current form data (typed from `initialData`).                                                                                                                                                                                                             |
+| `setData(key, value)`                  | Set one field. Also accepts a partial object (`setData({ a, b })`) or an updater function.                                                                                                                                                                |
+| `errors`                               | `{ field: ["message", ...] }` from the last 422 response.                                                                                                                                                                                                 |
+| `hasErrors`                            | `true` when `errors` is non-empty.                                                                                                                                                                                                                        |
+| `processing`                           | `true` while a submission is in flight.                                                                                                                                                                                                                   |
+| `wasSuccessful`                        | `true` once the most recent submission succeeded.                                                                                                                                                                                                         |
+| `post/put/patch/delete(url, options?)` | Submit `data` with that verb. Returns a promise of the submit result. `delete` sends no request body — put the resource id in the URL.                                                                                                                    |
+| `submit(method, url, options?)`        | Submit with an explicit method.                                                                                                                                                                                                                           |
+| `reset(...fields)`                     | Restore all (or the given) fields to their initial values; clears matching errors and `wasSuccessful`. Initial values are the `initialData` from the first render — later prop changes are not tracked (Inertia `useForm` semantics); remount to re-seed. |
+| `clearErrors(...fields)`               | Clear all (or the given) field errors.                                                                                                                                                                                                                    |
+| `setError(field, messages)`            | Set errors for one field manually.                                                                                                                                                                                                                        |
+| `RailsFormRequestError`                | Rejection error for non-2xx responses other than a mappable 422; carries the unread `Response` plus `responseBody` (parsed JSON) for an unmappable 422.                                                                                                   |
 
 Per-submit `options`: `headers` (merged in; CSRF headers always win),
 `onSuccess(result)`, and `onError(errors)`.

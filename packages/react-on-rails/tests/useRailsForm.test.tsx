@@ -17,19 +17,17 @@ interface MockResponseOptions {
 }
 
 // Minimal structural stand-in for the fetch Response (jsdom has no fetch).
-const mockResponse = ({
-  status = 200,
-  body = null,
-  redirected = false,
-  url = '',
-}: MockResponseOptions = {}) =>
-  ({
+const mockResponse = (options: MockResponseOptions = {}): Response => {
+  const { status = 200, body = null, redirected = false, url = '' } = options;
+  return {
     ok: status >= 200 && status < 300,
     status,
     redirected,
     url,
     json: () => (body === null ? Promise.reject(new Error('no body')) : Promise.resolve(body)),
-  }) as unknown as Response;
+    clone: () => mockResponse(options),
+  } as unknown as Response;
+};
 
 const fetchMock = jest.fn<Promise<Response>, [string, RequestInit]>();
 
@@ -91,6 +89,35 @@ describe('useRailsForm', () => {
       });
 
       expect(fetchMock.mock.calls[0][1].method).toBe(expectedMethod);
+    });
+
+    it('omits the request body for delete()', async () => {
+      // DELETE bodies are widely stripped by proxies/CDNs; the resource id
+      // belongs in the URL.
+      const { result } = renderHook(() => useRailsForm({ a: 1 }));
+
+      await act(async () => {
+        await result.current.delete('/things/1');
+      });
+
+      expect(fetchMock.mock.calls[0][1].body).toBeUndefined();
+    });
+
+    it('accepts a named interface as the form-data type', async () => {
+      // Type-level regression: the generic must not require a string index
+      // signature (a plain interface has none).
+      interface ContactFormData {
+        name: string;
+        email: string;
+      }
+      const initial: ContactFormData = { name: '', email: '' };
+      const { result } = renderHook(() => useRailsForm<ContactFormData>(initial));
+
+      act(() => {
+        result.current.setData('name', 'Ada');
+      });
+
+      expect(result.current.data).toEqual({ name: 'Ada', email: '' });
     });
 
     it('submit() accepts an explicit method', async () => {
@@ -225,6 +252,26 @@ describe('useRailsForm', () => {
 
       expect(result.current.errors).toEqual({});
       expect(result.current.processing).toBe(false);
+    });
+
+    it('keeps the response readable and exposes responseBody on an unmappable 422', async () => {
+      fetchMock.mockResolvedValue(mockResponse({ status: 422, body: { message: 'nope' } }));
+      const { result } = renderHook(() => useRailsForm({ name: '' }));
+
+      let caught: RailsFormRequestError | undefined;
+      await act(async () => {
+        try {
+          await result.current.post('/contact_messages');
+        } catch (error) {
+          caught = error as RailsFormRequestError;
+        }
+      });
+
+      expect(caught).toBeInstanceOf(RailsFormRequestError);
+      // The hook parsed a clone, so the original body stream is still readable...
+      await expect(caught!.response.json()).resolves.toEqual({ message: 'nope' });
+      // ...and the already-parsed body is exposed for convenience.
+      expect(caught!.responseBody).toEqual({ message: 'nope' });
     });
 
     it('clears stale errors after a subsequent successful submit', async () => {
@@ -365,6 +412,22 @@ describe('useRailsForm', () => {
 
       expect(result.current.data).toEqual({ name: 'initial', email: 'a@b.c' });
       expect(result.current.errors).toEqual({});
+    });
+
+    it('reset() clears wasSuccessful', async () => {
+      fetchMock.mockResolvedValue(mockResponse({ status: 201, body: { message: 'ok' } }));
+      const { result } = renderHook(() => useRailsForm({ name: '' }));
+
+      await act(async () => {
+        await result.current.post('/contact_messages');
+      });
+      expect(result.current.wasSuccessful).toBe(true);
+
+      act(() => {
+        result.current.reset();
+      });
+
+      expect(result.current.wasSuccessful).toBe(false);
     });
 
     it('reset(field) restores only the given field and clears only its errors', async () => {
