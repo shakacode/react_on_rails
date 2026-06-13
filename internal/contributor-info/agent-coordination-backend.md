@@ -89,7 +89,9 @@ BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX"
 printf '%s\n' "$BATCH_ID" > "$BATCH_ID_FILE"
 # Record the printed file path in the batch handoff.
 printf 'Batch id file: %s\n' "$BATCH_ID_FILE"
-# In a fresh shell, restore with: BATCH_ID=$(cat /tmp/agent-coord-batch-id.coord-layer.XXXXXX)
+# In a fresh shell, set BATCH_ID_FILE to the recorded path, then restore:
+# BATCH_ID_FILE=/tmp/agent-coord-batch-id.coord-layer.abc123
+# BATCH_ID=$(cat "$BATCH_ID_FILE")
 # At batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
 
 bin/agent-coord heartbeat \
