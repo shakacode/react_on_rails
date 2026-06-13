@@ -8,6 +8,20 @@ Some public repos still use older slugs with underscores or legacy wording.
 This page is the source of truth for which public repos are current and worth
 starting from.
 
+## Control Plane Cost Posture
+
+For public demo and starter staging deployments on Control Plane, prefer a
+serverless web workload with `minScale: 0` when occasional cold-start latency is
+acceptable. Keep `type: standard` with `minScale: 1` only when the app is a
+production target or when always-warm live-demo latency is part of the acceptance
+criteria.
+
+If a workload already exists as `type: standard`, Control Plane will not change
+that workload type in place. Plan a delete/recreate migration, or create the
+environment-specific serverless workload before the first deploy. The reusable
+guidance lives in
+[Control Plane Flow: Scale the Web Workload to Zero](https://github.com/shakacode/control-plane-flow/blob/main/docs/tips.md#scale-the-web-workload-to-zero).
+
 ## Starter Repos
 
 Check each entry's note before evaluating — some starters are fully open
