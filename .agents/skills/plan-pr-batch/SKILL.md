@@ -57,7 +57,7 @@ Plan a PR batch
 
 4. Output
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
-   - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan. Measure it (e.g. `wc -m`), do not eyeball it. Reserve ~1100 characters for the preflight and execution-rules boilerplate, remeasure after template changes, and keep the file-touch map, `Worker notes`, and `Done when` terse — the worker reads the issue/PR URL for full detail; push evidence and audit notes to the Batch Plan instead.
+   - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan. Measure it (e.g. `wc -m`), do not eyeball it. Record the measured fixed-template budget with the short SHA used for the measurement, remeasure after template changes, and keep the filled file-touch map, `Worker notes`, and `Done when` terse (target ~150 chars per item) — the worker reads the issue/PR URL for full detail; push evidence and audit notes to the Batch Plan instead.
    - If the batch will not fit, split it into smaller goals and output only the first ready goal.
    - Do not start `$pr-batch` unless the user asks; then hand them the fenced goal prompt and tell them to run `$pr-batch` with it.
 
@@ -86,7 +86,9 @@ Preflight first: if this session cannot run workers without blocking approval pr
 
 Repository: OWNER/REPO
 Batch objective: ...
-File-touch map: PR/Issue #N -> touched/created paths; deferred/reserved paths -> reason.
+File-touch map:
+- PR/Issue #N -> changed/affected paths, including create/delete/rename (owner: lane/name)
+- Deferred/reserved paths -> path(s) (reason: ... / later owner: lane/name)
 
 Items:
 - PR #N: URL
