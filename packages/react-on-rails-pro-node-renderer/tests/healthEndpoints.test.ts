@@ -55,8 +55,15 @@ const renderWithBundle = async (app: ReturnType<typeof createWorker>) => {
 };
 
 describe('built-in health endpoints', () => {
+  let app: ReturnType<typeof createWorker> | undefined;
+
   beforeEach(async () => {
     await resetForTest(testName);
+  });
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
   });
 
   afterAll(async () => {
@@ -64,7 +71,7 @@ describe('built-in health endpoints', () => {
   });
 
   test('GET /health and GET /ready are not registered by default', async () => {
-    const app = createWorker();
+    app = createWorker();
 
     const healthRes = await app.inject().get('/health').end();
     expect(healthRes.statusCode).toBe(404);
@@ -74,7 +81,7 @@ describe('built-in health endpoints', () => {
   });
 
   test('GET /health returns 200 with a status-only body when enabled', async () => {
-    const app = createWorker({ enableHealthEndpoints: true });
+    app = createWorker({ enableHealthEndpoints: true });
 
     const res = await app.inject().get('/health').end();
     expect(res.statusCode).toBe(200);
@@ -84,7 +91,7 @@ describe('built-in health endpoints', () => {
   });
 
   test('GET /ready returns 503 before a bundle is loaded and 200 after', async () => {
-    const app = createWorker({ enableHealthEndpoints: true });
+    app = createWorker({ enableHealthEndpoints: true });
 
     // No bundle compiled into the VM pool yet: not ready.
     const notReadyRes = await app.inject().get('/ready').end();
@@ -101,7 +108,7 @@ describe('built-in health endpoints', () => {
   });
 
   test('GET /health stays 200 regardless of bundle state when enabled', async () => {
-    const app = createWorker({ enableHealthEndpoints: true });
+    app = createWorker({ enableHealthEndpoints: true });
 
     // Liveness passes while readiness still fails.
     const healthBefore = await app.inject().get('/health').end();

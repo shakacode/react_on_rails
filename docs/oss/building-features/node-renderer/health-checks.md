@@ -225,7 +225,9 @@ services:
   readiness and your APM are for.
 - **Custom routes still work.** If you need richer checks (warm-up gates, dependency checks, custom payloads), the
   [`configureFastify` health-check recipe](./js-configuration.md#adding-a-health-check-endpoint) still applies and can
-  coexist with the built-in endpoints as long as your custom routes use different paths.
+  coexist with the built-in endpoints as long as your custom routes use different paths. Remove or rename any existing
+  custom `/health` or `/ready` route before enabling `enableHealthEndpoints`; Fastify raises a duplicate-route startup
+  error when built-in and custom routes share the same path.
 
 ## Rails-Side Readiness
 

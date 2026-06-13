@@ -307,6 +307,8 @@ example above or switch the file to `.mjs` or `"type": "module"`.
 > endpoints behind the `enableHealthEndpoints` config option — no custom Fastify code required. See
 > [Health and Readiness Endpoints](./health-checks.md). Use the recipe below only when you need custom probe logic
 > (extra warm-up gates, dependency checks, or custom payloads).
+> If your `configureFastify` callback already registers `/health` or `/ready`, remove or rename the custom route
+> before enabling `enableHealthEndpoints`; Fastify raises a duplicate-route startup error for reused paths.
 
 A common need is a `/health` endpoint for container health checks:
 
