@@ -81,7 +81,8 @@ If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/g
 
 Keep this template aligned with the matching plan-to-goal prompt in
 `.agents/workflows/pr-processing.md`, including the review/audit gate
-paragraphs.
+paragraphs. The `Coordination:` line below intentionally points at the canonical
+workflow rules instead of duplicating them.
 
 Use this template when creating the `/goal` text:
 
@@ -94,6 +95,10 @@ Goal name: <concrete goal name, not the pasted prompt text>.
 Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
+Coordination: follow `.agents/workflows/pr-processing.md` under Coordination
+State and Worker Rules before creating worktrees or branches. Include stable
+agent ids, `agent-coord status` / claim outcomes, batch ids, dependency refs,
+and any `UNKNOWN` state in every worker lane and handoff.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -215,40 +220,23 @@ requests already handled, and no-PR rationales.
 
 ## Coordination State
 
-Use exact lane assignments as the primary coordination mechanism. Labels are helpful but not sufficient.
+Use [.agents/workflows/pr-processing.md](../../workflows/pr-processing.md) as the
+canonical source for coordination state and worker rules. Keep this skill as a
+routing entry point; do not duplicate the full protocol here.
 
-- Use a maintainer-applied eligibility label such as `codex-ready` only if the repo has adopted it.
-- Use a temporary `codex-wip` label only as a visible dashboard hint; do not treat it as the durable lock.
-- Prefer a structured claim comment for resumable coordination:
-
-```markdown
-<!-- codex-claim v1
-batch: <BATCH_ID>
-machine: <MACHINE_ID>
-thread: <codex-thread-id>
-branch: <BRANCH_NAME>
-status: in_progress
-expires_at: <ISO8601_UTC>
--->
-```
-
-Use any stable session, thread, or machine identifier that lets a restarted
-coordinator recognize its own work; if none exists, use `thread: unavailable`
-and rely on the machine, branch, and batch fields. Set `expires_at` to a short
-bounded lease, usually 2-4 hours for an active batch or no later than the known
-batch window. Refresh the claim when continuing beyond that window.
-
-On restart, search for existing claim comments. Resume your own live claim, skip another live claim, or treat expired claims as recoverable after reporting the takeover.
+In short: exact lane assignments beat labels; private `agent-coord` state is the
+source of truth when `agent-coord status` exits 0; refused claims hard-stop
+machine agents; workers heartbeat at phase transitions; coordinators create
+private batch files before dependency lanes start; dependency-sensitive lanes run
+`agent-coord status` before rebase, push, readiness, and closeout; and structured
+public claim comments are only advisory fallback state.
 
 ## Worker Rules
 
-When worker subagents are explicitly authorized:
-
-- Assign one target or one disjoint lane per worker.
-- Give each worker a separate worktree and branch.
-- Tell workers they are not alone in the codebase and must not revert others' edits.
-- Keep write scopes disjoint unless the main agent serializes integration.
-- The main agent owns final PR creation, status reporting, full-CI decisions, and merge sequencing.
+Follow the canonical
+[Worker Rules](../../workflows/pr-processing.md#worker-rules) and keep one target
+or one disjoint lane per worker. The main agent owns final PR creation, status
+reporting, full-CI decisions, and merge sequencing.
 
 ## Coordinator Closeout Lane
 

@@ -2,6 +2,11 @@
 
 Use this guide when deciding between the planning and execution skills for Codex batch work.
 
+When one coordinator runs multiple batches across machines, desktop apps, or
+repositories, use [Multi-Batch Operations](multi-batch-operations.md) for the
+operator-level topology, launcher roles, cross-batch routing, and failure
+drills. This file stays focused on skill selection and per-batch sizing.
+
 ## Skill Roles
 
 | Skill             | Use when                                                                              | Output                                                                           |
@@ -18,7 +23,7 @@ The `.agents/skills/plan-pr-batch/agents/openai.yaml` file under a skill is opti
 2. If exact candidate issues are already known and may be hypothetical, AI/code-analysis-only, over-scoped, or better handled with a no-PR evidence comment, start with `$evaluate-issue` directly.
 3. Verify every candidate through GitHub. Use `UNKNOWN` for facts that cannot be checked.
 4. After `$plan-pr-batch` resolves exact candidates, use `$evaluate-issue` for speculative, AI/code-analysis-only, over-scoped, or unclear items before assigning implementation work.
-5. Shape the batch into independent worker lanes. Cap at 8 items when files or risk overlap, or 10 fully independent items; otherwise propose a smaller first batch.
+5. Shape the batch into independent worker lanes. Cap each batch at 8 items when files or risk overlap, or 10 fully independent items; otherwise propose a smaller first batch. For multiple concurrent batches, keep this as a per-batch cap and apply the cross-batch routing guidance in [Multi-Batch Operations](multi-batch-operations.md) before launching.
 6. Give the user the Batch Plan and fenced `$pr-batch` goal prompt. Do not launch workers yet.
 7. When the user says to run it, use `$pr-batch` with the fenced goal prompt.
 
