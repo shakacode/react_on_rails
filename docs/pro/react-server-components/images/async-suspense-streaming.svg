@@ -67,9 +67,6 @@
         0%, 60% { opacity: 0; } 65%, 92% { opacity: 1; } 97%, 100% { opacity: 0; }
       }
 
-      .spinner { animation: spin 1s linear infinite; transform-origin: center; }
-      @keyframes spin { to { transform: rotate(360deg); } }
-
       @media (prefers-reduced-motion: reduce) {
         * { animation: none !important; opacity: 1 !important; }
       }
@@ -112,10 +109,7 @@
 
     <!-- Fallback (loading state) -->
     <rect x="120" y="192" width="660" height="140" rx="6" class="fallback-box" stroke-width="2" stroke-dasharray="8 4"/>
-    <text x="420" y="268" text-anchor="middle" font-size="14" class="fallback-text">Loading...</text>
-    <g transform="translate(480, 260)">
-      <circle cx="0" cy="0" r="10" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-dasharray="20 12" class="spinner"/>
-    </g>
+    <text x="450" y="268" text-anchor="middle" font-size="14" class="fallback-text">Loading...</text>
 
     <text x="450" y="346" text-anchor="middle" font-size="9" class="label-sub">Suspense fallback shows while the async component resolves server-side</text>
   </g>
