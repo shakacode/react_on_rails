@@ -45,10 +45,39 @@ describe InstallGenerator, type: :generator do
       dependencies = JSON.parse(content).fetch("dependencies")
 
       tailwind_dependency_requirements.each do |name, version|
-        exact_version = version.delete_prefix("^")
-        expect(dependencies[name]).to match(/\A\^?#{Regexp.escape(exact_version)}\z/)
+        expect_npm_dependency_to_satisfy(name, dependencies[name], version)
       end
     end
+  end
+
+  def expect_npm_dependency_to_satisfy(name, actual_version, expected_requirement)
+    if actual_version.nil?
+      raise RSpec::Expectations::ExpectationNotMetError,
+            "expected #{name} dependency to be present and satisfy #{expected_requirement.inspect}"
+    end
+
+    unless expected_requirement.start_with?("^")
+      expect(actual_version).to eq(expected_requirement)
+      return
+    end
+
+    expected_floor = Gem::Version.new(expected_requirement.delete_prefix("^"))
+    actual = Gem::Version.new(actual_version.delete_prefix("^"))
+
+    expect(actual).to be >= expected_floor
+    expect(actual).to be < npm_caret_upper_bound(expected_floor)
+  rescue ArgumentError
+    raise RSpec::Expectations::ExpectationNotMetError,
+          "expected #{name} dependency #{actual_version.inspect} to satisfy #{expected_requirement.inspect}"
+  end
+
+  def npm_caret_upper_bound(version)
+    major, minor, patch = version.segments.values_at(0, 1, 2).map { |segment| segment || 0 }
+
+    return Gem::Version.new("#{major + 1}.0.0") if major.positive?
+    return Gem::Version.new("0.#{minor + 1}.0") if minor.positive?
+
+    Gem::Version.new("0.0.#{patch + 1}")
   end
 
   def assert_tailwind_ssr_setup(config_dir:, extension:)
@@ -506,6 +535,19 @@ describe InstallGenerator, type: :generator do
         expect(content).to match(/React\.FC<HelloWorldProps>/)
         expect(content).to match(/onChange=\{.*e.*=>.*setName\(e\.target\.value\).*\}/)
       end
+    end
+  end
+
+  describe "#expect_npm_dependency_to_satisfy" do
+    it "uses npm caret upper bounds" do
+      expect { expect_npm_dependency_to_satisfy("example", "^4.3.1", "^4.3.0") }.not_to raise_error
+      expect { expect_npm_dependency_to_satisfy("example", "^5.0.0", "^4.3.0") }
+        .to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect_npm_dependency_to_satisfy("example", "^0.1.9", "^0.1.0") }.not_to raise_error
+      expect { expect_npm_dependency_to_satisfy("example", "^0.2.0", "^0.1.0") }
+        .to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect_npm_dependency_to_satisfy("example", "^0.0.4", "^0.0.3") }
+        .to raise_error(RSpec::Expectations::ExpectationNotMetError)
     end
   end
 

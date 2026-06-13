@@ -16,6 +16,7 @@ on:
       - 'llms.txt'
       - 'llms-full.txt'
       - 'script/generate-llms-full.mjs'
+      - 'script/generate-llms-full-test.bash'
       - '.github/workflows/check-llms-full.yml'
   pull_request:
     paths:
@@ -28,6 +29,7 @@ on:
       - 'llms.txt'
       - 'llms-full.txt'
       - 'script/generate-llms-full.mjs'
+      - 'script/generate-llms-full-test.bash'
       - '.github/workflows/check-llms-full.yml'
   workflow_dispatch:
 
@@ -47,6 +49,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ steps.tool-versions.outputs.node-version }}
+
+      - name: Test llms-full generator validation
+        run: bash script/generate-llms-full-test.bash
 
       - name: Check llms-full.txt is current and docs URLs resolve
         run: node script/generate-llms-full.mjs --check

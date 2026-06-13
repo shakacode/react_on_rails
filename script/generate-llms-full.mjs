@@ -5,7 +5,8 @@
  * docs/pro, in sidebar order, with canonical reactonrails.com URLs.
  *
  * Also validates that every reactonrails.com/docs URL referenced from
- * llms.txt and the preamble resolves to a published doc or docs directory.
+ * llms.txt and the preamble resolves to a published doc or docs directory,
+ * and that llms.txt represents every sidebar top-level section.
  *
  * Usage:
  *   node script/generate-llms-full.mjs           # regenerate llms-full.txt
@@ -34,6 +35,7 @@ const SIDEBARS_FILE = path.join(DOCS_DIR, 'sidebars.ts');
 const LLMS_FILE = path.join(ROOT, 'llms.txt');
 const OUTPUT_FILE = path.join(ROOT, 'llms-full.txt');
 const SITE_DOCS_URL = 'https://reactonrails.com/docs';
+const SPLIT_THRESHOLD_KIB = 2048;
 
 const checkMode = process.argv.includes('--check');
 
@@ -96,6 +98,14 @@ function loadIdList(file) {
   return new Set(ids);
 }
 
+function stripSidebarsComments(content) {
+  return content
+    .split('\n')
+    .filter((line) => !/^\s*\/\//.test(line))
+    .map((line) => line.replace(/\s\/\/.*$/, ''))
+    .join('\n');
+}
+
 function collectDocs() {
   const exclusions = loadIdList(EXCLUSIONS_FILE);
   const docs = new Map(); // docId → { relPath, content }
@@ -115,12 +125,7 @@ function collectDocs() {
 function sidebarOrderedIds(docs) {
   // Mirror script/check-docs-sidebar: strip full-line and inline `//` comments,
   // then read quoted strings in order of appearance.
-  const content = fs
-    .readFileSync(SIDEBARS_FILE, 'utf8')
-    .split('\n')
-    .filter((line) => !/^\s*\/\//.test(line))
-    .map((line) => line.replace(/\s\/\/.*$/, ''))
-    .join('\n');
+  const content = stripSidebarsComments(fs.readFileSync(SIDEBARS_FILE, 'utf8'));
   const ordered = [];
   const seen = new Set();
   for (const match of content.matchAll(/'([^'\n]+)'|"([^"\n]+)"/g)) {
@@ -132,6 +137,117 @@ function sidebarOrderedIds(docs) {
   }
   const rest = [...docs.keys()].filter((id) => !seen.has(id)).sort();
   return [...ordered, ...rest];
+}
+
+function matchingDelimiterIndex(content, openIndex, openChar, closeChar) {
+  let depth = 0;
+  let quote;
+  let escaped = false;
+
+  // This scanner is intentionally small for static sidebars.ts content. It
+  // treats template literals as strings and does not parse `${...}` expressions.
+  for (let index = openIndex; index < content.length; index += 1) {
+    const char = content[index];
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === quote) {
+        quote = undefined;
+      }
+    } else if (char === "'" || char === '"' || char === '`') {
+      quote = char;
+    } else if (char === openChar) {
+      depth += 1;
+    } else if (char === closeChar) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+
+  throw new Error(`Could not find matching ${closeChar} in ${path.relative(ROOT, SIDEBARS_FILE)}`);
+}
+
+function docsSidebarArrayBody() {
+  const content = stripSidebarsComments(fs.readFileSync(SIDEBARS_FILE, 'utf8'));
+  const docsSidebarIndex = content.indexOf('docsSidebar');
+  if (docsSidebarIndex === -1) {
+    throw new Error(`Could not find docsSidebar in ${path.relative(ROOT, SIDEBARS_FILE)}`);
+  }
+  const openIndex = content.indexOf('[', docsSidebarIndex);
+  if (openIndex === -1) {
+    throw new Error(`Could not find docsSidebar array in ${path.relative(ROOT, SIDEBARS_FILE)}`);
+  }
+  const closeIndex = matchingDelimiterIndex(content, openIndex, '[', ']');
+  return content.slice(openIndex + 1, closeIndex);
+}
+
+function splitTopLevelSidebarEntries(arrayBody) {
+  const entries = [];
+  let start = 0;
+  let depth = 0;
+  let quote;
+  let escaped = false;
+
+  // Keep this in sync with matchingDelimiterIndex: static sidebar config only,
+  // not a full TypeScript parser for template-literal expressions.
+  for (let index = 0; index < arrayBody.length; index += 1) {
+    const char = arrayBody[index];
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === quote) {
+        quote = undefined;
+      }
+    } else if (char === "'" || char === '"' || char === '`') {
+      quote = char;
+    } else if (char === '{' || char === '[' || char === '(') {
+      depth += 1;
+    } else if (char === '}' || char === ']' || char === ')') {
+      depth -= 1;
+    } else if (char === ',' && depth === 0) {
+      entries.push(arrayBody.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+
+  const lastEntry = arrayBody.slice(start).trim();
+  if (lastEntry) entries.push(lastEntry);
+  return entries;
+}
+
+function quotedStrings(content) {
+  return [...content.matchAll(/'([^'\n]+)'|"([^"\n]+)"/g)].map((match) => match[1] ?? match[2]);
+}
+
+function sidebarTopLevelSections(docs) {
+  return splitTopLevelSidebarEntries(docsSidebarArrayBody())
+    .map((entry) => {
+      const docIds = [];
+      const seen = new Set();
+      for (const candidate of quotedStrings(entry)) {
+        if (docs.has(candidate) && !seen.has(candidate)) {
+          seen.add(candidate);
+          docIds.push(candidate);
+        }
+      }
+      if (docIds.length === 0) {
+        fail(
+          `docs/sidebars.ts top-level entry has no resolvable doc IDs: ${entry
+            .replace(/\s+/g, ' ')
+            .slice(0, 120)}`,
+        );
+        return undefined;
+      }
+
+      const labelMatch = entry.match(/\blabel\s*:\s*(['"])(.*?)\1/);
+      const directDocId = entry.match(/^\s*(['"])(.*?)\1\s*$/)?.[2];
+      return { label: labelMatch?.[2] ?? directDocId ?? docIds[0], docIds };
+    })
+    .filter(Boolean);
 }
 
 function generate(docs, orderedIds) {
@@ -166,8 +282,20 @@ function generate(docs, orderedIds) {
   return `${parts.join('\n')}\n`;
 }
 
-function validateDocUrls(docs) {
+function docsUrlsFromFile(file) {
   const urlPattern = /https:\/\/reactonrails\.com\/docs[^\s)\]'"`>]*/g;
+  const text = fs.readFileSync(file, 'utf8');
+  return [...text.matchAll(urlPattern)].map((match) => {
+    const url = match[0].replace(/[.,;:]+$/, '');
+    // Anchors are stripped: validation is page-level only. Anchor-level
+    // checking would need heading extraction across all docs — if a linked
+    // section heading is renamed, this check will not catch it.
+    const docPath = url.slice(SITE_DOCS_URL.length).replace(/^\//, '').replace(/#.*$/, '').replace(/\/$/, '');
+    return { url, docPath };
+  });
+}
+
+function validateDocUrls(docs, docsUrlsByFile) {
   // Only the published route counts: a slugged doc's file-path route and a
   // README/index file's literal path are not live URLs and must not validate.
   // Intentional references to redirect URLs go in docs/.llms-known-redirects.
@@ -192,17 +320,7 @@ function validateDocUrls(docs) {
 
   let validated = 0;
   for (const file of [LLMS_FILE, PREAMBLE_FILE]) {
-    const text = fs.readFileSync(file, 'utf8');
-    for (const match of text.matchAll(urlPattern)) {
-      const url = match[0].replace(/[.,;:]+$/, '');
-      // Anchors are stripped: validation is page-level only. Anchor-level
-      // checking would need heading extraction across all docs — if a linked
-      // section heading is renamed, this check will not catch it.
-      const docPath = url
-        .slice(SITE_DOCS_URL.length)
-        .replace(/^\//, '')
-        .replace(/#.*$/, '')
-        .replace(/\/$/, '');
+    for (const { url, docPath } of docsUrlsByFile.get(file)) {
       validated += 1;
       if (!resolves(docPath)) {
         fail(
@@ -214,10 +332,55 @@ function validateDocUrls(docs) {
   return validated;
 }
 
+function validateSidebarTopLevelSections(docs, llmsUrls) {
+  const llmsDocPaths = new Set(llmsUrls.map(({ docPath }) => docPath));
+  const sections = sidebarTopLevelSections(docs);
+
+  for (const { label, docIds } of sections) {
+    const sectionDocPaths = docIds.map((docId) => {
+      const { slug } = docs.get(docId);
+      return urlPathForDoc(docId, slug);
+    });
+    const representativePaths = new Set(sectionDocPaths);
+    const firstSegments = sectionDocPaths.map((docPath) => docPath.split('/')[0]).filter(Boolean);
+    if (firstSegments.length > 0 && firstSegments.every((segment) => segment === firstSegments[0])) {
+      // Future generated-index/category URLs can represent a section by its
+      // first path segment, such as /docs/core-concepts.
+      representativePaths.add(firstSegments[0]);
+    }
+
+    if (![...representativePaths].some((docPath) => llmsDocPaths.has(docPath))) {
+      fail(
+        `llms.txt does not represent sidebar top-level section "${label}". ` +
+          `Add at least one reactonrails.com/docs URL for one of: ${sectionDocPaths.slice(0, 5).join(', ')}`,
+      );
+    }
+  }
+
+  return sections.length;
+}
+
+function validateSplitThreshold(output) {
+  const outputSizeKib = Buffer.byteLength(output) / 1024;
+  if (outputSizeKib > SPLIT_THRESHOLD_KIB) {
+    fail(
+      `llms-full.txt is ${outputSizeKib.toFixed(0)} KiB, above the ${SPLIT_THRESHOLD_KIB} KiB split threshold. ` +
+        'Split the generated reference into OSS and Pro files before shipping this size.',
+    );
+  }
+  return outputSizeKib;
+}
+
 const docs = collectDocs();
 const orderedIds = sidebarOrderedIds(docs);
 const output = generate(docs, orderedIds);
-const validatedUrlCount = validateDocUrls(docs);
+const docsUrlsByFile = new Map([
+  [LLMS_FILE, docsUrlsFromFile(LLMS_FILE)],
+  [PREAMBLE_FILE, docsUrlsFromFile(PREAMBLE_FILE)],
+]);
+const validatedUrlCount = validateDocUrls(docs, docsUrlsByFile);
+const validatedSidebarSectionCount = validateSidebarTopLevelSections(docs, docsUrlsByFile.get(LLMS_FILE));
+const outputSizeKib = validateSplitThreshold(output);
 
 if (checkMode) {
   const existing = fs.existsSync(OUTPUT_FILE) ? fs.readFileSync(OUTPUT_FILE, 'utf8') : '';
@@ -233,6 +396,8 @@ if (checkMode) {
 if (process.exitCode !== 1) {
   console.log(
     `✓ llms-full.txt ${checkMode ? 'is current' : 'generated'}: ${orderedIds.length} pages, ` +
-      `${(Buffer.byteLength(output) / 1024).toFixed(0)} KiB; ${validatedUrlCount} docs URLs validated.`,
+      `${outputSizeKib.toFixed(0)} KiB ` +
+      `(split threshold ${SPLIT_THRESHOLD_KIB} KiB); ${validatedUrlCount} docs URLs and ` +
+      `${validatedSidebarSectionCount} sidebar top-level sections validated.`,
   );
 }
