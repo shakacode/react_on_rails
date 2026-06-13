@@ -7253,12 +7253,17 @@ Every submit issues a `fetch` with:
   (via the same `authenticityToken`/`authenticityHeaders` utilities exposed on
   the `ReactOnRails` object) plus `X-Requested-With: XMLHttpRequest`,
 - `credentials: 'same-origin'` so the Rails session cookie is included,
-- `JSON.stringify(data)` as the body.
+- `JSON.stringify(data)` as the body — except for `delete`, which sends **no
+  body** (DELETE bodies are legal per RFC 9110 but are stripped or rejected by
+  many proxies and CDNs in practice; put the resource identifier in the URL).
 
 The CSRF token is read from the meta tag at submit time, so a token rendered
-with the page is picked up without any configuration. If your app rotates
-tokens during long-lived sessions, refresh the meta tag (e.g., re-render it
-after sign-in) — the next submit reads the current value.
+with the page is picked up without any configuration. Your layout must render
+`<%= csrf_meta_tags %>` (the Rails default) — without the meta tag Rails
+rejects the submit as a forgery, and the hook logs a development-mode console
+warning. If your app rotates tokens during long-lived sessions, refresh the
+meta tag (e.g., re-render it after sign-in) — the next submit reads the
+current value.
 
 Field keys are passed through untouched: if your Rails model says
 `errors: { first_name: [...] }`, the hook gives you
@@ -7272,20 +7277,20 @@ parameters (a `transform` option for key mapping is planned — see
 const form = useRailsForm(initialData);
 ```
 
-| Member                                 | Description                                                                                |
-| -------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `data`                                 | Current form data (typed from `initialData`).                                              |
-| `setData(key, value)`                  | Set one field. Also accepts a partial object (`setData({ a, b })`) or an updater function. |
-| `errors`                               | `{ field: ["message", ...] }` from the last 422 response.                                  |
-| `hasErrors`                            | `true` when `errors` is non-empty.                                                         |
-| `processing`                           | `true` while a submission is in flight.                                                    |
-| `wasSuccessful`                        | `true` once the most recent submission succeeded.                                          |
-| `post/put/patch/delete(url, options?)` | Submit `data` with that verb. Returns a promise of the submit result.                      |
-| `submit(method, url, options?)`        | Submit with an explicit method.                                                            |
-| `reset(...fields)`                     | Restore all (or the given) fields to their initial values; clears matching errors.         |
-| `clearErrors(...fields)`               | Clear all (or the given) field errors.                                                     |
-| `setError(field, messages)`            | Set errors for one field manually.                                                         |
-| `RailsFormRequestError`                | Rejection error for non-2xx responses other than a mappable 422; carries the `Response`.   |
+| Member                                 | Description                                                                                                                                                                                                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data`                                 | Current form data (typed from `initialData`).                                                                                                                                                                                                             |
+| `setData(key, value)`                  | Set one field. Also accepts a partial object (`setData({ a, b })`) or an updater function.                                                                                                                                                                |
+| `errors`                               | `{ field: ["message", ...] }` from the last 422 response.                                                                                                                                                                                                 |
+| `hasErrors`                            | `true` when `errors` is non-empty.                                                                                                                                                                                                                        |
+| `processing`                           | `true` while a submission is in flight.                                                                                                                                                                                                                   |
+| `wasSuccessful`                        | `true` once the most recent submission succeeded.                                                                                                                                                                                                         |
+| `post/put/patch/delete(url, options?)` | Submit `data` with that verb. Returns a promise of the submit result. `delete` sends no request body — put the resource id in the URL.                                                                                                                    |
+| `submit(method, url, options?)`        | Submit with an explicit method.                                                                                                                                                                                                                           |
+| `reset(...fields)`                     | Restore all (or the given) fields to their initial values; clears matching errors and `wasSuccessful`. Initial values are the `initialData` from the first render — later prop changes are not tracked (Inertia `useForm` semantics); remount to re-seed. |
+| `clearErrors(...fields)`               | Clear all (or the given) field errors.                                                                                                                                                                                                                    |
+| `setError(field, messages)`            | Set errors for one field manually.                                                                                                                                                                                                                        |
+| `RailsFormRequestError`                | Rejection error for non-2xx responses other than a mappable 422; carries the unread `Response` plus `responseBody` (parsed JSON) for an unmappable 422.                                                                                                   |
 
 Per-submit `options`: `headers` (merged in; CSRF headers always win),
 `onSuccess(result)`, and `onError(errors)`.
@@ -26893,319 +26898,6 @@ Choose **React on Rails** if most of these are true:
 - [Comparing React on Rails to alternatives](./comparing-react-on-rails-to-alternatives.md)
 - [Comparison with alternatives (feature matrix and benchmarks)](./comparison-with-alternatives.md)
 - [Installation into an Existing Rails App](./installation-into-an-existing-rails-app.md)
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/articles
-SOURCE: docs/oss/misc/articles.md
-================================================================================
-
-# Articles, Videos, and Podcasts
-
-## Articles
-
-- [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4) for an overview of the integration of React on Rails with Webpacker.
-- [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92)
-- [React on Rails, 2000+ 🌟 Stars](https://medium.com/shakacode/react-on-rails-2000-stars-32ff5cfacfbf#.6gmfb2gpy)
-- [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
-- [Simple Tutorial](../getting-started/tutorial.md).
-
-## Videos
-
-- [Video of running the v9 installer with Webpacker v3](https://youtu.be/M0WUM_XPaII). History, motivations, philosophy, and overview.
-
-1. [GORUCO 2017: Front-End Sadness to Happiness: The React on Rails Story by Justin Gordon](https://www.youtube.com/watch?v=SGkTvKRPYrk)
-2. [egghead.io: Creating a component with React on Rails](https://egghead.io/lessons/react-creating-a-component-with-react-on-rails)
-3. [egghead.io: Creating a redux component with React on Rails](https://egghead.io/lessons/react-add-redux-state-management-to-a-react-on-rails-project)
-4. [React On Rails Tutorial Series](https://www.youtube.com/playlist?list=PL5VAKH-U1M6dj84BApfUtvBjvF-0-JfEU)
-   1. [History and Motivation](https://youtu.be/F4oymbUHvoY)
-   2. [Basic Tutorial Walkthrough](https://youtu.be/_bjScw60FBk)
-   3. [Code Walkthrough](https://youtu.be/McQ9UM-_ocQ)
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/credits
-SOURCE: docs/oss/misc/credits.md
-================================================================================
-
-# React on Rails Credits and Authors
-
-## Authors
-
-[The Shaka Code team!](http://www.shakacode.com/about/)
-
-The origins of the project began with the need to do a rich JavaScript interface for a ShakaCode's client. The choice to use Webpack and Rails is described in [Fast Rich Client Rails Development With Webpack and the ES6 Transpiler](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/).
-
-The gem project started with [Justin Gordon](https://github.com/justin808/) pairing with [Samnang Chhun](https://github.com/samnang) to figure out how to do server rendering with Webpack plus Rails. [Alex Fedoseev](https://github.com/alex35mil) then joined in. [Rob Wise](https://github.com/robwise), [Aaron Van Bokhoven](https://github.com/aaronvb), and Andy Wang did the bulk of the generators. Many others have [contributed](https://github.com/shakacode/react_on_rails/graphs/contributors).
-
-The gem was initially inspired by the [react-rails gem](https://github.com/reactjs/react-rails).
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/doctrine
-SOURCE: docs/oss/misc/doctrine.md
-================================================================================
-
-# The React on Rails Doctrine
-
-By Justin Gordon, January 26, 2016
-
-This document is an extension and complement to [The Rails Doctrine](http://rubyonrails.org/doctrine/). If you haven't read that document, I suggest you do so first.
-
-To paraphrase the [React on Rails Introduction](../introduction.md), the project objective is to provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries.
-
-When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and with modern JavaScript? A good example is view helper integration of React components on a Rails view. If the answer is yes, then the functionality belongs right here.
-
-In other cases, we release separate npm packages or Ruby gems. For example, we needed an easy way to integrate [Twitter Bootstrap](http://getbootstrap.com/) with Webpack, and we released the [npm bootstrap-loader](https://github.com/shakacode/bootstrap-loader/).
-
-Besides the project objective, let's stick with the "Rails Doctrine" and keep the following in mind.
-
-## Optimize for Programmer Happiness
-
-The React on Rails setup provides several key components related to front-end developer happiness:
-
-1. [Hot reloading of both JavaScript and CSS](https://gaearon.github.io/react-hot-loader/), using the [webpack-dev-server](https://webpack.js.org/configuration/dev-server/) package. This works for both using an [Express server](http://expressjs.com/) to load stubs for the ajax requests, as well as using a live Rails server. **Oh yes**, your Rails server can do hot reloading!
-2. [CSS modules](https://github.com/css-modules/webpack-demo) which remove the madness of a global namespace for CSS. We organize our CSS (Sass, actually) right next to our JavaScript React component files. This means no more creating long class names to ensure that CSS picks up the right styles.
-3. [ES6 JavaScript](http://es6-features.org/#Constants) is a great language for client side coding, much more so than Ruby due to the asynchronous nature of UI programming.
-4. JavaScript libraries and tooling work better in the native node way, rather than via some aspect of Sprockets and the Rails Asset Pipeline. We find way less frustration this way, especially from being able to get the latest advances with the rest of the JavaScript community. Why complicated beautiful JavaScript tooling Rails asset pipeline complexity?
-5. We want our JavaScript from NPM. Getting JavaScript from rubygems.org is comparatively frustrating.
-6. Happiness for us is actively participating in open source, so we want to be where the action is, which is with the NPM libraries on github.com.
-7. You can get set up on React on Rails **FAST** using our application generator.
-8. By placing all client-side development inside of the `/client` directory, pure JavaScript developers can productively do development separate from Rails. Instead of Rails APIs, stub APIs on an express server can provide a simple backend, allowing for rapid iteration of UI prototypes.
-9. Just because we're not relying on the Rails asset pipeline for ES6 conversion does not mean that we're deploying Rails apps in any different way. We still use the asset pipeline to include our Webpack compiled JavaScript. This only requires a few small modifications, as explained in [our heroku deployment documentation](../deployment/heroku-deployment.md).
-
-## Convention over Configuration
-
-- React on Rails has taken the hard work out of figuring out the JavaScript tooling that works best with Rails. Not only could you spend lots of time researching different tooling, but then you'd have to figure out how to splice it all together. This is where a lot of "JavaScript fatigue" comes from. The following keep the code clean and consistent:
-- [Style Guide](./style.md)
-
-We're big believers in this quote from the Rails Doctrine:
-
-> The same goes even when you understand how all the pieces go together. When there’s an obvious next step for every change, we can scoot through the many parts of an application that is the same or very similar to all the other applications that went before it. A place for everything and everything in its place. Constraints liberate even the most able minds.
-
-## The Menu Is Omakase
-
-Here's the chef's selection from the React on Rails community:
-
-### Libraries
-
-- [Bootstrap](http://getbootstrap.com/), loaded from [bootstrap-loader](https://github.com/shakacode/bootstrap-loader/). Common UI styles.
-- [Lodash](https://lodash.com/): Swiss army knife of utilities.
-- [React](https://react.dev/): UI components.
-- [React Router](https://reactrouter.com/): Provider of deep links for client-side application.
-- [Redux](https://redux.js.org/): Flux implementation (aka "state container").
-
-### JavaScript Tooling
-
-- [Babel](https://babeljs.io/): Transpiler for ES6 into ES5 and much more.
-- [ESLint](https://eslint.org/)
-- [Webpack](https://webpack.js.org/): Generator of deployment assets and provider of hot module reloading.
-
-By having a common set of tools, we can discuss what we should or shouldn't be using. Thus, this takes out the "JavaScript Fatigue" from having too many unclear choices in the JavaScript world.
-
-By the way, we're _not_ omakase for standard Rails. That would be CoffeeScript. However, the Rails Doctrine makes it clear that non-standard menu choices are certainly welcome!
-
-## No One Paradigm
-
-React on Rails fits into the "No One Paradigm" of the Rails ecosystem from the perspective that it rocks for client-side development with Rails, even though it's a totally different language than the server code written in Ruby.
-
-## Exalt Beautiful Code
-
-ES5 was ugly. ES6 is beautiful. React is beautiful. Client side code written with React plus Redux, fully linted with the ShakaCode linters, and organized per our recommended project structure is beautiful. Don't take our word for it. Take a look at the component sample code in the [react-webpack-rails-tutorial sample code](https://github.com/shakacode/react-webpack-rails-tutorial/tree/master/client/app/bundles/comments).
-
-## Value Integrated Systems
-
-Assuming that you're building the type of app that's a good fit for Rails (document/database based with lots of business rules), the tight integration of modern JavaScript with React on top of Ruby on Rails is better than building a pure client-side app and separate microservices. Here's why:
-
-- Via React on Rails, we can seamlessly integrate React UI components with Rails.
-- Tight integration allows for trivial set up of server rendering of React on top of Rails, complete with support for fragment caching of the server rendered HTML, and integration with [Turbolinks](https://github.com/turbolinks/turbolinks).
-- Tight integration allows mixing and matching Rails pages with React-driven pages, even on the same page. Not every part of a UI requires the high fidelity achievable using React. Many existing apps may have hundreds of standard Rails forms. Support for mixing and matching React with Rails forms provides the best of both worlds.
-
-## Progress over Stability
-
-React on Rails will maintain an active pace of development, to keep up with:
-
-- Community suggestions.
-- New client side tooling, libraries, and techniques.
-- Updates to Rails.
-
-## Raise a Big Tent
-
-React on Rails is definitely a part of the big tent of Rails. Plus, React on Rails provides its own big tent. A huge benefit of the React on Rails system is simple integration with Webpack and NPM, allowing integration with almost any library available on [npm](https://www.npmjs.org/)! The integration with Webpack also allows for other Webpack supported build tools.
-
-## Thanks!
-
-Thanks for reading and being a part of the React on Rails community. Feedback on this document and _anything_ in React on Rails is welcome. Please [open an issue](https://github.com/shakacode/react_on_rails/issues/new) or a pull request. If you'd like to join our private Slack channel, please [email](mailto:contact@shakacode.com) us a request.
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/style
-SOURCE: docs/oss/misc/style.md
-================================================================================
-
-# Code Style
-
-This document describes the coding style of [ShakaCode](http://www.shakacode.com). Yes, it's opinionated, as all style guidelines should be. We shall put as little as possible into this guide and instead rely on:
-
-- Use of linters with our standard linter configuration.
-- References to existing style guidelines that support the linter configuration.
-
-## Client Side JavaScript and React
-
-- See the [Shakacode JavaScript Style Guide](https://github.com/shakacode/style-guide-javascript)
-
-## Style Guides to Follow
-
-Follow these style guidelines per the linter configuration. Basically, lint your code and if you have questions about the suggested fixes, look here:
-
-### Ruby Coding Standards
-
-- [ShakaCode Ruby Coding Standards](https://github.com/shakacode/style-guide-ruby)
-- [Ruby Documentation](http://guides.rubyonrails.org/api_documentation_guidelines.html)
-
-### JavaScript Coding Standards
-
-- [ShakaCode Javascript](https://github.com/shakacode/style-guide-javascript)
-- Use the [eslint-config-shakacode](https://github.com/shakacode/style-guide-javascript/tree/master/packages/eslint-config-shakacode) NPM package with ESLint.
-- [JSDoc](https://jsdoc.app/)
-
-### Git coding Standards
-
-- [Git Coding Standards](https://git-scm.com/docs/CodingGuidelines)
-
-### Sass Coding Standards
-
-- [Sass Guidelines](https://sass-guidelin.es/) by Kitty Giraudel
-- [Github Front End Guidelines](http://primercss.io/guidelines/)
-
-## Git Usage
-
-- Follow a [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow) model where you branch off master for features.
-- Before merging a branch to master, rebase it on top of master, by using command like `git fetch; git checkout my-branch; git rebase -i origin/master`. Clean up your commit message at this point. Be super careful to communicate with anybody else working on this branch and do not do this when others have uncommitted changes. Ideally, your merge of your feature back to master should be one nice commit.
-- Run hosted CI and code coverage.
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/tips
-SOURCE: docs/oss/misc/tips.md
-================================================================================
-
-# Tips
-
-- Make sure to run the Rails app using `bin/dev` (or `foreman start -f Procfile.dev`) and **not `rails s`** so development watchers are running. For tests, use one consistent strategy: either React on Rails TestHelper + `build_test_command` (recommended) or `compile: true` in `config/shakapacker.yml` (not both). Keep test and development `public_output_path` values separate so manifests do not collide. If you run tests frequently while developing, run `bin/dev test-watch` in a separate terminal for faster feedback (auto mode chooses full vs client-only). Advanced only: if you intentionally use `bin/dev static`, you can share dev/test output paths, but do not do that in HMR mode.
-
-- The default for rendering right now is `prerender: false`. **NOTE:** Server-side rendering does not work for some components that use an async setup for server rendering. You can configure the default for prerender in your config.
-- You can expose either a React component or a function that returns a React component. If you wish to create a React component via a function, rather than simply props, then you need to set the property "generator" on that helper invocation to true (or change the defaults). When that is done, the function is invoked with a single parameter of "props", and that function should return a React element.
-- Be sure you can first render your React component **on the client side only** before you try to debug server rendering!
-- Open up the HTML source and take a look at the generated HTML and the JavaScript to see what's going on under the covers. Note that when server rendering is turned on, then you'll see the server-rendered React components. When server rendering is turned off, then you'll only see the `div` element where the in-line JavaScript will render the component. You might also notice how the props you pass (a Ruby Hash) becomes in-line JavaScript on the HTML page.
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/updating-dependencies
-SOURCE: docs/oss/misc/updating-dependencies.md
-================================================================================
-
-# Updating Ruby and JavaScript Dependencies
-
-If you frequently update dependencies in small batches, you will avoid large and painful updates later. Then again, if you don't have good test coverage, it's hazardous to update dependencies at any time.
-
-## Ruby
-
-Delete any unwanted version constraints from your Gemfile and run:
-
-```bash
-bundle update
-```
-
-## Node Dependencies
-
-Run the commands below from the directory that contains your `package.json`. In current React on
-Rails apps, that is usually the app root rather than a `client/` subdirectory.
-
-### Checking for Outdated Packages
-
-Check for outdated versions of packages:
-
-```bash
-pnpm outdated
-```
-
-Equivalents for other package managers:
-
-- npm: `npm outdated`
-- yarn: `yarn outdated`
-- bun: `bun outdated`
-
-Read CHANGELOGs of major updated packages before you update. You might not be ready for
-some updates.
-
-### Updating All Dependencies
-
-**Option 1: Using npm-check-updates (Recommended)**
-
-Run these commands. You may or may not need to `rm -rf` your `node_modules` directory.
-
-```bash
-pnpm dlx npm-check-updates -u -a
-pnpm install
-```
-
-To also remove old `node_modules` so you only get what corresponds to `package.json`:
-
-```bash
-pnpm dlx npm-check-updates -u -a && rm -rf node_modules && pnpm install
-```
-
-Equivalents for other package managers:
-
-- npm: `npx npm-check-updates -u -a && npm install`
-- yarn: `npx npm-check-updates -u -a && yarn install`
-- bun: `bunx npm-check-updates -u -a && bun install`
-
-**Option 2: Using your package manager's upgrade command**
-
-To update all dependencies within their existing semver ranges:
-
-```bash
-pnpm up
-```
-
-To ignore ranges and update everything to the absolute latest versions:
-
-```bash
-pnpm up --latest
-```
-
-To upgrade a specific package to its latest version:
-
-```bash
-pnpm up [package] --latest
-```
-
-Equivalents for other package managers:
-
-| Action                     | npm                        | yarn (v1)               | bun                    |
-| -------------------------- | -------------------------- | ----------------------- | ---------------------- |
-| Update within ranges       | `npm update`               | `yarn upgrade`          | `bun update`           |
-| Update to latest           | _(use ncu from Option 1)_  | `yarn upgrade --latest` | `bun update --latest`  |
-| Specific package to latest | `npm install <pkg>@latest` | `yarn add <pkg>@latest` | `bun add <pkg>@latest` |
-
-Note that `npm update` does not modify `package.json` by default (only the lockfile). Add `--save`
-if you want it to update version ranges. The other package managers update `package.json` by default.
-
-### Adding New Dependencies
-
-Typically, you can add your Node dependencies as you normally would:
-
-```bash
-pnpm add module_name@version
-# or for dev dependencies
-pnpm add -D module_name@version
-```
-
-Equivalents for other package managers:
-
-- npm: `npm install module_name@version` / `npm install -D module_name@version`
-- yarn: `yarn add module_name@version` / `yarn add --dev module_name@version`
-- bun: `bun add module_name@version` / `bun add -D module_name@version`
-
-### Verify After Updates
-
-Confirm that the hot replacement dev server and the Rails server both work after updating dependencies.
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/upgrading/changelog

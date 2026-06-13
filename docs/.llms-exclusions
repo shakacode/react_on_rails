@@ -1,5 +1,7 @@
-# Docs intentionally excluded from the generated llms-full.txt
-# (redirect stubs with no real content). One doc ID per line.
+# Docs intentionally excluded from the generated llms-full.txt.
+# Prefer redirect stubs with no real content. Full docs may be temporarily
+# excluded only to stay below the hard split threshold until llms-full is split.
+# One doc ID per line.
 # Inline comments (after #) are allowed.
 # Used by script/generate-llms-full.mjs.
 
@@ -11,3 +13,12 @@ misc/asset-pipeline
 
 # URL-compatibility stub that redirects to pro/react-on-rails-pro
 pro/home-pro
+
+# Contributing/Resources pages (linked from introduction.md, not the sidebar).
+# Excluded until llms-full is split so product/API docs remain under the cap.
+misc/doctrine
+misc/style
+misc/updating-dependencies
+misc/credits
+misc/articles
+misc/tips
