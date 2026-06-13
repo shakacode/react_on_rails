@@ -16,5 +16,5 @@ The authoritative rubric lives in `.agents/skills/evaluate-issue/SKILL.md`. Read
 3. Batch handoff:
    - Exclude `park / P3`, `close`, and `product decision` items from implementation batches unless the batch is explicitly audit/comment-only.
    - Convert low-value assigned issues into no-PR evidence comments rather than speculative PRs.
-   - For investigation or benchmark targets, apply the closing-evidence gate from `.agents/skills/evaluate-issue/SKILL.md` step 4 before carrying a `close`, `park`, or `document/work around` disposition into `$pr-batch`.
+   - For investigation or benchmark targets, apply the closing-evidence gate from `.agents/skills/evaluate-issue/SKILL.md` step 4 before carrying a `close`, `park`, or `document/work around` disposition into `$pr-batch`. If the gate cannot be satisfied, record the caveat explicitly in the evidence comment and downgrade the disposition to `park` or `product decision` rather than `close`.
    - Carry the disposition into `$pr-batch` as the target outcome: implementation PR, no-PR evidence comment, `document/work around`, or product-decision blocker.
