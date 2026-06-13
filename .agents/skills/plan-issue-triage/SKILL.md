@@ -7,6 +7,13 @@ description: Use when preparing a ready prompt for Claude, Codex, or another age
 
 Generate a ready-to-run prompt for issue triage. Do not perform the full audit, change code, or launch workers unless the user explicitly asks.
 
+Memorable invocation:
+
+```text
+$plan-issue-triage
+Plan an issue triage
+```
+
 ## Workflow
 
 1. Resolve the target
@@ -64,7 +71,7 @@ Repository and skill context:
 - Scope: [exact issue search, label, milestone, or all open issues]
 - Use $evaluate-issue for priority/value decisions.
 - Use $plan-pr-batch only to shape follow-up implementation batches.
-- If repo-local skills are unavailable, read the SKILL.md files for evaluate-issue and plan-pr-batch from this repository's skills directory directly.
+- For this repo, if skill autoloading is unavailable, read `.agents/skills/evaluate-issue/SKILL.md` and `.agents/skills/plan-pr-batch/SKILL.md` directly (`.claude/skills` points at `.agents/skills`); adapt this path for other repositories.
 
 Triage rules:
 - Fetch the current GitHub state before evaluating issues.
