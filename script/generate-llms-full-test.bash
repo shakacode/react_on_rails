@@ -43,7 +43,7 @@ run_test() {
   TESTS_RUN=$((TESTS_RUN + 1))
   echo "-> $test_fn"
 
-  local tmpdir failure_file new_failures
+  local tmpdir failure_file new_failures=0
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/generate-llms-full-test.XXXXXX")"
   failure_file="$tmpdir/.failures"
   : > "$failure_file"
@@ -191,14 +191,17 @@ test_missing_sidebar_top_level_section_fails_check() {
 test_unresolvable_sidebar_top_level_entry_fails_check() {
   write_fixture
   awk '
+    BEGIN { inserted = 0 }
     /^  ],/ {
       print "    {"
       print "      type: '\''category'\'',"
       print "      label: '\''External Only'\'',"
       print "      items: [{ type: '\''link'\'', href: '\''https://example.com'\'', label: '\''External'\'' }],"
       print "    },"
+      inserted = 1
     }
     { print }
+    END { if (!inserted) exit 1 }
   ' docs/sidebars.ts > docs/sidebars.ts.next
   mv docs/sidebars.ts.next docs/sidebars.ts
 
