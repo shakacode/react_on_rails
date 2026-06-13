@@ -19,7 +19,7 @@ Generate a ready-to-run prompt for issue triage. Do not perform the full audit, 
    - Default to review-only triage.
    - Spell out that review-only allows high-signal GitHub issue comments.
    - Spell out that review-only forbids code changes, branches, commits, PRs, label changes, milestone changes, assignee changes, title/body edits, and closing issues unless the prompt explicitly grants that permission.
-   - If the user says comments are not allowed, generate a no-comment/draft-only prompt instead.
+   - If the user asks for read-only, no-write, or no-comment triage, generate a no-comment/draft-only prompt instead.
 
 3. Build the prompt
    - Tell the recipient to use `$evaluate-issue` for value and priority decisions.
@@ -64,7 +64,7 @@ Repository and skill context:
 - Scope: [exact issue search, label, milestone, or all open issues]
 - Use $evaluate-issue for priority/value decisions.
 - Use $plan-pr-batch only to shape follow-up implementation batches.
-- If repo-local skills are unavailable, read .agents/skills/evaluate-issue/SKILL.md and .agents/skills/plan-pr-batch/SKILL.md directly.
+- If repo-local skills are unavailable, read the SKILL.md files for evaluate-issue and plan-pr-batch from this repository's skills directory directly.
 
 Triage rules:
 - Fetch the current GitHub state before evaluating issues.
