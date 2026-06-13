@@ -75,8 +75,8 @@ batch work. Ask me to confirm the included and excluded PRs before deep audit.
 After confirmation, audit each included PR for:
 - risky behavior change
 - missing or weak validation
-- missing lockfile content-diff evidence when committed lockfiles changed: changed dependencies, rationale, sibling-lock comparison, and platform-precompiled/source-build or build-time dependency changes
-- weak closing evidence in analysis, benchmark, or investigation PRs that closed issues: apply the full gate from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md`, including reproducible artifact or explicit caveat, internal consistency, production-environment caveats, and second-agent refutation handling
+- missing lockfile content-diff evidence when committed lockfiles changed, using the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`
+- weak closing evidence in analysis, benchmark, or investigation PRs that closed issues: apply the full gate from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md`, including reproducible artifact or explicit caveat, internal consistency, production-environment caveats, and refutable-conclusion handling
 - cross-PR interactions
 - overlapping files or assumptions
 - undocumented non-blocking decisions

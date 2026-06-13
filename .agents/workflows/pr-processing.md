@@ -210,13 +210,10 @@ compatibility before merge. Check that `.github/dependabot.yml` has matching
 form, and that npm/pnpm workspace layout matches the configured Dependabot
 directory or directories.
 
-When a committed lockfile's contents change, the PR evidence must include a
-lockfile content-diff note. Name the changed dependencies, give the one-line
-rationale for each intentional version/source change, compare the same
-dependency across sibling lockfiles in the repo, and explicitly call out
-platform-precompiled/source-build transitions or newly introduced build-time
-dependencies. Unexplained sibling-version splits or platform/source-build
-transitions block merge-readiness until aligned or justified.
+When a committed lockfile's contents change, the PR evidence must satisfy the
+lockfile content-diff requirement from the Handoff Contract in
+`.agents/skills/pr-batch/SKILL.md`. Unexplained lockfile drift blocks
+merge-readiness until aligned or justified.
 
 Typical checks include `actionlint`, `yamllint .github/`,
 `script/ci-changes-detector origin/main`, package-script smoke checks, dependency
@@ -302,7 +299,7 @@ Classify each target before assigning a worker:
 - **No-PR evidence comment**: the issue is duplicate, low-value, already fixed, or better closed with evidence. The posted comment is the deliverable; include live evidence, the no-PR rationale, and whether the issue should stay open, close, or wait.
 - **Product-decision blocker**: the issue needs a maintainer/product decision before code would be safe. The deliverable is a surfaced question or decision request, not a speculative branch.
 
-For investigation or benchmark conclusions, apply the closing-evidence bar from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md` to every outcome path. Implementation PRs, combined investigation PRs, and no-PR evidence comments that recommend close, park, or document/work around must satisfy that canonical gate before recommending or carrying the disposition forward.
+For investigation or benchmark conclusions, apply the closing-evidence bar from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md` to every outcome path. Implementation PRs, combined investigation PRs, and no-PR evidence comments that recommend close or document/work around must satisfy that canonical gate before recommending or carrying the disposition forward. When the gate cannot be satisfied, carry only a caveated no-PR `park` disposition or a product-decision blocker.
 
 Workers should not turn product-decision blockers into speculative PRs. They should post or draft the evidence-backed question and stop that target.
 
@@ -365,9 +362,8 @@ scoped, run one additional Claude Code review pass if available, such as
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
 controls. For lockfile changes, include Dependabot ecosystem and
-directory/directories compatibility plus the lockfile content-diff note: changed
-dependencies, rationale, sibling-lock comparison, and any platform-precompiled /
-source-build or build-time dependency change.
+directory/directories compatibility, then apply the lockfile content-diff
+evidence requirement from the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 
