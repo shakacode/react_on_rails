@@ -195,6 +195,8 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   const recommendedMinTuple = parseTuple(reactOnRailsRsc.recommendedMin);
   if (
     !isAtLeast(rscTuple, recommendedMinTuple) ||
+    // Warn only when the installed RSC is a prerelease at the exact stable floor, e.g. 19.0.5-rc.7
+    // when 19.0.5 stable is available. Higher prerelease tuples are outside this upgrade nudge.
     (sameTuple(rscTuple, recommendedMinTuple) && isPrereleaseVersion(rscVersion))
   ) {
     return { level: 'warn', message: warnMessage(rscVersion, reactOnRailsRsc.recommendedMin, proVersion) };

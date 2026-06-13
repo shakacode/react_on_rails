@@ -52,10 +52,11 @@ react-on-rails-pro (this package)
 This package wraps and extends the base `react-on-rails` package. You only need to install `react-on-rails-pro` — the base package is included as a dependency.
 
 If your app uses React Server Components, also install `react-on-rails-rsc`. The
-Pro package declares it as an optional peer with an explicit React-runtime range;
-pin the app dependency to a reviewed stable version instead of using `*`. The
-peer range still admits the prior coordinated `19.0.5-rc.6` and `19.0.5-rc.7`
-pins during upgrades so the node renderer can warn and guide apps to stable.
+Pro package declares it as an optional peer with an explicit patch-only
+React-runtime range; pin the app dependency to a reviewed stable version instead
+of using `*`. The peer range still admits the prior coordinated `19.0.5-rc.6`
+and `19.0.5-rc.7` pins during upgrades so the node renderer can warn and guide
+apps to stable.
 
 ### What this package adds over `react-on-rails`
 

@@ -724,6 +724,8 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
   describe "RSC package pin messages" do
     it "describes the exact package pin without falling back to latest" do
+      # If the pin returns to a prerelease during a future RSC rollout, re-check
+      # that the info and recovery warning name the intended stable target.
       info = instance.send(:rsc_dependency_pin_info)
       warning = instance.send(:rsc_dependency_pin_failed_warning)
 

@@ -44,6 +44,9 @@ describe('checkRscPeerCompatibility', () => {
     expect(checkRscPeerCompatibility({ rscVersion: '19.0.5-rc.6', reactVersion: '19.0.4' }).level).toBe(
       'warn',
     );
+    expect(checkRscPeerCompatibility({ rscVersion: '19.0.5-rc.7', reactVersion: '19.0.4' }).level).toBe(
+      'warn',
+    );
   });
 
   it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {
