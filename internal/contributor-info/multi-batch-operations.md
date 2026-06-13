@@ -39,11 +39,13 @@ should use this PR branch or `main` for the current workflow docs.
    bin/agent-coord --help
    mkdir -p "$HOME/.local/bin"
    ln -sf "$PWD/bin/agent-coord" "$HOME/.local/bin/agent-coord"
-   "$HOME/.local/bin/agent-coord" status
+   export PATH="$HOME/.local/bin:$PATH"
+   agent-coord status
    ```
 
-   Add `$HOME/.local/bin` to the shell `PATH`, or keep using the full path in
-   later commands.
+   Keep that `PATH` entry in the active shell, or keep using the full path in
+   later commands. Add it to the shell profile if future shells should inherit
+   the same setup.
 
 4. If the status command exits non-zero, report private state as `UNKNOWN` and
    use the structured public claim comment fallback. Do not start a
