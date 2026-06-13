@@ -47,6 +47,16 @@ class TimestampedTaggableRecord
   end
 end
 
+class RelationLikeTag
+  def cache_key
+    "posts/query"
+  end
+
+  def to_ary
+    [TaggableRecord.new(cache_key: "posts/1")]
+  end
+end
+
 describe ReactOnRailsPro::Cache::TagIndex, :caching do
   let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
 
@@ -85,6 +95,10 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       record = TaggableRecord.new(cache_key: "posts/42")
 
       expect(described_class.normalize_tags(-> { ["a", record, -> { "b" }] })).to eq(%w[a posts/42 b])
+    end
+
+    it "normalizes cache-key objects that are also array-like as a single tag" do
+      expect(described_class.normalize_tags(RelationLikeTag.new)).to eq(["posts/query"])
     end
 
     it "raises on tags that normalize to blank" do
@@ -292,9 +306,23 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect { ReactOnRailsPro::Cache.register_tags([], "entry/one", nil) }.not_to raise_error
     end
 
+    it "raises on bare blank tags in register_tags" do
+      expect { ReactOnRailsPro::Cache.register_tags(" ", "entry/one", nil) }
+        .to raise_error(ReactOnRailsPro::Error, /blank tag/)
+    end
+
     it "treats blank tags in revalidate_tags as a no-op returning 0" do
       expect(ReactOnRailsPro.revalidate_tag(nil)).to eq(0)
       expect(ReactOnRailsPro.revalidate_tags(nil, "", "   ", [])).to eq(0)
+    end
+
+    it "preserves cache-key objects that are also array-like during revalidation" do
+      relation = RelationLikeTag.new
+      Rails.cache.write("entry/relation", "one")
+      ReactOnRailsPro::Cache.register_tags(relation, "entry/relation", nil)
+
+      expect(ReactOnRailsPro.revalidate_tag(relation)).to eq(1)
+      expect(Rails.cache.read("entry/relation")).to be_nil
     end
 
     it "tolerates a legacy bare-array index payload (no expires_at)" do

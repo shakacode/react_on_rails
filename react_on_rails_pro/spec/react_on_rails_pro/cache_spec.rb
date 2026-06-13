@@ -128,6 +128,38 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(Rails.cache.read(string_cache_key)).to eq(result)
     end
 
+    it "validates cache_tags before writing a cache miss" do
+      string_cache_key =
+        "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/invalid_tag_key"
+
+      expect do
+        described_class.fetch_react_component("MyComponent",
+                                              cache_key: "invalid_tag_key",
+                                              cache_tags: [""],
+                                              cache_options: { expires_in: 3600 }) do
+          "<div>Something</div>"
+        end
+      end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
+
+      expect(Rails.cache.read(string_cache_key)).to be_nil
+    end
+
+    it "validates bare blank cache_tags before writing a cache miss" do
+      string_cache_key =
+        "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/bare_invalid_tag_key"
+
+      expect do
+        described_class.fetch_react_component("MyComponent",
+                                              cache_key: "bare_invalid_tag_key",
+                                              cache_tags: " ",
+                                              cache_options: { expires_in: 3600 }) do
+          "<div>Something</div>"
+        end
+      end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
+
+      expect(Rails.cache.read(string_cache_key)).to be_nil
+    end
+
     it "skips the cache if option :if is false" do
       result = "<div>Something</div>"
       create_component_code = instance_double(TestingCache, call: result)

@@ -39,15 +39,17 @@ module ReactOnRailsPro
       INDEX_TTL_SLACK = 300 # 5 minutes, in seconds
 
       class << self
-        # Records the cache entry key under each normalized tag. Called after
-        # a successful cache write (never on a cache hit).
+        # Records the cache entry key under each normalized tag after a successful cache write (never on a cache hit).
         def register(tags, cache_key, cache_options)
-          normalized = normalize_tags(tags).uniq
-          return if normalized.empty?
+          register_normalized(normalize_tags(tags), cache_key, cache_options)
+        end
+
+        def register_normalized(normalized_tags, cache_key, cache_options)
+          return if normalized_tags.empty?
 
           warn_if_expires_in_missing(cache_options)
           entry_key = normalized_entry_key(cache_key, cache_options)
-          normalized.each { |tag| append_entry_key(tag, entry_key, cache_options) }
+          normalized_tags.uniq.each { |tag| append_entry_key(tag, entry_key, cache_options) }
         end
 
         # Deletes every cache entry recorded under the given tags, then the
@@ -62,7 +64,8 @@ module ReactOnRailsPro
         # (arity 0) returning any accepted form, or an Array of any mix —
         # into a flat Array of String tags.
         def normalize_tags(tags)
-          Array(tags).flat_map { |tag| normalize_tag(tag) }
+          tags = [tags] unless tags.is_a?(Array)
+          tags.flat_map { |tag| normalize_tag(tag) }
         end
 
         def index_key(tag)

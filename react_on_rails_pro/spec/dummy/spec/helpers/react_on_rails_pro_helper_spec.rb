@@ -167,6 +167,17 @@ describe ReactOnRailsProHelper do
           it "is a no-op for tags that were never written" do
             expect(ReactOnRailsPro.revalidate_tag("never-written-tag")).to eq(0)
           end
+
+          it "validates tags before writing a cache miss" do
+            expect do
+              cached_react_component("App", cache_key: "invalid-tagged-key", cache_tags: [""],
+                                            cache_options: { expires_in: 3600 }) do
+                { a: 1 }
+              end
+            end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
+
+            expect(cache_data.keys).not_to include(%r{/App/invalid-tagged-key})
+          end
         end
 
         context "with multiple cache keys" do
@@ -1197,6 +1208,19 @@ describe ReactOnRailsProHelper do
         end
         expect(third_value).to be_a(ReactOnRailsPro::AsyncValue)
         expect(third_value.value).not_to eq(first_html)
+      end
+
+      it "validates tags before writing an async cache miss" do
+        cache_key = "async-invalid-tag-test-#{SecureRandom.hex(4)}"
+        component_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
+
+        expect do
+          cached_async_react_component("App", cache_key:, cache_tags: [""],
+                                              cache_options: { expires_in: 3600 }) do
+            { a: 1 }
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
+        expect(Rails.cache.read(component_cache_key)).to be_nil
       end
 
       it "respects :if option for conditional caching" do

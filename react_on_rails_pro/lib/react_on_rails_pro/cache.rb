@@ -27,11 +27,13 @@ module ReactOnRailsPro
           Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
           cache_options = options[:cache_options]
           cache_hit = true
+          normalized_cache_tags = []
           result = Rails.cache.fetch(cache_key, cache_options) do
             cache_hit = false
+            normalized_cache_tags = normalize_tags(options[:cache_tags])
             yield
           end
-          register_tags(options[:cache_tags], cache_key, cache_options) unless cache_hit
+          register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
           # Pass back the cache key in the results only if the result is a Hash
           if result.is_a?(Hash)
             result[:RORP_CACHE_KEY] = cache_key
@@ -45,25 +47,48 @@ module ReactOnRailsPro
 
       # Registers cache tags for an already-written cache entry so a later
       # ReactOnRailsPro.revalidate_tag can delete it. Call after a successful
-      # cache write (never on a cache hit). No-op when tags are blank.
+      # cache write (never on a cache hit). No-op when tags are nil or [].
       # See ReactOnRailsPro::Cache::TagIndex for the v1 index semantics
       # (best-effort, lossy-OK; correctness bounded by :expires_in).
       def register_tags(tags, cache_key, cache_options)
-        return if tags.blank?
+        register_normalized_tags(normalize_tags(tags), cache_key, cache_options)
+      end
 
-        TagIndex.register(tags, cache_key, cache_options || {})
+      def register_normalized_tags(normalized_tags, cache_key, cache_options)
+        return if normalized_tags.blank?
+
+        TagIndex.register_normalized(normalized_tags, cache_key, cache_options || {})
+      end
+
+      def normalize_tags(tags)
+        return [] if tags.nil? || (tags.is_a?(Array) && tags.empty?)
+
+        TagIndex.normalize_tags(tags)
       end
 
       # Deletes every cached component entry registered under the given tags
       # and clears the tag index entries. Tags accept the same forms as the
       # `cache_tags:` helper option. Blank tags (nil/empty/whitespace) are
-      # ignored, mirroring register_tags; missing/evicted index entries are a
-      # no-op. Returns the number of cache entries deleted.
+      # silently ignored at the revalidation boundary (unlike registration,
+      # which raises on blank tags). Missing/evicted index entries are a no-op.
+      # Returns the number of cache entries deleted.
       def revalidate_tags(*tags)
-        meaningful_tags = tags.flatten.reject(&:blank?)
+        meaningful_tags = meaningful_revalidation_tags(tags)
         return 0 if meaningful_tags.empty?
 
         TagIndex.revalidate(*meaningful_tags)
+      end
+
+      def meaningful_revalidation_tags(tags)
+        tags.flat_map do |tag|
+          if tag.is_a?(Array)
+            meaningful_revalidation_tags(tag)
+          elsif tag.blank?
+            []
+          else
+            [tag]
+          end
+        end
       end
 
       def use_cache?(options)

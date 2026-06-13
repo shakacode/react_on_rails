@@ -25,13 +25,21 @@ module ReactOnRailsPro
 
     def self.register_tags: (untyped tags, untyped cache_key, Hash[Symbol, untyped]? cache_options) -> void
 
+    def self.register_normalized_tags: (Array[String] normalized_tags, untyped cache_key, Hash[Symbol, untyped]? cache_options) -> void
+
+    def self.normalize_tags: (untyped tags) -> Array[String]
+
     def self.revalidate_tags: (*untyped tags) -> Integer
+
+    def self.meaningful_revalidation_tags: (Array[untyped] tags) -> Array[untyped]
 
     class TagIndex
       INDEX_KEY_PREFIX: String
       INDEX_TTL_SLACK: Integer
 
       def self.register: (untyped tags, untyped cache_key, Hash[Symbol, untyped] cache_options) -> void
+
+      def self.register_normalized: (Array[String] normalized_tags, untyped cache_key, Hash[Symbol, untyped] cache_options) -> void
 
       def self.revalidate: (*untyped tags) -> Integer
 
