@@ -13,7 +13,11 @@ Fetch review comments from a GitHub PR in this repository, triage them, and crea
 Apply the Maintainer Attention Contract from `AGENTS.md` for all broad
 code-changing actions. Skill-specific routing:
 
-- Autonomous low-risk optional handling applies to `f`, `f+i`, and `f+o`.
+- Autonomous low-risk optional handling with the behavior-preserving filter
+  applies to `f` and `f+i`.
+- Action `f+o` selects every current `OPTIONAL` item for inline handling without
+  the autonomous defer/decline filter; promote only items that need judgment,
+  change behavior, or expand scope to `DISCUSS`.
 - Action `a` already selects every `MUST-FIX` and `OPTIONAL` item for inline
   handling; it does not create additional autonomous optional scope.
 - Explicit `o <nums>` and `all optional` selections are scoped to selected
@@ -619,9 +623,10 @@ Rules for the summary comment:
 - Always post it as a general PR issue comment, never as a review-thread reply.
 - Include the exact marker `<!-- address-review-summary -->` as the first line of the comment.
 - Summarize `MUST-FIX` and `DISCUSS` items under a `Mattered` section, including whether each item was addressed, deferred, or left pending by user choice.
-- Summarize `OPTIONAL` items under an `Optional` section when they were
-  explicitly handled or autonomously handled/recorded by the
-  GitHub-summary-posting action.
+- Summarize any `OPTIONAL` items that survive triage under an `Optional` section
+  before advancing the summary cutoff. Include whether each item was addressed
+  inline, deferred to tracking, deferred/declined under the attention contract,
+  declined, or still pending with the next requested action.
 - Summarize `SKIPPED` items under a `Skipped` section with short reasons.
 - Mention any deferred-work tracking outcome and follow-up issue URL that was created.
 - Mention whether the run used the default cutoff or the explicit `check all reviews` override.
@@ -640,9 +645,10 @@ trap _cleanup_addr_review EXIT
 # Set SCAN_SCOPE before this block, e.g.:
 #   SCAN_SCOPE="since previous summary at ${REVIEW_CUTOFF_AT}"  # cutoff active
 #   SCAN_SCOPE="full history via check all reviews"              # CHECK_ALL_REVIEWS set
-# Set OPTIONAL_OUTCOMES to bullets when optional items were fixed, explicitly
-# handled, or autonomously deferred/declined.
-# Leave OPTIONAL_OUTCOMES empty to omit the Optional section.
+# Set OPTIONAL_OUTCOMES to bullets for any optional item that survived triage:
+# fixed, explicitly handled, autonomously deferred/declined, declined, deferred
+# to tracking, or still pending. Leave empty only when there were no optional
+# items to carry forward.
 {
   printf '<!-- address-review-summary -->\n'
   printf '## Address-review summary\n\n'

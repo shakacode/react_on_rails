@@ -220,7 +220,8 @@ contract unless a maintainer explicitly narrows the run.
   not alter public APIs, generated output, runtime behavior, validation scope, or
   reviewer obligations. Low-risk means local and mechanically checkable.
   Qualifying examples: typo/comment punctuation, whitespace or trailing comma
-  cleanup, unused import removal, or unambiguous documentation wording.
+  cleanup, type-only or linter-confirmed unused import removal after verifying
+  the imported module has no side effects, or unambiguous documentation wording.
   Disqualifying examples: renaming a public method or constant, changing
   generated content, altering CI or release policy, adding/removing validation,
   or touching another lane's files. If the nit is not worth fixing, record it as
