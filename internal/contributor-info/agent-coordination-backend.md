@@ -9,9 +9,11 @@ rules in [AGENTS.md](../../AGENTS.md), [.agents/skills/pr-batch/SKILL.md](../../
 and [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md).
 
 Until the private repo has tagged releases, pull the private repo and rerun the
-smoke checks below after backend CLI or schema changes. Record the validated
-private backend commit in the PR body or batch handoff, not in this stable
-public pointer.
+smoke checks below after backend CLI or schema changes. The command examples and
+default TTL values in this page were verified against private backend commit
+`ed339f2000d3639eca03298a22d7c600a04e20f7`; update that anchor when the private
+CLI contract changes. The private README and `bin/agent-coord --help` output are
+authoritative if they differ from this public pointer.
 
 ## Setup
 
@@ -36,14 +38,19 @@ non-zero, report private state as `UNKNOWN` and use structured public claim
 comments as an advisory fallback. A successful status check followed by a
 refused `agent-coord claim` is not unavailability; it is a hard stop.
 
+Do not use an unverified private clone for hard-stop gates. If the local private
+CLI or README no longer matches this public pointer and the operator cannot
+validate the current private backend version, report private state as `UNKNOWN`
+and stay in advisory fallback mode until a coordinator validates the backend.
+
 Machine agents must not override a refused private claim on their own. A human
 coordinator may authorize a one-off manual override only after running
 `agent-coord status`, recording why the private state is wrong or degraded in
-the batch handoff as the authoritative incident note, and either repairing the
-private state or posting a structured public claim comment that names the
-override. Mirror the same note to the issue or PR when that is the active lane
-discussion, but do not use an override to bypass a live or stale holder that can
-be contacted.
+the batch handoff as the authoritative incident note, and repairing the private
+state so later machine agents can observe the override through `agent-coord
+status`. Mirror the same note to the issue or PR when that is the active lane
+discussion, but do not use a public claim comment as the machine-readable
+override channel or to bypass a live or stale holder that can be contacted.
 
 Use a temporary local state directory for smoke checks that should not write to
 GitHub. `AGENT_COORD_STATE_ROOT` sets the directory where `agent-coord` reads
@@ -91,6 +98,9 @@ bin/agent-coord status
 Heartbeat liveness is derived from timestamps: `live` before the TTL expires,
 `stale` until 4x TTL, and `dead` after that. The default heartbeat TTL is 15
 minutes, so the default dead threshold is 60 minutes after the heartbeat update.
+Verify these defaults against the private README or CLI help when updating the
+private backend; the values above were current at private commit
+`ed339f2000d3639eca03298a22d7c600a04e20f7`.
 Dependent lanes blocked on a dead-heartbeat takeover should expect up to that
 60-minute window before takeover is safe under default TTL settings.
 The default claim lease TTL is 4 hours, used only as a fallback when heartbeat

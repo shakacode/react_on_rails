@@ -12,22 +12,23 @@ lane.
 
 ## Baseline Topology
 
-The current coordination model assumes these durable host and surface roles.
-Keep specific hardware inventory in the private operations runbook and update
-that inventory when the active machine pool or launch surfaces change:
+The current coordination model uses these role names for a two-machine,
+three-launcher operating window. Keep specific hardware inventory in the private
+operations runbook; this public table is role vocabulary, not a durable list of
+machine names or an enforced scheduler policy:
 
-| Surface or host              | Primary role                  | Notes                                                                                       |
+| Role                         | Primary use                   | Notes                                                                                       |
 | ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
-| Mobile high-memory host      | High-memory mobile batch host | Useful for heavy local context, but treat power, network, and travel as availability risks. |
-| Stable wired host            | Stable wired batch host       | Prefer for long-running desktop sessions and lanes that benefit from steady network/power.  |
+| Mobile high-memory host      | High-memory batch host        | Useful for heavy local context, but treat power, network, and travel as availability risks. |
+| Stable wired host            | Stable batch host             | Prefer for long-running desktop sessions and lanes that benefit from steady network/power.  |
 | Claude Desktop               | Batch kickoff surface         | Best for long-running multi-lane work when Claude Fable should own the hardest items.       |
 | Codex Desktop                | Batch kickoff surface         | Best for long-running Codex batches, local validation, commits, and repo-aware finishing.   |
 | conductor.build              | Single-PR focus and finishing | Best when one PR needs concentrated Claude plus Codex chats on the same PR.                 |
 | shakacode/react_on_rails     | Main gem/npm/Pro monorepo     | Claims use this full repo name in the coordination backend.                                 |
 | shakacode/react_on_rails_rsc | RSC integration/adoption repo | Uses the same coordination backend, with claims namespaced by repo.                         |
 
-Run up to three concurrent batches only when their packages, branches, and risk
-surfaces are intentionally disjoint:
+Prefer no more than three concurrent batches, and only when their packages,
+branches, and risk surfaces are intentionally disjoint:
 
 - one Claude Fable batch for the hardest, most ambiguous, or highest-risk items;
 - two Codex batches for simpler, parallel-friendly, well-scoped items;
@@ -38,6 +39,9 @@ Machine choice is an operational decision, not a policy label. Prefer the wired
 host when continuity matters more than local memory, and prefer the mobile host
 when mobility or local capacity is the better fit. If either machine is likely
 to disappear during a lane, route dependency-sensitive work elsewhere.
+If a coordinator attempts a fourth batch before backend enforcement exists, treat
+that as an explicit human decision: record the package/risk separation in the
+batch handoff and downgrade any uncertain overlap to blocked or deferred work.
 
 ## Launcher Roles
 
