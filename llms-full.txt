@@ -11235,6 +11235,105 @@ If you're using the React on Rails Pro Node Renderer, the renderer process has i
 - [Testing Configuration](./testing-configuration.md) — setting up test environments
 
 ================================================================================
+PAGE: https://reactonrails.com/docs/building-features/performance-tracks-and-profiling
+SOURCE: docs/oss/building-features/performance-tracks-and-profiling.md
+================================================================================
+
+# React Performance Tracks and Profiling
+
+React on Rails apps have three broad performance questions that look similar but need different tool clusters:
+
+1. **What did the browser do?** Use Chrome DevTools Performance recordings with [React Performance Tracks](https://react.dev/reference/dev-tools/react-performance-tracks).
+2. **What did the React on Rails Pro Node Renderer do?** Use the Node inspector and the renderer tracing integrations.
+3. **What did real users experience?** Use field metrics such as [Web Vitals and Real User Monitoring](./web-vitals-and-rum.md).
+
+React Performance Tracks are most useful when you can reproduce a slow interaction locally. They show React scheduler work, component render and effect durations, and, for React Server Components in development builds, server request and Server Component timing. They do not replace production telemetry, but they make the local trace much easier to read than a JavaScript stack alone.
+
+## Choose the right profiling path
+
+| Symptom                                              | Start with                                                                                                                                                     | Why                                                                                                                  |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Slow click, navigation, or hydration in the browser  | Chrome DevTools Performance recording with React Performance Tracks                                                                                            | Shows React scheduler priority, component render cost, effects, network, layout, and paint on one timeline.          |
+| A specific component renders too often               | React Components track, React DevTools, and optional `<Profiler>` boundaries                                                                                   | Shows component render/effect duration and, in development builds, prop changes for selected entries.                |
+| Slow server rendering in the Pro Node Renderer       | [Profiling Server-Side Rendering Code](../../pro/profiling-server-side-rendering-code.md)                                                                      | Attaches Chrome DevTools to the Node process and records CPU work such as bundle upload, VM setup, and render calls. |
+| Renderer breakpoints or request-by-request debugging | [Node Renderer Debugging](./node-renderer/debugging.md)                                                                                                        | Uses `--inspect`, renderer logs, and focused restarts for breakpoint debugging.                                      |
+| Production SSR latency or error correlation          | [Error Reporting and Tracing](./node-renderer/error-reporting-and-tracing.md) and [OpenTelemetry](../../pro/node-renderer.md#observability-with-opentelemetry) | Captures spans and errors from live requests without attaching an inspector to production traffic.                   |
+| Memory growth in the renderer                        | [Memory Leaks](../../pro/js-memory-leaks.md)                                                                                                                   | Uses heap snapshots and worker restart strategy instead of CPU flamegraphs.                                          |
+
+## Record React Performance Tracks
+
+Use this workflow for browser-side interaction, hydration, Suspense, and RSC timing investigations.
+
+1. Run the app in development with React 19.2 or newer when your app supports that React line. For React on Rails Pro RSC apps, keep the React version supported by the current RSC guide and release notes; do not upgrade a generated RSC app only to capture Performance Tracks.
+2. Install and enable the React Developer Tools browser extension when you want the Components track to include the full component tree.
+3. Open Chrome DevTools, then open the **Performance** panel.
+4. Start recording, reload the page or perform the slow interaction, then stop recording.
+5. Inspect the React tracks alongside the normal browser tracks for network, JavaScript, layout, paint, and user timing.
+
+React enables Performance Tracks automatically in development builds. In profiling builds, the Scheduler track is enabled by default. The Components track is limited to subtrees wrapped in `<Profiler>` unless the React DevTools extension is enabled. React's Server Components and Server Requests tracks are development-build only.
+
+## Read the React tracks
+
+The **Scheduler** track explains the priority and phase of React work:
+
+- **Blocking** work usually comes from direct user interactions.
+- **Transition** work comes from non-blocking updates scheduled with `startTransition`.
+- **Suspense** work shows fallback and reveal timing.
+- **Idle** work runs only after higher-priority work is clear.
+
+Within those lanes, look for update, render, commit, and remaining-effect spans. A render followed by repeated updates or long effects often points to avoidable state changes, expensive effects, or missing memoization boundaries.
+
+The **Components** track shows component render and effect durations as flamegraphs. Use it to answer:
+
+- Which component subtree is expensive?
+- Did the cost happen during render, layout effects, or passive effects?
+- Did a selected component receive changed props that explain the render?
+
+The **Server** tracks are relevant when you use React Server Components in development. The Server Requests track visualizes async work that flows into Server Components, and the Server Components tracks show the component work and awaited Promises. Treat these as React-level RSC timing: they do not include every Rails controller, Fastify, network, or renderer worker cost.
+
+## Keep names readable
+
+Profiles are only useful when component and function names survive the build.
+
+- Prefer named functions and named component exports over anonymous inline components.
+- Set `displayName` on components wrapped by helpers such as `memo` or `forwardRef` when the wrapper hides the useful name.
+- Use a development build first. It gives the clearest component names and enables the full React development instrumentation.
+- For a production-like profiling build, alias `react-dom/client` to `react-dom/profiling` at build time as described in the [React Performance Tracks docs](https://react.dev/reference/dev-tools/react-performance-tracks#using-profiling-builds), and preserve function/class names in that temporary build if minification erases useful labels. For Terser-style minifiers, that means profiling-only `keep_fnames` and `keep_classnames` settings or the equivalent setting in your bundler/minifier. Do not turn those knobs on blindly for production, since they can increase bundle size and reduce minification.
+
+## Correlate browser and server work
+
+For a local SSR/RSC investigation, collect one browser trace and one renderer trace for the same scenario:
+
+1. Record the browser interaction with React Performance Tracks.
+2. Record the renderer process with the [SSR profiling workflow](../../pro/profiling-server-side-rendering-code.md).
+3. Compare timestamps, request logs, and component names. The browser trace shows hydration, interaction, Suspense, and paint timing. The renderer trace shows CPU spent before HTML or RSC payloads reach the browser.
+
+If your server-rendered code needs its own named spans in a renderer CPU profile, add temporary User Timing marks around the code under investigation:
+
+```js
+performance.mark('ror:ssr:ProductSummary:start');
+try {
+  // Render or data preparation work under investigation.
+} finally {
+  performance.mark('ror:ssr:ProductSummary:end');
+  performance.measure('ror:ssr:ProductSummary', 'ror:ssr:ProductSummary:start', 'ror:ssr:ProductSummary:end');
+}
+```
+
+In the Pro Node Renderer VM, `performance` is available when `supportModules: true`; otherwise inject it with `additionalContext`. See [Runtime Globals for SSR and RSC](./node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
+
+## Use production telemetry for production questions
+
+Do not attach `--inspect` to production traffic as your primary profiling strategy. It slows the renderer and changes the workload you are trying to measure.
+
+Use production-safe instrumentation instead:
+
+- [Web Vitals and RUM](./web-vitals-and-rum.md) for user-visible browser outcomes such as LCP, INP, CLS, FCP, and TTFB.
+- [OpenTelemetry](../../pro/node-renderer.md#observability-with-opentelemetry) for SSR request spans from the Pro Node Renderer.
+- [Error Reporting and Tracing](./node-renderer/error-reporting-and-tracing.md) for Sentry, Honeybadger, and custom tracing integrations.
+- [Profiling Server-Side Rendering Code](../../pro/profiling-server-side-rendering-code.md) for short, local CPU profiling sessions when you can reproduce the slow path.
+
+================================================================================
 PAGE: https://reactonrails.com/docs/building-features/web-vitals-and-rum
 SOURCE: docs/oss/building-features/web-vitals-and-rum.md
 ================================================================================
@@ -13113,7 +13212,9 @@ SOURCE: docs/oss/building-features/node-renderer/debugging.md
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
 > Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
-Because the renderer communicates over a port to the server, you can start a renderer instance locally in your application and debug it.
+Because the renderer communicates over a port to Rails, you can start a local renderer instance with Node's inspector and debug the server-rendered JavaScript directly.
+
+Use this page for breakpoints, renderer logs, and memory snapshots. For CPU flamegraphs, use [Profiling Server-Side Rendering Code](../../../pro/profiling-server-side-rendering-code.md). For React 19.2 Performance Tracks, hydration traces, and choosing the right profiling tool, use [React Performance Tracks and Profiling](../performance-tracks-and-profiling.md).
 
 ## Monorepo Workflow
 
@@ -13124,11 +13225,22 @@ It is a `pnpm` workspace app and already points at the local packages in this mo
 
 ### Quick start: debugging with the full stack running
 
-If you already have the dummy app running via `bin/dev` (which uses `Procfile.dev`), the node renderer is listening on port 3800 but without `--inspect`. To attach a debugger you first need to restart it with `--inspect` — either stop the renderer process and run `pnpm run node-renderer:debug`, or temporarily add `--inspect` to the `node-renderer:` entry in `Procfile.dev` and `overmind restart node-renderer`. Then:
+If you already have the dummy app running via `bin/dev` (which uses `Procfile.dev`), the node renderer is listening on port 3800 without `--inspect`. To attach a debugger, restart only the renderer with the inspector enabled:
+
+```bash
+cd react_on_rails_pro/spec/dummy
+overmind stop node-renderer
+pnpm run node-renderer:debug
+```
+
+Keep that terminal open while you debug. Then:
 
 1. Open `chrome://inspect` in Chrome and connect to the renderer process.
-2. Use overmind to isolate renderer logs: `overmind connect node-renderer` (Ctrl-B to detach).
-3. After a code change, restart just the renderer: `overmind restart node-renderer`.
+2. Watch renderer logs in that terminal. Keep `bin/dev` visible for Rails logs.
+3. Set breakpoints in the inspector and reload the page that triggers SSR.
+4. After a server-bundle or renderer change, press Ctrl-C and rerun `pnpm run node-renderer:debug`.
+
+If you prefer to keep the renderer under Overmind, temporarily add `--inspect` to the `node-renderer:` entry in `Procfile.dev`, then run `overmind restart node-renderer`.
 
 ### Isolated debugging: manual per-terminal startup
 
@@ -13161,6 +13273,13 @@ Use this when you need full control over the renderer process — different flag
    pnpm --filter react-on-rails-pro-node-renderer run build
    ```
 1. If you are debugging an external app instead of the monorepo dummy app, refresh the installed renderer package using your local package workflow (for example `yalc`, `npm pack`, or a workspace link) before rerunning the renderer.
+
+### Breakpoints vs. profiles
+
+- Use `--inspect` breakpoints when you need to inspect props, globals, module state, or the exact branch taken during SSR.
+- Use [the SSR profiling guide](../../../pro/profiling-server-side-rendering-code.md) when the code is correct but slow.
+- Use [React Performance Tracks and Profiling](../performance-tracks-and-profiling.md) when the slow path includes browser hydration, Suspense, RSC timing, or client interactions.
+- Use [Error Reporting and Tracing](./error-reporting-and-tracing.md) or [OpenTelemetry](../../../pro/node-renderer.md#observability-with-opentelemetry) for production request spans.
 
 ## Debugging Memory Leaks
 
@@ -13203,10 +13322,6 @@ When diagnosing memory leaks in a containerized environment, running the Node re
 - Restart or scale the renderer without restarting Rails
 
 See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common patterns and fixes.
-
-## Debugging using the Node debugger
-
-1. See [this article](https://github.com/shakacode/react_on_rails/issues/1196) on setting up the debugger.
 
 ## Debugging Jest tests
 
@@ -24767,17 +24882,17 @@ PAGE: https://reactonrails.com/docs/pro/profiling-server-side-rendering-code
 SOURCE: docs/pro/profiling-server-side-rendering-code.md
 ================================================================================
 
-# Profiling Server-Side Renderer In RORP
+# Profiling Server-Side Rendering Code
 
-This guide helps you profile the server-side code running in the React on Rails Pro (RORP) Node
-Renderer so you can find slow paths and bottlenecks.
+This guide helps you profile server-side JavaScript running through React on Rails Pro so you can find slow paths and bottlenecks.
+
+Use this page when you need a CPU profile of the Pro Node Renderer or an ExecJS/V8 log. For breakpoints and renderer logs, see [Node Renderer Debugging](../oss/building-features/node-renderer/debugging.md). For React 19.2 Performance Tracks, browser traces, and a profiling decision guide, see [React Performance Tracks and Profiling](../oss/building-features/performance-tracks-and-profiling.md).
 
 The examples below use the sample app in `react_on_rails_pro/spec/dummy`.
 
-**Prerequisite:** This guide assumes you have [Overmind](https://github.com/DarthSim/overmind)
-installed. On macOS, you can install it with `brew install overmind`.
+**Prerequisite:** This guide assumes you have [Overmind](https://github.com/DarthSim/overmind) installed. On macOS, you can install it with `brew install overmind`.
 
-## Profiling Server-Side Code Running On Node Renderer
+## Profiling the Pro Node Renderer
 
 1. Start the sample app with Overmind.
 
@@ -24800,18 +24915,17 @@ installed. On macOS, you can install it with `brew install overmind`.
    RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect renderer/node-renderer.js
    ```
 
-   Keep this terminal open while you profile. If your app usually starts the renderer through a
-   package script, temporarily switch to this direct `node --inspect` command while profiling.
+   Keep this terminal open while you profile. In the repository dummy app you can also use `pnpm run node-renderer:debug`, which runs the same renderer entry point with `--inspect`. In another app, use the same package script with your package manager, such as `npm run node-renderer:debug` or `yarn node-renderer:debug`.
 
-1. Visit `chrome://inspect` on Chrome browser and you should see something like this:
+1. Visit `chrome://inspect` in Chrome. You should see the Node renderer process:
 
    ![Chrome Inspect Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/2a64660f-9381-4bbb-b385-318aa833389d)
 
-1. Click the `inspect` link. This should open a developer tools window. Open the performance tab there
+1. Click the `inspect` link. This opens a dedicated DevTools window for the Node process. Open the **Performance** tab there.
 
    ![Chrome Performance Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/ddf572bd-182f-4911-bb8f-4bafa4ec1034)
 
-1. Click the `record` button
+1. Click the record button.
 
    ![Chrome Performance Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/20848091-d446-4690-988b-09db59ddf9e0)
 
@@ -24819,104 +24933,103 @@ installed. On macOS, you can install it with `brew install overmind`.
 
    ![RORP Dummy App](https://github.com/shakacode/react_on_rails_pro/assets/7099193/8dc1ef3d-62e4-492d-a5b4-c693b7f7e08c)
 
-1. If you get any `Timeout Error` while visiting the page, you may need to increase the `ssr_timeout` in the Ruby on Rails initializer file. **Running node-renderer** using the `--inspect` flag makes it slower. So, you can increase the `ssr_timeout` to `10 seconds` by adding the following line to `config/initializers/react_on_rails_pro.rb` file
+1. If the page raises a `Timeout Error`, temporarily increase `ssr_timeout` in `config/initializers/react_on_rails_pro.rb`. Running the renderer with `--inspect` slows SSR enough that a normal development timeout can be too short.
 
    ```ruby
    config.ssr_timeout = 10
    ```
 
-1. Stop performance recording
+1. Stop performance recording.
 
    ![Running profiler at the performance tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/bc02bbd6-3358-4edf-ba3a-36e11620a096)
 
-1. You should see something like this
+1. Inspect the recorded profile.
 
    ![Recorded Node JS profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/6dc098bb-9f07-49be-9a1f-2149f6712631)
 
 ## Profile Analysis
 
-You can see that there is much work done during the first request because it contains the process of uploading the component bundles and executing the server-side bundle code.
+The first request usually includes extra work because Rails uploads component bundles and the renderer executes the server-side bundle code.
 
 ![Recorded Node JS profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/9ff91973-7190-465b-9750-c99d95f16711)
 
-By zooming into it, you can see the function that’s called `buildVM` (you can also search for it by clicking Ctrl+f and type the function name)
+Zoom into that first request and search for `buildVM` with `Ctrl+F` or `Cmd+F`.
 
 ![NodeJS startup code profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/e16d2028-83a2-43e6-a2ca-c788873dd88c)
 
-All code that runs later inside that code context calls the `runInContext` function. Like this code that calls `renderToString` to render a specific react component
+Code that runs inside that VM context appears under `runInContext`. For example, server-rendered components that use `renderToString` show up below that frame.
 
 ![runInContext function profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/a50f76de-83aa-4af7-8eb2-2941f419f4aa)
 
-To check the profile of other requests, zoom into any of the following spots of work
+For later requests, zoom into another request-sized block of work.
 
 ![Recorded Node JS profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/6bfff9bf-375a-4ba8-817e-81509821e8df)
 
-You should find a call to `serverRenderReactComponent`
+You should find a call to `serverRenderReactComponent`.
 
 ![serverRenderReactComponent function profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/6b2014e2-db85-4ba5-9dfc-2600cc863e98)
 
-**If you can’t find any requests coming to the renderer server, component caching may be the cause.** You can try to disable React on Rails caching by adding the following line to `config/initializers/react_on_rails_pro.rb` file
+**If you cannot find any requests coming to the renderer server, component caching may be the cause.** You can try to disable React on Rails caching by adding the following line to `config/initializers/react_on_rails_pro.rb`:
 
 ```ruby
 config.prerender_caching = false
 ```
 
+If the slow path includes client hydration, browser layout, or React Server Components timing, collect a separate browser trace using [React Performance Tracks and Profiling](../oss/building-features/performance-tracks-and-profiling.md). The Node profile explains renderer CPU time; the browser trace explains what happened after the response reached the browser.
+
 ## Profiling Renderer With High Loads
 
-To see the renderer behavior while there are many requests coming to it, you can use the `ApacheBench (ab)` tool that lets you make many HTTP requests to a specific end points at the same time.
+To see renderer behavior under concurrent local traffic, use `ApacheBench (ab)` to make many HTTP requests to the same endpoint.
 
-1. The `ApacheBench (ab)` is installed on macOS by default. You can install it on Linux by running the following command
+1. `ApacheBench (ab)` is installed on macOS by default. On Linux, install it with:
 
    ```bash
    sudo apt-get install apache2-utils
    ```
 
-1. Do all steps in `Profiling Server-Side Code Running On Node Renderer` section except the step where you open the page in the browser. Instead of opening the page in the browser, let the `ab` tool make many HTTP requests for you by running the following command.
+1. Follow the steps in [Profiling the Pro Node Renderer](#profiling-the-pro-node-renderer), but instead of opening the page in the browser, let `ab` drive the traffic:
 
    ```bash
    ab -n 100 -c 10 http://localhost:3000/
    ```
 
-1. Now, when you open the node-renderer profile, you will see it very busy responding to all requests
+1. The Node profile should show the renderer responding to concurrent requests.
 
    ![Busy renderer profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/2ce69bf2-45ee-4a9d-af33-37e20aed86bc)
 
-1. Then, you can analyze the renderer behavior of each request as stated in `Profile Analysis` section.
+1. Analyze each request-sized block as described in [Profile Analysis](#profile-analysis).
 
-### ExecJS
+## Profiling ExecJS
 
 React on Rails Pro supports profiling with ExecJS starting from version **4.0.0**. You will need to do more work to profile ExecJS if you are using an older version.
 
-If you are using **v4.0.0** or later, you can enable the profiler by setting the `profile_server_rendering_js_code` config by adding the following line to the ReactOnRails initializer.
+If you are using **v4.0.0** or later, enable the profiler by setting `profile_server_rendering_js_code` in the React on Rails Pro initializer:
 
 ```ruby
 config.profile_server_rendering_js_code = true
 ```
 
-Then, run the app you are profiling and open some pages in it.
-You will find many log files with the name `isloate-0x*.log` in the root of your app. You can use the following command to analyze the log files.
+Then, run the app you are profiling and open some pages in it. You will find log files named `isolate-0x*.log` in the root of your app. Use the following command to analyze the log files:
 
 ```bash
 rake react_on_rails_pro:process_v8_logs
 ```
 
-You will find all log files are converted to `profile.v8log.json` file and moved to the **v8_profiles** directory.
+The task converts the logs to `profile.v8log.json` files and moves them to the **v8_profiles** directory.
 
-You can use `speedscope` to analyze the `profile.v8log.json` file. You can install `speedscope` by running the following command
-
-```bash
-npm install -g speedscope
-```
-
-Then, you can analyze the profile by running the following command
+You can analyze the `profile.v8log.json` file with `speedscope`:
 
 ```bash
-speedscope /path/to/profile.v8log.json
+pnpm dlx speedscope /path/to/profile.v8log.json
+# or with npm:
+npx speedscope /path/to/profile.v8log.json
+# or with Yarn:
+yarn dlx speedscope /path/to/profile.v8log.json
 ```
 
 ### Profiling ExecJS with Older Versions of React on Rails Pro
 
-If you are using an older version of React on Rails Pro, you need to do more work to profile the server-side code running in the ExecJS.
+If you are using an older version of React on Rails Pro, you need to configure the ExecJS runtime manually.
 
 If you are using `node` as the runtime for ExecJS, you can enable the profiler by adding the following code on top of the `ReactOnRailsPro` initializer.
 
@@ -24948,12 +25061,15 @@ class CustomRuntime < ExecJS::ExternalRuntime
 end
 ```
 
-After adding the code, you can run the app and open some pages in it. You will find many log files with the name `isloate-0x*.log` in the root of your app. You can use the following command to analyze any log file.
+After adding the code, run the app and open the pages you want to profile. You will find log files named `isolate-0x*.log` in the root of your app. Use these commands to analyze a log:
 
 ```bash
-node --prof-process --preprocess -j isolate*.log > profile.v8log.json
-npm install -g speedscope
-speedscope /path/to/profile.v8log.json
+node --prof-process --preprocess -j isolate-0x*.log > profile.v8log.json
+pnpm dlx speedscope /path/to/profile.v8log.json
+# or with npm:
+npx speedscope /path/to/profile.v8log.json
+# or with Yarn:
+yarn dlx speedscope /path/to/profile.v8log.json
 ```
 
 ================================================================================
