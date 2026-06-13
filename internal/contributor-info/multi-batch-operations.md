@@ -67,10 +67,10 @@ of truth for concurrent batches. Public issue or PR claim comments are human
 hints and recovery aids only.
 
 Use stable agent ids with the base format `<machine>-<tool>-<batch>`, for
-example `mobile-codex-batch2`, `desktop-claude-fable`, or `desktop-conductor-finish`. If one
-batch runs multiple simultaneously-heartbeating lanes on the same machine and
-tool, add a short lane suffix after the batch id so each heartbeat remains
-distinguishable.
+example `mobile-codex-batch2`, `desktop-claude-fable`, or
+`desktop-conductor-finish`; if one batch runs multiple
+simultaneously-heartbeating lanes on the same machine and tool, add a short lane
+suffix after the batch id so each heartbeat remains distinguishable.
 
 Use this lifecycle for every lane:
 

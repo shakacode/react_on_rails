@@ -32,9 +32,11 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      (`agent-coord status` exits 0), acquire an `agent-coord claim` for each
      issue/PR lane before creating that lane's worktree or branch. Machine
      agents must hard-stop when the claim is refused and report the holder plus
-     heartbeat liveness. If `agent-coord status` cannot be checked, report
-     private state as `UNKNOWN` and use structured public claim comments as an
-     advisory fallback.
+     heartbeat liveness. `agent-coord status` is a preflight view; the claim
+     operation is the backend's compare-and-swap gate, so the claim result is the
+     source of truth for races. If `agent-coord status` cannot be checked,
+     report private state as `UNKNOWN` and use structured public claim comments
+     as an advisory fallback.
    - For lanes declared in `batches/<batch-id>.json` with `depends_on`, run
      `agent-coord status` at lane start and before rebase or push. If the lane
      shows unmet `blocked_on` refs, set that lane's heartbeat status to
@@ -446,6 +448,8 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
   lane's worktree or branch. A refused claim is a hard stop for machine agents:
   report the holder, heartbeat liveness, and target instead of creating a
   competing branch.
+  `agent-coord status` is advisory preflight, while `agent-coord claim` is the
+  backend's compare-and-swap gate for concurrent claim races.
 - Refresh heartbeats with `agent-coord heartbeat` at phase transitions: item
   start, branch or PR update, review pass, blocked state, resumed state, and
   done state.

@@ -37,6 +37,8 @@ is missing, auth fails, the private repo cannot be read, or `status` exits
 non-zero, report private state as `UNKNOWN` and use structured public claim
 comments as an advisory fallback. A successful status check followed by a
 refused `agent-coord claim` is not unavailability; it is a hard stop.
+`agent-coord status` is a preflight view; `agent-coord claim` is the backend's
+compare-and-swap gate for concurrent claim races.
 
 Do not use an unverified private clone for hard-stop gates. If the local private
 CLI or README no longer matches this public pointer and the operator cannot
@@ -60,10 +62,11 @@ the default state root documented in the private repo README.
 ```bash
 STATE_ROOT=$(mktemp -d)
 AGENT_COORD_STATE_ROOT="$STATE_ROOT" bin/agent-coord heartbeat \
-  --agent-id worker-3969 \
+  --agent-id smoke-test-0 \
   --repo shakacode/react_on_rails \
-  --target 3969
+  --target 9999
 AGENT_COORD_STATE_ROOT="$STATE_ROOT" bin/agent-coord status
+rm -rf "$STATE_ROOT"
 ```
 
 ## Heartbeats
