@@ -84,10 +84,12 @@ Use stable agent ids that identify machine role, tool, and lane, for example
 
 ```bash
 BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)-coord-layer"
-BATCH_ID_FILE="${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer"
+BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX")
 # Set once at kickoff, include a short batch slug plus a unique suffix, and reuse for this batch.
 printf '%s\n' "$BATCH_ID" > "$BATCH_ID_FILE"
-# In a fresh shell, restore with: BATCH_ID=$(cat "$BATCH_ID_FILE")
+# Record the printed file path in the batch handoff.
+printf 'Batch id file: %s\n' "$BATCH_ID_FILE"
+# In a fresh shell, restore with: BATCH_ID=$(cat /tmp/agent-coord-batch-id.coord-layer.XXXXXX)
 # At batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
 
 bin/agent-coord heartbeat \
