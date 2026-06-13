@@ -18,7 +18,9 @@ require "rails_helper"
 # System tests for the TanStack Router starter
 # (client/app/ror-auto-load-components/TanStackStarterApp.jsx), the runnable
 # example behind docs/oss/building-features/client-side-routing-instant-navigation.md.
-describe "TanStack Router Starter" do
+# rubocop:disable Lint/RedundantCopDisableDirective
+describe "TanStack Router Starter" do # rubocop:disable RSpec/FilePath,RSpec/SpecFilePathFormat
+  # rubocop:enable Lint/RedundantCopDisableDirective
   describe "initial server-side render", :rack_test do
     it "server-renders the initial route HTML" do
       visit "/tanstack_starter"
@@ -132,8 +134,9 @@ describe "TanStack Router Starter" do
         entry.level.match?(/SEVERE|WARNING/) &&
           (entry.message.include?("Switched to client rendering") || entry.message.match?(/hydrat/i))
       end
-      expect(hydration_errors).to be_empty,
-                                  "Expected no hydration errors, got:\n#{hydration_errors.map(&:message).join("\n")}"
+      hydration_error_messages = hydration_errors.map(&:message).join("\n")
+      hydration_failure_message = "Expected no hydration errors, got:\n#{hydration_error_messages}"
+      expect(hydration_errors).to be_empty, hydration_failure_message
     end
   end
 end

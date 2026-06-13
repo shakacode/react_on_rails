@@ -53,7 +53,7 @@ Every URL under `/dashboard` renders the same view, so deep links server-render 
 </div>
 ```
 
-The `data-turbo="false"` boundary keeps Turbo Drive from intercepting link clicks inside the React-routed subtree, so the two routers never compete. Outside this boundary, Turbo keeps working as usual. This guide deliberately makes **no promises about deeper Turbo integration** (shared back/forward handling, scroll restoration across the boundary, Turbo Frames around streamed HTML) — that coexistence track is open in [issue #3485](https://github.com/shakacode/react_on_rails/issues/3485).
+The `data-turbo="false"` boundary keeps Turbo Drive from intercepting link clicks inside the React-routed subtree, so the two routers never compete. Outside this boundary, Turbo keeps working as usual. This guide does not address **deeper Turbo integration** (shared back/forward handling, scroll restoration across the boundary, Turbo Frames around streamed HTML) — that coexistence track is open in [issue #3485](https://github.com/shakacode/react_on_rails/issues/3485).
 
 ### 3. A persistent shell layout with nested routes
 
