@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
   <title>Server Components vs Client Components</title>
-  <desc>Animated split-screen comparison showing what Server Components and Client Components can and cannot do, and the boundary between them. Server Components can use async, heavy imports, and data props. Client Components can use state, effects, event handlers, and browser APIs.</desc>
+  <desc>Split-screen comparison showing what Server Components and Client Components can and cannot do, and the boundary between them. Server Components can use async, heavy imports, and data props. Client Components can use state, effects, event handlers, and browser APIs.</desc>
   <defs>
     <linearGradient id="serverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#22C55E"/><stop offset="100%" stop-color="#16A34A"/>
@@ -50,21 +50,7 @@
         .code-bg { fill: #0F172A; }
       }
 
-      .fade1 { opacity: 0; animation: fadeIn 12s ease 0.3s infinite; }
-      .fade2 { opacity: 0; animation: fadeIn 12s ease 0.8s infinite; }
-      .fade3 { opacity: 0; animation: fadeIn 12s ease 1.3s infinite; }
-      .fade4 { opacity: 0; animation: fadeIn 12s ease 1.8s infinite; }
-      .fade5 { opacity: 0; animation: fadeIn 12s ease 2.3s infinite; }
-      .fade6 { opacity: 0; animation: fadeIn 12s ease 2.8s infinite; }
-      .fade7 { opacity: 0; animation: fadeIn 12s ease 3.3s infinite; }
-
-      @keyframes fadeIn {
-        0% { opacity: 0; } 3% { opacity: 1; } 83% { opacity: 1; } 92% { opacity: 0; } 100% { opacity: 0; }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        * { animation: none !important; opacity: 1 !important; }
-      }
+      .fade1, .fade2, .fade3, .fade4, .fade5, .fade6, .fade7 { opacity: 1; }
     </style>
   </defs>
 
