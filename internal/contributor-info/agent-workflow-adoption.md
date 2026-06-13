@@ -18,6 +18,20 @@ The goal is not to copy React on Rails blindly. The goal is to copy the reusable
 - [.agents/workflows/address-review.md](../../.agents/workflows/address-review.md) - generic non-Claude review-comment triage and fixing workflow.
 - [.agents/skills/autoreview/SKILL.md](../../.agents/skills/autoreview/SKILL.md) - independent review skill used before commits, pushes, PRs, or merge readiness.
 
+### Multi-batch coordination support
+
+Copy these when the target repo participates in concurrent batches, cross-repo
+work, or the shared private coordination backend:
+
+- [internal/contributor-info/agent-coordination-backend.md](agent-coordination-backend.md) - pointer to the private coordination backend, heartbeat rules, and local smoke-check commands.
+- [internal/contributor-info/multi-batch-operations.md](multi-batch-operations.md) - operating model for multiple batches across machines, launch surfaces, and repos.
+
+Adopting repos should join the same private shakacode/agent-coordination repo
+instead of creating per-repo coordination stores. Claims and heartbeats are
+namespaced by full repo name, so one status table can safely include
+`shakacode/react_on_rails` and adopter repos such as
+`shakacode/react_on_rails_rsc`.
+
 ### Claude support
 
 Copy these when the target repo uses Claude Code:
@@ -77,19 +91,26 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - Keep the post-merge audit checks for late reviews, untriaged `Must Fix` comments, missing changelog entries, and cross-PR interactions.
    - Keep the post-merge issue plan gate: Codex and Claude independent audits draft issue entries only; one coordinator dedupes fingerprints and creates issues only after user approval.
 
-5. Customize address-review behavior.
+5. Adopt cross-repo coordination when needed.
+   - Copy `agent-coordination-backend.md` and `multi-batch-operations.md` only if the target repo will participate in multi-machine, multi-batch, or cross-repo work.
+   - Point operators at the same private shakacode/agent-coordination backend used by React on Rails.
+   - Use full repository names in every claim and heartbeat so `owner/repo#123` remains distinct from another repo's `#123`.
+   - Keep private backend schema examples in the private coordination repo. Public/adopter repos should document only operator rules, setup pointers, and safe fallbacks.
+   - Define which packages or directories must not be split across simultaneous batches, then add that routing rule to the target repo's copy of `multi-batch-operations.md`.
+
+6. Customize address-review behavior.
    - Keep the summary marker `<!-- address-review-summary -->` unless the repo already has a different checkpoint marker.
    - Keep the tiers: `MUST-FIX`, `DISCUSS`, `OPTIONAL`, and `SKIPPED`.
    - Keep `autopilot` as an initiation mode and `a` as the post-triage apply action.
    - Update bot assumptions, reviewer names, and any repo-specific reply or resolution rules.
 
-6. Decide whether to adopt CI comment commands.
+7. Decide whether to adopt CI comment commands.
    - If adopted, create the labels the workflow expects, especially `full-ci`.
    - Update the workflow map in `ci-commands.yml` so it dispatches the target repo's actual expensive workflows.
    - Ensure each expensive workflow knows how to react to `full-ci` or manual dispatch.
    - If not adopted, remove `+ci-*` language from `AGENTS.md` and `pr-processing.md`, and replace it with the target repo's real full-CI trigger.
 
-7. Validate with a dry run.
+8. Validate with a dry run.
    - Ask an agent to process a low-risk issue and stop before opening a PR.
    - Ask an agent to run `$pr-batch` with a filter-based request and confirm it stops with an exact target list and `/goal` prompt before spawning workers.
    - Ask an agent to triage one PR review and stop at the quick-action menu.
@@ -109,6 +130,7 @@ Update these before considering the workflow adopted:
 - Manual developer-flow checks for app startup, generated apps, examples, or test fixtures.
 - PR labels such as `full-ci`, `benchmark`, and `ready-to-merge`.
 - Batch coordination labels such as `codex-ready`, `codex-wip`, or `codex-pending-question`, if adopted; otherwise remove or replace those examples and rely on exact lane assignments plus structured claim comments.
+- Cross-repo coordination backend, agent-id format, claim/heartbeat/status lifecycle, and package-routing rules if the repo will share multi-batch operations with other repos.
 - Full-CI trigger mechanism if `+ci-*` is not installed.
 - Follow-up issue title convention. React on Rails uses `Follow-up:`.
 - Documentation boundaries: public docs, internal docs, generated docs, changelog policy.
