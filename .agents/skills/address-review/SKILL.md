@@ -300,13 +300,16 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    instead of promoting it to `DISCUSS`. Route substantive deferred handling
    through the later `DISCUSS` decision path, such as `f+i`, rather than
    inventing a deferred bundle inside plain `f`.
-4. If local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
-5. Reply to each addressed `MUST-FIX` or `OPTIONAL` comment explaining the fix or recorded outcome.
-6. Resolve the corresponding review threads when the issue is handled or explicitly declined.
-7. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
-8. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (prepare a deferred-work bundle), or `r all discuss + resolve`.
-9. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
-10. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to prepare a deferred-work bundle, or `r all discuss + resolve` to decline and close.").
+4. If any autonomous nit fix failed local validation or self-review and the
+   repair is not mechanical and in scope, drop or revert that nit and record the
+   failure rationale before proceeding to commit.
+5. Commit/push-before-reply gate: if local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
+6. Reply to each addressed `MUST-FIX` or `OPTIONAL` comment explaining the fix or recorded outcome.
+7. Resolve the corresponding review threads when the issue is handled or explicitly declined.
+8. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
+9. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (prepare a deferred-work bundle), or `r all discuss + resolve`.
+10. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
+11. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to prepare a deferred-work bundle, or `r all discuss + resolve` to decline and close.").
 
 ### Action `f+i` — Fix, deferred-work bundle, and merge-ready
 
@@ -322,14 +325,14 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    during the initial `f` gate, citing the pushed commit or recorded outcome,
    and resolve threads when the concern is handled or explicitly
    deferred/declined under the attention contract.
-3. Prepare one deferred-work bundle for all `DISCUSS` items, remaining
-   `OPTIONAL` items worth tracking, and non-trivial `SKIPPED` items. Exclude
-   weak "could consider" optional suggestions, trivial duplicates, factually
-   incorrect suggestions, status noise, and already handled autonomous optional
-   nits. For low-risk optional nits excluded from the bundle as not worth
-   tracking, record the deferred/declined rationale and resolve or reply
-   according to the chosen tracking/drop outcome instead of prompting
-   separately. Do not create a GitHub issue yet.
+3. Prepare one deferred-work bundle, in distinct sections, for all `DISCUSS`
+   items, remaining `OPTIONAL` items worth tracking, and non-trivial `SKIPPED`
+   items. Exclude weak "could consider" optional suggestions, trivial duplicates,
+   factually incorrect suggestions, status noise, and already handled autonomous
+   optional nits. For low-risk optional nits excluded from the bundle as not
+   worth tracking, record the deferred/declined rationale and resolve or reply
+   according to the chosen tracking/drop outcome instead of prompting separately.
+   Do not create a GitHub issue yet.
 4. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Do not post replies or resolve bundled items until that tracking/drop outcome is chosen. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
 5. For each deferred item in the chosen tracking outcome, post a reply in the original location referencing that outcome (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists and the conversation is complete. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 6. For trivial `SKIPPED` items that are not included in the bundle (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads only when the user confirms.
@@ -452,7 +455,9 @@ After posting the reply, resolve the review thread when all of the following are
   declined with a clear explanation approved by the user; or autonomously
   deferred/declined as a low-risk behavior-preserving `OPTIONAL` item under the
   Maintainer Attention Contract with the rationale recorded in the reply or
-  summary
+  summary. Autonomous deferred/declined optional replies must explicitly say
+  "Autonomously deferred under the Maintainer Attention Contract; please reopen
+  if this needs maintainer review" before the thread is resolved.
 - The thread is not already resolved
 
 Use GitHub GraphQL to resolve the thread:

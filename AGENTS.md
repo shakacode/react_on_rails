@@ -216,9 +216,10 @@ contract unless a maintainer explicitly narrows the run.
   The final-candidate debounce point is the first point after the agent starts
   the final local validation/review gate for merge readiness or after
   current-head configured review/check gates are already running or complete.
-  Behavior-preserving means wording, formatting, or equivalent cleanup that does
-  not alter public APIs, generated output, runtime behavior, validation scope, or
-  reviewer obligations. Low-risk means local and mechanically checkable.
+  Behavior-preserving means wording, formatting, or mechanical
+  whitespace/punctuation cleanup that does not alter public APIs, generated
+  output, runtime behavior, validation scope, or reviewer obligations. Low-risk
+  means local and mechanically checkable.
   Qualifying examples: typo/comment punctuation, whitespace or trailing comma
   cleanup, type-only or linter-confirmed unused import removal after verifying
   the imported module has no side effects, or unambiguous documentation wording.
@@ -249,7 +250,9 @@ contract unless a maintainer explicitly narrows the run.
   that evidence attached. Use `UNKNOWN` for facts that could not be verified.
 - **Attention metric**: batch closeouts count human decision points per PR, with
   a target of at most one for low-risk lanes. Higher counts are reported as FYI
-  process churn, not hidden in narrative handoffs.
+  process churn, not hidden in narrative handoffs. Counts above target invite a
+  later check on whether smaller lanes, sharper scope, or better batching would
+  reduce future churn; they are not a hard failure by themselves.
 - **Confidence notes**: delegated merge authority exists only when the current
   user or batch goal grants it and the release-mode rules permit it. Before a
   delegated merge, the worker or coordinator writes a confidence note in the
