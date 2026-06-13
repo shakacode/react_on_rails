@@ -358,6 +358,12 @@ describe('useRailsForm', () => {
           mockResponse({ status: 201, body: { message: 'created', redirectTo: 'http://localhost/posts/1' } }),
         )
         .mockResolvedValueOnce(
+          mockResponse({ status: 201, body: { message: 'created', redirectTo: 'posts/1' } }),
+        )
+        .mockResolvedValueOnce(
+          mockResponse({ status: 201, body: { message: 'created', redirectTo: '?saved=1' } }),
+        )
+        .mockResolvedValueOnce(
           mockResponse({ status: 201, body: { message: 'created', redirect_to: 'javascript:alert(1)' } }),
         )
         .mockResolvedValueOnce(
@@ -373,6 +379,18 @@ describe('useRailsForm', () => {
         await expect(result.current.post('/posts')).resolves.toMatchObject({
           ok: true,
           redirectTo: 'http://localhost/posts/1',
+        });
+      });
+      await act(async () => {
+        await expect(result.current.post('/posts')).resolves.toMatchObject({
+          ok: true,
+          redirectTo: '/posts/1',
+        });
+      });
+      await act(async () => {
+        await expect(result.current.post('/posts')).resolves.toMatchObject({
+          ok: true,
+          redirectTo: '/?saved=1',
         });
       });
       await act(async () => {

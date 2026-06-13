@@ -175,7 +175,10 @@ const safeJsonRedirectHint = (redirectTo: string): string | null => {
       (parsedRedirect.protocol === 'http:' || parsedRedirect.protocol === 'https:') &&
       parsedRedirect.origin === currentOrigin
     ) {
-      return normalizedRedirect;
+      if (/^https?:\/\//i.test(normalizedRedirect)) {
+        return parsedRedirect.href;
+      }
+      return `${parsedRedirect.pathname}${parsedRedirect.search}${parsedRedirect.hash}`;
     }
   } catch {
     return null;
