@@ -81,7 +81,8 @@ If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/g
 
 Keep this template aligned with the matching plan-to-goal prompt in
 `.agents/workflows/pr-processing.md`, including the review/audit gate
-paragraphs.
+paragraphs. Keep the `Coordination:` paragraph in sync with the same paragraph
+there.
 
 Use this template when creating the `/goal` text:
 
@@ -103,6 +104,8 @@ private `batches/<batch-id>.json` files for dependency lanes, and check
 readiness, or closeout decisions. Treat non-empty `blocked_on` refs as unmet
 dependencies; if a lane declares `depends_on` but status shows no matching
 private batch state, report dependency state as `UNKNOWN` and stop that lane.
+If status cannot be checked for a declared dependency lane, stop with dependency
+state `UNKNOWN` instead of using advisory fallback for that lane.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 

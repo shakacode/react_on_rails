@@ -111,6 +111,8 @@ Execution rules:
   heartbeat status. If a lane declares `depends_on` but `agent-coord status`
   shows no matching private batch state, treat dependency state as `UNKNOWN` and
   stop to report the missing private batch file.
+  If status cannot be checked for a declared dependency lane, stop with
+  dependency state `UNKNOWN` instead of using advisory fallback for that lane.
 - Final handoff must include links, tests, blockers, next action, and merged/ready/blocked/deferred/UNKNOWN sections.
 ```
 

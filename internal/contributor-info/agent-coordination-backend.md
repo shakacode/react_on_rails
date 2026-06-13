@@ -84,8 +84,8 @@ Use stable agent ids that identify machine role, tool, and lane, for example
 `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
 
 ```bash
-BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M)-coord-layer"
-# Set once at kickoff, include a short batch slug, and reuse for this batch.
+BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$$-coord-layer"
+# Set once at kickoff, include a short batch slug plus a unique suffix, and reuse for this batch.
 printf '%s\n' "$BATCH_ID" > .agent-coord-batch-id
 # In a fresh shell, restore with: BATCH_ID=$(cat .agent-coord-batch-id)
 
@@ -113,9 +113,11 @@ calls.
 
 For dependency-sensitive lanes, coordinators create or update
 `batches/<batch-id>.json` in the private backend before dispatching dependent
-workers. The private backend README and CLI are authoritative for the terminal
-heartbeat statuses that unblock `depends_on` refs. A released claim is audit
-state and does not unblock dependent lanes by itself.
+workers. Use the private backend README and schema files for that JSON layout;
+this public pointer intentionally omits the batch-state schema. The private
+backend README and CLI are authoritative for the terminal heartbeat statuses
+that unblock `depends_on` refs. A released claim is audit state and does not
+unblock dependent lanes by itself.
 
 If a worker lane declares `depends_on` but `agent-coord status` shows no matching
 batch file or lane state, the worker must treat dependency state as `UNKNOWN` and

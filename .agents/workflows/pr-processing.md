@@ -44,7 +44,9 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      independent lane until the dependency reports a backend terminal heartbeat
      status. If the lane declares `depends_on` but `agent-coord status` shows no
      matching private batch state for that lane, treat dependency state as
-     `UNKNOWN` and stop to report the missing private batch file. The current
+     `UNKNOWN` and stop to report the missing private batch file. If the status
+     command itself fails for a declared dependency lane, also stop with
+     dependency state `UNKNOWN` instead of using advisory fallback. The current
      public summary lives in
      [agent-coordination-backend.md](../../internal/contributor-info/agent-coordination-backend.md).
    - Use the current checkout for one focused task.
@@ -304,6 +306,8 @@ private `batches/<batch-id>.json` files for dependency lanes, and check
 readiness, or closeout decisions. Treat non-empty `blocked_on` refs as unmet
 dependencies; if a lane declares `depends_on` but status shows no matching
 private batch state, report dependency state as `UNKNOWN` and stop that lane.
+If status cannot be checked for a declared dependency lane, stop with dependency
+state `UNKNOWN` instead of using advisory fallback for that lane.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -459,7 +463,8 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
 - Use `agent-coord status` before starting dependency-sensitive lanes and before
   rebase, push, readiness, or closeout decisions that depend on another lane.
 - Coordinators create or update private backend `batches/<batch-id>.json` files
-  before dispatching workers for dependency-sensitive lanes; declared
+  before dispatching workers for dependency-sensitive lanes, following the
+  private backend README/schema rather than public examples; declared
   `depends_on` refs are only enforceable after that state exists.
 - For lanes declared in `batches/<batch-id>.json` with `depends_on`, treat
   non-empty `blocked_on` refs as an unmet dependency. The worker should refresh
