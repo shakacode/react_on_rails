@@ -10,7 +10,6 @@
  */
 
 import * as React from 'react';
-import { act as reactDomTestUtilsAct } from 'react-dom/test-utils';
 import { renderComponent } from '../src/ClientRenderer.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import { setRootErrorHandlers, resetRootErrorHandlers } from '../src/rootErrorHandlers.ts';
@@ -24,7 +23,17 @@ declare global {
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-const act = React.act ?? reactDomTestUtilsAct;
+type ReactAct = typeof React.act;
+const reactWithActFallback = React as typeof React & {
+  act?: ReactAct;
+  unstable_act?: ReactAct;
+};
+const act = reactWithActFallback.act ?? reactWithActFallback.unstable_act;
+
+if (typeof act !== 'function') {
+  throw new Error('React act helper is not available.');
+}
+
 const react19It = supportsReact19RootErrorCallbacks ? it : it.skip;
 
 const setupRailsContext = (railsEnv = 'test'): void => {

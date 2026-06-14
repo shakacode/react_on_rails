@@ -308,7 +308,10 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
         document.getElementById(domNodeId) as Element,
         reactElement as ReactElement,
         hydrate,
-        buildRootErrorCallbackOptions({ componentName: name, domNodeId: domNodeId || undefined }, hydrate),
+        buildRootErrorCallbackOptions(
+          { componentName: name || undefined, domNodeId: domNodeId || undefined },
+          hydrate,
+        ),
       );
     },
 
