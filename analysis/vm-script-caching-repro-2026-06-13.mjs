@@ -13,8 +13,8 @@ function median(values) {
   return sorted[middle];
 }
 
-function formatMicroseconds(value, width) {
-  return `${value.toFixed(2).padStart(width)}us`;
+function formatMicroseconds(value, numberWidth) {
+  return `${value.toFixed(2).padStart(numberWidth)}us`;
 }
 
 function formatRatio(value) {
@@ -33,7 +33,7 @@ function measure(callback, samples) {
   for (let index = 0; index < samples; index += 1) {
     const startedAt = performance.now();
     callback(index);
-    timings.push((performance.now() - startedAt) * 1000);
+    timings.push((performance.now() - startedAt) * 1000); // microseconds
   }
 
   return median(timings);
@@ -64,8 +64,15 @@ const cases = [
 const context = vm.createContext({
   values: Array.from({ length: 32 }, (_, index) => index + 1),
 });
-// Sink for compile measurements so new vm.Script() results remain reachable during each sample.
-const measurementSink = {};
+// Sink for compile measurements so new vm.Script() results remain reachable across nearby samples.
+const measurementSink = { scripts: [] };
+
+function retainCompiledScript(script) {
+  measurementSink.scripts.push(script);
+  if (measurementSink.scripts.length > 5) {
+    measurementSink.scripts.shift();
+  }
+}
 
 console.log('vm.Script caching reproduction');
 console.log('==============================');
@@ -97,10 +104,10 @@ for (const benchmarkCase of cases) {
   }, samples);
   // Intentionally after sameSourceRunMedian so this measures a same-source compilation-cache hit.
   const sameSourceCompileMedian = measure(() => {
-    measurementSink.script = new vm.Script(source);
+    retainCompiledScript(new vm.Script(source));
   }, samples);
   const uniqueSourceCompileMedian = measure((index) => {
-    measurementSink.script = new vm.Script(`${source}\n// unique compile ${index}`);
+    retainCompiledScript(new vm.Script(`${source}\n// unique compile ${index}`));
   }, samples);
 
   // Same-source ratio is the renderer-relevant stable-source comparison; unique-source ratio is colder-path contrast.
