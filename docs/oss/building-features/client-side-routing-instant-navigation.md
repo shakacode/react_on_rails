@@ -69,7 +69,7 @@ The `data-turbo="false"` boundary keeps Turbo Drive from intercepting link click
 ```jsx
 'use client';
 
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import {
   Link,
   Outlet,
@@ -120,6 +120,7 @@ const HomePage = () => <h2>Home</h2>;
 const ReportsPage = () => {
   const { reports } = React.useContext(ReportDataContext);
   const [mounted, setMounted] = useState(false);
+  const componentProps = useMemo(() => ({ reports }), [reports]);
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -130,7 +131,7 @@ const ReportsPage = () => {
 
   return (
     <Suspense fallback={<p>Loading reports...</p>}>
-      <RSCRoute componentName="Reports" componentProps={{ reports }} />
+      <RSCRoute componentName="Reports" componentProps={componentProps} />
     </Suspense>
   );
 };
@@ -159,6 +160,9 @@ const DashboardApp = createTanStackRouterRenderFunction(
 
 export default DashboardApp;
 ```
+
+> [!NOTE]
+> Keep `componentProps` references stable for values derived during render, and wrap production `RSCRoute` routes in an app-specific error boundary so payload fetch or render failures degrade to your chosen error UI.
 
 With [auto-bundling](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md), placing this file in your components subdirectory registers it automatically — the generated client pack also sets up the default RSC provider that `RSCRoute` needs in the browser.
 

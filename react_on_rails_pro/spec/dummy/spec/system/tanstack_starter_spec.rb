@@ -107,11 +107,11 @@ describe "TanStack Router Starter" do # rubocop:disable RSpec/FilePath,RSpec/Spe
     before do
       # Flush the Selenium log buffer accumulated by preceding examples so
       # this test only sees logs from its own visit. Reading the buffer clears
-      # it. Isolated runs may reach this hook before the browser has started;
-      # in that case the buffer is empty, so there is nothing to flush.
+      # it. If the driver session disappeared before the flush (for example, a
+      # browser crash or disconnect), there is no browser log buffer to flush.
       page.driver.browser.logs.get(:browser)
     rescue Selenium::WebDriver::Error::NoSuchDriverError
-      # Browser not yet started; buffer is empty, nothing to flush.
+      # Driver session gone; nothing to flush.
     end
 
     it "renders the route by resolving the server component on the client without hydration errors" do

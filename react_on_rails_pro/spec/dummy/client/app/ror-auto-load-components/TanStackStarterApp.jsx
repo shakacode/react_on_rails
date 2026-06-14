@@ -103,6 +103,8 @@ const NotFoundPage = () => <h2 id="tanstack-starter-not-found">Starter page not 
 // Side effect: TanStack Router unmounts this outlet component when leaving the
 // route, so the placeholder can briefly flash on repeat client navigations too.
 // That tradeoff is intentional in this starter.
+// Production apps should wrap the RSCRoute below in an app-specific error boundary
+// for payload fetch or render failures; this starter keeps the runtime path minimal.
 // Keep empty componentProps stable; real props should also use a stable reference.
 const EMPTY_PROPS = {};
 
