@@ -25,6 +25,7 @@ import log from './log.js';
 import type { TracingContext } from './tracing.js';
 import type { RenderResult } from '../worker/vm.js';
 import fileExistsAsync from './fileExistsAsync.js';
+import { remapStackTrace } from '../worker/vmSourceMapSupport.js';
 
 export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
 
@@ -89,6 +90,7 @@ export type RequestInfo = { renderingRequest: string } | { label: string; conten
 export function formatExceptionMessage(request: RequestInfo, error: unknown, context?: string) {
   const label = 'renderingRequest' in request ? 'JS code for rendering request was:' : request.label;
   const content = 'renderingRequest' in request ? request.renderingRequest : request.content;
+  const stack = remapStackTrace((error as Error).stack) ?? (error as Error).stack;
 
   return `${context ? `\nContext:\n${context}\n` : ''}
 ${label}
@@ -98,7 +100,7 @@ EXCEPTION MESSAGE:
 ${(error as Error).message || error}
 
 STACK:
-${(error as Error).stack}`;
+${stack}`;
 }
 
 // https://github.com/fastify/fastify-multipart?tab=readme-ov-file#usage

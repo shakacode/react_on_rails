@@ -55,6 +55,11 @@ interface BundleSourceMapRegistration {
   firstLineColumnOffset: number;
 }
 
+interface LoadedSourceMap {
+  sourceMap: SourceMap;
+  sources: string[];
+}
+
 // Bundles whose stack frames we are willing to resolve. Acts as an allowlist:
 // the resolver is exposed to (untrusted) bundle code inside the VM, so it must
 // not be usable to probe arbitrary filesystem paths.
@@ -63,7 +68,7 @@ const registeredBundles = new Map<string, BundleSourceMapRegistration>();
 // Lazily-populated cache: bundle path -> parsed SourceMap, or null when the
 // bundle has no (usable) source map. Registration invalidates entries so a
 // same-path build retry cannot be poisoned by an earlier failed lookup.
-const sourceMapCache = new Map<string, SourceMap | null>();
+const sourceMapCache = new Map<string, LoadedSourceMap | null>();
 
 /**
  * Name of the host-callback global injected into the VM context. Used by
@@ -146,7 +151,7 @@ function resolveSourceMapPath(bundleFilePath: string, sourceMappingUrl: string):
   return resolvedPath;
 }
 
-function loadSourceMapForBundle(bundleFilePath: string): SourceMap | null {
+function loadSourceMapForBundle(bundleFilePath: string): LoadedSourceMap | null {
   try {
     const bundleContents = fs.readFileSync(bundleFilePath, 'utf8');
     const sourceMappingUrl = extractSourceMappingUrl(bundleContents);
@@ -174,11 +179,26 @@ function loadSourceMapForBundle(bundleFilePath: string): SourceMap | null {
     if (!sourceMapJson) {
       return null;
     }
-    return new SourceMap(JSON.parse(sourceMapJson) as ConstructorParameters<typeof SourceMap>[0]);
+    const payload = JSON.parse(sourceMapJson) as ConstructorParameters<typeof SourceMap>[0];
+    return {
+      sourceMap: new SourceMap(payload),
+      sources: Array.isArray(payload.sources)
+        ? payload.sources.filter((source): source is string => typeof source === 'string')
+        : [],
+    };
   } catch (error) {
     log.debug('Failed to load source map for bundle %s: %s', bundleFilePath, error);
     return null;
   }
+}
+
+function sourceMapForBundle(bundleFilePath: string): LoadedSourceMap | null {
+  let sourceMap = sourceMapCache.get(bundleFilePath);
+  if (sourceMap === undefined) {
+    sourceMap = loadSourceMapForBundle(bundleFilePath);
+    sourceMapCache.set(bundleFilePath, sourceMap);
+  }
+  return sourceMap;
 }
 
 export interface ResolvedSourcePosition {
@@ -219,11 +239,7 @@ export function resolveOriginalPosition(
     return null;
   }
 
-  let sourceMap = sourceMapCache.get(fileName);
-  if (sourceMap === undefined) {
-    sourceMap = loadSourceMapForBundle(fileName);
-    sourceMapCache.set(fileName, sourceMap);
-  }
+  const sourceMap = sourceMapForBundle(fileName);
   if (!sourceMap) {
     return null;
   }
@@ -242,7 +258,7 @@ export function resolveOriginalPosition(
   // only entries from the requested line so frames in webpack runtime glue or
   // other unmapped lines fall back to their bundled location instead of being
   // rewritten to an unrelated original file.
-  const entry = sourceMap.findEntry(lineNumber - 1, zeroBasedColumn) as Partial<SourceMapping>;
+  const entry = sourceMap.sourceMap.findEntry(lineNumber - 1, zeroBasedColumn) as Partial<SourceMapping>;
   if (
     entry.originalSource === undefined ||
     entry.originalLine === undefined ||
@@ -256,6 +272,76 @@ export function resolveOriginalPosition(
     line: entry.originalLine + 1,
     column: (entry.originalColumn ?? 0) + 1,
   };
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Remaps host-formatted stack traces that contain registered bundle locations.
+ *
+ * Errors created by callbacks supplied from the host realm (for example, the
+ * CommonJS `require` function passed into `Module.wrap`) use the host realm's
+ * stack formatter instead of the VM-local `Error.prepareStackTrace` hook. This
+ * pass preserves the same allowlist: only exact registered bundle paths are
+ * remapped.
+ */
+export function remapStackTrace(stack: unknown): string | undefined {
+  if (typeof stack !== 'string') {
+    return undefined;
+  }
+
+  let remappedStack = stack;
+  registeredBundles.forEach((_registration, bundleFilePath) => {
+    const bundleLocationRegex = new RegExp(`${escapeRegExp(bundleFilePath)}:(\\d+):(\\d+)`, 'g');
+    remappedStack = remappedStack.replace(bundleLocationRegex, (match, lineNumber, columnNumber) => {
+      const position = resolveOriginalPosition(bundleFilePath, Number(lineNumber), Number(columnNumber));
+      return position ? `${position.source}:${position.line}:${position.column}` : match;
+    });
+
+    const sourceMap = sourceMapForBundle(bundleFilePath);
+    sourceMap?.sources.forEach((source) => {
+      if (!source.includes('://')) {
+        return;
+      }
+
+      // Some host formatters (notably Jest's) apply the map before this pass
+      // but coerce URL-like sources such as `webpack://app/file.ts` into a path
+      // under the bundle directory: `<bundle-dir>/webpack:/app/file.ts`.
+      // Normalize those back to the original source URL.
+      const hostMappedSourcePath = path.join(path.dirname(bundleFilePath), source.replace('://', ':/'));
+      const hostMappedSourceRegex = new RegExp(`${escapeRegExp(hostMappedSourcePath)}:(\\d+):(\\d+)`, 'g');
+      remappedStack = remappedStack.replace(
+        hostMappedSourceRegex,
+        (_match, lineNumber, columnNumber) => `${source}:${lineNumber}:${columnNumber}`,
+      );
+    });
+  });
+
+  return remappedStack;
+}
+
+export function remapErrorStack(error: unknown) {
+  if (
+    typeof error !== 'object' ||
+    error === null ||
+    typeof (error as { stack?: unknown }).stack !== 'string'
+  ) {
+    return;
+  }
+
+  const stackableError = error as { stack: string };
+  const remappedStack = remapStackTrace(stackableError.stack);
+  if (!remappedStack || remappedStack === stackableError.stack) {
+    return;
+  }
+
+  try {
+    stackableError.stack = remappedStack;
+  } catch {
+    // Keep the original stack if the Error implementation makes it read-only.
+  }
 }
 
 /**

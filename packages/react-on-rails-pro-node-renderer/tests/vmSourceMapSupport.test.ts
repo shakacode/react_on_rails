@@ -94,6 +94,12 @@ function buildThrowingBundleMap(file: string) {
   return { version: 3, file, sources: [ORIGINAL_SOURCE], names: [], mappings };
 }
 
+function buildRequireFailureBundleMap(file: string) {
+  // line 3, column >= 0 -> Boom.ts L2 C3 (1-based)
+  const mappings = ['', '', segment(0, 0, 1, 2)].join(';');
+  return { version: 3, file, sources: [ORIGINAL_SOURCE], names: [], mappings };
+}
+
 /**
  * A single-line bundle to verify the Module.wrap first-line column correction.
  * Contains a decoy mapping at a generated column that only matches when the
@@ -306,6 +312,28 @@ describe('source-mapped stack traces for VM errors', () => {
     }
     expect(thrown).toBeDefined();
     expect(thrown?.message).toBe('eval kaboom');
+    expect(thrown?.stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
+  });
+
+  test('host-realm callback errors thrown during bundle evaluation are remapped', async () => {
+    const bundleSource = [
+      '// generated banner line 1',
+      '// generated banner line 2',
+      "require('missing-host-callback-module');",
+    ].join('\n');
+    const bundlePath = await writeVmBundle(
+      `${bundleSource}\n${inlineSourceMapComment(buildRequireFailureBundleMap('bundle.js'))}\n`,
+    );
+
+    let thrown: Error | undefined;
+    try {
+      await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    } catch (error) {
+      thrown = error as Error;
+    }
+
+    expect(thrown).toBeDefined();
+    expect(thrown?.message).toContain("Cannot find module 'missing-host-callback-module'");
     expect(thrown?.stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
   });
 

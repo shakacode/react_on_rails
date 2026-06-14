@@ -47,6 +47,7 @@ import {
   unregisterBundleForSourceMaps,
   resetSourceMapSupport,
   resolveOriginalPosition,
+  remapErrorStack,
 } from './vmSourceMapSupport.js';
 
 const readFileAsync = promisify(fs.readFile);
@@ -351,6 +352,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
       // the caller, after this catch), and unregistering here would leave
       // bundle-evaluation errors unmapped. The registration is only a small
       // allowlist entry keyed by the bundle path.
+      remapErrorStack(error);
       log.error({ error }, 'Caught Error when creating context in buildVM');
       errorReporter.error(error as Error);
       throw error;
