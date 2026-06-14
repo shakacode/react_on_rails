@@ -330,6 +330,27 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
   });
 
+  test('sourceMappingURL is ignored when realpath fails for reasons other than a missing map', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const bundleDirectory = path.dirname(bundlePath);
+    const lockedDirectoryName = 'locked-map-directory';
+    const lockedDirectoryPath = path.join(bundleDirectory, lockedDirectoryName);
+    const mapFileName = 'permission-denied.map';
+    const sourceMappingUrl = `${lockedDirectoryName}/${mapFileName}`;
+    const mapPath = path.join(lockedDirectoryPath, mapFileName);
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${sourceMappingUrl}\n`);
+    await mkdirAsync(lockedDirectoryPath, { recursive: true });
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(mapFileName)));
+    await fsPromises.chmod(lockedDirectoryPath, 0o000);
+
+    try {
+      registerBundleForSourceMaps(bundlePath);
+      expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
+    } finally {
+      await fsPromises.chmod(lockedDirectoryPath, 0o700);
+    }
+  });
+
   test('non-JSON data URL source maps are ignored', async () => {
     const bundlePath = await writeVmBundle(
       `${buildThrowingBundleSource()}\n${inlineNonJsonDataUrlSourceMapComment(

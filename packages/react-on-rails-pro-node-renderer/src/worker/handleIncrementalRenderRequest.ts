@@ -24,7 +24,7 @@ export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
   add: (chunk: unknown) => Promise<void>;
   handleRequestClosed: () => Promise<void>;
-  executionContext?: ExecutionContext;
+  executionContext: ExecutionContext;
 };
 
 export type UpdateChunk = {

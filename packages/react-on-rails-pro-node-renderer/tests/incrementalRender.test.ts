@@ -86,13 +86,15 @@ describe('incremental render NDJSON endpoint', () => {
   const createMockSink = () => {
     const sinkAdd = jest.fn();
     const handleRequestClosed = jest.fn();
+    const releaseExecutionContext = jest.fn();
 
     const sink: incremental.IncrementalRenderSink = {
       add: sinkAdd,
       handleRequestClosed,
+      executionContext: { release: releaseExecutionContext } as unknown as ExecutionContext,
     };
 
-    return { sink, sinkAdd, handleRequestClosed };
+    return { sink, sinkAdd, handleRequestClosed, releaseExecutionContext };
   };
 
   const createMockResponse = (data = 'mock response'): ResponseResult => ({
@@ -168,7 +170,7 @@ describe('incremental render NDJSON endpoint', () => {
   /**
    * Helper function to create a streaming test setup
    */
-  const createStreamingTestSetup = async ({ withExecutionContext = false } = {}) => {
+  const createStreamingTestSetup = async () => {
     await createVmBundle(TEST_NAME);
 
     const { Readable } = await import('stream');
@@ -185,10 +187,8 @@ describe('incremental render NDJSON endpoint', () => {
     const sink: incremental.IncrementalRenderSink = {
       add: sinkAdd,
       handleRequestClosed,
+      executionContext: { release: releaseExecutionContext } as unknown as ExecutionContext,
     };
-    if (withExecutionContext) {
-      sink.executionContext = { release: releaseExecutionContext } as unknown as ExecutionContext;
-    }
 
     const mockResponse: ResponseResult = {
       status: 200,
@@ -462,7 +462,7 @@ describe('incremental render NDJSON endpoint', () => {
       releaseExecutionContext,
       handleSpy,
       SERVER_BUNDLE_TIMESTAMP,
-    } = await createStreamingTestSetup({ withExecutionContext: true });
+    } = await createStreamingTestSetup();
 
     const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
     const { promise, receivedChunks } = createStreamingResponsePromise(req);
@@ -519,7 +519,7 @@ describe('incremental render NDJSON endpoint', () => {
         }),
       );
     } finally {
-      result.sink?.executionContext?.release();
+      result.sink?.executionContext.release();
     }
   });
 

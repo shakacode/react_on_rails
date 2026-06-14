@@ -87,6 +87,8 @@ function releaseSourceMapRegistration(bundlePath: string) {
   if (currentCount <= 1) {
     activeSourceMapRequestCounts.delete(bundlePath);
     const wasEvicted = evictedSourceMapRegistrations.delete(bundlePath);
+    // Eviction deletes the VM first today; keep the guard so future callers do
+    // not unregister a source map for a live pooled VM.
     if (wasEvicted && !vmContexts.has(bundlePath)) {
       unregisterBundleForSourceMaps(bundlePath);
     }

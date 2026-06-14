@@ -103,6 +103,8 @@ function extractSourceMappingUrl(bundleContents: string): string | undefined {
 
 /**
  * Registers a bundle file so stack frames pointing into it can be remapped.
+ * Pass `bundleContents` when available; omitting it makes the first error-path
+ * lookup synchronously re-read the bundle to find its `sourceMappingURL`.
  */
 export function registerBundleForSourceMaps(
   bundleFilePath: string,
@@ -187,7 +189,17 @@ function resolveSourceMapPath(bundleFilePath: string, sourceMappingUrl: string):
       return undefined;
     }
     return realSourceMapPath;
-  } catch {
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+      log.debug(
+        'Ignoring source map after realpath failed for bundle %s: %s',
+        bundleFilePath,
+        sourceMappingUrl,
+      );
+      return undefined;
+    }
+
     // Missing maps are handled by the caller; returning the lexical path keeps
     // the normal "not found" path quiet while still validating existing symlinks.
     return resolvedPath;
@@ -384,10 +396,10 @@ export function remapStackTrace(stack: unknown): string | undefined {
         return;
       }
 
-      // Some host formatters (notably Jest's) apply the map before this pass
-      // but coerce URL-like sources such as `webpack://app/file.ts` into a path
-      // under the bundle directory: `<bundle-dir>/webpack:/app/file.ts`.
-      // Normalize those back to the original source URL.
+      // Jest applies the map before this pass but coerces URL-like sources such
+      // as `webpack://app/file.ts` into `<bundle-dir>/webpack:/app/file.ts`.
+      // Other host formatters are handled by the bundle-path regex above; a
+      // miss here is benign because the regex simply will not match.
       const hostMappedSourcePath = path.join(path.dirname(bundleFilePath), source.replace('://', ':/'));
       const hostMappedSourceRegex = new RegExp(`${escapeRegExp(hostMappedSourcePath)}:(\\d+):(\\d+)`, 'g');
       remappedStack = remappedStack.replace(
