@@ -529,6 +529,89 @@ describe('incremental render NDJSON endpoint', () => {
     );
   });
 
+  test(
+    'releases incremental execution context when the response stream hangs after request EOF',
+    async () => {
+      const {
+        responseStream,
+        handleRequestClosed,
+        releaseExecutionContext,
+        handleSpy,
+        SERVER_BUNDLE_TIMESTAMP,
+      } = await createStreamingTestSetup();
+
+      const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
+      const receivedChunks: string[] = [];
+      const responseClosed = new Promise<void>((resolve, reject) => {
+        let receivedResponse = false;
+
+        req.once('response', (res) => {
+          receivedResponse = true;
+          res.on('data', (chunk: Buffer) => {
+            receivedChunks.push(chunk.toString());
+          });
+          res.once('aborted', () => resolve());
+          res.once('close', () => resolve());
+          res.once('end', () => resolve());
+          res.once('error', () => resolve());
+        });
+        req.once('error', (error) => {
+          if (receivedResponse) {
+            resolve();
+          } else {
+            reject(error);
+          }
+        });
+      });
+
+      try {
+        req.write(`${JSON.stringify(createInitialObject(SERVER_BUNDLE_TIMESTAMP))}\n`);
+        await waitFor(() => {
+          expect(handleSpy).toHaveBeenCalledTimes(1);
+        });
+
+        responseStream.push('stream started');
+        await waitFor(() => {
+          expect(receivedChunks).toEqual(['stream started']);
+        });
+
+        req.end();
+        await waitFor(() => {
+          expect(handleRequestClosed).toHaveBeenCalledTimes(1);
+        });
+        expect(releaseExecutionContext).not.toHaveBeenCalled();
+
+        await waitFor(
+          () => {
+            expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+          },
+          { timeout: STREAM_CHUNK_TIMEOUT_MS + 5_000 },
+        );
+
+        let responseCloseTimeoutId: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            responseClosed,
+            new Promise<never>((_, reject) => {
+              responseCloseTimeoutId = setTimeout(
+                () => reject(new Error('Timed out waiting for hung response stream to close')),
+                5_000,
+              );
+            }),
+          ]);
+        } finally {
+          if (responseCloseTimeoutId) {
+            clearTimeout(responseCloseTimeoutId);
+          }
+        }
+      } finally {
+        req.destroy();
+        responseStream.destroy();
+      }
+    },
+    STREAM_CHUNK_TIMEOUT_MS + 12_000,
+  );
+
   test('logs onRequestClosedUpdateChunk failures returned from runInVM', async () => {
     await createVmBundle(TEST_NAME);
     const logErrorSpy = jest.spyOn(log, 'error').mockImplementation(() => undefined);

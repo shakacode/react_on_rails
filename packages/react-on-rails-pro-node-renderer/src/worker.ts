@@ -49,7 +49,7 @@ import {
   type IncrementalRenderSink,
 } from './worker/handleIncrementalRenderRequest.js';
 import { handleIncrementalRenderStream } from './worker/handleIncrementalRenderStream.js';
-import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT } from './shared/constants.js';
+import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT, STREAM_CHUNK_TIMEOUT_MS } from './shared/constants.js';
 import {
   badRequestResponseResult,
   errorResponseResult,
@@ -65,6 +65,7 @@ import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
 const INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS = 1_000;
+const INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS = STREAM_CHUNK_TIMEOUT_MS;
 
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
@@ -453,7 +454,17 @@ export default function run(config: Partial<Config>) {
     let incrementalRequestClosed = false;
     let incrementalResponseFinished = false;
     let incrementalExecutionContextReleased = false;
+    let incrementalResponseFinishTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let incrementalTracingContext: TracingContext | undefined;
+
+    const clearIncrementalResponseFinishTimeout = () => {
+      if (!incrementalResponseFinishTimeoutId) {
+        return;
+      }
+
+      clearTimeout(incrementalResponseFinishTimeoutId);
+      incrementalResponseFinishTimeoutId = undefined;
+    };
 
     const releaseIncrementalExecutionContextWhenDone = () => {
       if (
@@ -465,13 +476,43 @@ export default function run(config: Partial<Config>) {
         return;
       }
 
+      clearIncrementalResponseFinishTimeout();
       incrementalExecutionContextReleased = true;
       incrementalSink.executionContext.release();
     };
 
     const markIncrementalResponseFinished = () => {
+      clearIncrementalResponseFinishTimeout();
       incrementalResponseFinished = true;
       releaseIncrementalExecutionContextWhenDone();
+    };
+
+    const scheduleIncrementalResponseFinishTimeout = () => {
+      if (
+        incrementalResponseFinishTimeoutId ||
+        incrementalResponseFinished ||
+        incrementalExecutionContextReleased ||
+        !incrementalSink?.executionContext
+      ) {
+        return;
+      }
+
+      incrementalResponseFinishTimeoutId = setTimeout(() => {
+        incrementalResponseFinishTimeoutId = undefined;
+        if (incrementalResponseFinished || incrementalExecutionContextReleased) {
+          return;
+        }
+
+        log.warn({
+          msg: 'Timed out waiting for incremental render response stream to finish after request closed',
+          timeoutMs: INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS,
+        });
+
+        if (!res.raw.destroyed) {
+          res.raw.destroy();
+        }
+        markIncrementalResponseFinished();
+      }, INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS);
     };
 
     const waitForIncrementalRequestClose = async (closeRequestPromise: Promise<void>, timeoutMs: number) => {
@@ -515,6 +556,7 @@ export default function run(config: Partial<Config>) {
         );
       } finally {
         incrementalRequestClosed = true;
+        scheduleIncrementalResponseFinishTimeout();
         releaseIncrementalExecutionContextWhenDone();
       }
     };
