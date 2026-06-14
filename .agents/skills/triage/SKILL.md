@@ -70,21 +70,25 @@ Only start phase 2 after phase 1 has a verified worklist and capacity state.
      If live occupancy, blocked lanes, reserved lanes, profiles, or inbox config
      cannot be verified, stop phase 2 with a precise blocker instead of deriving
      `N`.
+   - If `N` is 0 after subtracting live, blocked, and reserved lanes, report
+     "all lanes currently occupied" and stop phase 2 instead of inventing groups.
 3. Split the actionable worklist into up to `N` non-empty groups, honoring
    dependencies, file/risk disjointness, package boundaries, release gates, and
    cross-repo sequencing. If actionable work has fewer items than available
    slots, report the idle slots instead of creating empty groups.
 4. Keep dependencies inside a group where practical. When a dependency must cross
    groups, express it as a `depends_on` ref for the private batch state.
-5. Produce one `$pr-batch` goal prompt per group, each under 4000 characters
-   with a stable batch id, lane name, agent id, target list, validation
-   expectations, and coordination hooks.
+5. Produce one `$pr-batch` goal prompt per group, within the per-group prompt
+   size limit defined in `$pr-batch`, with a stable batch id, lane name, agent
+   id, target list, validation expectations, and coordination hooks.
 6. Assign queued-but-not-started work to the matching inbox queue when the
    backend supports queue state. A queue entry is advisory assignment only; each
    worker must still acquire an `agent-coord claim` before editing.
 
-If profiles, inboxes, or queue state are required but unavailable, stop with a
-precise blocker after phase 1. Do not fall back to a fixed number of groups.
+If profiles or inboxes are unavailable, stop with a precise blocker after the
+inventory phase; do not fall back to a fixed number of groups. Queue state is
+advisory; omit the queue summary section and note unavailability when the
+backend does not support it.
 
 ## Output
 
@@ -96,7 +100,8 @@ Return:
   lanes.
 - Capacity source and derived `N`; if unavailable, the exact phase-2 blocker.
 - Up to one non-empty capacity-derived group per available lane, each with a
-  ready `$pr-batch` prompt under 4000 characters; report idle slots separately.
+  ready `$pr-batch` prompt within the `$pr-batch` prompt size limit; report idle
+  slots separately.
 - Per-inbox queue summary when backend queue state is available: next-up items,
   in-flight items, blocked/lost-heartbeat items, and `UNKNOWN` state. If the
   installed backend does not support queue state, omit this section and note that
