@@ -149,6 +149,15 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
+  it('does not throw on the coordinated React 19.2.7 runtime floor', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.2.0-rc.1', '19.2.7'),
+      }),
+    ).not.toThrow();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it('does not rerun after a hard startup error', () => {
     const resolveVersion = resolveVersions('20.0.0');
     expect(() => runRscPeerCompatibilityCheck({ resolveVersion })).toThrow(/Incompatible react-on-rails-rsc/);

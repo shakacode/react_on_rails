@@ -58,17 +58,20 @@ const isAtLeast = (actual: VersionTuple, floor: VersionTuple): boolean => {
 const sameTuple = (left: VersionTuple, right: VersionTuple): boolean =>
   left.every((value, index) => value === right[index]);
 
-const supportedReactRange = ({
-  supportedMajor,
-  supportedMinor,
-  minPatch,
-}: typeof RSC_PEER_SUPPORT.react): string =>
-  `${supportedMajor}.${supportedMinor}.x with patch >= ${supportedMajor}.${supportedMinor}.${minPatch}`;
+const supportedReactRange = ({ supportedMajor, supportedRanges }: typeof RSC_PEER_SUPPORT.react): string =>
+  supportedRanges
+    .map(
+      ({ minor, minPatch }) =>
+        `${supportedMajor}.${minor}.x with patch >= ${supportedMajor}.${minor}.${minPatch}`,
+    )
+    .join(' or ');
 
 const isSupportedReactTuple = (
   [major, minor, patch]: VersionTuple,
-  { supportedMajor, supportedMinor, minPatch }: typeof RSC_PEER_SUPPORT.react,
-): boolean => major === supportedMajor && minor === supportedMinor && patch >= minPatch;
+  { supportedMajor, supportedRanges }: typeof RSC_PEER_SUPPORT.react,
+): boolean =>
+  major === supportedMajor &&
+  supportedRanges.some((range) => minor === range.minor && patch >= range.minPatch);
 
 const proLabel = (proVersion?: string) =>
   proVersion ? `React on Rails Pro (${proVersion})` : 'React on Rails Pro';

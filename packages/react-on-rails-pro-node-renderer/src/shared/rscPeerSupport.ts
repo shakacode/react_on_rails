@@ -24,5 +24,12 @@
 // (the stable 19.0.5 ship/pin is tracked by issue #3634).
 export const RSC_PEER_SUPPORT = {
   reactOnRailsRsc: { recommendedMin: '19.0.2', supportedMajor: 19 },
-  react: { supportedMajor: 19, supportedMinor: 0, minPatch: 4 },
+  react: {
+    supportedMajor: 19,
+    supportedRanges: [
+      { minor: 0, minPatch: 4 },
+      // React 19.2.7 is the coordinated floor for react-on-rails-rsc 19.2.x.
+      { minor: 2, minPatch: 7 },
+    ],
+  },
 } as const;
