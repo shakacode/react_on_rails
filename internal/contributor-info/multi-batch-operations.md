@@ -95,38 +95,42 @@ should use this PR branch or `main` for the current workflow docs.
 
 ## Baseline Topology
 
-The current coordination model uses these role names for a two-machine,
-three-launcher operating window. Keep specific hardware inventory in the private
-operations runbook; this public table is role vocabulary, not a durable list of
-machine names or an enforced scheduler policy:
+The current coordination model uses these role names for multi-machine,
+multi-launcher operating windows. Keep specific hardware inventory, active
+inbox ids, and capacity counts in runtime registration or the private operations
+runbook; this public table is role vocabulary, not a durable list of machine
+names or an enforced scheduler policy:
 
-| Role                         | Primary use                   | Notes                                                                                       |
-| ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
-| Mobile high-memory host      | High-memory batch host        | Useful for heavy local context, but treat power, network, and travel as availability risks. |
-| Stable wired host            | Stable batch host             | Prefer for long-running desktop sessions and lanes that benefit from steady network/power.  |
-| Claude Desktop               | Batch kickoff surface         | Best for long-running multi-lane work when Claude Fable should own the hardest items.       |
-| Codex Desktop                | Batch kickoff surface         | Best for long-running Codex batches, local validation, commits, and repo-aware finishing.   |
-| conductor.build              | Single-PR focus and finishing | Best when one PR needs concentrated Claude plus Codex chats on the same PR.                 |
-| shakacode/react_on_rails     | Main gem/npm/Pro monorepo     | Claims use this full repo name in the coordination backend.                                 |
-| shakacode/react_on_rails_rsc | RSC integration/adoption repo | Uses the same coordination backend, with claims namespaced by repo.                         |
+| Role                         | Primary use                   | Notes                                                                                                |
+| ---------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Mobile high-memory host      | High-memory batch host        | Useful for heavy local context, but treat power, network, and travel as availability risks.          |
+| Stable wired host            | Stable batch host             | Prefer for long-running desktop sessions and lanes that benefit from steady network/power.           |
+| Claude Desktop               | Batch kickoff surface         | Best for long-running multi-lane work when a configured high-capability lane owns the hardest items. |
+| Codex Desktop                | Batch kickoff surface         | Best for long-running Codex batches, local validation, commits, and repo-aware finishing.            |
+| conductor.build              | Single-PR focus and finishing | Best when one PR needs concentrated Claude plus Codex chats on the same PR.                          |
+| shakacode/react_on_rails     | Main gem/npm/Pro monorepo     | Claims use this full repo name in the coordination backend.                                          |
+| shakacode/react_on_rails_rsc | RSC integration/adoption repo | Uses the same coordination backend, with claims namespaced by repo.                                  |
 
-Prefer no more than three concurrent batches as a soft operating limit. A fourth
-batch requires an explicit human decision with package and risk separation
-recorded in the batch handoff. Keep concurrent batch packages, branches, and
-risk surfaces intentionally disjoint:
+Prefer no more concurrent batches than the registered capacity profiles expose
+as available lane slots. A manual override beyond profile-advertised capacity
+requires an explicit human decision with package and risk separation recorded in
+the batch handoff. Keep concurrent batch packages, branches, and risk surfaces
+intentionally disjoint:
 
-- one Claude Fable batch for the hardest, most ambiguous, or highest-risk items;
-- two Codex batches for simpler, parallel-friendly, well-scoped items;
+- route the hardest, most ambiguous, or highest-risk items to a configured
+  high-capability lane;
+- route simpler, parallel-friendly, well-scoped items to remaining available
+  capacity;
 - conductor.build sessions only for focused PR finishing or a single PR that
   needs both Claude and Codex attention.
 
 Machine choice is an operational decision, not a policy label. Prefer the wired
 host when continuity matters more than local memory, and prefer the mobile host
 when mobility or local capacity is the better fit. If either machine is likely
-to disappear during a lane, route dependency-sensitive work elsewhere.
-If a coordinator attempts a fourth batch, treat that as an explicit human
-decision: record the package/risk separation in the batch handoff and downgrade
-any uncertain overlap to blocked or deferred work.
+to disappear during a lane, route dependency-sensitive work elsewhere. If a
+coordinator exceeds registered capacity, record the package/risk separation in
+the batch handoff and downgrade any uncertain overlap to blocked or deferred
+work.
 
 ## Launcher Roles
 
@@ -155,7 +159,7 @@ of truth for concurrent batches. Public issue or PR claim comments are human
 hints and recovery aids only.
 
 Use stable agent ids with the base format `<machine>-<tool>-<batch>`, for
-example `mobile-codex-batch2`, `desktop-claude-fable`, or
+example `mobile-codex-batch2`, `desktop-claude-highcap`, or
 `desktop-conductor-finish`; if one batch runs multiple
 simultaneously-heartbeating lanes on the same machine and tool, add a short lane
 suffix after the batch id so each heartbeat remains distinguishable.
@@ -189,7 +193,25 @@ but do not use a public comment to override a refused private claim.
 The per-batch cap remains in
 [PR Batch Skills Usage](agent-pr-batch-skills.md): 8 items when files or risk
 overlap, or 10 fully independent items. Treat that as a per-batch maximum, not a
-global promise that three batches can safely process 24 to 30 active items.
+global multiplier based on a presumed lane count.
+
+For whole-surface triage, derive the number of implementation groups from
+registered capacity profiles and enabled inboxes. The flow is:
+
+1. Read live `agent-coord` claims and heartbeats.
+2. Read runtime capacity profiles and inbox config from the private backend or
+   a gitignored local config file.
+3. Convert the registered profiles into available lane slots.
+4. Split the actionable worklist into up to one non-empty group per available
+   lane slot, and report idle slots separately when capacity exceeds actionable
+   work.
+5. Write assigned-but-not-started work to the per-inbox queues when the backend
+   supports queue state, or report phase 2 blocked if queue state is required
+   but unavailable.
+
+The queue is not a lock. Workers still claim the repo target before editing, and
+the queue view must reconcile live claims, stale heartbeats, released claims,
+and done heartbeats before recommending the next item for an inbox.
 
 Before launching multiple batches, route by package and risk:
 
@@ -264,6 +286,12 @@ Adopting repos join the same private shakacode/agent-coordination backend.
 Claims and heartbeats are namespaced by full repo name, so
 `shakacode/react_on_rails#3973` and `shakacode/react_on_rails_rsc#3973` are
 different targets even if the issue numbers match.
+
+Use one desktop project or worktree per repository for code edits. A coordinator
+session may read shared `agent-coord` status across repositories, but editing,
+validation, commits, and PR updates should happen from the checkout for the
+target repo. Cross-repo work is coordinated through backend dependencies rather
+than by treating one repo-scoped session as if it owned another repo's files.
 
 Use one status table for the whole operating window. That lets a coordinator see
 that a `react_on_rails_rsc` lane is waiting on a `react_on_rails` package

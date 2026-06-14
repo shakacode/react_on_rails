@@ -3,10 +3,12 @@
 Concurrent agent batches can use the private `shakacode/agent-coordination`
 repository for shared claim, heartbeat, and batch dependency state.
 
-Keep schema definitions and examples in the private backend repository. This
-React on Rails repository should only carry this pointer and the public workflow
-rules in [AGENTS.md](../../AGENTS.md), [.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md),
-and [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md).
+Keep authoritative JSON schema definitions and examples in the private backend
+repository. This React on Rails repository carries the operator-facing contract
+and public workflow rules in [AGENTS.md](../../AGENTS.md),
+[.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md),
+[.agents/skills/triage/SKILL.md](../../.agents/skills/triage/SKILL.md), and
+[.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md).
 
 Until the private repo has tagged releases, use `agent-coord version --json` and
 `agent-coord config show --json` as the CLI contract. The private README,
@@ -78,6 +80,58 @@ AGENT_COORD_STATE_ROOT="$STATE_ROOT" agent-coord status
 rm -rf "$STATE_ROOT"
 ```
 
+## Capacity Profiles And Inbox Queues
+
+Capacity profiles and per-inbox assignment queues are backend-owned runtime
+state. Do not commit operator hardware values, machine names, inbox identities,
+model names, or active group counts to this public repository.
+
+The public contract for a capacity profile is:
+
+- `profile_id`: stable runtime id chosen by the operator or backend.
+- `ram_gb`: positive integer reported by runtime registration or a gitignored
+  local config file.
+- `max_concurrent_batches`: positive integer capacity for simultaneous batch
+  lane ownership from that profile.
+- `inboxes`: operator-configured inbox ids that can receive assigned-but-not-
+  started work for that profile.
+- optional routing metadata, such as capability tags, read from runtime config
+  rather than hardcoded model names.
+
+Profiles must be registered at runtime or loaded from a machine-local ignored
+file such as `.agent-coord.local.json`. The repository ignores that path so
+capacity values can change without source edits. If the backend exposes a
+registration command, use it as the source of truth; otherwise use the private
+backend README and schema files. The installed `agent-coord` 0.1.0 public
+contract exposes claim, heartbeat, status, version, config, doctor, and
+bootstrap commands, but does not yet expose a public capacity-profile or queue
+subcommand.
+
+The per-inbox queue is an assignment view, not a lock. A queued item means "this
+inbox should pick this up next"; the worker must still acquire an
+`agent-coord claim` before editing. Queue entries should reference the target
+repo, issue or PR number, batch id, lane name, planned agent id, and assignment
+status. The inbox "next up" view should hide completed items, show in-flight
+items from live claims and heartbeats, and flag lost-heartbeat items as needing a
+takeover or resume decision instead of silently reassigning them.
+When implemented, `agent-coord status` or `batch-status` should expose this
+per-inbox "next up" view.
+
+Capacity-aware triage derives group count from registered state:
+
+1. Read current capacity profiles and enabled inbox config.
+2. Convert profiles into available lane slots from `max_concurrent_batches`,
+   bounded by enabled inboxes and current live or blocked claims.
+3. Let `N` be the resulting available lane-slot count.
+4. Split work into up to `N` non-empty groups, or stop phase 2 with a blocker
+   when `N` cannot be verified. When actionable work has fewer items than
+   available slots, report the remaining idle slots instead of creating empty
+   groups or prompts.
+
+Do not multiply per-batch item caps by an assumed number of machines. The
+registered profiles and inbox config are the only source for capacity-aware
+group count.
+
 ## Heartbeats
 
 Workers refresh heartbeats at every phase transition:
@@ -90,7 +144,7 @@ Workers refresh heartbeats at every phase transition:
 - done state
 
 Use stable agent ids that identify machine role, tool, and lane, for example
-`mobile-codex-batch2` or `desktop-claude-fable-lane1`.
+`mobile-codex-batch2` or `desktop-claude-highcap-lane1`.
 
 ```bash
 BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4)-coord-layer"
