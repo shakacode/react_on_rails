@@ -84,6 +84,8 @@ function inlineNonJsonDataUrlSourceMapComment(map: object) {
  * `webpack://test-app/components/Boom.ts` line 2, column 3 (1-based).
  */
 const ORIGINAL_SOURCE = 'webpack://test-app/components/Boom.ts';
+const SOURCE_ROOT = 'webpack://source-rooted-app';
+const SOURCE_ROOTED_SOURCE = `${SOURCE_ROOT}/components/Boom.ts`;
 
 function buildThrowingBundleSource() {
   return [
@@ -99,6 +101,14 @@ function buildThrowingBundleMap(file: string) {
   // line 4 mapping: column 0 -> Boom.ts L4 C0
   const mappings = ['', '', `${segment(0, 0, 0, 0)},${segment(16, 0, 1, 2)}`, segment(0, 0, 2, -2)].join(';');
   return { version: 3, file, sources: [ORIGINAL_SOURCE], names: [], mappings };
+}
+
+function buildSourceRootBundleMap(file: string) {
+  return {
+    ...buildThrowingBundleMap(file),
+    sourceRoot: SOURCE_ROOT,
+    sources: ['components/Boom.ts'],
+  };
 }
 
 function buildRequireFailureBundleMap(file: string) {
@@ -252,6 +262,26 @@ describe('source-mapped stack traces for VM errors', () => {
       line: 4,
       column: 1,
     });
+  });
+
+  test('sourceRoot is applied to relative source entries', async () => {
+    const bundlePath = await writeVmBundle(
+      `${buildThrowingBundleSource()}\n${inlineSourceMapComment(buildSourceRootBundleMap('bundle.js'))}\n`,
+    );
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    expect(resolveOriginalPosition(bundlePath, 3, 17)).toEqual({
+      source: SOURCE_ROOTED_SOURCE,
+      line: 2,
+      column: 3,
+    });
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`${SOURCE_ROOTED_SOURCE}:2:3`);
   });
 
   test('registered inline sourceMappingURL avoids re-reading the bundle on first lookup', async () => {

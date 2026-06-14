@@ -64,6 +64,7 @@ interface BundleSourceMapRegistration {
 interface LoadedSourceMap {
   sourceMap: SourceMap;
   sources: string[];
+  sourceRoot?: string;
 }
 
 // Bundles whose stack frames we are willing to resolve. Acts as an allowlist:
@@ -229,6 +230,22 @@ function createSourceMap(payload: ConstructorParameters<typeof SourceMap>[0]): S
   return null;
 }
 
+function hasUriScheme(value: string) {
+  return /^[A-Za-z][A-Za-z\d+.-]*:/.test(value);
+}
+
+function applySourceRoot(sourceRoot: string | undefined, source: string) {
+  if (!sourceRoot || hasUriScheme(source) || path.isAbsolute(source)) {
+    return source;
+  }
+
+  if (sourceRoot.endsWith('/') || source.startsWith('/')) {
+    return `${sourceRoot}${source}`;
+  }
+
+  return `${sourceRoot}/${source}`;
+}
+
 function loadSourceMapForBundle(
   bundleFilePath: string,
   registration: BundleSourceMapRegistration,
@@ -267,10 +284,14 @@ function loadSourceMapForBundle(
     if (!sourceMap) {
       return null;
     }
+    const sourceRoot = typeof payload.sourceRoot === 'string' ? payload.sourceRoot : undefined;
     return {
       sourceMap,
+      sourceRoot,
       sources: Array.isArray(payload.sources)
-        ? payload.sources.filter((source): source is string => typeof source === 'string')
+        ? payload.sources
+            .filter((source): source is string => typeof source === 'string')
+            .map((source) => applySourceRoot(sourceRoot, source))
         : [],
     };
   } catch (error) {
@@ -356,7 +377,7 @@ export function resolveOriginalPosition(
   }
 
   return {
-    source: entry.originalSource,
+    source: applySourceRoot(sourceMap.sourceRoot, entry.originalSource),
     line: entry.originalLine + 1,
     // Source Map v3 allows line-only mappings. Report column 1 rather than
     // dropping the remap; start-of-line is still more useful than bundle glue.
