@@ -59,6 +59,8 @@ Do not label AI/code-analysis-only findings as high priority without verified us
 
 ## Batch Planning
 
+For broad issue audits or all-open-issues review, use `.agents/skills/plan-issue-triage/SKILL.md` first to generate a review-only prompt. In that context, GitHub issue comments may be allowed while code, branch, issue, PR, label, milestone, assignee, title/body, and issue-state changes remain disallowed unless explicitly approved.
+
 Before adding issues to a PR batch, classify each target as:
 
 - implementation PR;
