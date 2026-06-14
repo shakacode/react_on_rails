@@ -94,7 +94,7 @@ containers:
         port: 3800
       initialDelaySeconds: 10
       periodSeconds: 5
-      failureThreshold: 6
+      failureThreshold: 12 # tune to your cold-start time; 10 + (5 * 12) = 70 s total
       timeoutSeconds: 1
     # Readiness: shallow TCP check. Do NOT gate readiness on /ready unless you
     # also pre-warm the renderer — see "Gating traffic on /ready" below.
@@ -189,6 +189,9 @@ fail the task before the first render compiles a bundle:
 }
 ```
 
+Tune `startPeriod` to match the observed image pull, boot, and first-render latency for your app. Larger bundles or
+slower registries may need 60 seconds or more.
+
 If you intentionally warm the renderer before `startPeriod` expires and want ECS to replace a task that cannot serve
 compiled bundles, change the path to `/ready`.
 
@@ -204,11 +207,10 @@ services:
     build: .
     command: node renderer/node-renderer.js
     environment:
-      RENDERER_HOST: '0.0.0.0'
       RENDERER_ENABLE_HEALTH_ENDPOINTS: 'true'
     healthcheck:
       test:
-        ['CMD', 'curl', '-sf', '--max-time', '2', '--http2-prior-knowledge', 'http://localhost:3800/ready']
+        ['CMD', 'curl', '-sf', '--max-time', '3', '--http2-prior-knowledge', 'http://localhost:3800/health']
       interval: 5s
       timeout: 3s
       retries: 5

@@ -48,7 +48,7 @@ available default ENV values if you wire them into your own launch script.
    Because these functions are valid client-side, they are ignored on server-side rendering without errors or warnings.
    Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
-1. **enableHealthEndpoints** - (default: `truthy(env.RENDERER_ENABLE_HEALTH_ENDPOINTS)`; disabled when unset) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
+1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS=true` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
 
 Deprecated options:
 
@@ -425,10 +425,10 @@ Keep the three probe types distinct:
 
 - **Startup** answers whether the renderer has finished booting. Separate it from readiness and liveness so slow startup
   does not cause premature restarts or block traffic.
-- **Readiness** answers whether the renderer should receive new render requests. Prefer the built-in `/ready` endpoint
-  (see [Health and Readiness Endpoints](./health-checks.md), enabled with `enableHealthEndpoints`), or use a custom
-  `/health` route from [Adding a Health Check Endpoint](#adding-a-health-check-endpoint), or the built-in `/info`
-  endpoint for a shallow process check.
+- **Readiness** answers whether the renderer should receive new render requests. Use the built-in `/ready` endpoint
+  only when an out-of-band warm-up render can compile a bundle before probe-gated traffic begins. Without that warm-up
+  path, prefer a shallow TCP readiness check or the built-in `/info` endpoint, and use `/ready` for monitoring or
+  post-deploy verification. See [Health and Readiness Endpoints](./health-checks.md) for the full cold-start semantics.
 - **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer. Prefer
   `tcpSocket` as the default so transient CPU or GC pauses do not restart an otherwise recoverable renderer; use an
   h2c-aware `exec` check only when you intentionally need stricter hung-process detection.
