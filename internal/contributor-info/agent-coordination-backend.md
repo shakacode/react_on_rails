@@ -73,58 +73,63 @@ the JSON commands parsed successfully. Do not paste raw `agent-coord config
 show --json` output, private defaults, liveness thresholds, or terminal-status
 details into public PRs.
 
-The preflight exports `AGENT_COORD_BIN` in the calling shell before entering the
-subshell that runs the checks. Keep that exported value for the operational
-snippets below so the probed private checkout and later heartbeat/claim commands
-use the same binary.
+The preflight exports `AGENT_COORD_BIN` in the calling shell only after the
+private checkout and command contract probes pass. Keep that exported value for
+the operational snippets below so the probed private checkout and later
+heartbeat/claim commands use the same binary.
 
 ```bash
 if test -z "${AGENT_COORD_REPO:-}"; then
   echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
   exit 1
+elif test ! -x "$AGENT_COORD_REPO/bin/agent-coord"; then
+  echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
+  exit 1
 fi
 
-AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord"
-export AGENT_COORD_BIN
-
-(
+if (
   set -eu -o pipefail
 
   command -v jq >/dev/null 2>&1 || { echo "jq is required for this preflight" >&2; exit 1; }
 
   require_json_output() {
-    label="$1"
-    output="$2"
+    local label="$1"
+    local output="$2"
 
     if ! printf '%s' "$output" | grep -q '[^[:space:]]'; then
       echo "$label produced no JSON output" >&2
       return 1
     fi
 
-    printf '%s\n' "$output" | jq -e 'type' >/dev/null
+    if ! printf '%s\n' "$output" | jq -e 'type == "object"' >/dev/null; then
+      echo "$label did not produce a JSON object" >&2
+      return 1
+    fi
   }
 
-  if test ! -x "$AGENT_COORD_BIN"; then
-    echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
-    exit 1
-  else
-    git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
-      git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
-      "$AGENT_COORD_BIN" --help &&
-      AGENT_COORD_VERSION_JSON="$("$AGENT_COORD_BIN" version --json)" &&
-      require_json_output "agent-coord version --json" "$AGENT_COORD_VERSION_JSON" &&
-      # Suppress stderr intentionally: private config details must not appear in public PRs.
-      # Failures and blank stdout are still caught; record the exit code in PR evidence.
-      # For private diagnostics, rerun without 2>/dev/null in a private terminal.
-      AGENT_COORD_CONFIG_JSON="$("$AGENT_COORD_BIN" config show --json 2>/dev/null)" &&
-      require_json_output "agent-coord config show --json" "$AGENT_COORD_CONFIG_JSON" &&
-      "$AGENT_COORD_BIN" doctor &&
-      "$AGENT_COORD_BIN" status &&
-      "$AGENT_COORD_BIN" claim --help &&
-      "$AGENT_COORD_BIN" heartbeat --help &&
-      "$AGENT_COORD_BIN" release --help
-  fi
-)
+  AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord"
+  git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
+    git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
+    "$AGENT_COORD_BIN" --help &&
+    AGENT_COORD_VERSION_JSON="$("$AGENT_COORD_BIN" version --json)" &&
+    require_json_output "agent-coord version --json" "$AGENT_COORD_VERSION_JSON" &&
+    # Suppress stderr intentionally: private config details must not appear in public PRs.
+    # Non-zero exits still stop the preflight; blank stdout is caught only after a zero exit.
+    # For private diagnostics, rerun without 2>/dev/null in a private terminal.
+    AGENT_COORD_CONFIG_JSON="$("$AGENT_COORD_BIN" config show --json 2>/dev/null)" &&
+    require_json_output "agent-coord config show --json" "$AGENT_COORD_CONFIG_JSON" &&
+    "$AGENT_COORD_BIN" doctor &&
+    "$AGENT_COORD_BIN" status &&
+    "$AGENT_COORD_BIN" claim --help &&
+    "$AGENT_COORD_BIN" heartbeat --help &&
+    "$AGENT_COORD_BIN" release --help
+); then
+  AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord"
+  export AGENT_COORD_BIN
+  printf 'AGENT_COORD_BIN=%s\n' "$AGENT_COORD_BIN"
+else
+  exit 1
+fi
 ```
 
 Do not paste private schemas, default TTLs, dead-threshold formulas,
@@ -132,6 +137,7 @@ terminal-status lists, or full help output into this public repo. Public PR
 evidence should record the private tag or commit, the commands run, and whether
 each command exited 0. When tag state is uncertain, treat the commit SHA from
 `git rev-parse HEAD` as the authoritative evidence.
+
 For operational snippets below, set `AGENT_COORD_BIN` to the same validated
 binary; if relying on `PATH`, record `command -v agent-coord` and
 `agent-coord version --json` as part of the public-safe evidence.
