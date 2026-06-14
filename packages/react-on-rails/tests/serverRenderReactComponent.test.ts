@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Script } from 'node:vm';
 import serverRenderReactComponent from '../src/serverRenderReactComponent.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import type { RenderParams, RailsContext, RenderFunction, RenderFunctionResult } from '../src/types/index.ts';
@@ -97,13 +98,19 @@ describe('serverRenderReactComponent', () => {
     expect(hasErrors).toBeTruthy();
   });
 
-  it('applies the optional Pro VM stack remapper to rendering error metadata', () => {
+  it('applies the optional Pro VM stack remapper to error HTML and metadata', () => {
     (globalThis as GlobalWithSourceMappedStackRemapper)[SOURCE_MAPPED_STACK_REMAPPER_KEY] = (stack) =>
       typeof stack === 'string' ? stack.replace('Error: XYZ', 'Error: remapped XYZ') : undefined;
+    const crossRealmError: unknown = new Script(`
+      const error = new Error("XYZ");
+      error.stack = "Error: XYZ\\n    at hostCallback (/tmp/bundle.js:3:1)";
+      error;
+    `).runInNewContext();
 
-    const X2: React.FC = () => {
-      throw new Error('XYZ');
+    const X2: RenderFunction = () => {
+      throw crossRealmError;
     };
+    X2.renderFunction = true;
 
     ComponentRegistry.register({ X2 });
 
@@ -115,8 +122,10 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: false,
     });
     assertIsString(renderResult);
-    const { renderingError } = parseLengthPrefixed(renderResult);
+    const { html, renderingError } = parseLengthPrefixed(renderResult);
 
+    assertIsString(html);
+    expect(html).toContain('Error: remapped XYZ');
     expect(renderingError).toMatchObject({ message: 'XYZ' });
     expect((renderingError as { stack?: string }).stack).toContain('Error: remapped XYZ');
   });
