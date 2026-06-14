@@ -65,7 +65,7 @@ const ActivityTabSwitcher = ({ initialTab = 'profile' }: ActivityTabSwitcherProp
   return (
     <div className="activity-tab-switcher">
       <h3>React 19.2 &lt;Activity&gt; tab switcher</h3>
-      <div role="tablist">
+      <div role="tablist" aria-label="Activity demo tabs">
         {TAB_NAMES.map((tab) => (
           <button
             key={tab}
