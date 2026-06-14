@@ -161,7 +161,7 @@ if (
       return 1
     }
 
-    git -C "$AGENT_COORD_REPO" fetch --quiet --tags origin || {
+    git -C "$AGENT_COORD_REPO" fetch --quiet --prune --tags origin || {
       echo "could not fetch private agent-coordination origin; backend SHA reachability is UNKNOWN" >&2
       return 1
     }
