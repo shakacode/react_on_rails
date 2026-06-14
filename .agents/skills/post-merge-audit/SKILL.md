@@ -21,6 +21,14 @@ Use `.agents/workflows/post-merge-audit.md` for reusable copy-paste prompts, inc
 
 Start by resolving the exact audit range:
 
+When this repository includes `.agents/skills/post-merge-audit/bin/post-merge-audit-scope`, run it first:
+
+```bash
+.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json
+```
+
+The resolver is read-only. It resolves the default release-candidate base, the head SHA, squash-aware merged PRs, prior `post-merge-audit-finding` fingerprints, carry-over PRs, and the remaining `to_audit` list. Use its output as the initial scope table, then verify assumptions before deep audit.
+
 1. Base: the user-supplied tag/commit, or the most recent release candidate tag when the user says "since the last RC".
 2. Head: usually `origin/main` or the current release branch.
 3. Merged PR list: every PR merged between base and head.
