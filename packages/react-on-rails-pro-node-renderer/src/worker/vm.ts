@@ -162,6 +162,14 @@ const extendContext = (contextObject: vm.Context, additionalContext: Record<stri
   Object.assign(contextObject, additionalContext);
 };
 
+const readPrepareStackTraceHook = (context: vm.Context): unknown => {
+  try {
+    return vm.runInContext('typeof Error === "undefined" ? undefined : Error.prepareStackTrace', context);
+  } catch {
+    return undefined;
+  }
+};
+
 // Helper function to manage VM pool size
 function manageVMPoolSize() {
   const { maxVMPoolSize } = getConfig();
@@ -338,6 +346,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
       // VM. Must run before the bundle is evaluated so the bundle's own error
       // handling (e.g. react-on-rails `handleError`) sees remapped stacks.
       vm.runInContext(PREPARE_STACK_TRACE_INSTALL_SCRIPT, context);
+      const installedPrepareStackTrace = readPrepareStackTraceHook(context);
 
       // If node-specific code is provided then it must be wrapped into a module wrapper. The bundle
       // may need the `require` function, which is not available when running in vm unless passed in.
@@ -353,6 +362,12 @@ async function buildVM(filePath: string): Promise<VMContext> {
         );
       } else {
         vm.runInContext(bundleContents, context, { filename: filePath });
+      }
+      if (readPrepareStackTraceHook(context) !== installedPrepareStackTrace) {
+        log.warn(
+          'Bundle replaced Error.prepareStackTrace; source-mapped stack traces are disabled for bundle %s',
+          filePath,
+        );
       }
 
       // Only now, after VM is fully initialized, store the context
@@ -483,18 +498,29 @@ export async function buildExecutionContext(
     retainedSourceMapRegistrations.add(sourceMapRegistration);
   };
   const mapBundleFilePathToVMContext = new Map<string, VMContext>();
-  try {
-    await Promise.all(
-      bundlePaths.map(async (bundleFilePath) => {
+  let buildRejected = false;
+  let firstBuildRejection: unknown;
+  // Wait for every parallel build callback before releasing retained source-map
+  // registrations; otherwise a sibling build can retain after an early rejection.
+  await Promise.allSettled(
+    bundlePaths.map(async (bundleFilePath) => {
+      try {
         const vmContext = await getOrBuildVMContext(bundleFilePath, buildVmsIfNeeded);
         retainSourceMapRegistrationOnce(vmContext.sourceMapRegistration);
         vmContext.lastUsed = Date.now();
         mapBundleFilePathToVMContext.set(bundleFilePath, vmContext);
-      }),
-    );
-  } catch (error) {
+      } catch (error) {
+        if (!buildRejected) {
+          buildRejected = true;
+          firstBuildRejection = error;
+        }
+        throw error;
+      }
+    }),
+  );
+  if (buildRejected) {
     retainedSourceMapRegistrations.forEach(releaseSourceMapRegistration);
-    throw error;
+    throw firstBuildRejection;
   }
 
   // This Map persists for the lifetime of this ExecutionContext (one HTTP request).

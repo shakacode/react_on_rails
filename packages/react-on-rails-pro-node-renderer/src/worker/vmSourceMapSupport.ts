@@ -148,6 +148,8 @@ function sourceMapFileNameFromUrl(bundleFilePath: string, sourceMappingUrl: stri
     sourceMappingUrl.includes('\\') ||
     sourceMappingUrl.includes('?') ||
     sourceMappingUrl.includes('#') ||
+    sourceMappingUrl === '.' ||
+    sourceMappingUrl === '..' ||
     path.basename(sourceMappingUrl) !== sourceMappingUrl
   ) {
     log.debug(
@@ -217,7 +219,9 @@ function resolveReadableSourceMapPath(bundleFilePath: string, candidatePath: str
       // bundle directory. The sourceMappingURL still has to be a plain file name.
       // SECURITY: that bundle directory must not be writable by untrusted
       // parties; an attacker-controlled symlink would let the loader read any
-      // file the renderer process can access.
+      // file the renderer process can access. The symlink path is returned for
+      // read-time compatibility with trusted Pro pre-stage tooling, so this does
+      // not defend against TOCTOU changes by an untrusted bundle-directory writer.
       if (linkStats.isSymbolicLink() && targetStats.isFile()) {
         return resolvedPath;
       }
@@ -570,11 +574,11 @@ function remapStackTraceForRegistration(stack: string, registration: BundleSourc
       return;
     }
 
-    // Jest only: it applies the map before this pass but coerces URL-like
-    // sources such as `webpack://app/file.ts` into
-    // `<bundle-dir>/webpack:/app/file.ts`.
-    // Other host formatters are handled by the bundle-path regex above; a
-    // miss here is benign because the regex simply will not match.
+    // Host formatter URL normalization: Jest applies the map before this pass
+    // but coerces URL-like sources such as `webpack://app/file.ts` into
+    // `<bundle-dir>/webpack:/app/file.ts`. Production V8 host formatting keeps
+    // bundle paths and is handled by the bundle-path regex above; a miss here is
+    // benign because this regex simply will not match.
     const hostMappedSourcePath = path.join(path.dirname(bundleFilePath), source.replace(/:\/\//g, ':/'));
     const hostMappedSourceRegex = new RegExp(`${escapeRegExp(hostMappedSourcePath)}:(\\d+):(\\d+)`, 'g');
     remappedStack = remappedStack.replace(

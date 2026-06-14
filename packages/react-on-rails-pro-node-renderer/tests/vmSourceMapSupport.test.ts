@@ -17,10 +17,11 @@ import path from 'path';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import vm from 'vm';
-import { mkdirAsync, serverBundleCachePath, vmBundlePath, resetForTest } from './helper';
+import { mkdirAsync, serverBundleCachePath, vmBundlePath, resetForTest, waitFor } from './helper';
 import { buildExecutionContext, hasVMContextForBundle, removeVM, resetVM } from '../src/worker/vm';
 import { buildConfig } from '../src/shared/configBuilder';
 import { isErrorRenderResult } from '../src/shared/utils';
+import log from '../src/shared/log';
 import {
   PREPARE_STACK_TRACE_INSTALL_SCRIPT,
   registerBundleForSourceMaps,
@@ -220,6 +221,36 @@ describe('source-mapped stack traces for VM errors', () => {
     );
     expect(typeof result).toBe('string');
     expect(result).toContain(`at boom (${ORIGINAL_SOURCE}:2:3)`);
+  });
+
+  test('warns when bundle code replaces the installed Error.prepareStackTrace hook', async () => {
+    const bundlePath = await writeVmBundle('Error.prepareStackTrace = function () { return "custom"; };');
+    const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+    try {
+      await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Bundle replaced Error.prepareStackTrace; source-mapped stack traces are disabled for bundle %s',
+        bundlePath,
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test('warning check tolerates bundle code replacing the global Error binding', async () => {
+    const bundlePath = await writeVmBundle('global.Error = undefined;');
+    const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+    try {
+      await expect(buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true)).resolves.toBeDefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Bundle replaced Error.prepareStackTrace; source-mapped stack traces are disabled for bundle %s',
+        bundlePath,
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   test('external .map file next to the bundle is used', async () => {
@@ -635,6 +666,53 @@ describe('source-mapped stack traces for VM errors', () => {
 
     executionContext.release();
     expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).not.toContain(ORIGINAL_SOURCE);
+  });
+
+  test('failed parallel VM builds release source maps retained by sibling builds that settle later', async () => {
+    const missingBundlePath = path.join(serverBundleCachePath(testName), 'missing', 'missing.js');
+    const lateBundlePath = path.join(serverBundleCachePath(testName), 'late', 'late.js');
+    const lateMapFileName = `${path.basename(lateBundlePath)}.map`;
+    const lateMapPath = path.join(path.dirname(lateBundlePath), lateMapFileName);
+    await writeBundleAt(
+      lateBundlePath,
+      `${buildThrowingBundleSource()}\n//# sourceMappingURL=${lateMapFileName}\n`,
+    );
+    await fsPromises.writeFile(lateMapPath, JSON.stringify(buildThrowingBundleMap(lateMapFileName)));
+
+    let allowLateMapRead!: () => void;
+    const lateMapReadStarted = new Promise<void>((resolve) => {
+      const originalReadFile = fs.promises.readFile.bind(fs.promises);
+      const lateMapReadCanFinish = new Promise<void>((resolveLateMapRead) => {
+        allowLateMapRead = resolveLateMapRead;
+      });
+      jest.spyOn(fs.promises, 'readFile').mockImplementation((async (...args) => {
+        if (path.resolve(String(args[0])) === lateMapPath) {
+          resolve();
+          await lateMapReadCanFinish;
+        }
+        return originalReadFile(...args);
+      }) as typeof fs.promises.readFile);
+    });
+
+    try {
+      const buildPromise = buildExecutionContext(
+        [missingBundlePath, lateBundlePath],
+        /* buildVmsIfNeeded */ true,
+      );
+      await lateMapReadStarted;
+      allowLateMapRead();
+      await expect(buildPromise).rejects.toThrow();
+      await waitFor(() => {
+        expect(hasVMContextForBundle(lateBundlePath)).toBe(true);
+      });
+
+      removeVM(lateBundlePath);
+      expect(remapStackTrace(`Error: host\n    at boom (${lateBundlePath}:3:17)`)).not.toContain(
+        ORIGINAL_SOURCE,
+      );
+    } finally {
+      jest.restoreAllMocks();
+    }
   });
 
   test('same-path rebuild does not remap active old VM errors with the new source map', async () => {
