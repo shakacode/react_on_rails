@@ -34,6 +34,8 @@ class PrMergeLedger
   GITHUB_API_RETRY_BASE_DELAY_SECONDS = 0.25
   MAX_GRAPHQL_PAGES = 500
   GITHUB_REPO_NAME_PATTERN = /\A[A-Za-z0-9._-]+\z/
+  MAX_BODY_LINES = 1_000
+  MAX_EXCERPT_LENGTH = 180
   LIST_MARKER_PATTERN = /(?:[-*]\s*(?:\[[ xX]\]\s*)?|\d+[.)]\s*)/
   FINDING_LINE_PREFIX_PATTERN = /(?:#{LIST_MARKER_PATTERN.source})?(?:\#{1,6}\s+)?/
   PRIORITY_MARKER_PATTERN = /MUST[- ]?FIX|\[?P[0-2]\]?/
@@ -157,10 +159,15 @@ class PrMergeLedger
                    "remove them or omit --fixture"
     end
 
-    return unless @argv.length > 1 && @options[:changelog_classification_provided]
+    if @argv.length > 1 && @options[:changelog_classification_provided]
+      raise Error,
+            "--changelog-classification applies to one PR at a time; run multi-PR ledgers separately"
+    end
 
-    raise Error,
-          "--changelog-classification applies to one PR at a time; run multi-PR ledgers separately"
+    return unless @options[:strict] && @argv.length > 1
+
+    warn "pr-merge-ledger: --strict with multiple PRs always fails until each PR has a " \
+         "non-UNKNOWN changelog classification"
   end
 
   def build_option_parser
@@ -531,6 +538,11 @@ class PrMergeLedger
 
   def findings_from_text(text, url, id, dispositions, used_disposition_keys)
     lines = text.to_s.each_line.map(&:chomp)
+    if lines.length > MAX_BODY_LINES
+      warn "pr-merge-ledger: #{url} body has #{lines.length} lines; scanning first #{MAX_BODY_LINES}"
+      lines = lines.first(MAX_BODY_LINES)
+    end
+
     source_finding_count = lines.sum do |line_text|
       next 0 if non_actionable_finding_summary?(line_text)
 
@@ -981,7 +993,10 @@ class PrMergeLedger
   end
 
   def excerpt(text)
-    text.to_s.gsub(/\s+/, " ").strip[0, 180]
+    compacted = text.to_s.gsub(/\s+/, " ").strip
+    return compacted if compacted.length <= MAX_EXCERPT_LENGTH
+
+    "#{compacted[0, MAX_EXCERPT_LENGTH - 3]}..."
   end
 
   def write_report(report)

@@ -2504,6 +2504,7 @@ RSpec.describe "script/pr-merge-ledger" do
   end
 
   it "keeps full issue comment bodies out of the output ledger" do
+    long_body = "A long informational comment that should be excerpted in output. " * 4
     fixture = {
       "repository" => "shakacode/react_on_rails",
       "pull_request" => {
@@ -2518,7 +2519,7 @@ RSpec.describe "script/pr-merge-ledger" do
         {
           "id" => "comment-1",
           "url" => "https://example.com/comment-1",
-          "body" => "A long informational comment that should be excerpted in output.",
+          "body" => long_body,
           "author" => { "login" => "reviewer" },
           "createdAt" => "2026-06-01T00:00:00Z"
         }
@@ -2543,10 +2544,53 @@ RSpec.describe "script/pr-merge-ledger" do
 
       report = JSON.parse(stdout)
       issue_comment = report.dig("pull_requests", 0, "issue_comments", 0)
-      expect(issue_comment).to include(
-        "body_excerpt" => "A long informational comment that should be excerpted in output."
-      )
+      expect(issue_comment.fetch("body_excerpt")).to end_with("...")
+      expect(issue_comment.fetch("body_excerpt").length).to eq(180)
       expect(issue_comment).not_to have_key("body")
+    end
+  end
+
+  it "bounds priority finding scans for very large comment bodies" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 5,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [],
+      "comments" => [
+        {
+          "id" => "large-comment",
+          "url" => "https://example.com/large-comment",
+          "body" => (["informational"] * 1_005).join("\n"),
+          "author" => { "login" => "reviewer" },
+          "createdAt" => "2026-06-01T00:00:00Z"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-large-comment-body", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+      expect(stderr).to include(
+        "pr-merge-ledger: https://example.com/large-comment body has 1005 lines; scanning first 1000"
+      )
+      expect(JSON.parse(stdout).fetch("complete_allowed")).to be(true)
     end
   end
 
@@ -3361,10 +3405,15 @@ RSpec.describe "script/pr-merge-ledger" do
         "2",
         "--repo",
         "shakacode/react_on_rails",
+        "--strict",
         chdir: repo_root
       )
 
-      expect(status).to be_success, stderr
+      expect(status).not_to be_success
+      expect(stderr).to include(
+        "pr-merge-ledger: --strict with multiple PRs always fails until each PR has a " \
+        "non-UNKNOWN changelog classification"
+      )
 
       report = JSON.parse(stdout)
       expect(report.dig("source", "prs")).to eq([1, 2])
@@ -3676,10 +3725,23 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(schema.dig("$defs", "pull_request_ledger", "additionalProperties")).to be(false)
     expect(schema.dig("$defs", "pull_request_ledger", "required")).to include("issue_comments")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "violations", "type")).to eq("array")
+    expect(
+      schema.dig("$defs", "pull_request_ledger", "properties", "unresolved_current_head_review_threads",
+                 "properties", "threads", "items", "$ref")
+    ).to eq("#/$defs/review_thread")
+    expect(schema.dig("$defs", "pull_request_ledger", "properties", "issue_comments", "items", "$ref")).to eq(
+      "#/$defs/issue_comment"
+    )
+    expect(
+      schema.dig("$defs", "pull_request_ledger", "properties", "priority_finding_dispositions", "properties",
+                 "findings", "items", "$ref")
+    ).to eq("#/$defs/priority_finding")
     expect(schema.dig("$defs", "violation", "additionalProperties")).to be(false)
     expect(schema.dig("$defs", "violation", "properties")).to include(
       "path", "line", "reviewer", "head_sha", "current_head"
     )
+    expect(schema.dig("$defs", "review_thread", "additionalProperties")).to be(false)
+    expect(schema.dig("$defs", "review_object", "properties")).to include("body_text")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "unknown_fields", "type")).to eq("array")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "complete_allowed", "type")).to eq("boolean")
   end
