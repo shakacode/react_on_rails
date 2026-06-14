@@ -27,7 +27,7 @@ When this repository includes `.agents/skills/post-merge-audit/bin/post-merge-au
 .agents/skills/post-merge-audit/bin/post-merge-audit-scope --json
 ```
 
-The resolver is read-only. It resolves the default release-candidate base, the head SHA, squash-aware merged PRs, prior `post-merge-audit-finding` fingerprints, carry-over PRs, and the remaining `to_audit` list. Use its output as the initial scope table, then verify assumptions before deep audit.
+The resolver is read-only. It resolves the default release-candidate base, the head SHA, squash-aware merged PRs, prior `post-merge-audit-finding` fingerprints, PRs with open finding markers, and the `to_audit` list. Use its output as the initial scope table, then verify assumptions before deep audit.
 
 1. Base: the user-supplied tag/commit, or the most recent release candidate tag when the user says "since the last RC".
 2. Head: usually `origin/main` or the current release branch.

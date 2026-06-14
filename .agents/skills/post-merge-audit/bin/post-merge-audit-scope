@@ -181,25 +181,6 @@ end
 RUBY
 }
 
-pma_scope_subtract_prs() {
-  local merged_file="$1"
-  local carry_file="$2"
-
-  ruby - "$merged_file" "$carry_file" <<'RUBY'
-merged_path, carry_path = ARGV
-carry = File.readlines(carry_path, chomp: true).map(&:strip).reject(&:empty?).to_h { |value| [value, true] }
-seen = {}
-
-File.readlines(merged_path, chomp: true).each do |value|
-  value = value.strip
-  next if value.empty? || seen[value] || carry[value]
-
-  seen[value] = true
-  puts value
-end
-RUBY
-}
-
 pma_scope_fetch_issue_markers() {
   local repo="$1"
   local limit="$2"
@@ -397,7 +378,7 @@ pma_scope_self_check_assert_equals() {
 }
 
 pma_scope_self_check() {
-  local parsed expected markers tmpdir merged carry to_audit repo
+  local parsed expected markers repo
 
   pma_scope_require_command ruby || return 1
   pma_scope_require_command git || return 1
@@ -438,20 +419,6 @@ JSON
       "https://example.test/issues/88"
   )"
   pma_scope_self_check_assert_equals "$expected" "$markers" "issue marker parser" || return 1
-
-  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-self.XXXXXX")" || return 1
-  merged="$tmpdir/merged.txt"
-  carry="$tmpdir/carry.txt"
-  to_audit="$tmpdir/to-audit.txt"
-  printf '%s\n' 4014 4015 > "$merged"
-  : > "$carry"
-  pma_scope_subtract_prs "$merged" "$carry" > "$to_audit"
-  expected="$(printf '%s\n%s' 4014 4015)"
-  pma_scope_self_check_assert_equals "$expected" "$(cat "$to_audit")" "empty carry-over subtraction" || {
-    rm -rf "$tmpdir"
-    return 1
-  }
-  rm -rf "$tmpdir"
 
   git rev-parse --show-toplevel >/dev/null
   git rev-parse --verify "HEAD^{commit}" >/dev/null
@@ -604,7 +571,8 @@ pma_scope_main() (
   pma_scope_fetch_issue_markers "$repo" "$limit" "$markers_file" "$open_markers_file"
   pma_scope_marker_pr_numbers "$open_markers_file" > "$marker_numbers_file"
   pma_scope_intersect_prs "$merged_numbers_file" "$marker_numbers_file" > "$carry_file"
-  pma_scope_subtract_prs "$merged_numbers_file" "$carry_file" > "$to_audit_file"
+  # Prior findings are carry-over context; they do not prove the whole PR was fully audited.
+  cp "$merged_numbers_file" "$to_audit_file"
 
   case "$output_format" in
     json)

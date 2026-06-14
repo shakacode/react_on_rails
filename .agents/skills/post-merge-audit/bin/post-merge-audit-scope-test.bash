@@ -167,18 +167,48 @@ JSON
   assert_equals "$expected" "$out" "issue markers"
 }
 
-test_subtract_prs_preserves_all_merged_prs_when_carry_over_is_empty() {
-  local tmpdir out expected
+test_open_markers_do_not_suppress_to_audit() {
+  local tmpdir repo fake_bin open_json closed_json base out actual expected carry fingerprints
 
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
-  printf '%s\n' 4014 4015 > "$tmpdir/merged.txt"
-  : > "$tmpdir/carry.txt"
+  repo="$tmpdir/repo"
+  fake_bin="$tmpdir/bin"
+  open_json="$tmpdir/open.json"
+  closed_json="$tmpdir/closed.json"
+  mkdir -p "$repo" "$fake_bin"
+  cat > "$open_json" <<'JSON'
+[
+  {
+    "number": 89,
+    "state": "OPEN",
+    "url": "https://example.test/issues/89",
+    "body": "<!-- post-merge-audit-finding v1\naudit: current-audit\nfingerprint: pr-4014:open-finding\naffected_prs: 4014\n-->"
+  }
+]
+JSON
+  printf '[]\n' > "$closed_json"
+  make_fake_gh "$fake_bin/gh" "$open_json" "$closed_json"
 
-  out="$(pma_scope_subtract_prs "$tmpdir/merged.txt" "$tmpdir/carry.txt")"
-  expected="$(printf '%s\n%s' 4014 4015)"
+  git -C "$repo" init --quiet --initial-branch=main
+  git -C "$repo" config user.email "test@example.com"
+  git -C "$repo" config user.name "Test User"
+  git -C "$repo" commit --quiet --allow-empty -m "base"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" commit --quiet --allow-empty -m "Fix audit scope resolver (#4014)"
+
+  out="$(
+    cd "$repo" &&
+      env -u BASH_ENV PATH="$fake_bin:$PATH" "$RESOLVER" --base "$base" --head HEAD --repo owner/repo --json
+  )"
+  actual="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("to_audit").join(",")' <<< "$out")"
+  carry="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("carry_over_prs").join(",")' <<< "$out")"
+  fingerprints="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("existing_fingerprints").map { |fp| fp.fetch("state") }.join(",")' <<< "$out")"
+  expected="4014"
 
   rm -rf "$tmpdir"
-  assert_equals "$expected" "$out" "to_audit with empty carry-over"
+  assert_equals "$expected" "$actual" "open markers do not suppress to_audit"
+  assert_equals "$expected" "$carry" "open markers remain carry-over context"
+  assert_equals "OPEN" "$fingerprints" "open markers remain dedupe context"
 }
 
 test_resolver_uses_first_parent_for_merged_pr_scope() {
@@ -517,7 +547,7 @@ test_sourced_main_run_preserves_cwd_and_exit_trap() {
 
 run_test test_parse_git_log_extracts_squash_and_merge_subject_prs_once
 run_test test_extract_issue_markers_from_json_keeps_fingerprint_state_and_affected_prs
-run_test test_subtract_prs_preserves_all_merged_prs_when_carry_over_is_empty
+run_test test_open_markers_do_not_suppress_to_audit
 run_test test_resolver_uses_first_parent_for_merged_pr_scope
 run_test test_closed_markers_do_not_suppress_to_audit
 run_test test_default_base_ignores_rc_tags_on_merged_side_branches
