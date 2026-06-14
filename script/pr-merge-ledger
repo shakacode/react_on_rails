@@ -11,7 +11,7 @@ require "timeout"
 class PrMergeLedger
   SCHEMA_VERSION = "pr-merge-ledger/v1"
   UNKNOWN = "UNKNOWN"
-  SCHEMA_URI = "script/pr-merge-ledger.schema.json"
+  SCHEMA_URI = "https://raw.githubusercontent.com/shakacode/react_on_rails/main/script/pr-merge-ledger.schema.json"
   SCHEMA_PATH = File.expand_path("pr-merge-ledger.schema.json", __dir__)
   CHANGELOG_CLASSIFICATIONS = %w[
     changelog_present
@@ -60,14 +60,23 @@ class PrMergeLedger
   FINDING_SUMMARY_PREFIX_PATTERN =
     /\A\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-)+(?<summary>.*)\z/i
   FINDING_SUMMARY_SUBJECT_PATTERN = /\b(?:findings?|issues?|items?|main issue)\b/i
-  FINDING_SUMMARY_RESOLUTION_PATTERN = /\b(?:none|fixed|resolved|waived)\b/i
+  FINDING_SUMMARY_RESOLUTION_PATTERN = /
+    \bnone(?!\s+of\b) |
+    \b(?:findings?|issues?|items?|main\s+issue)\b
+    (?:
+      \s*[:=-]\s* |
+      (?:\s+(?:were|was|are|is|has|have|been|got|now|already|previously))*\s+
+    )
+    (?:fixed|resolved|waived)
+    (?=\s*(?:$|[.;,)]|\b(?:by|in|with|via|from|after|before|on|because|through)\b))
+  /ix
   NEGATED_SUMMARY_RESOLUTION_PATTERN = Regexp.union(
     /\bnot\s+(?:\S+\s+){0,3}?(?:fixed|resolved|waived)\b/i,
     /\b(?:none|nothing)\s+(?:fixed|resolved|waived)\b/i,
     /\bno\s+(?:\S+\s+){0,4}?(?:fixed|resolved|waived)\b/i
   )
   ADDITIONAL_SEVERITY_PATTERN =
-    /(?:[.;,(:-]|\b(?:and|but)\b)\s*(?:[-*]\s*)?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
+    /(?:[.;,(:-]|\b(?:and|but|while)\b)\s*(?:[-*]\s*)?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
 
   class Error < StandardError; end
 
@@ -115,6 +124,11 @@ class PrMergeLedger
   end
 
   def validate_options
+    if @options[:fixture] && !@argv.empty?
+      raise Error, "PR number args (#{@argv.join(', ')}) are ignored when --fixture is given; " \
+                   "remove them or omit --fixture"
+    end
+
     return unless @argv.length > 1 && @options[:changelog_classification_provided]
 
     raise Error,
@@ -273,6 +287,8 @@ class PrMergeLedger
   # rubocop:enable Metrics/AbcSize
 
   def file_paths(dataset)
+    return nil unless dataset.key?("files") && !dataset["files"].nil?
+
     Array(dataset["files"]).map { |file| file.is_a?(Hash) ? file.fetch("path") : file }
   end
 
@@ -311,6 +327,7 @@ class PrMergeLedger
     comments, comments_complete = review_thread_comments(thread)
     normalized_comments = comments.map { |comment| normalize_thread_comment(comment, pull_request) }
     latest_comment = normalized_comments.max_by { |comment| timestamp_sort_key(comment["created_at"]) }
+    current_head_evidence = current_thread_evidence(thread, normalized_comments, pull_request)
 
     {
       "id" => thread.fetch("id"),
@@ -325,7 +342,8 @@ class PrMergeLedger
       "review_state" => latest_comment&.fetch("review_state", nil),
       "review_head_sha" => latest_comment&.fetch("review_head_sha", nil),
       "comment_head_sha" => latest_comment&.fetch("comment_head_sha", nil),
-      "current_head" => current_thread?(thread, normalized_comments, pull_request),
+      "current_head" => !current_head_evidence.nil?,
+      "current_head_evidence" => current_head_evidence,
       "comments_complete" => comments_complete,
       "comments" => normalized_comments
     }
@@ -389,7 +407,9 @@ class PrMergeLedger
   def latest_reviews_by_reviewer(reviews)
     latest_reviews = reviews.group_by { |review| review.fetch("reviewer") }
                             .map do |_reviewer, reviewer_reviews|
-                              reviewer_reviews.max_by { |review| timestamp_sort_key(review["submitted_at"]) }
+                              reviewer_reviews.max_by do |review|
+                                timestamp_sort_key(review["submitted_at"], "review #{review.fetch('id')} submitted_at")
+                              end
                             end
 
     latest_reviews.sort_by { |review| review.fetch("reviewer") }
@@ -400,12 +420,19 @@ class PrMergeLedger
   end
 
   def current_thread?(thread, comments, pull_request)
-    return false if thread["isOutdated"] == true
-    return false if comments.empty?
+    !current_thread_evidence(thread, comments, pull_request).nil?
+  end
+
+  def current_thread_evidence(thread, comments, pull_request)
+    return nil if thread["isOutdated"] == true
+    return nil if comments.empty?
 
     # Conservative fallback: if no comment can be confirmed as current-head by SHA but GitHub has not marked
     # a comment outdated, block rather than silently miss an unresolved thread after a non-force push.
-    current_thread_comment?(comments, pull_request) || comments.any? { |comment| !comment.fetch("outdated") }
+    return "sha_match" if current_thread_comment?(comments, pull_request)
+    return "conservative_non_outdated" if comments.any? { |comment| !comment.fetch("outdated") }
+
+    nil
   end
 
   def current_thread_comment?(comments, pull_request)
@@ -589,7 +616,9 @@ class PrMergeLedger
       id
     ]
 
-    marker_keys.concat(finding.fetch(:multiple_markers) ? [url, id] : line_keys).compact
+    return marker_keys.compact if finding.fetch(:multiple_markers)
+
+    marker_keys.concat(line_keys).compact
   end
 
   def warn_unused_dispositions(dispositions, used_disposition_keys)
@@ -605,9 +634,12 @@ class PrMergeLedger
     raise Error, "finding disposition #{disposition.inspect} must be one of #{DISPOSITIONS.join(', ')}"
   end
 
-  def timestamp_sort_key(raw_timestamp)
+  def timestamp_sort_key(raw_timestamp, warning_context = nil)
     Time.parse(raw_timestamp.to_s)
   rescue ArgumentError
+    if warning_context
+      warn "pr-merge-ledger: #{warning_context} has invalid timestamp #{raw_timestamp.inspect}; treating as oldest"
+    end
     Time.at(0).utc
   end
 
@@ -619,6 +651,14 @@ class PrMergeLedger
   end
 
   def lockfile_diff(files)
+    if files.nil?
+      return {
+        "status" => UNKNOWN,
+        "has_lockfile_diff" => UNKNOWN,
+        "files" => []
+      }
+    end
+
     lockfiles = files.select { |path| lockfile_path?(path) }
     {
       "status" => "known",
