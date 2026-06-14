@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Chunk Contamination: Shared Import Drags Vendor Chunks</title>
+  <desc>Animated before/after showing how a shared import between a heavy page and a small component drags vendor chunks into the RSC page bundle, and the fix that shrinks it by isolating the import.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .bad-header { fill: #FEE2E2; stroke: #FECACA; }
+      .bad-text { fill: #991B1B; }
+      .good-header { fill: #D1FAE5; stroke: #86EFAC; }
+      .good-text { fill: #166534; }
+      .chunk-vendor { fill: #FEE2E2; stroke: #F87171; }
+      .chunk-vendor-text { fill: #991B1B; }
+      .chunk-app { fill: #DBEAFE; stroke: #93C5FD; }
+      .chunk-app-text { fill: #1E40AF; }
+      .chunk-small { fill: #D1FAE5; stroke: #22C55E; }
+      .chunk-small-text { fill: #166534; }
+      .bar-vendor { fill: #F87171; }
+      .bar-app { fill: #60A5FA; }
+      .bar-small { fill: #4ADE80; }
+      .bar-bg { fill: #E2E8F0; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .bad-header { fill: #450A0A; stroke: #F87171; }
+        .bad-text { fill: #FCA5A5; }
+        .good-header { fill: #052E16; stroke: #10B981; }
+        .good-text { fill: #6EE7B7; }
+        .chunk-vendor { fill: #450A0A; stroke: #F87171; }
+        .chunk-vendor-text { fill: #FCA5A5; }
+        .chunk-app { fill: #172554; stroke: #3B82F6; }
+        .chunk-app-text { fill: #93C5FD; }
+        .chunk-small { fill: #052E16; stroke: #10B981; }
+        .chunk-small-text { fill: #6EE7B7; }
+        .bar-bg { fill: #334155; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+      }
+
+      .phase-a { opacity: 1; animation: toggleA 12s ease infinite; }
+      .phase-b { opacity: 0; animation: toggleB 12s ease infinite; }
+
+      @keyframes toggleA {
+        0%, 42% { opacity: 1; } 48%, 90% { opacity: 0; } 96%, 100% { opacity: 1; }
+      }
+      @keyframes toggleB {
+        0%, 42% { opacity: 0; } 48%, 90% { opacity: 1; } 96%, 100% { opacity: 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; }
+        .phase-a, .phase-b { opacity: 1 !important; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="400" class="bg"/>
+  <text x="450" y="26" text-anchor="middle" font-size="18" font-weight="700" class="title">Chunk Contamination: Vendor Drag</text>
+  <text x="450" y="44" text-anchor="middle" font-size="11" class="subtitle">Shared imports pull unrelated vendor chunks into your RSC page bundle</text>
+
+  <!-- ============ BEFORE ============ -->
+  <g class="phase-a">
+    <rect x="30" y="58" width="840" height="286" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="30" y="58" width="840" height="28" rx="12" class="bad-header" stroke-width="1"/>
+    <rect x="30" y="74" width="840" height="12" class="bad-header"/>
+    <text x="450" y="78" text-anchor="middle" font-size="12" font-weight="700" class="bad-text">❌ Before: RSC page inherits vendor chunks from shared import</text>
+
+    <!-- RSC Page bundle visualization -->
+    <text x="450" y="110" text-anchor="middle" font-size="11" font-weight="600" class="label-text">RSC Page Bundle (what the browser downloads)</text>
+
+    <!-- Big stacked bar showing contamination -->
+    <rect x="60" y="122" width="780" height="50" rx="8" class="bar-bg"/>
+    <rect x="60" y="122" width="260" height="50" rx="8" class="bar-vendor"/>
+    <rect x="320" y="122" width="180" height="50" class="bar-app"/>
+    <rect x="500" y="122" width="60" height="50" class="bar-small"/>
+    <rect x="560" y="122" width="280" height="50" rx="8" class="bar-bg" opacity="0.5"/>
+
+    <text x="190" y="152" text-anchor="middle" font-size="10" font-weight="600" fill="white">vendor chunks</text>
+    <text x="410" y="152" text-anchor="middle" font-size="10" font-weight="600" fill="white">app code</text>
+    <text x="530" y="152" text-anchor="middle" font-size="10" font-weight="600" fill="white">RSC</text>
+    <text x="700" y="152" text-anchor="middle" font-size="10" class="label-sub">(wasted space)</text>
+
+    <!-- Chunk details -->
+    <rect x="60" y="190" width="160" height="28" rx="6" class="chunk-vendor" stroke-width="1.5"/>
+    <text x="140" y="208" text-anchor="middle" font-size="9" class="chunk-vendor-text">lodash — 70 KB</text>
+
+    <rect x="240" y="190" width="160" height="28" rx="6" class="chunk-vendor" stroke-width="1.5"/>
+    <text x="320" y="208" text-anchor="middle" font-size="9" class="chunk-vendor-text">moment — 200 KB</text>
+
+    <rect x="420" y="190" width="180" height="28" rx="6" class="chunk-vendor" stroke-width="1.5"/>
+    <text x="510" y="208" text-anchor="middle" font-size="9" class="chunk-vendor-text">react-markdown — 80 KB</text>
+
+    <rect x="620" y="190" width="120" height="28" rx="6" class="chunk-app" stroke-width="1.5"/>
+    <text x="680" y="208" text-anchor="middle" font-size="9" class="chunk-app-text">app — 24 KB</text>
+
+    <rect x="760" y="190" width="80" height="28" rx="6" class="chunk-small" stroke-width="1.5"/>
+    <text x="800" y="208" text-anchor="middle" font-size="9" class="chunk-small-text">RSC — 8 KB</text>
+
+    <!-- Size callout -->
+    <rect x="260" y="240" width="380" height="36" rx="8" class="chunk-vendor" stroke-width="2"/>
+    <text x="450" y="256" text-anchor="middle" font-size="12" font-weight="700" class="chunk-vendor-text">Total: 382 KB</text>
+    <text x="450" y="272" text-anchor="middle" font-size="9" class="bad-text">350 KB of vendor chunks pulled in by shared utils.js</text>
+
+    <text x="450" y="302" text-anchor="middle" font-size="10" class="label-text">The RSC page only needs 8 KB — but shared imports drag in the full vendor tree</text>
+    <text x="450" y="320" text-anchor="middle" font-size="9" class="label-sub">utils.js is also imported by PostsPage which depends on lodash + moment + react-markdown</text>
+  </g>
+
+  <!-- ============ AFTER ============ -->
+  <g class="phase-b">
+    <rect x="30" y="58" width="840" height="286" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="30" y="58" width="840" height="28" rx="12" class="good-header" stroke-width="1"/>
+    <rect x="30" y="74" width="840" height="12" class="good-header"/>
+    <text x="450" y="78" text-anchor="middle" font-size="12" font-weight="700" class="good-text">✅ After: Isolated import — only own chunks</text>
+
+    <text x="450" y="110" text-anchor="middle" font-size="11" font-weight="600" class="label-text">RSC Page Bundle (after fix)</text>
+
+    <!-- Small bar showing clean bundle -->
+    <rect x="60" y="122" width="780" height="50" rx="8" class="bar-bg"/>
+    <rect x="60" y="122" width="60" height="50" rx="8" class="bar-small"/>
+
+    <text x="90" y="152" text-anchor="middle" font-size="10" font-weight="600" fill="white">RSC</text>
+    <text x="460" y="152" text-anchor="middle" font-size="10" class="label-sub">(no contamination — vendor chunks stay with PostsPage)</text>
+
+    <!-- Only RSC chunk -->
+    <rect x="60" y="190" width="100" height="28" rx="6" class="chunk-small" stroke-width="1.5"/>
+    <text x="110" y="208" text-anchor="middle" font-size="9" class="chunk-small-text">RSC — 8 KB</text>
+
+    <!-- Size callout -->
+    <rect x="260" y="240" width="380" height="36" rx="8" class="chunk-small" stroke-width="2"/>
+    <text x="450" y="256" text-anchor="middle" font-size="12" font-weight="700" class="chunk-small-text">Total: 8 KB</text>
+    <text x="450" y="272" text-anchor="middle" font-size="9" class="good-text">48× smaller — vendor chunks stay with their actual consumers</text>
+
+    <text x="450" y="302" text-anchor="middle" font-size="10" class="label-text">Thin wrapper breaks the shared-chunk inheritance chain</text>
+    <text x="450" y="320" text-anchor="middle" font-size="9" class="label-sub">PostsPage keeps its vendor chunks — RSC page has only its own code</text>
+  </g>
+
+  <!-- Bottom callout -->
+  <rect x="100" y="362" width="700" height="30" rx="8" class="note-box" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="380" text-anchor="middle" font-size="10" font-weight="600" class="note-text">When a small component downloads unexpectedly large chunks, check for shared imports with heavier pages</text>
+</svg>

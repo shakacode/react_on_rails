@@ -74,6 +74,7 @@ const sidebars: SidebarsConfig = {
             'building-features/react-19-native-metadata',
             'building-features/react-19-activity',
             'building-features/react-compiler',
+            'building-features/view-transitions',
             'building-features/streaming-server-rendering',
             'building-features/how-to-conditionally-server-render-based-on-device-type',
             'building-features/how-to-use-different-files-for-client-and-server-rendering',
@@ -86,8 +87,10 @@ const sidebars: SidebarsConfig = {
           label: 'Integrations',
           items: [
             'building-features/react-and-redux',
+            'building-features/styling-with-tailwind',
             'building-features/i18n',
             'building-features/images',
+            'building-features/fast-images',
             'building-features/fonts',
             'building-features/rails-engine-integration',
             'building-features/turbolinks',
@@ -102,6 +105,8 @@ const sidebars: SidebarsConfig = {
             'building-features/extensible-precompile-pattern',
             'building-features/process-managers',
             'building-features/debugging',
+            'building-features/performance-tracks-and-profiling',
+            'building-features/web-vitals-and-rum',
           ],
         },
         {
@@ -124,6 +129,7 @@ const sidebars: SidebarsConfig = {
       label: 'Reference',
       link: { type: 'generated-index', title: 'Reference' },
       items: [
+        'reference/error-reference',
         {
           type: 'category',
           label: 'Configuration',
@@ -155,6 +161,7 @@ const sidebars: SidebarsConfig = {
         'deployment/docker-deployment',
         'deployment/heroku-deployment',
         'deployment/review-app-security',
+        'deployment/security-model-and-hardening',
         'deployment/server-rendering-tips',
         'deployment/troubleshooting',
         'deployment/troubleshooting-build-errors',
@@ -181,7 +188,9 @@ const sidebars: SidebarsConfig = {
           label: 'Migration Guides',
           items: [
             'migrating/example-migrations',
+            'migrating/migrating-from-nextjs',
             'migrating/migrating-from-react-rails',
+            'migrating/migrating-from-inertia-rails',
             'migrating/migrating-from-vite-rails',
             'migrating/migrating-from-webpack-to-rspack',
             'migrating/babel-to-swc-migration',

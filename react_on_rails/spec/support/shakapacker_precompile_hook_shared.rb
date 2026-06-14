@@ -74,7 +74,9 @@ def build_rescript_if_needed
     exit 1
   end
 
-  package_json = JSON.parse(File.read(package_json_path))
+  # Read as UTF-8 explicitly: under a C/POSIX locale (no LANG/LC_ALL), Encoding.default_external
+  # is US-ASCII and non-ASCII content would raise when parsed or regex-matched.
+  package_json = JSON.parse(File.read(package_json_path, mode: "r:bom|utf-8"))
   unless package_json.dig("scripts", "build:rescript")
     warn "❌ Error: ReScript config found but no build:rescript script in package.json"
     warn "    Add this to your package.json scripts section:"
@@ -111,8 +113,10 @@ def generate_packs_if_needed
   return unless File.exist?(initializer_path)
 
   # Check if auto-pack generation is configured
-  # Match config lines that aren't commented out and allow flexible spacing
-  initializer_content = File.read(initializer_path)
+  # Match config lines that aren't commented out and allow flexible spacing.
+  # Read as UTF-8 explicitly: under a C/POSIX locale (no LANG/LC_ALL), Encoding.default_external
+  # is US-ASCII and non-ASCII content would raise when regex-matched.
+  initializer_content = File.read(initializer_path, mode: "r:bom|utf-8")
   return unless initializer_content.match?(/^\s*(?!#).*config\.auto_load_bundle\s*=/) ||
                 initializer_content.match?(/^\s*(?!#).*config\.components_subdirectory\s*=/)
 

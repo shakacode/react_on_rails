@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>RSC Bundle Architecture</title>
+  <desc>Diagram showing three distinct bundles in an RSC project: the RSC Bundle containing server components and client references running in Node VM, the Server Bundle containing both component types for SSR in Node VM, and the Client Bundle split into chunks running in the browser.</desc>
+  <defs>
+    <linearGradient id="reactGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#61DAFB"/><stop offset="100%" stop-color="#21A0C8"/>
+    </linearGradient>
+    <linearGradient id="browserGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A90D9"/><stop offset="100%" stop-color="#2E5A8A"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .card-header { fill: #F1F5F9; }
+      .card-title { fill: #0F172A; }
+      .card-sub { fill: #64748B; }
+      .item-bg { fill: #F8FAFC; stroke: #E2E8F0; }
+      .item-text { fill: #334155; }
+      .item-code { fill: #0F172A; }
+      .tag-server { fill: #ECFDF5; stroke: #86EFAC; }
+      .tag-server-text { fill: #166534; }
+      .tag-client { fill: #FFF7ED; stroke: #FDBA74; }
+      .tag-client-text { fill: #9A3412; }
+      .tag-runtime { fill: #EFF6FF; stroke: #93C5FD; }
+      .tag-runtime-text { fill: #1E40AF; }
+      .env-box { fill: #F1F5F9; stroke: #CBD5E1; }
+      .env-text { fill: #475569; }
+      .condition-text { fill: #7C3AED; }
+      .connector { stroke: #CBD5E1; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .card-header { fill: #0F172A; }
+        .card-title { fill: #F1F5F9; }
+        .card-sub { fill: #94A3B8; }
+        .item-bg { fill: #0F172A; stroke: #334155; }
+        .item-text { fill: #CBD5E1; }
+        .item-code { fill: #F1F5F9; }
+        .tag-server { fill: #052E16; stroke: #10B981; }
+        .tag-server-text { fill: #6EE7B7; }
+        .tag-client { fill: #431407; stroke: #F97316; }
+        .tag-client-text { fill: #FDBA74; }
+        .tag-runtime { fill: #172554; stroke: #3B82F6; }
+        .tag-runtime-text { fill: #93C5FD; }
+        .env-box { fill: #0F172A; stroke: #475569; }
+        .env-text { fill: #94A3B8; }
+        .condition-text { fill: #A78BFA; }
+        .connector { stroke: #475569; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="420" class="bg"/>
+
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="700" class="title">Three Bundles in an RSC Project</text>
+  <text x="450" y="48" text-anchor="middle" font-size="11" class="subtitle">Each bundle runs in a different environment with different constraints</text>
+
+  <!-- RSC Bundle Card -->
+  <g>
+    <rect x="20" y="70" width="270" height="330" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="20" y="70" width="270" height="40" rx="12" fill="url(#reactGrad)"/>
+    <rect x="20" y="98" width="270" height="12" fill="url(#reactGrad)"/>
+    <text x="155" y="95" text-anchor="middle" font-size="13" font-weight="600" fill="white">RSC Bundle</text>
+
+    <rect x="34" y="120" width="242" height="24" rx="6" class="item-bg" stroke-width="1"/>
+    <text x="155" y="136" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" class="item-code">rsc-bundle.js</text>
+
+    <text x="40" y="164" font-size="10" font-weight="600" class="card-title">Contains:</text>
+    <rect x="40" y="172" width="100" height="18" rx="4" class="tag-server" stroke-width="1"/>
+    <text x="90" y="184" text-anchor="middle" font-size="9" class="tag-server-text">Server Components</text>
+    <rect x="148" y="172" width="108" height="18" rx="4" class="tag-client" stroke-width="1"/>
+    <text x="202" y="184" text-anchor="middle" font-size="9" class="tag-client-text">Client References</text>
+
+    <text x="40" y="210" font-size="10" font-weight="600" class="card-title">Webpack config:</text>
+    <text x="40" y="224" font-family="ui-monospace, monospace" font-size="9" class="item-text">rscWebpackConfig.js</text>
+
+    <text x="40" y="248" font-size="10" font-weight="600" class="card-title">Condition:</text>
+    <text x="40" y="262" font-family="ui-monospace, monospace" font-size="9" class="condition-text">react-server</text>
+
+    <rect x="34" y="280" width="242" height="28" rx="6" class="tag-runtime" stroke-width="1"/>
+    <text x="155" y="298" text-anchor="middle" font-size="10" font-weight="600" class="tag-runtime-text">Runtime: Node Renderer VM</text>
+
+    <rect x="34" y="316" width="242" height="28" rx="6" class="env-box" stroke-width="1"/>
+    <text x="155" y="334" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" class="env-text">RSC_BUNDLE_ONLY=true</text>
+
+    <text x="155" y="374" text-anchor="middle" font-size="9" class="card-sub">Generates RSC payloads</text>
+  </g>
+
+  <!-- Server Bundle Card -->
+  <g>
+    <rect x="315" y="70" width="270" height="330" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="315" y="70" width="270" height="40" rx="12" fill="url(#reactGrad)"/>
+    <rect x="315" y="98" width="270" height="12" fill="url(#reactGrad)"/>
+    <text x="450" y="95" text-anchor="middle" font-size="13" font-weight="600" fill="white">Server Bundle</text>
+
+    <rect x="329" y="120" width="242" height="24" rx="6" class="item-bg" stroke-width="1"/>
+    <text x="450" y="136" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" class="item-code">server-bundle.js</text>
+
+    <text x="335" y="164" font-size="10" font-weight="600" class="card-title">Contains:</text>
+    <rect x="335" y="172" width="100" height="18" rx="4" class="tag-server" stroke-width="1"/>
+    <text x="385" y="184" text-anchor="middle" font-size="9" class="tag-server-text">Server Components</text>
+    <rect x="443" y="172" width="100" height="18" rx="4" class="tag-client" stroke-width="1"/>
+    <text x="493" y="184" text-anchor="middle" font-size="9" class="tag-client-text">Client Components</text>
+
+    <text x="335" y="210" font-size="10" font-weight="600" class="card-title">Webpack config:</text>
+    <text x="335" y="224" font-family="ui-monospace, monospace" font-size="9" class="item-text">serverWebpackConfig.js</text>
+
+    <text x="335" y="248" font-size="10" font-weight="600" class="card-title">Purpose:</text>
+    <text x="335" y="262" font-size="9" class="item-text">Full SSR — renders any component to HTML</text>
+
+    <rect x="329" y="280" width="242" height="28" rx="6" class="tag-runtime" stroke-width="1"/>
+    <text x="450" y="298" text-anchor="middle" font-size="10" font-weight="600" class="tag-runtime-text">Runtime: Node Renderer VM</text>
+
+    <rect x="329" y="316" width="242" height="28" rx="6" class="env-box" stroke-width="1"/>
+    <text x="450" y="334" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" class="env-text">SERVER_BUNDLE_ONLY=true</text>
+
+    <text x="450" y="374" text-anchor="middle" font-size="9" class="card-sub">Streams HTML with embedded payload</text>
+  </g>
+
+  <!-- Client Bundle Card -->
+  <g>
+    <rect x="610" y="70" width="270" height="330" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="610" y="70" width="270" height="40" rx="12" fill="url(#browserGrad)"/>
+    <rect x="610" y="98" width="270" height="12" fill="url(#browserGrad)"/>
+    <text x="745" y="95" text-anchor="middle" font-size="13" font-weight="600" fill="white">Client Bundle</text>
+
+    <rect x="624" y="120" width="242" height="24" rx="6" class="item-bg" stroke-width="1"/>
+    <text x="745" y="136" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" class="item-code">client chunks (split)</text>
+
+    <text x="630" y="164" font-size="10" font-weight="600" class="card-title">Contains:</text>
+    <rect x="630" y="172" width="100" height="18" rx="4" class="tag-client" stroke-width="1"/>
+    <text x="680" y="184" text-anchor="middle" font-size="9" class="tag-client-text">Client Components</text>
+    <rect x="738" y="172" width="100" height="18" rx="4" class="tag-client" stroke-width="1"/>
+    <text x="788" y="184" text-anchor="middle" font-size="9" class="tag-client-text">Hydration Code</text>
+
+    <text x="630" y="210" font-size="10" font-weight="600" class="card-title">Entry points:</text>
+    <text x="630" y="224" font-size="9" class="item-text">Each 'use client' file → separate chunk</text>
+
+    <text x="630" y="248" font-size="10" font-weight="600" class="card-title">Code splitting:</text>
+    <text x="630" y="262" font-size="9" class="item-text">Chunks loaded on-demand during hydration</text>
+
+    <rect x="624" y="280" width="242" height="28" rx="6" class="tag-runtime" stroke-width="1"/>
+    <text x="745" y="298" text-anchor="middle" font-size="10" font-weight="600" class="tag-runtime-text">Runtime: Browser</text>
+
+    <rect x="624" y="316" width="242" height="28" rx="6" class="env-box" stroke-width="1"/>
+    <text x="745" y="334" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" class="env-text">CLIENT_BUNDLE_ONLY=true</text>
+
+    <text x="745" y="374" text-anchor="middle" font-size="9" class="card-sub">Hydrates interactive components</text>
+  </g>
+</svg>

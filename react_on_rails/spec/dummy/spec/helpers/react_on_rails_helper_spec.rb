@@ -136,6 +136,266 @@ describe ReactOnRailsHelper do
     end
   end
 
+  describe "#react_on_rails_preload_links" do
+    let(:manifest) { instance_double(Shakapacker::Manifest) }
+    let(:integrity_config) { { enabled: false, cross_origin: "anonymous" } }
+    let(:shakapacker_config) do
+      instance_double(Shakapacker::Configuration, integrity: integrity_config, nested_entries?: true)
+    end
+    let(:shakapacker_instance) { instance_double(Shakapacker::Instance, manifest:, config: shakapacker_config) }
+
+    before do
+      allow(Shakapacker).to receive(:instance).and_return(shakapacker_instance)
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+    end
+
+    def preload_link_nodes(html)
+      Nokogiri::HTML.fragment(html).css("link")
+    end
+
+    it "emits script and stylesheet preload tags for a generated component pack" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return(["/packs/runtime-123.js", "/packs/generated/HelloWorld-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(["/packs/generated/HelloWorld-789.css"])
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hello_world"))
+
+      expect(links.map { |link| link["href"] }).to eq(
+        ["/packs/runtime-123.js", "/packs/generated/HelloWorld-456.js", "/packs/generated/HelloWorld-789.css"]
+      )
+      expect(links.map { |link| [link["rel"], link["as"]] }).to eq(
+        [%w[preload script], %w[preload script], %w[preload style]]
+      )
+    end
+
+    it "raises the standard nested entries error when generated packs cannot be looked up" do
+      allow(ReactOnRails::PackerUtils).to receive(:nested_entries?).and_return(false)
+
+      expect { helper.react_on_rails_preload_links("hello_world") }
+        .to raise_error(ReactOnRails::Error, /nested_entries/)
+      expect(manifest).not_to have_received(:lookup_pack_with_chunks!)
+    end
+
+    it "emits modulepreload tags for module manifest assets" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/ModernComponent-123.js",
+                        "type" => "module",
+                        "integrity" => "sha384-modern"
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true, cross_origin: "anonymous" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.size).to eq(1)
+      expect(links.first["href"]).to eq("/packs/generated/ModernComponent-123.js")
+      expect(links.first["rel"]).to eq("modulepreload")
+      expect(links.first["as"]).to be_nil
+      expect(links.first["integrity"]).to eq("sha384-modern")
+      expect(links.first["crossorigin"]).to eq("anonymous")
+    end
+
+    it "emits modulepreload tags for mjs assets with query strings" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([{ "src" => "/packs/generated/ModernComponent-123.mjs?v=abc" }])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["href"]).to eq("/packs/generated/ModernComponent-123.mjs?v=abc")
+      expect(links.first["rel"]).to eq("modulepreload")
+      expect(links.first["crossorigin"]).to eq("anonymous")
+    end
+
+    it "preserves configured crossorigin values on modulepreload tags without integrity" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([{ "src" => "/packs/generated/ModernComponent-123.mjs" }])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: false, cross_origin: "" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["crossorigin"]).to eq("")
+    end
+
+    it "preserves explicit false manifest values when classifying module assets" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/LegacyModule", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/LegacyModule-123.mjs",
+                        # String keys take precedence, so "module" => false wins over module: true.
+                        "module" => false,
+                        module: true
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/LegacyModule", type: :stylesheet)
+        .and_return(nil)
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("legacy_module"))
+
+      expect(links.first["rel"]).to eq("preload")
+      expect(links.first["as"]).to eq("script")
+    end
+
+    it "preserves configured crossorigin values on modulepreload tags with integrity" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/ModernComponent-123.mjs",
+                        "integrity" => "sha384-modern"
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true, cross_origin: "" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["crossorigin"]).to eq("")
+    end
+
+    it "defaults missing crossorigin values on modulepreload tags with integrity" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/ModernComponent-123.mjs",
+                        "integrity" => "sha384-modern"
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["integrity"]).to eq("sha384-modern")
+      expect(links.first["crossorigin"]).to eq("anonymous")
+    end
+
+    it "resolves manifest sources through Rails asset paths" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HostedComponent", type: :javascript)
+        .and_return(["/packs/generated/HostedComponent-123.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HostedComponent", type: :stylesheet)
+        .and_return(["/packs/generated/HostedComponent-456.css"])
+      allow(helper).to receive(:path_to_asset) do |source, options|
+        expect(options).to eq(skip_pipeline: true)
+        "https://cdn.example.com#{source}"
+      end
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hosted_component"))
+
+      expect(links.map { |link| link["href"] }).to eq(
+        [
+          "https://cdn.example.com/packs/generated/HostedComponent-123.js",
+          "https://cdn.example.com/packs/generated/HostedComponent-456.css"
+        ]
+      )
+    end
+
+    it "normalizes prefixed generated pack names consistently" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return(["/packs/generated/HelloWorld-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(nil)
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("generated/hello_world"))
+
+      expect(links.first["href"]).to eq("/packs/generated/HelloWorld-456.js")
+    end
+
+    it "rejects hyphenated component names before manifest lookup" do
+      expect { helper.react_on_rails_preload_links("my-component") }
+        .to raise_error(ArgumentError, /without hyphens/)
+      expect(manifest).not_to have_received(:lookup_pack_with_chunks!)
+    end
+
+    it "raises a clear error for hash manifest sources without src" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/BrokenComponent", type: :javascript)
+        .and_return([{ "integrity" => "sha384-broken" }])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/BrokenComponent", type: :stylesheet)
+        .and_return(nil)
+
+      expect { helper.react_on_rails_preload_links("broken_component") }
+        .to raise_error(ArgumentError, /manifest source without src/)
+    end
+
+    it "deduplicates shared chunks across component packs" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return(["/packs/runtime-123.js", "/packs/generated/HelloWorld-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(["/packs/shared-789.css"])
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ReduxApp", type: :javascript)
+        .and_return(["/packs/runtime-123.js", "/packs/generated/ReduxApp-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ReduxApp", type: :stylesheet)
+        .and_return(["/packs/shared-789.css"])
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hello_world", "generated/ReduxApp"))
+
+      expect(links.map { |link| link["href"] }).to eq(
+        [
+          "/packs/runtime-123.js",
+          "/packs/generated/HelloWorld-456.js",
+          "/packs/shared-789.css",
+          "/packs/generated/ReduxApp-456.js"
+        ]
+      )
+    end
+
+    it "deduplicates assets by href before rendering link attributes" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/runtime-123.js",
+                        "integrity" => "sha384-runtime"
+                      },
+                      "/packs/runtime-123.js"
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true, cross_origin: "anonymous" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hello_world"))
+
+      expect(links.size).to eq(1)
+      expect(links.first["href"]).to eq("/packs/runtime-123.js")
+      expect(links.first["integrity"]).to eq("sha384-runtime")
+    end
+  end
+
   describe "#json_safe_and_pretty(hash_or_string)" do
     it "raises an error if not hash nor string nor nil passed" do
       expect { helper.json_safe_and_pretty(false) }.to raise_error(ReactOnRails::Error)

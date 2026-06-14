@@ -48,4 +48,9 @@ Rails.application.routes.draw do
   get "turbo_frame_tag_hello_world" => "pages#turbo_frame_tag_hello_world"
   post "turbo_stream_send_hello_world" => "pages#turbo_stream_send_hello_world"
   get "manual_render_test" => "pages#manual_render_test"
+
+  # EXPERIMENTAL View Transitions demo (issue #3888). Inert by default: the
+  # route only exists when the dummy app is booted with VIEW_TRANSITIONS_DEMO=true.
+  # See docs/oss/building-features/view-transitions.md.
+  get "view_transitions_demo" => "pages#view_transitions_demo" if ENV["VIEW_TRANSITIONS_DEMO"] == "true"
 end

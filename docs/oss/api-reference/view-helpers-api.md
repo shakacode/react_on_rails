@@ -48,6 +48,35 @@ Uncommonly used options:
 
 ---
 
+### react_on_rails_preload_links
+
+```erb
+<%= react_on_rails_preload_links("HelloWorld", "comments_list") %>
+```
+
+Use `react_on_rails_preload_links` in a layout or view `<head>` when you know which auto-bundled React components the page will render. The helper resolves each component to its generated Shakapacker pack (`generated/ComponentName`) and emits preload link tags for the manifest assets. Pass component names as PascalCase, camelCase, or snake_case strings; hyphenated names are rejected because they cannot be normalized reliably.
+
+For JavaScript chunks, plain script assets render as `<link rel="preload" as="script">`. Module assets render as `<link rel="modulepreload">` when the manifest marks the asset as a module or the emitted file has an `.mjs` extension. CSS chunks render as `<link rel="preload" as="style">`. Component packs without CSS assets simply skip the stylesheet preload.
+
+```erb
+<head>
+  <%= react_on_rails_preload_links("ProductPage") %>
+  <%= stylesheet_pack_tag "application" %>
+</head>
+<body>
+  <%= react_component("ProductPage", props: @product_props, auto_load_bundle: true) %>
+  <%= javascript_pack_tag "application" %>
+</body>
+```
+
+Because preload hints belong in `<head>`, pass component names that are known before the component renders.
+
+This helper only emits HTML link tags. Keep the normal `stylesheet_pack_tag` and `javascript_pack_tag` calls in the layout so the browser still applies and executes the assets.
+
+When using a CDN asset host, keep Shakapacker's Subresource Integrity and `crossorigin` settings consistent between preload tags and the final script/style tags so the browser can reuse the preloaded response.
+
+---
+
 ### react_component_hash
 
 > **React 19 Alternative:** For metadata use cases (page titles, meta tags, canonical URLs), consider using [React 19 Native Metadata](../building-features/react-19-native-metadata.md) with `react_component` or `stream_react_component` instead. React 19 natively hoists `<title>`, `<meta>`, and `<link>` tags to `<head>`, eliminating the need for a render-function and `react_component_hash`. See the [migration guide](../building-features/react-19-native-metadata.md#migration-guide) for step-by-step instructions.

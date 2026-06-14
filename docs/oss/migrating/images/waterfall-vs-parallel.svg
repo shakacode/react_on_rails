@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 680" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Client-Side Fetching vs Server Component Data</title>
+  <desc>Side-by-side comparison showing client-side fetching requiring an extra API round trip after mount versus Server Component pattern where Rails streams data via async props — no extra round trips, no client state management, Suspense handles loading.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .bad-header { fill: #FEE2E2; stroke: #FECACA; }
+      .bad-text { fill: #991B1B; }
+      .good-header { fill: #D1FAE5; stroke: #86EFAC; }
+      .good-text { fill: #166534; }
+      .seq-browser { fill: #DBEAFE; stroke: #93C5FD; }
+      .seq-server { fill: #ECFDF5; stroke: #22C55E; }
+      .seq-done { fill: #D1FAE5; stroke: #86EFAC; }
+      .seq-fetch { fill: #FEE2E2; stroke: #FECACA; }
+      .marker-line { stroke: #94A3B8; }
+      .arrow-body { fill: #94A3B8; }
+      .badge-uc { fill: #FEE2E2; stroke: #EF4444; }
+      .badge-text { fill: #991B1B; }
+      .track-bg { fill: #F1F5F9; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .bad-header { fill: #450A0A; stroke: #F87171; }
+        .bad-text { fill: #FCA5A5; }
+        .good-header { fill: #052E16; stroke: #10B981; }
+        .good-text { fill: #6EE7B7; }
+        .seq-browser { fill: #172554; stroke: #3B82F6; }
+        .seq-server { fill: #052E16; stroke: #10B981; }
+        .seq-done { fill: #052E16; stroke: #10B981; }
+        .seq-fetch { fill: #450A0A; stroke: #F87171; }
+        .marker-line { stroke: #64748B; }
+        .arrow-body { fill: #64748B; }
+        .badge-uc { fill: #450A0A; stroke: #F87171; }
+        .badge-text { fill: #FCA5A5; }
+        .track-bg { fill: #1E293B; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="680" class="bg"/>
+  <text x="450" y="26" text-anchor="middle" font-size="18" font-weight="700" class="title">Client-Side Fetching vs Server Component</text>
+  <text x="450" y="44" text-anchor="middle" font-size="11" class="subtitle">Server Components receive data as props — no extra round trips, no client-side state management</text>
+
+  <!-- ============ TOP CARD: Client-Side Fetching ============ -->
+  <rect x="30" y="58" width="840" height="252" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="30" y="58" width="840" height="28" rx="12" class="bad-header" stroke-width="1"/>
+  <rect x="30" y="74" width="840" height="12" class="bad-header"/>
+  <text x="450" y="78" text-anchor="middle" font-size="12" font-weight="700" class="bad-text">&#x274C; Client-Side Fetching (useEffect + fetch)</text>
+
+  <!-- Lifeline labels -->
+  <rect x="130" y="92" width="140" height="20" rx="6" class="seq-browser" stroke-width="1.5"/>
+  <text x="200" y="106" text-anchor="middle" font-size="10" font-weight="600" class="label-text">Browser</text>
+  <rect x="630" y="92" width="140" height="20" rx="6" class="seq-browser" stroke-width="1.5"/>
+  <text x="700" y="106" text-anchor="middle" font-size="10" font-weight="600" class="label-text">Server</text>
+
+  <!-- Lifeline dashes -->
+  <line x1="200" y1="112" x2="200" y2="280" class="marker-line" stroke-width="1" stroke-dasharray="4 3"/>
+  <line x1="700" y1="112" x2="700" y2="280" class="marker-line" stroke-width="1" stroke-dasharray="4 3"/>
+
+  <!-- 1. Request page -->
+  <line x1="210" y1="126" x2="688" y2="126" class="marker-line" stroke-width="1.5"/>
+  <polygon points="688,122 700,126 688,130" class="arrow-body"/>
+  <text x="450" y="122" text-anchor="middle" font-size="9" class="label-text">1. Request page</text>
+
+  <!-- 2. HTML + JS back (no data) -->
+  <line x1="690" y1="146" x2="212" y2="146" class="marker-line" stroke-width="1.5"/>
+  <polygon points="212,142 200,146 212,150" class="arrow-body"/>
+  <text x="450" y="142" text-anchor="middle" font-size="9" class="label-text">2. HTML shell + JS bundle (no data)</text>
+
+  <!-- Browser: mount, spinner -->
+  <rect x="80" y="158" width="240" height="22" rx="5" class="seq-browser" stroke-width="1"/>
+  <text x="200" y="173" text-anchor="middle" font-size="8" class="label-text">Mount component &#x2192; useEffect &#x2192; show spinner</text>
+
+  <!-- 3. Extra API call (RED!) -->
+  <line x1="210" y1="194" x2="688" y2="194" stroke="#EF4444" stroke-width="2"/>
+  <polygon points="688,190 700,194 688,198" fill="#EF4444"/>
+  <text x="370" y="190" text-anchor="middle" font-size="9" font-weight="600" class="bad-text">3. GET /api/user</text>
+  <rect x="530" y="184" width="96" height="14" rx="4" class="badge-uc" stroke-width="1"/>
+  <text x="578" y="194" text-anchor="middle" font-size="7" font-weight="700" class="badge-text">extra round trip!</text>
+
+  <!-- Server: query DB -->
+  <rect x="580" y="208" width="240" height="16" rx="4" class="seq-fetch" stroke-width="1"/>
+  <text x="700" y="220" text-anchor="middle" font-size="8" class="bad-text">Query database, serialize to JSON</text>
+
+  <!-- 4. JSON response -->
+  <line x1="690" y1="238" x2="212" y2="238" class="marker-line" stroke-width="1.5"/>
+  <polygon points="212,234 200,238 212,242" class="arrow-body"/>
+  <text x="450" y="234" text-anchor="middle" font-size="9" class="label-text">4. JSON { user }</text>
+
+  <!-- Browser: re-render -->
+  <rect x="80" y="252" width="240" height="16" rx="4" class="seq-browser" stroke-width="1"/>
+  <text x="200" y="264" text-anchor="middle" font-size="8" class="label-text">setState &#x2192; re-render &#x2192; content visible</text>
+
+  <!-- Summary -->
+  <text x="450" y="286" text-anchor="middle" font-size="10" font-weight="600" class="bad-text">2 round trips &#x2022; user sees spinner &#x2022; client JS required for fetching + state</text>
+  <text x="450" y="300" text-anchor="middle" font-size="9" class="label-sub">Requires: useState, useEffect, fetch, loading/error handling, API endpoint</text>
+
+  <!-- ============ BOTTOM CARD: Server Component ============ -->
+  <rect x="30" y="322" width="840" height="246" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="30" y="322" width="840" height="28" rx="12" class="good-header" stroke-width="1"/>
+  <rect x="30" y="338" width="840" height="12" class="good-header"/>
+  <text x="450" y="342" text-anchor="middle" font-size="12" font-weight="700" class="good-text">&#x2705; Server Component (async props from Rails)</text>
+
+  <!-- Lifeline labels -->
+  <rect x="130" y="356" width="140" height="20" rx="6" class="seq-browser" stroke-width="1.5"/>
+  <text x="200" y="370" text-anchor="middle" font-size="10" font-weight="600" class="label-text">Browser</text>
+  <rect x="620" y="356" width="160" height="20" rx="6" class="seq-server" stroke-width="1.5"/>
+  <text x="700" y="370" text-anchor="middle" font-size="10" font-weight="600" class="label-text">Server (Rails)</text>
+
+  <!-- Lifeline dashes -->
+  <line x1="200" y1="376" x2="200" y2="536" class="marker-line" stroke-width="1" stroke-dasharray="4 3"/>
+  <line x1="700" y1="376" x2="700" y2="536" class="marker-line" stroke-width="1" stroke-dasharray="4 3"/>
+
+  <!-- 1. Request page -->
+  <line x1="210" y1="390" x2="688" y2="390" class="marker-line" stroke-width="1.5"/>
+  <polygon points="688,386 700,390 688,394" class="arrow-body"/>
+  <text x="450" y="386" text-anchor="middle" font-size="9" class="label-text">1. Request page</text>
+
+  <!-- Server: Load fast props -->
+  <rect x="580" y="404" width="240" height="16" rx="4" class="seq-server" stroke-width="1.5"/>
+  <text x="700" y="416" text-anchor="middle" font-size="8" class="label-text">Load fast props (sync: name, price)</text>
+
+  <!-- 2. HTML shell streams with fast data (GREEN) -->
+  <line x1="690" y1="434" x2="212" y2="434" stroke="#22C55E" stroke-width="2.5"/>
+  <polygon points="212,430 200,434 212,438" fill="#22C55E"/>
+  <text x="450" y="430" text-anchor="middle" font-size="9" font-weight="600" class="good-text">2. HTML shell + fast content (streaming starts)</text>
+
+  <!-- Concurrent: browser shows shell + server loads slow data -->
+  <rect x="80" y="448" width="240" height="26" rx="4" class="seq-done" stroke-width="1.5"/>
+  <text x="200" y="459" text-anchor="middle" font-size="8" font-weight="600" class="good-text">Shell visible immediately</text>
+  <text x="200" y="470" text-anchor="middle" font-size="7" class="label-sub">Suspense fallback shown for slow data</text>
+
+  <rect x="580" y="448" width="240" height="26" rx="4" class="seq-server" stroke-width="1"/>
+  <text x="700" y="459" text-anchor="middle" font-size="8" class="label-text">emit block: load slow data</text>
+  <text x="700" y="470" text-anchor="middle" font-size="7" class="label-sub">(reviews, recommendations)</text>
+
+  <!-- 3. Async prop streams in (GREEN dashed) -->
+  <line x1="690" y1="490" x2="212" y2="490" stroke="#22C55E" stroke-width="1.5" stroke-dasharray="8 4"/>
+  <polygon points="212,486 200,490 212,494" fill="#22C55E"/>
+  <text x="450" y="486" text-anchor="middle" font-size="9" class="good-text">3. getReactOnRailsAsyncProp resolves &#x2192; streams in</text>
+
+  <!-- Suspense fills -->
+  <rect x="80" y="504" width="240" height="16" rx="4" class="seq-done" stroke-width="1"/>
+  <text x="200" y="516" text-anchor="middle" font-size="8" font-weight="600" class="good-text">&#x2713; Suspense fills &#x2192; full content visible</text>
+
+  <!-- Summary -->
+  <text x="450" y="544" text-anchor="middle" font-size="10" font-weight="600" class="good-text">1 round trip &#x2022; shell immediate &#x2022; slow data streams via async props</text>
+  <text x="450" y="558" text-anchor="middle" font-size="9" class="label-sub">No useState, no useEffect, no fetch &#x2014; data stays server-side, Suspense handles loading</text>
+
+  <!-- Legend -->
+  <g transform="translate(30, 580)">
+    <rect x="0" y="0" width="840" height="28" rx="8" class="track-bg" stroke-width="0"/>
+    <rect x="20" y="8" width="30" height="10" rx="3" class="seq-browser" stroke-width="1"/>
+    <text x="58" y="17" font-size="9" class="label-text">Browser activity</text>
+    <rect x="190" y="8" width="30" height="10" rx="3" class="seq-server" stroke-width="1"/>
+    <text x="228" y="17" font-size="9" class="label-text">Server activity</text>
+    <line x1="350" y1="13" x2="380" y2="13" stroke="#EF4444" stroke-width="2"/>
+    <text x="388" y="17" font-size="9" class="label-text">Extra round trip</text>
+    <line x1="510" y1="13" x2="540" y2="13" stroke="#22C55E" stroke-width="2.5"/>
+    <text x="548" y="17" font-size="9" class="label-text">Streaming response</text>
+    <line x1="670" y1="13" x2="700" y2="13" stroke="#22C55E" stroke-width="1.5" stroke-dasharray="4 2"/>
+    <text x="708" y="17" font-size="9" class="label-text">Async props</text>
+  </g>
+
+  <!-- Bottom callout -->
+  <rect x="80" y="620" width="740" height="46" rx="6" class="note-box" stroke-width="1"/>
+  <text x="450" y="638" text-anchor="middle" font-size="10" font-weight="600" class="note-text">Server Components eliminate: useState, useEffect, loading states, API endpoints, fetch calls</text>
+  <text x="450" y="656" text-anchor="middle" font-size="9" class="note-text">For slow data: async props (getReactOnRailsAsyncProp) stream each value behind Suspense boundaries</text>
+</svg>

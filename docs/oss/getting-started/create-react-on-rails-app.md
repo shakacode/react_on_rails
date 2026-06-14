@@ -24,6 +24,7 @@ When no `--pro` or `--rsc` flag is given, the CLI prompts you to choose a setup 
 
 The default choice is RSC. Press Enter to accept it, or type `1` or `2` to pick a different mode.
 In non-interactive environments (CI, pipes), standard mode is used automatically.
+When the mode prompt is shown, the CLI also asks whether to add Tailwind CSS v4 to the generated SSR example.
 
 To skip the prompt, pass `--standard`, `--pro`, or `--rsc` explicitly.
 All mode flags support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
@@ -48,6 +49,9 @@ npx create-react-on-rails-app my-app --standard
 # JavaScript instead of TypeScript
 npx create-react-on-rails-app my-app --template javascript
 
+# Add Tailwind CSS v4 to the generated SSR example
+npx create-react-on-rails-app my-app --tailwind
+
 # Use Rspack for ~20x faster builds
 npx create-react-on-rails-app my-app --rspack
 
@@ -60,16 +64,18 @@ npx create-react-on-rails-app my-app --rspack --rsc
 
 ### All Options
 
-| Option                       | Description                                                    | Default       |
-| ---------------------------- | -------------------------------------------------------------- | ------------- |
-| `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`  |
-| `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`       |
-| `--standard`                 | Use open-source React on Rails (skip prompt)                   | `false`       |
-| `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)      | `false`       |
-| `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`       |
-| `-p, --package-manager <pm>` | `npm` or `pnpm`                                                | auto-detected |
+| Option                       | Description                                                    | Default                  |
+| ---------------------------- | -------------------------------------------------------------- | ------------------------ |
+| `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`             |
+| `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`                  |
+| `--standard`                 | Use open-source React on Rails (skip prompt)                   | `false`                  |
+| `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)      | `false`                  |
+| `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`                  |
+| `--tailwind`                 | Add Tailwind CSS v4 to the generated SSR example               | prompt with mode/`false` |
+| `-p, --package-manager <pm>` | `npm` or `pnpm`                                                | auto-detected            |
 
 When none of `--standard`, `--pro`, or `--rsc` is given, the CLI prompts interactively in TTY environments (default: RSC). In non-TTY environments (CI, pipes, redirected output), standard mode is used automatically.
+When `--tailwind` is omitted, Tailwind is prompted only alongside the mode prompt and disabled otherwise.
 
 ## What It Does
 
@@ -90,6 +96,7 @@ After completion, you get:
 - Standard Rails git scaffold files (`.gitignore` and `.gitattributes`) preserved in the generated app
 - Optional Pro setup (`--pro`) with Pro Node renderer wiring and the generated `/hello_world` example
 - Optional RSC setup (`--rsc`) with HelloServer route and Pro Node renderer wiring
+- Optional Tailwind CSS v4 setup (`--tailwind`) for the generated SSR example
 - Server-side rendering ready
 - Development scripts (`bin/dev` with hot reloading and first-run browser open)
 

@@ -253,6 +253,30 @@ test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only() {
   assert_contains "$out" '"benchmarks_changed": false' "docs PR output"
 }
 
+# Regression for PR #4006: a docs-only PR under docs-internal/ that also ships a
+# binary asset (the .png infographic) used to fall through to the uncategorized
+# catch-all, forcing the ENTIRE JS + Ruby + Pro test suite to run. The markdown
+# itself was always caught by the *.md extension; the image was not, and
+# docs-internal/ was not recognized as a documentation directory the way docs/
+# and internal/ are. Everything under docs-internal/ is internal documentation
+# and must stay non-runtime regardless of file type.
+test_docs_internal_tree_with_image_asset_is_non_runtime_only() {
+  setup_repo
+  mkdir -p docs-internal/rsc-architecture-deep-dive/images
+  printf '# Deep dive\n' > docs-internal/rsc-architecture-deep-dive/00-START-HERE.md
+  printf 'binary-ish png bytes\n' > docs-internal/rsc-architecture-deep-dive/images/flow.png
+  commit_change "internal architecture docs with infographic"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": true' "docs-internal image output"
+  assert_contains "$out" '"non_runtime_only": true' "docs-internal image output"
+  assert_contains "$out" '"run_lint": false' "docs-internal image output"
+  assert_contains "$out" '"run_ruby_tests": false' "docs-internal image output"
+  assert_contains "$out" '"run_js_tests": false' "docs-internal image output"
+  assert_contains "$out" '"benchmarks_changed": false' "docs-internal image output"
+}
+
 # Regression for PR #3717: agent/editor tooling under .claude/** and .agents/**
 # is non-runtime. The .claude/skills symlink (a tracked path with no extension)
 # used to miss every category and hit the catch-all, forcing the full test +
@@ -364,6 +388,42 @@ test_node_renderer_source_change_runs_node_renderer_benchmark() {
   assert_contains "$out" '"run_pro_benchmarks": true' "node renderer output"
   # Node renderer changes don't touch the core suite.
   assert_contains "$out" '"run_core_benchmarks": false' "node renderer output"
+}
+
+# An uncategorized file (e.g. a new CI/tooling dotfile like .ci-dependency-versions,
+# the #3855 case) runs the full TEST suite for safety, but must NOT benchmark:
+# unknown files are almost always tooling, not a hot runtime path, so a Bencher
+# run here is pure noise. Main pushes benchmark unconditionally, so a genuinely
+# new runtime path is still measured once it lands.
+test_uncategorized_file_runs_tests_but_skips_benchmarks() {
+  setup_repo
+  write_file_change ".ci-dependency-versions" "ruby: 3.2"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "uncategorized output"
+  # Full test suite still runs (the safety the catch-all is there for).
+  assert_contains "$out" '"run_ruby_tests": true' "uncategorized output"
+  assert_contains "$out" '"run_pro_tests": true' "uncategorized output"
+  # ... but no benchmark suite.
+  assert_contains "$out" '"run_core_benchmarks": false' "uncategorized output"
+  assert_contains "$out" '"run_pro_benchmarks": false' "uncategorized output"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "uncategorized output"
+}
+
+# Spec-only changes run the gem tests but never benchmark: specs are not shipped,
+# so they cannot move runtime performance (#3854 changed only CI-config specs yet
+# ran the core+pro suites).
+test_rspec_only_change_skips_benchmarks() {
+  setup_repo
+  write_file_change "react_on_rails/spec/react_on_rails/some_bench_spec.rb"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_ruby_tests": true' "rspec-bench output"
+  assert_contains "$out" '"run_core_benchmarks": false' "rspec-bench output"
+  assert_contains "$out" '"run_pro_benchmarks": false' "rspec-bench output"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "rspec-bench output"
 }
 
 test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint() {
@@ -793,11 +853,14 @@ run_test test_docs_changes_are_non_runtime_only
 run_test test_internal_non_markdown_docs_are_non_runtime_only
 run_test test_issue_template_changes_are_non_runtime_only
 run_test test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only
+run_test test_docs_internal_tree_with_image_asset_is_non_runtime_only
 run_test test_agent_tooling_changes_are_non_runtime_only
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
 run_test test_ci_infra_plus_runtime_source_still_benchmarks
 run_test test_node_renderer_source_change_runs_node_renderer_benchmark
+run_test test_uncategorized_file_runs_tests_but_skips_benchmarks
+run_test test_rspec_only_change_skips_benchmarks
 run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_ruby_block_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_wrapping_ruby_code_with_block_comment_delimiters_remains_runtime_affecting

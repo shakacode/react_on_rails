@@ -1,0 +1,223 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Selective Hydration Timeline</title>
+  <desc>Animated timeline showing how selective hydration works with streamed RSC components. With async script loading, components hydrate independently as they stream in — the page becomes interactive before slow components finish loading. Compares defer (all-or-nothing) vs async (progressive) loading strategies.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .header-defer { fill: #FEE2E2; stroke: #FECACA; }
+      .header-defer-text { fill: #991B1B; }
+      .header-async { fill: #D1FAE5; stroke: #86EFAC; }
+      .header-async-text { fill: #166534; }
+      .track-bg { fill: #F1F5F9; stroke: #E2E8F0; }
+      .track-waiting { fill: #E2E8F0; }
+      .track-streaming { fill: #93C5FD; }
+      .track-hydrated { fill: #22C55E; }
+      .track-blocked { fill: #FECACA; }
+      .track-interactive { fill: #4ADE80; }
+      .marker-line { stroke: #94A3B8; }
+      .time-text { fill: #64748B; }
+      .status-waiting { fill: #94A3B8; }
+      .status-streaming { fill: #3B82F6; }
+      .status-hydrated { fill: #22C55E; }
+      .status-blocked { fill: #EF4444; }
+      .callout-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .callout-text { fill: #1E40AF; }
+      .legend-label { fill: #334155; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .header-defer { fill: #450A0A; stroke: #F87171; }
+        .header-defer-text { fill: #FCA5A5; }
+        .header-async { fill: #052E16; stroke: #10B981; }
+        .header-async-text { fill: #6EE7B7; }
+        .track-bg { fill: #1E293B; stroke: #334155; }
+        .track-waiting { fill: #334155; }
+        .track-streaming { fill: #1D4ED8; }
+        .track-hydrated { fill: #16A34A; }
+        .track-blocked { fill: #7F1D1D; }
+        .track-interactive { fill: #22C55E; }
+        .marker-line { stroke: #64748B; }
+        .time-text { fill: #94A3B8; }
+        .callout-box { fill: #172554; stroke: #3B82F6; }
+        .callout-text { fill: #93C5FD; }
+        .legend-label { fill: #CBD5E1; }
+      }
+
+      .phase-a { opacity: 0; animation: phaseA 14s ease infinite; }
+      .phase-b { opacity: 0; animation: phaseB 14s ease infinite; }
+
+      @keyframes phaseA {
+        0%, 42% { opacity: 1; } 48%, 100% { opacity: 0; }
+      }
+      @keyframes phaseB {
+        0%, 48% { opacity: 0; } 54%, 92% { opacity: 1; } 97%, 100% { opacity: 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; }
+        .phase-a, .phase-b { opacity: 1 !important; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="520" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Selective Hydration Timeline</text>
+  <text x="450" y="46" text-anchor="middle" font-size="11" class="subtitle">With async loading, components hydrate independently — no waiting for the slowest one</text>
+
+  <!-- ============ PHASE A: defer (all-or-nothing) ============ -->
+  <g class="phase-a">
+    <rect x="30" y="60" width="840" height="210" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="30" y="60" width="840" height="32" rx="12" class="header-defer" stroke-width="1.5"/>
+    <rect x="30" y="80" width="840" height="12" class="header-defer"/>
+    <text x="450" y="82" text-anchor="middle" font-size="13" font-weight="700" class="header-defer-text">❌  loading_strategy: :defer  (all-or-nothing)</text>
+
+    <!-- Time axis -->
+    <line x1="120" y1="252" x2="820" y2="252" class="marker-line" stroke-width="1"/>
+    <text x="120" y="266" text-anchor="middle" font-size="8" class="time-text">0s</text>
+    <text x="260" y="266" text-anchor="middle" font-size="8" class="time-text">1s</text>
+    <text x="400" y="266" text-anchor="middle" font-size="8" class="time-text">2s</text>
+    <text x="540" y="266" text-anchor="middle" font-size="8" class="time-text">3s</text>
+    <text x="680" y="266" text-anchor="middle" font-size="8" class="time-text">5s</text>
+    <text x="820" y="266" text-anchor="middle" font-size="8" class="time-text">5s+</text>
+
+    <!-- Component labels -->
+    <text x="110" y="112" text-anchor="end" font-size="10" font-weight="600" class="label-text">Page Shell</text>
+    <text x="110" y="142" text-anchor="end" font-size="10" font-weight="600" class="label-text">Posts</text>
+    <text x="110" y="172" text-anchor="end" font-size="10" font-weight="600" class="label-text">LongWaiting</text>
+    <text x="110" y="202" text-anchor="end" font-size="10" font-weight="600" class="label-text">Scripts</text>
+
+    <!-- Page Shell: streamed fast, but blocked from hydration -->
+    <rect x="120" y="100" width="140" height="16" rx="4" class="track-streaming"/>
+    <rect x="260" y="100" width="420" height="16" rx="4" class="track-blocked"/>
+    <rect x="680" y="100" width="140" height="16" rx="4" class="track-hydrated"/>
+
+    <!-- Posts: streamed at ~1s, blocked -->
+    <rect x="120" y="130" width="140" height="16" rx="4" class="track-waiting"/>
+    <rect x="260" y="130" width="140" height="16" rx="4" class="track-streaming"/>
+    <rect x="400" y="130" width="280" height="16" rx="4" class="track-blocked"/>
+    <rect x="680" y="130" width="140" height="16" rx="4" class="track-hydrated"/>
+
+    <!-- LongWaiting: streams at 5s -->
+    <rect x="120" y="160" width="560" height="16" rx="4" class="track-waiting"/>
+    <rect x="680" y="160" width="90" height="16" rx="4" class="track-streaming"/>
+    <rect x="770" y="160" width="50" height="16" rx="4" class="track-hydrated"/>
+
+    <!-- Scripts: defer blocks until DOM complete -->
+    <rect x="120" y="190" width="560" height="16" rx="4" class="track-waiting"/>
+    <rect x="680" y="190" width="40" height="16" rx="4" class="track-hydrated"/>
+
+    <!-- Blocked annotation -->
+    <text x="470" y="234" text-anchor="middle" font-size="10" font-weight="600" class="header-defer-text">Everything waits for LongWaitingComponent (5s) before any hydration</text>
+
+    <!-- Blocked arrow -->
+    <line x1="680" y1="96" x2="680" y2="210" class="marker-line" stroke-width="1" stroke-dasharray="4 2"/>
+    <text x="690" y="224" font-size="8" class="time-text">hydrate all</text>
+  </g>
+
+  <!-- ============ PHASE B: async (selective) ============ -->
+  <g class="phase-b">
+    <rect x="30" y="60" width="840" height="210" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="30" y="60" width="840" height="32" rx="12" class="header-async" stroke-width="1.5"/>
+    <rect x="30" y="80" width="840" height="12" class="header-async"/>
+    <text x="450" y="82" text-anchor="middle" font-size="13" font-weight="700" class="header-async-text">✅  loading_strategy: :async  (selective hydration)</text>
+
+    <!-- Time axis -->
+    <line x1="120" y1="252" x2="820" y2="252" class="marker-line" stroke-width="1"/>
+    <text x="120" y="266" text-anchor="middle" font-size="8" class="time-text">0s</text>
+    <text x="260" y="266" text-anchor="middle" font-size="8" class="time-text">1s</text>
+    <text x="400" y="266" text-anchor="middle" font-size="8" class="time-text">2s</text>
+    <text x="540" y="266" text-anchor="middle" font-size="8" class="time-text">3s</text>
+    <text x="680" y="266" text-anchor="middle" font-size="8" class="time-text">5s</text>
+    <text x="820" y="266" text-anchor="middle" font-size="8" class="time-text">5s+</text>
+
+    <!-- Component labels -->
+    <text x="110" y="112" text-anchor="end" font-size="10" font-weight="600" class="label-text">Page Shell</text>
+    <text x="110" y="142" text-anchor="end" font-size="10" font-weight="600" class="label-text">Posts</text>
+    <text x="110" y="172" text-anchor="end" font-size="10" font-weight="600" class="label-text">LongWaiting</text>
+    <text x="110" y="202" text-anchor="end" font-size="10" font-weight="600" class="label-text">Scripts</text>
+
+    <!-- Page Shell: streams fast, hydrates immediately -->
+    <rect x="120" y="100" width="140" height="16" rx="4" class="track-streaming"/>
+    <rect x="260" y="100" width="560" height="16" rx="4" class="track-hydrated"/>
+
+    <!-- Posts: streams at ~1s, hydrates immediately after -->
+    <rect x="120" y="130" width="140" height="16" rx="4" class="track-waiting"/>
+    <rect x="260" y="130" width="140" height="16" rx="4" class="track-streaming"/>
+    <rect x="400" y="130" width="420" height="16" rx="4" class="track-hydrated"/>
+
+    <!-- LongWaiting: streams at 5s, hydrates right after -->
+    <rect x="120" y="160" width="560" height="16" rx="4" class="track-waiting"/>
+    <rect x="680" y="160" width="90" height="16" rx="4" class="track-streaming"/>
+    <rect x="770" y="160" width="50" height="16" rx="4" class="track-hydrated"/>
+
+    <!-- Scripts: load async, ready early -->
+    <rect x="120" y="190" width="100" height="16" rx="4" class="track-streaming"/>
+    <rect x="220" y="190" width="600" height="16" rx="4" class="track-hydrated"/>
+
+    <!-- Hydration markers -->
+    <line x1="260" y1="96" x2="260" y2="120" class="marker-line" stroke-width="1" stroke-dasharray="4 2"/>
+    <text x="274" y="94" font-size="7" class="status-hydrated">✨ interactive</text>
+
+    <line x1="400" y1="126" x2="400" y2="150" class="marker-line" stroke-width="1" stroke-dasharray="4 2"/>
+    <text x="414" y="124" font-size="7" class="status-hydrated">✨ interactive</text>
+
+    <text x="470" y="234" text-anchor="middle" font-size="10" font-weight="600" class="header-async-text">Each component hydrates as soon as it streams — user sees interactivity in &lt;1s</text>
+  </g>
+
+  <!-- Legend (always visible) -->
+  <g transform="translate(30, 290)">
+    <rect x="0" y="0" width="840" height="36" rx="8" class="track-bg" stroke-width="1"/>
+    <rect x="20" y="10" width="40" height="12" rx="3" class="track-waiting"/>
+    <text x="68" y="20" font-size="9" class="legend-label">Waiting</text>
+    <rect x="130" y="10" width="40" height="12" rx="3" class="track-streaming"/>
+    <text x="178" y="20" font-size="9" class="legend-label">Streaming</text>
+    <rect x="260" y="10" width="40" height="12" rx="3" class="track-hydrated"/>
+    <text x="308" y="20" font-size="9" class="legend-label">Hydrated</text>
+    <rect x="400" y="10" width="40" height="12" rx="3" class="track-blocked"/>
+    <text x="448" y="20" font-size="9" class="legend-label">Blocked (waiting for scripts)</text>
+  </g>
+
+  <!-- Component tree diagram -->
+  <rect x="30" y="340" width="840" height="160" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="366" text-anchor="middle" font-size="12" font-weight="600" class="label-text">Component Structure</text>
+
+  <!-- Tree -->
+  <rect x="350" y="380" width="200" height="24" rx="6" fill="#DBEAFE" stroke="#93C5FD" stroke-width="1.5"/>
+  <text x="450" y="396" text-anchor="middle" font-size="9" font-weight="600" fill="#1E40AF">&lt;ReactServerComponentPage&gt;</text>
+
+  <line x1="350" y1="404" x2="350" y2="420" class="marker-line" stroke-width="1"/>
+  <line x1="550" y1="404" x2="550" y2="420" class="marker-line" stroke-width="1"/>
+
+  <!-- Left Suspense -->
+  <rect x="160" y="420" width="180" height="58" rx="6" class="header-async" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <text x="250" y="438" text-anchor="middle" font-size="9" font-weight="600" class="header-async-text">&lt;Suspense&gt;</text>
+  <rect x="174" y="448" width="152" height="22" rx="4" fill="#DBEAFE" stroke="#93C5FD" stroke-width="1"/>
+  <text x="250" y="463" text-anchor="middle" font-size="8" fill="#1E40AF">&lt;Posts /&gt; — fast ⚡</text>
+
+  <line x1="350" y1="420" x2="250" y2="420" class="marker-line" stroke-width="1"/>
+
+  <!-- Right Suspense -->
+  <rect x="560" y="420" width="220" height="58" rx="6" class="header-defer" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <text x="670" y="438" text-anchor="middle" font-size="9" font-weight="600" class="header-defer-text">&lt;Suspense&gt;</text>
+  <rect x="574" y="448" width="192" height="22" rx="4" fill="#FEE2E2" stroke="#FECACA" stroke-width="1"/>
+  <text x="670" y="463" text-anchor="middle" font-size="8" fill="#991B1B">&lt;LongWaitingComponent /&gt; — 5s ⏳</text>
+
+  <line x1="550" y1="420" x2="670" y2="420" class="marker-line" stroke-width="1"/>
+
+  <!-- Key insight -->
+  <rect x="150" y="492" width="600" height="22" rx="6" class="callout-box" stroke-width="1"/>
+  <text x="450" y="507" text-anchor="middle" font-size="10" font-weight="600" class="callout-text">Each Suspense boundary is an independent hydration unit</text>
+</svg>

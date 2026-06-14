@@ -8,6 +8,16 @@ module ReactOnRails
     class DevTestsGenerator < Rails::Generators::Base
       include GeneratorHelper
 
+      ESLINT_DEV_DEPENDENCIES = {
+        "@eslint/js" => "^9.0.0",
+        "eslint" => "^9.0.0",
+        "eslint-config-prettier" => "^10.0.0",
+        "eslint-plugin-import" => "^2.29.0",
+        "eslint-plugin-react" => "^7.37.5",
+        "eslint-plugin-react-hooks" => "^6.1.1",
+        "globals" => "^16.0.0"
+      }.freeze
+
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates/dev_tests", __dir__))
 
@@ -24,7 +34,7 @@ module ReactOnRails
                    desc: "Include React Server Components test (hello_server_spec.rb)"
 
       def copy_rspec_files
-        %w[.eslintrc
+        %w[eslint.config.mjs
            spec/spec_helper.rb
            spec/rails_helper.rb
            spec/simplecov_helper.rb
@@ -66,6 +76,15 @@ module ReactOnRails
         # Generated examples are in gen-examples/examples/<name>/
         # The npm package is in packages/react-on-rails/
         contents["dependencies"]["react-on-rails"] = "file:../../../packages/react-on-rails"
+
+        File.open(package_json, "w+") { |f| f.puts JSON.pretty_generate(contents) }
+      end
+
+      def add_internal_eslint_dev_dependencies
+        package_json = File.join(destination_root, "package.json")
+        contents = JSON.parse(File.read(package_json))
+        contents["devDependencies"] ||= {}
+        contents["devDependencies"].merge!(ESLINT_DEV_DEPENDENCIES)
 
         File.open(package_json, "w+") { |f| f.puts JSON.pretty_generate(contents) }
       end

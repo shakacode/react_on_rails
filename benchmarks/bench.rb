@@ -106,11 +106,15 @@ def benchmark_route(route)
   # Strip optional parameters from route for URL (e.g., "(/:locale)" -> "")
   target = URI.parse("http://#{BASE_URL}#{strip_optional_params(route)}")
 
-  # Warm up server for this route
-  puts "Warming up server for #{route} with 10 requests..."
-  10.times do
+  # Warm up this route before measuring: a few priming requests trigger
+  # first-request compilation/cache population so they don't skew the run. Kept
+  # small on purpose — at ~37 routes/shard the old 10×0.5s (5s/route) warm-up
+  # dominated CI time (#4012); the 30s k6 run below is what actually loads the
+  # server, and it self-warms the remaining workers in its first fraction of a second.
+  puts "Warming up server for #{route} with 3 requests..."
+  3.times do
     server_responding?(target)
-    sleep 0.5
+    sleep 0.2
   end
   puts "Warm-up complete for #{route}"
 

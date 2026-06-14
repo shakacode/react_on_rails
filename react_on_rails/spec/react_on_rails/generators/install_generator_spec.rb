@@ -15,12 +15,146 @@ describe InstallGenerator, type: :generator do
     described_class.new([], options, destination_root:)
   end
 
+  def redux_generator_fixture(options = {})
+    ReactOnRails::Generators::ReactWithReduxGenerator.new([], options, destination_root:)
+  end
+
+  def rsc_generator_fixture(options = {})
+    ReactOnRails::Generators::RscGenerator.new([], options, destination_root:)
+  end
+
   def gem_root_ci_workflow_path
     File.expand_path("../../../.github/workflows/ci.yml", __dir__)
   end
 
   def render_stock_webpack_template(template_path, options = {})
     base_generator_fixture(options).send(:rendered_template_for_cleanup, template_path)
+  end
+
+  def tailwind_dependency_requirements
+    {
+      "tailwindcss" => "^4.3.0",
+      "@tailwindcss/postcss" => "^4.3.0",
+      "postcss" => "^8.5.15",
+      "postcss-loader" => "^8.2.1"
+    }
+  end
+
+  def assert_tailwind_dependencies
+    assert_file "package.json" do |content|
+      dependencies = JSON.parse(content).fetch("dependencies")
+
+      tailwind_dependency_requirements.each do |name, version|
+        expect_npm_dependency_to_satisfy(name, dependencies[name], version)
+      end
+    end
+  end
+
+  def expect_npm_dependency_to_satisfy(name, actual_version, expected_requirement)
+    if actual_version.nil?
+      raise RSpec::Expectations::ExpectationNotMetError,
+            "expected #{name} dependency to be present and satisfy #{expected_requirement.inspect}"
+    end
+
+    unless expected_requirement.start_with?("^")
+      expect(actual_version).to eq(expected_requirement)
+      return
+    end
+
+    expected_floor = Gem::Version.new(expected_requirement.delete_prefix("^"))
+    actual = Gem::Version.new(actual_version.delete_prefix("^"))
+
+    expect(actual).to be >= expected_floor
+    expect(actual).to be < npm_caret_upper_bound(expected_floor)
+  rescue ArgumentError
+    raise RSpec::Expectations::ExpectationNotMetError,
+          "expected #{name} dependency #{actual_version.inspect} to satisfy #{expected_requirement.inspect}"
+  end
+
+  def npm_caret_upper_bound(version)
+    major, minor, patch = version.segments.values_at(0, 1, 2).map { |segment| segment || 0 }
+
+    return Gem::Version.new("#{major + 1}.0.0") if major.positive?
+    return Gem::Version.new("0.#{minor + 1}.0") if minor.positive?
+
+    Gem::Version.new("0.0.#{patch + 1}")
+  end
+
+  def assert_tailwind_ssr_setup(config_dir:, extension:)
+    assert_tailwind_dependencies
+    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+    assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
+
+    assert_tailwind_component(extension)
+    assert_tailwind_bundler_config(config_dir)
+    assert_tailwind_ssr_stylesheet_placeholder
+  end
+
+  def assert_tailwind_redux_setup(config_dir:, extension:)
+    assert_tailwind_dependencies
+    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+    assert_no_file "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css"
+
+    assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{extension}" do |content|
+      expect(content).to include("../../../stylesheets/application.css")
+    end
+
+    assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.#{extension}" do |content|
+      expect(content).to include("React on Rails + Redux + Tailwind CSS")
+      expect(content).to include("rounded-lg")
+      expect(content).to include("focus:outline-hidden")
+      expect(content).not_to include("HelloWorld.module.css")
+      expect(content).not_to include("<form")
+    end
+
+    assert_tailwind_bundler_config(config_dir)
+  end
+
+  def assert_tailwind_component(extension)
+    assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{extension}" do |content|
+      expect(content).to include("../../../stylesheets/application.css")
+      expect(content).to include("React on Rails + Tailwind CSS")
+      expect(content).to include("rounded-lg")
+    end
+  end
+
+  def assert_tailwind_bundler_config(config_dir)
+    assert_file "#{config_dir}/commonWebpackConfig.js" do |content|
+      expect(content).to include("postcss-loader")
+      expect(content).to include("@tailwindcss/postcss")
+      expect(content).to include("addTailwindPostcssLoader")
+      expect(content).to include("mergeTailwindPostcssLoader")
+      expect(content).to include("plugin?.postcssPlugin")
+      expect(content).to include("webpackConfig.module?.rules")
+    end
+  end
+
+  def assert_tailwind_ssr_stylesheet_placeholder
+    assert_file "app/views/hello_world/index.html.erb" do |content|
+      expect(content).to include('react_component("HelloWorld", props: @hello_world_props, prerender: true)')
+    end
+
+    assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+      stylesheet_index = content.index("<%= stylesheet_pack_tag %>")
+      javascript_index = content.index("<%= javascript_pack_tag %>")
+
+      expect(stylesheet_index).not_to be_nil
+      expect(javascript_index).not_to be_nil
+      expect(stylesheet_index).to be < javascript_index
+      expect(content).to include("React on Rails injects component CSS/JS here")
+    end
+  end
+
+  def assert_tailwind_rsc_setup(config_dir:, extension:)
+    assert_tailwind_dependencies
+    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+
+    assert_file "app/javascript/src/HelloServer/components/LikeButton.#{extension}" do |content|
+      expect(content).to include("../../../stylesheets/application.css")
+      expect(content).to start_with("'use client';")
+    end
+
+    assert_tailwind_bundler_config(config_dir)
   end
 
   def simulate_managed_stock_webpack_files(options = {})
@@ -82,6 +216,22 @@ describe InstallGenerator, type: :generator do
         expect(rendered).to include("RSCRspackPlugin")
         expect(rendered).to include("react-on-rails-rsc/RspackPlugin")
       end
+    end
+  end
+
+  describe "Tailwind managed-template cleanup rendering" do
+    render_failed_sentinel = ReactOnRails::Generators::BaseGenerator.const_get(:TEMPLATE_RENDER_FAILED)
+
+    it "renders commonWebpackConfig.js for Tailwind during cleanup" do
+      rendered = render_stock_webpack_template(
+        "base/base/config/webpack/commonWebpackConfig.js.tt",
+        tailwind: true
+      )
+
+      expect(rendered).not_to equal(render_failed_sentinel)
+      expect(rendered).to include("@tailwindcss/postcss")
+      expect(rendered).to include("addTailwindPostcssLoader")
+      expect(rendered).to include("mergeTailwindPostcssLoader")
     end
   end
 
@@ -385,6 +535,51 @@ describe InstallGenerator, type: :generator do
         expect(content).to match(/React\.FC<HelloWorldProps>/)
         expect(content).to match(/onChange=\{.*e.*=>.*setName\(e\.target\.value\).*\}/)
       end
+    end
+  end
+
+  describe "#expect_npm_dependency_to_satisfy" do
+    it "uses npm caret upper bounds" do
+      expect { expect_npm_dependency_to_satisfy("example", "^4.3.1", "^4.3.0") }.not_to raise_error
+      expect { expect_npm_dependency_to_satisfy("example", "^5.0.0", "^4.3.0") }
+        .to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect_npm_dependency_to_satisfy("example", "^0.1.9", "^0.1.0") }.not_to raise_error
+      expect { expect_npm_dependency_to_satisfy("example", "^0.2.0", "^0.1.0") }
+        .to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect_npm_dependency_to_satisfy("example", "^0.0.4", "^0.0.3") }
+        .to raise_error(RSpec::Expectations::ExpectationNotMetError)
+    end
+  end
+
+  context "with --tailwind --no-rspack" do
+    before(:all) { run_generator_test_with_args(%w[--tailwind --no-rspack], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "no_redux_generator"
+
+    it "generates a Tailwind v4 SSR setup for Webpack with extracted CSS enabled" do
+      assert_tailwind_ssr_setup(config_dir: "config/webpack", extension: "jsx")
+    end
+  end
+
+  context "with --tailwind --rspack --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--tailwind --rspack --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "no_redux_generator"
+
+    it "generates a Tailwind v4 SSR setup for Rspack with extracted CSS enabled" do
+      assert_tailwind_ssr_setup(config_dir: "config/rspack", extension: "tsx")
+    end
+  end
+
+  context "with --redux --tailwind --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--redux --tailwind --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+
+    it "wires Tailwind into the Redux SSR example" do
+      assert_tailwind_redux_setup(config_dir: "config/rspack", extension: "tsx")
     end
   end
 
@@ -1220,7 +1415,9 @@ describe InstallGenerator, type: :generator do
         # Version pins are present in the constants
         expect(content).to include("@rspack/core@^2.0.0-0")
         expect(content).to include("@rspack/cli@^2.0.0-0")
+        expect(content).to include("@rspack/dev-server@^2.0.0")
         expect(content).to include("@rspack/plugin-react-refresh@^2.0.0")
+        expect(content).to match(%r{@rspack/plugin-react-refresh@\^2\.0\.0\s+react-refresh})
         expect(content).to include("webpack@^5.0.0")
         # Version-stripping regex is used for package.json key deletion
         expect(content).to include('dep[%r{\A(@[^/]+/[^@]+|[^@]+)}]')
@@ -1233,6 +1430,7 @@ describe InstallGenerator, type: :generator do
         expect(package_json["dependencies"]).to include("@rspack/core")
         expect(package_json["dependencies"]).to include("rspack-manifest-plugin")
         expect(package_json["devDependencies"]).to include("@rspack/cli")
+        expect(package_json["devDependencies"]).to include("@rspack/dev-server")
         expect(package_json["devDependencies"]).to include("@rspack/plugin-react-refresh")
       end
     end
@@ -2485,6 +2683,35 @@ describe InstallGenerator, type: :generator do
     include_examples "rsc_hello_server_files"
   end
 
+  context "with --rsc --rspack --tailwind --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--rsc --rspack --tailwind --typescript], package_json: true) }
+
+    include_examples "rsc_common_files"
+
+    it "wires Tailwind into the generated RSC client component" do
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+      assert_tailwind_rsc_setup(config_dir: "config/rspack", extension: "tsx")
+    end
+  end
+
+  describe "RSC Tailwind client component import insertion" do
+    let(:components_dir) { "app/javascript/src/HelloServer/components" }
+    let(:client_component_path) { "#{components_dir}/LikeButton.jsx" }
+
+    it "anchors after quote and semicolon variants of the use client directive" do
+      simulate_existing_file(client_component_path, "\"use client\"\n\nexport default function LikeButton() {}\n")
+
+      Dir.chdir(destination_root) do
+        expect(rsc_generator_fixture(tailwind: true).send(:add_tailwind_import_to_rsc_client_component, components_dir))
+          .to be(true)
+      end
+
+      expect(File.read(File.join(destination_root, client_component_path))).to start_with(
+        "\"use client\"\nimport '../../../stylesheets/application.css';\n\n"
+      )
+    end
+  end
+
   context "with --rsc --rspack" do
     before(:all) { run_generator_test_with_args(%w[--rsc --rspack], package_json: true) }
 
@@ -3136,6 +3363,21 @@ describe InstallGenerator, type: :generator do
         .with("react_on_rails:rsc", [], hash_including(pretend: true))
 
       redux_pro_rsc_install_generator.send(:invoke_generators)
+    end
+
+    it "does not read the copied Redux Tailwind entry in pretend mode" do
+      redux_generator = redux_generator_fixture(pretend: true, tailwind: true)
+      client_entry = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
+
+      allow(redux_generator).to receive(:copy_file)
+      allow(redux_generator).to receive(:gsub_file)
+      allow(redux_generator).to receive(:prepend_to_file)
+
+      expect(File).not_to receive(:read)
+      expect(redux_generator).to receive(:say_status)
+        .with(:pretend, "Would add Tailwind stylesheet import to #{client_entry}", :yellow)
+
+      redux_generator.send(:copy_base_files)
     end
   end
 

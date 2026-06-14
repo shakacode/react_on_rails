@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>RSC Build Pipeline: Bundle Branches</title>
+  <desc>Static diagram showing the RSC build pipeline with three parallel webpack bundle processes (client, server, RSC) plus the Node renderer, as defined in Procfile.dev. Each bundle targets different environments and entry points.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .client-bundle { fill: #FFF7ED; stroke: #F97316; }
+      .client-text { fill: #9A3412; }
+      .server-bundle { fill: #ECFDF5; stroke: #22C55E; }
+      .server-text { fill: #166534; }
+      .rsc-bundle { fill: #DBEAFE; stroke: #3B82F6; }
+      .rsc-text { fill: #1E40AF; }
+      .node-box { fill: #F3E8FF; stroke: #A78BFA; }
+      .node-text { fill: #6D28D9; }
+      .rails-box { fill: #FEE2E2; stroke: #FECACA; }
+      .rails-text { fill: #991B1B; }
+      .process-bg { fill: #F1F5F9; stroke: #E2E8F0; }
+      .arrow-line { stroke: #94A3B8; }
+      .arrow-body { fill: #94A3B8; }
+      .env-badge { fill: #FEF3C7; stroke: #FCD34D; }
+      .env-text { fill: #92400E; }
+      .code-bg { fill: #1E293B; }
+      .code-text { fill: #E2E8F0; }
+      .code-keyword { fill: #67E8F9; }
+      .code-string { fill: #4ADE80; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .client-bundle { fill: #431407; stroke: #F97316; }
+        .client-text { fill: #FDBA74; }
+        .server-bundle { fill: #052E16; stroke: #10B981; }
+        .server-text { fill: #6EE7B7; }
+        .rsc-bundle { fill: #172554; stroke: #3B82F6; }
+        .rsc-text { fill: #93C5FD; }
+        .node-box { fill: #2E1065; stroke: #A78BFA; }
+        .node-text { fill: #C4B5FD; }
+        .rails-box { fill: #450A0A; stroke: #F87171; }
+        .rails-text { fill: #FCA5A5; }
+        .process-bg { fill: #1E293B; stroke: #334155; }
+        .arrow-line { stroke: #64748B; }
+        .arrow-body { fill: #64748B; }
+        .env-badge { fill: #422006; stroke: #F59E0B; }
+        .env-text { fill: #FCD34D; }
+        .code-bg { fill: #0F172A; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="400" class="bg"/>
+  <text x="450" y="26" text-anchor="middle" font-size="18" font-weight="700" class="title">RSC Build Pipeline</text>
+  <text x="450" y="44" text-anchor="middle" font-size="11" class="subtitle">Four parallel processes: Rails, client bundle, server bundle, RSC bundle + Node renderer</text>
+
+  <!-- Process blocks -->
+  <rect x="30" y="58" width="840" height="200" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="80" text-anchor="middle" font-size="12" font-weight="600" class="label-text">Procfile.dev — Parallel Processes</text>
+
+  <!-- Rails -->
+  <rect x="50" y="96" width="160" height="76" rx="8" class="rails-box" stroke-width="2"/>
+  <text x="130" y="118" text-anchor="middle" font-size="11" font-weight="600" class="rails-text">Rails Server</text>
+  <text x="130" y="136" text-anchor="middle" font-size="9" class="rails-text">rails s -p 3000</text>
+  <rect x="76" y="148" width="108" height="16" rx="8" class="env-badge" stroke-width="1"/>
+  <text x="130" y="160" text-anchor="middle" font-size="8" font-weight="600" class="env-text">port 3000</text>
+
+  <!-- Client Bundle -->
+  <rect x="230" y="96" width="160" height="76" rx="8" class="client-bundle" stroke-width="2"/>
+  <text x="310" y="118" text-anchor="middle" font-size="11" font-weight="600" class="client-text">Client Bundle</text>
+  <text x="310" y="136" text-anchor="middle" font-size="9" class="client-text">shakapacker-dev-server</text>
+  <rect x="248" y="148" width="124" height="16" rx="8" class="env-badge" stroke-width="1"/>
+  <text x="310" y="160" text-anchor="middle" font-size="8" font-weight="600" class="env-text">HMR=true (browser)</text>
+
+  <!-- Server Bundle -->
+  <rect x="410" y="96" width="160" height="76" rx="8" class="server-bundle" stroke-width="2"/>
+  <text x="490" y="118" text-anchor="middle" font-size="11" font-weight="600" class="server-text">Server Bundle</text>
+  <text x="490" y="136" text-anchor="middle" font-size="9" class="server-text">shakapacker --watch</text>
+  <rect x="416" y="148" width="148" height="16" rx="8" class="env-badge" stroke-width="1"/>
+  <text x="490" y="160" text-anchor="middle" font-size="8" font-weight="600" class="env-text">SERVER_BUNDLE_ONLY</text>
+
+  <!-- RSC Bundle -->
+  <rect x="590" y="96" width="140" height="76" rx="8" class="rsc-bundle" stroke-width="2"/>
+  <text x="660" y="118" text-anchor="middle" font-size="11" font-weight="600" class="rsc-text">RSC Bundle</text>
+  <text x="660" y="136" text-anchor="middle" font-size="9" class="rsc-text">shakapacker --watch</text>
+  <rect x="600" y="148" width="120" height="16" rx="8" class="env-badge" stroke-width="1"/>
+  <text x="660" y="160" text-anchor="middle" font-size="8" font-weight="600" class="env-text">RSC_BUNDLE_ONLY</text>
+
+  <!-- Node Renderer -->
+  <rect x="750" y="96" width="110" height="76" rx="8" class="node-box" stroke-width="2"/>
+  <text x="805" y="118" text-anchor="middle" font-size="11" font-weight="600" class="node-text">Node</text>
+  <text x="805" y="132" text-anchor="middle" font-size="11" font-weight="600" class="node-text">Renderer</text>
+  <rect x="760" y="148" width="90" height="16" rx="8" class="env-badge" stroke-width="1"/>
+  <text x="805" y="160" text-anchor="middle" font-size="8" font-weight="600" class="env-text">port 3800</text>
+
+  <!-- Entry points / targets -->
+  <text x="310" y="192" text-anchor="middle" font-size="9" class="label-sub">target: web</text>
+  <text x="310" y="204" text-anchor="middle" font-size="9" class="label-sub">client-bundle.js</text>
+
+  <text x="490" y="192" text-anchor="middle" font-size="9" class="label-sub">target: node</text>
+  <text x="490" y="204" text-anchor="middle" font-size="9" class="label-sub">server-bundle.js</text>
+
+  <text x="660" y="192" text-anchor="middle" font-size="9" class="label-sub">target: node</text>
+  <text x="660" y="204" text-anchor="middle" font-size="9" class="label-sub">rsc-bundle.js</text>
+
+  <text x="805" y="192" text-anchor="middle" font-size="9" class="label-sub">Node.js VM</text>
+  <text x="805" y="204" text-anchor="middle" font-size="9" class="label-sub">node-renderer.js</text>
+
+  <!-- Arrows showing data flow -->
+  <text x="450" y="240" text-anchor="middle" font-size="11" font-weight="600" class="label-text">Request Flow</text>
+
+  <rect x="30" y="254" width="840" height="100" rx="12" class="card" stroke-width="1.5"/>
+
+  <!-- Flow: Browser → Rails → Node → (loads server + RSC bundles) → HTML stream → Browser -->
+  <rect x="50" y="272" width="100" height="30" rx="6" class="client-bundle" stroke-width="1.5"/>
+  <text x="100" y="292" text-anchor="middle" font-size="9" font-weight="600" class="client-text">Browser</text>
+
+  <line x1="150" y1="287" x2="190" y2="287" class="arrow-line" stroke-width="2"/>
+  <polygon points="190,283 202,287 190,291" class="arrow-body"/>
+
+  <rect x="204" y="272" width="120" height="30" rx="6" class="rails-box" stroke-width="1.5"/>
+  <text x="264" y="292" text-anchor="middle" font-size="9" font-weight="600" class="rails-text">Rails (3000)</text>
+
+  <line x1="324" y1="287" x2="364" y2="287" class="arrow-line" stroke-width="2"/>
+  <polygon points="364,283 376,287 364,291" class="arrow-body"/>
+
+  <rect x="378" y="272" width="140" height="30" rx="6" class="node-box" stroke-width="1.5"/>
+  <text x="448" y="292" text-anchor="middle" font-size="9" font-weight="600" class="node-text">Node Renderer (3800)</text>
+
+  <line x1="518" y1="287" x2="558" y2="287" class="arrow-line" stroke-width="2"/>
+  <polygon points="558,283 570,287 558,291" class="arrow-body"/>
+
+  <rect x="572" y="266" width="100" height="20" rx="4" class="server-bundle" stroke-width="1"/>
+  <text x="622" y="280" text-anchor="middle" font-size="8" class="server-text">server-bundle</text>
+  <rect x="572" y="290" width="100" height="20" rx="4" class="rsc-bundle" stroke-width="1"/>
+  <text x="622" y="304" text-anchor="middle" font-size="8" class="rsc-text">rsc-bundle</text>
+
+  <line x1="672" y1="287" x2="712" y2="287" class="arrow-line" stroke-width="2"/>
+  <polygon points="712,283 724,287 712,291" class="arrow-body"/>
+
+  <text x="692" y="278" text-anchor="middle" font-size="8" class="label-sub">stream</text>
+
+  <rect x="726" y="272" width="120" height="30" rx="6" class="client-bundle" stroke-width="1.5"/>
+  <text x="786" y="292" text-anchor="middle" font-size="9" font-weight="600" class="client-text">Browser (hydrate)</text>
+
+  <text x="450" y="340" text-anchor="middle" font-size="9" class="label-sub">Rails receives the request, delegates RSC rendering to the Node renderer which loads server + RSC bundles</text>
+
+  <!-- Bottom callout -->
+  <rect x="100" y="368" width="700" height="24" rx="6" class="note-box" stroke-width="1"/>
+  <text x="450" y="384" text-anchor="middle" font-size="10" font-weight="600" class="note-text">All four processes run in parallel during development via Procfile.dev</text>
+</svg>

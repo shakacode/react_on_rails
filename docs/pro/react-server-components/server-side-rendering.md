@@ -7,6 +7,10 @@ Before reading this document, please read:
 
 These documents provide essential background on React Server Components and how they work without Server Side Rendering (SSR).
 
+<p align="center">
+  <img src="images/stream-vs-react-component.svg" alt="Static split-screen comparison showing why stream_react_component with renderToPipeableStream is required for RSC (supports Suspense and async), while react_component with renderToString breaks on async Server Components." width="840" />
+</p>
+
 ## Update the React Server Component Page
 
 Let's make React on Rails server-side render the React Server Component Page we created in the previous articles.

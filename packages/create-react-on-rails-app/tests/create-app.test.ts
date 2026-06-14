@@ -36,6 +36,7 @@ const baseOptions: CliOptions = {
   template: 'javascript',
   packageManager: 'npm',
   rspack: false,
+  tailwind: false,
   pro: false,
   rsc: false,
   agentFiles: true,
@@ -163,6 +164,16 @@ describe('buildGeneratorArgs', () => {
     ]);
   });
 
+  it('adds tailwind flag when enabled', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, tailwind: true })).toEqual([
+      '--new-app',
+      '--no-rspack',
+      '--tailwind',
+      '--force',
+      '--ignore-warnings',
+    ]);
+  });
+
   // The rspack:false -> --no-rspack mapping is already asserted by the default test above
   // ('includes ignore-warnings by default'); the rspack:true -> --rspack mapping by
   // 'adds rspack flag when enabled'. The CLI default-path resolution (no flag -> --rspack)
@@ -194,9 +205,18 @@ describe('buildGeneratorArgs', () => {
         ...baseOptions,
         template: 'typescript',
         rspack: true,
+        tailwind: true,
         rsc: true,
       }),
-    ).toEqual(['--new-app', '--typescript', '--rspack', '--rsc', '--force', '--ignore-warnings']);
+    ).toEqual([
+      '--new-app',
+      '--typescript',
+      '--rspack',
+      '--tailwind',
+      '--rsc',
+      '--force',
+      '--ignore-warnings',
+    ]);
   });
 
   it('combines rspack and rsc flags without typescript', () => {

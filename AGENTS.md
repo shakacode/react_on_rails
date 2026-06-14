@@ -10,15 +10,18 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `.agents/skills/`: agent skills; `.claude/skills` is a symlink here so Claude Code exposes the same workflows as slash commands
 - `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
 - `internal/contributor-info/agent-workflow-adoption.md`: guide for copying these agent workflows into other repositories
-- `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-pr-batch` and `$pr-batch`
+- `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
+- `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing
 - When deciding whether an issue or proposed fix is worth doing, use `.agents/skills/evaluate-issue/SKILL.md`; a short invocation is `$evaluate-issue` or "Is this issue worth fixing?"
+- When the user wants a ready prompt for review-only GitHub issue triage or an all-open-issues audit, use `.agents/skills/plan-issue-triage/SKILL.md`; a short invocation is `$plan-issue-triage` or "Plan an issue triage"
 - When the user wants to choose issues or PRs for a future Codex batch, use `.agents/skills/plan-pr-batch/SKILL.md` to produce a ready `$pr-batch` goal; a short invocation is `$plan-pr-batch` or "Plan a Codex batch"
 - When the user wants a multi-issue or multi-PR Codex batch, use `.agents/skills/pr-batch/SKILL.md`; a short invocation is `$pr-batch` or "Run a Codex batch"
 - When the user wants to audit merged batch work, missed reviews, release-candidate risk, or possible bad merges, use `.agents/skills/post-merge-audit/SKILL.md`; reusable prompts live in `.agents/workflows/post-merge-audit.md`
 - When the user wants an adversarial PR review, red-team review, Claude/Codex comparison review, or a stricter pre-merge gate, use `.agents/skills/adversarial-pr-review/SKILL.md`; reusable prompts live in `.agents/workflows/adversarial-pr-review.md`
 - When the user assigns an issue, PR, review-fix pass, or merge queue to an agent, follow `.agents/workflows/pr-processing.md`
 - When the user asks to address PR review comments, use `.agents/skills/address-review/SKILL.md`; `.agents/workflows/address-review.md` remains a copy/paste prompt for assistants without skill support
+- When the user wants to manually verify a bug-fix PR by reproducing the failure before the fix and confirming it is gone after (with captured evidence or screenshots, optionally posted to the PR and issue), use `.agents/skills/verify-pr-fix/SKILL.md`; a short invocation is `$verify-pr-fix` or "manually verify this fix"
 - Default simplify model: `claude-opus-4-8`
 
 ## Canonical Agent Policy
@@ -197,6 +200,104 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 **GitHub follow-up issues**: Follow-up issues are the exception. Prefer fixing or declining review feedback in the PR. If deferred work remains valuable, present one bundled deferred-work summary and ask whether to track it. Prefer an existing issue; otherwise create at most one bundled issue per PR unless the user explicitly approves more. New follow-up issue titles must begin with `Follow-up:`. Build multi-line issue bodies as Markdown files and pass them with `gh issue create --body-file`; do not pass escaped newline strings through `--body`.
 
+## Maintainer Attention Contract
+
+Maintainer attention is for judgment, not for routine progress pings or
+machine-checkable work. Agents working PRs, reviews, or batches must apply this
+contract unless a maintainer explicitly narrows the run.
+
+- **Autonomous nits**: behavior-preserving `OPTIONAL` review nits may be fixed
+  inline without asking when they stay inside the PR scope, are low-risk, and are
+  before the final-candidate debounce point: once a merge-readiness review cycle
+  has started, do not introduce new nit commits that would restart it.
+  Inside the PR scope means the file, section, or workflow copy is already part
+  of the PR diff or directly cited by current review feedback. Cross-copy
+  consistency edits are in scope only when the paired section is already in the
+  PR diff or directly cited by current review feedback; this excludes unrelated
+  cleanup, other machine lanes, reserved files, generated output not already in
+  scope, and separate workflow files that merely discuss the same concept.
+  The final-candidate debounce point begins when the agent explicitly
+  designates the current head as merge-ready or the final candidate in a PR
+  body, PR comment, or handoff, or when the agent pushes after completing the
+  final local validation/review gate and records that push as the candidate.
+  Automatically queued checks from ordinary fix-phase pushes do not count unless
+  that push or check set has been declared as the final readiness gate. Earlier
+  incremental per-file checks during the fix phase do not count.
+  Behavior-preserving means wording, formatting, or mechanical
+  whitespace/punctuation cleanup that does not alter public APIs, generated
+  output, runtime behavior, validation scope, or the semantic meaning of any
+  section that has an unresolved review thread on it. Low-risk means local and
+  mechanically checkable, such as a formatter-confirmed cleanup; a rename that
+  requires searching all callers is not low-risk. Mechanical means deterministic
+  and local, such as rerunning a formatter or fixing whitespace introduced by
+  the nit, without reasoning about runtime behavior, callers, or policy.
+  Qualifying examples: typo/comment punctuation, whitespace or trailing comma
+  cleanup, or unambiguous documentation wording.
+  Disqualifying examples: renaming a public method or constant, changing
+  generated content, altering CI or release policy, adding/removing validation,
+  removing an import or `require` whose module side effects are not proven by a
+  dedicated tool or code inspection, or touching another lane's files. If the nit
+  is not worth fixing, record it as deferred or declined with rationale instead
+  of asking "OK to fix this nit?".
+  Autonomous deferred/declined nit replies must include `[auto-deferred]` on its
+  own line plus a one-line rationale, for example:
+  ```text
+  [auto-deferred]
+  Whitespace cleanup deferred to avoid restarting the final-candidate gate.
+  ```
+  Post the tag and rationale before resolving the review thread; do not resolve
+  an auto-deferred thread without that reply.
+  If an autonomous nit fix fails local validation or self-review, repair it in
+  the same batch only when the repair is still mechanical and in scope;
+  otherwise drop or revert that nit, record the failed validation and rationale,
+  and promote the underlying concern to `DISCUSS` only when it is a correctness
+  issue, regression risk, or explicit reviewer request.
+  Never push a failing autonomous nit or ask the maintainer to debug it.
+  Escalate only when the item changes behavior, expands scope, conflicts with
+  policy, or has unclear risk.
+- **CI-wait protocol**: while checks or review bots are running, do bounded
+  useful work such as self-review, local-only cleanup notes, documentation sync
+  that does not require pushing the active PR head, or another independent lane.
+  Do not introduce optional cleanup commits that restart current-head gates after
+  the final-candidate debounce point. Do not interrupt the maintainer for routine
+  "CI is still running", "CI is green", or "review arrived" updates. CI failures
+  and new `MUST-FIX`-tier review findings are not routine; surface them
+  immediately.
+- **One decision point per lane**: batch genuine judgment calls into one decision
+  block at lane completion or hard block. The block must include the question,
+  options, recommendation, evidence links or command output, and the next action
+  after an answer. Avoid "see above" decisions that require the maintainer to
+  reconstruct context.
+- **Self-verification before escalation**: anything provable by tests, lint,
+  screenshots, repro scripts, `gh` state, or code inspection must arrive with
+  that evidence attached. Use `UNKNOWN` for facts that could not be verified.
+- **Attention metric**: batch closeouts count human decision points per PR, with
+  a target of at most one for low-risk lanes: lanes with no `MUST-FIX` items,
+  no blocking questions, and only documentation, process, or mechanical changes.
+  Higher counts are reported as FYI process churn, not hidden in narrative
+  handoffs. Counts above target invite a later check on whether smaller lanes,
+  sharper scope, or better batching would reduce future churn; they are not a
+  hard failure by themselves. A human decision point is any question, option
+  selection, or confirmation directed at a maintainer that required direct input,
+  excluding push confirmations that are mandatory sub-steps of an action the
+  maintainer already selected, such as the required push confirmation after
+  committing action `f`. A standalone "should I push this nit fix?" question
+  counts. Report it as `Decision points: N` in the FYI section of the batch
+  handoff.
+- **Confidence notes**: delegated merge authority exists only when the current
+  user or batch goal grants it and the release-mode rules permit it. Before a
+  delegated merge, the worker or coordinator writes a confidence note in the
+  issue, PR body, or batch handoff covering validated commands, evidence links,
+  remaining `UNKNOWN` facts, and residual risk. When merge authority is not
+  delegated, use the same format for merge-readiness evidence without merging:
+  ```text
+  Confidence note:
+  - Validated: <commands or checks run and outcomes>
+  - Evidence: <links to CI, screenshots, logs, or inline output>
+  - UNKNOWN: <facts that could not be verified, or "none">
+  - Residual risk: <one-line risk summary, or "none">
+  ```
+
 ## Release Mode And Auto-Merge Coordination
 
 Use the current release tracker to decide whether PRs are in normal development, accelerated RC, strict RC, or final-release mode. The tracker is the live source of truth for the mode; committed docs define how to interpret it.
@@ -269,10 +370,11 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 
 - **Default: no CI-expansion label.** For docs-only changes, focused tests, small isolated fixes, and refactors with no cross-package behavior change, rely on the standard path-based CI selection and local verification.
 - **Use `full-ci`** (or ask a maintainer to comment `+ci-run-full`) when the PR is high-risk or broad: CI workflow/detector changes, dependency or lockfile updates, package manager/Ruby/Node version changes, release/build/package publishing logic, generator output, dummy app boot/build behavior, SSR or hydration behavior, cross-cutting core Ruby changes, Pro/core boundary changes, or changes where skipped suites would leave a credible regression path.
-- **Use `benchmark`** for performance-sensitive changes: server rendering paths, Node renderer, caching, bundle generation, asset serving/precompile behavior, concurrency/pooling, or anything expected to affect throughput, latency, memory, or bundle size. `full-ci` does not trigger benchmarks; use both labels when a PR is both high-risk and performance-sensitive.
+- **Use `benchmark`** (or a suite-specific `benchmark-core` / `benchmark-pro` / `benchmark-pro-node-renderer`) for performance-sensitive changes: server rendering paths, Node renderer, caching, bundle generation, asset serving/precompile behavior, concurrency/pooling, or anything expected to affect throughput, latency, memory, or bundle size. **Benchmarks are opt-in on PRs**: without a `benchmark*` label no suite runs, because per-PR benchmark numbers are informational only and noise-dominated on shared CI runners (the regression gate runs only on `main`). They always run on push to `main`, the regression backstop. `full-ci` does not trigger benchmarks; use both labels when a PR is both high-risk and performance-sensitive.
+- **Use `full-ci-no-benchmarks`** when a PR needs the broad test matrix but cannot move runtime performance — CI plumbing/detector changes, lint/RuboCop config, dependency or tool-version bookkeeping, scaffolder/tooling files. This label hard-suppresses every benchmark suite for the PR, overriding an explicit `benchmark*` label, so a 30+ minute suite never runs (and never ships meaningless Bencher data). Pair it with `full-ci` for full test coverage without benchmarks. (Benchmarks still run on every push to `main`, which remains the regression backstop.)
 - **Remove `full-ci` when no longer needed** with `+ci-stop-full` if the PR returns to a low-risk state after splitting or reverting broad changes.
 - **Record intentional full-CI waivers** with `+ci-skip-full [optional reason]`. This is especially important for admins: the comment creates a SHA-bound audit trail without forcing docs-only or low-risk PRs to run the full matrix.
-- In PR descriptions and handoffs, state the recommended label decision explicitly: `Labels: none`, `Labels: full-ci`, `Labels: benchmark`, or `Labels: full-ci, benchmark`, with one sentence explaining why.
+- In PR descriptions and handoffs, state the recommended label decision explicitly: `Labels: none`, `Labels: full-ci`, `Labels: benchmark`, `Labels: full-ci, benchmark`, or `Labels: full-ci, full-ci-no-benchmarks`, with one sentence explaining why.
 
 ### For All PRs
 
@@ -316,7 +418,11 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Verify language, runtime, and library claims locally before changing code in response to AI review comments.
 - Deduplicate repeated bot comments before acting on them. Fix the underlying issue once, then resolve the duplicates.
 - Rebase or merge `main` once, near the end of the review cycle. For `CHANGELOG.md` conflicts, prefer resolving them as the final step before merge.
-- When asking an agent to address review comments, instruct it to classify comments into `blocking`, `optional`, and `noise`, then apply only the `blocking` items plus any explicitly selected optional items.
+- When asking an agent to address review comments, instruct it to classify
+  comments into `blocking`, `optional`, and `noise`, then apply the `blocking`
+  items plus any explicitly selected optional items. Low-risk behavior-preserving
+  optional nits remain governed by the Maintainer Attention Contract and may be
+  fixed or logged without a separate approval prompt.
 
 ## Boundaries
 

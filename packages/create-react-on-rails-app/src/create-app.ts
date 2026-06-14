@@ -175,6 +175,10 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
   // the generator's fresh-install default happens to be (now, or if it changes again later).
   args.push(options.rspack ? '--rspack' : '--no-rspack');
 
+  if (options.tailwind) {
+    args.push('--tailwind');
+  }
+
   // --rsc supersedes --pro because RSC mode already requires Pro and the generator accepts a single mode flag.
   if (options.pro && !options.rsc) {
     args.push('--pro');
@@ -402,24 +406,26 @@ function reactOnRailsProCommitMessage(modeFlag: string): { subject: string; body
 function generatorCommitMessage(options: CliOptions): { subject: string; body: string } {
   const language = options.template === 'typescript' ? 'TypeScript' : 'JavaScript';
   const bundler = options.rspack ? 'Rspack' : 'Webpack';
+  const setup = options.tailwind ? `${language}, ${bundler}, and Tailwind CSS` : `${language} and ${bundler}`;
+  const tailwindFlag = options.tailwind ? ' --tailwind' : '';
 
   if (options.rsc) {
     return {
-      subject: `Install React Server Components with ${language} and ${bundler}`,
-      body: 'Run react_on_rails:install --rsc to add the generated home page, HelloServer example, and Pro RSC wiring.',
+      subject: `Install React Server Components with ${setup}`,
+      body: `Run react_on_rails:install --rsc${tailwindFlag} to add the generated home page, HelloServer example, and Pro RSC wiring.`,
     };
   }
 
   if (options.pro) {
     return {
-      subject: `Install React on Rails Pro with ${language} and ${bundler}`,
-      body: 'Run react_on_rails:install --pro to add the generated home page, SSR example, and Pro Node renderer wiring.',
+      subject: `Install React on Rails Pro with ${setup}`,
+      body: `Run react_on_rails:install --pro${tailwindFlag} to add the generated home page, SSR example, and Pro Node renderer wiring.`,
     };
   }
 
   return {
-    subject: `Install React on Rails with ${language} and ${bundler}`,
-    body: 'Run react_on_rails:install to add the generated home page, SSR example, and development workflow.',
+    subject: `Install React on Rails with ${setup}`,
+    body: `Run react_on_rails:install${tailwindFlag} to add the generated home page, SSR example, and development workflow.`,
   };
 }
 

@@ -312,14 +312,9 @@ For third-party packages, check if the library provides direct import paths (mos
 
 Avoid creating barrel files that mix server and client components. If you must use a barrel file, keep separate barrels for server and client exports:
 
-```text
-components/
-├── server/index.js    # Only server components
-├── client/index.js    # Only 'use client' components
-├── ServerHeader.jsx
-├── ClientSearch.jsx
-└── ...
-```
+<p align="center">
+  <img src="images/barrel-file-contamination.svg" alt="Static diagram showing how a single barrel file (index.js) with 'use client' contaminates all re-exports, and the fix using separate server/client barrels to keep imports isolated." width="840" />
+</p>
 
 ## The `server-only` and `client-only` Packages
 

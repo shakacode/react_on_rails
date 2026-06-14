@@ -34,26 +34,37 @@ const MODES = [
 
 const DEFAULT_KEY = '3';
 
+function createPromptInterface(): readline.Interface {
+  return readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+}
+
+function rejectWhenClosed(rl: readline.Interface, reject: (reason?: unknown) => void): () => void {
+  let answered = false;
+
+  rl.on('SIGINT', () => {
+    answered = true;
+    rl.close();
+    reject(new Error(PROMPT_CANCELLED));
+  });
+
+  rl.once('close', () => {
+    if (!answered) {
+      reject(new Error(PROMPT_CANCELLED));
+    }
+  });
+
+  return () => {
+    answered = true;
+  };
+}
+
 export function promptForMode(): Promise<ModeChoice> {
   return new Promise((resolve, reject) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    let answered = false;
-
-    rl.on('SIGINT', () => {
-      answered = true;
-      rl.close();
-      reject(new Error(PROMPT_CANCELLED));
-    });
-
-    rl.once('close', () => {
-      if (!answered) {
-        reject(new Error(PROMPT_CANCELLED));
-      }
-    });
+    const rl = createPromptInterface();
+    const markAnswered = rejectWhenClosed(rl, reject);
 
     console.log(chalk.bold('Select a setup mode:\n'));
     for (const mode of MODES) {
@@ -63,7 +74,7 @@ export function promptForMode(): Promise<ModeChoice> {
     console.log('');
 
     rl.question(`Choice (1-3) [${DEFAULT_KEY}]: `, (answer) => {
-      answered = true;
+      markAnswered();
       rl.close();
       const key = answer.trim() || DEFAULT_KEY;
       const selected = MODES.find((m) => m.key === key);
@@ -73,6 +84,25 @@ export function promptForMode(): Promise<ModeChoice> {
         return;
       }
       resolve({ pro: selected.pro, rsc: selected.rsc });
+    });
+  });
+}
+
+export function promptForTailwind(): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const rl = createPromptInterface();
+    const markAnswered = rejectWhenClosed(rl, reject);
+
+    console.log(chalk.bold('Add styling:\n'));
+    console.log(`  ${chalk.bold('Y. Tailwind CSS v4')} ${chalk.cyan('(recommended)')}`);
+    console.log('  n. No Tailwind CSS');
+    console.log('');
+
+    rl.question('Add Tailwind CSS v4? [Y/n]: ', (answer) => {
+      markAnswered();
+      rl.close();
+      const normalized = answer.trim().toLowerCase();
+      resolve(!(normalized === 'n' || normalized === 'no'));
     });
   });
 }

@@ -41,6 +41,12 @@ module ReactOnRails
                    type: :boolean,
                    desc: "Use Webpack as the bundler (alias for --no-rspack; --no-webpack is equivalent to --rspack)"
 
+      # --tailwind
+      class_option :tailwind,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install Tailwind CSS v4 and style the generated SSR example"
+
       # --pro
       class_option :pro,
                    type: :boolean,
@@ -104,6 +110,10 @@ module ReactOnRails
 
         def use_rsc?
           generator.__send__(:use_rsc?)
+        end
+
+        def use_tailwind?
+          generator.__send__(:use_tailwind?)
         end
 
         def shakapacker_version_9_or_higher?
@@ -228,7 +238,7 @@ module ReactOnRails
         base_files = %w[app/javascript/packs/server-bundle.js]
 
         # Skip HelloWorld CSS for Redux (uses HelloWorldApp) or RSC (uses HelloServer)
-        unless options.redux? || use_rsc?
+        unless options.redux? || use_rsc? || use_tailwind?
           base_files << "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
         end
 
@@ -257,6 +267,14 @@ module ReactOnRails
 
         # Handle webpack.config.js separately with smart replacement
         copy_webpack_main_config(base_path, config)
+      end
+
+      def copy_tailwind_files
+        return unless use_tailwind?
+
+        base_path = "base/tailwind/"
+        copy_file("#{base_path}app/javascript/stylesheets/application.css",
+                  "app/javascript/stylesheets/application.css")
       end
 
       def copy_packer_config
@@ -970,7 +988,7 @@ module ReactOnRails
           # Note: files originally generated with --pro or --rsc will not match when the
           # current run omits those options; in that case, we preserve the directory.
           # Templates rely on config[:message] plus a small helper subset exposed by
-          # TemplateRenderContext (add_documentation_reference, use_pro?, use_rsc?,
+          # TemplateRenderContext (add_documentation_reference, use_pro?, use_rsc?, use_tailwind?,
           # shakapacker_version_9_or_higher?, rsc_plugin_class_name, rsc_plugin_import_path).
           # Missing method delegates raise NoMethodError and are caught below, treating the
           # file as non-removable.

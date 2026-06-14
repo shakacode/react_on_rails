@@ -16,7 +16,6 @@ SUITES = [
     suite_prefix: "CORE",
     shard_total: 1,
     app_versions: %w[both core_only],
-    run_output: "RUN_CORE_BENCHMARKS",
     labels: %w[benchmark benchmark-core],
     app_directory: "react_on_rails/spec/dummy",
     artifact_name: "benchmark-core-results",
@@ -35,7 +34,6 @@ SUITES = [
     suite_prefix: "PRO",
     shard_total: 2,
     app_versions: %w[both pro_only pro_rails_only],
-    run_output: "RUN_PRO_BENCHMARKS",
     labels: %w[benchmark benchmark-pro],
     app_directory: "react_on_rails_pro/spec/dummy",
     artifact_name: "benchmark-pro-results",
@@ -54,7 +52,6 @@ SUITES = [
     suite_prefix: "PRO_NODE_RENDERER",
     shard_total: 1,
     app_versions: %w[both pro_only pro_node_renderer_only],
-    run_output: "RUN_PRO_NODE_RENDERER_BENCHMARKS",
     labels: %w[benchmark benchmark-pro benchmark-pro-node-renderer],
     app_directory: "react_on_rails_pro/spec/dummy",
     artifact_name: "benchmark-pro-node-renderer-results",
@@ -74,6 +71,17 @@ SUITES = [
 # to these, but validating guards against a typo or future rename silently
 # selecting no suites (which would skip benchmarks while CI stays green).
 VALID_APP_VERSIONS = SUITES.flat_map { |suite| suite.fetch(:app_versions) }.uniq.freeze
+
+# A PR label that forces every benchmark suite OFF for this run, even when a
+# suite-specific or broad `benchmark` label would otherwise select suites (PRs are
+# already opt-in, so this is the override for an explicit benchmark label). This is
+# the "full CI but skip benchmarks" escape hatch, paired with the `full-ci` label
+# (which only governs the TEST matrix, never benchmarks): use it on PRs that carry
+# a benchmark label but cannot move runtime performance — CI plumbing, lint/config,
+# or tooling — so Bencher does not record a meaningless run (the #3919 / #3855 class
+# of spurious runs). Honored from forks too: it only ever turns benchmarks off, so
+# there is no fork-safety concern.
+BENCHMARK_SUPPRESS_LABEL = "full-ci-no-benchmarks"
 
 def truthy_env?(name)
   ENV.fetch(name, "false") == "true"
@@ -96,12 +104,17 @@ def suite_requested_by_event?(suite, labels)
   return true if event_name == "workflow_dispatch"
   return false unless event_name == "pull_request"
 
-  # Fork PRs never run: only honor the change-detection (run_output) or label
-  # triggers when the PR's head repo is this repo. GITHUB_REPOSITORY is always set
-  # by Actions, so a blank/forked head repo can't match it.
+  # PRs are opt-in: a benchmark run on a PR is informational only (the regression
+  # gate, confirmation rerun, and issue filing are all main-push only), and
+  # single-run deltas on shared CI runners are noise-dominated, so auto-running the
+  # full ~20-min/shard suite on every code change cost far more than it informed
+  # (#4012). Require an explicit benchmark* label instead. Change-detection no
+  # longer selects suites on PRs — only the event and labels do.
+  # Fork PRs never run: their labels aren't trusted. GITHUB_REPOSITORY is always
+  # set by Actions, so a blank/forked head repo can't match it.
   return false unless ENV.fetch("BENCHMARK_PULL_REQUEST_HEAD_REPO", "") == ENV.fetch("GITHUB_REPOSITORY")
 
-  truthy_env?(suite.fetch(:run_output)) || suite.fetch(:labels).intersect?(labels)
+  suite.fetch(:labels).intersect?(labels)
 end
 
 def suite_selected_by_input?(suite)
@@ -207,7 +220,7 @@ end
 
 def build_matrix
   labels = pull_request_labels
-  rows = if truthy_env?("BENCHMARK_NON_RUNTIME_ONLY")
+  rows = if truthy_env?("BENCHMARK_NON_RUNTIME_ONLY") || labels.include?(BENCHMARK_SUPPRESS_LABEL)
            []
          else
            SUITES.select { |suite| suite_enabled?(suite, labels) }.flat_map { |suite| suite_rows(suite) }

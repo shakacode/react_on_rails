@@ -26,6 +26,17 @@ module ReactOnRails
       subject { described_class.escape(hash_value.to_json) }
 
       it_behaves_like "escaped json"
+
+      it "escapes </script> in props so the payload cannot terminate the surrounding script tag" do
+        payload = { x: "</script><script>alert('xss')</script>" }.to_json
+
+        escaped = described_class.escape(payload)
+
+        expect(escaped).to eq(
+          '{"x":"\\u003c/script\\u003e\\u003cscript\\u003ealert(\'xss\')\\u003c/script\\u003e"}'
+        )
+        expect(escaped).not_to include("</script>")
+      end
     end
   end
 end

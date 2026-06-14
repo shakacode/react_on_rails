@@ -1,0 +1,31 @@
+<%#
+  EXPERIMENTAL / UNSUPPORTED View Transitions demo (issue #3888).
+
+  This page demonstrates the CSR recipe from
+  docs/oss/building-features/view-transitions.md. It is inert by default: the
+  route only exists when the dummy app is booted with VIEW_TRANSITIONS_DEMO=true
+  (see config/routes.rb).
+%>
+<% content_for :head do %>
+  <style>
+    /* Pair the demo box's old/new snapshots and slow the animation enough to see it. */
+    #vt-demo-box {
+      view-transition-name: vt-demo-box;
+    }
+
+    ::view-transition-old(vt-demo-box),
+    ::view-transition-new(vt-demo-box) {
+      animation-duration: 300ms;
+    }
+  </style>
+<% end %>
+
+<h1>View Transitions demo (experimental — unsupported)</h1>
+
+<p>
+  Client-side-only rendering of <code>ViewTransitionsDemo</code>. The toggle wraps a React state update
+  in <code>document.startViewTransition()</code> (with a non-animated fallback when the browser lacks
+  the API). See <code>docs/oss/building-features/view-transitions.md</code>.
+</p>
+
+<%= react_component("ViewTransitionsDemo", prerender: false) %>

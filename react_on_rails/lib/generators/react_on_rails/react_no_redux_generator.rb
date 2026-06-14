@@ -18,6 +18,11 @@ module ReactOnRails
                    default: false,
                    desc: "Generate TypeScript files"
 
+      class_option :tailwind,
+                   type: :boolean,
+                   default: false,
+                   desc: "Style the generated HelloWorld example with Tailwind CSS v4"
+
       class_option :new_app,
                    type: :boolean,
                    default: false,
@@ -25,17 +30,24 @@ module ReactOnRails
 
       def copy_base_files
         base_js_path = "base/base"
+        tailwind_js_path = "base/tailwind"
+        ext = component_extension(options)
 
         # Determine which component files to copy based on TypeScript option
-        component_files = [
-          "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{component_extension(options)}",
-          "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.#{component_extension(options)}",
-          "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
-        ]
+        client_component =
+          "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{ext}"
+        server_component =
+          "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.#{ext}"
 
-        component_files.each do |file|
-          copy_file("#{base_js_path}/#{file}", file)
+        if use_tailwind?
+          copy_file("#{tailwind_js_path}/#{client_component}", client_component)
+        else
+          copy_file("#{base_js_path}/#{client_component}", client_component)
+          copy_file("#{base_js_path}/app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css",
+                    "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css")
         end
+
+        copy_file("#{base_js_path}/#{server_component}", server_component)
       end
 
       def create_appropriate_templates

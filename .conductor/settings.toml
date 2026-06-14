@@ -1,0 +1,7 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+archive = ""
+run = "bin/conductor-exec bash -c 'cd react_on_rails/spec/dummy && bin/dev'"
+run_mode = "nonconcurrent"
+setup = "./conductor-setup.sh"

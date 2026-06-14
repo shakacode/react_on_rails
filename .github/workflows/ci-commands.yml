@@ -24,7 +24,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Handle +ci command
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const owner = context.repo.owner;
@@ -75,12 +75,22 @@ jobs:
             }
 
             async function addReaction(content) {
-              await github.rest.reactions.createForIssueComment({
-                owner,
-                repo,
-                comment_id: commentId,
-                content
-              });
+              try {
+                await github.rest.reactions.createForIssueComment({
+                  owner,
+                  repo,
+                  comment_id: commentId,
+                  content
+                });
+              } catch (error) {
+                const status = error.status || 'unknown';
+                const message = error.message || String(error);
+                const details = `${status} ${message}`;
+                core.warning(
+                  `Reaction ${content} failed on comment ${commentId}: ` +
+                  details
+                );
+              }
             }
 
             async function hasWriteAccess() {
@@ -232,7 +242,19 @@ jobs:
             }
 
             async function triggerFullCi(pr) {
-              if (pr.head.repo.full_name !== repoFullName) {
+              const headRepoFullName = pr.head.repo?.full_name;
+
+              if (!headRepoFullName) {
+                await addReaction('confused');
+                await postComment([
+                  'Unable to run full CI from this command because the PR head repository is unavailable.',
+                  '',
+                  'The repository may have been deleted or made private. A maintainer should push the branch to this repository or trigger the required workflows manually.'
+                ].join('\n'));
+                return;
+              }
+
+              if (headRepoFullName !== repoFullName) {
                 await addReaction('confused');
                 await postComment([
                   'Unable to run full CI from this command because the PR branch is from a fork.',

@@ -1,7 +1,7 @@
 PATH
   remote: ../../..
   specs:
-    react_on_rails (17.0.0.rc.2)
+    react_on_rails (17.0.0.rc.3)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -12,7 +12,7 @@ PATH
 PATH
   remote: ../..
   specs:
-    react_on_rails_pro (17.0.0.rc.2)
+    react_on_rails_pro (17.0.0.rc.3)
       addressable
       async (>= 2.29)
       async-http (~> 0.95)
@@ -20,7 +20,7 @@ PATH
       io-endpoint (~> 0.17.0)
       jwt (>= 2.5, < 4)
       rainbow
-      react_on_rails (= 17.0.0.rc.2)
+      react_on_rails (= 17.0.0.rc.3)
 
 GEM
   remote: https://rubygems.org/
@@ -319,6 +319,12 @@ GEM
       sprockets (>= 3.0.0)
     sqlite3 (1.7.3)
       mini_portile2 (~> 2.8.0)
+    sqlite3 (1.7.3-aarch64-linux)
+    sqlite3 (1.7.3-arm-linux)
+    sqlite3 (1.7.3-arm64-darwin)
+    sqlite3 (1.7.3-x86-linux)
+    sqlite3 (1.7.3-x86_64-darwin)
+    sqlite3 (1.7.3-x86_64-linux)
     stringio (3.2.0)
     thor (1.5.0)
     timeout (0.6.0)

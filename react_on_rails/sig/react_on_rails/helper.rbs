@@ -33,6 +33,9 @@ module ReactOnRails
     def redux_store_hydration_data: () -> safe_buffer
 
     # Returns html_safe string (ActiveSupport::SafeBuffer)
+    def react_on_rails_preload_links: (*untyped component_names) -> safe_buffer
+
+    # Returns html_safe string (ActiveSupport::SafeBuffer)
     def server_render_js: (
       String js_expression,
       ?Hash[Symbol, untyped] options
