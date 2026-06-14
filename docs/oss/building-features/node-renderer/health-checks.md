@@ -23,7 +23,7 @@ probes cannot carry it). Keep the renderer on `localhost` or private networking 
 ## Enabling the Endpoints
 
 The endpoints are **off by default**. Enable them with the `enableHealthEndpoints` config option or the
-`RENDERER_ENABLE_HEALTH_ENDPOINTS` environment variable:
+`RENDERER_ENABLE_HEALTH_ENDPOINTS` environment variable (`true`, `TRUE`, `yes`, `YES`, or `1`):
 
 ```js
 // renderer/node-renderer.js

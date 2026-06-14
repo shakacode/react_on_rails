@@ -125,19 +125,22 @@ describe('built-in health endpoints', () => {
     expect(JSON.parse(res.payload)).toEqual({ status: 'ok' });
   });
 
-  test('GET /health and GET /ready are registered when enabled by environment variable', async () => {
-    process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS = 'true';
-    app = createWorker();
+  test.each(['true', '1'])(
+    'GET /health and GET /ready are registered when env var is %s',
+    async (envValue) => {
+      process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS = envValue;
+      app = createWorker();
 
-    const healthRes = await app.inject().get('/health').end();
-    expect(healthRes.statusCode).toBe(200);
-    expect(JSON.parse(healthRes.payload)).toEqual({ status: 'ok' });
+      const healthRes = await app.inject().get('/health').end();
+      expect(healthRes.statusCode).toBe(200);
+      expect(JSON.parse(healthRes.payload)).toEqual({ status: 'ok' });
 
-    const readyRes = await app.inject().get('/ready').end();
-    expect(readyRes.statusCode).toBe(503);
-    expect(readyRes.headers['retry-after']).toBe('5');
-    expect(JSON.parse(readyRes.payload)).toEqual({ status: 'waiting_for_bundle' });
-  });
+      const readyRes = await app.inject().get('/ready').end();
+      expect(readyRes.statusCode).toBe(503);
+      expect(readyRes.headers['retry-after']).toBe('5');
+      expect(JSON.parse(readyRes.payload)).toEqual({ status: 'waiting_for_bundle' });
+    },
+  );
 
   test.each(['false', '0'])(
     'GET /health and GET /ready are not registered when env var is %s',

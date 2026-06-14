@@ -86,6 +86,7 @@ declare module 'fastify' {
 
 const HEALTH_ENDPOINT_ROUTES = ['/health', '/ready'] as const;
 const FASTIFY_DUPLICATED_ROUTE_ERROR_CODE = 'FST_ERR_DUPLICATED_ROUTE';
+const READY_RETRY_AFTER_SECONDS = 5;
 // TODO: Reassess the duplicated-route message format when upgrading Fastify.
 
 function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
@@ -137,8 +138,8 @@ function applyFastifyConfigWithHealthEndpointMigrationHint(
     const conflictingPath = enableHealthEndpoints ? conflictingHealthEndpointPath(error) : undefined;
     if (conflictingPath) {
       const message =
-        `enableHealthEndpoints registers built-in GET ${conflictingPath}, but a configureFastify callback ` +
-        `already registered that route. Remove or rename the custom ${conflictingPath} route when migrating ` +
+        `enableHealthEndpoints registers built-in GET ${conflictingPath} before configureFastify callbacks run, ` +
+        `and a configureFastify callback also tried to register that route. Remove or rename the custom ${conflictingPath} route when migrating ` +
         'to the built-in health endpoints. See docs/oss/building-features/node-renderer/health-checks.md.';
 
       log.error({ err: error, route: conflictingPath }, message);
@@ -733,7 +734,10 @@ export default function run(config: Partial<Config>) {
       if (hasAnyVMContext()) {
         res.send({ status: 'ready' });
       } else {
-        res.status(503).header('Retry-After', '5').send({ status: 'waiting_for_bundle' });
+        res
+          .status(503)
+          .header('Retry-After', String(READY_RETRY_AFTER_SECONDS))
+          .send({ status: 'waiting_for_bundle' });
       }
     });
   }

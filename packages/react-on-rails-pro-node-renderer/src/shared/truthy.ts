@@ -14,5 +14,12 @@
  */
 
 export default function truthy(value: unknown) {
-  return value === true || value === 'YES' || value === 'TRUE' || value === 'yes' || value === 'true';
+  return (
+    value === true ||
+    value === '1' ||
+    value === 'YES' ||
+    value === 'TRUE' ||
+    value === 'yes' ||
+    value === 'true'
+  );
 }
