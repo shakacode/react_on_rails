@@ -596,20 +596,20 @@ The closeout lane is:
    whether full CI is needed, request full CI with `+ci-run-full` and record the
    reason as FYI, then loop back to re-fetch and wait for the newly requested
    current-head checks before readiness or merge.
-7. Assemble or refresh the attention-contract closeout for each lane after any
+8. Assemble or refresh the attention-contract closeout for each lane after any
    full-CI waitback: autonomous nit outcomes, human decision-point count, current
    confidence or readiness note, and any remaining `UNKNOWN` facts.
-8. Under the current release mode, mark ready or merge PRs that satisfy the
+9. Under the current release mode, mark ready or merge PRs that satisfy the
    merge qualification rules, including the merge-endgame debounce and
    waiver-soak rules before merge; report only remaining blockers, questions,
    or `UNKNOWN` live state.
-9. After any closeout-lane merge action, run a lightweight sweep for late
-   post-merge bot findings before the final batch handoff: confirm the PR landed,
-   check `main` status, and inspect late review/check comments that arrived
-   around or after merge. Route release-relevant findings into the next
-   post-merge audit intake. Reserve the full post-merge audit workflow for
-   final-release readiness, suspected bad merges, or a lightweight sweep that
-   finds a blocker, failed post-merge check, or credible release-readiness risk.
+10. After any closeout-lane merge action, run a lightweight sweep for late
+    post-merge bot findings before the final batch handoff: confirm the PR landed,
+    check `main` status, and inspect late review/check comments that arrived
+    around or after merge. Route release-relevant findings into the next
+    post-merge audit intake. Reserve the full post-merge audit workflow for
+    final-release readiness, suspected bad merges, or a lightweight sweep that
+    finds a blocker, failed post-merge check, or credible release-readiness risk.
 
 ## Self-Review Gate
 
