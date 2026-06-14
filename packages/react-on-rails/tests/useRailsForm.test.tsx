@@ -47,6 +47,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  fetchMock.mockClear();
   fetchMock.mockResolvedValue(mockResponse({ status: 200, body: {} }));
 });
 
@@ -61,7 +62,7 @@ describe('useRailsForm', () => {
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toBe('/contact_messages');
+      expect(url).toBe(new URL('/contact_messages', document.baseURI).href);
       expect(init.method).toBe('POST');
       expect(init.credentials).toBe('same-origin');
       expect(init.body).toBe(JSON.stringify({ name: 'Justin', email: '' }));
@@ -93,6 +94,24 @@ describe('useRailsForm', () => {
 
       expect(fetchMock).not.toHaveBeenCalled();
       expect(result.current.processing).toBe(false);
+    });
+
+    it('rejects relative URLs that would resolve through a cross-origin base tag', async () => {
+      const base = document.createElement('base');
+      base.href = 'https://example.com/';
+      document.head.appendChild(base);
+
+      try {
+        const { result } = renderHook(() => useRailsForm({ a: 1 }));
+
+        await act(async () => {
+          await expect(result.current.post('contact_messages')).rejects.toThrow(/same-origin URLs/);
+        });
+
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        base.remove();
+      }
     });
 
     it.each([

@@ -187,17 +187,26 @@ const safeJsonRedirectHint = (redirectTo: string): string | null => {
   return null;
 };
 
-const isSameOriginRequestUrl = (url: string): boolean => {
-  const currentOrigin = typeof window === 'undefined' ? null : window.location.origin;
-  if (currentOrigin === null) {
-    return true;
+const resolveSameOriginRequestUrl = (url: string): string | null => {
+  const currentLocation = typeof window === 'undefined' ? null : window.location;
+  if (currentLocation === null) {
+    return url;
   }
 
   try {
-    return new URL(url, currentOrigin).origin === currentOrigin;
+    const requestBase = typeof document === 'undefined' ? currentLocation.href : document.baseURI;
+    const resolvedUrl = new URL(url, requestBase);
+    if (
+      (resolvedUrl.protocol === 'http:' || resolvedUrl.protocol === 'https:') &&
+      resolvedUrl.origin === currentLocation.origin
+    ) {
+      return resolvedUrl.href;
+    }
   } catch {
-    return false;
+    return null;
   }
+
+  return null;
 };
 
 const extractRedirectTo = (response: Response, responseData: unknown): string | null => {
@@ -319,7 +328,8 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
 
   const submit = useCallback(
     async (method: RailsFormMethod, url: string, options: RailsFormSubmitOptions = {}) => {
-      if (!isSameOriginRequestUrl(url)) {
+      const requestUrl = resolveSameOriginRequestUrl(url);
+      if (requestUrl === null) {
         throw new Error('useRailsForm can only submit to same-origin URLs.');
       }
 
@@ -348,7 +358,7 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
 
       let response: Response;
       try {
-        response = await fetch(url, {
+        response = await fetch(requestUrl, {
           method: method.toUpperCase(),
           credentials: 'same-origin',
           headers: authenticityHeaders({
