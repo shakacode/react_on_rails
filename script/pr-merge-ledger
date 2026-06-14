@@ -140,7 +140,7 @@ class PrMergeLedger
     warn "ledger violations: #{report.fetch('violations').length}; " \
          "unknown fields: #{report.fetch('unknown_fields').length}"
     1
-  rescue Error, JSON::ParserError, Errno::ENOENT, Errno::EACCES, KeyError => e
+  rescue Error, JSON::ParserError, Errno::ENOENT, Errno::EACCES, KeyError, NoMethodError, TypeError => e
     warn "pr-merge-ledger: #{e.message}"
     2
   end
@@ -248,8 +248,9 @@ class PrMergeLedger
     @argv.map do |pr_number|
       begin
         pr_int = Integer(pr_number, 10)
+        raise ArgumentError unless pr_int.positive?
       rescue ArgumentError
-        raise Error, "PR number must be an integer: #{pr_number.inspect}"
+        raise Error, "PR number must be a positive integer: #{pr_number.inspect}"
       end
 
       collector.fetch(pr_int).merge("repository" => repo)
@@ -810,6 +811,8 @@ class PrMergeLedger
   end
 
   def timestamp_sort_key(raw_timestamp, warning_context = nil)
+    # Pending/malformed GitHub review timestamps sort oldest so they cannot clear
+    # a later dated decision review.
     Time.parse(raw_timestamp.to_s)
   rescue ArgumentError
     label = warning_context || "timestamp"
@@ -1066,6 +1069,9 @@ class PrMergeLedger
     end
 
     def fetch(pr_number)
+      # Metadata, threads, reviews, and comments are fetched sequentially, so a
+      # push during collection can make SHA comparisons a best-effort snapshot
+      # rather than an atomic GitHub view.
       metadata, files = fetch_metadata_and_files(pr_number)
       {
         "pull_request" => metadata,
@@ -1215,6 +1221,8 @@ class PrMergeLedger
     def append_graphql_variable(args, key, value)
       return if value.nil?
 
+      raise Error, "gh api graphql variable key cannot contain '=': #{key}" if key.to_s.include?("=")
+
       value_string = value.to_s
       if value.is_a?(String) && value_string.start_with?("@")
         raise Error, "gh api graphql variable #{key} cannot start with @"
@@ -1242,6 +1250,8 @@ class PrMergeLedger
 
     def capture_gh(args)
       timeout = PrMergeLedger.github_api_timeout_seconds
+      # Timeout.timeout can interrupt Open3 mid-IO. The risk is acceptable for
+      # short-lived gh calls only; do not extend this pattern to stateful subprocesses.
       Timeout.timeout(timeout) do
         Open3.capture3("gh", *args)
       end

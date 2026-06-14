@@ -477,6 +477,25 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "prints a clean error when fixture pull request data is malformed" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => nil
+    }
+
+    Tempfile.create(["pr-merge-ledger-malformed-pull-request", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(script_path, "--fixture", file.path, chdir: repo_root)
+
+      expect(status.exitstatus).to eq(2)
+      expect(stdout).to be_empty
+      expect(stderr).to include("pr-merge-ledger:")
+      expect(stderr).not_to include("from ")
+    end
+  end
+
   it "allows superseded change-request reviews after a newer review from the same reviewer" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -3422,6 +3441,21 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(status.exitstatus).to eq(2)
     expect(stdout).to be_empty
     expect(stderr).to include('repo must look like OWNER/REPO: "bad=owner/react_on_rails"')
+  end
+
+  it "rejects non-positive PR numbers before calling GitHub" do
+    stdout, stderr, status = Open3.capture3(
+      script_path,
+      "--repo",
+      "shakacode/react_on_rails",
+      "--",
+      "-1",
+      chdir: repo_root
+    )
+
+    expect(status.exitstatus).to eq(2)
+    expect(stdout).to be_empty
+    expect(stderr).to include('PR number must be a positive integer: "-1"')
   end
 
   it "rejects fixture mode combined with positional PR arguments" do
