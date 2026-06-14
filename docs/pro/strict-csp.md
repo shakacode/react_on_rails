@@ -41,8 +41,9 @@ end
 Notes:
 
 - With a nonce generator configured and `script-src` in `content_security_policy_nonce_directives`, Rails appends `'nonce-…'` to the `script-src` directive of every response automatically.
-- **Per-request vs. per-session nonce**: `SecureRandom.base64(16)` generates a fresh nonce per request. Use it for normal full-page navigations. If your app uses Turbo/Turbolinks visits that can load streamed SSR/RSC pages, prefer a session-based generator (`->(request) { request.session.id.to_s }`) because executable inline scripts in Turbo-fetched pages carry the new response's nonce while the active document still enforces the original page's policy.
+- **Per-request vs. per-session nonce**: `SecureRandom.base64(16)` generates a fresh nonce per request. Use it for normal full-page navigations. If your app uses Turbo/Turbolinks visits that can load streamed SSR/RSC pages, prefer a session-based generator (`->(request) { request.session.id.to_s }`) because executable inline scripts in Turbo-fetched pages carry the new response's nonce while the active document still enforces the original page's policy. React on Rails' inert JSON data tags and same-origin client bundle work with either nonce lifetime; the session-based preference applies to executable inline scripts in Turbo/Turbolinks-fetched streamed responses.
 - Browsers ignore `'unsafe-inline'` for a directive once that directive contains a nonce, so adding it as a fallback for legacy browsers is harmless but does not weaken the policy in modern browsers.
+- In production, configure CSP violation reporting (`report-uri` or `report-to`, often in report-only mode first) so nonce regressions show up before users report hydration failures.
 - A development environment usually needs extra allowances for `webpack-dev-server` (the bundle origin, the HMR websocket, and `'unsafe-eval'` for eval-based source maps). See the Pro dummy app's initializer (`react_on_rails_pro/spec/dummy/config/initializers/content_security_policy.rb`) for a working example that stays strict in test/production.
 
 ## How the Nonce Flows

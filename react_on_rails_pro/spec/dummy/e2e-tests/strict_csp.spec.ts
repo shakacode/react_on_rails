@@ -102,10 +102,12 @@ function getCspViolations(page: Page): Promise<CspViolation[]> {
 function isDevBuildFlightClientEval(violation: CspViolation): boolean {
   const isEvalBlockedByScriptSrc =
     violation.blockedURI === 'eval' && violation.violatedDirective.includes('script-src');
-  const isReactFlightSource = violation.sourceFile.includes('react-on-rails-rsc');
-  const isAnonymousDevFlightEval = violation.sourceFile === '' && violation.sample === '';
+  const isReactFlightSource =
+    violation.sourceFile.includes('react-on-rails-rsc') ||
+    violation.sample.includes('react-on-rails-rsc') ||
+    violation.sample.includes('react-server-dom-webpack');
 
-  return isEvalBlockedByScriptSrc && (isReactFlightSource || isAnonymousDevFlightEval);
+  return isEvalBlockedByScriptSrc && isReactFlightSource;
 }
 
 async function getUnexpectedCspViolations(page: Page): Promise<CspViolation[]> {
@@ -232,6 +234,13 @@ test.describe('Strict CSP (script-src self + per-request nonce, no unsafe-inline
     await Promise.all(
       componentIds.map((id) => expect(page.locator(`#${id} pre`)).toBeVisible({ timeout: 30000 })),
     );
+
+    const rscPayloadChunkCounts = await page.evaluate(() => {
+      const payloads = (window as CspTestGlobals).REACT_ON_RAILS_RSC_PAYLOADS ?? {};
+      return Object.values(payloads).map((chunks) => chunks.length);
+    });
+    expect(rscPayloadChunkCounts.length).toBeGreaterThanOrEqual(componentIds.length);
+    rscPayloadChunkCounts.forEach((chunkCount) => expect(chunkCount).toBeGreaterThan(0));
 
     expect(await getUnexpectedCspViolations(page)).toEqual([]);
     expect(pageErrors).toEqual([]);
