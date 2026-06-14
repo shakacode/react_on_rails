@@ -213,16 +213,20 @@ contract unless a maintainer explicitly narrows the run.
   of the PR diff, directly cited by current review feedback, or required to keep
   touched copies synchronized; it excludes unrelated cleanup, other machine
   lanes, reserved files, and generated output not already in scope.
-  The final-candidate debounce point begins once the agent treats the current
-  head as the merge-readiness candidate by starting the final local
-  validation/review gate for that head, or by triggering or queuing current-head
-  CI/review checks. Earlier incremental per-file checks during the fix phase do
-  not count unless they are part of that final-candidate gate.
+  The final-candidate debounce point begins once the agent records the current
+  head as the merge-readiness candidate in the PR body, a PR comment, or the
+  handoff after starting the final local validation/review gate for that head,
+  or once current-head CI/review checks have been explicitly triggered or queued
+  as the declared final readiness gate. Automatically queued checks from
+  ordinary PR pushes do not count unless they are part of that recorded
+  final-candidate gate. Earlier incremental per-file checks during the fix phase
+  do not count unless they are part of that recorded final-candidate gate.
   Behavior-preserving means wording, formatting, or mechanical
   whitespace/punctuation cleanup that does not alter public APIs, generated
-  output, runtime behavior, validation scope, or reviewer obligations. Low-risk
-  means local and mechanically checkable, such as a formatter-confirmed cleanup;
-  a rename that requires searching all callers is not low-risk by default.
+  output, runtime behavior, validation scope, or the semantic meaning of any
+  document section under active review. Low-risk means local and mechanically
+  checkable, such as a formatter-confirmed cleanup; a rename that requires
+  searching all callers is not low-risk by default.
   Qualifying examples: typo/comment punctuation, whitespace or trailing comma
   cleanup, type-only or linter-confirmed unused import removal after verifying
   the imported module has no side effects, or unambiguous documentation wording.

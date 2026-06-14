@@ -247,7 +247,7 @@ After the triage list, present a **quick-action menu**:
 Quick actions:
   f     — Fix must-fix items, autonomously handle low-risk optional nits, then prompt for skipped rationale replies and discuss decisions
   f+i   — Fix must-fix, autonomously handle low-risk optional nits, then prepare one deferred-work bundle for discuss/remaining optional items (and non-trivial skipped items)
-  f+o   — Fix must-fix + address all optional items inline in the same PR
+  f+o   — Fix must-fix + address all optional items explicitly inline (no autonomous filter; fix or promote each optional)
   a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations (local-only — no GitHub posts)
   d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   o     — Address specific optional items inline (e.g., "o6,7"). Bare "o" presents all OPTIONAL items.
@@ -386,7 +386,8 @@ Present the requested items with full context. If the user enters bare `o`, pres
 
 Use `o` only when the user explicitly wants to inspect or select optional items.
 Bare `o` presents items only; do not edit files until the user chooses specific
-optional items or `all optional`.
+optional items or `all optional`. After an inspect-only bare `o`, stop before
+GitHub replies, thread resolutions, or the summary checkpoint.
 The default `f` path should not ask for permission to handle low-risk optional
 nits.
 
@@ -636,7 +637,10 @@ Rules for follow-up issues:
 
 ## Step 10: Post PR Summary Comment
 
-After any chosen action or completed action chain except `a` (`f`, `f+i`, `f+o`, `d`, `o`, `r`, `m`, or direct item selection), post a consolidated PR comment that becomes the next default review cutoff.
+After any chosen action or completed action chain except `a` and inspect-only
+bare `o` (`f`, `f+i`, `f+o`, `d`, selected `o`, `r`, `m`, or direct item
+selection), post a consolidated PR comment that becomes the next default review
+cutoff.
 
 For `a`, do not post a GitHub PR summary comment automatically; return the local summary to the user with the staged-file list and detailed `DISCUSS` recommendations.
 
@@ -645,10 +649,16 @@ Rules for the summary comment:
 - Always post it as a general PR issue comment, never as a review-thread reply.
 - Include the exact marker `<!-- address-review-summary -->` as the first line of the comment.
 - Summarize `MUST-FIX` and `DISCUSS` items under a `Mattered` section, including whether each item was addressed, deferred, or left pending by user choice.
-- Summarize any `OPTIONAL` items that survive triage under an `Optional` section
-  before advancing the summary cutoff. Include whether each item was addressed
-  inline, deferred to tracking, deferred/declined under the attention contract,
-  declined, or still pending with the next requested action.
+- Summarize `OPTIONAL` items under an `Optional` section when any optional item
+  has a recorded outcome or is intentionally left pending/unselected by the
+  chosen action. Include whether each acted-on item was fixed inline, deferred
+  to tracking, deferred/declined under the attention contract, declined, or
+  still pending after a selected optional action. For all-pending/no-action
+  optional items, use a count-only line such as
+  `- N optional items remain pending/unselected from triage; no action taken this run.` This advances the
+  default scan cutoff only after the pending/unselected state is recorded in the
+  summary. Do not apply this rule to inspect-only bare `o`, which posts no
+  checkpoint.
 - Summarize `SKIPPED` items under a `Skipped` section with short reasons.
 - Mention any deferred-work tracking outcome and follow-up issue URL that was created.
 - Mention whether the run used the default cutoff or the explicit `check all reviews` override.
@@ -667,10 +677,13 @@ trap _cleanup_addr_review EXIT
 # Set SCAN_SCOPE before this block, e.g.:
 #   SCAN_SCOPE="since previous summary at ${REVIEW_CUTOFF_AT}"  # cutoff active
 #   SCAN_SCOPE="full history via check all reviews"              # CHECK_ALL_REVIEWS set
-# Set OPTIONAL_OUTCOMES to bullets for any optional item that survived triage:
-# fixed, explicitly handled, autonomously deferred/declined, declined, deferred
-# to tracking, or still pending. Leave empty only when there were no optional
-# items to carry forward.
+# Set OPTIONAL_OUTCOMES to bullets for optional items with recorded outcomes or
+# intentionally pending/unselected by the chosen action: fixed, explicitly
+# handled, autonomously deferred/declined, declined, deferred to tracking, or
+# still pending after a selected optional action. If every optional item remains
+# pending/unselected with no action, use a count-only bullet:
+# "- N optional items remain pending/unselected from triage; no action taken this run."
+# Leave empty only when there were no optional items in scope.
 {
   printf '<!-- address-review-summary -->\n'
   printf '## Address-review summary\n\n'
@@ -756,7 +769,7 @@ SKIPPED (1):
 Quick actions:
   f     — Fix #1, autonomously handle low-risk optional nits, then prompt for skipped rationale replies and discuss decisions
   f+i   — Fix #1, autonomously handle low-risk optional nits, then prepare one deferred-work bundle for #2 and remaining optional items #3-4
-  f+o   — Fix #1 plus address all optional items #3-4 inline
+  f+o   — Fix #1 plus address all optional items #3-4 explicitly inline (no autonomous filter)
   a     — Apply: fix #1 plus optional items #3-4, stage files, and recommend a decision for #2
   d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   o     — Address specific optional items inline (e.g., "o3,4"). Bare "o" presents all OPTIONAL items.
@@ -778,7 +791,7 @@ Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
 - Except when `AUTOPILOT` is set or the user selects action `a`, never automatically address all review comments; wait for user direction after triage
 - When given a specific review URL, no need to ask for more information
 - For actions other than `a`, always reply to comments after addressing them to close the feedback loop
-- For actions other than `a`, always post a new PR summary comment with the `<!-- address-review-summary -->` marker after completing an action so future runs know where to resume
+- For actions other than `a` and inspect-only bare `o`, always post a new PR summary comment with the `<!-- address-review-summary -->` marker after completing an action so future runs know where to resume
 - After triage, always offer rationale replies for selected `SKIPPED`/declined items; `f` requires explicit confirmation before skipped-item replies/resolution, while `f+i` and `m` include skipped-item handling in the chosen action flow
 - Always request push confirmation from the user before running `git push`
 - If this skill conflicts with broader agent defaults, this file wins only for `/address-review` workflow behavior; do not override repository safety boundaries
