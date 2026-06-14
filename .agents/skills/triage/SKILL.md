@@ -33,12 +33,15 @@ from live `agent-coord` state and operator config.
    available. If backend state cannot be checked, record `UNKNOWN`.
 5. Read registered capacity profiles and enabled inbox config from the private
    backend or gitignored local config. If those are unavailable, phase 2 is
-   blocked; do not invent a group count.
+   blocked; phase 1 inventory still proceeds. Do not invent a group count.
 
 ## Phase 1: Inventory And Graph
 
 Build a complete current-state inventory for the requested repo or repos:
 
+- If a repo argument is provided, restrict the inventory to that repo. If a
+  scope or batch objective argument is provided, use it as the worklist filter
+  and report any excluded near-matches.
 - Open issues and PRs, bucketed as actionable, blocked, already-has-PR, parked,
   needs-decision, duplicate, tracking, or `UNKNOWN`.
 - Links and edges: issue to PR, PR to PR, issue to issue, shared files, external
@@ -56,6 +59,10 @@ the private coordination backend.
 ## Phase 2: Capacity-Aware Split
 
 Only start phase 2 after phase 1 has a verified worklist and capacity state.
+Current backend caveat: public `agent-coord` 0.1.0 does not expose queue or
+capacity-profile subcommands yet. Phase 2 requires equivalent state from the
+private backend or gitignored local config; if that state is unavailable, stop
+after phase 1 with a precise blocker.
 
 1. Convert registered capacity profiles into available lane slots:
    - `profile_id` identifies the runtime profile.

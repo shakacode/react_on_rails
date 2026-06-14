@@ -163,6 +163,8 @@ for example `mobile-batch2-lane1`, `desktop-highcap-lane1`, or
 `desktop-conductor-finish`; if one batch runs multiple
 simultaneously-heartbeating lanes on the same machine or profile, add a short
 lane suffix after the batch id so each heartbeat remains distinguishable.
+Existing registrations using the older `<machine>-<tool>-<batch>` format remain
+valid until claim expiry; re-key them on the next session start.
 
 Use this lifecycle for every lane:
 
