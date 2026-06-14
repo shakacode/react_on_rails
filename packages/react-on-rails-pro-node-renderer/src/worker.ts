@@ -493,28 +493,26 @@ export default function run(config: Partial<Config>) {
       }
     };
 
-    const closeIncrementalRequest = async ({ timeoutMs }: { timeoutMs?: number } = {}) => {
+    const closeIncrementalRequest = async ({
+      timeoutMs = INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS,
+    }: { timeoutMs?: number } = {}) => {
       if (!incrementalSink || incrementalRequestClosed) {
         return;
       }
       const sink = incrementalSink;
 
       try {
-        if (timeoutMs === undefined) {
-          await sink.handleRequestClosed();
-        } else {
-          await waitForIncrementalRequestClose(
-            Promise.resolve()
-              .then(() => sink.handleRequestClosed())
-              .catch((closeError: unknown) => {
-                log.error({
-                  msg: 'Error while closing incremental render request after response started',
-                  error: closeError,
-                });
-              }),
-            timeoutMs,
-          );
-        }
+        await waitForIncrementalRequestClose(
+          Promise.resolve()
+            .then(() => sink.handleRequestClosed())
+            .catch((closeError: unknown) => {
+              log.error({
+                msg: 'Error while closing incremental render request after response started',
+                error: closeError,
+              });
+            }),
+          timeoutMs,
+        );
       } finally {
         incrementalRequestClosed = true;
         releaseIncrementalExecutionContextWhenDone();

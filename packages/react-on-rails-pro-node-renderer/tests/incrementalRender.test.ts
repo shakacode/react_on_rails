@@ -491,6 +491,44 @@ describe('incremental render NDJSON endpoint', () => {
     expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
   });
 
+  test('releases incremental execution context when request close hook hangs after successful request EOF', async () => {
+    const {
+      responseStream,
+      handleRequestClosed,
+      releaseExecutionContext,
+      handleSpy,
+      SERVER_BUNDLE_TIMESTAMP,
+    } = await createStreamingTestSetup();
+    handleRequestClosed.mockImplementation(() => new Promise<void>(() => {}));
+
+    const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
+    const { promise, receivedChunks } = createStreamingResponsePromise(req);
+
+    req.write(`${JSON.stringify(createInitialObject(SERVER_BUNDLE_TIMESTAMP))}\n`);
+    await waitFor(() => {
+      expect(handleSpy).toHaveBeenCalledTimes(1);
+    });
+
+    responseStream.push('stream can finish before close hook settles');
+    await waitFor(() => {
+      expect(receivedChunks).toEqual(['stream can finish before close hook settles']);
+    });
+
+    req.end();
+    responseStream.push(null);
+    await promise;
+
+    await waitFor(() => {
+      expect(handleRequestClosed).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(
+      () => {
+        expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 2_500 },
+    );
+  });
+
   test('logs onRequestClosedUpdateChunk failures returned from runInVM', async () => {
     await createVmBundle(TEST_NAME);
     const logErrorSpy = jest.spyOn(log, 'error').mockImplementation(() => undefined);
