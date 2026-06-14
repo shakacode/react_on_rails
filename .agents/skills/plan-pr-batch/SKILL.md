@@ -67,7 +67,9 @@ Plan a PR batch
      cannot run, record the PR paths as `UNKNOWN` and treat the item as serial.
    - File-touch map, PR Files API fallback: prefer the local `git diff` above
      as the authoritative source; treat the API as a best-effort cross-check.
-     Fetch with
+     When the local diff succeeds, keep those paths authoritative even if the
+     API response is capped, incomplete, or unavailable. Use the API as the
+     scheduling source only when the local diff cannot run. Fetch with
      `gh api --paginate --method GET repos/{owner}/{repo}/pulls/N/files -f per_page=100`;
      the default page size is 30, so a small unpaginated page can look complete
      while truncated. `--paginate` follows all pages automatically; no Link
@@ -75,9 +77,10 @@ Plan a PR batch
      acceptable only when it records both `.filename` and `.previous_filename`
      when present, and its listed-file count matches the PR's `changedFiles`
      value from `gh pr view N --json changedFiles`. GitHub caps the Files API at
-     ~3000 files; if `changedFiles` is at or near that cap, the response cannot
-     prove there are no more pages, or it only reports new paths, record the PR
-     paths as `UNKNOWN` and treat the item as serial.
+     ~3000 files; if the API is the only available source and `changedFiles` is
+     at or near that cap, the response cannot prove there are no more pages, or
+     it only reports new paths, record the PR paths as `UNKNOWN` and treat the
+     item as serial.
    - File-touch map, issue path discovery: read the issue body, record proposed
      new paths from issue/design notes, and grep the repo to confirm existing
      paths. If paths cannot be determined from the issue body or design notes,
