@@ -19,6 +19,10 @@ const HANDLER_KEYS = [
   'onCaughtError',
   'onUncaughtError',
 ] as const satisfies readonly (keyof Required<RootErrorHandlers>)[];
+const REACT_19_ONLY_HANDLER_KEYS = [
+  'onCaughtError',
+  'onUncaughtError',
+] as const satisfies readonly RootErrorHandlerKey[];
 
 // Registered through `ReactOnRails.setOptions({ rootErrorHandlers })`; module-level so both the
 // core ClientRenderer and the Pro ClientSideRenderer (which imports this module from the same
@@ -72,8 +76,9 @@ export function setRootErrorHandlers(handlers: RootErrorHandlers): void {
     const react19OnlyKeys = providedKeys.filter((key) => key !== 'onRecoverableError');
     if (react19OnlyKeys.length > 0 && !warnedMissingReact19Callbacks) {
       console.warn(
-        `[ReactOnRails] rootErrorHandlers (${react19OnlyKeys.join(', ')}) require React 19. ` +
-          'Only onRecoverableError is supported on React 18; the other registered callbacks will never be called.',
+        `[ReactOnRails] rootErrorHandlers (${REACT_19_ONLY_HANDLER_KEYS.join(', ')}) require React 19. ` +
+          'Only onRecoverableError is supported on React 18; onCaughtError and onUncaughtError callbacks ' +
+          'will never be called with the current React version.',
       );
       warnedMissingReact19Callbacks = true;
     }
@@ -198,8 +203,9 @@ export interface BuildRootErrorCallbackOptionsExtras {
    * supplemental line and skips `defaultReportRecoverableError`, so each recoverable error is
    * default-reported exactly once.
    *
-   * New Pro hydrate paths MUST set this to `true` when they call `chainRecoverableErrorHandlers`;
-   * omitting it causes double-reporting in development.
+   * New Pro hydrate paths that call `chainRecoverableErrorHandlers` should use
+   * `buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting` instead of setting this
+   * low-level flag directly; omitting it causes double-reporting in development.
    */
   defaultReportingHandledInternally?: boolean;
 }

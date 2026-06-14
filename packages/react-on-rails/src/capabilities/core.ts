@@ -234,7 +234,7 @@ export function createCoreCapability(registries: Registries) {
         document.getElementById(domNodeId) as Element,
         reactElement as ReactElement,
         hydrate,
-        buildRootErrorCallbackOptions({ componentName: name, domNodeId }, hydrate),
+        buildRootErrorCallbackOptions({ componentName: name, domNodeId: domNodeId || undefined }, hydrate),
       );
     },
 
