@@ -86,6 +86,7 @@ declare module 'fastify' {
 
 const HEALTH_ENDPOINT_ROUTES = ['/health', '/ready'] as const;
 const FASTIFY_DUPLICATED_ROUTE_ERROR_CODE = 'FST_ERR_DUPLICATED_ROUTE';
+// TODO: Reassess the duplicated-route message format when upgrading Fastify.
 
 function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- fixing it with `void` just violates no-void
@@ -135,14 +136,15 @@ function applyFastifyConfigWithHealthEndpointMigrationHint(
   } catch (error) {
     const conflictingPath = enableHealthEndpoints ? conflictingHealthEndpointPath(error) : undefined;
     if (conflictingPath) {
-      const originalMessage = error instanceof Error ? error.message : String(error);
       const message =
         `enableHealthEndpoints registers built-in GET ${conflictingPath}, but a configureFastify callback ` +
         `already registered that route. Remove or rename the custom ${conflictingPath} route when migrating ` +
         'to the built-in health endpoints. See docs/oss/building-features/node-renderer/health-checks.md.';
 
       log.error({ err: error, route: conflictingPath }, message);
-      throw new Error(`${message} Original Fastify error: ${originalMessage}`);
+      const migrationError = new Error(message) as Error & { cause?: unknown };
+      migrationError.cause = error;
+      throw migrationError;
     }
 
     throw error;
@@ -710,6 +712,10 @@ export default function run(config: Partial<Config>) {
     // Liveness: 200 whenever this process can answer — i.e. the event loop is
     // responsive. Intentionally checks no dependencies (no bundle, Rails, or
     // license state) so a transient dependency issue never restarts the pod.
+    // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
+    // this is an internal renderer service not exposed to the internet, returns
+    // a static status string, and exposes no sensitive runtime data.
+    // lgtm[js/missing-rate-limiting]
     app.get('/health', (_req, res) => {
       res.send({ status: 'ok' });
     });
@@ -720,6 +726,9 @@ export default function run(config: Partial<Config>) {
     // bundles responds 410 to renders until the Rails client uploads one.
     // With workersCount > 1 the cluster module distributes probe connections
     // across workers, so a probe checks one worker per request.
+    // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
+    // same rationale as /health; this returns only a static readiness status.
+    // lgtm[js/missing-rate-limiting]
     app.get('/ready', (_req, res) => {
       if (hasAnyVMContext()) {
         res.send({ status: 'ready' });

@@ -56,6 +56,31 @@ const renderWithBundle = async (app: ReturnType<typeof createWorker>) => {
     .end();
 };
 
+const expectHealthEndpointConflict = (routePath: '/health' | '/ready') => {
+  let caughtError: unknown;
+
+  try {
+    createWorker({ enableHealthEndpoints: true });
+  } catch (error) {
+    caughtError = error;
+  }
+
+  expect(caughtError).toBeInstanceOf(Error);
+  if (!(caughtError instanceof Error)) {
+    throw new Error(`Expected ${routePath} conflict to throw an Error`);
+  }
+
+  const migrationError = caughtError as Error & { cause?: unknown };
+  expect(migrationError.message).toContain(`enableHealthEndpoints registers built-in GET ${routePath}`);
+  expect(migrationError.message).not.toContain('Original Fastify error');
+  expect(migrationError.cause).toBeInstanceOf(Error);
+  if (!(migrationError.cause instanceof Error)) {
+    throw new Error(`Expected ${routePath} conflict to preserve the Fastify error cause`);
+  }
+
+  expect((migrationError.cause as { code?: unknown }).code).toBe('FST_ERR_DUPLICATED_ROUTE');
+};
+
 describe('built-in health endpoints', () => {
   let app: ReturnType<typeof createWorker> | undefined;
 
@@ -114,6 +139,20 @@ describe('built-in health endpoints', () => {
     expect(JSON.parse(readyRes.payload)).toEqual({ status: 'waiting_for_bundle' });
   });
 
+  test.each(['false', '0'])(
+    'GET /health and GET /ready are not registered when env var is %s',
+    async (envValue) => {
+      process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS = envValue;
+      app = createWorker();
+
+      const healthRes = await app.inject().get('/health').end();
+      expect(healthRes.statusCode).toBe(404);
+
+      const readyRes = await app.inject().get('/ready').end();
+      expect(readyRes.statusCode).toBe(404);
+    },
+  );
+
   test('GET /ready returns 503 before a bundle is loaded and 200 after', async () => {
     app = createWorker({ enableHealthEndpoints: true });
 
@@ -154,8 +193,16 @@ describe('built-in health endpoints', () => {
       });
     });
 
-    expect(() => createWorker({ enableHealthEndpoints: true })).toThrow(
-      /enableHealthEndpoints registers built-in GET \/health/,
-    );
+    expectHealthEndpointConflict('/health');
+  });
+
+  test('reports a migration hint when a custom ready route conflicts with built-in endpoints', () => {
+    configureFastify((fastifyApp) => {
+      fastifyApp.get('/ready', (_req, res) => {
+        res.send({ status: 'legacy' });
+      });
+    });
+
+    expectHealthEndpointConflict('/ready');
   });
 });
