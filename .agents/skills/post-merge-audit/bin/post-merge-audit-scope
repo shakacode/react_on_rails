@@ -42,9 +42,19 @@ pma_scope_default_head_ref() {
 }
 
 pma_scope_default_base_ref() {
-  local head_ref="$1"
+  local commit head_ref tag
 
-  git describe --tags --match '*.rc.*' --first-parent --abbrev=0 "$head_ref" 2>/dev/null || true
+  head_ref="$1"
+
+  while IFS= read -r commit; do
+    tag="$(git tag --points-at "$commit" --list '*.rc.*' | head -n 1)"
+    if [ -n "$tag" ]; then
+      printf '%s\n' "$tag"
+      return 0
+    fi
+  done < <(git rev-list --first-parent "$head_ref" 2>/dev/null || true)
+
+  return 0
 }
 
 pma_scope_resolve_ref_sha() {
@@ -205,7 +215,7 @@ pma_scope_fetch_issue_markers() {
   local limit="$2"
   local output_file="$3"
   local open_output_file="$4"
-  local tmpdir open_json closed_json
+  local closed_markers tmpdir open_json closed_json
 
   pma_scope_require_command gh || return 1
   if [ -n "${PMA_SCOPE_TMPDIR:-}" ]; then
@@ -215,6 +225,7 @@ pma_scope_fetch_issue_markers() {
   fi
   open_json="$tmpdir/open.json"
   closed_json="$tmpdir/closed.json"
+  closed_markers="$tmpdir/closed-markers.tsv"
 
   if ! gh search issues "post-merge-audit-finding v1" \
     --repo "$repo" \
@@ -244,9 +255,15 @@ pma_scope_fetch_issue_markers() {
     return 1
   fi
 
-  if ! pma_scope_extract_issue_markers_from_json_files "$open_json" "$closed_json" > "$output_file"; then
+  if ! pma_scope_extract_issue_markers_from_json_files "$closed_json" > "$closed_markers"; then
     rm -rf "$tmpdir"
-    pma_scope_error "failed to parse post-merge audit finding issues"
+    pma_scope_error "failed to parse closed post-merge audit finding issues"
+    return 1
+  fi
+
+  if ! cat "$open_output_file" "$closed_markers" > "$output_file"; then
+    rm -rf "$tmpdir"
+    pma_scope_error "failed to combine post-merge audit finding markers"
     return 1
   fi
   rm -rf "$tmpdir"

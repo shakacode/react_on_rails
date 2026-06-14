@@ -61,6 +61,7 @@ else
 fi
 BASH
   chmod +x "$path"
+  unset PMA_TEST_OPEN_JSON PMA_TEST_CLOSED_JSON
   export PMA_TEST_OPEN_JSON="$open_json"
   export PMA_TEST_CLOSED_JSON="$closed_json"
 }
@@ -504,7 +505,7 @@ test_sourced_main_help_does_not_change_shell_options() {
 }
 
 test_sourced_main_run_preserves_cwd_and_exit_trap() {
-  local tmpdir repo fake_bin open_json closed_json base out expected expected_pwd
+  local actual_rc_pwd expected_rc_pwd tmpdir repo fake_bin open_json closed_json base out expected_pwd
 
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
   repo="$tmpdir/repo"
@@ -535,14 +536,20 @@ test_sourced_main_run_preserves_cwd_and_exit_trap() {
       printf "rc=%s\npwd=%s\ntrap=%s\n" "$rc" "$PWD" "$(trap -p EXIT)"
     ' bash "$RESOLVER" "$repo" "$fake_bin" "$base"
   )"
-  expected="$(
+  expected_rc_pwd="$(
     printf 'rc=0\n'
-    printf 'pwd=%s\n' "$expected_pwd"
-    printf "trap=trap -- 'printf caller-exit-trap >/dev/null' EXIT"
+    printf 'pwd=%s' "$expected_pwd"
   )"
 
   rm -rf "$tmpdir"
-  assert_equals "$expected" "$out" "sourced pma_scope_main caller context"
+  actual_rc_pwd="$(printf '%s\n' "$out" | sed -n '1,2p')"
+  assert_equals "$expected_rc_pwd" "$actual_rc_pwd" "sourced pma_scope_main caller context"
+  case "$out" in
+    *"printf caller-exit-trap >/dev/null"*) ;;
+    *)
+      fail "caller exit trap not preserved: $out"
+      ;;
+  esac
 }
 
 run_test test_parse_git_log_extracts_squash_and_merge_subject_prs_once
