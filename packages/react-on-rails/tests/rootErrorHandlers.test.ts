@@ -247,7 +247,8 @@ describe('rootErrorHandlers', () => {
         onRecoverableError: jest.fn(() => Promise.reject(rejection)),
       });
       const options = buildRootErrorCallbackOptions({ componentName: 'X', domNodeId: 'x' }, true);
-      expect(() => options.onRecoverableError?.(new Error('boom'), undefined)).not.toThrow();
+      const originalError = new Error('boom');
+      expect(() => options.onRecoverableError?.(originalError, undefined)).not.toThrow();
 
       // Flush microtasks so the swallowing .catch runs.
       await new Promise((resolve) => {
@@ -256,6 +257,8 @@ describe('rootErrorHandlers', () => {
       expect(console.error).toHaveBeenCalledWith(
         expect.stringContaining('rootErrorHandlers.onRecoverableError callback threw'),
         rejection,
+        'Original root error:',
+        originalError,
       );
     });
 
@@ -268,10 +271,13 @@ describe('rootErrorHandlers', () => {
         }),
       });
       const options = buildRootErrorCallbackOptions({ componentName: 'X', domNodeId: 'x' }, true);
-      expect(() => options.onRecoverableError?.(new Error('boom'), undefined)).not.toThrow();
+      const originalError = new Error('boom');
+      expect(() => options.onRecoverableError?.(originalError, undefined)).not.toThrow();
       expect(console.error).toHaveBeenCalledWith(
         expect.stringContaining('rootErrorHandlers.onRecoverableError callback threw'),
         handlerError,
+        'Original root error:',
+        originalError,
       );
     });
   });

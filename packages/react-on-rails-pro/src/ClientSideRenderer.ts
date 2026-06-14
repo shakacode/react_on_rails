@@ -254,24 +254,30 @@ You should return a React.Component always for the client side entry point.`);
           // user onRecoverableError is CHAINED after Pro's internal recoverable-error handler so
           // both run. The dedicated helper keeps the internal default-reporting invariant in one
           // named place instead of relying on each Pro call site to remember a low-level flag.
-          const buildErrorCallbackOptions = wrappedByDefaultRSCProvider
-            ? buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting
-            : buildRootErrorCallbackOptions;
+          const buildErrorCallbackOptions =
+            wrappedByDefaultRSCProvider && shouldHydrate
+              ? buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting
+              : buildRootErrorCallbackOptions;
           const userErrorCallbackOptions = buildErrorCallbackOptions(
             { componentName: name, domNodeId },
             shouldHydrate,
           );
           let renderOptions: Parameters<typeof reactHydrateOrRender>[3] = userErrorCallbackOptions;
           if (wrappedByDefaultRSCProvider) {
+            const { onRecoverableError: userOnRecoverableError, ...rootErrorCallbackOptions } =
+              userErrorCallbackOptions;
+            const identifierPrefix = shouldHydrate ? this.ssrIdentifierPrefix : domNodeId;
             renderOptions = shouldHydrate
               ? {
-                  ...userErrorCallbackOptions,
-                  ...(this.ssrIdentifierPrefix ? { identifierPrefix: this.ssrIdentifierPrefix } : {}),
-                  onRecoverableError: chainRecoverableErrorHandlers(
-                    userErrorCallbackOptions.onRecoverableError,
-                  ),
+                  ...rootErrorCallbackOptions,
+                  ...(identifierPrefix ? { identifierPrefix } : {}),
+                  onRecoverableError: chainRecoverableErrorHandlers(userOnRecoverableError),
                 }
-              : { ...userErrorCallbackOptions, identifierPrefix: domNodeId };
+              : {
+                  ...rootErrorCallbackOptions,
+                  ...(userOnRecoverableError ? { onRecoverableError: userOnRecoverableError } : {}),
+                  identifierPrefix,
+                };
           }
           const rootOrElement = reactHydrateOrRender(domNode, reactElement, shouldHydrate, renderOptions);
           this.state = 'rendered';

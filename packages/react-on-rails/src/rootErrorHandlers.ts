@@ -121,7 +121,12 @@ function safeInvoke(
   context: RootErrorContext,
 ): void {
   const logHandlerFailure = (handlerError: unknown) => {
-    console.error(`[ReactOnRails] The registered rootErrorHandlers.${key} callback threw:`, handlerError);
+    console.error(
+      `[ReactOnRails] The registered rootErrorHandlers.${key} callback threw while handling a root error:`,
+      handlerError,
+      'Original root error:',
+      error,
+    );
   };
   // Re-type the void-returning handler so an async handler's returned promise can be inspected.
   const invoke = handler as (e: unknown, i: unknown, c: RootErrorContext) => unknown;

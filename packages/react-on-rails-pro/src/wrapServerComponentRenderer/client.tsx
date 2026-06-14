@@ -132,15 +132,18 @@ const wrapServerComponentRenderer = (
       { componentName, domNodeId },
       shouldHydrate,
     );
+    const { onRecoverableError: userOnRecoverableError, ...rootErrorCallbackOptions } =
+      userErrorCallbackOptions;
     const reactRoot = shouldHydrate
       ? ReactDOMClient.hydrateRoot(domNode, rootElement, {
-          ...userErrorCallbackOptions,
+          ...rootErrorCallbackOptions,
           identifierPrefix: domNodeId,
-          onRecoverableError: chainRecoverableErrorHandlers(userErrorCallbackOptions.onRecoverableError),
+          onRecoverableError: chainRecoverableErrorHandlers(userOnRecoverableError),
         })
       : (() => {
           const root = ReactDOMClient.createRoot(domNode, {
-            ...userErrorCallbackOptions,
+            ...rootErrorCallbackOptions,
+            ...(userOnRecoverableError ? { onRecoverableError: userOnRecoverableError } : {}),
             identifierPrefix: domNodeId,
           });
           root.render(rootElement);
