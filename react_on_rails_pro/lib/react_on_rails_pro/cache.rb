@@ -19,6 +19,7 @@ require "react_on_rails_pro/cache/tag_index"
 module ReactOnRailsPro
   class Cache
     ACTIVE_SUPPORT_EXPIRES_AT_VERSION = Gem::Version.new("7.0.0")
+    EXPIRED_CACHE_WRITE_TTL = 1
 
     class << self
       # options[:cache_options] can include :compress, :expires_in, :race_condition_ttl and
@@ -28,6 +29,15 @@ module ReactOnRailsPro
           cache_key = react_component_cache_key(component_name, options)
           Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
           cache_options = cache_write_options(options[:cache_options])
+          if cache_write_expired?(options[:cache_options])
+            result = yield
+            if result.is_a?(Hash)
+              result[:RORP_CACHE_KEY] = cache_key
+              result[:RORP_CACHE_HIT] = false
+            end
+            return result
+          end
+
           cache_hit = true
           normalized_cache_tags = []
           result = Rails.cache.fetch(cache_key, cache_options) do
@@ -75,7 +85,7 @@ module ReactOnRailsPro
         return cache_options unless expires_at
 
         expires_in = expires_at.to_time.to_f - Time.now.to_f
-        return cache_options.merge(expires_in: 0).except(:expires_at) if expires_in <= 0
+        return cache_options.merge(expires_in: EXPIRED_CACHE_WRITE_TTL).except(:expires_at) if expires_in <= 0
 
         if cache_supports_expires_at?
           return cache_options.except(:expires_in) if cache_options.key?(:expires_in)
@@ -86,6 +96,13 @@ module ReactOnRailsPro
         return cache_options.except(:expires_at) unless cache_options[:expires_in].nil?
 
         cache_options.merge(expires_in:).except(:expires_at)
+      end
+
+      def cache_write_expired?(cache_options)
+        return false unless cache_options&.key?(:expires_at)
+
+        expires_at = cache_options[:expires_at]
+        expires_at && expires_at.to_time.to_f <= Time.now.to_f
       end
 
       def cache_supports_expires_at?

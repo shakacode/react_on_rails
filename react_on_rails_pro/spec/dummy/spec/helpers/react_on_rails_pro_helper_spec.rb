@@ -895,6 +895,33 @@ describe ReactOnRailsProHelper do
           .with(["stream-tag"], "stream-cache-key", tag_index_cache_options)
       end
 
+      it "does not write or register stream cache entries whose expires_at passed before completion" do
+        raw_cache_options = { expires_at: Time.now - 60 }
+        captured_on_complete = nil
+
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+
+        captured_on_complete.call(["chunk"])
+
+        expect(Rails.cache).not_to have_received(:write)
+        expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
+      end
+
       it "respects skip_prerender_cache and does not write or hit cache" do
         mock_request_and_response(count: 3)
         # Disable view-level caching for this run via conditional

@@ -31,6 +31,8 @@ module ReactOnRailsPro
 
     def self.cache_write_options: (Hash[Symbol, untyped]? cache_options) -> Hash[Symbol, untyped]?
 
+    def self.cache_write_expired?: (Hash[Symbol, untyped]? cache_options) -> bool
+
     def self.cache_supports_expires_at?: () -> bool
 
     def self.revalidate_tags: (*untyped tags) -> Integer

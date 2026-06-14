@@ -148,6 +148,30 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(1)
     end
 
+    it "does not cache entries whose expires_at has already passed" do
+      allow(described_class).to receive(:cache_supports_expires_at?).and_return(false)
+      result = "<div>Something</div>"
+      create_component_code = instance_double(TestingCache, call: result)
+
+      fetch = lambda do
+        described_class.fetch_react_component("MyComponent",
+                                              cache_key: "expired_expires_at_key",
+                                              cache_tags: ["post:42"],
+                                              cache_options: { expires_at: Time.now - 60 }) do
+          create_component_code.call
+        end
+      end
+
+      expect(fetch.call).to eq(result)
+      expect(fetch.call).to eq(result)
+      expect(create_component_code).to have_received(:call).twice
+
+      string_cache_key =
+        "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/expired_expires_at_key"
+      expect(Rails.cache.read(string_cache_key)).to be_nil
+      expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(0)
+    end
+
     it "validates cache_tags before writing a cache miss" do
       string_cache_key =
         "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/invalid_tag_key"
@@ -250,24 +274,31 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(cache_options[:namespace]).to eq("components")
     end
 
-    it "clamps converted expires_at to zero when the target time has already passed" do
+    it "uses the minimum positive TTL when converted expires_at has already passed" do
       allow(described_class).to receive(:cache_supports_expires_at?).and_return(false)
 
       cache_options = described_class.cache_write_options(expires_at: Time.now - 60, namespace: "components")
 
       expect(cache_options).not_to have_key(:expires_at)
-      expect(cache_options[:expires_in]).to eq(0)
+      expect(cache_options[:expires_in]).to eq(1)
       expect(cache_options[:namespace]).to eq("components")
     end
 
-    it "clamps expired expires_at before Rails normalizes it" do
+    it "uses the minimum positive TTL for expired expires_at before Rails normalizes it" do
       allow(described_class).to receive(:cache_supports_expires_at?).and_return(true)
 
       cache_options = described_class.cache_write_options(expires_at: Time.now - 60, namespace: "components")
 
       expect(cache_options).not_to have_key(:expires_at)
-      expect(cache_options[:expires_in]).to eq(0)
+      expect(cache_options[:expires_in]).to eq(1)
       expect(cache_options[:namespace]).to eq("components")
+    end
+
+    it "detects when expires_at has already passed" do
+      expect(described_class.cache_write_expired?(expires_at: Time.now - 60)).to be(true)
+      expect(described_class.cache_write_expired?(expires_at: Time.now + 60)).to be(false)
+      expect(described_class.cache_write_expired?(expires_in: 60)).to be(false)
+      expect(described_class.cache_write_expired?(nil)).to be(false)
     end
 
     it "preserves explicit expires_in when ActiveSupport does not support expires_at" do

@@ -22,11 +22,15 @@ require "async/promise"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
-  def fetch_react_component(component_name, options)
+  def fetch_react_component(component_name, options, &)
     if ReactOnRailsPro::Cache.use_cache?(options)
       cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
       Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
       cache_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
+      if ReactOnRailsPro::Cache.cache_write_expired?(options[:cache_options])
+        return render_expired_cache_miss(cache_key, &)
+      end
+
       cache_hit = true
       normalized_cache_tags = []
       result = Rails.cache.fetch(cache_key, cache_options) do
@@ -346,6 +350,9 @@ module ReactOnRailsProHelper
     unless ReactOnRailsPro::Cache.use_cache?(raw_options)
       return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &)
     end
+    if ReactOnRailsPro::Cache.cache_write_expired?(raw_options[:cache_options])
+      return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &)
+    end
 
     # Compose a cache key consistent with non-stream helper semantics.
     key_options = raw_options.merge(prerender: true)
@@ -390,6 +397,8 @@ module ReactOnRailsProHelper
     tag_index_cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     cache_aware_options = raw_options.merge(
       on_complete: lambda { |chunks|
+        next if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+
         cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
         Rails.cache.write(view_cache_key, chunks, cache_options)
         ReactOnRailsPro::Cache.register_normalized_tags(
@@ -442,7 +451,12 @@ module ReactOnRailsProHelper
     end
 
     cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, raw_options)
-    cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_options[:cache_options] || {})
+    raw_cache_options = raw_options[:cache_options] || {}
+    if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+      return render_async_react_component_uncached(component_name, raw_options, &)
+    end
+
+    cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     Rails.logger.debug { "React on Rails Pro async cache_key is #{cache_key.inspect}" }
 
     # Synchronous cache lookup
@@ -458,7 +472,7 @@ module ReactOnRailsProHelper
     end
 
     Rails.logger.debug { "React on Rails Pro async cache MISS for #{cache_key.inspect}" }
-    render_async_react_component_with_cache(component_name, raw_options, cache_key, cache_options, &)
+    render_async_react_component_with_cache(component_name, raw_options, cache_key, raw_cache_options, cache_options, &)
   end
 
   # Renders async without caching (when :if/:unless conditions disable cache)
@@ -473,18 +487,36 @@ module ReactOnRailsProHelper
   end
 
   # Renders async and writes to cache on completion
-  def render_async_react_component_with_cache(component_name, raw_options, cache_key, cache_options, &)
+  def render_async_react_component_with_cache(
+    component_name,
+    raw_options,
+    cache_key,
+    raw_cache_options,
+    cache_options,
+    &
+  )
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
     options = prepare_async_render_options(raw_options, &)
 
     task = @react_on_rails_async_barrier.async do
       result = react_component(component_name, options)
-      Rails.cache.write(cache_key, result, cache_options)
-      ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+      unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+        Rails.cache.write(cache_key, result, cache_options)
+        ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+      end
       result
     end
 
     ReactOnRailsPro::AsyncValue.new(task:)
+  end
+
+  def render_expired_cache_miss(cache_key)
+    result = yield
+    if result.is_a?(Hash)
+      result[:RORP_CACHE_KEY] = cache_key
+      result[:RORP_CACHE_HIT] = false
+    end
+    result
   end
 
   def prepare_async_render_options(raw_options)
