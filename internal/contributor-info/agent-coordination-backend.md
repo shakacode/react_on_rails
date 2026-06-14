@@ -88,6 +88,7 @@ details into public PRs.
       "$AGENT_COORD_REPO/bin/agent-coord" version --json | jq empty &&
       # Suppress stderr intentionally: private config details must not appear in public PRs.
       # Failures are still caught via pipefail + jq empty; record the exit code in PR evidence.
+      # For private diagnostics, rerun without 2>/dev/null in a private terminal.
       "$AGENT_COORD_REPO/bin/agent-coord" config show --json 2>/dev/null | jq empty &&
       "$AGENT_COORD_REPO/bin/agent-coord" doctor &&
       "$AGENT_COORD_REPO/bin/agent-coord" status &&
