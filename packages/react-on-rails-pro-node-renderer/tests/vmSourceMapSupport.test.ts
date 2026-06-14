@@ -62,6 +62,10 @@ function inlineSourceMapComment(map: object) {
   return `//# sourceMappingURL=data:application/json;charset=utf-8;base64,${base64}`;
 }
 
+function inlinePercentEncodedSourceMapComment(map: object) {
+  return `//# sourceMappingURL=data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(map))}`;
+}
+
 /**
  * A "compiled TS" bundle:
  *   line 1: banner
@@ -86,7 +90,7 @@ function buildThrowingBundleSource() {
 function buildThrowingBundleMap(file: string) {
   // line 3 mappings: column 0 -> Boom.ts L1 C0; column 16 -> Boom.ts L2 C2 (0-based)
   // line 4 mapping: column 0 -> Boom.ts L4 C0
-  const mappings = ['', '', `${segment(0, 0, 0, 0)},${segment(16, 0, 1, 2)}`, segment(0, 0, 3, -2)].join(';');
+  const mappings = ['', '', `${segment(0, 0, 0, 0)},${segment(16, 0, 1, 2)}`, segment(0, 0, 2, -2)].join(';');
   return { version: 3, file, sources: [ORIGINAL_SOURCE], names: [], mappings };
 }
 
@@ -201,6 +205,33 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
   });
 
+  test('percent-encoded data URL source maps are used', async () => {
+    const bundlePath = await writeVmBundle(
+      `${buildThrowingBundleSource()}\n${inlinePercentEncodedSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
+    );
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+  });
+
+  test('line 4 mappings resolve to line 4 in the original source', async () => {
+    const bundlePath = await writeVmBundle(
+      `${buildThrowingBundleSource()}\n${inlineSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
+    );
+    registerBundleForSourceMaps(bundlePath);
+
+    expect(resolveOriginalPosition(bundlePath, 4, 1)).toEqual({
+      source: ORIGINAL_SOURCE,
+      line: 4,
+      column: 1,
+    });
+  });
+
   test('sourceMappingURL cannot escape the bundle directory with a parent path', async () => {
     const bundlePath = vmBundlePath(testName);
     const outsideMapPath = path.join(path.dirname(path.dirname(bundlePath)), 'outside.map');
@@ -306,7 +337,7 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
   });
 
-  test('evicted VM contexts still remap stacks held by active execution contexts', async () => {
+  test('evicted VM source maps are kept for active execution contexts and retired on release', async () => {
     buildConfig({
       serverBundleCachePath: serverBundleCachePath(testName),
       supportModules: true,
@@ -317,7 +348,14 @@ describe('source-mapped stack traces for VM errors', () => {
     const bundlePath = await writeVmBundle(
       `${buildThrowingBundleSource()}\n${inlineSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
     );
-    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    const executionContext = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    const { runInVM } = executionContext;
+
+    const capturedError = await runInVM(
+      "(function(){ try { global.triggerSsrError(); } catch (e) { global.heldSsrError = e; return 'held'; } })()",
+      bundlePath,
+    );
+    expect(capturedError).toBe('held');
 
     await new Promise((resolve) => {
       setTimeout(resolve, 10);
@@ -328,12 +366,11 @@ describe('source-mapped stack traces for VM errors', () => {
     await buildExecutionContext([otherBundlePath], /* buildVmsIfNeeded */ true);
     expect(hasVMContextForBundle(bundlePath)).toBe(false);
 
-    const result = await runInVM('global.triggerSsrError()', bundlePath);
-    expect(isErrorRenderResult(result)).toBe(true);
-    if (!isErrorRenderResult(result)) {
-      throw new Error('expected exceptionMessage result');
-    }
-    expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+    const stack = await runInVM('global.heldSsrError.stack', bundlePath);
+    expect(stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
+
+    executionContext.release();
+    expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
   });
 
   test('bundle without a source map keeps the real bundle path in stack frames', async () => {

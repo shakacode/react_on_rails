@@ -39,6 +39,7 @@ import {
   handleNewBundlesProvided,
   sumUploadedBytes,
 } from './worker/handleRenderRequest.js';
+import type { ExecutionContext } from './worker/vm.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
 import { SENSITIVE_REQUEST_BODY_KEYS } from './shared/sensitiveKeys.js';
 import { handleStartupListenError } from './worker/startupErrorHandler.js';
@@ -100,6 +101,60 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
     await res.send(stream);
   } else {
     res.send(data);
+  }
+};
+
+function releaseExecutionContextWhenStreamFinishes(
+  stream: NonNullable<ResponseResult['stream']>,
+  res: FastifyReply,
+  executionContext: ExecutionContext,
+) {
+  let released = false;
+  const release = () => {
+    if (released) {
+      return;
+    }
+    released = true;
+    stream.off('close', release);
+    stream.off('end', release);
+    stream.off('error', release);
+    res.raw.off('close', release);
+    executionContext.release();
+  };
+
+  stream.once('close', release);
+  stream.once('end', release);
+  stream.once('error', release);
+  res.raw.once('close', release);
+
+  return release;
+}
+
+const setResponseAndReleaseExecutionContext = async (
+  result: ResponseResult,
+  res: FastifyReply,
+  executionContext: ExecutionContext | undefined,
+) => {
+  if (!executionContext) {
+    await setResponse(result, res);
+    return;
+  }
+
+  if (result.stream) {
+    const release = releaseExecutionContextWhenStreamFinishes(result.stream, res, executionContext);
+    try {
+      await setResponse(result, res);
+    } catch (error) {
+      release();
+      throw error;
+    }
+    return;
+  }
+
+  try {
+    await setResponse(result, res);
+  } finally {
+    executionContext.release();
   }
 };
 
@@ -358,7 +413,7 @@ export default function run(config: Partial<Config>) {
             assetsToCopy,
             tracingContext: context,
           });
-          await setResponse(result.response, res);
+          await setResponseAndReleaseExecutionContext(result.response, res, result.executionContext);
         } catch (err) {
           const exceptionMessage = formatExceptionMessage(
             { renderingRequest },
@@ -463,12 +518,12 @@ export default function run(config: Partial<Config>) {
               await setResponse(response, res);
             },
 
-            onRequestEnded: () => {
+            onRequestEnded: async () => {
               if (!incrementalSink) {
                 return;
               }
 
-              incrementalSink.handleRequestClosed();
+              await incrementalSink.handleRequestClosed();
             },
           });
         },
@@ -496,7 +551,7 @@ export default function run(config: Partial<Config>) {
         // If we don't call endStream(), the stream will hang forever waiting for props that will never arrive.
         // This causes onResponse to never fire, leaving activeRequestsCount stuck and preventing worker shutdown.
         if (incrementalSink) {
-          incrementalSink.handleRequestClosed();
+          await incrementalSink.handleRequestClosed();
         }
 
         // CRITICAL: Destroy the response connection to immediately close it.

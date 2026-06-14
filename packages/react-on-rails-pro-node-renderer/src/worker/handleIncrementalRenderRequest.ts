@@ -22,7 +22,7 @@ import { subSpan } from '../shared/tracing.js';
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
   add: (chunk: unknown) => Promise<void>;
-  handleRequestClosed: () => void;
+  handleRequestClosed: () => Promise<void>;
 };
 
 export type UpdateChunk = {
@@ -159,21 +159,24 @@ export async function handleIncrementalRenderRequest(
             }
           }
         },
-        handleRequestClosed: () => {
+        handleRequestClosed: async () => {
           if (!onRequestClosedUpdateChunk) {
+            executionContext.release();
             return;
           }
 
           const bundlePath = getRequestBundleFilePath(onRequestClosedUpdateChunk.bundleTimestamp);
-          executionContext
-            .runInVM(onRequestClosedUpdateChunk.updateChunk, bundlePath)
-            .catch((err: unknown) => {
-              log.error({
-                msg: 'Error running onRequestClosedUpdateChunk',
-                err,
-                onRequestClosedUpdateChunk,
-              });
+          try {
+            await executionContext.runInVM(onRequestClosedUpdateChunk.updateChunk, bundlePath);
+          } catch (err: unknown) {
+            log.error({
+              msg: 'Error running onRequestClosedUpdateChunk',
+              err,
+              onRequestClosedUpdateChunk,
             });
+          } finally {
+            executionContext.release();
+          }
         },
       },
     };

@@ -69,6 +69,38 @@ const vmContexts = new Map<string, VMContext>();
 // Track VM creation promises to handle concurrent buildVM requests
 const vmCreationPromises = new Map<string, Promise<VMContext>>();
 
+// Execution contexts can outlive VM pool entries while a request is still
+// running. Keep source maps for those evicted contexts until the request
+// releases them, then drop both the registration and parsed-map cache.
+const activeSourceMapRequestCounts = new Map<string, number>();
+const evictedSourceMapRegistrations = new Set<string>();
+
+function retainSourceMapRegistration(bundlePath: string) {
+  activeSourceMapRequestCounts.set(bundlePath, (activeSourceMapRequestCounts.get(bundlePath) ?? 0) + 1);
+}
+
+function releaseSourceMapRegistration(bundlePath: string) {
+  const currentCount = activeSourceMapRequestCounts.get(bundlePath) ?? 0;
+  if (currentCount <= 1) {
+    activeSourceMapRequestCounts.delete(bundlePath);
+    const wasEvicted = evictedSourceMapRegistrations.delete(bundlePath);
+    if (wasEvicted && !vmContexts.has(bundlePath)) {
+      unregisterBundleForSourceMaps(bundlePath);
+    }
+    return;
+  }
+
+  activeSourceMapRequestCounts.set(bundlePath, currentCount - 1);
+}
+
+function retireSourceMapRegistrationAfterEviction(bundlePath: string) {
+  if ((activeSourceMapRequestCounts.get(bundlePath) ?? 0) > 0) {
+    evictedSourceMapRegistrations.add(bundlePath);
+  } else {
+    unregisterBundleForSourceMaps(bundlePath);
+  }
+}
+
 /**
  * Returns all bundle paths that have a VM context
  * @internal Used in tests
@@ -125,10 +157,7 @@ function manageVMPoolSize() {
     const oldestPath = sortedEntries.shift()?.[0];
     if (oldestPath) {
       vmContexts.delete(oldestPath);
-      // ExecutionContext instances hold direct references to VM contexts. After
-      // a context is evicted from the shared pool, an in-flight request may
-      // still format an error stack from that context, so keep its source-map
-      // registration until resetVM/removeVM explicitly clears it.
+      retireSourceMapRegistrationAfterEviction(oldestPath);
       log.debug(`Removed VM for bundle ${oldestPath} due to pool size limit (max: ${maxVMPoolSize})`);
     }
   }
@@ -380,6 +409,7 @@ export type ExecutionContext = {
     vmCluster?: typeof cluster,
   ) => Promise<RenderResult>;
   getVMContext: (bundleFilePath: string) => VMContext | undefined;
+  release: () => void;
 };
 
 /**
@@ -400,19 +430,28 @@ export async function buildExecutionContext(
   bundlePaths: string[],
   buildVmsIfNeeded: boolean,
 ): Promise<ExecutionContext> {
+  const retainedBundlePaths = Array.from(new Set(bundlePaths));
+  retainedBundlePaths.forEach(retainSourceMapRegistration);
+
   const mapBundleFilePathToVMContext = new Map<string, VMContext>();
-  await Promise.all(
-    bundlePaths.map(async (bundleFilePath) => {
-      const vmContext = await getOrBuildVMContext(bundleFilePath, buildVmsIfNeeded);
-      vmContext.lastUsed = Date.now();
-      mapBundleFilePathToVMContext.set(bundleFilePath, vmContext);
-    }),
-  );
+  try {
+    await Promise.all(
+      bundlePaths.map(async (bundleFilePath) => {
+        const vmContext = await getOrBuildVMContext(bundleFilePath, buildVmsIfNeeded);
+        vmContext.lastUsed = Date.now();
+        mapBundleFilePathToVMContext.set(bundleFilePath, vmContext);
+      }),
+    );
+  } catch (error) {
+    retainedBundlePaths.forEach(releaseSourceMapRegistration);
+    throw error;
+  }
 
   // This Map persists for the lifetime of this ExecutionContext (one HTTP request).
   // It allows data to be shared between the initial render and subsequent update chunks.
   // Example: asyncPropsManager is stored here during initial render and accessed by update chunks.
   const sharedExecutionContext = new Map();
+  let released = false;
 
   const runInVM = async (renderingRequest: string, bundleFilePath: string, vmCluster?: typeof cluster) => {
     try {
@@ -495,6 +534,13 @@ export async function buildExecutionContext(
   return {
     getVMContext: (bundleFilePath: string) => mapBundleFilePathToVMContext.get(bundleFilePath),
     runInVM,
+    release: () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      retainedBundlePaths.forEach(releaseSourceMapRegistration);
+    },
   };
 }
 
@@ -502,6 +548,8 @@ export async function buildExecutionContext(
 export function resetVM() {
   vmContexts.clear();
   vmCreationPromises.clear();
+  activeSourceMapRequestCounts.clear();
+  evictedSourceMapRegistrations.clear();
   resetSourceMapSupport();
 }
 
@@ -512,5 +560,7 @@ export function resetVM() {
 export function removeVM(bundlePath: string) {
   vmContexts.delete(bundlePath);
   vmCreationPromises.delete(bundlePath);
+  activeSourceMapRequestCounts.delete(bundlePath);
+  evictedSourceMapRegistrations.delete(bundlePath);
   unregisterBundleForSourceMaps(bundlePath);
 }

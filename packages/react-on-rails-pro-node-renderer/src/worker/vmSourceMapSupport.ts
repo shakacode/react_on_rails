@@ -106,12 +106,22 @@ function extractSourceMappingUrl(bundleContents: string): string | undefined {
 }
 
 function parseDataUrlSourceMap(url: string): string | undefined {
-  const base64Marker = 'base64,';
-  const base64Index = url.indexOf(base64Marker);
-  if (base64Index === -1) {
+  const commaIndex = url.indexOf(',');
+  if (commaIndex === -1) {
     return undefined;
   }
-  return Buffer.from(url.slice(base64Index + base64Marker.length), 'base64').toString('utf8');
+
+  const metadata = url.slice('data:'.length, commaIndex).toLowerCase();
+  const payload = url.slice(commaIndex + 1);
+  if (metadata.split(';').includes('base64')) {
+    return Buffer.from(payload, 'base64').toString('utf8');
+  }
+
+  try {
+    return decodeURIComponent(payload);
+  } catch {
+    return payload;
+  }
 }
 
 function isPathInsideOrEqual(candidatePath: string, directoryPath: string) {
