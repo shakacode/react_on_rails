@@ -93,7 +93,7 @@ elif test ! -x "$AGENT_COORD_REPO_ABS/bin/agent-coord"; then
   return 1 2>/dev/null || exit 1
 fi
 
-AGENT_COORD_REPO="$AGENT_COORD_REPO_ABS"
+AGENT_COORD_REPO="$AGENT_COORD_REPO_ABS" # Canonicalize: further references use the absolute path.
 
 if (
   set -eu -o pipefail
