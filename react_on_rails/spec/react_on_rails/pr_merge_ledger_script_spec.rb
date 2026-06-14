@@ -536,6 +536,70 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks current-head change-request reviews even when the reviewer comments later" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 2,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "requested-changes",
+          "state" => "CHANGES_REQUESTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "current" },
+          "url" => "https://example.com/requested-changes",
+          "body" => "Please fix this."
+        },
+        {
+          "id" => "later-comment",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-02T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "current" },
+          "url" => "https://example.com/later-comment",
+          "body" => "Follow-up comment."
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-current-change-request", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      pr_ledger = report.fetch("pull_requests").first
+      violation_codes = report.fetch("violations").map { |violation| violation.fetch("code") }
+      expect(pr_ledger.dig("review_objects", "latest_by_reviewer").first).to include(
+        "id" => "later-comment",
+        "state" => "COMMENTED"
+      )
+      expect(pr_ledger.dig("review_objects", "changes_requested").first).to include(
+        "id" => "requested-changes",
+        "state" => "CHANGES_REQUESTED",
+        "current_head" => true
+      )
+      expect(violation_codes).to include("changes_requested_review_object")
+    end
+  end
+
   it "ignores stale change-request review objects when the PR decision is clear" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -2602,7 +2666,7 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
-  it "bounds priority finding scans for very large comment bodies" do
+  it "blocks priority finding scans that truncate very large comment bodies" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
       "pull_request" => {
@@ -2638,11 +2702,28 @@ RSpec.describe "script/pr-merge-ledger" do
         chdir: repo_root
       )
 
-      expect(status).to be_success, stderr
+      expect(status).not_to be_success, stderr
       expect(stderr).to include(
         "pr-merge-ledger: https://example.com/large-comment body has 1005 lines; scanning first 1000"
       )
-      expect(JSON.parse(stdout).fetch("complete_allowed")).to be(true)
+      report = JSON.parse(stdout)
+      pr_ledger = report.fetch("pull_requests").first
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(pr_ledger.dig("priority_finding_dispositions", "status")).to eq("UNKNOWN")
+      expect(pr_ledger.dig("priority_finding_dispositions", "truncated_sources").first).to include(
+        "id" => "large-comment",
+        "url" => "https://example.com/large-comment",
+        "line_count" => 1005,
+        "scanned_line_count" => 1000
+      )
+      expect(pr_ledger.fetch("unknown_fields").first).to include(
+        "field" => "priority_finding_dispositions.body_scan",
+        "message" => "priority finding source body was truncated before full scan",
+        "url" => "https://example.com/large-comment"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_body_scan"
+      )
     end
   end
 
@@ -3258,7 +3339,7 @@ RSpec.describe "script/pr-merge-ledger" do
       "reviews" => [
         {
           "id" => "bad-timestamp-review",
-          "state" => "CHANGES_REQUESTED",
+          "state" => "COMMENTED",
           "submittedAt" => "not-a-time",
           "author" => { "login" => "reviewer" },
           "commit" => { "oid" => "abc123" },
@@ -3850,6 +3931,10 @@ RSpec.describe "script/pr-merge-ledger" do
       schema.dig("$defs", "pull_request_ledger", "properties", "priority_finding_dispositions", "properties",
                  "findings", "items", "$ref")
     ).to eq("#/$defs/priority_finding")
+    expect(
+      schema.dig("$defs", "pull_request_ledger", "properties", "priority_finding_dispositions", "properties",
+                 "truncated_sources", "items", "$ref")
+    ).to eq("#/$defs/priority_finding_truncated_source")
     expect(schema.dig("$defs", "violation", "additionalProperties")).to be(false)
     expect(schema.dig("$defs", "violation", "properties")).to include(
       "path", "line", "reviewer", "head_sha", "current_head"

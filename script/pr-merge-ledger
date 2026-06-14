@@ -303,7 +303,7 @@ class PrMergeLedger
     output_issue_comments = issue_comments.map { |comment| comment.except("body") }
     latest_reviews = latest_reviews_by_reviewer(output_reviews)
     all_changes_requested = output_reviews.select { |review| review.fetch("state") == "CHANGES_REQUESTED" }
-    changes_requested = current_changes_requested(latest_reviews)
+    changes_requested = current_changes_requested(output_reviews)
     finding_report = finding_dispositions(review_threads, reviews, issue_comments, dispositions)
     changelog = changelog_classification
     lockfile = lockfile_diff(files)
@@ -505,9 +505,25 @@ class PrMergeLedger
     findings = []
     used_disposition_keys = []
 
-    append_findings(thread_comments_for_findings(review_threads), "body", findings, dispositions, used_disposition_keys)
-    append_findings(reviews_for_findings(reviews), "body_text", findings, dispositions, used_disposition_keys)
-    append_findings(issue_comments, "body", findings, dispositions, used_disposition_keys)
+    truncated_sources = []
+    context = {
+      dispositions:,
+      used_disposition_keys:,
+      truncated_sources:
+    }
+    append_findings(
+      thread_comments_for_findings(review_threads),
+      "body",
+      findings,
+      context
+    )
+    append_findings(
+      reviews_for_findings(reviews),
+      "body_text",
+      findings,
+      context
+    )
+    append_findings(issue_comments, "body", findings, context)
 
     warn_unused_dispositions(dispositions, used_disposition_keys)
 
@@ -522,16 +538,16 @@ class PrMergeLedger
       ]
     end
     {
-      "status" => "known",
-      "findings" => unique_findings
+      "status" => truncated_sources.empty? ? "known" : UNKNOWN,
+      "findings" => unique_findings,
+      "truncated_sources" => truncated_sources.uniq { |source| source.fetch("url") }
     }
   end
 
-  def append_findings(records, text_key, findings, dispositions, used_disposition_keys)
+  def append_findings(records, text_key, findings, context)
     records.each do |record|
       findings.concat(
-        findings_from_text(record.fetch(text_key), record.fetch("url"), record.fetch("id"), dispositions,
-                           used_disposition_keys)
+        findings_from_text(record.fetch(text_key), record.fetch("url"), record.fetch("id"), context)
       )
     end
   end
@@ -547,10 +563,16 @@ class PrMergeLedger
     reviews.select { |review| review.fetch("current_head") }
   end
 
-  def findings_from_text(text, url, id, dispositions, used_disposition_keys)
+  def findings_from_text(text, url, id, context)
     lines = text.to_s.each_line.map(&:chomp)
     if lines.length > MAX_BODY_LINES
       warn "pr-merge-ledger: #{url} body has #{lines.length} lines; scanning first #{MAX_BODY_LINES}"
+      context.fetch(:truncated_sources) << {
+        "id" => id,
+        "url" => url,
+        "line_count" => lines.length,
+        "scanned_line_count" => MAX_BODY_LINES
+      }
       lines = lines.first(MAX_BODY_LINES)
     end
 
@@ -559,14 +581,14 @@ class PrMergeLedger
 
       finding_occurrences(line_text).length
     end
-    context = {
+    line_context = {
       source_finding_count:,
-      dispositions:,
-      used_disposition_keys:
+      dispositions: context.fetch(:dispositions),
+      used_disposition_keys: context.fetch(:used_disposition_keys)
     }
 
     lines.each_with_index.flat_map do |line_text, index|
-      findings_from_line(line_text, index + 1, { url:, id: }, context)
+      findings_from_line(line_text, index + 1, { url:, id: }, line_context)
     end
   end
 
@@ -836,6 +858,14 @@ class PrMergeLedger
         finding["url"]
       )
     end
+    finding_dispositions.fetch("truncated_sources").each do |source|
+      unknowns << unknown_field(
+        pull_request,
+        "priority_finding_dispositions.body_scan",
+        "priority finding source body was truncated before full scan",
+        source["url"]
+      )
+    end
 
     if changelog.fetch("classification") == UNKNOWN
       unknowns << unknown_field(
@@ -977,6 +1007,8 @@ class PrMergeLedger
 
   def unknown_violation_code(field)
     case field
+    when /\Apriority_finding_dispositions\.body_scan/
+      "unknown_priority_finding_body_scan"
     when /\Apriority_finding_dispositions/
       "unknown_priority_finding_disposition"
     when /\Achangelog_classification/
