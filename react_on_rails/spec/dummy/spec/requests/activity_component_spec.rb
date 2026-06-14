@@ -38,6 +38,8 @@ describe "React 19.2 Activity component", :server_rendering do
     expect(response).to have_http_status(:ok)
 
     html_nodes = Nokogiri::HTML(response.body)
-    expect(html_nodes.css("div#ActivityTabSwitcher-react-component-0").children.size).to eq(0)
+    component = html_nodes.at_css("div#ActivityTabSwitcher-react-component-0")
+
+    expect(component.element_children.size).to eq(0)
   end
 end

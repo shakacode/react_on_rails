@@ -5,6 +5,8 @@ const { resolve } = require('path');
 // in the workspace root package.json, while the rest of the monorepo stays on
 // the workspace-wide React pin. Aliasing to the dummy's own copy keeps the
 // bundles on 19.2 instead of the root workspace copy.
+// TODO(#3865): revert this alias to the workspace root once the RSC React pin
+// lifts and the scoped dummy override is no longer needed.
 const dummyNodeModules = resolve(__dirname, '..', '..', 'node_modules');
 
 module.exports = {

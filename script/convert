@@ -79,8 +79,11 @@ gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react-dom": "[^
 # The Activity demo uses React 19.2-only APIs. Minimum-dependency CI converts the
 # dummy to React 18, so remove both the scoped override and the demo/spec files.
 update_json_file("../package.json") do |package_json|
-  package_json.fetch("pnpm").fetch("overrides").delete("react_on_rails>react")
-  package_json.fetch("pnpm").fetch("overrides").delete("react_on_rails>react-dom")
+  overrides = package_json.dig("pnpm", "overrides")
+  next unless overrides
+
+  overrides.delete("react_on_rails>react")
+  overrides.delete("react_on_rails>react-dom")
 end
 remove_file("../react_on_rails/spec/dummy/client/app/startup/ActivityTabSwitcher.tsx")
 remove_file("../react_on_rails/spec/dummy/spec/requests/activity_component_spec.rb")

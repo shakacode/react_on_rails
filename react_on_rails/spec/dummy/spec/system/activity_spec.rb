@@ -44,8 +44,6 @@ shared_examples "Activity tab switcher" do
 end
 
 describe "React 19.2 Activity", :js do
-  subject { page }
-
   context "with CSR (prerender: false)" do
     before { visit client_side_activity_path }
 
