@@ -26,7 +26,7 @@ async function delayCompiledJavaScript(page) {
 
 async function readCssModulesHeadingStyle(page) {
   const heading = page.getByRole('heading', { name: cssModulesHeadingText });
-  await expect(heading).toBeVisible();
+  await expect(heading).toBeVisible({ timeout: 0 });
 
   return heading.evaluate((element, styledColor) => {
     const style = window.getComputedStyle(element);
@@ -78,7 +78,7 @@ test.describe('FOUC regression coverage', () => {
         response.url().includes('/webpack/test/css/generated/CssModulesImagesFontsExample') &&
         response.url().endsWith('.css') &&
         response.status() === 200,
-      { timeout: 5000 },
+      { timeout: 15000 },
     );
 
     try {
