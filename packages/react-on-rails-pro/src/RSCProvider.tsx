@@ -119,7 +119,17 @@ export const createRSCProvider = ({
           }
           return payload;
         };
-        promise = getServerComponent({ componentName, componentProps }).then(markPayloadIfSuccessful);
+        const evictPromiseIfRejected = (error: unknown) => {
+          if (fetchRSCPromisesRef.current[key] === promise) {
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+            delete fetchRSCPromisesRef.current[key];
+          }
+          throw error;
+        };
+        promise = getServerComponent({ componentName, componentProps }).then(
+          markPayloadIfSuccessful,
+          evictPromiseIfRejected,
+        );
         fetchRSCPromisesRef.current[key] = promise;
         return promise;
       },
