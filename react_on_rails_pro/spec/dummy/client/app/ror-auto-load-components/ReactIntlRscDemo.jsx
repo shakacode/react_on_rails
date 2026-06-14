@@ -52,6 +52,15 @@ const BADGE = (bg, color) => ({
   color,
   marginLeft: 8,
 });
+const RICH_TEXT_LINK_STYLE = { color: '#2563eb', textDecoration: 'underline' };
+const RICH_TEXT_FORMATTERS = {
+  link: (chunks) => (
+    <a href="/terms" style={RICH_TEXT_LINK_STYLE}>
+      {chunks}
+    </a>
+  ),
+  bold: (chunks) => <strong>{chunks}</strong>,
+};
 
 function GreetingSection({ locale }) {
   const intl = getIntl(locale);
@@ -418,13 +427,7 @@ function AdvancedICUSection({ locale }) {
     },
     {
       label: 'rich text',
-      value: intl.formatMessage(
-        { id: 'advanced.richText' },
-        {
-          link: (chunks) => `[${chunks}]`,
-          bold: (chunks) => `**${chunks}**`,
-        },
-      ),
+      value: React.Children.toArray(intl.formatMessage({ id: 'advanced.richText' }, RICH_TEXT_FORMATTERS)),
     },
     {
       label: 'escaped apostrophes',
