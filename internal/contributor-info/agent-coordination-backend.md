@@ -44,7 +44,9 @@ if ! command -v agent_coord >/dev/null 2>&1; then
 fi
 agent_coord --help # Verify the compatibility alias (underscore form) is also on PATH.
 "$INSTALLED_AGENT_COORD_BIN" version --json
-"$INSTALLED_AGENT_COORD_BIN" config show --json >/dev/null 2>/dev/null # Suppress raw private output.
+if ! "$INSTALLED_AGENT_COORD_BIN" config show --json >/dev/null 2>&1; then
+  echo "agent-coord config show --json failed; rerun directly in a private terminal for diagnostics" >&2
+fi
 "$INSTALLED_AGENT_COORD_BIN" doctor
 "$INSTALLED_AGENT_COORD_BIN" status
 ```
@@ -89,6 +91,11 @@ private checkout and command contract probes pass. Keep that exported value for
 the operational snippets below so the probed private checkout and later
 heartbeat/claim commands use the same binary.
 
+Run this block in `bash`; it relies on `pipefail`, functions, and `local`.
+If the strict preflight exits at the private `config show` step, rerun
+`$AGENT_COORD_BIN config show --json` directly in a private terminal without
+output suppression to read the backend diagnostic.
+
 ```bash
 if test -z "${AGENT_COORD_REPO:-}"; then
   echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
@@ -101,7 +108,7 @@ elif test ! -x "$AGENT_COORD_REPO_ABS/bin/agent-coord"; then
   return 1 2>/dev/null || exit 1
 fi
 
-AGENT_COORD_REPO="$AGENT_COORD_REPO_ABS" # Canonicalize: further references use the absolute path.
+AGENT_COORD_REPO="$AGENT_COORD_REPO_ABS" # Canonicalize in the caller: further references use the absolute path.
 
 if (
   set -eu -o pipefail
@@ -117,6 +124,8 @@ if (
       return 1
     fi
 
+    # Require a JSON object, not an array or scalar. If the private CLI changes
+    # shape, update this check and the CLI Contract prose together.
     if ! printf '%s\n' "$output" | jq -e 'type == "object"' >/dev/null; then
       echo "$label did not produce a JSON object" >&2
       return 1
@@ -145,12 +154,33 @@ if (
     fi
   }
 
+  require_published_agent_coord_head() {
+    local head_sha
+    head_sha="$(git -C "$AGENT_COORD_REPO" rev-parse HEAD)" || {
+      echo "could not read agent-coordination HEAD" >&2
+      return 1
+    }
+
+    git -C "$AGENT_COORD_REPO" fetch --quiet --tags origin || {
+      echo "could not fetch private agent-coordination origin; backend SHA reachability is UNKNOWN" >&2
+      return 1
+    }
+
+    if ! git -C "$AGENT_COORD_REPO" branch -r --contains "$head_sha" | grep -q '[^[:space:]]' &&
+       ! git -C "$AGENT_COORD_REPO" tag --contains "$head_sha" | grep -q '[^[:space:]]'; then
+      echo "agent-coordination HEAD $head_sha is not reachable from a fetched remote branch or tag" >&2
+      return 1
+    fi
+
+    printf '%s\n' "$head_sha"
+  }
+
   AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord" # Subshell-local; parent re-exports after probes pass.
   # set -eu above handles abort-on-error; && keeps each evidence/probe step explicit.
   require_clean_agent_coord_checkout &&
     # --dirty annotates race-condition dirtiness; the clean-check above is the hard gate.
     git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
-    git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
+    require_published_agent_coord_head &&
     "$AGENT_COORD_BIN" --help >/dev/null &&
     AGENT_COORD_VERSION_JSON="$("$AGENT_COORD_BIN" version --json)" &&
     require_json_output "agent-coord version --json" "$AGENT_COORD_VERSION_JSON" &&
@@ -169,6 +199,7 @@ if (
   export AGENT_COORD_BIN
   printf 'AGENT_COORD_BIN=%s\n' "$AGENT_COORD_BIN"
 else
+  unset AGENT_COORD_BIN
   return 1 2>/dev/null || exit 1
 fi
 ```
