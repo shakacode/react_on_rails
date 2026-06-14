@@ -13,6 +13,9 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { checkRscPeerCompatibility } from '../src/shared/checkRscPeerCompatibility';
 import { RSC_PEER_SUPPORT } from '../src/shared/rscPeerSupport';
 
@@ -30,6 +33,20 @@ const versionBelowRecommendedMin = (version: string) => {
 const belowRecommendedMin = versionBelowRecommendedMin(recommendedMin);
 
 describe('checkRscPeerCompatibility', () => {
+  it('keeps the Pro recommended RSC minimum aligned with the generator exact pin', () => {
+    const generatorDependencyManager = readFileSync(
+      path.resolve(
+        __dirname,
+        '../../..',
+        'react_on_rails/lib/generators/react_on_rails/js_dependency_manager.rb',
+      ),
+      'utf8',
+    );
+    const generatorPin = generatorDependencyManager.match(/RSC_PACKAGE_VERSION_PIN = "([^"]+)"/)?.[1];
+
+    expect(generatorPin).toBe(recommendedMin);
+  });
+
   it('keeps allowed prereleases aligned with the recommended minimum stable base', () => {
     // Empty is valid when no prerelease exceptions are needed.
     expect(
@@ -97,9 +114,12 @@ describe('checkRscPeerCompatibility', () => {
 
   it('errors for an unlisted prerelease above the stable recommended minimum', () => {
     const result = checkRscPeerCompatibility({ rscVersion: '19.0.6-rc.1', reactVersion: '19.0.4' });
+    const allowedPrereleaseGuidance = RSC_PEER_SUPPORT.reactOnRailsRsc.allowedPrereleases.join(' / ');
+
+    expect(allowedPrereleaseGuidance).not.toBe('');
     expect(result.level).toBe('error');
     expect(result.message).toContain('19.0.6-rc.1');
-    expect(result.message).toContain(RSC_PEER_SUPPORT.reactOnRailsRsc.allowedPrereleases.join(' / '));
+    expect(result.message).toContain(allowedPrereleaseGuidance);
   });
 
   it('errors when rsc major is above the supported major', () => {

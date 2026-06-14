@@ -23,9 +23,17 @@ Before running the generator, verify your environment:
 If React is outside the supported 19.0.x range or below 19.0.4, upgrade it first:
 
 ```bash
-pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
-# or: yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
-# or: npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+pnpm add react@~19.0.4 react-dom@~19.0.4
+pnpm add --save-exact react-on-rails-rsc@19.0.5
+
+# or: yarn add react@~19.0.4 react-dom@~19.0.4
+# or: yarn add --exact react-on-rails-rsc@19.0.5
+
+# or: npm install react@~19.0.4 react-dom@~19.0.4
+# or: npm install --save-exact react-on-rails-rsc@19.0.5
+
+# or: bun add react@~19.0.4 react-dom@~19.0.4
+# or: bun add --exact react-on-rails-rsc@19.0.5
 ```
 
 > **React 19.0.x with patch >= 19.0.4** is recommended. Earlier 19.0.x versions (19.0.0--19.0.3) have known security vulnerabilities — see the [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for details.
