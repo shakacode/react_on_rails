@@ -39,7 +39,8 @@ hardcoded in the skill.
 
 If live capacity profiles or inbox queues are unavailable, `$triage` may still
 produce the phase-1 inventory and graph, but phase 2 must stop with a precise
-blocker instead of inventing machine names, model names, or group counts.
+blocker instead of inventing machine names, model or tool names, or group
+counts.
 
 ## Implementation Batch Planning Flow
 

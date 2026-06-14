@@ -84,7 +84,7 @@ rm -rf "$STATE_ROOT"
 
 Capacity profiles and per-inbox assignment queues are backend-owned runtime
 state. Do not commit operator hardware values, machine names, inbox identities,
-model names, or active group counts to this public repository.
+model or tool names, or active group counts to this public repository.
 
 The public contract for a capacity profile is:
 
@@ -96,7 +96,7 @@ The public contract for a capacity profile is:
 - `inboxes`: operator-configured inbox ids that can receive assigned-but-not-
   started work for that profile.
 - optional routing metadata, such as capability tags, read from runtime config
-  rather than hardcoded model names.
+  rather than hardcoded model or tool names.
 
 Profiles must be registered at runtime or loaded from a machine-local ignored
 file such as `.agent-coord.local.json`. The repository ignores that path so
@@ -145,8 +145,8 @@ Workers refresh heartbeats at every phase transition:
 - resumed state
 - done state
 
-Use stable agent ids that identify machine role, tool, and lane, for example
-`mobile-codex-batch2` or `desktop-claude-highcap-lane1`.
+Use stable agent ids that identify machine role, capability profile, and lane,
+for example `mobile-batch2-lane1` or `desktop-highcap-lane1`.
 
 ```bash
 BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4)-coord-layer"
@@ -161,7 +161,7 @@ printf 'Batch id file: %s\n' "$BATCH_ID_FILE"
 # At batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
 
 agent-coord heartbeat \
-  --agent-id mobile-codex-batch2 \
+  --agent-id mobile-batch2-lane1 \
   --repo shakacode/react_on_rails \
   --target 3970 \
   --batch-id "$BATCH_ID" \

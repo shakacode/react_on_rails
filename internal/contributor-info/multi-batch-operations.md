@@ -158,11 +158,11 @@ The private shakacode/agent-coordination repository is the coordination source
 of truth for concurrent batches. Public issue or PR claim comments are human
 hints and recovery aids only.
 
-Use stable agent ids with the base format `<machine>-<tool>-<batch>`, for
-example `mobile-codex-batch2`, `desktop-claude-highcap`, or
+Use stable agent ids with the base format `<machine-or-profile>-<batch>-<lane>`,
+for example `mobile-batch2-lane1`, `desktop-highcap-lane1`, or
 `desktop-conductor-finish`; if one batch runs multiple
-simultaneously-heartbeating lanes on the same machine and tool, add a short lane
-suffix after the batch id so each heartbeat remains distinguishable.
+simultaneously-heartbeating lanes on the same machine or profile, add a short
+lane suffix after the batch id so each heartbeat remains distinguishable.
 
 Use this lifecycle for every lane:
 
@@ -312,7 +312,7 @@ Before kickoff:
 
 - confirm exact issue/PR targets and trusted scope;
 - run `agent-coord status`;
-- assign agent ids using `<machine>-<tool>-<batch>`;
+- assign agent ids using `<machine-or-profile>-<batch>-<lane>`;
 - route packages so concurrent batches do not overlap;
 - reserve conductor.build only for single-PR focus or finishing;
 - document any cross-repo dependency before workers start.
