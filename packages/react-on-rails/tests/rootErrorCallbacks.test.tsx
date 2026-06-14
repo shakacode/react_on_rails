@@ -15,6 +15,7 @@ import { renderComponent } from '../src/ClientRenderer.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import { setRootErrorHandlers, resetRootErrorHandlers } from '../src/rootErrorHandlers.ts';
 import { resetRailsContext } from '../src/context.ts';
+import { supportsReact19RootErrorCallbacks } from '../src/reactApis.cts';
 
 declare global {
   // eslint-disable-next-line no-var, vars-on-top
@@ -22,6 +23,8 @@ declare global {
 }
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+const react19It = supportsReact19RootErrorCallbacks ? it : it.skip;
 
 const setupRailsContext = (railsEnv = 'test'): void => {
   const railsContextElement = document.createElement('div');
@@ -112,8 +115,8 @@ describe('root error callbacks with real react-dom (React 19)', () => {
       renderComponent('dev-mismatch-dom-id');
     });
 
-    const consoleErrorCalls = (console.error as jest.Mock).mock.calls;
-    const brandedCall = consoleErrorCalls.find(
+    const consoleWarnCalls = (console.warn as jest.Mock).mock.calls;
+    const brandedCall = consoleWarnCalls.find(
       (call) =>
         typeof call[0] === 'string' &&
         call[0].includes('[ReactOnRails] Recoverable hydration error in component "MismatchComponent"'),
@@ -125,77 +128,83 @@ describe('root error callbacks with real react-dom (React 19)', () => {
     );
   });
 
-  it('invokes the user onUncaughtError with enriched context on the client-render (createRoot) path', async () => {
-    setupRailsContext();
-    const onUncaughtError = jest.fn();
-    setRootErrorHandlers({ onUncaughtError });
+  react19It(
+    'invokes the user onUncaughtError with enriched context on the client-render (createRoot) path',
+    async () => {
+      setupRailsContext();
+      const onUncaughtError = jest.fn();
+      setRootErrorHandlers({ onUncaughtError });
 
-    const renderError = new Error('deliberate render error');
-    const ThrowingComponent: React.FC = () => {
-      throw renderError;
-    };
-    ComponentRegistry.register({ ThrowingComponent });
-    // No server HTML: this exercises the createRoot (client-render) path.
-    setupComponentDom('ThrowingComponent', 'throwing-dom-id');
+      const renderError = new Error('deliberate render error');
+      const ThrowingComponent: React.FC = () => {
+        throw renderError;
+      };
+      ComponentRegistry.register({ ThrowingComponent });
+      // No server HTML: this exercises the createRoot (client-render) path.
+      setupComponentDom('ThrowingComponent', 'throwing-dom-id');
 
-    // Under `act`, React intentionally rethrows uncaught render errors instead of routing them to
-    // the root's onUncaughtError option, so this test renders without act and flushes React's
-    // scheduled work with a macrotask instead.
-    globalThis.IS_REACT_ACT_ENVIRONMENT = false;
-    try {
-      renderComponent('throwing-dom-id');
-      await new Promise((resolve) => {
-        setTimeout(resolve, 0);
+      // Under `act`, React intentionally rethrows uncaught render errors instead of routing them to
+      // the root's onUncaughtError option, so this test renders without act and flushes React's
+      // scheduled work with a macrotask instead.
+      globalThis.IS_REACT_ACT_ENVIRONMENT = false;
+      try {
+        renderComponent('throwing-dom-id');
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
+      } finally {
+        globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+      }
+
+      expect(onUncaughtError).toHaveBeenCalled();
+      const [error, , context] = onUncaughtError.mock.calls[0] as [unknown, unknown, unknown];
+      expect(error).toBe(renderError);
+      expect(context).toEqual({ componentName: 'ThrowingComponent', domNodeId: 'throwing-dom-id' });
+    },
+  );
+
+  react19It(
+    'invokes the user onCaughtError with enriched context when an error boundary catches',
+    async () => {
+      setupRailsContext();
+      const onCaughtError = jest.fn();
+      setRootErrorHandlers({ onCaughtError });
+
+      const boundaryError = new Error('caught by boundary');
+      const ThrowingChild: React.FC = () => {
+        throw boundaryError;
+      };
+
+      class Boundary extends React.Component<React.PropsWithChildren, { hasError: boolean }> {
+        constructor(props: React.PropsWithChildren) {
+          super(props);
+          this.state = { hasError: false };
+        }
+
+        static getDerivedStateFromError() {
+          return { hasError: true };
+        }
+
+        render() {
+          const { hasError } = this.state;
+          const { children } = this.props;
+          return hasError ? React.createElement('div', null, 'fallback') : children;
+        }
+      }
+
+      const BoundaryComponent: React.FC = () =>
+        React.createElement(Boundary, null, React.createElement(ThrowingChild));
+      ComponentRegistry.register({ BoundaryComponent });
+      setupComponentDom('BoundaryComponent', 'boundary-dom-id');
+
+      await act(async () => {
+        renderComponent('boundary-dom-id');
       });
-    } finally {
-      globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-    }
 
-    expect(onUncaughtError).toHaveBeenCalled();
-    const [error, , context] = onUncaughtError.mock.calls[0] as [unknown, unknown, unknown];
-    expect(error).toBe(renderError);
-    expect(context).toEqual({ componentName: 'ThrowingComponent', domNodeId: 'throwing-dom-id' });
-  });
-
-  it('invokes the user onCaughtError with enriched context when an error boundary catches', async () => {
-    setupRailsContext();
-    const onCaughtError = jest.fn();
-    setRootErrorHandlers({ onCaughtError });
-
-    const boundaryError = new Error('caught by boundary');
-    const ThrowingChild: React.FC = () => {
-      throw boundaryError;
-    };
-
-    class Boundary extends React.Component<React.PropsWithChildren, { hasError: boolean }> {
-      constructor(props: React.PropsWithChildren) {
-        super(props);
-        this.state = { hasError: false };
-      }
-
-      static getDerivedStateFromError() {
-        return { hasError: true };
-      }
-
-      render() {
-        const { hasError } = this.state;
-        const { children } = this.props;
-        return hasError ? React.createElement('div', null, 'fallback') : children;
-      }
-    }
-
-    const BoundaryComponent: React.FC = () =>
-      React.createElement(Boundary, null, React.createElement(ThrowingChild));
-    ComponentRegistry.register({ BoundaryComponent });
-    setupComponentDom('BoundaryComponent', 'boundary-dom-id');
-
-    await act(async () => {
-      renderComponent('boundary-dom-id');
-    });
-
-    expect(onCaughtError).toHaveBeenCalled();
-    const [error, , context] = onCaughtError.mock.calls[0] as [unknown, unknown, unknown];
-    expect(error).toBe(boundaryError);
-    expect(context).toEqual({ componentName: 'BoundaryComponent', domNodeId: 'boundary-dom-id' });
-  });
+      expect(onCaughtError).toHaveBeenCalled();
+      const [error, , context] = onCaughtError.mock.calls[0] as [unknown, unknown, unknown];
+      expect(error).toBe(boundaryError);
+      expect(context).toEqual({ componentName: 'BoundaryComponent', domNodeId: 'boundary-dom-id' });
+    },
+  );
 });

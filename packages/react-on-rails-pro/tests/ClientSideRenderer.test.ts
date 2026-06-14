@@ -19,6 +19,7 @@
 
 import * as React from 'react';
 import { resetRailsContext } from 'react-on-rails/context';
+import { supportsReact19RootErrorCallbacks } from 'react-on-rails/reactApis';
 import type { RailsContext, RendererFunction } from 'react-on-rails/types';
 import { resetRootErrorHandlers, setRootErrorHandlers } from 'react-on-rails/@internal/rootErrorHandlers';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
@@ -427,16 +428,16 @@ describe('ClientSideRenderer', () => {
       expect(reportErrorSpy).toHaveBeenCalledTimes(1);
       expect(reportErrorSpy).toHaveBeenCalledWith(recoverableError);
 
-      // Exactly one console.error: the branded supplemental line (context + stack + guide link),
-      // not a second full error dump.
-      const consoleErrorCalls = (console.error as jest.Mock).mock.calls;
-      expect(consoleErrorCalls).toHaveLength(1);
-      const [message] = consoleErrorCalls[0] as [unknown];
+      // Exactly one console.warn: the branded supplemental guidance line (context + stack +
+      // guide link), not a second full error dump.
+      const consoleWarnCalls = (console.warn as jest.Mock).mock.calls;
+      expect(consoleWarnCalls).toHaveLength(1);
+      const [message] = consoleWarnCalls[0] as [unknown];
       expect(message).toEqual(expect.stringContaining('[ReactOnRails] Recoverable hydration error'));
       expect(message).toEqual(expect.stringContaining('"TestComponent"'));
       expect(message).toEqual(expect.stringContaining('dom-id-dev'));
       expect(message).toEqual(expect.stringContaining('Component stack:'));
-      expect(consoleErrorCalls[0]).toHaveLength(1);
+      expect(consoleWarnCalls[0]).toHaveLength(1);
 
       // The user callback still runs with the enriched context.
       expect(userOnRecoverableError).toHaveBeenCalledWith(recoverableError, errorInfo, {
@@ -477,8 +478,12 @@ describe('ClientSideRenderer', () => {
         mockReactHydrateOrRender.mock.calls[0][2] === true && mockReactHydrateOrRender.mock.calls[0][3];
       expect(renderOptions).toEqual({
         onRecoverableError: expect.any(Function),
-        onCaughtError: expect.any(Function),
-        onUncaughtError: expect.any(Function),
+        ...(supportsReact19RootErrorCallbacks
+          ? {
+              onCaughtError: expect.any(Function),
+              onUncaughtError: expect.any(Function),
+            }
+          : {}),
       });
 
       const recoverableError = new Error('plain hydrate recoverable error');

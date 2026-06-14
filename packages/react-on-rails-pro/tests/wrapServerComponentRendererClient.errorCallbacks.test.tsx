@@ -23,6 +23,7 @@
 
 import * as React from 'react';
 import { resetRootErrorHandlers, setRootErrorHandlers } from 'react-on-rails/@internal/rootErrorHandlers';
+import { supportsReact19RootErrorCallbacks } from 'react-on-rails/reactApis';
 import { getNodeVersion } from './testUtils';
 
 // Mock webpack require system for the RSC client runtime import.
@@ -48,7 +49,7 @@ type HydrateOptions = {
   onUncaughtError?: (error: unknown, errorInfo?: unknown) => void;
 };
 
-(getNodeVersion() >= 18 ? describe : describe.skip)(
+(getNodeVersion() >= 18 && supportsReact19RootErrorCallbacks ? describe : describe.skip)(
   'wrapServerComponentRenderer client error callbacks',
   () => {
     const domNodeId = 'rsc-error-callback-root';

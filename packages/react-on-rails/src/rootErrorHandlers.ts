@@ -14,11 +14,11 @@ export const HYDRATION_MISMATCH_GUIDE_URL =
 
 type RootErrorHandlerKey = keyof RootErrorHandlers;
 
-const HANDLER_KEYS: readonly RootErrorHandlerKey[] = [
+const HANDLER_KEYS = [
   'onRecoverableError',
   'onCaughtError',
   'onUncaughtError',
-];
+] as const satisfies readonly (keyof Required<RootErrorHandlers>)[];
 
 // Registered through `ReactOnRails.setOptions({ rootErrorHandlers })`; module-level so both the
 // core ClientRenderer and the Pro ClientSideRenderer (which imports this module from the same
@@ -175,7 +175,7 @@ function logDevHydrationError(context: RootErrorContext, errorInfo: unknown): vo
   const domNodeId = context.domNodeId ?? 'unknown';
   const componentStack = extractComponentStack(errorInfo);
   const componentStackSuffix = componentStack ? `\nComponent stack:${componentStack}` : '';
-  console.error(
+  console.warn(
     `[ReactOnRails] Recoverable hydration error in component "${componentName}" (dom id: "${domNodeId}"). The server-rendered HTML did not match what React rendered on the client, so React threw away the server HTML and re-rendered on the client. Common Rails-specific causes and fixes: ${HYDRATION_MISMATCH_GUIDE_URL}${componentStackSuffix}`,
   );
 }
