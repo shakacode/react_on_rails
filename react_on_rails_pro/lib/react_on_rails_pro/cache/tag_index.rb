@@ -196,6 +196,7 @@ module ReactOnRailsPro
 
           expires_at = cache_options[:expires_at]
           return nil unless expires_at
+          return nil unless ReactOnRailsPro::Cache.cache_supports_expires_at?
 
           remaining = expires_at.to_time.to_f - Time.now.to_f
           # Expired entries fall back to the configured index TTL. The reference
@@ -206,17 +207,23 @@ module ReactOnRailsPro
 
         def warn_if_expires_in_missing(cache_options, entry_key)
           return unless Rails.env.development?
-          return if cache_options[:expires_in].present? || cache_options[:expires_at].present?
+          return if cache_expiry_present?(cache_options)
 
           return unless warn_missing_expiry_once?(entry_key)
 
           Rails.logger.warn(
             "[ReactOnRailsPro] cache_tags: used without cache_options[:expires_in] or " \
-            "cache_options[:expires_at]. Tag revalidation is " \
+            "cache_options[:expires_at] on Rails 7+. Tag revalidation is " \
             "best-effort (index appends are lossy under concurrency, and the index itself can be evicted), " \
-            "so always set :expires_in or :expires_at on tagged entries to bound how long a missed " \
-            "invalidation can live."
+            "so always set :expires_in, or :expires_at on Rails 7+, on tagged entries to bound how " \
+            "long a missed invalidation can live."
           )
+        end
+
+        def cache_expiry_present?(cache_options)
+          return true if cache_options[:expires_in].present?
+
+          cache_options[:expires_at].present? && ReactOnRailsPro::Cache.cache_supports_expires_at?
         end
 
         def warn_missing_expiry_once?(entry_key)
@@ -235,8 +242,8 @@ module ReactOnRailsPro
           keys, _expires_at = read_index(key)
           return 0 if keys.empty?
 
-          deleted = delete_entries(keys)
           Rails.cache.delete(key)
+          deleted = delete_entries(keys)
           Rails.logger.debug do
             "[ReactOnRailsPro] revalidate_tag #{tag.inspect}: deleted #{deleted} of #{keys.size} indexed entries"
           end
@@ -248,6 +255,7 @@ module ReactOnRailsPro
         # default namespace to avoid prefixing them a second time.
         # delete_multi only exists on ActiveSupport >= 6.1; fall back to
         # per-key deletes on older stores.
+        # Returns an Integer count of deleted cache entries.
         def delete_entries(keys)
           if Rails.cache.respond_to?(:delete_multi)
             Rails.cache.delete_multi(keys, namespace: nil)
@@ -266,10 +274,17 @@ module ReactOnRailsPro
 
         def merged_cache_options(cache_options)
           cache_options ||= {}
+          cache_options = supported_expiry_options(cache_options)
           store = Rails.cache
           return cache_options unless store.respond_to?(:merged_options, true)
 
           store.send(:merged_options, cache_options)
+        end
+
+        def supported_expiry_options(cache_options)
+          return cache_options if ReactOnRailsPro::Cache.cache_supports_expires_at?
+
+          cache_options.except(:expires_at)
         end
 
         def normalized_entry_key(cache_key, cache_options)
@@ -290,11 +305,18 @@ module ReactOnRailsPro
           store = Rails.cache
           unless PRIVATE_KEY_METHODS.all? { |method_name| store.respond_to?(method_name, true) }
             warn_missing_private_key_api(store)
-            return cache_key.to_s
+            return fallback_entry_key(cache_key)
           end
 
           expanded = store.send(:expanded_key, cache_key)
           store.send(:namespace_key, expanded, store.send(:merged_options, cache_options))
+        end
+
+        def fallback_entry_key(cache_key)
+          return cache_key.map { |segment| fallback_entry_key(segment) }.join("/") if cache_key.is_a?(Array)
+          return cache_key.cache_key.to_s if cache_key.respond_to?(:cache_key)
+
+          cache_key.to_s
         end
 
         def warn_missing_private_key_api(store)
@@ -309,8 +331,8 @@ module ReactOnRailsPro
 
           Rails.logger.warn do
             "[ReactOnRailsPro] #{store.class} does not implement the private key-normalization API " \
-              "(#{PRIVATE_KEY_METHODS.join(', ')}); the cache tag index falls back to raw cache keys, " \
-              "so tag revalidation may miss entries written with a :namespace or expanded key forms."
+              "(#{PRIVATE_KEY_METHODS.join(', ')}); the cache tag index falls back to Rails-like " \
+              "expanded keys without namespace or store-specific encoding, so tag revalidation may miss entries."
           end
         end
       end

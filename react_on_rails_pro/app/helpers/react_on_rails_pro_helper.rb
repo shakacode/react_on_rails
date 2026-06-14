@@ -26,7 +26,7 @@ module ReactOnRailsProHelper
     if ReactOnRailsPro::Cache.use_cache?(options)
       cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
       Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
-      cache_options = options[:cache_options]
+      cache_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
       cache_hit = true
       normalized_cache_tags = []
       result = Rails.cache.fetch(cache_key, cache_options) do
@@ -388,7 +388,7 @@ module ReactOnRailsProHelper
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
     cache_aware_options = raw_options.merge(
       on_complete: lambda { |chunks|
-        cache_options = raw_options[:cache_options] || {}
+        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_options[:cache_options] || {})
         Rails.cache.write(view_cache_key, chunks, cache_options)
         ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, view_cache_key, cache_options)
       }
@@ -436,7 +436,7 @@ module ReactOnRailsProHelper
     end
 
     cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, raw_options)
-    cache_options = raw_options[:cache_options] || {}
+    cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_options[:cache_options] || {})
     Rails.logger.debug { "React on Rails Pro async cache_key is #{cache_key.inspect}" }
 
     # Synchronous cache lookup

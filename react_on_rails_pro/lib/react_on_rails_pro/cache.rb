@@ -18,6 +18,8 @@ require "react_on_rails_pro/cache/tag_index"
 
 module ReactOnRailsPro
   class Cache
+    ACTIVE_SUPPORT_EXPIRES_AT_VERSION = Gem::Version.new("7.0.0")
+
     class << self
       # options[:cache_options] can include :compress, :expires_in, :race_condition_ttl and
       # other options
@@ -25,7 +27,7 @@ module ReactOnRailsPro
         if use_cache?(options)
           cache_key = react_component_cache_key(component_name, options)
           Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
-          cache_options = options[:cache_options]
+          cache_options = cache_write_options(options[:cache_options])
           cache_hit = true
           normalized_cache_tags = []
           result = Rails.cache.fetch(cache_key, cache_options) do
@@ -66,6 +68,21 @@ module ReactOnRailsPro
         TagIndex.normalize_tags(tags)
       end
 
+      def cache_write_options(cache_options)
+        return cache_options unless cache_options&.key?(:expires_at)
+        return cache_options if cache_supports_expires_at?
+        return cache_options if cache_options[:expires_in]
+
+        expires_at = cache_options[:expires_at]
+        return cache_options unless expires_at
+
+        cache_options.merge(expires_in: expires_at.to_time.to_f - Time.now.to_f).except(:expires_at)
+      end
+
+      def cache_supports_expires_at?
+        ActiveSupport.gem_version >= ACTIVE_SUPPORT_EXPIRES_AT_VERSION
+      end
+
       # Deletes every cached component entry registered under the given tags
       # and clears the tag index entries. Tags accept the same forms as the
       # `cache_tags:` helper option. Blank tags (nil/empty/whitespace) are
@@ -98,7 +115,7 @@ module ReactOnRailsPro
       def blank_revalidation_tag?(tag)
         return true if tag.nil?
         return true if unpersisted_record_tag?(tag)
-        return false if tag.respond_to?(:cache_key)
+        return tag.cache_key.blank? if tag.respond_to?(:cache_key)
 
         tag.blank?
       end

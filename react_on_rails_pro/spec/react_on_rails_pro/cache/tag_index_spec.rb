@@ -280,6 +280,17 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("t")).to be_nil
     end
 
+    it "deletes the index before cached entries to shrink the revalidation race window" do
+      Rails.cache.write("entry/one", "one")
+      described_class.register(["t"], "entry/one", { expires_in: 3600 })
+      index_key = described_class.index_key("t")
+
+      expect(Rails.cache).to receive(:delete).with(index_key).ordered.and_call_original
+      expect(Rails.cache).to receive(:delete_multi).with(["entry/one"], namespace: nil).ordered.and_call_original
+
+      expect(described_class.revalidate("t")).to eq(1)
+    end
+
     it "caps keys per tag at cache_tag_index_max_keys, dropping the oldest" do
       # Pin the env so the development-only missing-expires_in warning cannot
       # add extra :warn calls to the assertion below.
@@ -340,6 +351,7 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
     end
 
     it "covers entries that use expires_at instead of expires_in" do
+      allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(true)
       now = Time.now.to_f
 
       described_class.register(["t"], "k1", { expires_at: Time.now + 3600 })
@@ -348,12 +360,33 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("t")["expires_at"]).to be_within(5).of(expected)
     end
 
+    it "uses the fallback index TTL for raw expires_at when the cache store would ignore it" do
+      allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(false)
+      allow(ReactOnRailsPro.configuration).to receive(:cache_tag_index_expires_in).and_return(123)
+      now = Time.now.to_f
+
+      described_class.register(["t"], "k1", { expires_at: Time.now + 3600 })
+
+      expect(index_payload("t")["expires_at"]).to be_within(5).of(now + 123)
+    end
+
     it "does not warn in development when expires_at is set" do
+      allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(true)
       allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
 
       described_class.register(["t"], "k1", { expires_at: Time.now + 60 })
 
       expect(logger_mock).not_to have_received(:warn)
+    end
+
+    it "warns in development when only unsupported expires_at is set" do
+      allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(false)
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
+
+      described_class.register(["t"], "k1", { expires_at: Time.now + 60 })
+
+      expected_warning = /without cache_options\[:expires_in\].*cache_options\[:expires_at\]/
+      expect(logger_mock).to have_received(:warn).with(expected_warning)
     end
 
     it "warns in development when cache_tags are used without expires_in or expires_at" do
@@ -428,6 +461,10 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(ReactOnRailsPro.revalidate_tags(nil, "", "   ", [])).to eq(0)
     end
 
+    it "treats objects with blank cache keys as no-ops at the revalidation boundary" do
+      expect(ReactOnRailsPro.revalidate_tags(TaggableRecord.new(cache_key: " "))).to eq(0)
+    end
+
     it "treats unpersisted AR-style records as no-ops at the revalidation boundary" do
       tags = [
         UnpersistedTaggableRecord.new,
@@ -458,7 +495,7 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(Rails.cache.read("entry/one")).to be_nil
     end
 
-    it "falls back to the raw cache key with a warning when the store lacks the private key API" do
+    it "falls back to a Rails-like expanded cache key with a warning when the store lacks the private key API" do
       bare_store = ActiveSupport::Cache::MemoryStore.new
       allow(bare_store).to receive(:respond_to?).and_call_original
       allow(bare_store).to receive(:respond_to?).with(:expanded_key, true).and_return(false)
@@ -467,6 +504,9 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       described_class.instance_variable_set(:@warned_private_key_api, nil)
 
       expect(described_class.send(:normalized_entry_key, "entry/raw", {})).to eq("entry/raw")
+      expect(described_class.send(:normalized_entry_key, ["entry", "array", 42], {})).to eq("entry/array/42")
+      expect(described_class.send(:normalized_entry_key, ["entry", TaggableRecord.new(cache_key: "posts/42")], {}))
+        .to eq("entry/posts/42")
       expect(Rails.logger).to have_received(:warn)
     end
   end
