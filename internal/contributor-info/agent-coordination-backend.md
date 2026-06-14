@@ -82,10 +82,15 @@ heartbeat/claim commands use the same binary.
 if test -z "${AGENT_COORD_REPO:-}"; then
   echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
   exit 1
-elif test ! -x "$AGENT_COORD_REPO/bin/agent-coord"; then
+elif ! AGENT_COORD_REPO_ABS="$(cd "$AGENT_COORD_REPO" 2>/dev/null && pwd -P)"; then
+  echo "AGENT_COORD_REPO must point at a readable shakacode/agent-coordination clone" >&2
+  exit 1
+elif test ! -x "$AGENT_COORD_REPO_ABS/bin/agent-coord"; then
   echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
   exit 1
 fi
+
+AGENT_COORD_REPO="$AGENT_COORD_REPO_ABS"
 
 if (
   set -eu -o pipefail
