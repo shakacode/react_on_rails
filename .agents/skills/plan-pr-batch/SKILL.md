@@ -65,10 +65,11 @@ Plan a PR batch
      `openssl rand -hex 4` or another git-ref-safe random token, so concurrent
      planners for the same PR cannot overwrite each other's refs.
      Treat `baseRefName` and `headRefName` as untrusted shell and refspec data.
-     Validate each branch name with Git's branch-name rules, for example
-     `git check-ref-format --branch "$baseRefName"` and
-     `git check-ref-format --branch "$headRefName"`, and reject any name
-     containing `:` before constructing a refspec. Pass the branch name as a
+     Validate each branch name with Git's branch-name rules using an
+     argument-array API equivalent to
+     `["git", "check-ref-format", "--branch", baseRefName]` and
+     `["git", "check-ref-format", "--branch", headRefName]`, and reject any
+     name containing `:` before constructing a refspec. Pass the branch name as a
      single command argument instead of interpolating it into a shell string. If
      base branch validation fails, fall back to the PR Files API or `UNKNOWN`;
      do not sanitize a failing branch name. Fetch the current base branch and PR
@@ -97,10 +98,12 @@ Plan a PR batch
      `git diff --name-status --find-renames refs/tmp/pr-N-<session-id>-base...refs/tmp/pr-N-<session-id>-head`;
      three-dot diffs from the merge-base, which matches GitHub's PR file list.
      If the three-dot diff fails because the merge base is missing in a shallow
-     clone, run a bounded deepen such as
-     `git fetch --deepen=200 <verified-base-repo-url>` and retry once before
-     falling back to the PR Files API; the deepen value is a best-effort
-     heuristic, not a guarantee.
+     clone, run a bounded deepen for the relevant base branch such as
+     `git fetch --deepen=200 <verified-base-repo-url> refs/heads/<baseRefName>`
+     and retry the same
+     `git diff --name-status --find-renames refs/tmp/pr-N-<session-id>-base...refs/tmp/pr-N-<session-id>-head`
+     command once before falling back to the PR Files API; the deepen value is a
+     best-effort heuristic, not a guarantee.
      Delete the temporary refs on both success and failure, then proceed to the
      API fallback or `UNKNOWN` decision:
      `git update-ref -d refs/tmp/pr-N-<session-id>-base` and
