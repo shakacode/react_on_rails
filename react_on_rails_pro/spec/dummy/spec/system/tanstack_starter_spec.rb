@@ -110,7 +110,7 @@ describe "TanStack Router Starter" do # rubocop:disable RSpec/FilePath,RSpec/Spe
       # it. Isolated runs may reach this hook before the browser has started;
       # in that case the buffer is empty, so there is nothing to flush.
       page.driver.browser.logs.get(:browser)
-    rescue StandardError
+    rescue Selenium::WebDriver::Error::WebDriverError
       # Browser not yet started; buffer is empty, nothing to flush.
     end
 
