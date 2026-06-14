@@ -8507,7 +8507,7 @@ For more information on Turbolinks 5: [https://github.com/turbolinks/turbolinks]
 #### CSRF and MIME Type Handling
 
 - **CSRF tokens**: Turbolinks 5 changes the head element by JavaScript (not only body) on page changes with the correct csrf meta tag. Be thorough checking CSRF tokens, especially when multiple windows are opened, as the CSRF helper in ReactOnRails needs to work with Turbolinks5.
-- **MIME type handling**: Turbolinks 5 sends requests with `Accept: text/html` only (not `Accept: */*`), which makes Rails behave differently compared to normal requests. For more details on the special handling of `*/*` you can read [Mime Type Resolution in Rails](https://www.bigbinary.com/blog/mime-type-resolution-in-rails).
+- **MIME type handling**: Turbolinks 5 sends requests with `Accept: text/html` only (not `Accept: */*`), which makes Rails behave differently compared to normal requests. For more details on the special handling of `*/*` you can read [Mime Type Resolution in Rails](http://blog.bigbinary.com/2010/11/23/mime-type-resolution-in-rails.html).
 - **Multiple Webpack bundles**: If you're using multiple Webpack bundles, make sure that there are no name conflicts between JS objects or Redux store paths.
 
 #### Debugging Turbolinks Events
