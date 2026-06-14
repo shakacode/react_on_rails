@@ -369,9 +369,6 @@
         "body_excerpt": {
           "type": "string"
         },
-        "body_text": {
-          "type": "string"
-        },
         "current_head": {
           "type": "boolean"
         }

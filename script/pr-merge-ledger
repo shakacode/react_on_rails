@@ -598,10 +598,8 @@ class PrMergeLedger
     occurrences = finding_occurrences(line_text)
     return [] if occurrences.empty?
 
-    source_finding_count = context.fetch(:source_finding_count) || occurrences.length
     finding_context = context.merge(
-      multiple_markers: occurrences.length > 1,
-      source_finding_count:
+      multiple_markers: occurrences.length > 1
     )
     occurrences.map do |occurrence|
       finding_from_occurrence(line_text, source_line, source, occurrence, finding_context)
@@ -1147,7 +1145,17 @@ class PrMergeLedger
       page_info = raw_comments.fetch("pageInfo")
       return thread unless page_info.fetch("hasNextPage")
 
-      nodes = raw_comments.fetch("nodes")
+      completed_comments = raw_comments.merge("nodes" => raw_comments.fetch("nodes").dup)
+      page_info = append_remaining_review_thread_comments(
+        thread.fetch("id"),
+        completed_comments.fetch("nodes"),
+        page_info
+      )
+      completed_comments["pageInfo"] = page_info
+      thread.merge("comments" => completed_comments)
+    end
+
+    def append_remaining_review_thread_comments(thread_id, nodes, page_info)
       cursor = page_info.fetch("endCursor")
       page_count = 0
 
@@ -1157,9 +1165,9 @@ class PrMergeLedger
           raise Error, "pagination exceeded #{MAX_GRAPHQL_PAGES} pages for reviewThread.comments"
         end
 
-        response = graphql(review_thread_comments_query, threadId: thread.fetch("id"), commentsCursor: cursor)
+        response = graphql(review_thread_comments_query, threadId: thread_id, commentsCursor: cursor)
         fetched_thread = response.dig("data", "node")
-        raise Error, "review thread #{thread.fetch('id')} was not found" unless fetched_thread
+        raise Error, "review thread #{thread_id} was not found" unless fetched_thread
 
         connection = fetched_thread.fetch("comments")
         nodes.concat(connection.fetch("nodes"))
@@ -1169,8 +1177,7 @@ class PrMergeLedger
         cursor = next_cursor(page_info, "reviewThread.comments", cursor)
       end
 
-      raw_comments["pageInfo"] = page_info
-      thread
+      page_info
     end
 
     def graphql(query, variables)
@@ -1194,7 +1201,7 @@ class PrMergeLedger
       return if value.nil?
 
       value_string = value.to_s
-      if !value.is_a?(Integer) && value_string.start_with?("@")
+      if value.is_a?(String) && value_string.start_with?("@")
         raise Error, "gh api graphql variable #{key} cannot start with @"
       end
 

@@ -3940,7 +3940,7 @@ RSpec.describe "script/pr-merge-ledger" do
       "path", "line", "reviewer", "head_sha", "current_head"
     )
     expect(schema.dig("$defs", "review_thread", "additionalProperties")).to be(false)
-    expect(schema.dig("$defs", "review_object", "properties")).to include("body_text")
+    expect(schema.dig("$defs", "review_object", "properties")).not_to include("body_text")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "unknown_fields", "type")).to eq("array")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "complete_allowed", "type")).to eq("boolean")
   end
