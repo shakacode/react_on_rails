@@ -55,7 +55,8 @@ pma_scope_resolve_ref_sha() {
 
 pma_scope_parse_git_log() {
   ruby -e '
-seen = {}
+records = {}
+order = []
 
 ARGF.each_line do |line|
   line = line.chomp
@@ -65,10 +66,14 @@ ARGF.each_line do |line|
   # GitHub squash merges append the PR number at the end. Prefer that marker over quoted refs.
   pr_number = subject[/\s\(#(\d+)\)\s*\z/, 1]
   pr_number ||= subject[/\AMerge pull request #(\d+)\b/, 1]
-  next if pr_number.nil? || seen[pr_number]
+  next if pr_number.nil?
 
-  seen[pr_number] = true
-  puts [pr_number, sha, subject].join("\t")
+  order << pr_number unless records.key?(pr_number)
+  records[pr_number] = [pr_number, sha, subject]
+end
+
+order.each do |pr_number|
+  puts records.fetch(pr_number).join("\t")
 end
 '
 }
@@ -406,7 +411,7 @@ pma_scope_self_check() {
     } | pma_scope_parse_git_log
   )"
   expected="$(
-    printf '%s\t%s\t%s\n' "4014" "abc123" "Fix audit scope resolver (#4014)"
+    printf '%s\t%s\t%s\n' "4014" "fedcba" "Duplicate mention (#4014)"
     printf '%s\t%s\t%s' "4015" "def456" "Merge pull request #4015 from shakacode/example"
   )"
   pma_scope_self_check_assert_equals "$expected" "$parsed" "git log parser" || return 1

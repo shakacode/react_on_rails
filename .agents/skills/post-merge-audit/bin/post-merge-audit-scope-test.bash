@@ -123,7 +123,7 @@ test_parse_git_log_extracts_squash_and_merge_subject_prs_once() {
   )"
 
   expected="$(
-    printf '%s\t%s\t%s\n' "4014" "abc123" "Fix audit scope resolver (#4014)"
+    printf '%s\t%s\t%s\n' "4014" "fedcba" "Duplicate mention (#4014)"
     printf '%s\t%s\t%s' "4015" "def456" "Merge pull request #4015 from shakacode/example"
     printf '\n%s\t%s\t%s' "4012" "f00f00" "Revert 'feat: foo (#4010)' (#4012)"
     printf '\n%s\t%s\t%s' "4020" "dad000" "Revert \"Merge pull request #4015 from shakacode/example\" (#4020)"
