@@ -7171,6 +7171,11 @@ The contract between them is one blessed error shape:
 The hook works against **any** endpoint returning that shape; the concern is a
 convenience, not a requirement.
 
+Compatibility: `react-on-rails/useRailsForm` requires React 16.8 or newer
+because it is a hook. Apps still on React 16.0-16.7 can continue using the
+package's other React 16 APIs, but this subpath throws a clear error until React
+is upgraded to a hooks-capable version.
+
 ## Quick start
 
 ### Client

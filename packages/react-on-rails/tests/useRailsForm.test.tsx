@@ -52,6 +52,26 @@ beforeEach(() => {
 });
 
 describe('useRailsForm', () => {
+  it('throws a clear error when React hook exports are unavailable', () => {
+    jest.isolateModules(() => {
+      const actualReact = jest.requireActual<typeof React>('react');
+      jest.doMock('react', () => ({
+        ...actualReact,
+        useCallback: undefined,
+        useEffect: undefined,
+        useRef: undefined,
+        useState: undefined,
+      }));
+
+      const legacyReactModule = require('../src/useRailsForm.ts') as typeof import('../src/useRailsForm.ts');
+
+      expect(() => legacyReactModule.useRailsForm({ name: '' })).toThrow(
+        /useRailsForm requires React 16\.8 or newer/,
+      );
+    });
+    jest.dontMock('react');
+  });
+
   describe('request building', () => {
     it('posts JSON data with CSRF and Accept headers attached', async () => {
       const { result } = renderHook(() => useRailsForm({ name: 'Justin', email: '' }));

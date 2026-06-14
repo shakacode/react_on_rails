@@ -24,7 +24,7 @@
  * what to do.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import * as React from 'react';
 import { authenticityHeaders, authenticityToken } from './Authenticity.ts';
 
 /** Per-field validation errors: `{ field: ["message", ...] }`. */
@@ -135,6 +135,22 @@ const PINNED_RAILS_FORM_HEADER_NAMES = new Set([
   'x-csrf-token',
   'x-requested-with',
 ]);
+
+const REQUIRED_REACT_HOOK_NAMES = ['useCallback', 'useEffect', 'useRef', 'useState'] as const;
+
+type RequiredReactHooks = Pick<typeof React, (typeof REQUIRED_REACT_HOOK_NAMES)[number]>;
+
+const getReactHooks = (): RequiredReactHooks => {
+  const missingHooks = REQUIRED_REACT_HOOK_NAMES.filter((hookName) => typeof React[hookName] !== 'function');
+  if (missingHooks.length > 0) {
+    throw new Error(
+      `useRailsForm requires React 16.8 or newer because it uses React hooks. Missing React exports: ${missingHooks.join(
+        ', ',
+      )}.`,
+    );
+  }
+  return React as RequiredReactHooks;
+};
 
 const railsFormJsonHeaders = (customHeaders: Record<string, string> = {}): Record<string, string> => {
   const filteredCustomHeaders = Object.fromEntries(
@@ -301,6 +317,8 @@ const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
  * responses reject with `RailsFormRequestError`.
  */
 export function useRailsForm<TData extends object>(initialData: TData): UseRailsForm<TData> {
+  const { useCallback, useEffect, useRef, useState } = getReactHooks();
+
   // Captured once on first render (Inertia useForm semantics): reset() restores
   // these mount-time values even if the initialData prop changes later.
   const initialDataRef = useRef(initialData);
