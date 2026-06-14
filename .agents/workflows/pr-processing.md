@@ -29,14 +29,15 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
 3. Isolate the work:
    - Fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
    - When the private `shakacode/agent-coordination` backend is available
-     (`agent-coord status` exits 0), acquire an `agent-coord claim` for each
-     issue/PR lane before creating that lane's worktree or branch. Machine
-     agents must hard-stop when the claim is refused and report the holder plus
-     heartbeat liveness. `agent-coord status` is a preflight view; the claim
-     operation is the backend's compare-and-swap gate, so the claim result is the
-     source of truth for races. If `agent-coord status` cannot be checked,
-     report private state as `UNKNOWN` and use structured public claim comments
-     as an advisory fallback.
+     (`agent-coord doctor` and `agent-coord status` exit 0), acquire an
+     `agent-coord claim` for each issue/PR lane before creating that lane's
+     worktree or branch. Machine agents must hard-stop when the claim is refused
+     with `CLAIM_REFUSED` / exit code 3 and report the holder plus heartbeat
+     liveness. `agent-coord status` is a preflight view; the claim operation is
+     the backend's compare-and-swap gate, so the claim result is the source of
+     truth for races. If `agent-coord doctor` or `agent-coord status` cannot be
+     checked, report private state as `UNKNOWN` and use structured public claim
+     comments as an advisory fallback.
    - For lanes declared in `batches/<batch-id>.json` with `depends_on`, run
      `agent-coord status` at lane start and before rebase or push. If the lane
      shows unmet `blocked_on` refs, set that lane's heartbeat status to
@@ -447,10 +448,12 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
 - For concurrent or multi-machine batches, use the private `shakacode/agent-coordination`
   backend when available. Each lane gets a stable agent id such as
   `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
-- Treat the backend as available when `agent-coord status` exits 0. If the
-  command is missing, auth fails, or status exits non-zero, report private state
-  as `UNKNOWN` and use advisory public claim comments. A refused
-  `agent-coord claim` after a successful status check remains a hard stop.
+- Treat the backend as available when `agent-coord doctor` and
+  `agent-coord status` exit 0. If the command is missing, auth fails, doctor
+  fails, or status exits non-zero, report private state as `UNKNOWN` and use
+  advisory public claim comments where dependency rules allow it. A refused
+  `agent-coord claim` after a successful status check returns `CLAIM_REFUSED` /
+  exit code 3 and remains a hard stop.
 - Acquire an `agent-coord claim` for each issue/PR lane before creating that
   lane's worktree or branch. A refused claim is a hard stop for machine agents:
   report the holder, heartbeat liveness, and target instead of creating a
@@ -461,9 +464,10 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
   start, branch or PR update, review pass, blocked state, resumed state, and
   done state.
   Heartbeat liveness is timestamp-derived: `live` before the TTL expires,
-  `stale` until the backend dead threshold, and `dead` after that. Check the
-  private backend README and CLI help for current TTL defaults and threshold
-  calculations; do not model liveness with sticky labels.
+  `stale` until the backend dead threshold, and `dead` after that. Check
+  `agent-coord config show --json`, the private backend README, and CLI help for
+  current TTL defaults, terminal heartbeat statuses, and threshold calculations;
+  do not model liveness with sticky labels.
 - Use `agent-coord status` before starting dependency-sensitive lanes and before
   rebase, push, readiness, or closeout decisions that depend on another lane.
   If `agent-coord status` cannot be checked for a declared dependency lane, stop
