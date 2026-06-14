@@ -764,9 +764,10 @@ Use `.agents/skills/address-review/SKILL.md` when skills are available; Claude C
 
 - `MUST-FIX`: fix in the PR.
 - `DISCUSS`: ask the user or make a narrow, evidence-backed decision.
-- `OPTIONAL`: after an action is selected, apply low-risk behavior-preserving
-  nits inline or record them as deferred/declined; promote anything needing
-  judgment to `DISCUSS`.
+- `OPTIONAL`: in `f` and `f+i`, apply low-risk behavior-preserving nits inline
+  or record them as deferred/declined; promote anything needing judgment to
+  `DISCUSS`. For `f+o`, `o <nums>`, and `all optional`, fix each selected item
+  inline or escalate it to `DISCUSS`; autonomous defer does not apply.
 - `SKIPPED`: reply with rationale only when useful; do not create work from noise.
 
 Do not let follow-up issues become a substitute for finishing the PR. Follow-up tracking is allowed only for real, non-blocking work that remains valuable outside the PR context.

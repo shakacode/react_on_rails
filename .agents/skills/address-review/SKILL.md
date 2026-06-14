@@ -464,9 +464,9 @@ After posting the reply, resolve the review thread when all of the following are
   declined with a clear explanation approved by the user; or autonomously
   deferred/declined as a low-risk behavior-preserving `OPTIONAL` item under the
   Maintainer Attention Contract with the rationale recorded in the reply or
-  summary. Autonomous deferred/declined optional replies must explicitly say
-  "Autonomously deferred under the Maintainer Attention Contract; please reopen
-  if this needs maintainer review" before the thread is resolved.
+  summary. Autonomous deferred/declined optional replies must include the tag
+  `[auto-deferred]` on its own line plus a one-line rationale before the thread
+  is resolved.
 - The thread is not already resolved
 
 Use GitHub GraphQL to resolve the thread:

@@ -219,7 +219,8 @@ contract unless a maintainer explicitly narrows the run.
   Behavior-preserving means wording, formatting, or mechanical
   whitespace/punctuation cleanup that does not alter public APIs, generated
   output, runtime behavior, validation scope, or reviewer obligations. Low-risk
-  means local and mechanically checkable.
+  means local and mechanically checkable, such as a formatter-confirmed cleanup;
+  a rename that requires searching all callers is not low-risk by default.
   Qualifying examples: typo/comment punctuation, whitespace or trailing comma
   cleanup, type-only or linter-confirmed unused import removal after verifying
   the imported module has no side effects, or unambiguous documentation wording.
