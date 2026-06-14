@@ -862,6 +862,56 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks numbered-list priority findings from review summaries" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 5,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "numbered-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/numbered-review",
+          "body" => "1. [P1] First numbered finding.\n2. P2: Second numbered finding."
+        }
+      ],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-numbered-finding", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
+      expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
+        ["1. [P1] First numbered finding.", "2. P2: Second numbered finding."]
+      )
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
+    end
+  end
+
   it "keeps same-severity findings from distinct lines in one source" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -2579,6 +2629,30 @@ RSpec.describe "script/pr-merge-ledger" do
         "state" => "COMMENTED"
       )
       expect(report.dig("pull_requests", 0, "review_objects", "changes_requested")).to be_empty
+    end
+  end
+
+  it "times out repository auto-detection" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      if [ "$1" = "repo" ]; then
+        sleep 2
+      fi
+    SH
+
+    with_fake_gh(fake_gh) do |env|
+      stdout, stderr, status = Open3.capture3(
+        env.merge("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS" => "1"),
+        script_path,
+        "1",
+        "--changelog-classification",
+        "not_user_visible",
+        chdir: repo_root
+      )
+
+      expect(status.exitstatus).to eq(2)
+      expect(stdout).to be_empty
+      expect(stderr).to include("gh repo view timed out after 1 seconds")
     end
   end
 

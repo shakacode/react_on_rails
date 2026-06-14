@@ -29,10 +29,11 @@ class PrMergeLedger
     bun.lock
     bun.lockb
   ].freeze
-  GITHUB_API_TIMEOUT_SECONDS = 30
+  GITHUB_API_TIMEOUT_SECONDS = Integer(ENV.fetch("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS", "30"), 10)
   MAX_GRAPHQL_PAGES = 500
+  LIST_MARKER_PATTERN = /(?:[-*]|\d+[.)])\s*/
   FINDING_BADGE_PREFIX = %r{
-    \A\s*(?:[-*]\s*)?(?:\*\*)?
+    \A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?
     <sub><sub>!\[%<severity>s\s+Badge\]\([^)]+\)</sub></sub>
     (?:\*\*)?(?:\s|:|-|$)
   }ix
@@ -43,22 +44,22 @@ class PrMergeLedger
     ]
   end.freeze
   FINDING_PATTERNS = {
-    "MUST_FIX" => /\A\s*(?:[-*]\s*)?(?:\*\*)?MUST[- ]?FIX(?:\*\*)?(?:\s|:|-|$)/i,
+    "MUST_FIX" => /\A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?MUST[- ]?FIX(?:\*\*)?(?:\s|:|-|$)/i,
     "P0" => Regexp.union(
       BADGE_FINDING_PATTERNS.fetch("P0"),
-      /\A\s*(?:[-*]\s*)?(?:\*\*)?\[?P0\]?(?:\*\*)?(?:\s|:|-|$)/i
+      /\A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?\[?P0\]?(?:\*\*)?(?:\s|:|-|$)/i
     ),
     "P1" => Regexp.union(
       BADGE_FINDING_PATTERNS.fetch("P1"),
-      /\A\s*(?:[-*]\s*)?(?:\*\*)?\[?P1\]?(?:\*\*)?(?:\s|:|-|$)/i
+      /\A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?\[?P1\]?(?:\*\*)?(?:\s|:|-|$)/i
     ),
     "P2" => Regexp.union(
       BADGE_FINDING_PATTERNS.fetch("P2"),
-      /\A\s*(?:[-*]\s*)?(?:\*\*)?\[?P2\]?(?:\*\*)?(?:\s|:|-|$)/i
+      /\A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?\[?P2\]?(?:\*\*)?(?:\s|:|-|$)/i
     )
   }.freeze
   FINDING_SUMMARY_PREFIX_PATTERN =
-    /\A\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-)+(?<summary>.*)\z/i
+    /\A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-)+(?<summary>.*)\z/i
   FINDING_SUMMARY_SUBJECT_PATTERN = /\b(?:findings?|issues?|items?|main issue)\b/i
   FINDING_SUMMARY_RESOLUTION_PATTERN = /
     \bnone(?!\s+of\b)(?=\s*(?:$|[.;,)])) |
@@ -76,8 +77,8 @@ class PrMergeLedger
     /\bno\s+(?:\S+\s+){0,4}?(?:fixed|resolved|waived)\b/i
   )
   ADDITIONAL_SEVERITY_PATTERN = /
-    (?:[.;,(:-]|\b(?:and|but|while)\b)\s*
-    (?:[-*]\s*)?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?
+    (?:(?<!\d)[.;,(:-]|\b(?:and|but|while)\b)\s*
+    (?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?
     (?:\s|:|-|$)
   /ix
 
@@ -218,10 +219,14 @@ class PrMergeLedger
   end
 
   def detect_repo
-    stdout, stderr, status = Open3.capture3("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
-    raise Error, "could not detect gh repo: #{stderr.strip}" unless status.success?
+    Timeout.timeout(GITHUB_API_TIMEOUT_SECONDS) do
+      stdout, stderr, status = Open3.capture3("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
+      raise Error, "could not detect gh repo: #{stderr.strip}" unless status.success?
 
-    stdout.strip
+      stdout.strip
+    end
+  rescue Timeout::Error
+    raise Error, "gh repo view timed out after #{GITHUB_API_TIMEOUT_SECONDS} seconds"
   end
 
   def load_fixture(path)
@@ -553,7 +558,7 @@ class PrMergeLedger
     return [] unless first_severity
 
     occurrences = [{ severity: first_severity, source_column: 1, marker_index: 1 }]
-    line.to_enum(:scan, ADDITIONAL_SEVERITY_PATTERN).each do
+    line.scan(ADDITIONAL_SEVERITY_PATTERN) do
       match = Regexp.last_match
       occurrences << {
         severity: normalize_finding_severity(match[:severity]),
