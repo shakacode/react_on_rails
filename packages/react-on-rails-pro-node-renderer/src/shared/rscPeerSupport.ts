@@ -27,9 +27,9 @@ export const RSC_PEER_SUPPORT = {
   react: {
     supportedMajor: 19,
     supportedRanges: [
-      { minor: 0, minPatch: 4 },
+      { rscMinor: 0, minor: 0, minPatch: 4 },
       // React 19.2.7 is the coordinated floor for react-on-rails-rsc 19.2.x.
-      { minor: 2, minPatch: 7 },
+      { rscMinor: 2, minor: 2, minPatch: 7 },
     ],
   },
 } as const;

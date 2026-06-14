@@ -158,6 +158,24 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
+  it('throws when React 19.2 is paired with the React 19.0 RSC package line', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.0.5', '19.2.7'),
+      }),
+    ).toThrow(/Incompatible react/);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('throws when React 19.0 is paired with the React 19.2 RSC package line', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.2.0-rc.1', '19.0.4'),
+      }),
+    ).toThrow(/Incompatible react/);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it('does not rerun after a hard startup error', () => {
     const resolveVersion = resolveVersions('20.0.0');
     expect(() => runRscPeerCompatibilityCheck({ resolveVersion })).toThrow(/Incompatible react-on-rails-rsc/);

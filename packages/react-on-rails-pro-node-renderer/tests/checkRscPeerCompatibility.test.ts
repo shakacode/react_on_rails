@@ -65,7 +65,7 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.message).toContain('react');
     expect(r.message).toContain('18.3.1');
     expect(r.message).toContain('19.0.x with patch >= 19.0.4');
-    expect(r.message).toContain('19.2.x with patch >= 19.2.7');
+    expect(r.message).not.toContain('19.2.x with patch >= 19.2.7');
   });
 
   it('errors when React 19.0 patch is below the supported minimum', () => {
@@ -82,6 +82,24 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.message).toContain('react');
     expect(r.message).toContain('19.2.6');
     expect(r.message).toContain('19.2.x with patch >= 19.2.7');
+  });
+
+  it('errors when React 19.2 is paired with the React 19.0 RSC package line', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: '19.0.5', reactVersion: '19.2.7' });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('react');
+    expect(r.message).toContain('19.2.7');
+    expect(r.message).toContain('19.0.x with patch >= 19.0.4');
+    expect(r.message).not.toContain('19.2.x with patch >= 19.2.7');
+  });
+
+  it('errors when React 19.0 is paired with the React 19.2 RSC package line', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: '19.2.0-rc.1', reactVersion: '19.0.4' });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('react');
+    expect(r.message).toContain('19.0.4');
+    expect(r.message).toContain('19.2.x with patch >= 19.2.7');
+    expect(r.message).not.toContain('19.0.x with patch >= 19.0.4');
   });
 
   it('errors when React uses an unsupported React 19 minor', () => {
@@ -101,7 +119,7 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.level).toBe('error');
     expect(r.message).toContain('react-dom');
     expect(r.message).toContain('19.0.x with patch >= 19.0.4');
-    expect(r.message).toContain('19.2.x with patch >= 19.2.7');
+    expect(r.message).not.toContain('19.2.x with patch >= 19.2.7');
   });
 
   it('errors when react-dom does not match react', () => {
