@@ -11,6 +11,12 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+module ActiveSupport
+  class Duration
+    def to_f: () -> Float
+  end
+end
+
 module ReactOnRailsPro
   class Configuration
     DEFAULT_RENDERER_URL: String
@@ -63,7 +69,7 @@ module ReactOnRailsPro
     attr_accessor rsc_bundle_js_file: String?
     attr_accessor react_client_manifest_file: String?
     attr_accessor react_server_client_manifest_file: String?
-    attr_accessor cache_tag_index_expires_in: Numeric
+    attr_accessor cache_tag_index_expires_in: Numeric | ActiveSupport::Duration
     attr_accessor cache_tag_index_max_keys: Integer
 
     def initialize: (
@@ -92,7 +98,7 @@ module ReactOnRailsPro
       ?rsc_bundle_js_file: String?,
       ?react_client_manifest_file: String?,
       ?react_server_client_manifest_file: String?,
-      ?cache_tag_index_expires_in: Numeric,
+      ?cache_tag_index_expires_in: Numeric | ActiveSupport::Duration,
       ?cache_tag_index_max_keys: Integer
     ) -> void
 

@@ -122,12 +122,13 @@ module ReactOnRailsPro
 
     # Sets how long tag->key index entries live (see Cache::TagIndex).
     #
-    # @param value [Numeric] A positive number of seconds (e.g. 7.days)
+    # @param value [Numeric, ActiveSupport::Duration] A positive duration or number of seconds (e.g. 7.days)
     # @raise [ReactOnRailsPro::Error] if value is not a positive, finite number
     def cache_tag_index_expires_in=(value)
-      unless value.is_a?(Numeric) && value.positive? && value.to_f.finite?
+      valid_duration = value.is_a?(Numeric) || value.is_a?(ActiveSupport::Duration)
+      unless valid_duration && value.to_f.positive? && value.to_f.finite?
         raise ReactOnRailsPro::Error,
-              "config.cache_tag_index_expires_in must be a positive number of seconds"
+              "config.cache_tag_index_expires_in must be a positive duration or number of seconds"
       end
       @cache_tag_index_expires_in = value
     end
