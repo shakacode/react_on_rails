@@ -29,7 +29,7 @@ import type { ReactComponent, ReactComponentRenderFunction, RendererFunction } f
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { isRendererTeardownResult } from 'react-on-rails/@internal/rendererTeardown';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
-import { buildRootErrorCallbackOptions } from 'react-on-rails/@internal/rootErrorHandlers';
+import { buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting } from 'react-on-rails/@internal/rootErrorHandlers';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
 import { chainRecoverableErrorHandlers } from '../handleRecoverableError.client.ts';
@@ -125,17 +125,12 @@ const wrapServerComponentRenderer = (
     // User-registered root error callbacks (rootErrorHandlers), wrapped with this mount's
     // component name and dom id. On the hydrate path the user onRecoverableError is CHAINED after
     // Pro's internal recoverable-error handler so both run. This file is always RSC-wrapped; the
-    // internal handler already default-reports on hydrate, so the dev-mode logger emits only its
-    // supplemental branded line (the flag is moot on createRoot, where the dev logger is not attached).
+    // helper records that the internal handler already default-reports on hydrate, so the dev-mode
+    // logger emits only its supplemental branded line.
     const shouldHydrate = !!domNode.innerHTML;
-    const userErrorCallbackOptions = buildRootErrorCallbackOptions(
+    const userErrorCallbackOptions = buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting(
       { componentName, domNodeId },
       shouldHydrate,
-      {
-        // Only hydrateRoot receives an onRecoverableError wrapper here. The createRoot branch does
-        // not attach one, so this flag is meaningful only for the hydrate path.
-        defaultReportingHandledInternally: shouldHydrate,
-      },
     );
     const reactRoot = shouldHydrate
       ? ReactDOMClient.hydrateRoot(domNode, rootElement, {

@@ -175,7 +175,7 @@ function logDevHydrationError(context: RootErrorContext, errorInfo: unknown): vo
   const domNodeId = context.domNodeId ?? 'unknown';
   const componentStack = extractComponentStack(errorInfo);
   const componentStackSuffix = componentStack ? `\nComponent stack:${componentStack}` : '';
-  console.warn(
+  console.error(
     `[ReactOnRails] Recoverable hydration error in component "${componentName}" (dom id: "${domNodeId}"). The server-rendered HTML did not match what React rendered on the client, so React threw away the server HTML and re-rendered on the client. Common Rails-specific causes and fixes: ${HYDRATION_MISMATCH_GUIDE_URL}${componentStackSuffix}`,
   );
 }
@@ -257,4 +257,18 @@ export function buildRootErrorCallbackOptions(
   }
 
   return options;
+}
+
+/**
+ * Pro RSC hydration wraps the returned `onRecoverableError` with an internal handler that has already
+ * performed React's default recoverable-error reporting. Keep that invariant in one named helper so
+ * Pro call sites do not need to remember the lower-level `defaultReportingHandledInternally` flag.
+ */
+export function buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting(
+  context: RootErrorContext,
+  hydrating: boolean,
+): RootErrorCallbackOptions {
+  return buildRootErrorCallbackOptions(context, hydrating, {
+    defaultReportingHandledInternally: hydrating,
+  });
 }

@@ -10,7 +10,7 @@
  */
 
 import * as React from 'react';
-import { act } from 'react';
+import { act } from 'react-dom/test-utils';
 import { renderComponent } from '../src/ClientRenderer.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import { setRootErrorHandlers, resetRootErrorHandlers } from '../src/rootErrorHandlers.ts';
@@ -115,8 +115,8 @@ describe('root error callbacks with real react-dom (React 19)', () => {
       renderComponent('dev-mismatch-dom-id');
     });
 
-    const consoleWarnCalls = (console.warn as jest.Mock).mock.calls;
-    const brandedCall = consoleWarnCalls.find(
+    const consoleErrorCalls = (console.error as jest.Mock).mock.calls;
+    const brandedCall = consoleErrorCalls.find(
       (call) =>
         typeof call[0] === 'string' &&
         call[0].includes('[ReactOnRails] Recoverable hydration error in component "MismatchComponent"'),

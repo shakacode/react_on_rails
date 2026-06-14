@@ -32,7 +32,10 @@ import { isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from 'react-on-rails/reactApis';
 import reactHydrateOrRender from 'react-on-rails/reactHydrateOrRender';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
-import { buildRootErrorCallbackOptions } from 'react-on-rails/@internal/rootErrorHandlers';
+import {
+  buildRootErrorCallbackOptions,
+  buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting,
+} from 'react-on-rails/@internal/rootErrorHandlers';
 import { isThenable } from 'react-on-rails/@internal/isThenable';
 import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderRegistry.ts';
 import { chainRecoverableErrorHandlers } from './handleRecoverableError.client.ts';
@@ -249,13 +252,14 @@ You should return a React.Component always for the client side entry point.`);
           // User-registered root error callbacks (rootErrorHandlers), wrapped with this mount's
           // component name and dom id. Applied to every root; on the RSC-wrapped hydrate path the
           // user onRecoverableError is CHAINED after Pro's internal recoverable-error handler so
-          // both run (the internal handler must never be clobbered, and the user callback must
-          // never be dropped). On that chained path the internal handler already default-reports
-          // the error, so the dev-mode logger must emit only its supplemental branded line.
-          const userErrorCallbackOptions = buildRootErrorCallbackOptions(
+          // both run. The dedicated helper keeps the internal default-reporting invariant in one
+          // named place instead of relying on each Pro call site to remember a low-level flag.
+          const buildErrorCallbackOptions = wrappedByDefaultRSCProvider
+            ? buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting
+            : buildRootErrorCallbackOptions;
+          const userErrorCallbackOptions = buildErrorCallbackOptions(
             { componentName: name, domNodeId },
             shouldHydrate,
-            { defaultReportingHandledInternally: wrappedByDefaultRSCProvider && shouldHydrate },
           );
           let renderOptions: Parameters<typeof reactHydrateOrRender>[3] = userErrorCallbackOptions;
           if (wrappedByDefaultRSCProvider) {

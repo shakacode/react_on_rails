@@ -5,6 +5,7 @@ import 'jquery-ujs';
 import '@hotwired/turbo-rails';
 
 import ReactOnRails from 'react-on-rails/client';
+import { supportsReact19RootErrorCallbacks } from 'react-on-rails/reactApis';
 
 import HelloTurboStream from '../startup/HelloTurboStream';
 import ManualRenderComponent from '../startup/ManualRenderComponent';
@@ -55,6 +56,7 @@ type RootErrorCallbackEvent = {
 declare global {
   interface Window {
     __ROOT_ERROR_CALLBACK_EVENTS__?: RootErrorCallbackEvent[];
+    __ROOT_ERROR_CALLBACK_SUPPORTS_REACT19__?: boolean;
   }
 }
 
@@ -73,14 +75,24 @@ const recordRootErrorEvent =
     console.error(`[dummy] rootErrorHandlers ${kind} error callback fired:`, error);
   };
 
+/* eslint-disable no-underscore-dangle -- double-underscore marks the test-only window global */
+window.__ROOT_ERROR_CALLBACK_SUPPORTS_REACT19__ = supportsReact19RootErrorCallbacks;
+/* eslint-enable no-underscore-dangle */
+
+const rootErrorHandlers = {
+  onRecoverableError: recordRootErrorEvent('recoverable'),
+  ...(supportsReact19RootErrorCallbacks
+    ? {
+        onCaughtError: recordRootErrorEvent('caught'),
+        onUncaughtError: recordRootErrorEvent('uncaught'),
+      }
+    : {}),
+};
+
 ReactOnRails.setOptions({
   traceTurbolinks: true,
   turbo: true,
-  rootErrorHandlers: {
-    onRecoverableError: recordRootErrorEvent('recoverable'),
-    onCaughtError: recordRootErrorEvent('caught'),
-    onUncaughtError: recordRootErrorEvent('uncaught'),
-  },
+  rootErrorHandlers,
 });
 
 ReactOnRails.register({

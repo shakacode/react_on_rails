@@ -20,8 +20,22 @@ import { isRSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.t
 const getRecoverableErrorCause = (error: unknown): unknown =>
   error instanceof Error && 'cause' in error ? (error as Error & { cause?: unknown }).cause : undefined;
 
-const isRSCRouteSSRFalseBailout = (error: unknown): boolean =>
-  isRSCRouteSSRFalseBailoutError(error) || isRSCRouteSSRFalseBailoutError(getRecoverableErrorCause(error));
+const isRSCRouteSSRFalseBailout = (error: unknown): boolean => {
+  let current = error;
+  const seen = new Set<unknown>();
+  while (current != null) {
+    if (seen.has(current)) {
+      return false;
+    }
+    seen.add(current);
+
+    if (isRSCRouteSSRFalseBailoutError(current)) {
+      return true;
+    }
+    current = getRecoverableErrorCause(current);
+  }
+  return false;
+};
 
 /**
  * Builds an `onRecoverableError` root option that chains Pro's internal recoverable-error
@@ -37,6 +51,11 @@ const isRSCRouteSSRFalseBailout = (error: unknown): boolean =>
  * With no user handler, Pro still installs this wrapper so RSC hydrate roots preserve React's
  * default recoverable-error reporting while applying the bailout filter above. That is equivalent
  * to React's native default reporting but keeps Pro's filtering/chaining path uniform.
+ *
+ * User caution: this wrapper calls `defaultReportRecoverableError` before `next`, so a user
+ * `onRecoverableError` callback on Pro RSC hydrate roots should not call `reportError(error)` again.
+ * Core/non-RSC roots follow standard React semantics: a registered callback replaces React's default
+ * reporting and must re-report if the app needs `window.onerror`/`reportError` coverage.
  */
 export const chainRecoverableErrorHandlers =
   (

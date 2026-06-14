@@ -14,3 +14,7 @@
 <hr/>
 <h2>Client-rendered component that throws on demand (onUncaughtError)</h2>
 <%= react_component("RootErrorThrower", prerender: false, id: "RootErrorThrower-react-component-0") %>
+
+<hr/>
+<h2>Client-rendered component caught by an error boundary (onCaughtError)</h2>
+<%= react_component("RootErrorBoundaryThrower", prerender: false, id: "RootErrorBoundaryThrower-react-component-0") %>

@@ -313,8 +313,8 @@ describe('rootErrorHandlers', () => {
       expect(reportErrorSpy).toHaveBeenCalledWith(error);
 
       // The branded line is supplemental guidance: context + componentStack + guide link, no error dump.
-      expect(console.warn).toHaveBeenCalledTimes(1);
-      const [message] = (console.warn as jest.Mock).mock.calls[0] as [string];
+      expect(console.error).toHaveBeenCalledTimes(1);
+      const [message] = (console.error as jest.Mock).mock.calls[0] as [string];
       expect(message).toContain(
         'Recoverable hydration error in component "DevComponent" (dom id: "dev-dom-id")',
       );
@@ -333,7 +333,7 @@ describe('rootErrorHandlers', () => {
       options.onRecoverableError?.(error, undefined);
 
       expect(console.error).toHaveBeenCalledWith(error);
-      expect(console.warn).toHaveBeenCalledWith(
+      expect(console.error).toHaveBeenCalledWith(
         expect.stringContaining('Recoverable hydration error in component "X"'),
       );
     });
@@ -349,8 +349,8 @@ describe('rootErrorHandlers', () => {
       options.onRecoverableError?.(error, undefined);
 
       expect(reportErrorSpy).not.toHaveBeenCalled();
-      expect(console.warn).toHaveBeenCalledTimes(1);
-      expect(console.warn).toHaveBeenCalledWith(
+      expect(console.error).toHaveBeenCalledTimes(1);
+      expect(console.error).toHaveBeenCalledWith(
         expect.stringContaining('Recoverable hydration error in component "X"'),
       );
     });
@@ -360,7 +360,7 @@ describe('rootErrorHandlers', () => {
       setRailsContext('development');
       const callOrder: string[] = [];
       reportErrorSpy.mockImplementation(() => callOrder.push('defaultReport'));
-      (console.warn as jest.Mock).mockImplementation(() => callOrder.push('devLog'));
+      (console.error as jest.Mock).mockImplementation(() => callOrder.push('devLog'));
       module.setRootErrorHandlers({
         onRecoverableError: jest.fn(() => callOrder.push('user')),
       });

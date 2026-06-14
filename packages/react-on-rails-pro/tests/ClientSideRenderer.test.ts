@@ -428,16 +428,16 @@ describe('ClientSideRenderer', () => {
       expect(reportErrorSpy).toHaveBeenCalledTimes(1);
       expect(reportErrorSpy).toHaveBeenCalledWith(recoverableError);
 
-      // Exactly one console.warn: the branded supplemental guidance line (context + stack +
+      // Exactly one console.error: the branded supplemental guidance line (context + stack +
       // guide link), not a second full error dump.
-      const consoleWarnCalls = (console.warn as jest.Mock).mock.calls;
-      expect(consoleWarnCalls).toHaveLength(1);
-      const [message] = consoleWarnCalls[0] as [unknown];
+      const consoleErrorCalls = (console.error as jest.Mock).mock.calls;
+      expect(consoleErrorCalls).toHaveLength(1);
+      const [message] = consoleErrorCalls[0] as [unknown];
       expect(message).toEqual(expect.stringContaining('[ReactOnRails] Recoverable hydration error'));
       expect(message).toEqual(expect.stringContaining('"TestComponent"'));
       expect(message).toEqual(expect.stringContaining('dom-id-dev'));
       expect(message).toEqual(expect.stringContaining('Component stack:'));
-      expect(consoleWarnCalls[0]).toHaveLength(1);
+      expect(consoleErrorCalls[0]).toHaveLength(1);
 
       // The user callback still runs with the enriched context.
       expect(userOnRecoverableError).toHaveBeenCalledWith(recoverableError, errorInfo, {

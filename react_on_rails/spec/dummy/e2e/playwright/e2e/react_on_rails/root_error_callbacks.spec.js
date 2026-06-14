@@ -41,6 +41,11 @@ test.describe('React root error callbacks (rootErrorHandlers)', () => {
     page,
   }) => {
     await page.goto('/root_error_callbacks');
+    test.skip(
+      // eslint-disable-next-line no-underscore-dangle
+      !(await page.evaluate(() => window.__ROOT_ERROR_CALLBACK_SUPPORTS_REACT19__)),
+      'React 19 root error callbacks are not available in this matrix',
+    );
 
     const thrower = page.locator('#RootErrorThrower-react-component-0');
     await expect(thrower.getByRole('button', { name: 'Throw render error' })).toBeVisible();
@@ -56,5 +61,31 @@ test.describe('React root error callbacks (rootErrorHandlers)', () => {
     expect(event.componentName).toBe('RootErrorThrower');
     expect(event.domNodeId).toBe('RootErrorThrower-react-component-0');
     expect(event.message).toContain('Deliberate uncaught render error');
+  });
+
+  test('onCaughtError fires with component context when an error boundary catches the render error', async ({
+    page,
+  }) => {
+    await page.goto('/root_error_callbacks');
+    test.skip(
+      // eslint-disable-next-line no-underscore-dangle
+      !(await page.evaluate(() => window.__ROOT_ERROR_CALLBACK_SUPPORTS_REACT19__)),
+      'React 19 root error callbacks are not available in this matrix',
+    );
+
+    const thrower = page.locator('#RootErrorBoundaryThrower-react-component-0');
+    await expect(thrower.getByRole('button', { name: 'Throw boundary error' })).toBeVisible();
+
+    expect(await getEvents(page, 'caught')).toHaveLength(0);
+
+    await thrower.getByRole('button', { name: 'Throw boundary error' }).click();
+
+    await expect.poll(async () => (await getEvents(page, 'caught')).length).toBeGreaterThan(0);
+    await expect(thrower.getByRole('status')).toHaveText('Boundary caught render error');
+
+    const [event] = await getEvents(page, 'caught');
+    expect(event.componentName).toBe('RootErrorBoundaryThrower');
+    expect(event.domNodeId).toBe('RootErrorBoundaryThrower-react-component-0');
+    expect(event.message).toContain('Deliberate caught render error');
   });
 });
