@@ -61,9 +61,9 @@ Plan a PR batch
      repo. If no verified remote or URL can be resolved, use the PR Files API
      fallback before recording paths as `UNKNOWN`; do not diff the current
      checkout's default remote. Choose a session-unique temporary-ref suffix
-     first, such as `pr-N-<session-id>` where `<session-id>` is 8 lowercase hex
-     characters from `uuidgen` or a random token, so concurrent planners for the
-     same PR cannot overwrite each other's refs.
+     first, such as `pr-N-<session-id>` where `<session-id>` comes from
+     `openssl rand -hex 4` or another git-ref-safe random token, so concurrent
+     planners for the same PR cannot overwrite each other's refs.
      Fetch the current base branch and PR head into temporary refs without
      checking out untrusted PR code:
      `git fetch <verified-base-repo-url> refs/heads/<baseRefName>:refs/tmp/pr-N-<session-id>-base`
@@ -76,19 +76,21 @@ Plan a PR batch
      `headRefName` with a fully qualified source ref
      (`refs/heads/<headRefName>:refs/tmp/pr-N-<session-id>-head`) or use the PR
      Files API fallback. Treat `headRefName` as untrusted shell and refspec data:
-     validate it with `git check-ref-format --branch -- "$headRefName"` before
-     constructing a refspec, pass the refspec as one quoted shell argument or via
-     an argument-array API, and never interpolate a raw PR branch name into a
-     shell command. If validation fails, fall back to the PR Files API or
-     `UNKNOWN`; do not sanitize a failing branch name. A plain `git fetch origin`
-     does not fetch cross-fork heads unless `origin` has already been verified as
-     the PR's target repo.
+     validate it with `git check-ref-format --branch -- "$headRefName"` and
+     reject any name containing `:` before constructing a refspec, pass the
+     refspec as one quoted shell argument or via an argument-array API, and never
+     interpolate a raw PR branch name into a shell command. If validation fails,
+     fall back to the PR Files API or `UNKNOWN`; do not sanitize a failing branch
+     name. A plain `git fetch origin` does not fetch cross-fork heads unless
+     `origin` has already been verified as the PR's target repo.
      Run
      `git diff --name-status --find-renames refs/tmp/pr-N-<session-id>-base...refs/tmp/pr-N-<session-id>-head`;
      three-dot diffs from the merge-base, which matches GitHub's PR file list.
      If the three-dot diff fails because the merge base is missing in a shallow
-     clone, run `git fetch --deepen=50 <verified-base-repo-url>` once and retry
-     before falling back to the PR Files API.
+     clone, run a bounded deepen such as
+     `git fetch --deepen=200 <verified-base-repo-url>` and retry once before
+     falling back to the PR Files API; the deepen value is a best-effort
+     heuristic, not a guarantee.
      Delete the temporary refs on both success and failure, then proceed to the
      API fallback or `UNKNOWN` decision:
      `git update-ref -d refs/tmp/pr-N-<session-id>-base` and
@@ -104,7 +106,7 @@ Plan a PR batch
      API response is capped, incomplete, or unavailable. Use the API as the
      scheduling source only when the local diff cannot run. Run the API
      pipeline in one shell invocation with `pipefail` enabled, for example
-     `bash -o pipefail -c "gh api --paginate repos/OWNER/REPO/pulls/N/files -f per_page=100 | jq -s 'add // []'"`;
+     `bash -o pipefail -c 'gh api --paginate --method GET "repos/OWNER/REPO/pulls/N/files?per_page=100" | jq -s "add // []"'`;
      if either command fails, the response is an error-shaped object such as
      `{"message": ...}` / `{"errors": ...}`, or any row lacks `.filename`, record
      the paths as `UNKNOWN` instead of trusting an empty array from a broken
@@ -122,19 +124,23 @@ Plan a PR batch
      `changedFiles` is at or above that cap, or any row with `status: "renamed"`
      is missing
      `.previous_filename`, record the PR paths as `UNKNOWN` and treat the item
-     as serial. If the paginated count differs from `changedFiles`, re-read
-     `changedFiles` once before recording `UNKNOWN` so freshly pushed PRs do not
-     fail the sanity check on transient metadata lag. If counts still diverge
-     after the re-read, record paths as `UNKNOWN` and treat the item as serial.
+     as serial. If the paginated count differs from `changedFiles` in either
+     direction, re-read `changedFiles` once before recording `UNKNOWN` so freshly
+     pushed PRs do not fail the sanity check on transient metadata lag. If counts
+     still diverge after the re-read, record paths as `UNKNOWN` and treat the
+     item as serial; note any known submodule or binary-file count mismatch in
+     the Batch Plan instead of silently trusting an incomplete API path list.
    - File-touch map, issue path discovery: read the issue body, record proposed
      new paths from issue/design notes, and grep the repo to confirm existing
      paths. If paths cannot be determined from the issue body or design notes,
      record them as `UNKNOWN` and treat the item as serial.
    - File-touch map, collision and wave scheduling: items that affect the same
      path cannot run as parallel worktrees; keep only file-disjoint items in the
-     parallel first batch and sequence or defer collisions. An `UNKNOWN` item
-     runs as a serial "discovery lane" — a lane that first determines its real
-     paths instead of editing in parallel. Never run discovery lanes
+     parallel first batch and sequence or defer collisions. A directory rename
+     reserves descendants under both the old and new directory names, so any
+     create/delete/edit under either tree collides with that rename. An `UNKNOWN`
+     item runs as a serial "discovery lane" — a lane that first determines its
+     real paths instead of editing in parallel. Never run discovery lanes
      concurrently with active editor lanes. For items already in the scheduling
      set, complete discovery before the editor wave starts. If the coordinator
      adds items after an editor wave has already started, wait for that wave to
@@ -190,7 +196,7 @@ Preflight first: if this session cannot run workers without blocking approval pr
 
 Repository: OWNER/REPO
 Batch objective: ...
-File-touch map:
+File-touch map (one line per item; pick the applicable format):
 - PR/Issue #N -> changed/affected paths, including create/delete/rename (owner: lane/name)
 - PR/Issue #N -> summarized path pattern(s) plus collision-relevant exact paths/renames/deletes (owner: lane/name)
 - PR/Issue #N -> UNKNOWN (paths not determinable from issue body/design notes; treat as serial)
