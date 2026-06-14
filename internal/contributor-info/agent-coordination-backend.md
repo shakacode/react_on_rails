@@ -125,6 +125,7 @@ if (
 
   require_clean_agent_coord_checkout() {
     git -C "$AGENT_COORD_REPO" update-index -q --refresh || true
+    local untracked_files
 
     if ! git -C "$AGENT_COORD_REPO" diff --quiet --ignore-submodules -- ||
        ! git -C "$AGENT_COORD_REPO" diff --cached --quiet --ignore-submodules --; then
@@ -132,7 +133,12 @@ if (
       return 1
     fi
 
-    if git -C "$AGENT_COORD_REPO" ls-files --others --exclude-standard | grep -q .; then
+    if ! untracked_files="$(git -C "$AGENT_COORD_REPO" ls-files --others --exclude-standard)"; then
+      echo "agent-coordination checkout untracked-file scan failed" >&2
+      return 1
+    fi
+
+    if test -n "$untracked_files"; then
       echo "agent-coordination checkout has untracked files; commit, clean, or record dirty evidence" >&2
       return 1
     fi
