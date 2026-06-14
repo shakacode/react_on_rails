@@ -88,6 +88,7 @@ for (const benchmarkCase of cases) {
     compiled.runInContext(context);
   }, samples);
   // Intentionally after cachedMedian: this shared context has already warmed this script body.
+  // This biases Same/Precompiled toward 1.0, understating rather than overstating the advantage.
   const sameSourceRunMedian = measure(() => {
     vm.runInContext(source, context);
   }, samples);
@@ -125,6 +126,7 @@ console.log();
 console.log('Note: Same-source compile uses V8/Node compilation-cache behavior by default.');
 console.log('Same-source run also benefits from that cache after warmup.');
 console.log('Cached exec runs before same-source run, so the shared-context JIT is already warmer.');
+console.log('This biases Same/Precompiled toward 1.0: it understates, not overstates, the advantage.');
 console.log('Unique-source compile/run varies the source text each sample to show a colder path.');
 console.log('Same/Precompiled compares stable source text; Unique/Precompiled is colder-path contrast.');
 console.log('Run with `node --no-compilation-cache` to compare with V8 compilation caching disabled.');
