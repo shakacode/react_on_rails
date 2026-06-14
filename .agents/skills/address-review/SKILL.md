@@ -715,7 +715,7 @@ trap _cleanup_addr_review EXIT
 #   SCAN_SCOPE="since previous summary at ${REVIEW_CUTOFF_AT}"  # cutoff active
 #   SCAN_SCOPE="full history via check all reviews"              # CHECK_ALL_REVIEWS set
 # Set CUTOFF_SAFE=1 only after verifying the cutoff guard; leave 0 for a non-cutoff status.
-CUTOFF_SAFE=0
+CUTOFF_SAFE="${CUTOFF_SAFE:-0}"
 # Set OPTIONAL_OUTCOMES to bullets for optional items with recorded outcomes or
 # intentionally pending/unselected by the chosen action: fixed, explicitly
 # handled, autonomously deferred/declined, declined, deferred to tracking, or

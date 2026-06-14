@@ -215,21 +215,21 @@ contract unless a maintainer explicitly narrows the run.
   PR diff or directly cited by current review feedback; this excludes unrelated
   cleanup, other machine lanes, reserved files, generated output not already in
   scope, and separate workflow files that merely discuss the same concept.
-  The final-candidate debounce point begins when the agent writes a PR body,
-  PR comment, or handoff that names the current head as the merge-readiness or
-  final candidate, or when the agent pushes after completing the final local
-  validation/review gate and records that push as the candidate. Automatically
-  queued checks from ordinary fix-phase pushes do not count unless that push or
-  check set has been declared as the final readiness gate. Earlier incremental
-  per-file checks during the fix phase do not count.
+  The final-candidate debounce point begins when the agent explicitly
+  designates the current head as merge-ready or the final candidate in a PR
+  body, PR comment, or handoff, or when the agent pushes after completing the
+  final local validation/review gate and records that push as the candidate.
+  Automatically queued checks from ordinary fix-phase pushes do not count unless
+  that push or check set has been declared as the final readiness gate. Earlier
+  incremental per-file checks during the fix phase do not count.
   Behavior-preserving means wording, formatting, or mechanical
   whitespace/punctuation cleanup that does not alter public APIs, generated
   output, runtime behavior, validation scope, or the semantic meaning of any
-  document section under active review. Low-risk means local and mechanically
-  checkable, such as a formatter-confirmed cleanup; a rename that requires
-  searching all callers is not low-risk. Mechanical means deterministic and
-  local, such as rerunning a formatter or fixing whitespace introduced by the
-  nit, without reasoning about runtime behavior, callers, or policy.
+  section that has an unresolved review thread on it. Low-risk means local and
+  mechanically checkable, such as a formatter-confirmed cleanup; a rename that
+  requires searching all callers is not low-risk. Mechanical means deterministic
+  and local, such as rerunning a formatter or fixing whitespace introduced by
+  the nit, without reasoning about runtime behavior, callers, or policy.
   Qualifying examples: typo/comment punctuation, whitespace or trailing comma
   cleanup, or unambiguous documentation wording.
   Disqualifying examples: renaming a public method or constant, changing
