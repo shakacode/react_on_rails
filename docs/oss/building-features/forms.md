@@ -119,9 +119,10 @@ Every submit issues a `fetch` with:
 
 The CSRF token is read from the meta tag at submit time, so a token rendered
 with the page is picked up without any configuration. Your layout must render
-`<%= csrf_meta_tags %>` (the Rails default) — without the meta tag Rails
-rejects the submit as a forgery, and the hook logs a development-mode console
-warning. If your app rotates tokens during long-lived sessions, refresh the
+`<%= csrf_meta_tags %>` (the Rails default) — without the meta tag the hook
+throws before calling `fetch`, so the form cannot accidentally submit as an
+anonymous or reset session. If your app rotates tokens during long-lived
+sessions, refresh the
 meta tag (e.g., re-render it after sign-in) — the next submit reads the
 current value.
 
@@ -206,6 +207,9 @@ It renders `record.errors.messages` (any ActiveModel/ActiveRecord object) as
 `{ errors: { field: [messages] } }`. It is deliberately tiny: if your API
 already returns errors another way (JSON:API, custom serializers), keep it —
 just map your shape to the documented one at the endpoint the form posts to.
+Pass numeric HTTP status codes such as `400` or `422`; Rails status symbols are
+intentionally rejected so Rack/Rails status-symbol renames cannot change the
+wire response.
 Because those ActiveModel messages are sent to the browser verbatim, review
 custom validations for internal IDs, admin-only details, or security-sensitive
 wording before using the concern on a model.

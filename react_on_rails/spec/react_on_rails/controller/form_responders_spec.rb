@@ -56,5 +56,11 @@ RSpec.describe ReactOnRails::Controller::FormResponders do
 
       expect(controller_instance.rendered[:status]).to eq(400)
     end
+
+    it "rejects symbolic statuses so Rack/Rails status-symbol renames do not change behavior" do
+      expect do
+        controller_instance.render_model_errors(record, status: :unprocessable_entity)
+      end.to raise_error(ArgumentError, /Integer HTTP status/)
+    end
   end
 end

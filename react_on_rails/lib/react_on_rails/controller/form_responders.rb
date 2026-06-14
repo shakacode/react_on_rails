@@ -31,14 +31,18 @@ module ReactOnRails
       #
       # record: any object responding to `errors` with `ActiveModel::Errors`
       #         (or anything whose `errors` responds to `messages`).
-      # status: HTTP status for the response. Defaults to 422 (Unprocessable
-      #         Content), which is what the hook's error mapping keys on. The
-      #         numeric default sidesteps the Rack 3.1 rename of
-      #         :unprocessable_entity to :unprocessable_content.
+      # status: Numeric HTTP status for the response. Defaults to 422
+      #         (Unprocessable Content), which is what the hook's error mapping
+      #         keys on. Numeric statuses sidestep Rack/Rails status-symbol
+      #         renames such as :unprocessable_entity to :unprocessable_content.
       # SECURITY: ActiveModel error messages are sent to the browser verbatim.
       # Review custom validations for internal IDs, admin-only details, or
       # security-sensitive wording before using this on a model.
       def render_model_errors(record, status: 422)
+        unless status.is_a?(Integer)
+          raise ArgumentError, "render_model_errors status must be an Integer HTTP status code"
+        end
+
         render json: { errors: record.errors.messages }, status:
       end
     end

@@ -4,7 +4,7 @@
  *
  * The hook keeps Rails as the mutation layer: it wires up `fetch`, attaches the
  * CSRF token from the standard Rails `<meta name="csrf-token">` tag (via the
- * existing `authenticityHeaders` utility), sends/receives JSON, and maps the
+ * existing `authenticityToken` utility), sends/receives JSON, and maps the
  * blessed 422 validation-error shape — `{ errors: { field: ["message"] } }` —
  * onto per-field client state. The matching server side is the opt-in
  * `ReactOnRails::Controller::FormResponders#render_model_errors` concern in the
@@ -25,7 +25,7 @@
  */
 
 import * as React from 'react';
-import { authenticityHeaders, authenticityToken } from './Authenticity.ts';
+import { authenticityToken } from './Authenticity.ts';
 
 /** Per-field validation errors: `{ field: ["message", ...] }`. */
 export type RailsFormErrors = Record<string, string[]>;
@@ -166,6 +166,15 @@ const railsFormJsonHeaders = (customHeaders: Record<string, string> = {}): Recor
   };
 };
 
+const railsFormHeaders = (
+  csrfToken: string,
+  customHeaders?: Record<string, string>,
+): Record<string, string> => ({
+  ...railsFormJsonHeaders(customHeaders),
+  'X-CSRF-Token': csrfToken,
+  'X-Requested-With': 'XMLHttpRequest',
+});
+
 const toMessageArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
     return value.map(String);
@@ -250,8 +259,7 @@ const resolveSameOriginRequestUrl = (url: string): string | null => {
   }
 
   try {
-    const requestBase = typeof document === 'undefined' ? currentLocation.href : document.baseURI;
-    const resolvedUrl = new URL(url, requestBase);
+    const resolvedUrl = new URL(url, document.baseURI);
     if (
       (resolvedUrl.protocol === 'http:' || resolvedUrl.protocol === 'https:') &&
       resolvedUrl.origin === currentLocation.origin
@@ -413,6 +421,14 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
         throw new Error('useRailsForm can only submit to same-origin URLs.');
       }
 
+      const csrfToken = authenticityToken();
+      if (csrfToken === null) {
+        throw new Error(
+          'useRailsForm requires a <meta name="csrf-token"> tag before submitting. ' +
+            'Add <%= csrf_meta_tags %> to your Rails layout.',
+        );
+      }
+
       submissionIdRef.current += 1;
       const submissionId = submissionIdRef.current;
       const isCurrent = () => mountedRef.current && submissionId === submissionIdRef.current;
@@ -428,14 +444,6 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
       setWasSuccessful(false);
       setErrors({});
 
-      if (process.env.NODE_ENV !== 'production' && authenticityToken() === null) {
-        console.warn(
-          '[useRailsForm] No <meta name="csrf-token"> tag found. Rails will reject the ' +
-            'request as a forgery unless CSRF protection is disabled for this action. ' +
-            'Add <%= csrf_meta_tags %> to your layout.',
-        );
-      }
-
       let response: Response;
       try {
         response = await fetch(requestUrl, {
@@ -444,7 +452,7 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
           // Never follow redirects while carrying explicit CSRF headers; an
           // open redirect could otherwise leak the token to another origin.
           redirect: 'error',
-          headers: authenticityHeaders(railsFormJsonHeaders(options.headers)),
+          headers: railsFormHeaders(csrfToken, options.headers),
           // DELETE bodies are legal per RFC 9110 but are stripped or rejected by
           // many proxies/CDNs in practice — identify the resource in the URL.
           body: method === 'delete' ? undefined : JSON.stringify(dataRef.current),

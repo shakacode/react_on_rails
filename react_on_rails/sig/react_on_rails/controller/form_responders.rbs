@@ -4,7 +4,7 @@ module ReactOnRails
     module FormResponders
       # Renders ActiveModel errors as `{ errors: { field: [messages] } }` JSON
       # with HTTP 422 (by default).
-      def render_model_errors: (untyped record, ?status: Symbol | Integer) -> void
+      def render_model_errors: (untyped record, ?status: Integer) -> void
     end
   end
 end

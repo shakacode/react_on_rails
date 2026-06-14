@@ -120,6 +120,26 @@ describe('useRailsForm', () => {
       });
     });
 
+    it('rejects before fetch when the Rails CSRF meta tag is missing', async () => {
+      const csrfMeta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]');
+      csrfMeta?.remove();
+
+      try {
+        const { result } = renderHook(() => useRailsForm({ a: 1 }));
+
+        await act(async () => {
+          await expect(result.current.post('/things')).rejects.toThrow(/csrf-token/);
+        });
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(result.current.processing).toBe(false);
+      } finally {
+        if (csrfMeta) {
+          document.head.appendChild(csrfMeta);
+        }
+      }
+    });
+
     it('rejects cross-origin submit URLs before attaching CSRF headers', async () => {
       const { result } = renderHook(() => useRailsForm({ a: 1 }));
 
