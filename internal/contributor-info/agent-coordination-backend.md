@@ -172,6 +172,10 @@ Use stable agent ids that identify machine role, tool, and lane, for example
 `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
 
 ```bash
+: "${AGENT_ID:?set AGENT_ID, e.g. desktop-codex-lane1}"
+: "${TARGET_PR_NUMBER:?set TARGET_PR_NUMBER for the lane}"
+: "${BRANCH_NAME:?set BRANCH_NAME for the lane}"
+
 BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4)-coord-layer"
 BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX")
 # Set once at kickoff, include a short batch slug plus a unique suffix, and reuse for this batch.
@@ -182,10 +186,6 @@ printf 'Batch id file: %s\n' "$BATCH_ID_FILE"
 # BATCH_ID_FILE=/tmp/agent-coord-batch-id.coord-layer.abc123
 # BATCH_ID=$(cat "$BATCH_ID_FILE")
 # At batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
-
-: "${AGENT_ID:?set AGENT_ID, e.g. desktop-codex-lane1}"
-: "${TARGET_PR_NUMBER:?set TARGET_PR_NUMBER for the lane}"
-: "${BRANCH_NAME:?set BRANCH_NAME for the lane}"
 
 agent-coord heartbeat \
   --agent-id "$AGENT_ID" \
