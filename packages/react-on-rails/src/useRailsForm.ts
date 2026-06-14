@@ -179,6 +179,8 @@ const toMessageArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
     return value.map(String);
   }
+  // The documented Rails shape is string-or-string-array messages. Preserve
+  // unexpected custom-endpoint values visibly instead of silently dropping them.
   return [String(value)];
 };
 
@@ -232,7 +234,8 @@ const safeJsonRedirectHint = (redirectTo: string): string | null => {
 
   try {
     // Resolve JSON hints against the origin, not the current path: query-only
-    // hints such as `?saved=1` intentionally normalize to `/?saved=1`.
+    // hints such as `?saved=1` intentionally normalize to `/?saved=1`, and
+    // `posts/1` normalizes to `/posts/1` rather than `/current/page/posts/1`.
     const parsedRedirect = new URL(normalizedRedirect, currentOrigin);
     if (
       (parsedRedirect.protocol === 'http:' || parsedRedirect.protocol === 'https:') &&
@@ -252,9 +255,9 @@ const safeJsonRedirectHint = (redirectTo: string): string | null => {
 
 const resolveSameOriginRequestUrl = (url: string): string | null => {
   const currentLocation = typeof window === 'undefined' ? null : window.location;
-  if (currentLocation === null) {
-    // No browser origin is available in SSR/Node, so the same-origin CSRF
-    // guard cannot be enforced. Refuse the submit instead of guessing.
+  if (currentLocation === null || typeof document === 'undefined') {
+    // No browser origin/document is available in SSR/Node, so same-origin and
+    // CSRF guards cannot be enforced. Refuse the submit instead of guessing.
     return null;
   }
 

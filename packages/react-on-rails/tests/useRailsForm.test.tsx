@@ -170,6 +170,25 @@ describe('useRailsForm', () => {
       expect(result.current.processing).toBe(false);
     });
 
+    it('rejects submit URLs when the browser document is unavailable', async () => {
+      const { result } = renderHook(() => useRailsForm({ a: 1 }));
+      const originalDocumentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
+      Object.defineProperty(globalThis, 'document', { configurable: true, value: undefined });
+
+      try {
+        await act(async () => {
+          await expect(result.current.post('/things')).rejects.toThrow(/same-origin URLs/);
+        });
+      } finally {
+        if (originalDocumentDescriptor) {
+          Object.defineProperty(globalThis, 'document', originalDocumentDescriptor);
+        }
+      }
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.current.processing).toBe(false);
+    });
+
     it('rejects relative URLs that would resolve through a cross-origin base tag', async () => {
       const base = document.createElement('base');
       base.href = 'https://example.com/';

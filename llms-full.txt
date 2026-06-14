@@ -7301,6 +7301,10 @@ const form = useRailsForm(initialData);
 Per-submit `options`: `headers` (merged in; CSRF headers always win),
 `onSuccess(result)`, and `onError(errors)`.
 
+Calling `reset()` inside `onSuccess` starts a fresh editing cycle immediately, so
+`wasSuccessful` is also reset to `false`. Keep separate success-message state if
+the UI needs to keep showing a success banner after clearing the fields.
+
 Response handling:
 
 - **2xx** — `wasSuccessful` flips on, `errors` clears, and `onSuccess` receives
