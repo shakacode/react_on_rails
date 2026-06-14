@@ -72,6 +72,7 @@ const sidebars: SidebarsConfig = {
             'building-features/code-splitting',
             'building-features/react-helmet',
             'building-features/react-19-native-metadata',
+            'building-features/react-19-activity',
             'building-features/react-compiler',
             'building-features/view-transitions',
             'building-features/streaming-server-rendering',
