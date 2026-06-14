@@ -49,8 +49,7 @@ pma_scope_default_base_ref() {
   head_ref="$1"
 
   while IFS= read -r commit; do
-    # If multiple RC tags point at the same commit, git tag order is the tie-breaker.
-    tag="$(git tag --points-at "$commit" --list '*.rc.*' | head -n 1)"
+    tag="$(git tag --points-at "$commit" --list '*.rc.*' --sort=-version:refname | head -n 1)"
     if [ -n "$tag" ]; then
       printf '%s\n' "$tag"
       return 0
@@ -119,6 +118,7 @@ issues = ARGV.flat_map do |path|
 end
 
 seen = {}
+sanitize_tsv_field = ->(value) { value.to_s.tr("\t", " ") }
 issues.each do |issue|
   body = issue.fetch("body", "").to_s
   body.scan(/<!--\s*post-merge-audit-finding\s+v1\s*(.*?)-->/m).each do |match|
@@ -138,7 +138,14 @@ issues.each do |issue|
     next if seen[dedupe_key]
 
     seen[dedupe_key] = true
-    puts [fingerprint, issue_number, state, prs.join(","), audit, url].join("\t")
+    puts [
+      sanitize_tsv_field.call(fingerprint),
+      sanitize_tsv_field.call(issue_number),
+      sanitize_tsv_field.call(state),
+      prs.join(","),
+      sanitize_tsv_field.call(audit),
+      sanitize_tsv_field.call(url)
+    ].join("\t")
   end
 end
 RUBY

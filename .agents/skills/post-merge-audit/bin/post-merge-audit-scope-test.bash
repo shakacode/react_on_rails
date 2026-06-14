@@ -143,7 +143,7 @@ test_extract_issue_markers_from_json_keeps_fingerprint_state_and_affected_prs() 
     "number": 3842,
     "state": "CLOSED",
     "url": "https://github.com/shakacode/react_on_rails/issues/3842",
-    "body": "Resolved\n\n<!-- post-merge-audit-finding v1\naudit: 2026-06-14-post-rc\nfingerprint: pr-3724:changelog-server-bundle-load-error\naffected_prs: 3724, 3725\n-->"
+    "body": "Resolved\n\n<!-- post-merge-audit-finding v1\naudit: 2026-06-14\tpost-rc\nfingerprint: pr-3724:\tchangelog-server-bundle-load-error\naffected_prs: 3724, 3725\n-->"
   },
   {
     "number": 3900,
@@ -157,11 +157,11 @@ JSON
 
   expected="$(
     printf '%s\t%s\t%s\t%s\t%s\t%s' \
-      "pr-3724:changelog-server-bundle-load-error" \
+      "pr-3724: changelog-server-bundle-load-error" \
       "3842" \
       "CLOSED" \
       "3724,3725" \
-      "2026-06-14-post-rc" \
+      "2026-06-14 post-rc" \
       "https://github.com/shakacode/react_on_rails/issues/3842"
   )"
 
@@ -348,6 +348,7 @@ test_default_base_uses_nearest_rc_on_first_parent_history() {
   git -C "$repo" tag -a v1.0.0.rc.1 -m "first rc"
   git -C "$repo" commit --quiet --allow-empty -m "Second release candidate"
   git -C "$repo" tag -a v1.0.0.rc.2 -m "second rc"
+  git -C "$repo" tag -a v9.0.0.rc.2 -m "same commit higher rc"
   git -C "$repo" tag -a v9.0.0.rc.1 "$base" -m "newer tag on older rc"
   git -C "$repo" commit --quiet --allow-empty -m "Main line change (#4014)"
 
@@ -359,7 +360,7 @@ test_default_base_uses_nearest_rc_on_first_parent_history() {
   actual="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("to_audit").join(",")' <<< "$out")"
 
   rm -rf "$tmpdir"
-  assert_equals "v1.0.0.rc.2" "$base_ref" "nearest default base on first-parent history"
+  assert_equals "v9.0.0.rc.2" "$base_ref" "nearest default base on first-parent history"
   assert_equals "4014" "$actual" "nearest default-base to_audit"
 }
 
