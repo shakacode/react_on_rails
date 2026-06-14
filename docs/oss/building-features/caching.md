@@ -270,6 +270,8 @@ On every tagged cache write, the final cache key is appended to a per-tag index 
 
 - **Always set `expires_in` (or `expires_at`) on tagged entries.** It is the upper bound on how long a missed invalidation can serve stale HTML. In development, React on Rails Pro logs a warning when `cache_tags:` is used without an expiry.
 - **Use a shared cache store in production** — Redis or Memcached. With `:memory_store` the index is per-process, so `revalidate_tag` in one process cannot see entries written by another; with `:null_store` tags are inert.
+- **Keep cache deletion failures bounded by expiry.** `revalidate_tag` clears the tag index before deleting the indexed entries to reduce re-registration races. If the cache store raises during deletion, any surviving entries are orphaned from that tag and only expire via their own `expires_in`.
+- **Custom cache stores must honor `namespace: nil` in `delete_multi` and `delete`.** The tag index records the fully namespaced logical keys that Rails wrote, then suppresses the store default namespace at delete time. Stores that ignore `options[:namespace]` can silently miss tag-revalidation deletes.
 
 Two config knobs bound the index (defaults shown):
 

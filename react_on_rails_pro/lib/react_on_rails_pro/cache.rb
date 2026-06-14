@@ -116,6 +116,7 @@ module ReactOnRailsPro
         return true if tag.nil?
         return true if unpersisted_record_tag?(tag)
         return tag.cache_key.blank? if tag.respond_to?(:cache_key)
+        return tag.to_s.blank? if tag.is_a?(Symbol)
 
         tag.blank?
       end

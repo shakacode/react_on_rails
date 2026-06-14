@@ -39,6 +39,13 @@ module ReactOnRailsPro
       # points at, so an entry never outlives its index registration.
       INDEX_TTL_SLACK = 300 # 5 minutes, in seconds
       MAX_EXPIRY_WARN_KEYS = 1_000
+      # The private Store methods normalized_entry_key reproduces. Custom or
+      # future stores missing any of these fall back to the raw cache key
+      # (with a one-time warning) instead of failing registration silently.
+      # Re-run the standard-store canary when adding a new ActiveSupport minor;
+      # these methods are private even though they have been stable across the
+      # Rails versions covered by this PR.
+      PRIVATE_KEY_METHODS = %i[expanded_key namespace_key merged_options].freeze
       @warned_missing_expiry_cache_keys = {}
       @warned_missing_expiry_mutex = Mutex.new
       @warned_private_key_api = {}
@@ -231,6 +238,8 @@ module ReactOnRailsPro
           @warned_missing_expiry_cache_keys ||= {}
           @warned_missing_expiry_mutex.synchronize do
             next false if @warned_missing_expiry_cache_keys[entry_key]
+            # Bound per-process warning memory. Once full, new keys skip this
+            # development warning; :expires_in remains the operator contract.
             next false if @warned_missing_expiry_cache_keys.size >= MAX_EXPIRY_WARN_KEYS
 
             @warned_missing_expiry_cache_keys[entry_key] = true
@@ -264,14 +273,6 @@ module ReactOnRailsPro
           end
         end
 
-        # The private Store methods normalized_entry_key reproduces. Custom or
-        # future stores missing any of these fall back to the raw cache key
-        # (with a one-time warning) instead of failing registration silently.
-        # Re-run the FileStore round-trip canary when adding a new ActiveSupport
-        # minor; these methods are private even though they have been stable
-        # across the Rails versions covered by this PR.
-        PRIVATE_KEY_METHODS = %i[expanded_key namespace_key merged_options].freeze
-
         def merged_cache_options(cache_options)
           cache_options ||= {}
           cache_options = supported_expiry_options(cache_options)
@@ -300,8 +301,9 @@ module ReactOnRailsPro
           # prefers #cache_key_with_version and prepends RAILS_CACHE_ID, both
           # of which would record a name the store never used. Reaching into
           # these private Store methods is the only way to reproduce the
-          # store's naming; all three have been stable across ActiveSupport
-          # versions for years.
+          # store's naming. The canary spec below covers MemoryStore/FileStore
+          # semantics against the bundled ActiveSupport version so Rails
+          # upgrades fail loudly if this private API drifts.
           store = Rails.cache
           unless PRIVATE_KEY_METHODS.all? { |method_name| store.respond_to?(method_name, true) }
             warn_missing_private_key_api(store)

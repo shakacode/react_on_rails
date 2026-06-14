@@ -243,6 +243,29 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       end
     end
 
+    it "canaries private Rails store key API semantics for standard stores" do
+      Dir.mktmpdir do |dir|
+        stores = {
+          memory: ActiveSupport::Cache::MemoryStore.new(namespace: "store-ns"),
+          file: ActiveSupport::Cache::FileStore.new(dir, namespace: "store-ns")
+        }
+
+        stores.each do |store_name, store|
+          aggregate_failures(store_name) do
+            described_class::PRIVATE_KEY_METHODS.each do |method_name|
+              expect(store.respond_to?(method_name, true)).to be(true)
+            end
+
+            expanded = store.send(:expanded_key, ["entry", "array", 42])
+            options = store.send(:merged_options, namespace: "call-ns")
+
+            expect(expanded).to eq("entry/array/42")
+            expect(store.send(:namespace_key, expanded, options)).to eq("call-ns:entry/array/42")
+          end
+        end
+      end
+    end
+
     it "deletes entries written under a cache_options namespace" do
       Rails.cache.write("entry/one", "one", namespace: "rorp-test")
       described_class.register(["t"], "entry/one", { namespace: "rorp-test" })
@@ -458,7 +481,7 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
 
     it "treats blank tags in revalidate_tags as a no-op returning 0" do
       expect(ReactOnRailsPro.revalidate_tag(nil)).to eq(0)
-      expect(ReactOnRailsPro.revalidate_tags(nil, "", "   ", [])).to eq(0)
+      expect(ReactOnRailsPro.revalidate_tags(nil, "", "   ", :"   ", [])).to eq(0)
     end
 
     it "treats objects with blank cache keys as no-ops at the revalidation boundary" do
