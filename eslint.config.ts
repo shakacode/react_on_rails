@@ -16,6 +16,26 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 });
 
+// v6.1.1 does not expose a flat preset for these compiler-era Rules-of-React
+// checks. Revisit this explicit list when bumping eslint-plugin-react-hooks.
+const reactCompilerRulesOfReact = {
+  'react-hooks/static-components': 'error',
+  'react-hooks/use-memo': 'error',
+  'react-hooks/component-hook-factories': 'error',
+  'react-hooks/preserve-manual-memoization': 'error',
+  'react-hooks/incompatible-library': 'warn',
+  'react-hooks/immutability': 'error',
+  'react-hooks/globals': 'error',
+  'react-hooks/refs': 'error',
+  'react-hooks/set-state-in-effect': 'error',
+  'react-hooks/error-boundaries': 'error',
+  'react-hooks/purity': 'error',
+  'react-hooks/set-state-in-render': 'error',
+  'react-hooks/unsupported-syntax': 'warn',
+  'react-hooks/config': 'error',
+  'react-hooks/gating': 'error',
+} as const;
+
 const config = defineConfig([
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
@@ -366,6 +386,12 @@ const config = defineConfig([
       // Some tests validate error conditions without explicit assertions
       'jest/expect-expect': 'off',
     },
+  },
+  {
+    // Mirrors the Babel `sources` predicate in react_on_rails/spec/dummy/babel.config.js.
+    // Keep these two in sync if the component is renamed or moved.
+    files: ['react_on_rails/spec/dummy/client/app/startup/ReactCompilerExample.tsx'],
+    rules: reactCompilerRulesOfReact,
   },
   // must be the last config in the array
   // https://github.com/prettier/eslint-plugin-prettier?tab=readme-ov-file#configuration-new-eslintconfigjs

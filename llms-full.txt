@@ -5953,7 +5953,7 @@ SOURCE: docs/oss/building-features/react-compiler.md
 
 # React Compiler with React on Rails
 
-[React Compiler](https://react.dev/learn/react-compiler) (stable **v1.0**, shipped 2025-10-07) is a build-time tool that adds **automatic memoization** to your components. It removes most hand-written `useMemo` / `useCallback` / `React.memo` boilerplate and cuts unnecessary re-renders — a free runtime-performance and DX win that costs you only a build-config change.
+[React Compiler](https://react.dev/learn/react-compiler) (stable **v1.0**, shipped 2025-10-07) is a build-time tool that adds **automatic memoization** to your components. It cuts unnecessary re-renders and much of the hand-written `useMemo` / `useCallback` / `React.memo` boilerplate.
 
 Because the Compiler is versioned independently of React itself, it works on React on Rails' current `react`/`react-dom` `~19.0.x` pin. You do **not** need to wait for a React 19.2 bump to adopt it.
 
@@ -5964,6 +5964,7 @@ React on Rails delegates JavaScript/TypeScript transforms to your app's build to
 - **Babel path is canonical and verified.** Add `babel-plugin-react-compiler` to your `babel.config.js`, ordered **first**. The compiler-memoized output builds and server-renders correctly.
 - **SWC path is experimental — not recommended for production yet.** As of June 2026 there is no first-party SWC React Compiler plugin; only a brand-new, pre-1.0 third-party Wasm plugin exists. See [Rspack + SWC path](#rspack--swc-path-experimental).
 - **Scope it.** Both paths let you gate the compiler to specific files via the `sources` option. Start scoped to a few components, verify SSR, then widen.
+- **RSC boundaries are opt-in from the client side.** Compile `'use client'` islands, keep Server Components directive-free, and verify the RSC payload path separately.
 
 ## Prerequisites
 
@@ -5988,7 +5989,7 @@ yarn add --dev babel-plugin-react-compiler@^1.0.0
 
 ### 2. Add the plugin to `babel.config.js`, ordered FIRST
 
-The React Compiler **must run before every other Babel plugin and preset** so it sees your original source before any other transform rewrites it (per the [React docs](https://react.dev/learn/react-compiler/installation)). In Babel, plugins run before presets, and within the `plugins` array they run in order — so the compiler must be the **first entry in `plugins`**.
+The React Compiler **must run before every other Babel plugin and preset** so it sees your original source before another transform rewrites it (per the [React docs](https://react.dev/learn/react-compiler/installation)). In Babel, make it the **first entry in `plugins`**.
 
 A typical React on Rails `babel.config.js` builds on Shakapacker's preset. Prepend the compiler:
 
@@ -6017,9 +6018,9 @@ module.exports = function createBabelConfig(api) {
 
 ### 3. (Recommended) Scope the compiler with `sources`
 
-You usually do not want to flip the compiler on for your entire app in one step — it changes the output of every component and can surface latent Rules-of-React violations. The plugin's `sources` option accepts **either an array of strings or a predicate `(filename) => boolean`**.
+Avoid enabling the compiler for the whole app in one step: it changes every component's output and can surface latent Rules-of-React violations. The `sources` option accepts **either an array of strings or a predicate `(filename) => boolean`**.
 
-The array form is **not glob-based**: each entry is matched as a plain filename **substring** (the plugin checks whether the absolute filename _contains_ the string), so a literal `**` glob like `client/app/**/*.tsx` matches no real path and would silently skip every component. Use the predicate form when you want precise control — it receives the absolute filename and returns `true` to opt a file in:
+The array form is **not glob-based**: each entry is matched as a filename **substring**, so a literal `**` glob like `client/app/**/*.tsx` matches no real path and silently skips every component. Use the predicate form for precise control:
 
 ```js
 resultConfig.plugins = [
@@ -6035,7 +6036,7 @@ resultConfig.plugins = [
 ];
 ```
 
-Start scoped, verify SSR and your tests, then widen the predicate (or drop `sources` to compile everything).
+Start scoped, verify SSR and tests, then widen the predicate (or drop `sources`).
 
 ### 4. Build and verify
 
@@ -6068,6 +6069,31 @@ This was verified end-to-end: a compiler-memoized example component (`ReactCompi
 
 If you adopt the compiler, keep verifying SSR for your own components — especially any that read browser-only globals at render time, which is a Rules-of-React violation independent of the compiler.
 
+## RSC boundary example
+
+The React Compiler applies only to Client Components (`'use client'`). Keep Server Components directive-free and outside the `sources` predicate:
+
+```tsx
+// components/compiler-ready/Picker.client.tsx
+'use client';
+
+import { useState } from 'react';
+
+export function Picker() {
+  const [quantity, setQuantity] = useState(1);
+  return <button onClick={() => setQuantity((value) => value + 1)}>{quantity}</button>;
+}
+
+// ror-auto-load-components/RscProduct.tsx
+import { Picker } from '../components/compiler-ready/Picker.client';
+
+export default function RscProduct() {
+  return <Picker />;
+}
+```
+
+Scope `sources` to `components/compiler-ready/` before widening it.
+
 ## Rspack + SWC path (experimental)
 
 Many React on Rails teams use Rspack with SWC for build speed (see the [Babel → SWC migration guide](../migrating/babel-to-swc-migration.md)). Unfortunately, the SWC React Compiler story is **not production-viable as of June 2026**:
@@ -6086,6 +6112,7 @@ The standard dummy app (`react_on_rails/spec/dummy`) ships a scoped, runnable re
 - **Component:** `client/app/startup/ReactCompilerExample.tsx` — a non-RSC component written with **no** manual memoization.
 - **Babel wiring:** `babel.config.js` adds `babel-plugin-react-compiler` **first**, gated behind `REACT_COMPILER=1` and scoped via `sources` to just `ReactCompilerExample`, so the default build (which uses SWC) and the existing test suite are unaffected.
 - **View / route:** `app/views/pages/react_compiler_example.html.erb` + the `react_compiler_example` route render it with `prerender: true` (SSR + hydration).
+- **Lint wiring:** the root flat ESLint config uses `eslint-plugin-react-hooks` v6 and enables the compiler Rules-of-React checks for this scoped compiler example.
 
 Build it with the compiler on (Babel path):
 
@@ -6101,8 +6128,6 @@ The compiler is **off by default**, so nothing changes for the normal SWC build.
 
 These are intentionally deferred and tracked separately:
 
-- **ESLint v6 / compiler lint rules.** The Compiler's "Rules of React" lint rules ship in `eslint-plugin-react-hooks` **v6**; this repo is on `^5.2.0`. Bumping ESLint and wiring the rules is a separate change (it has flat-config implications) and is not part of this recipe.
-- **RSC (React Server Components).** Auto-memoization across the `'use client'` / `'use server'` boundary is the highest-risk surface and needs a real RSC dummy build, not extrapolation. A non-RSC recipe ships first; the RSC example/verification is a follow-up.
 - **Performance benchmark.** A concrete before/after re-render / interaction-latency benchmark to quantify the win is a follow-up.
 
 ## References
