@@ -87,6 +87,10 @@ class PrMergeLedger
     (?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?
     (?:\s|:|-|/|$)
   }ix
+  SUMMARY_TRAILING_PRIORITY_PATTERN = %r{
+    \b(?:fixed|resolved|waived)\s+
+    (?:#{PRIORITY_MARKER_PATTERN.source})(?:\s|:|-|/|$)
+  }ix
 
   class Error < StandardError; end
 
@@ -471,6 +475,7 @@ class PrMergeLedger
   end
 
   def unresolved_current_head_thread?(thread)
+    # Truncated comment pages are reported through unknown_fields instead of counted from partial evidence.
     thread.fetch("comments_complete") && !thread.fetch("is_resolved") && thread.fetch("current_head")
   end
 
@@ -609,7 +614,10 @@ class PrMergeLedger
     return false unless summary.match?(FINDING_SUMMARY_SUBJECT_PATTERN)
     return false unless resolved_finding_summary_clause?(summary)
 
-    additional_finding_summary_clauses(summary).all? do |clause|
+    additional_clauses = additional_finding_summary_clauses(summary)
+    return false if hidden_additional_priority?(summary, additional_clauses)
+
+    additional_clauses.all? do |clause|
       resolved_finding_summary_clause?(clause)
     end
   end
@@ -628,9 +636,21 @@ class PrMergeLedger
 
   def resolved_finding_summary_clause?(summary)
     first_clause = summary.split(/[.;(]/, 2).first.to_s
+    return false if first_clause.match?(SUMMARY_TRAILING_PRIORITY_PATTERN)
     return false if first_clause.match?(NEGATED_SUMMARY_RESOLUTION_PATTERN)
 
     first_clause.match?(FINDING_SUMMARY_RESOLUTION_PATTERN)
+  end
+
+  def hidden_additional_priority?(summary, additional_clauses)
+    rest = summary.split(/[.;(]/, 2)[1]
+    return false unless rest
+
+    priority_marker_count(rest) > additional_clauses.sum { |clause| priority_marker_count(clause) }
+  end
+
+  def priority_marker_count(text)
+    text.to_s.scan(PRIORITY_MARKER_PATTERN).length
   end
 
   def disposition_for(finding, dispositions, used_disposition_keys)
@@ -1059,7 +1079,8 @@ class PrMergeLedger
     end
 
     def graphql(query, variables)
-      args = ["api", "graphql", "-f", "owner=#{@owner}", "-f", "name=#{@name}", "-f", "query=#{query}"]
+      args = ["api", "graphql", "--retry", "3", "-f", "owner=#{@owner}", "-f", "name=#{@name}", "-f",
+              "query=#{query}"]
       variables.each do |key, value|
         next if value.nil?
 

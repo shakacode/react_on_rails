@@ -1990,6 +1990,104 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks period-separated resolved summaries with later open priority items" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "period-mixed-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/period-mixed-review",
+          "body" => "P2 findings resolved. Please also fix P1 regression."
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-period-mixed-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P2])
+      expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
+        ["P2 findings resolved. Please also fix P1 regression."]
+      )
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN])
+    end
+  end
+
+  it "blocks whitespace-separated mixed severity summary lines with open priority items" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "space-mixed-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/space-mixed-review",
+          "body" => "P2 issues fixed P1 still open"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-space-mixed-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P2])
+      expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
+        ["P2 issues fixed P1 still open"]
+      )
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN])
+    end
+  end
+
   it "blocks conjunction-separated mixed severity summary lines with open priority items" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -3243,6 +3341,11 @@ RSpec.describe "script/pr-merge-ledger" do
   it "prints GraphQL response errors from gh API calls" do
     fake_gh = <<~SH
       #!/bin/sh
+      case " $* " in
+        *" --retry 3 "*) ;;
+        *) printf '%s\\n' 'missing --retry 3' >&2; exit 42 ;;
+      esac
+
       cat <<'JSON'
       {"data":null,"errors":[{"message":"rate limit exceeded"},{"message":"bad credentials"}]}
       JSON
@@ -3367,7 +3470,9 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(schema.dig("$defs", "pull_request_ledger", "required")).to include("issue_comments")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "violations", "type")).to eq("array")
     expect(schema.dig("$defs", "violation", "additionalProperties")).to be(false)
-    expect(schema.dig("$defs", "violation", "properties")).to include("path", "line")
+    expect(schema.dig("$defs", "violation", "properties")).to include(
+      "path", "line", "reviewer", "head_sha", "current_head"
+    )
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "unknown_fields", "type")).to eq("array")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "complete_allowed", "type")).to eq("boolean")
   end
