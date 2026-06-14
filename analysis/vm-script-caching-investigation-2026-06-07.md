@@ -4,72 +4,83 @@ Related issue: [#3282](https://github.com/shakacode/react_on_rails/issues/3282)
 
 ## Verdict
 
-| Area                      | Status         | Finding                                                                               |
-| ------------------------- | -------------- | ------------------------------------------------------------------------------------- |
-| vm.Script caching benefit | **Not needed** | Execution time dominates; compile overhead is negligible for real workloads           |
-| Hypothesis from #3282     | Refuted        | Expected ~3ms savings not achievable — real compile cost is <15μs even for 500KB code |
-| Implementation effort     | Not justified  | Adds complexity for <0.01% improvement on actual render paths                         |
+| Area                      | Status                                | Finding                                                                                                           |
+| ------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| vm.Script caching benefit | **Not supported by current evidence** | Exploratory microbenchmarks show same-source cache hits and colder unique-source compiles behave very differently |
+| Hypothesis from #3282     | Not demonstrated as raw compile cost  | The original ~3ms observation was not reproduced with its original harness                                        |
+| Implementation effort     | Not justified without stronger signal | Adds cache invalidation and memory-management complexity before a production-like win is proven                   |
 
 ## Executive Summary
 
-Issue #3282 proposed caching pre-compiled `vm.Script` objects to save the ~3ms "per-request JS-parse cost" observed in profiling. We ran controlled benchmarks isolating V8 compilation cost and found:
+Issue #3282 proposed caching pre-compiled `vm.Script` objects to save the ~3ms "per-request JS-parse cost" observed in profiling. This note measured isolated `vm.Script` compilation, cached execution, and repeated `vm.runInContext` execution on macOS arm64. It did **not** reproduce the original #3282 profiling harness or a Linux x86_64 production-like environment.
 
-1. **V8 compilation is extremely fast**: ~26μs per MB of code
-2. **Execution time dominates**: Scripts with real computation show only 1.02-1.08x speedup from caching
-3. **The 3ms observed** was likely execution time, not parse time
+Directly measured in this investigation:
 
-Caching `vm.Script` is only beneficial for scripts that:
+1. **Isolated compile/setup medians need caveats**: original raw medians were 0.5-3.8μs, with a clearly noisy 650 KB row at 0.83μs; a 2026-06-13 reproduction separated hot same-source cache hits from colder unique-source compiles and measured much larger values for the unique-source path, including a 662 KB generated script in the high single-digit to low double-digit milliseconds on Apple M5 Max.
+2. **Execution time dominated these synthetic scripts**: scripts with real computation showed roughly 1.00-1.08x speedup from caching, often within measurement noise.
+3. **No portable throughput constant was established**: the measurements are useful as exploratory evidence, not as a precise "μs per MB" claim.
 
-- Execute in <1μs (trivial expressions)
-- Run 100+ times with identical code
-- Have minimal actual computation
+Inferred, not directly measured here:
 
-The render template in react_on_rails_pro does real work (React rendering, props serialization, DOM diffing) — execution will always dominate, making compilation overhead irrelevant.
+1. The original ~3ms #3282 observation likely included work other than raw `new vm.Script(...)` compilation, such as React execution, props handling, context setup, or profiler warmup effects.
+2. A production-like Linux x86_64 benchmark could still find a meaningful compile/cache signal, but this analysis did not produce that evidence.
 
-## Benchmark Environment
+Caching `vm.Script` is most likely to matter when most of these heuristics hold:
+
+- Execution is extremely small, often near the low-microsecond range.
+- The exact same source text runs many times.
+- Actual computation is minimal enough that compile cost remains visible.
+
+The render template in react_on_rails_pro does real work (React rendering and props serialization). The available evidence says execution is likely to dominate; it does not prove that every production workload has zero measurable benefit from `vm.Script` caching.
+
+## Original Benchmark Environment
 
 - **Runtime**: Node.js v22.12.0
 - **OS**: macOS Darwin (arm64)
 - **CPU**: Apple M1
 - **Methodology**: 5000 measurements per subject (1000 iterations × 5 trials, interleaved A/B)
 
+## Reproducibility Note
+
+The original local experiment bundle was an ephemeral `tmp/` path and was not retained. A narrow standalone reproduction script is now committed as [`analysis/vm-script-caching-repro-2026-06-13.mjs`](vm-script-caching-repro-2026-06-13.mjs). It is intended to reproduce the shape of the microbenchmark, not to establish portable production throughput. The example reproduction output below was captured on an Apple M5 Max host, not the original Apple M1 host.
+
 ## Key Results
 
 ### 1. Compilation Cost vs Code Size
 
-| Code Size | Compile Time | Cached Exec | Uncached Exec | Speedup   |
-| --------- | ------------ | ----------- | ------------- | --------- |
-| 60 chars  | 0.54μs       | 0.62μs      | 1.37μs        | **2.2x**  |
-| 8 KB      | 0.54μs       | 38.04μs     | 38.54μs       | **1.01x** |
-| 69 KB     | 2.75μs       | 400.12μs    | 404.00μs      | **1.01x** |
-| 650 KB    | 0.83μs       | 2016.46μs   | 2016.25μs     | **1.00x** |
+| Code Size | Compile Time | Cached Exec | RunInContext Exec | Speedup   | Interpretation              |
+| --------- | ------------ | ----------- | ----------------- | --------- | --------------------------- |
+| 60 chars  | 0.54μs       | 0.62μs      | 1.37μs            | **2.2x**  | Trivial script              |
+| 8 KB      | 0.54μs       | 38.04μs     | 38.54μs           | **1.01x** | Noise-band difference       |
+| 69 KB     | 2.75μs       | 400.12μs    | 404.00μs          | **1.01x** | Noise-band difference       |
+| 650 KB    | 0.83μs       | 2016.46μs   | 2016.25μs         | **1.00x** | Internally inconsistent row |
 
-**Observation**: For scripts with real execution time (38μs+), caching provides <1% improvement because compilation (0.5-3μs) is noise compared to execution.
+**Observation**: For scripts with real execution time (38μs+), cached execution and repeated same-source `vm.runInContext` differed by mostly <1%. The 650 KB compile median is lower than the 69 KB median, so it should be treated as timer and benchmark noise. This table does not support a precise per-MB compilation-throughput claim.
 
 ### 2. Parse Complexity Analysis
 
 Different AST patterns were tested to find maximum parse cost:
 
-| Pattern           | Code Size | Compile Time | Size Needed for 1ms Compile |
+| Pattern           | Code Size | Compile Time | 1ms Threshold               |
 | ----------------- | --------- | ------------ | --------------------------- |
-| Nested objects    | 2.7 KB    | 1.0μs        | **2.6 MB**                  |
-| Generators        | 9 KB      | 1.2μs        | 7.3 MB                      |
-| Class definitions | 16 KB     | 1.4μs        | 11.2 MB                     |
-| Regex literals    | 29 KB     | 1.8μs        | 15.4 MB                     |
-| String literals   | 111 KB    | 3.8μs        | 27.6 MB                     |
+| Nested objects    | 2.7 KB    | 1.0μs        | Not reliably estimated here |
+| Generators        | 9 KB      | 1.2μs        | Not reliably estimated here |
+| Class definitions | 16 KB     | 1.4μs        | Not reliably estimated here |
+| Regex literals    | 29 KB     | 1.8μs        | Not reliably estimated here |
+| String literals   | 111 KB    | 3.8μs        | Not reliably estimated here |
 
-**Observation**: Even the most expensive parsing pattern (deeply nested objects) requires 2.6 MB of code to reach 1ms compile time. This is unrealistic for render templates.
+**Observation**: These generated AST patterns also landed in the low-microsecond range, but the data is too noisy to estimate a production 1ms compile threshold from this table.
 
 ### 3. Execution Count Scaling
 
 How much time is saved across N executions of a trivial script (32 chars)?
 
-| Executions | Cached Total | Uncached Total | Time Saved |
-| ---------- | ------------ | -------------- | ---------- |
-| 10         | 15μs         | 33μs           | 18μs       |
-| 100        | 112μs        | 183μs          | 71μs       |
-| 1,000      | 627μs        | 1,410μs        | 784μs      |
-| 10,000     | 3,844μs      | 11,043μs       | **7.2ms**  |
+| Executions | Cached Total | RunInContext Total | Time Saved |
+| ---------- | ------------ | ------------------ | ---------- |
+| 10         | 15μs         | 33μs               | 18μs       |
+| 100        | 112μs        | 183μs              | 71μs       |
+| 1,000      | 627μs        | 1,410μs            | 784μs      |
+| 10,000     | 3,844μs      | 11,043μs           | **7.2ms**  |
 
 **Observation**: Need ~10,000 executions of trivial scripts to save 7ms total. The render template runs once per request — no amortization possible.
 
@@ -77,29 +88,29 @@ How much time is saved across N executions of a trivial script (32 chars)?
 
 Scripts that do real work (object creation, loops, array operations):
 
-| Script Type             | Cached/exec | Uncached/exec | Speedup   |
-| ----------------------- | ----------- | ------------- | --------- |
-| Trivial (return 1+1)    | 0.37μs      | 1.05μs        | 2.8x      |
-| Light (loop 10x)        | 0.47μs      | 1.17μs        | 2.5x      |
-| Medium (100 sqrt calls) | 12.87μs     | 13.80μs       | **1.07x** |
-| Heavy (1000 objects)    | 39.15μs     | 39.99μs       | **1.02x** |
+| Script Type             | Cached/exec | RunInContext/exec | Speedup   |
+| ----------------------- | ----------- | ----------------- | --------- |
+| Trivial (return 1+1)    | 0.37μs      | 1.05μs            | 2.8x      |
+| Light (loop 10x)        | 0.47μs      | 1.17μs            | 2.5x      |
+| Medium (100 sqrt calls) | 12.87μs     | 13.80μs           | **1.07x** |
+| Heavy (1000 objects)    | 39.15μs     | 39.99μs           | **1.02x** |
 
-**Observation**: The moment execution time exceeds ~5μs, caching benefit drops to noise levels.
+**Observation**: In these synthetic cases, once execution time exceeded a few microseconds, caching benefit dropped into measurement noise.
 
-## Why the Original 3ms Estimate Was Wrong
+## What the Original 3ms Estimate Did and Did Not Show
 
 Issue #3282 stated:
 
 > Per-request JS-parse cost: ~3 ms
 
-This measurement likely included:
+This investigation did not rerun the original profiling harness, so it cannot prove what the original number contained. Based on the isolated microbenchmarks above, the ~3ms "parse" attribution likely included one or more non-compile costs:
 
 1. **React component evaluation** (function execution, not parsing)
 2. **Props serialization** (JSON stringify/parse overhead)
 3. **Context creation** (`vm.createContext` cost, not `vm.Script` compile)
 4. **JIT warmup** artifacts in the profiling
 
-Our isolated benchmark shows V8 parses 1MB of JavaScript in ~26μs. A 200-byte template (post-#3281) would compile in <1μs.
+The corrected conclusion is narrower: the available isolated measurements did not reproduce a raw `vm.Script` compile cost anywhere near 3ms. They do not, by themselves, prove that a 200-byte post-#3281 render template would always compile in less than 1μs on every runtime and host.
 
 ## Scripts That Would Benefit (Not Our Use Case)
 
@@ -132,39 +143,69 @@ const render = new vm.Script(`
 
 ## Decision Framework
 
-| Condition                        | Cache vm.Script? |
-| -------------------------------- | ---------------- |
-| Script execution < 1μs           | Yes              |
-| Script execution > 10μs          | No               |
-| Script runs 1x per request       | No               |
-| Script is pure config/expression | Yes              |
-| Script does React rendering      | **No**           |
+| Condition                        | Cache signal                       |
+| -------------------------------- | ---------------------------------- |
+| Script execution near 1μs        | Strongest chance of a visible win  |
+| Script execution above ~10μs     | Usually diluted by execution cost  |
+| Script runs 1x per request       | Usually not enough reuse by itself |
+| Script is pure config/expression | More plausible                     |
+| Script does React rendering      | Needs production-like proof first  |
 
 ## Recommendation
 
-**Close issue #3282 as "won't implement".**
+**Keep issue #3282 closed unless new production-like evidence shows a material win.**
 
-The optimization targets the wrong layer. V8's JIT compiler is not the bottleneck — React rendering and props handling are. Any performance work should focus on:
+The current evidence does not justify adding `vm.Script` caching to the renderer. It points toward React rendering and props handling as better performance targets:
 
 1. Reducing props size (#3281)
 2. Streaming/chunked rendering
 3. Component-level caching
 4. Reducing React reconciliation work
 
-Adding `vm.Script` caching would:
+Adding `vm.Script` caching without stronger evidence would:
 
 - Add code complexity (cache invalidation, memory management)
-- Provide <0.01% improvement on real workloads
+- Risk providing no measurable improvement on real workloads
 - Create false confidence that "we optimized the VM layer"
 
 ## Artifacts
 
 Benchmark scripts and raw data are captured in this committed analysis note:
 
-- Raw benchmark output: see the two sections below.
+- Reproduction script: [`analysis/vm-script-caching-repro-2026-06-13.mjs`](vm-script-caching-repro-2026-06-13.mjs)
+- Example reproduction output: see the section below.
+- Original raw benchmark output: see the two later sections, with caveats.
 - Original local experiment bundle: intentionally not retained because it was an ephemeral `tmp/` path.
 
-### Raw Benchmark Output (Summary)
+### Example Reproduction Output (2026-06-13)
+
+Later runs on the same host varied with source shape, V8's compilation cache, GC pauses, and sampling noise; run the script above for current local values. The compile measurements allocate many temporary `vm.Script` objects, so treat adjacent execution timings as directional rather than as stable benchmark numbers. The same-source/precompiled ratio is the relevant comparison only for a renderer path whose request source text is stable across calls. Current render paths that interpolate props or other request-specific text should be compared against the unique-source/precompiled contrast or a production-like benchmark.
+
+```text
+vm.Script caching reproduction
+==============================
+Node: v22.12.0
+Platform: darwin arm64
+CPU: Apple M5 Max
+
+| Size   | Code Len | Samples | Same-source Compile | Unique-source Compile | Cached Exec | Same-source Run | Unique-source Run | Same/Precompiled | Unique/Precompiled |
+| ------ | -------- | ------- | ------------------- | --------------------- | ----------- | --------------- | ----------------- | ---------------- | ------------------ |
+| tiny   |       54 |    5000 |              0.46us |                3.08us |      0.96us |          1.46us |            4.38us |            1.52x |              4.57x |
+| small  |      379 |    3000 |              0.42us |                7.67us |      1.67us |          2.17us |            9.88us |            1.30x |              5.92x |
+| medium |     8323 |    1000 |              0.79us |              137.44us |     31.58us |         33.75us |          195.25us |            1.07x |              6.18x |
+| large  |    72453 |     300 |              2.50us |             1797.06us |    283.71us |        304.02us |         2131.60us |            1.07x |              7.51x |
+| huge   |   662053 |      80 |             14.08us |            12638.65us |   2943.60us |       2917.54us |        16437.29us |            0.99x |              5.58x |
+
+Note: Same-source compile uses V8/Node compilation-cache behavior by default.
+Same-source run also benefits from that cache after warmup.
+Unique-source compile/run varies the source text each sample to show a colder path.
+Same/Precompiled compares stable source text; Unique/Precompiled is colder-path contrast.
+Run with `node --no-compilation-cache` to compare with V8 compilation caching disabled.
+```
+
+### Original Raw Benchmark Output (Exploratory)
+
+The original output label used `Uncached Med`, but repeated same-source `vm.runInContext` can benefit from V8's compilation cache after warmup. Treat that column as same-source `vm.runInContext` timing, not a demonstrated cold compile path.
 
 ```text
 vm.Script Caching Benchmark
@@ -198,6 +239,8 @@ Pattern                        |    Chars |  Compile
 
 ## Conclusion
 
-V8's compilation is too fast to be a bottleneck. The ~3ms attributed to "JS parsing" in the original issue was execution time, not parse time. Caching `vm.Script` objects provides meaningful speedup only for trivial expressions executed thousands of times — not for per-request React rendering.
+The available microbenchmarks do not support implementing `vm.Script` caching for the render path. They show cached execution and same-source `vm.runInContext` differences near the measurement-noise band once scripts perform real work, while also showing that cold or unique-source compilation can be much more expensive than the original same-source compile medians implied.
 
-**Status: Investigation complete. Optimization not needed.**
+The stronger original wording was overconfident. The ~3ms attributed to "JS parsing" in #3282 was not reproduced here as raw `vm.Script` compile cost, but identifying it as execution time remains an inference until the original or an equivalent production-like harness is rerun.
+
+**Status: Investigation corrected. Optimization still not justified by current evidence.**
