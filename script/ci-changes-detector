@@ -277,13 +277,18 @@ while IFS= read -r file; do
     # the catch-all below, which forces the entire test + benchmark suite to run
     # (see the #3474 regression and the benchmarks-on-a-docs-PR case in #3597).
     #   - internal/**              : planning, contributor-info, testimonials, history docs
+    #   - docs-internal/**         : internal-only deep-dive docs and their image
+    #     assets (outside the published docs site). Sibling of docs/ and
+    #     internal/. A binary asset here (the .png infographic in PR #4006) used
+    #     to miss every category and hit the catch-all, running the full JS+Ruby
+    #     suite on a docs-only PR; the markdown was already caught by *.md.
     #   - .github/ISSUE_TEMPLATE/** : GitHub issue templates (repo metadata, not CI infra)
     #   - .claude/** .agents/** .cursor/** : agent/editor tooling (skills, prompts,
     #     hooks, workflows). These run locally for coding agents, never in GitHub
     #     Actions CI, so they don't affect the runtime, tests, or benchmarks. The
     #     non-extension .claude/skills symlink is what slipped through the catch-all
     #     and ran benchmarks on the docs-only PR #3717.
-    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|internal/*|internal/**/*|.github/ISSUE_TEMPLATE/*|.github/ISSUE_TEMPLATE/**/*|.claude/*|.claude/**/*|.agents/*|.agents/**/*|.cursor/*|.cursor/**/*|.lychee.toml)
+    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs-internal/*|docs-internal/**/*|internal/*|internal/**/*|.github/ISSUE_TEMPLATE/*|.github/ISSUE_TEMPLATE/**/*|.claude/*|.claude/**/*|.agents/*|.agents/**/*|.cursor/*|.cursor/**/*|.lychee.toml)
       # Don't change DOCS_ONLY flag, just continue
       ;;
 
