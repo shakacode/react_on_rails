@@ -72,7 +72,7 @@
         "unresolved_current_head_review_threads",
         "review_objects",
         "issue_comments",
-        "p1_p2_must_fix_dispositions",
+        "priority_finding_dispositions",
         "changelog_classification",
         "lockfile_diff",
         "violations",
@@ -124,7 +124,7 @@
         "issue_comments": {
           "type": "array"
         },
-        "p1_p2_must_fix_dispositions": {
+        "priority_finding_dispositions": {
           "type": "object",
           "required": ["status", "findings"]
         },

@@ -57,7 +57,7 @@ RSpec.describe "script/pr-merge-ledger" do
       "current_head" => true
     )
     expect(pr_ledger.dig("unresolved_current_head_review_threads", "count")).to eq(1)
-    expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings").first).to include(
+    expect(pr_ledger.dig("priority_finding_dispositions", "findings").first).to include(
       "severity" => "P2",
       "disposition" => "UNKNOWN"
     )
@@ -66,7 +66,7 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(violation_codes).to include(
       "review_decision_changes_requested",
       "unresolved_current_head_review_thread",
-      "unknown_p1_p2_must_fix_disposition"
+      "unknown_priority_finding_disposition"
     )
     expect(violation_codes).not_to include("changes_requested_review_object")
   end
@@ -691,7 +691,7 @@ RSpec.describe "script/pr-merge-ledger" do
       report = JSON.parse(stdout)
       pr_ledger = report.fetch("pull_requests").first
       expect(report.fetch("complete_allowed")).to be(true)
-      expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings")).to be_empty
+      expect(pr_ledger.dig("priority_finding_dispositions", "findings")).to be_empty
     end
   end
 
@@ -745,14 +745,14 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success
 
       report = JSON.parse(stdout)
-      findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
       expect(findings.first).to include(
         "id" => "earlier-current-review",
         "severity" => "P2",
         "disposition" => "UNKNOWN"
       )
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
-        "unknown_p1_p2_must_fix_disposition"
+        "unknown_priority_finding_disposition"
       )
     end
   end
@@ -800,13 +800,13 @@ RSpec.describe "script/pr-merge-ledger" do
       report = JSON.parse(stdout)
       pr_ledger = report.fetch("pull_requests").first
       expect(report.fetch("complete_allowed")).to be(false)
-      expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings").first).to include(
+      expect(pr_ledger.dig("priority_finding_dispositions", "findings").first).to include(
         "id" => "critical-review",
         "severity" => "P0",
         "disposition" => "UNKNOWN"
       )
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
-        "unknown_p1_p2_must_fix_disposition"
+        "unknown_priority_finding_disposition"
       )
     end
   end
@@ -853,7 +853,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings", 0)
       expect(finding).to include(
         "id" => "badge-review",
         "severity" => "P2",
@@ -903,7 +903,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
       expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
       expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
         ["1. [P1] First numbered finding.", "2. P2: Second numbered finding."]
@@ -953,7 +953,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
       report = JSON.parse(stdout)
       pr_ledger = report.fetch("pull_requests").first
-      findings = pr_ledger.dig("p1_p2_must_fix_dispositions", "findings")
+      findings = pr_ledger.dig("priority_finding_dispositions", "findings")
       expect(findings.length).to eq(2)
       expect(findings.map { |finding| finding.fetch("source_line") }).to eq([1, 2])
       expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
@@ -1002,7 +1002,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
       expect(findings.length).to eq(1)
       expect(findings.first).to include(
         "severity" => "MUST_FIX",
@@ -1059,7 +1059,7 @@ RSpec.describe "script/pr-merge-ledger" do
       report = JSON.parse(stdout)
       pr_ledger = report.fetch("pull_requests").first
       expect(report.fetch("complete_allowed")).to be(true)
-      expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings")).to be_empty
+      expect(pr_ledger.dig("priority_finding_dispositions", "findings")).to be_empty
     end
   end
 
@@ -1224,9 +1224,9 @@ RSpec.describe "script/pr-merge-ledger" do
 
       report = JSON.parse(stdout)
       expect(report.dig("pull_requests", 0, "unresolved_current_head_review_threads", "count")).to eq(1)
-      expect(report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")).to be_empty
+      expect(report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")).to be_empty
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).not_to include(
-        "unknown_p1_p2_must_fix_disposition"
+        "unknown_priority_finding_disposition"
       )
     end
   end
@@ -1283,7 +1283,7 @@ RSpec.describe "script/pr-merge-ledger" do
       report = JSON.parse(stdout)
       pr_ledger = report.fetch("pull_requests").first
       expect(report.fetch("complete_allowed")).to be(true)
-      expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings")).to be_empty
+      expect(pr_ledger.dig("priority_finding_dispositions", "findings")).to be_empty
     end
   end
 
@@ -1329,7 +1329,7 @@ RSpec.describe "script/pr-merge-ledger" do
       report = JSON.parse(stdout)
       pr_ledger = report.fetch("pull_requests").first
       expect(report.fetch("complete_allowed")).to be(true)
-      expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings")).to be_empty
+      expect(pr_ledger.dig("priority_finding_dispositions", "findings")).to be_empty
     end
   end
 
@@ -1379,7 +1379,7 @@ RSpec.describe "script/pr-merge-ledger" do
       report = JSON.parse(stdout)
       pr_ledger = report.fetch("pull_requests").first
       expect(report.fetch("complete_allowed")).to be(true)
-      expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings")).to be_empty
+      expect(pr_ledger.dig("priority_finding_dispositions", "findings")).to be_empty
     end
   end
 
@@ -1423,7 +1423,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings", 0)
       expect(finding).to include(
         "id" => "open-review",
         "severity" => "P1",
@@ -1473,7 +1473,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings", 0)
       expect(finding).to include(
         "id" => "not-fully-resolved-review",
         "severity" => "P1",
@@ -1523,7 +1523,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings", 0)
       expect(finding).to include(
         "id" => "none-of-review",
         "severity" => "P1",
@@ -1573,7 +1573,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings", 0)
       expect(finding).to include(
         "id" => "none-the-less-review",
         "severity" => "P1",
@@ -1623,7 +1623,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
       expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
       expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
         ["P1 issues: none fixed yet.", "P2 findings: none resolved."]
@@ -1672,7 +1672,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings", 0)
       expect(finding).to include(
         "id" => "mixed-review",
         "severity" => "P1",
@@ -1722,7 +1722,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings", 0)
       expect(finding).to include(
         "id" => "comma-mixed-review",
         "severity" => "P1",
@@ -1772,7 +1772,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
       expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
       expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
         ["P1 issues fixed and P2 still open", "P1 issues fixed and P2 still open"]
@@ -1830,7 +1830,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
       expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2 P1 P2])
       expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
         [
@@ -1884,7 +1884,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings", 0)
       expect(finding).to include(
         "id" => "parenthetical-mixed-review",
         "severity" => "P1",
@@ -1934,7 +1934,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings", 0)
       expect(finding).to include(
         "id" => "previous-review-still-applies",
         "severity" => "P1",
@@ -1985,7 +1985,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
       report = JSON.parse(stdout)
       expect(report.fetch("complete_allowed")).to be(true)
-      expect(report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")).to be_empty
+      expect(report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")).to be_empty
     end
   end
 
@@ -2034,13 +2034,13 @@ RSpec.describe "script/pr-merge-ledger" do
         "id" => "comment-1",
         "author" => "reviewer"
       )
-      expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings").first).to include(
+      expect(pr_ledger.dig("priority_finding_dispositions", "findings").first).to include(
         "id" => "comment-1",
         "severity" => "P1",
         "disposition" => "UNKNOWN"
       )
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
-        "unknown_p1_p2_must_fix_disposition"
+        "unknown_priority_finding_disposition"
       )
     end
   end
@@ -2249,7 +2249,7 @@ RSpec.describe "script/pr-merge-ledger" do
         report = JSON.parse(stdout)
         pr_ledger = report.fetch("pull_requests").first
         expect(report.fetch("complete_allowed")).to be(true)
-        expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings").first).to include(
+        expect(pr_ledger.dig("priority_finding_dispositions", "findings").first).to include(
           "id" => "comment-1",
           "disposition" => "fixed"
         )
@@ -2306,7 +2306,7 @@ RSpec.describe "script/pr-merge-ledger" do
         expect(status).not_to be_success, stderr
 
         report = JSON.parse(stdout)
-        findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+        findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
         expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN fixed])
         expect(findings.map { |finding| finding.fetch("source_line") }).to eq([1, 2])
         expect(stderr).not_to include("unused disposition keys")
@@ -2363,7 +2363,7 @@ RSpec.describe "script/pr-merge-ledger" do
         expect(status).not_to be_success, stderr
 
         report = JSON.parse(stdout)
-        findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+        findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
         expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
         expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
         expect(stderr).to include("unused disposition keys: https://example.com/multi-line-broad-review")
@@ -2420,7 +2420,7 @@ RSpec.describe "script/pr-merge-ledger" do
         expect(status).not_to be_success, stderr
 
         report = JSON.parse(stdout)
-        findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+        findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
         expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
         expect(findings.map { |finding| finding.fetch("marker_index") }).to eq([1, 2])
         expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[fixed UNKNOWN])
@@ -2478,7 +2478,7 @@ RSpec.describe "script/pr-merge-ledger" do
         expect(status).not_to be_success, stderr
 
         report = JSON.parse(stdout)
-        findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+        findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
         expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
         expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
         expect(stderr).to include("unused disposition keys: https://example.com/same-line-broad-review")
@@ -2659,6 +2659,20 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(status.exitstatus).to eq(2)
     expect(stdout).to be_empty
     expect(stderr).to include("--changelog-classification applies to one PR at a time")
+  end
+
+  it "rejects malformed live repository names before calling GitHub" do
+    stdout, stderr, status = Open3.capture3(
+      script_path,
+      "3996",
+      "--repo",
+      "/react_on_rails",
+      chdir: repo_root
+    )
+
+    expect(status.exitstatus).to eq(2)
+    expect(stdout).to be_empty
+    expect(stderr).to include('repo must look like OWNER/REPO: "/react_on_rails"')
   end
 
   it "rejects fixture mode combined with positional PR arguments" do
@@ -2904,7 +2918,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
       if printf '%s' "$query" | grep -q 'node(id:$threadId)'; then
         cat <<'JSON'
-      {"data":{"repository":{"id":"repo-id"},"node":{"comments":{"nodes":[{"id":"comment-2","databaseId":2,"body":"second page","author":{"login":"reviewer"},"url":"https://example.com/comment-2","path":"script/pr-merge-ledger","line":1,"createdAt":"2026-06-02T00:00:00Z","outdated":false,"commit":{"oid":"head-1"},"originalCommit":{"oid":"head-1"},"pullRequestReview":{"id":"review-1","state":"COMMENTED","submittedAt":"2026-06-02T00:00:00Z","commit":{"oid":"head-1"},"author":{"login":"reviewer"}}}],"pageInfo":{"hasNextPage":false,"endCursor":"cursor-2"}}}}}
+      {"data":{"repository":{"id":"repo-id"},"node":{"comments":{"nodes":[{"id":"comment-2","databaseId":2,"body":"second page","author":{"login":"reviewer"},"url":"https://example.com/comment-2","path":"script/pr-merge-ledger","line":1,"createdAt":"2026-06-02T00:00:00Z","outdated":false,"commit":{"oid":"head-1"},"pullRequestReview":{"id":"review-1","state":"COMMENTED","submittedAt":"2026-06-02T00:00:00Z","commit":{"oid":"head-1"},"author":{"login":"reviewer"}}}],"pageInfo":{"hasNextPage":false,"endCursor":"cursor-2"}}}}}
       JSON
       elif printf '%s' "$query" | grep -q 'files(first'; then
         cat <<'JSON'
@@ -2912,7 +2926,7 @@ RSpec.describe "script/pr-merge-ledger" do
       JSON
       elif printf '%s' "$query" | grep -q 'reviewThreads'; then
         cat <<'JSON'
-      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"thread-1","isResolved":false,"isOutdated":false,"path":"script/pr-merge-ledger","line":1,"comments":{"nodes":[{"id":"comment-1","databaseId":1,"body":"first page","author":{"login":"reviewer"},"url":"https://example.com/comment-1","path":"script/pr-merge-ledger","line":1,"createdAt":"2026-06-01T00:00:00Z","outdated":false,"commit":{"oid":"head-1"},"originalCommit":{"oid":"head-1"},"pullRequestReview":{"id":"review-1","state":"COMMENTED","submittedAt":"2026-06-01T00:00:00Z","commit":{"oid":"head-1"},"author":{"login":"reviewer"}}}],"pageInfo":{"hasNextPage":true,"endCursor":"cursor-1"}}}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"thread-1","isResolved":false,"isOutdated":false,"path":"script/pr-merge-ledger","line":1,"comments":{"nodes":[{"id":"comment-1","databaseId":1,"body":"first page","author":{"login":"reviewer"},"url":"https://example.com/comment-1","path":"script/pr-merge-ledger","line":1,"createdAt":"2026-06-01T00:00:00Z","outdated":false,"commit":{"oid":"head-1"},"pullRequestReview":{"id":"review-1","state":"COMMENTED","submittedAt":"2026-06-01T00:00:00Z","commit":{"oid":"head-1"},"author":{"login":"reviewer"}}}],"pageInfo":{"hasNextPage":true,"endCursor":"cursor-1"}}}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
       JSON
       elif printf '%s' "$query" | grep -q 'reviews(first'; then
         cat <<'JSON'
@@ -3050,7 +3064,7 @@ RSpec.describe "script/pr-merge-ledger" do
         report = JSON.parse(stdout)
         pr_ledger = report.fetch("pull_requests").first
         expect(report.fetch("complete_allowed")).to be(true)
-        expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings").first).to include(
+        expect(pr_ledger.dig("priority_finding_dispositions", "findings").first).to include(
           "id" => "comment-2",
           "disposition" => "explicitly_waived",
           "evidence" => "maintainer waiver"

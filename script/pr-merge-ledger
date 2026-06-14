@@ -208,7 +208,9 @@ class PrMergeLedger
     repo = @options[:repo] || detect_repo
     @options[:repo] = repo
     owner, name = repo.split("/", 2)
-    raise Error, "repo must look like OWNER/REPO: #{repo.inspect}" unless owner && name
+    unless owner.to_s.match?(/\A\S+\z/) && name.to_s.match?(/\A\S+\z/)
+      raise Error, "repo must look like OWNER/REPO: #{repo.inspect}"
+    end
 
     collector = GitHubCollector.new(owner, name)
     @argv.map do |pr_number|
@@ -285,7 +287,7 @@ class PrMergeLedger
         "all_changes_requested" => all_changes_requested
       },
       "issue_comments" => output_issue_comments,
-      "p1_p2_must_fix_dispositions" => finding_dispositions,
+      "priority_finding_dispositions" => finding_dispositions,
       "changelog_classification" => changelog,
       "lockfile_diff" => lockfile
     }
@@ -736,7 +738,7 @@ class PrMergeLedger
 
       unknowns << unknown_field(
         pull_request,
-        "p1_p2_must_fix_dispositions.findings",
+        "priority_finding_dispositions.findings",
         "P0/P1/P2/Must-Fix finding has no fixed/waived/follow-up disposition",
         finding["url"]
       )
@@ -882,8 +884,8 @@ class PrMergeLedger
 
   def unknown_violation_code(field)
     case field
-    when /\Ap1_p2_must_fix_dispositions/
-      "unknown_p1_p2_must_fix_disposition"
+    when /\Apriority_finding_dispositions/
+      "unknown_priority_finding_disposition"
     when /\Achangelog_classification/
       "unknown_changelog_classification"
     when /\Alockfile_diff/
@@ -1121,7 +1123,6 @@ class PrMergeLedger
                       createdAt
                       outdated
                       commit { oid }
-                      originalCommit { oid }
                       pullRequestReview {
                         id
                         state
@@ -1158,7 +1159,6 @@ class PrMergeLedger
                   createdAt
                   outdated
                   commit { oid }
-                  originalCommit { oid }
                   pullRequestReview {
                     id
                     state
