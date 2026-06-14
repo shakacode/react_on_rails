@@ -454,6 +454,59 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "ignores stale change-request review objects when the PR decision is clear" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 2,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "stale-change-request",
+          "state" => "CHANGES_REQUESTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "old" },
+          "url" => "https://example.com/stale-change-request",
+          "body" => "Old requested change."
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-stale-change-request", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      pr_ledger = report.fetch("pull_requests").first
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(pr_ledger.dig("review_objects", "changes_requested")).to be_empty
+      expect(pr_ledger.dig("review_objects", "all_changes_requested").first).to include(
+        "id" => "stale-change-request",
+        "current_head" => false
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).not_to include(
+        "changes_requested_review_object"
+      )
+    end
+  end
+
   it "orders latest reviews by parsed timestamps instead of string order" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -557,6 +610,68 @@ RSpec.describe "script/pr-merge-ledger" do
       pr_ledger = report.fetch("pull_requests").first
       expect(report.fetch("complete_allowed")).to be(true)
       expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings")).to be_empty
+    end
+  end
+
+  it "scans every current-head review body for priority findings" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 4,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "earlier-current-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/earlier-current-review",
+          "body" => "[P2] Earlier current-head finding still needs disposition."
+        },
+        {
+          "id" => "later-current-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-02T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/later-current-review",
+          "body" => "Later current-head review."
+        }
+      ],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-all-current-reviews", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+      expect(findings.first).to include(
+        "id" => "earlier-current-review",
+        "severity" => "P2",
+        "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_p1_p2_must_fix_disposition"
+      )
     end
   end
 

@@ -232,7 +232,7 @@ class PrMergeLedger
     output_issue_comments = issue_comments.map { |comment| comment.except("body") }
     latest_reviews = latest_reviews_by_reviewer(output_reviews)
     all_changes_requested = output_reviews.select { |review| review.fetch("state") == "CHANGES_REQUESTED" }
-    changes_requested = latest_reviews.select { |review| review.fetch("state") == "CHANGES_REQUESTED" }
+    changes_requested = current_changes_requested(latest_reviews)
     finding_dispositions = finding_dispositions(review_threads, reviews, issue_comments, dispositions)
     changelog = changelog_classification
     lockfile = lockfile_diff(files)
@@ -386,6 +386,10 @@ class PrMergeLedger
     latest_reviews.sort_by { |review| review.fetch("reviewer") }
   end
 
+  def current_changes_requested(reviews)
+    reviews.select { |review| review.fetch("state") == "CHANGES_REQUESTED" && review.fetch("current_head") }
+  end
+
   def current_thread?(thread, comments, pull_request)
     return false if thread["isOutdated"] == true
     return false if comments.empty?
@@ -446,7 +450,7 @@ class PrMergeLedger
   end
 
   def reviews_for_findings(reviews)
-    latest_reviews_by_reviewer(reviews).select { |review| review.fetch("current_head") }
+    reviews.select { |review| review.fetch("current_head") }
   end
 
   def findings_from_text(text, url, id, dispositions, used_disposition_keys)
