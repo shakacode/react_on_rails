@@ -317,6 +317,24 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(secondResult.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
   });
 
+  test('external source map lookup retries after preload reads partial map content', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+    await fsPromises.writeFile(mapPath, '{"version":3,');
+
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+  });
+
   test('percent-encoded data URL source maps are used', async () => {
     const bundlePath = await writeVmBundle(
       `${buildThrowingBundleSource()}\n${inlinePercentEncodedSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
@@ -422,6 +440,23 @@ describe('source-mapped stack traces for VM errors', () => {
     } finally {
       readFileSyncSpy.mockRestore();
     }
+  });
+
+  test('retryable external source map misses are capped per bundle registration', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+    const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
+    await writeVmBundle(bundleContents);
+
+    const registration = registerBundleForSourceMaps(bundlePath, 0, bundleContents, undefined, true);
+    for (let index = 0; index < 5; index += 1) {
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+    }
+
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+    expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
   });
 
   test('global host stack remapping skips source-map loads for unrelated registered bundles', async () => {

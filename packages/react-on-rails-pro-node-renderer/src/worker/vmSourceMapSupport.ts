@@ -69,7 +69,7 @@ export interface BundleSourceMapRegistration {
   sourceMapJson?: string | null;
   /**
    * External source maps can arrive after a bundle first becomes visible. When
-   * true, a missing external map is not cached as a permanent miss.
+   * true, a missing external map is retried briefly before caching the miss.
    */
   retryMissingSourceMap?: boolean;
 }
@@ -90,7 +90,10 @@ const registeredBundles = new Map<string, BundleSourceMapRegistration>();
 // registrations so old active VM contexts cannot be remapped with newer maps.
 let sourceMapCache = new WeakMap<BundleSourceMapRegistration, LoadedSourceMap | null>();
 let retiredMissingSourceMapRetries = new WeakSet<BundleSourceMapRegistration>();
+let missingSourceMapRetryCounts = new WeakMap<BundleSourceMapRegistration, number>();
 let warnedMissingSourceMapConstructor = false;
+
+const MAX_MISSING_SOURCE_MAP_RETRIES = 5;
 
 function shouldRetryMissingSourceMap(registration: BundleSourceMapRegistration) {
   return registration.retryMissingSourceMap === true && !retiredMissingSourceMapRetries.has(registration);
@@ -102,9 +105,20 @@ export function retireMissingSourceMapRetry(registration: BundleSourceMapRegistr
   }
 
   retiredMissingSourceMapRetries.add(registration);
+  missingSourceMapRetryCounts.delete(registration);
   if (sourceMapCache.get(registration) === undefined) {
     sourceMapCache.set(registration, null);
   }
+}
+
+function recordMissingSourceMapRetry(registration: BundleSourceMapRegistration) {
+  const retryCount = (missingSourceMapRetryCounts.get(registration) ?? 0) + 1;
+  if (retryCount >= MAX_MISSING_SOURCE_MAP_RETRIES) {
+    retireMissingSourceMapRetry(registration);
+    return;
+  }
+
+  missingSourceMapRetryCounts.set(registration, retryCount);
 }
 
 /**
@@ -151,6 +165,15 @@ function parseDataUrlSourceMap(url: string): string | undefined {
     return decodeURIComponent(payload);
   } catch {
     return payload;
+  }
+}
+
+function isValidJson(sourceMapJson: string) {
+  try {
+    JSON.parse(sourceMapJson);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -340,7 +363,13 @@ export async function preloadSourceMapJsonForBundle(bundleFilePath: string, bund
   // External maps can arrive just after the bundle during upload/pre-stage flows.
   // Leave misses lazy; VM registrations mark them retryable so a first error
   // before the map copy finishes does not cache a permanent miss.
-  return readSourceMapJsonForBundleAsync(bundleFilePath, sourceMappingUrl);
+  const sourceMapJson = await readSourceMapJsonForBundleAsync(bundleFilePath, sourceMappingUrl);
+  if (sourceMapJson !== undefined && sourceMappingUrl && !isValidJson(sourceMapJson)) {
+    log.debug('Preloaded source map for bundle %s is not valid JSON yet; retrying lazily.', bundleFilePath);
+    return undefined;
+  }
+
+  return sourceMapJson;
 }
 
 /**
@@ -348,8 +377,8 @@ export async function preloadSourceMapJsonForBundle(bundleFilePath: string, bund
  * Pass `bundleContents` when available; omitting it makes the first error-path
  * lookup synchronously re-read the bundle to find its `sourceMappingURL`.
  * `preloadedSourceMapJson` supplies known JSON/null for this VM generation;
- * `retryMissingSourceMap` keeps external preload misses retryable until a map
- * is found or a same-path generation replaces the registration.
+ * `retryMissingSourceMap` keeps external preload misses retryable until a map is
+ * found, the retry cap is reached, or a same-path generation replaces the registration.
  */
 export function registerBundleForSourceMaps(
   bundleFilePath: string,
@@ -393,6 +422,7 @@ export function unregisterBundleForSourceMaps(bundleOrRegistration: string | Bun
     if (registration) {
       sourceMapCache.delete(registration);
       retiredMissingSourceMapRetries.delete(registration);
+      missingSourceMapRetryCounts.delete(registration);
     }
     registeredBundles.delete(bundleOrRegistration);
     return;
@@ -404,6 +434,7 @@ export function unregisterBundleForSourceMaps(bundleOrRegistration: string | Bun
   }
   sourceMapCache.delete(bundleOrRegistration);
   retiredMissingSourceMapRetries.delete(bundleOrRegistration);
+  missingSourceMapRetryCounts.delete(bundleOrRegistration);
 }
 
 /** @internal Used in tests */
@@ -411,6 +442,7 @@ export function resetSourceMapSupport() {
   registeredBundles.clear();
   sourceMapCache = new WeakMap<BundleSourceMapRegistration, LoadedSourceMap | null>();
   retiredMissingSourceMapRetries = new WeakSet<BundleSourceMapRegistration>();
+  missingSourceMapRetryCounts = new WeakMap<BundleSourceMapRegistration, number>();
   warnedMissingSourceMapConstructor = false;
 }
 
@@ -495,8 +527,11 @@ function sourceMapForRegistration(registration: BundleSourceMapRegistration): Lo
     sourceMap = loadSourceMapForBundle(registration.bundleFilePath, registration);
     if (sourceMap) {
       sourceMapCache.set(registration, sourceMap);
+      missingSourceMapRetryCounts.delete(registration);
     } else if (!shouldRetryMissingSourceMap(registration) || registration.sourceMappingUrl === null) {
       sourceMapCache.set(registration, sourceMap);
+    } else {
+      recordMissingSourceMapRetry(registration);
     }
   }
   return sourceMap;
