@@ -8,22 +8,6 @@ Some public repos still use older slugs with underscores or legacy wording.
 This page is the source of truth for which public repos are current and worth
 starting from.
 
-## Control Plane Cost Posture
-
-For public demo and starter staging deployments on Control Plane, keep the app
-workload as `type: standard`, set its autoscaling metric to `disabled`, and
-enable `capacityAI: true` so Control Plane can right-size idle capacity. Avoid
-pinning CPU autoscaling to `minScale: 1` / `maxScale: 1` unless always-warm
-latency or production predictability is part of the acceptance criteria.
-
-This is not the same as scale-to-zero: steady RAM usage and background work can
-still drive cost, and shared Postgres should usually stay manually sized. If a
-demo explicitly needs true idle scale-to-zero, create a separate `serverless`
-workload before first deploy or plan a delete/recreate migration because Control
-Plane will not change an existing `standard` workload to `serverless` in place.
-The reusable guidance lives in
-[Control Plane Flow: Enable Capacity AI for Demo and Starter Staging Apps](https://github.com/shakacode/control-plane-flow/blob/main/docs/tips.md#enable-capacity-ai-for-demo-and-starter-staging-apps).
-
 ## Starter Repos
 
 Check each entry's note before evaluating — some starters are fully open
@@ -115,6 +99,23 @@ For detailed proof criteria and migration contribution guidance, see
   you can click through in your browser without any local setup. Backed by the
   legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
   source.
+
+## Control Plane Cost Posture
+
+For public demo and starter staging deployments on Control Plane, keep the app
+workload as `type: standard` with `minScale: 1`, set its autoscaling metric to
+`disabled`, and enable `capacityAI: true` so Control Plane can right-size idle
+capacity while the demo keeps one warm replica. Do not pin `maxScale: 1` unless
+production predictability or a specific acceptance criterion requires a fixed
+replica count.
+
+This is not the same as scale-to-zero: steady RAM usage and background work can
+still drive cost, and shared Postgres should usually stay manually sized. If a
+demo explicitly needs true idle scale-to-zero, create a separate `serverless`
+workload before first deploy or plan a delete/recreate migration because Control
+Plane will not change an existing `standard` workload to `serverless` in place.
+The reusable guidance lives in
+[Control Plane Flow: Enable Capacity AI for Demo and Starter Staging Apps](https://github.com/shakacode/control-plane-flow/blob/main/docs/tips.md#enable-capacity-ai-for-demo-and-starter-staging-apps).
 
 ## Legacy Repos
 

@@ -388,10 +388,11 @@ cpflow deploy-image -a myapp   # deploy the pushed image to Control Plane
 - **GVC environment variables**: Set shared environment variables at the GVC level so all workloads inherit them. See the [Control Plane Flow guide to secrets and ENV values](https://github.com/shakacode/control-plane-flow/blob/main/docs/secrets-and-env-values.md).
 - **Secrets**: Use Control Plane's built-in secrets management (`cpln://secret/...`) instead of environment variables for sensitive values.
 - **One-off tasks**: Run migrations and other one-off commands via `cpflow run -a myapp -- bundle exec rails db:migrate`.
-- **Public demo and starter staging apps**: Prefer `type: standard` workloads
-  with the autoscaling metric disabled and `capacityAI: true`. Use serverless
-  scale-to-zero only as an explicit first-deploy choice or migration. See the
-  [examples and starters cost posture](../getting-started/examples-and-references.md#control-plane-cost-posture).
+- **Public demo and starter staging apps**: Keep `type: standard` workloads
+  with `minScale: 1`, the autoscaling metric disabled, and `capacityAI: true`.
+  Use serverless scale-to-zero only as an explicit first-deploy choice or
+  migration. See the
+  [Control Plane Cost Posture](../getting-started/examples-and-references.md#control-plane-cost-posture).
 - **Multiple locations**: Control Plane supports multi-region deployment. Add locations to your GVC to deploy globally.
 
 ## Node Renderer in containers
