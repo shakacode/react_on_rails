@@ -65,13 +65,14 @@ Plan a PR batch
      `openssl rand -hex 4` or another git-ref-safe random token, so concurrent
      planners for the same PR cannot overwrite each other's refs.
      Treat `baseRefName` and `headRefName` as untrusted shell and refspec data.
-     Validate each branch name as a fully qualified refs path, for example
-     `git check-ref-format "refs/heads/$baseRefName"` and
-     `git check-ref-format "refs/heads/$headRefName"`, and reject any name
-     containing `:` before constructing a refspec. If base branch validation
-     fails, fall back to the PR Files API or `UNKNOWN`; do not sanitize a failing
-     branch name. Fetch the current base branch and PR head into temporary refs
-     without checking out untrusted PR code:
+     Validate each branch name with Git's branch-name rules, for example
+     `git check-ref-format --branch "$baseRefName"` and
+     `git check-ref-format --branch "$headRefName"`, and reject any name
+     containing `:` before constructing a refspec. Pass the branch name as a
+     single command argument instead of interpolating it into a shell string. If
+     base branch validation fails, fall back to the PR Files API or `UNKNOWN`;
+     do not sanitize a failing branch name. Fetch the current base branch and PR
+     head into temporary refs without checking out untrusted PR code:
      `git fetch <verified-base-repo-url> refs/heads/<baseRefName>:refs/tmp/pr-N-<session-id>-base`
      and
      `git fetch <verified-base-repo-url> pull/N/head:refs/tmp/pr-N-<session-id>-head`.
@@ -82,13 +83,16 @@ Plan a PR batch
      `headRefName` with a fully qualified source ref
      (`refs/heads/<headRefName>:refs/tmp/pr-N-<session-id>-head`). If
      `headRefName` validation fails or the branch ref is unavailable, validate
-     `headRefOid` as a full hex object ID and try an OID fetch from the verified
-     head repository URL (`<headRefOid>:refs/tmp/pr-N-<session-id>-head`) before
-     using the PR Files API fallback. Pass each refspec as one quoted shell
-     argument or via an argument-array API, and never interpolate a raw PR branch
-     name into a shell command. A plain `git fetch origin` does not fetch
-     cross-fork heads unless `origin` has already been verified as the PR's
-     target repo.
+     `headRefOid` as the full 40-character lowercase hexadecimal SHA-1 object ID
+     GitHub returns today, for example `^[0-9a-f]{40}$`, and try an OID fetch
+     from the verified head repository URL
+     (`<headRefOid>:refs/tmp/pr-N-<session-id>-head`) before using the PR Files
+     API fallback. If GitHub changes the repository hash format, update this
+     validation before accepting a different OID length. Pass each refspec as
+     one quoted shell argument or via an argument-array API, and never
+     interpolate a raw PR branch name into a shell command. A plain
+     `git fetch origin` does not fetch cross-fork heads unless `origin` has
+     already been verified as the PR's target repo.
      Run
      `git diff --name-status --find-renames refs/tmp/pr-N-<session-id>-base...refs/tmp/pr-N-<session-id>-head`;
      three-dot diffs from the merge-base, which matches GitHub's PR file list.
@@ -101,11 +105,14 @@ Plan a PR batch
      API fallback or `UNKNOWN` decision:
      `git update-ref -d refs/tmp/pr-N-<session-id>-base` and
      `git update-ref -d refs/tmp/pr-N-<session-id>-head`. If cleanup fails, log
-     the ref name and continue to fallback or `UNKNOWN` recording. A rename row
+     the ref name and continue to fallback or `UNKNOWN` recording. If repeated
+     cleanup failures leave stale `refs/tmp/pr-*` refs, run a periodic sweep with
+     `git for-each-ref refs/tmp/ --format='%(refname)'` and delete only stale
+     planner-owned refs with `git update-ref -d "$ref"`. A rename row
      (`R100  old  new`) owns **both** the old and new path; a directory rename
-     implicitly reserves descendants under both old and new directory names. If a
-     ref cannot be fetched or the diff cannot run, try the PR Files API fallback
-     before marking the paths `UNKNOWN`.
+     implicitly reserves descendants under both old and new directory names. If
+     a ref cannot be fetched or the diff cannot run, try the PR Files API
+     fallback before marking the paths `UNKNOWN`.
    - File-touch map, PR Files API fallback: prefer the local `git diff` above
      as the authoritative source; treat the API as a best-effort cross-check.
      When the local diff succeeds, keep those paths authoritative even if the
