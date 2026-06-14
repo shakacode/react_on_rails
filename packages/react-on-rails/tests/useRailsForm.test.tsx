@@ -65,6 +65,7 @@ describe('useRailsForm', () => {
       expect(url).toBe(new URL('/contact_messages', document.baseURI).href);
       expect(init.method).toBe('POST');
       expect(init.credentials).toBe('same-origin');
+      expect(init.redirect).toBe('error');
       expect(init.body).toBe(JSON.stringify({ name: 'Justin', email: '' }));
       expect(init.headers).toEqual({
         Accept: 'application/json',
@@ -489,7 +490,7 @@ describe('useRailsForm', () => {
       });
     });
 
-    it('reports only same-origin followed redirect URLs', async () => {
+    it('filters redirected response URLs defensively when a custom fetch returns one', async () => {
       fetchMock
         .mockResolvedValueOnce(
           mockResponse({ status: 200, body: null, redirected: true, url: 'http://localhost/posts/1' }),

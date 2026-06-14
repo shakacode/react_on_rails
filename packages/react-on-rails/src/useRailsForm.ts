@@ -19,9 +19,9 @@
  *
  * Success/redirect handling is intentionally minimal and forward-compatible
  * with the client-routing work in issue #3873: the hook never navigates on its
- * own. It surfaces the redirect target (from a followed fetch redirect or a
- * safe JSON `redirect_to` hint) through `onSuccess` / the resolved submit result
- * so the app — or a future router integration — decides what to do.
+ * own. It surfaces safe JSON `redirect_to` hints through `onSuccess` / the
+ * resolved submit result so the app — or a future router integration — decides
+ * what to do.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -37,10 +37,12 @@ export interface RailsFormSuccessResult {
   /** Parsed JSON response body, or `null` when the body was empty or not JSON. */
   responseData: unknown;
   /**
-   * Redirect target when the server redirected (fetch follows it; we report the
-   * final URL) or replied with a safe JSON `redirect_to`/`redirectTo` hint.
-   * JSON hints are accepted only when they resolve to the current origin over
-   * HTTP(S); non-HTTP schemes such as `javascript:` are ignored.
+   * Redirect target when the server replied with a safe JSON
+   * `redirect_to`/`redirectTo` hint. Browser redirect following is disabled for
+   * CSRF-bearing submissions; a defensively filtered redirected Response URL is
+   * still accepted if a custom fetch implementation returns one.
+   * Hints are accepted only when they resolve to the current origin over HTTP(S);
+   * non-HTTP schemes such as `javascript:` are ignored.
    * The hook never navigates — pass this to your router or `window.location`.
    * Designed to compose with the client-routing integration in issue #3873.
    */
@@ -361,6 +363,9 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
         response = await fetch(requestUrl, {
           method: method.toUpperCase(),
           credentials: 'same-origin',
+          // Never follow redirects while carrying explicit CSRF headers; an
+          // open redirect could otherwise leak the token to another origin.
+          redirect: 'error',
           headers: authenticityHeaders({
             Accept: 'application/json',
             'Content-Type': 'application/json',
