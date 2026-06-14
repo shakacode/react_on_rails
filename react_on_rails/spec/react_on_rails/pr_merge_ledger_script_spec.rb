@@ -2031,11 +2031,14 @@ RSpec.describe "script/pr-merge-ledger" do
 
       report = JSON.parse(stdout)
       findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
-      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P2])
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P2 P1])
       expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
-        ["P2 findings resolved. Please also fix P1 regression."]
+        [
+          "P2 findings resolved. Please also fix P1 regression.",
+          "P2 findings resolved. Please also fix P1 regression."
+        ]
       )
-      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN])
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
     end
   end
 
@@ -2080,11 +2083,11 @@ RSpec.describe "script/pr-merge-ledger" do
 
       report = JSON.parse(stdout)
       findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
-      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P2])
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P2 P1])
       expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
-        ["P2 issues fixed P1 still open"]
+        ["P2 issues fixed P1 still open", "P2 issues fixed P1 still open"]
       )
-      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN])
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
     end
   end
 
@@ -3022,13 +3025,13 @@ RSpec.describe "script/pr-merge-ledger" do
       script_path,
       "3996",
       "--repo",
-      "/react_on_rails",
+      "bad=owner/react_on_rails",
       chdir: repo_root
     )
 
     expect(status.exitstatus).to eq(2)
     expect(stdout).to be_empty
-    expect(stderr).to include('repo must look like OWNER/REPO: "/react_on_rails"')
+    expect(stderr).to include('repo must look like OWNER/REPO: "bad=owner/react_on_rails"')
   end
 
   it "rejects fixture mode combined with positional PR arguments" do
@@ -3445,6 +3448,54 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status.exitstatus).to eq(2)
       expect(stdout).to be_empty
       expect(stderr).to include("pagination cursor did not advance for files")
+    end
+  end
+
+  it "fails when GraphQL pagination returns an empty cursor" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"Title","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch","headRefOid":"abc123","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":true,"endCursor":""}}}}}}
+      JSON
+    SH
+
+    with_fake_gh(fake_gh) do |env|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        chdir: repo_root
+      )
+
+      expect(status.exitstatus).to eq(2)
+      expect(stdout).to be_empty
+      expect(stderr).to include("pagination cursor did not advance for files")
+    end
+  end
+
+  it "rejects GraphQL variables that gh would read from files" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"Title","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch","headRefOid":"abc123","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":true,"endCursor":"@secret"}}}}}}
+      JSON
+    SH
+
+    with_fake_gh(fake_gh) do |env|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        chdir: repo_root
+      )
+
+      expect(status.exitstatus).to eq(2)
+      expect(stdout).to be_empty
+      expect(stderr).to include("gh api graphql variable endCursor cannot start with @")
     end
   end
 

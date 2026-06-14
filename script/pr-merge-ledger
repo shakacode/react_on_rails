@@ -33,6 +33,7 @@ class PrMergeLedger
   GITHUB_API_MAX_ATTEMPTS = 3
   GITHUB_API_RETRY_BASE_DELAY_SECONDS = 0.25
   MAX_GRAPHQL_PAGES = 500
+  GITHUB_REPO_NAME_PATTERN = /\A[A-Za-z0-9._-]+\z/
   LIST_MARKER_PATTERN = /(?:[-*]|\d+[.)])\s*/
   FINDING_LINE_PREFIX_PATTERN = /(?:#{LIST_MARKER_PATTERN.source})?(?:\#{1,6}\s+)?/
   PRIORITY_MARKER_PATTERN = /MUST[- ]?FIX|\[?P[0-2]\]?/
@@ -226,7 +227,7 @@ class PrMergeLedger
     repo = @options[:repo] || detect_repo
     @options[:repo] = repo
     owner, name = repo.split("/", 2)
-    unless owner.to_s.match?(/\A\S+\z/) && name.to_s.match?(/\A\S+\z/)
+    unless owner.to_s.match?(GITHUB_REPO_NAME_PATTERN) && name.to_s.match?(GITHUB_REPO_NAME_PATTERN)
       raise Error, "repo must look like OWNER/REPO: #{repo.inspect}"
     end
 
@@ -454,10 +455,6 @@ class PrMergeLedger
     reviews.select { |review| review.fetch("state") == "CHANGES_REQUESTED" && review.fetch("current_head") }
   end
 
-  def current_thread?(thread, comments, pull_request)
-    !current_thread_evidence(thread, comments, pull_request).nil?
-  end
-
   def current_thread_evidence(thread, comments, pull_request)
     return nil if thread["isOutdated"] == true
     return nil if comments.empty?
@@ -584,12 +581,23 @@ class PrMergeLedger
   end
 
   def finding_severity(line)
-    FINDING_PATTERNS.find { |_severity, pattern| line.match?(pattern) }&.first
+    primary_finding_match(line)&.first
+  end
+
+  def primary_finding_match(line)
+    FINDING_PATTERNS.each do |severity, pattern|
+      match = line.match(pattern)
+      return [severity, match] if match
+    end
+
+    nil
   end
 
   def finding_occurrences(line)
-    first_severity = finding_severity(line)
-    return [] unless first_severity
+    primary_match = primary_finding_match(line)
+    return [] unless primary_match
+
+    first_severity, first_match = primary_match
 
     occurrences = [{ severity: first_severity, source_column: 1, marker_index: 1 }]
     line.scan(ADDITIONAL_SEVERITY_PATTERN) do
@@ -600,7 +608,30 @@ class PrMergeLedger
         marker_index: occurrences.length + 1
       }
     end
+
+    append_uncovered_priority_occurrences(line, first_match.end(0), occurrences)
+    occurrences.sort_by! { |occurrence| occurrence.fetch(:source_column) }
+    occurrences.each_with_index { |occurrence, index| occurrence[:marker_index] = index + 1 }
     occurrences
+  end
+
+  def append_uncovered_priority_occurrences(line, first_marker_end, occurrences)
+    line.scan(PRIORITY_MARKER_PATTERN) do
+      match = Regexp.last_match
+      next if match.begin(0) < first_marker_end
+
+      gap = line[first_marker_end...match.begin(0)].to_s
+      next if gap.match?(/\A\s*\z/)
+
+      source_column = match.begin(0) + 1
+      next if occurrences.any? { |occurrence| occurrence.fetch(:source_column) == source_column }
+
+      occurrences << {
+        severity: normalize_finding_severity(match[0]),
+        source_column:,
+        marker_index: nil
+      }
+    end
   end
 
   def normalize_finding_severity(raw_severity)
@@ -719,9 +750,8 @@ class PrMergeLedger
   def timestamp_sort_key(raw_timestamp, warning_context = nil)
     Time.parse(raw_timestamp.to_s)
   rescue ArgumentError
-    if warning_context
-      warn "pr-merge-ledger: #{warning_context} has invalid timestamp #{raw_timestamp.inspect}; treating as oldest"
-    end
+    label = warning_context || "timestamp"
+    warn "pr-merge-ledger: #{label} has invalid timestamp #{raw_timestamp.inspect}; treating as oldest"
     Time.at(0).utc
   end
 
@@ -1040,7 +1070,7 @@ class PrMergeLedger
 
     def next_cursor(page_info, connection_name, previous_cursor)
       cursor = page_info.fetch("endCursor")
-      if cursor.nil? || cursor == previous_cursor
+      if cursor.nil? || cursor.to_s.empty? || cursor == previous_cursor
         raise Error, "pagination cursor did not advance for #{connection_name}"
       end
 
@@ -1083,10 +1113,7 @@ class PrMergeLedger
     def graphql(query, variables)
       args = ["api", "graphql", "-f", "owner=#{@owner}", "-f", "name=#{@name}", "-f", "query=#{query}"]
       variables.each do |key, value|
-        next if value.nil?
-
-        flag = value.is_a?(Integer) ? "-F" : "-f"
-        args.push(flag, "#{key}=#{value}")
+        append_graphql_variable(args, key, value)
       end
 
       stdout, stderr, status = capture_gh_with_retries(args)
@@ -1100,15 +1127,32 @@ class PrMergeLedger
       end
     end
 
+    def append_graphql_variable(args, key, value)
+      return if value.nil?
+
+      value_string = value.to_s
+      if !value.is_a?(Integer) && value_string.start_with?("@")
+        raise Error, "gh api graphql variable #{key} cannot start with @"
+      end
+
+      flag = value.is_a?(Integer) ? "-F" : "-f"
+      args.push(flag, "#{key}=#{value_string}")
+    end
+
     def capture_gh_with_retries(args)
       attempt = 0
       loop do
         attempt += 1
         stdout, stderr, status = capture_gh(args)
         return [stdout, stderr, status] if status.success? || attempt >= GITHUB_API_MAX_ATTEMPTS
+        return [stdout, stderr, status] if non_retryable_gh_error?(stderr)
 
         sleep(GITHUB_API_RETRY_BASE_DELAY_SECONDS * (2**(attempt - 1)))
       end
+    end
+
+    def non_retryable_gh_error?(stderr)
+      stderr.to_s.match?(/\b(?:401|403|404|422|Not Found|Unauthorized|Forbidden)\b/i)
     end
 
     def capture_gh(args)
