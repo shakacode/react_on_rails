@@ -364,7 +364,7 @@ export async function preloadSourceMapJsonForBundle(bundleFilePath: string, bund
   // Leave misses lazy; VM registrations mark them retryable so a first error
   // before the map copy finishes does not cache a permanent miss.
   const sourceMapJson = await readSourceMapJsonForBundleAsync(bundleFilePath, sourceMappingUrl);
-  if (sourceMapJson !== undefined && sourceMappingUrl && !isValidJson(sourceMapJson)) {
+  if (sourceMapJson !== undefined && !isValidJson(sourceMapJson)) {
     log.debug('Preloaded source map for bundle %s is not valid JSON yet; retrying lazily.', bundleFilePath);
     return undefined;
   }
@@ -402,7 +402,7 @@ export function registerBundleForSourceMaps(
     sourceMapJson:
       preloadedSourceMapJson !== undefined
         ? preloadedSourceMapJson
-        : (inlineSourceMapJson ?? (sourceMappingUrl === null ? null : undefined)),
+        : (inlineSourceMapJson ?? (sourceMappingUrl === null && !retryMissingSourceMap ? null : undefined)),
     retryMissingSourceMap,
   };
   const previousRegistration = registeredBundles.get(bundleFilePath);
@@ -528,7 +528,10 @@ function sourceMapForRegistration(registration: BundleSourceMapRegistration): Lo
     if (sourceMap) {
       sourceMapCache.set(registration, sourceMap);
       missingSourceMapRetryCounts.delete(registration);
-    } else if (!shouldRetryMissingSourceMap(registration) || registration.sourceMappingUrl === null) {
+    } else if (
+      !shouldRetryMissingSourceMap(registration) ||
+      (registration.sourceMappingUrl === null && !registration.retryMissingSourceMap)
+    ) {
       sourceMapCache.set(registration, sourceMap);
     } else {
       recordMissingSourceMapRetry(registration);

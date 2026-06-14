@@ -335,6 +335,23 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
   });
 
+  test('fallback source map lookup retries after preload reads partial map content', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapPath = `${bundlePath}.map`;
+    await writeVmBundle(buildThrowingBundleSource());
+    await fsPromises.writeFile(mapPath, '{"version":3,');
+
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+  });
+
   test('percent-encoded data URL source maps are used', async () => {
     const bundlePath = await writeVmBundle(
       `${buildThrowingBundleSource()}\n${inlinePercentEncodedSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
