@@ -71,6 +71,8 @@ export const chainRecoverableErrorHandlers =
     next?.(error, errorInfo);
   };
 
+// Backward-compatibility default export for consumers that imported the original Pro handler;
+// current internal callers use `chainRecoverableErrorHandlers` so user callbacks can be appended.
 const handleRecoverableError = chainRecoverableErrorHandlers();
 
 export default handleRecoverableError;

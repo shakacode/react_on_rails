@@ -206,6 +206,7 @@ type RootErrorCallbackOptions = Pick<
   'onRecoverableError' | 'onCaughtError' | 'onUncaughtError'
 >;
 
+/** @internal Used by Pro via the `@internal/rootErrorHandlers` alias; not part of the public API. */
 export interface BuildRootErrorCallbackOptionsExtras {
   /**
    * Set by Pro callers that chain their own default reporting around the returned
