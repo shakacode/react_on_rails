@@ -13,7 +13,7 @@ class ContactMessagesController < ApplicationController
 
   def create
     contact_message = ContactMessage.new(contact_message_params)
-    if contact_message.valid?
+    if contact_message.valid? # non-persisted model -- validate without saving
       render json: { message: "Thanks, #{contact_message.name}! Your message has been received." },
              status: :created
     else

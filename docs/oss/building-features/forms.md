@@ -145,7 +145,7 @@ const form = useRailsForm(initialData);
 | `reset(...fields)`                     | Restore all (or the given) fields to their initial values; clears matching errors and `wasSuccessful`. Initial values are the `initialData` from the first render — later prop changes are not tracked (Inertia `useForm` semantics); remount to re-seed. |
 | `clearErrors(...fields)`               | Clear all (or the given) field errors.                                                                                                                                                                                                                    |
 | `setError(field, messages)`            | Set errors for one field manually.                                                                                                                                                                                                                        |
-| `RailsFormRequestError`                | Rejection error for non-2xx responses other than a mappable 422; carries the unread `Response` plus `responseBody` (parsed JSON) for an unmappable 422.                                                                                                   |
+| `RailsFormRequestError`                | Exported error class (import separately; it is not a `form` member) for non-2xx responses other than a mappable 422; carries the unread `Response` plus `responseBody` (parsed JSON) for an unmappable 422.                                               |
 
 Per-submit `options`: `headers` (merged in; CSRF headers always win),
 `onSuccess(result)`, and `onError(errors)`.

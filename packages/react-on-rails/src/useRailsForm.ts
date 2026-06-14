@@ -187,9 +187,22 @@ const safeJsonRedirectHint = (redirectTo: string): string | null => {
   return null;
 };
 
+const isSameOriginRequestUrl = (url: string): boolean => {
+  const currentOrigin = typeof window === 'undefined' ? null : window.location.origin;
+  if (currentOrigin === null) {
+    return true;
+  }
+
+  try {
+    return new URL(url, currentOrigin).origin === currentOrigin;
+  } catch {
+    return false;
+  }
+};
+
 const extractRedirectTo = (response: Response, responseData: unknown): string | null => {
   if (response.redirected && response.url) {
-    return response.url;
+    return safeJsonRedirectHint(response.url);
   }
   if (typeof responseData === 'object' && responseData !== null) {
     const { redirect_to: redirectSnake, redirectTo: redirectCamel } = responseData as {
@@ -243,6 +256,7 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
 
   // Guards against state updates from stale (superseded) or unmounted submissions.
   const submissionIdRef = useRef(0);
+  const pendingSubmissionsRef = useRef(0);
   const mountedRef = useRef(true);
   useEffect(() => {
     // Re-assigning true is NOT redundant: under React StrictMode (and Fast
@@ -305,10 +319,21 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
 
   const submit = useCallback(
     async (method: RailsFormMethod, url: string, options: RailsFormSubmitOptions = {}) => {
+      if (!isSameOriginRequestUrl(url)) {
+        throw new Error('useRailsForm can only submit to same-origin URLs.');
+      }
+
       submissionIdRef.current += 1;
       const submissionId = submissionIdRef.current;
       const isCurrent = () => mountedRef.current && submissionId === submissionIdRef.current;
+      const finishSubmission = () => {
+        pendingSubmissionsRef.current = Math.max(0, pendingSubmissionsRef.current - 1);
+        if (mountedRef.current && pendingSubmissionsRef.current === 0) {
+          setProcessing(false);
+        }
+      };
 
+      pendingSubmissionsRef.current += 1;
       setProcessing(true);
       setWasSuccessful(false);
       setErrors({});
@@ -336,9 +361,7 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
           body: method === 'delete' ? undefined : JSON.stringify(dataRef.current),
         });
       } catch (fetchError) {
-        if (isCurrent()) {
-          setProcessing(false);
-        }
+        finishSubmission();
         throw fetchError;
       }
 
@@ -350,25 +373,23 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
         if (validationErrors) {
           if (isCurrent()) {
             setErrors(validationErrors);
-            setProcessing(false);
+            finishSubmission();
             options.onError?.(validationErrors);
+          } else {
+            finishSubmission();
           }
           return { ok: false as const, errors: validationErrors, response };
         }
-        if (isCurrent()) {
-          setProcessing(false);
-        }
+        finishSubmission();
         throw new RailsFormRequestError(response, body);
       }
 
       if (!response.ok) {
-        if (isCurrent()) {
-          setProcessing(false);
-        }
+        finishSubmission();
         throw new RailsFormRequestError(response);
       }
 
-      const responseData = await parseJsonBody(response);
+      const responseData = await parseJsonBody(response.clone());
       const result: RailsFormSuccessResult = {
         ok: true,
         responseData,
@@ -378,10 +399,12 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
       if (isCurrent()) {
         setErrors({});
         setWasSuccessful(true);
-        setProcessing(false);
+        finishSubmission();
         // Guarded like the state updates: a superseded submission must not
         // fire callbacks (e.g. navigate on redirectTo) after a newer one.
         options.onSuccess?.(result);
+      } else {
+        finishSubmission();
       }
       return result;
     },

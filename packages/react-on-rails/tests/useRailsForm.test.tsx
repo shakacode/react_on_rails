@@ -19,12 +19,19 @@ interface MockResponseOptions {
 // Minimal structural stand-in for the fetch Response (jsdom has no fetch).
 const mockResponse = (options: MockResponseOptions = {}): Response => {
   const { status = 200, body = null, redirected = false, url = '' } = options;
+  let bodyUsed = false;
   return {
     ok: status >= 200 && status < 300,
     status,
     redirected,
     url,
-    json: () => (body === null ? Promise.reject(new Error('no body')) : Promise.resolve(body)),
+    json: () => {
+      if (bodyUsed) {
+        return Promise.reject(new TypeError('body already used'));
+      }
+      bodyUsed = true;
+      return body === null ? Promise.reject(new Error('no body')) : Promise.resolve(body);
+    },
     clone: () => mockResponse(options),
   } as unknown as Response;
 };
@@ -75,6 +82,17 @@ describe('useRailsForm', () => {
 
       const [, init] = fetchMock.mock.calls[0];
       expect(init.headers).toMatchObject({ 'X-Custom': 'yes', 'X-CSRF-Token': TEST_CSRF_TOKEN });
+    });
+
+    it('rejects cross-origin submit URLs before attaching CSRF headers', async () => {
+      const { result } = renderHook(() => useRailsForm({ a: 1 }));
+
+      await act(async () => {
+        await expect(result.current.post('https://example.com/things')).rejects.toThrow(/same-origin URLs/);
+      });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.current.processing).toBe(false);
     });
 
     it.each([
@@ -195,6 +213,51 @@ describe('useRailsForm', () => {
         await expect(result.current.post('/things')).rejects.toThrow('network down');
       });
 
+      expect(result.current.processing).toBe(false);
+    });
+
+    it('stays processing until all overlapping submissions settle', async () => {
+      let resolveFirst!: (response: Response) => void;
+      let resolveSecond!: (response: Response) => void;
+      fetchMock
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveFirst = resolve;
+            }),
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveSecond = resolve;
+            }),
+        );
+      const { result } = renderHook(() => useRailsForm({ a: 1 }));
+
+      let firstSubmit: Promise<unknown> = Promise.resolve();
+      let secondSubmit: Promise<unknown> = Promise.resolve();
+      act(() => {
+        firstSubmit = result.current.post('/things');
+      });
+      await waitFor(() => expect(result.current.processing).toBe(true));
+      act(() => {
+        secondSubmit = result.current.post('/things');
+      });
+
+      act(() => {
+        resolveSecond(mockResponse({ status: 200, body: { ok: true } }));
+      });
+      await act(async () => {
+        await secondSubmit;
+      });
+      expect(result.current.processing).toBe(true);
+
+      act(() => {
+        resolveFirst(mockResponse({ status: 200, body: { ok: true } }));
+      });
+      await act(async () => {
+        await firstSubmit;
+      });
       expect(result.current.processing).toBe(false);
     });
   });
@@ -407,10 +470,14 @@ describe('useRailsForm', () => {
       });
     });
 
-    it('reports the followed redirect URL when fetch followed a redirect', async () => {
-      fetchMock.mockResolvedValue(
-        mockResponse({ status: 200, body: null, redirected: true, url: 'http://localhost/posts/1' }),
-      );
+    it('reports only same-origin followed redirect URLs', async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          mockResponse({ status: 200, body: null, redirected: true, url: 'http://localhost/posts/1' }),
+        )
+        .mockResolvedValueOnce(
+          mockResponse({ status: 200, body: null, redirected: true, url: 'https://example.com/posts/1' }),
+        );
       const { result } = renderHook(() => useRailsForm({ title: 'Hi' }));
 
       let submitResult: Awaited<ReturnType<typeof result.current.post>>;
@@ -423,6 +490,33 @@ describe('useRailsForm', () => {
         responseData: null,
         redirectTo: 'http://localhost/posts/1',
       });
+
+      await act(async () => {
+        submitResult = await result.current.post('/posts');
+      });
+
+      expect(submitResult!).toMatchObject({
+        ok: true,
+        responseData: null,
+        redirectTo: null,
+      });
+    });
+
+    it('keeps the success response readable after parsing responseData', async () => {
+      fetchMock.mockResolvedValue(mockResponse({ status: 200, body: { message: 'created' } }));
+      const { result } = renderHook(() => useRailsForm({ title: 'Hi' }));
+
+      let submitResult: Awaited<ReturnType<typeof result.current.post>>;
+      await act(async () => {
+        submitResult = await result.current.post('/posts');
+      });
+
+      expect(submitResult!.ok).toBe(true);
+      if (!submitResult!.ok) {
+        throw new Error('expected a successful submit result');
+      }
+      expect(submitResult!.responseData).toEqual({ message: 'created' });
+      await expect(submitResult!.response.json()).resolves.toEqual({ message: 'created' });
     });
 
     it('rejects with RailsFormRequestError for non-422 failures', async () => {
