@@ -507,6 +507,50 @@ test_repo_requires_owner_repo_form() {
   esac
 }
 
+test_sourced_main_propagates_marker_fetch_failure_without_errexit() {
+  local tmpdir repo fake_bin base out actual_rc
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
+  repo="$tmpdir/repo"
+  fake_bin="$tmpdir/bin"
+  mkdir -p "$repo" "$fake_bin"
+  cat > "$fake_bin/gh" <<'BASH'
+#!/usr/bin/env bash
+echo "simulated gh failure" >&2
+exit 1
+BASH
+  chmod +x "$fake_bin/gh"
+
+  git -C "$repo" init --quiet --initial-branch=main
+  git -C "$repo" config user.email "test@example.com"
+  git -C "$repo" config user.name "Test User"
+  git -C "$repo" commit --quiet --allow-empty -m "base"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" commit --quiet --allow-empty -m "Main line change (#4014)"
+
+  out="$(
+    bash -c '
+      set +e
+      set -u
+      set -o pipefail
+      source "$1"
+      cd "$2"
+      PATH="$3:$PATH" pma_scope_main --base "$4" --head HEAD --repo owner/repo --json 2>&1
+      printf "\nrc=%s\n" "$?"
+    ' bash "$RESOLVER" "$repo" "$fake_bin" "$base"
+  )"
+  actual_rc="$(printf '%s\n' "$out" | awk -F= '$1 == "rc" { print $2 }')"
+
+  rm -rf "$tmpdir"
+  assert_equals "1" "$actual_rc" "sourced marker fetch failure rc"
+  case "$out" in
+    *"failed to search open post-merge audit finding issues"*) ;;
+    *)
+      fail "marker fetch error message missing: $out"
+      ;;
+  esac
+}
+
 test_sourced_main_help_does_not_change_shell_options() {
   local out expected
 
@@ -590,6 +634,7 @@ run_test test_resolver_rejects_base_outside_first_parent_history
 run_test test_fetch_issue_markers_cleans_inner_tmpdir_on_parse_failure
 run_test test_limit_requires_positive_integer
 run_test test_repo_requires_owner_repo_form
+run_test test_sourced_main_propagates_marker_fetch_failure_without_errexit
 run_test test_sourced_main_help_does_not_change_shell_options
 run_test test_sourced_main_run_preserves_cwd_and_exit_trap
 

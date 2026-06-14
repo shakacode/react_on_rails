@@ -49,12 +49,13 @@ pma_scope_default_base_ref() {
   head_ref="$1"
 
   while IFS= read -r commit; do
+    # If multiple RC tags point at the same commit, git tag order is the tie-breaker.
     tag="$(git tag --points-at "$commit" --list '*.rc.*' | head -n 1)"
     if [ -n "$tag" ]; then
       printf '%s\n' "$tag"
       return 0
     fi
-  done < <(git rev-list --first-parent "$head_ref" 2>/dev/null || true)
+  done < <(git rev-list --first-parent --max-count=10000 "$head_ref" 2>/dev/null || true)
 
   return 0
 }
@@ -615,7 +616,7 @@ pma_scope_main() (
   git log --first-parent --reverse --format='%H%x09%s' "${base_sha}..${head_sha}" |
     pma_scope_parse_git_log > "$merged_file"
   pma_scope_tsv_pr_numbers "$merged_file" > "$merged_numbers_file"
-  pma_scope_fetch_issue_markers "$repo" "$limit" "$markers_file" "$open_markers_file"
+  pma_scope_fetch_issue_markers "$repo" "$limit" "$markers_file" "$open_markers_file" || return 1
   pma_scope_marker_pr_numbers "$open_markers_file" > "$marker_numbers_file"
   pma_scope_intersect_prs "$merged_numbers_file" "$marker_numbers_file" > "$carry_file"
   pma_scope_subtract_prs "$merged_numbers_file" "$carry_file" > "$to_audit_file"
