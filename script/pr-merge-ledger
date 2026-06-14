@@ -512,26 +512,30 @@ class PrMergeLedger
 
       finding_occurrences(line_text).length
     end
+    context = {
+      source_finding_count:,
+      dispositions:,
+      used_disposition_keys:
+    }
 
     lines.each_with_index.flat_map do |line_text, index|
-      findings_from_line(line_text, index + 1, { url:, id: }, dispositions, used_disposition_keys, source_finding_count)
+      findings_from_line(line_text, index + 1, { url:, id: }, context)
     end
   end
 
-  def findings_from_line(line_text, source_line, source, dispositions, used_disposition_keys, source_finding_count = nil)
+  def findings_from_line(line_text, source_line, source, context)
     return [] if non_actionable_finding_summary?(line_text)
 
     occurrences = finding_occurrences(line_text)
     return [] if occurrences.empty?
 
-    context = {
+    source_finding_count = context.fetch(:source_finding_count) || occurrences.length
+    finding_context = context.merge(
       multiple_markers: occurrences.length > 1,
-      source_finding_count: source_finding_count || occurrences.length,
-      dispositions:,
-      used_disposition_keys:
-    }
+      source_finding_count:
+    )
     occurrences.map do |occurrence|
-      finding_from_occurrence(line_text, source_line, source, occurrence, context)
+      finding_from_occurrence(line_text, source_line, source, occurrence, finding_context)
     end
   end
 
@@ -588,8 +592,26 @@ class PrMergeLedger
 
     summary = match[:summary].to_s
     return false unless summary.match?(FINDING_SUMMARY_SUBJECT_PATTERN)
-    return false if summary.match?(ADDITIONAL_SEVERITY_PATTERN)
+    return false unless resolved_finding_summary_clause?(summary)
 
+    additional_finding_summary_clauses(summary).all? do |clause|
+      resolved_finding_summary_clause?(clause)
+    end
+  end
+
+  def additional_finding_summary_clauses(summary)
+    matches = []
+    summary.scan(ADDITIONAL_SEVERITY_PATTERN) do
+      matches << Regexp.last_match
+    end
+
+    matches.map.with_index do |match, index|
+      clause_end = matches[index + 1]&.begin(0) || summary.length
+      summary[match.begin(:severity)...clause_end].to_s
+    end
+  end
+
+  def resolved_finding_summary_clause?(summary)
     first_clause = summary.split(/[.;(]/, 2).first.to_s
     return false if first_clause.match?(NEGATED_SUMMARY_RESOLUTION_PATTERN)
 

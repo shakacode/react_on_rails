@@ -1333,6 +1333,56 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "ignores resolved multi-severity summary lines" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "resolved-multi-severity-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/resolved-multi-severity-review",
+          "body" => [
+            "P1 and P2 findings fixed.",
+            "P1 issues fixed; P2 findings resolved.",
+            "P1 issues fixed and P2 findings were waived."
+          ].join("\n")
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-resolved-multi-severity-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      pr_ledger = report.fetch("pull_requests").first
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(pr_ledger.dig("p1_p2_must_fix_dispositions", "findings")).to be_empty
+    end
+  end
+
   it "blocks severity summaries that say an issue is not resolved" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
