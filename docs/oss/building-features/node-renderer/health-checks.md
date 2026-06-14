@@ -25,6 +25,10 @@ probes cannot carry it). Keep the renderer on `localhost` or private networking 
 The endpoints are **off by default**. Enable them with the `enableHealthEndpoints` config option or the
 `RENDERER_ENABLE_HEALTH_ENDPOINTS` environment variable (`true`, `TRUE`, `yes`, `YES`, or `1`):
 
+Those string values are parsed by the shared node-renderer `truthy()` helper, so the same accepted values also apply
+to other boolean environment variables that use that helper directly, such as `RENDERER_SUPPORT_MODULES` and
+`REPLAY_SERVER_ASYNC_OPERATION_LOGS`.
+
 ```js
 // renderer/node-renderer.js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');

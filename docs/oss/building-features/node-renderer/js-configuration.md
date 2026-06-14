@@ -48,7 +48,7 @@ available default ENV values if you wire them into your own launch script.
    Because these functions are valid client-side, they are ignored on server-side rendering without errors or warnings.
    Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
-1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS=true` or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
+1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
 
 Deprecated options:
 

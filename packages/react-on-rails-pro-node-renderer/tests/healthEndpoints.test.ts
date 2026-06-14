@@ -128,7 +128,7 @@ describe('built-in health endpoints', () => {
     expect(JSON.parse(res.payload)).toEqual({ status: 'ok' });
   });
 
-  test.each(['true', '1'])(
+  test.each(['true', 'TRUE', 'yes', 'YES', '1'])(
     'GET /health and GET /ready are registered when env var is %s',
     async (envValue) => {
       process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS = envValue;

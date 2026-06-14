@@ -132,6 +132,8 @@ function applyFastifyConfigWithHealthEndpointMigrationHint(
   app: FastifyInstance,
   enableHealthEndpoints: boolean,
 ) {
+  // This wraps synchronous configureFastify route registration only. Async
+  // Fastify plugins still surface Fastify's duplicate-route error during boot.
   try {
     applyFastifyConfigFunctions(app);
   } catch (error) {

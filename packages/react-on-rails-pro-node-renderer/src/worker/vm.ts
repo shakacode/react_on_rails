@@ -79,6 +79,9 @@ export function getVMContext(bundlePath: string): VMContext | undefined {
  * This intentionally stays false while a bundle is still compiling in
  * vmCreationPromises; /ready flips to 200 only after compilation finishes and
  * the compiled context is stored in vmContexts.
+ *
+ * Pool eviction can remove older bundle contexts, but readiness remains true as
+ * long as at least one compiled bundle remains in the pool.
  */
 export function hasAnyVMContext() {
   return vmContexts.size > 0;
