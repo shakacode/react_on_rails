@@ -2,6 +2,10 @@
 
 Flight Protocol, Wire format or RSC payload are different names for a serialization method that can be used to transfer different types of data between server and client. These data can be react elements, JSON objects, JavaScript primitives, react server function calls or results, ...etc. Flight Protocol format consists of multiple lines separated by new line, each line is called a chunk. Each chunk have the following format
 
+<p align="center">
+  <img src="images/flight-payload-streaming.svg" alt="Animated diagram showing how React Server Components serialize the element tree into Flight protocol wire-format chunks that stream to the client, where React reconstructs the component tree. Shows hint chunks, import chunks, model chunks, and streaming promise resolution." width="840" />
+</p>
+
 ```rsc
 <chunk id (hexa-decimal integer)>:<optional tag><JSON stringified payload>
 ```

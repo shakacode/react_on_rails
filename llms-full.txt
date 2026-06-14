@@ -628,6 +628,16 @@ starting from.
 Check each entry's note before evaluating — some starters are fully open
 source, while others require React on Rails Pro.
 
+### OSS Flagship Demo (open source)
+
+- Repo: [shakacode/react-on-rails-demo-flagship](https://github.com/shakacode/react-on-rails-demo-flagship)
+- Use it when you want the canonical clone-and-run open-source demo: a real
+  ActiveRecord-backed CRUD task board with server-side rendering, React 19,
+  TypeScript, Redux Toolkit, and Shakapacker + Rspack — no Pro, no RSC.
+- Two run modes: `bin/dev` for local development and `docker compose up` for a
+  deterministic container boot; `bin/smoke` verifies the server-rendered HTML
+  and exits non-zero if SSR fails.
+
 ### SSR + HMR Tutorial Demo (open source)
 
 - Repo: [shakacode/react-on-rails-demo-ssr-hmr](https://github.com/shakacode/react-on-rails-demo-ssr-hmr)

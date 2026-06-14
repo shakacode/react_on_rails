@@ -19,6 +19,10 @@ When React on Rails Pro encounters `<RSCRoute componentName="Dashboard" componen
 2. **During client-side navigation**, when `RSCRoute` appears in the tree for the first time (e.g., the user navigates to a new route), the client fetches the RSC payload from the server over HTTP and renders it.
 3. **When props change**, a new HTTP request is made for each unique combination of `componentName` and props. Identical combinations are cached (see [Performance and caching behavior](#performance-and-caching-behavior)).
 
+<p align="center">
+  <img src="images/rsc-route-lifecycle.svg" alt="Animated diagram showing the three RSCRoute lifecycle phases: initial SSR with embedded payload (no HTTP request), client-side navigation triggering an HTTP fetch, and prop changes using a cache keyed by componentName + JSON.stringify(props)." width="840" />
+</p>
+
 For this to work, `RSCRoute` needs the `RSCProvider` context it relies on internally. A client component tree that server-renders `RSCRoute` payloads must be wrapped with `wrapServerComponentRenderer`, which provides that context automatically. You never need to create an `RSCProvider` yourself.
 
 When you use `ssr={false}` to skip server rendering for a route, there is no server RSC payload work for the wrapper to do. The route still needs provider context in the browser so it can fetch its payload; if the component is not wrapped with `wrapServerComponentRenderer`, React on Rails Pro can provide that client-side `RSCProvider` context automatically. If the same tree server-renders any `RSCRoute` payloads, keep using `wrapServerComponentRenderer`.

@@ -1,0 +1,273 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>RSCRoute Lifecycle</title>
+  <desc>Animated diagram showing the three RSCRoute lifecycle phases: initial SSR with embedded payload (no HTTP request), client-side navigation triggering an HTTP fetch, and prop changes using a cache keyed by componentName + JSON.stringify(props).</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .phase-header { fill: #DBEAFE; stroke: #93C5FD; }
+      .phase-text { fill: #1E40AF; }
+      .server-box { fill: #ECFDF5; stroke: #22C55E; }
+      .server-text { fill: #166534; }
+      .client-box { fill: #FFF7ED; stroke: #F97316; }
+      .client-text { fill: #9A3412; }
+      .cache-box { fill: #FEF3C7; stroke: #FCD34D; }
+      .cache-text { fill: #92400E; }
+      .arrow-body { fill: #94A3B8; }
+      .arrow-line { stroke: #94A3B8; }
+      .http-line { stroke: #3B82F6; }
+      .http-text { fill: #3B82F6; }
+      .no-http { fill: #D1FAE5; stroke: #22C55E; }
+      .no-http-text { fill: #166534; }
+      .code-bg { fill: #1E293B; }
+      .code-text { fill: #E2E8F0; }
+      .code-keyword { fill: #67E8F9; }
+      .code-string { fill: #4ADE80; }
+      .code-fn { fill: #C4B5FD; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+      .step-circle { fill: #3B82F6; }
+      .step-num { fill: white; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .phase-header { fill: #172554; stroke: #3B82F6; }
+        .phase-text { fill: #93C5FD; }
+        .server-box { fill: #052E16; stroke: #10B981; }
+        .server-text { fill: #6EE7B7; }
+        .client-box { fill: #431407; stroke: #F97316; }
+        .client-text { fill: #FDBA74; }
+        .cache-box { fill: #422006; stroke: #F59E0B; }
+        .cache-text { fill: #FCD34D; }
+        .arrow-body { fill: #64748B; }
+        .arrow-line { stroke: #64748B; }
+        .http-line { stroke: #60A5FA; }
+        .http-text { fill: #60A5FA; }
+        .no-http { fill: #052E16; stroke: #10B981; }
+        .no-http-text { fill: #6EE7B7; }
+        .code-bg { fill: #0F172A; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+      }
+
+      .p1 { opacity: 1; animation: cycle1 16s ease infinite; }
+      .p2 { opacity: 0; animation: cycle2 16s ease infinite; }
+      .p3 { opacity: 0; animation: cycle3 16s ease infinite; }
+
+      @keyframes cycle1 {
+        0%, 28% { opacity: 1; } 33%, 100% { opacity: 0; }
+      }
+      @keyframes cycle2 {
+        0%, 28% { opacity: 0; } 33%, 60% { opacity: 1; } 65%, 100% { opacity: 0; }
+      }
+      @keyframes cycle3 {
+        0%, 60% { opacity: 0; } 65%, 92% { opacity: 1; } 97%, 100% { opacity: 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; opacity: 1 !important; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="500" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">RSCRoute Lifecycle</text>
+  <text x="450" y="46" text-anchor="middle" font-size="11" class="subtitle">Three phases: SSR with embedded payload → client-nav HTTP fetch → prop-change cache lookup</text>
+
+  <!-- Phase indicators (always visible) -->
+  <g>
+    <circle cx="155" cy="70" r="12" class="step-circle"/>
+    <text x="155" y="74" text-anchor="middle" font-size="10" font-weight="700" class="step-num">1</text>
+    <text x="175" y="74" font-size="10" font-weight="600" class="label-text">Initial SSR</text>
+
+    <circle cx="395" cy="70" r="12" class="step-circle"/>
+    <text x="395" y="74" text-anchor="middle" font-size="10" font-weight="700" class="step-num">2</text>
+    <text x="415" y="74" font-size="10" font-weight="600" class="label-text">Client Navigation</text>
+
+    <circle cx="660" cy="70" r="12" class="step-circle"/>
+    <text x="660" y="74" text-anchor="middle" font-size="10" font-weight="700" class="step-num">3</text>
+    <text x="680" y="74" font-size="10" font-weight="600" class="label-text">Props Change</text>
+  </g>
+
+  <!-- ============ PHASE 1: Initial SSR ============ -->
+  <g class="p1">
+    <rect x="30" y="90" width="840" height="300" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="30" y="90" width="840" height="30" rx="12" class="phase-header" stroke-width="1"/>
+    <rect x="30" y="108" width="840" height="12" class="phase-header"/>
+    <text x="450" y="110" text-anchor="middle" font-size="12" font-weight="600" class="phase-text">Phase 1: Initial Page Load (Server-Side Rendering)</text>
+
+    <!-- Server renders -->
+    <rect x="60" y="134" width="200" height="60" rx="8" class="server-box" stroke-width="1.5"/>
+    <text x="160" y="156" text-anchor="middle" font-size="10" font-weight="600" class="server-text">Rails renders page</text>
+    <text x="160" y="172" text-anchor="middle" font-size="9" class="server-text">RSCRoute payload included</text>
+
+    <!-- Arrow -->
+    <line x1="260" y1="164" x2="310" y2="164" class="arrow-line" stroke-width="2"/>
+    <polygon points="310,158 322,164 310,170" class="arrow-body"/>
+
+    <!-- Embedded in HTML -->
+    <rect x="324" y="130" width="260" height="74" rx="8" class="code-bg"/>
+    <text x="340" y="150" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">&lt;script</text>
+    <text x="384" y="150" font-family="ui-monospace, monospace" font-size="9" class="code-text"> id=</text>
+    <text x="340" y="166" font-family="ui-monospace, monospace" font-size="9" class="code-string">  "REACT_ON_RAILS_RSC_PAYLOADS"</text>
+    <text x="340" y="182" font-family="ui-monospace, monospace" font-size="9" class="code-text">&gt;{payload JSON}&lt;/</text>
+    <text x="482" y="182" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">script</text>
+    <text x="518" y="182" font-family="ui-monospace, monospace" font-size="9" class="code-text">&gt;</text>
+    <text x="340" y="198" font-family="ui-monospace, monospace" font-size="8" class="label-sub">Embedded directly in HTML response</text>
+
+    <!-- Arrow -->
+    <line x1="584" y1="164" x2="634" y2="164" class="arrow-line" stroke-width="2"/>
+    <polygon points="634,158 646,164 634,170" class="arrow-body"/>
+
+    <!-- Browser reads -->
+    <rect x="648" y="134" width="200" height="60" rx="8" class="client-box" stroke-width="1.5"/>
+    <text x="748" y="156" text-anchor="middle" font-size="10" font-weight="600" class="client-text">Browser hydrates</text>
+    <text x="748" y="172" text-anchor="middle" font-size="9" class="client-text">Reads embedded payload</text>
+
+    <!-- No HTTP callout -->
+    <rect x="280" y="224" width="340" height="30" rx="8" class="no-http" stroke-width="1.5"/>
+    <text x="450" y="244" text-anchor="middle" font-size="11" font-weight="700" class="no-http-text">No HTTP request needed — payload is already in the HTML</text>
+
+    <!-- Flow description -->
+    <text x="450" y="286" text-anchor="middle" font-size="10" class="label-text">Server pre-renders the RSC payload and embeds it in the HTML response.</text>
+    <text x="450" y="302" text-anchor="middle" font-size="10" class="label-text">The browser reads it from the DOM — zero additional network requests.</text>
+
+    <!-- SSR prop -->
+    <rect x="60" y="320" width="808" height="56" rx="8" class="code-bg"/>
+    <text x="76" y="340" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">&lt;RSCRoute</text>
+    <text x="148" y="340" font-family="ui-monospace, monospace" font-size="10" class="code-text"> componentName=</text>
+    <text x="282" y="340" font-family="ui-monospace, monospace" font-size="10" class="code-string">"Dashboard"</text>
+    <text x="364" y="340" font-family="ui-monospace, monospace" font-size="10" class="code-text"> ssr={</text>
+    <text x="400" y="340" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">true</text>
+    <text x="430" y="340" font-family="ui-monospace, monospace" font-size="10" class="code-text">} /&gt;</text>
+    <text x="480" y="340" font-family="ui-monospace, monospace" font-size="10" class="label-sub">← default, payload embedded in initial HTML</text>
+    <text x="76" y="362" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">&lt;RSCRoute</text>
+    <text x="148" y="362" font-family="ui-monospace, monospace" font-size="10" class="code-text"> componentName=</text>
+    <text x="282" y="362" font-family="ui-monospace, monospace" font-size="10" class="code-string">"Widget"</text>
+    <text x="340" y="362" font-family="ui-monospace, monospace" font-size="10" class="code-text">   ssr={</text>
+    <text x="392" y="362" font-family="ui-monospace, monospace" font-size="10" class="code-keyword">false</text>
+    <text x="428" y="362" font-family="ui-monospace, monospace" font-size="10" class="code-text">} /&gt;</text>
+    <text x="480" y="362" font-family="ui-monospace, monospace" font-size="10" class="label-sub">← skipped during SSR, fetched on client</text>
+  </g>
+
+  <!-- ============ PHASE 2: Client Navigation ============ -->
+  <g class="p2">
+    <rect x="30" y="90" width="840" height="300" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="30" y="90" width="840" height="30" rx="12" class="phase-header" stroke-width="1"/>
+    <rect x="30" y="108" width="840" height="12" class="phase-header"/>
+    <text x="450" y="110" text-anchor="middle" font-size="12" font-weight="600" class="phase-text">Phase 2: Client-Side Navigation (new route, first visit)</text>
+
+    <!-- Browser triggers nav -->
+    <rect x="60" y="140" width="200" height="50" rx="8" class="client-box" stroke-width="1.5"/>
+    <text x="160" y="162" text-anchor="middle" font-size="10" font-weight="600" class="client-text">User navigates</text>
+    <text x="160" y="178" text-anchor="middle" font-size="9" class="client-text">to /dashboard</text>
+
+    <!-- Arrow -->
+    <line x1="260" y1="165" x2="310" y2="165" class="arrow-line" stroke-width="2"/>
+    <polygon points="310,159 322,165 310,171" class="arrow-body"/>
+
+    <!-- RSCRoute checks cache -->
+    <rect x="324" y="134" width="200" height="62" rx="8" class="cache-box" stroke-width="1.5"/>
+    <text x="424" y="156" text-anchor="middle" font-size="10" font-weight="600" class="cache-text">RSCRoute checks cache</text>
+    <text x="424" y="172" text-anchor="middle" font-size="9" class="cache-text">key: "Dashboard" + props</text>
+    <text x="424" y="186" text-anchor="middle" font-size="9" class="cache-text">→ MISS (first visit)</text>
+
+    <!-- Arrow -->
+    <line x1="524" y1="165" x2="574" y2="165" class="arrow-line" stroke-width="2"/>
+    <polygon points="574,159 586,165 574,171" class="arrow-body"/>
+
+    <!-- HTTP fetch -->
+    <rect x="588" y="140" width="260" height="50" rx="8" class="server-box" stroke-width="1.5"/>
+    <text x="718" y="162" text-anchor="middle" font-size="10" font-weight="600" class="server-text">HTTP fetch RSC payload</text>
+    <text x="718" y="178" text-anchor="middle" font-size="9" class="server-text">GET /rsc_payload/Dashboard</text>
+
+    <!-- HTTP call line -->
+    <rect x="320" y="210" width="340" height="24" rx="6" fill="none" class="http-line" stroke-width="2" stroke-dasharray="8 4"/>
+    <text x="490" y="226" text-anchor="middle" font-size="10" font-weight="600" class="http-text">HTTP request — fetches RSC payload from server</text>
+
+    <!-- Return flow -->
+    <line x1="718" y1="190" x2="718" y2="256" class="arrow-line" stroke-width="2"/>
+    <polygon points="712,256 718,268 724,256" class="arrow-body"/>
+
+    <rect x="588" y="270" width="260" height="50" rx="8" class="client-box" stroke-width="1.5"/>
+    <text x="718" y="290" text-anchor="middle" font-size="10" font-weight="600" class="client-text">Render component</text>
+    <text x="718" y="306" text-anchor="middle" font-size="9" class="client-text">Cache the result for later</text>
+
+    <text x="300" y="286" text-anchor="middle" font-size="10" class="label-text">Result stored in cache:</text>
+    <rect x="120" y="296" width="360" height="22" rx="6" class="cache-box" stroke-width="1"/>
+    <text x="300" y="311" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" class="cache-text">"Dashboard" + JSON.stringify(props) → payload</text>
+
+    <text x="450" y="370" text-anchor="middle" font-size="10" class="label-text">Client-side navigation always checks cache first, then fetches on miss.</text>
+  </g>
+
+  <!-- ============ PHASE 3: Props Change ============ -->
+  <g class="p3">
+    <rect x="30" y="90" width="840" height="300" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="30" y="90" width="840" height="30" rx="12" class="phase-header" stroke-width="1"/>
+    <rect x="30" y="108" width="840" height="12" class="phase-header"/>
+    <text x="450" y="110" text-anchor="middle" font-size="12" font-weight="600" class="phase-text">Phase 3: Props Change (same route, new data)</text>
+
+    <!-- Props change trigger -->
+    <rect x="60" y="140" width="200" height="50" rx="8" class="client-box" stroke-width="1.5"/>
+    <text x="160" y="162" text-anchor="middle" font-size="10" font-weight="600" class="client-text">Props change</text>
+    <text x="160" y="178" text-anchor="middle" font-size="9" class="client-text">e.g. filter, page, locale</text>
+
+    <!-- Arrow to cache -->
+    <line x1="260" y1="165" x2="310" y2="165" class="arrow-line" stroke-width="2"/>
+    <polygon points="310,159 322,165 310,171" class="arrow-body"/>
+
+    <!-- Cache lookup -->
+    <rect x="324" y="130" width="240" height="70" rx="8" class="cache-box" stroke-width="1.5"/>
+    <text x="444" y="152" text-anchor="middle" font-size="10" font-weight="600" class="cache-text">Cache Lookup</text>
+    <text x="444" y="170" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" class="cache-text">key = componentName +</text>
+    <text x="444" y="186" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" class="cache-text">JSON.stringify(props)</text>
+
+    <!-- Branch: HIT -->
+    <line x1="444" y1="200" x2="280" y2="240" class="arrow-line" stroke-width="2"/>
+    <polygon points="274,236 280,248 286,236" class="arrow-body"/>
+    <text x="340" y="222" font-size="9" font-weight="600" class="no-http-text">HIT</text>
+
+    <rect x="140" y="250" width="280" height="50" rx="8" class="no-http" stroke-width="1.5"/>
+    <text x="280" y="272" text-anchor="middle" font-size="10" font-weight="600" class="no-http-text">Use cached payload — no HTTP</text>
+    <text x="280" y="288" text-anchor="middle" font-size="9" class="no-http-text">Same componentName + same props = instant</text>
+
+    <!-- Branch: MISS -->
+    <line x1="444" y1="200" x2="620" y2="240" class="arrow-line" stroke-width="2"/>
+    <polygon points="614,236 620,248 626,236" class="arrow-body"/>
+    <text x="560" y="222" font-size="9" font-weight="600" class="http-text">MISS</text>
+
+    <rect x="480" y="250" width="380" height="50" rx="8" class="server-box" stroke-width="1.5"/>
+    <text x="670" y="272" text-anchor="middle" font-size="10" font-weight="600" class="server-text">New HTTP request for updated props</text>
+    <text x="670" y="288" text-anchor="middle" font-size="9" class="server-text">Different props = different cache key</text>
+
+    <!-- Explanation -->
+    <rect x="140" y="320" width="620" height="50" rx="8" class="code-bg"/>
+    <text x="160" y="340" font-family="ui-monospace, monospace" font-size="9" class="code-text">cacheKey = </text>
+    <text x="232" y="340" font-family="ui-monospace, monospace" font-size="9" class="code-string">"Dashboard"</text>
+    <text x="306" y="340" font-family="ui-monospace, monospace" font-size="9" class="code-text"> + </text>
+    <text x="322" y="340" font-family="ui-monospace, monospace" font-size="9" class="code-fn">JSON.stringify</text>
+    <text x="424" y="340" font-family="ui-monospace, monospace" font-size="9" class="code-text">({ page: 2, locale: </text>
+    <text x="584" y="340" font-family="ui-monospace, monospace" font-size="9" class="code-string">"en"</text>
+    <text x="608" y="340" font-family="ui-monospace, monospace" font-size="9" class="code-text"> })</text>
+    <text x="160" y="358" font-family="ui-monospace, monospace" font-size="8" class="label-sub">Object identity doesn't matter — only the serialized JSON string is compared</text>
+  </g>
+
+  <!-- Bottom callout (always visible) -->
+  <rect x="100" y="410" width="700" height="76" rx="10" class="note-box" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="432" text-anchor="middle" font-size="11" font-weight="700" class="note-text">RSCRoute Caching Strategy</text>
+  <text x="450" y="452" text-anchor="middle" font-size="10" class="note-text">SSR: payload embedded in HTML (no fetch) → Navigation: cache check → HTTP on miss</text>
+  <text x="450" y="470" text-anchor="middle" font-size="10" class="note-text">Props change: identical serialized props = cache hit, different = new request</text>
+  <text x="450" y="484" text-anchor="middle" font-size="9" class="label-sub">Cache key: componentName + JSON.stringify(componentProps)</text>
+</svg>

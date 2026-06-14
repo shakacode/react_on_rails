@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Import Chain Contamination</title>
+  <desc>Static diagram showing how a small 'use client' component can inherit large chunk groups from heavier import paths, and the fix using a thin wrapper file to isolate the dependency tree.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .bad-header { fill: #FEE2E2; stroke: #FECACA; }
+      .bad-text { fill: #991B1B; }
+      .good-header { fill: #D1FAE5; stroke: #86EFAC; }
+      .good-text { fill: #166534; }
+      .component-box { fill: #DBEAFE; stroke: #93C5FD; }
+      .component-text { fill: #1E40AF; }
+      .heavy-box { fill: #FEE2E2; stroke: #F87171; }
+      .heavy-text { fill: #991B1B; }
+      .light-box { fill: #D1FAE5; stroke: #22C55E; }
+      .light-text { fill: #166534; }
+      .chunk-box { fill: #FEF3C7; stroke: #FCD34D; }
+      .chunk-text { fill: #92400E; }
+      .wrapper-box { fill: #F0FDF4; stroke: #22C55E; }
+      .wrapper-text { fill: #166534; }
+      .import-line { stroke: #94A3B8; }
+      .contamination-line { stroke: #EF4444; }
+      .clean-line { stroke: #22C55E; }
+      .arrow-body { fill: #94A3B8; }
+      .code-bg { fill: #1E293B; }
+      .code-text { fill: #E2E8F0; }
+      .code-keyword { fill: #67E8F9; }
+      .code-string { fill: #4ADE80; }
+      .code-fn { fill: #C4B5FD; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+      .size-bad { fill: #EF4444; }
+      .size-good { fill: #22C55E; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .bad-header { fill: #450A0A; stroke: #F87171; }
+        .bad-text { fill: #FCA5A5; }
+        .good-header { fill: #052E16; stroke: #10B981; }
+        .good-text { fill: #6EE7B7; }
+        .component-box { fill: #172554; stroke: #3B82F6; }
+        .component-text { fill: #93C5FD; }
+        .heavy-box { fill: #450A0A; stroke: #F87171; }
+        .heavy-text { fill: #FCA5A5; }
+        .light-box { fill: #052E16; stroke: #10B981; }
+        .light-text { fill: #6EE7B7; }
+        .chunk-box { fill: #422006; stroke: #F59E0B; }
+        .chunk-text { fill: #FCD34D; }
+        .wrapper-box { fill: #052E16; stroke: #10B981; }
+        .wrapper-text { fill: #6EE7B7; }
+        .import-line { stroke: #64748B; }
+        .contamination-line { stroke: #F87171; }
+        .clean-line { stroke: #10B981; }
+        .arrow-body { fill: #64748B; }
+        .code-bg { fill: #0F172A; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="460" class="bg"/>
+  <text x="450" y="26" text-anchor="middle" font-size="18" font-weight="700" class="title">Import Chain Contamination</text>
+  <text x="450" y="44" text-anchor="middle" font-size="11" class="subtitle">A small 'use client' component can inherit large chunks from shared imports</text>
+
+  <!-- ============ LEFT: The Problem ============ -->
+  <rect x="20" y="58" width="420" height="340" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="20" y="58" width="420" height="28" rx="12" class="bad-header" stroke-width="1"/>
+  <rect x="20" y="74" width="420" height="12" class="bad-header"/>
+  <text x="230" y="78" text-anchor="middle" font-size="12" font-weight="700" class="bad-text">❌ Problem: Shared Import</text>
+
+  <!-- PostsPage (heavy) -->
+  <rect x="40" y="100" width="170" height="36" rx="6" class="heavy-box" stroke-width="2"/>
+  <text x="125" y="118" text-anchor="middle" font-size="10" font-weight="600" class="heavy-text">PostsPage</text>
+  <text x="125" y="130" text-anchor="middle" font-size="8" class="heavy-text">heavy (lodash, moment)</text>
+
+  <!-- HelloWorldHooks (tiny) -->
+  <rect x="240" y="100" width="180" height="36" rx="6" class="light-box" stroke-width="2"/>
+  <text x="330" y="118" text-anchor="middle" font-size="10" font-weight="600" class="light-text">HelloWorldHooks</text>
+  <text x="330" y="130" text-anchor="middle" font-size="8" class="light-text">tiny (8 KB expected)</text>
+
+  <!-- Shared import node -->
+  <line x1="125" y1="136" x2="125" y2="160" class="import-line" stroke-width="1.5"/>
+  <line x1="330" y1="136" x2="330" y2="160" class="import-line" stroke-width="1.5"/>
+  <line x1="125" y1="160" x2="330" y2="160" class="contamination-line" stroke-width="2" stroke-dasharray="6 3"/>
+  <line x1="228" y1="160" x2="228" y2="176" class="contamination-line" stroke-width="2"/>
+
+  <rect x="148" y="176" width="160" height="30" rx="6" class="component-box" stroke-width="1.5"/>
+  <text x="228" y="196" text-anchor="middle" font-size="10" class="component-text">shared-utils.js</text>
+
+  <!-- Chunks pulled in -->
+  <line x1="228" y1="206" x2="228" y2="222" class="contamination-line" stroke-width="2"/>
+
+  <rect x="40" y="224" width="370" height="68" rx="8" class="chunk-box" stroke-width="2"/>
+  <text x="225" y="244" text-anchor="middle" font-size="10" font-weight="600" class="chunk-text">Inherited Chunk Groups</text>
+  <text x="225" y="262" text-anchor="middle" font-size="9" class="chunk-text">lodash (70 KB) + moment (200 KB) + react-markdown (80 KB)</text>
+  <text x="225" y="280" text-anchor="middle" font-size="9" class="chunk-text">+ vendor chunks from PostsPage's dependency tree</text>
+
+  <!-- Size callout -->
+  <rect x="80" y="306" width="280" height="32" rx="8" class="heavy-box" stroke-width="2"/>
+  <text x="220" y="322" text-anchor="middle" font-size="12" font-weight="700" class="heavy-text">Result: 382 KB download</text>
+  <text x="220" y="338" text-anchor="middle" font-size="9" class="bad-text">Expected 8 KB — 48× larger than necessary</text>
+
+  <!-- Arrow between panels -->
+  <rect x="446" y="190" width="28" height="60" rx="6" class="arrow-body" opacity="0.3"/>
+  <polygon points="460,260 448,248 472,248" class="arrow-body"/>
+  <text x="460" y="280" text-anchor="middle" font-size="8" font-weight="600" class="label-text">fix</text>
+
+  <!-- ============ RIGHT: The Fix ============ -->
+  <rect x="480" y="58" width="400" height="340" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="480" y="58" width="400" height="28" rx="12" class="good-header" stroke-width="1"/>
+  <rect x="480" y="74" width="400" height="12" class="good-header"/>
+  <text x="680" y="78" text-anchor="middle" font-size="12" font-weight="700" class="good-text">✅ Fix: Thin Wrapper</text>
+
+  <!-- PostsPage (heavy, isolated) -->
+  <rect x="500" y="100" width="160" height="36" rx="6" class="heavy-box" stroke-width="1.5" opacity="0.5"/>
+  <text x="580" y="118" text-anchor="middle" font-size="10" class="heavy-text">PostsPage</text>
+  <text x="580" y="130" text-anchor="middle" font-size="8" class="heavy-text">(isolated — own tree)</text>
+
+  <!-- Thin wrapper -->
+  <rect x="690" y="100" width="170" height="36" rx="6" class="wrapper-box" stroke-width="2"/>
+  <text x="775" y="118" text-anchor="middle" font-size="10" font-weight="600" class="wrapper-text">HelloWorldClient.jsx</text>
+  <text x="775" y="130" text-anchor="middle" font-size="8" class="wrapper-text">'use client' — thin wrapper</text>
+
+  <!-- Wrapper imports only the component -->
+  <line x1="775" y1="136" x2="775" y2="172" class="clean-line" stroke-width="2"/>
+
+  <rect x="690" y="172" width="170" height="30" rx="6" class="light-box" stroke-width="1.5"/>
+  <text x="775" y="192" text-anchor="middle" font-size="10" class="light-text">HelloWorldHooks</text>
+
+  <!-- No shared dependency -->
+  <text x="775" y="224" text-anchor="middle" font-size="9" class="good-text">No shared imports with PostsPage</text>
+  <text x="775" y="240" text-anchor="middle" font-size="9" class="good-text">→ No contaminated chunk groups</text>
+
+  <!-- Code example -->
+  <rect x="500" y="260" width="360" height="60" rx="8" class="code-bg"/>
+  <text x="516" y="278" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">'use client'</text>
+  <text x="576" y="278" font-family="ui-monospace, monospace" font-size="9" class="code-text">;</text>
+  <text x="516" y="296" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">import</text>
+  <text x="554" y="296" font-family="ui-monospace, monospace" font-size="9" class="code-fn"> HelloWorldHooks</text>
+  <text x="670" y="296" font-family="ui-monospace, monospace" font-size="9" class="code-keyword"> from</text>
+  <text x="702" y="296" font-family="ui-monospace, monospace" font-size="9" class="code-string"> './HelloWorldHooks'</text>
+  <text x="516" y="312" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">export default</text>
+  <text x="608" y="312" font-family="ui-monospace, monospace" font-size="9" class="code-fn"> HelloWorldHooks</text>
+  <text x="716" y="312" font-family="ui-monospace, monospace" font-size="9" class="code-text">;</text>
+
+  <!-- Size callout -->
+  <rect x="560" y="334" width="280" height="38" rx="8" class="light-box" stroke-width="2"/>
+  <text x="700" y="352" text-anchor="middle" font-size="12" font-weight="700" class="light-text">Result: 8 KB download</text>
+  <text x="700" y="366" text-anchor="middle" font-size="8" class="good-text">Only the component's own code — no contamination</text>
+
+  <!-- Bottom callout -->
+  <rect x="100" y="416" width="700" height="34" rx="8" class="note-box" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="432" text-anchor="middle" font-size="10" font-weight="600" class="note-text">A thin wrapper file breaks the shared-chunk inheritance chain</text>
+  <text x="450" y="446" text-anchor="middle" font-size="9" class="note-text">The wrapper imports only the component, not the heavy shared module</text>
+</svg>

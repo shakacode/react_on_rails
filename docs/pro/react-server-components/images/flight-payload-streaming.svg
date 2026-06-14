@@ -1,0 +1,234 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Flight Payload: Server to Client Streaming</title>
+  <desc>Animated diagram showing how React Server Components serialize the element tree into Flight protocol wire-format chunks that stream to the client, where React reconstructs the component tree. Shows hint chunks, import chunks, model chunks, and streaming promise resolution.</desc>
+  <defs>
+    <linearGradient id="reactGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#61DAFB"/><stop offset="100%" stop-color="#21A0C8"/>
+    </linearGradient>
+    <linearGradient id="browserGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A90D9"/><stop offset="100%" stop-color="#2E5A8A"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .code-bg { fill: #1E293B; }
+      .code-text { fill: #E2E8F0; }
+      .code-tag { fill: #F87171; }
+      .code-id { fill: #FCD34D; }
+      .code-json { fill: #67E8F9; }
+      .code-string { fill: #4ADE80; }
+      .code-comment { fill: #64748B; }
+      .chunk-hint { fill: #DBEAFE; stroke: #93C5FD; }
+      .chunk-hint-text { fill: #1E40AF; }
+      .chunk-import { fill: #F3E8FF; stroke: #C4B5FD; }
+      .chunk-import-text { fill: #6D28D9; }
+      .chunk-model { fill: #ECFDF5; stroke: #86EFAC; }
+      .chunk-model-text { fill: #166534; }
+      .chunk-promise { fill: #FEF3C7; stroke: #FCD34D; }
+      .chunk-promise-text { fill: #92400E; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .arrow-body { fill: #94A3B8; }
+      .wire-line { stroke: #CBD5E1; }
+      .tree-line { stroke: #94A3B8; }
+      .node-server { fill: #ECFDF5; stroke: #22C55E; }
+      .node-server-text { fill: #166534; }
+      .node-client { fill: #FFF7ED; stroke: #F97316; }
+      .node-client-text { fill: #9A3412; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .code-bg { fill: #0F172A; }
+        .chunk-hint { fill: #172554; stroke: #3B82F6; }
+        .chunk-hint-text { fill: #93C5FD; }
+        .chunk-import { fill: #2E1065; stroke: #A78BFA; }
+        .chunk-import-text { fill: #C4B5FD; }
+        .chunk-model { fill: #052E16; stroke: #10B981; }
+        .chunk-model-text { fill: #6EE7B7; }
+        .chunk-promise { fill: #422006; stroke: #F59E0B; }
+        .chunk-promise-text { fill: #FCD34D; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .arrow-body { fill: #64748B; }
+        .wire-line { stroke: #475569; }
+        .tree-line { stroke: #64748B; }
+        .node-server { fill: #052E16; stroke: #10B981; }
+        .node-server-text { fill: #6EE7B7; }
+        .node-client { fill: #431407; stroke: #F97316; }
+        .node-client-text { fill: #FDBA74; }
+      }
+
+      .s1 { opacity:0; animation: reveal 14s ease 0.5s infinite; }
+      .s2 { opacity:0; animation: reveal 14s ease 1.5s infinite; }
+      .s3 { opacity:0; animation: reveal 14s ease 2.5s infinite; }
+      .s4 { opacity:0; animation: reveal 14s ease 3.5s infinite; }
+      .s5 { opacity:0; animation: reveal 14s ease 5.0s infinite; }
+      .s6 { opacity:0; animation: reveal 14s ease 6.5s infinite; }
+      .s7 { opacity:0; animation: reveal 14s ease 7.5s infinite; }
+
+      @keyframes reveal {
+        0% { opacity: 0; }
+        3% { opacity: 1; }
+        85% { opacity: 1; }
+        93% { opacity: 0; }
+        100% { opacity: 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; opacity: 1 !important; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="500" class="bg"/>
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="700" class="title">Flight Payload: Server → Wire → Client</text>
+  <text x="450" y="48" text-anchor="middle" font-size="11" class="subtitle">Server serializes the element tree into streaming chunks; client reconstructs it</text>
+
+  <!-- LEFT: Server Component Tree -->
+  <g class="s1">
+    <rect x="20" y="65" width="240" height="200" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="20" y="65" width="240" height="32" rx="12" fill="url(#reactGrad)"/>
+    <rect x="20" y="85" width="240" height="12" fill="url(#reactGrad)"/>
+    <text x="140" y="86" text-anchor="middle" font-size="11" font-weight="600" fill="white">Server Component Tree</text>
+
+    <!-- Tree nodes -->
+    <rect x="95" y="108" width="70" height="22" rx="6" class="node-server" stroke-width="1.5"/>
+    <text x="130" y="123" text-anchor="middle" font-size="9" font-weight="600" class="node-server-text">&lt;Page&gt;</text>
+
+    <line x1="130" y1="130" x2="130" y2="140" class="tree-line" stroke-width="1"/>
+    <line x1="130" y1="140" x2="80" y2="140" class="tree-line" stroke-width="1"/>
+    <line x1="130" y1="140" x2="180" y2="140" class="tree-line" stroke-width="1"/>
+    <line x1="80" y1="140" x2="80" y2="148" class="tree-line" stroke-width="1"/>
+    <line x1="180" y1="140" x2="180" y2="148" class="tree-line" stroke-width="1"/>
+
+    <rect x="45" y="148" width="70" height="22" rx="6" class="node-server" stroke-width="1.5"/>
+    <text x="80" y="163" text-anchor="middle" font-size="9" font-weight="600" class="node-server-text">&lt;h1&gt;</text>
+
+    <rect x="145" y="148" width="70" height="22" rx="6" class="node-client" stroke-width="1.5"/>
+    <text x="180" y="163" text-anchor="middle" font-size="9" font-weight="600" class="node-client-text">&lt;Counter&gt;</text>
+
+    <text x="80" y="186" text-anchor="middle" font-size="8" class="label-sub">executed → serialized</text>
+    <text x="180" y="186" text-anchor="middle" font-size="8" class="label-sub">NOT executed</text>
+    <text x="180" y="198" text-anchor="middle" font-size="8" class="label-sub">→ reference only</text>
+
+    <text x="140" y="250" text-anchor="middle" font-size="9" class="label-sub">Server renders components,</text>
+    <text x="140" y="262" text-anchor="middle" font-size="9" class="label-sub">emits client references</text>
+  </g>
+
+  <!-- CENTER: Wire Format -->
+  <g>
+    <text x="450" y="78" text-anchor="middle" font-size="13" font-weight="600" class="label-text">Wire Format (Flight Protocol)</text>
+    <text x="450" y="94" text-anchor="middle" font-size="10" class="label-sub">Chunks stream in priority order</text>
+
+    <!-- Priority 1: Hint chunks -->
+    <g class="s2">
+      <rect x="290" y="110" width="320" height="36" rx="6" class="chunk-hint" stroke-width="1.5"/>
+      <text x="310" y="124" font-size="8" font-weight="700" class="chunk-hint-text">1</text>
+      <circle cx="310" cy="130" r="8" class="chunk-hint" stroke-width="1.5"/>
+      <text x="310" y="134" text-anchor="middle" font-size="8" font-weight="700" class="chunk-hint-text">H</text>
+      <text x="330" y="126" font-family="ui-monospace, monospace" font-size="9" class="chunk-hint-text">:HD["style.css","style"]</text>
+      <text x="530" y="126" font-size="9" class="chunk-hint-text">Hint — preload resources</text>
+      <text x="330" y="140" font-size="8" class="label-sub">Browser starts downloading CSS/fonts immediately</text>
+    </g>
+
+    <!-- Priority 2: Import chunks -->
+    <g class="s3">
+      <rect x="290" y="156" width="320" height="50" rx="6" class="chunk-import" stroke-width="1.5"/>
+      <circle cx="310" cy="176" r="8" class="chunk-import" stroke-width="1.5"/>
+      <text x="310" y="180" text-anchor="middle" font-size="8" font-weight="700" class="chunk-import-text">I</text>
+      <text x="330" y="172" font-family="ui-monospace, monospace" font-size="9" class="chunk-import-text">1:I{"id":"./Counter.jsx",</text>
+      <text x="338" y="186" font-family="ui-monospace, monospace" font-size="9" class="chunk-import-text">  "chunks":["client25"],"name":"Counter"}</text>
+      <text x="330" y="200" font-size="8" class="label-sub">Import — client module to load for hydration</text>
+    </g>
+
+    <!-- Priority 3: Model chunks -->
+    <g class="s4">
+      <rect x="290" y="216" width="320" height="64" rx="6" class="chunk-model" stroke-width="1.5"/>
+      <circle cx="310" cy="242" r="8" class="chunk-model" stroke-width="1.5"/>
+      <text x="310" y="246" text-anchor="middle" font-size="8" font-weight="700" class="chunk-model-text">M</text>
+      <text x="330" y="234" font-family="ui-monospace, monospace" font-size="9" class="chunk-model-text">0:["$","div",null,{"children":[</text>
+      <text x="338" y="248" font-family="ui-monospace, monospace" font-size="9" class="chunk-model-text">  ["$","h1",null,{"children":"My Page"}],</text>
+      <text x="338" y="262" font-family="ui-monospace, monospace" font-size="9" class="chunk-model-text">  ["$","$L1",null,{}]</text>
+      <text x="338" y="276" font-family="ui-monospace, monospace" font-size="8" class="chunk-model-text">   ↑ $L1 = lazy ref to chunk 1 (Counter)</text>
+    </g>
+
+    <!-- Priority 4: Streaming promise -->
+    <g class="s5">
+      <rect x="290" y="290" width="320" height="50" rx="6" class="chunk-promise" stroke-width="1.5"/>
+      <circle cx="310" cy="310" r="8" class="chunk-promise" stroke-width="1.5"/>
+      <text x="310" y="314" text-anchor="middle" font-size="8" font-weight="700" class="chunk-promise-text">$@</text>
+      <text x="330" y="308" font-family="ui-monospace, monospace" font-size="9" class="chunk-promise-text">{"fast":"hello","slow":"$@2"}</text>
+      <text x="330" y="322" font-family="ui-monospace, monospace" font-size="9" class="chunk-promise-text">2:"resolved after 2s"</text>
+      <text x="330" y="336" font-size="8" class="label-sub">Promise — resolves when slow data arrives</text>
+    </g>
+  </g>
+
+  <!-- RIGHT: Client Reconstruction -->
+  <g class="s6">
+    <rect x="640" y="65" width="240" height="200" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="640" y="65" width="240" height="32" rx="12" fill="url(#browserGrad)"/>
+    <rect x="640" y="85" width="240" height="12" fill="url(#browserGrad)"/>
+    <text x="760" y="86" text-anchor="middle" font-size="11" font-weight="600" fill="white">Client Reconstruction</text>
+
+    <!-- Reconstructed tree -->
+    <rect x="715" y="108" width="70" height="22" rx="6" class="node-server" stroke-width="1.5"/>
+    <text x="750" y="123" text-anchor="middle" font-size="9" font-weight="600" class="node-server-text">&lt;div&gt;</text>
+
+    <line x1="750" y1="130" x2="750" y2="140" class="tree-line" stroke-width="1"/>
+    <line x1="750" y1="140" x2="700" y2="140" class="tree-line" stroke-width="1"/>
+    <line x1="750" y1="140" x2="800" y2="140" class="tree-line" stroke-width="1"/>
+    <line x1="700" y1="140" x2="700" y2="148" class="tree-line" stroke-width="1"/>
+    <line x1="800" y1="140" x2="800" y2="148" class="tree-line" stroke-width="1"/>
+
+    <rect x="665" y="148" width="70" height="22" rx="6" class="node-server" stroke-width="1.5"/>
+    <text x="700" y="163" text-anchor="middle" font-size="9" font-weight="600" class="node-server-text">&lt;h1&gt;</text>
+
+    <rect x="765" y="148" width="70" height="22" rx="6" class="node-client" stroke-width="1.5"/>
+    <text x="800" y="163" text-anchor="middle" font-size="9" font-weight="600" class="node-client-text">&lt;Counter&gt;</text>
+
+    <text x="700" y="186" text-anchor="middle" font-size="8" class="label-sub">from model chunk</text>
+    <text x="800" y="186" text-anchor="middle" font-size="8" class="label-sub">loaded via import</text>
+    <text x="800" y="198" text-anchor="middle" font-size="8" class="label-sub">chunk → hydrated</text>
+
+    <text x="760" y="250" text-anchor="middle" font-size="9" class="label-sub">React builds the DOM,</text>
+    <text x="760" y="262" text-anchor="middle" font-size="9" class="label-sub">hydrates client components</text>
+  </g>
+
+  <!-- Emission order legend -->
+  <g class="s7">
+    <rect x="20" y="360" width="860" height="120" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="450" y="386" text-anchor="middle" font-size="13" font-weight="600" class="label-text">Chunk Emission Priority</text>
+    <text x="450" y="402" text-anchor="middle" font-size="10" class="label-sub">Server queues chunks by priority so resources download before data references them</text>
+
+    <g transform="translate(70, 420)">
+      <circle cx="0" cy="0" r="10" class="chunk-hint" stroke-width="1.5"/>
+      <text x="0" y="4" text-anchor="middle" font-size="8" font-weight="700" class="chunk-hint-text">1</text>
+      <text x="16" y="4" font-size="10" class="label-text">Hints — preload CSS, fonts</text>
+    </g>
+    <g transform="translate(280, 420)">
+      <circle cx="0" cy="0" r="10" class="chunk-import" stroke-width="1.5"/>
+      <text x="0" y="4" text-anchor="middle" font-size="8" font-weight="700" class="chunk-import-text">2</text>
+      <text x="16" y="4" font-size="10" class="label-text">Imports — client JS modules</text>
+    </g>
+    <g transform="translate(500, 420)">
+      <circle cx="0" cy="0" r="10" class="chunk-model" stroke-width="1.5"/>
+      <text x="0" y="4" text-anchor="middle" font-size="8" font-weight="700" class="chunk-model-text">3</text>
+      <text x="16" y="4" font-size="10" class="label-text">Models — element tree data</text>
+    </g>
+    <g transform="translate(710, 420)">
+      <circle cx="0" cy="0" r="10" class="chunk-promise" stroke-width="1.5"/>
+      <text x="0" y="4" text-anchor="middle" font-size="8" font-weight="700" class="chunk-promise-text">4</text>
+      <text x="16" y="4" font-size="10" class="label-text">Async data — streams when ready</text>
+    </g>
+
+    <text x="450" y="454" text-anchor="middle" font-size="9" class="label-sub">By the time the client parses model data, resources and modules are already downloading</text>
+  </g>
+</svg>

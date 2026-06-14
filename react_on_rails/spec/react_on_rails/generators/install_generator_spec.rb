@@ -1415,7 +1415,9 @@ describe InstallGenerator, type: :generator do
         # Version pins are present in the constants
         expect(content).to include("@rspack/core@^2.0.0-0")
         expect(content).to include("@rspack/cli@^2.0.0-0")
+        expect(content).to include("@rspack/dev-server@^2.0.0")
         expect(content).to include("@rspack/plugin-react-refresh@^2.0.0")
+        expect(content).to match(%r{@rspack/plugin-react-refresh@\^2\.0\.0\s+react-refresh})
         expect(content).to include("webpack@^5.0.0")
         # Version-stripping regex is used for package.json key deletion
         expect(content).to include('dep[%r{\A(@[^/]+/[^@]+|[^@]+)}]')
@@ -1428,6 +1430,7 @@ describe InstallGenerator, type: :generator do
         expect(package_json["dependencies"]).to include("@rspack/core")
         expect(package_json["dependencies"]).to include("rspack-manifest-plugin")
         expect(package_json["devDependencies"]).to include("@rspack/cli")
+        expect(package_json["devDependencies"]).to include("@rspack/dev-server")
         expect(package_json["devDependencies"]).to include("@rspack/plugin-react-refresh")
       end
     end

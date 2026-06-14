@@ -28,6 +28,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Pinned RSC installs to stable `react-on-rails-rsc@19.0.5`**: The generator default, root and Pro package manifests, Pro dummy app, lockfile, and Pro RSC install docs now use the stable `19.0.5` package instead of the `19.0.5-rc.7` rollout pin. The Pro node renderer now warns when an installed `react-on-rails-rsc` is older than the stable `19.0.5` floor or still on a prerelease, and the optional Pro peer range is explicit for the supported React 19.0.x RSC line while still letting older stable 19.0.x installs and the previous 19.0.5 prerelease tuple reach the runtime warning path. Fixes [Issue 3632](https://github.com/shakacode/react_on_rails/issues/3632), [Issue 3634](https://github.com/shakacode/react_on_rails/issues/3634), and [Issue 3965](https://github.com/shakacode/react_on_rails/issues/3965).
 
+#### Fixed
+
+- **Rspack generated apps start in HMR mode**: Fresh `rails generate react_on_rails:install --rspack` and `create-react-on-rails-app` projects now install `@rspack/dev-server`, use the `ReactRefreshRspackPlugin` export, and keep `bin/switch-bundler rspack`'s dev dependencies complete so `bin/dev` can launch Rspack serve instead of crashing during dev-server startup. Fixes [Issue 3925](https://github.com/shakacode/react_on_rails/issues/3925). [PR 3926](https://github.com/shakacode/react_on_rails/pull/3926) by [AbanoubGhadban](https://github.com/AbanoubGhadban) and [ihabadham](https://github.com/ihabadham).
+
 ### [17.0.0.rc.3] - 2026-06-11
 
 #### Added

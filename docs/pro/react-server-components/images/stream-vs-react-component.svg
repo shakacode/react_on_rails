@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 440" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>stream_react_component vs react_component</title>
+  <desc>Static split-screen comparison showing why stream_react_component with renderToPipeableStream is required for RSC (supports Suspense and async), while react_component with renderToString breaks on async Server Components.</desc>
+  <defs>
+    <linearGradient id="errorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EF4444"/><stop offset="100%" stop-color="#DC2626"/>
+    </linearGradient>
+    <linearGradient id="successGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22C55E"/><stop offset="100%" stop-color="#16A34A"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .error-zone { fill: #FEF2F2; stroke: #FECACA; }
+      .error-text { fill: #991B1B; }
+      .success-zone { fill: #F0FDF4; stroke: #86EFAC; }
+      .success-text { fill: #166534; }
+      .code-bg { fill: #1E293B; }
+      .code-text { fill: #E2E8F0; }
+      .code-keyword { fill: #67E8F9; }
+      .code-string { fill: #4ADE80; }
+      .code-fn { fill: #C4B5FD; }
+      .code-comment { fill: #64748B; }
+      .code-error { fill: #F87171; }
+      .feature-yes { fill: #D1FAE5; stroke: #86EFAC; }
+      .feature-yes-text { fill: #166534; }
+      .feature-no { fill: #FEE2E2; stroke: #FECACA; }
+      .feature-no-text { fill: #991B1B; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .error-zone { fill: #450A0A; stroke: #F87171; }
+        .error-text { fill: #FCA5A5; }
+        .success-zone { fill: #052E16; stroke: #10B981; }
+        .success-text { fill: #6EE7B7; }
+        .code-bg { fill: #0F172A; }
+        .feature-yes { fill: #052E16; stroke: #10B981; }
+        .feature-yes-text { fill: #6EE7B7; }
+        .feature-no { fill: #450A0A; stroke: #F87171; }
+        .feature-no-text { fill: #FCA5A5; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="440" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">stream_react_component vs react_component</text>
+  <text x="450" y="46" text-anchor="middle" font-size="11" class="subtitle">RSC requires streaming SSR — synchronous rendering breaks on async Server Components</text>
+
+  <!-- ============ LEFT: react_component (broken) ============ -->
+  <rect x="20" y="60" width="420" height="330" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="20" y="60" width="420" height="34" rx="12" fill="url(#errorGrad)"/>
+  <rect x="20" y="82" width="420" height="12" fill="url(#errorGrad)"/>
+  <text x="230" y="83" text-anchor="middle" font-size="12" font-weight="600" fill="white">❌  react_component + renderToString</text>
+
+  <!-- ERB code -->
+  <rect x="34" y="102" width="392" height="54" rx="8" class="code-bg"/>
+  <text x="48" y="118" font-family="ui-monospace, monospace" font-size="9" class="code-text">&lt;%= </text>
+  <text x="78" y="118" font-family="ui-monospace, monospace" font-size="9" class="code-fn">react_component</text>
+  <text x="186" y="118" font-family="ui-monospace, monospace" font-size="9" class="code-text">(</text>
+  <text x="56" y="134" font-family="ui-monospace, monospace" font-size="9" class="code-string">  "ReactServerComponentPage"</text>
+  <text x="272" y="134" font-family="ui-monospace, monospace" font-size="9" class="code-text">,</text>
+  <text x="56" y="150" font-family="ui-monospace, monospace" font-size="9" class="code-text">  prerender: </text>
+  <text x="138" y="150" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">true</text>
+  <text x="162" y="150" font-family="ui-monospace, monospace" font-size="9" class="code-text">) %&gt;</text>
+
+  <!-- How it works -->
+  <text x="230" y="178" text-anchor="middle" font-size="10" font-weight="600" class="label-text">How it works:</text>
+  <text x="40" y="196" font-size="10" class="label-text">1. Renders entire tree in a single synchronous pass</text>
+  <text x="40" y="214" font-size="10" class="label-text">2. Uses renderToString (no streaming support)</text>
+  <text x="40" y="232" font-size="10" class="label-text">3. Cannot wait for async components</text>
+
+  <!-- Error box -->
+  <rect x="34" y="248" width="392" height="50" rx="8" class="error-zone" stroke-width="2"/>
+  <text x="230" y="268" text-anchor="middle" font-size="9" font-weight="600" class="error-text">"The server did not finish this Suspense boundary:</text>
+  <text x="230" y="284" text-anchor="middle" font-size="9" class="error-text">The server used renderToString which does not support Suspense."</text>
+
+  <!-- Feature list -->
+  <rect x="34" y="310" width="190" height="24" rx="5" class="feature-no" stroke-width="1"/>
+  <text x="129" y="326" text-anchor="middle" font-size="9" class="feature-no-text">Async components</text>
+  <rect x="236" y="310" width="190" height="24" rx="5" class="feature-no" stroke-width="1"/>
+  <text x="331" y="326" text-anchor="middle" font-size="9" class="feature-no-text">Suspense boundaries</text>
+  <rect x="34" y="340" width="190" height="24" rx="5" class="feature-no" stroke-width="1"/>
+  <text x="129" y="356" text-anchor="middle" font-size="9" class="feature-no-text">Progressive streaming</text>
+  <rect x="236" y="340" width="190" height="24" rx="5" class="feature-no" stroke-width="1"/>
+  <text x="331" y="356" text-anchor="middle" font-size="9" class="feature-no-text">Incremental hydration</text>
+
+  <!-- ============ RIGHT: stream_react_component (correct) ============ -->
+  <rect x="460" y="60" width="420" height="330" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="460" y="60" width="420" height="34" rx="12" fill="url(#successGrad)"/>
+  <rect x="460" y="82" width="420" height="12" fill="url(#successGrad)"/>
+  <text x="670" y="83" text-anchor="middle" font-size="12" font-weight="600" fill="white">✅  stream_react_component + renderToPipeableStream</text>
+
+  <!-- ERB code -->
+  <rect x="474" y="102" width="392" height="54" rx="8" class="code-bg"/>
+  <text x="488" y="118" font-family="ui-monospace, monospace" font-size="9" class="code-text">&lt;%= </text>
+  <text x="518" y="118" font-family="ui-monospace, monospace" font-size="9" class="code-fn">stream_react_component</text>
+  <text x="672" y="118" font-family="ui-monospace, monospace" font-size="9" class="code-text">(</text>
+  <text x="496" y="134" font-family="ui-monospace, monospace" font-size="9" class="code-string">  "ReactServerComponentPage"</text>
+  <text x="496" y="150" font-family="ui-monospace, monospace" font-size="9" class="code-text">) %&gt;</text>
+
+  <!-- How it works -->
+  <text x="670" y="178" text-anchor="middle" font-size="10" font-weight="600" class="label-text">How it works:</text>
+  <text x="480" y="196" font-size="10" class="label-text">1. Opens HTTP response stream immediately</text>
+  <text x="480" y="214" font-size="10" class="label-text">2. Sends shell + Suspense fallbacks first</text>
+  <text x="480" y="232" font-size="10" class="label-text">3. Streams resolved chunks as async data arrives</text>
+
+  <!-- Controller code -->
+  <rect x="474" y="248" width="392" height="50" rx="8" class="code-bg"/>
+  <text x="488" y="264" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">include</text>
+  <text x="526" y="264" font-family="ui-monospace, monospace" font-size="9" class="code-fn"> ReactOnRailsPro::Stream</text>
+  <text x="488" y="284" font-family="ui-monospace, monospace" font-size="9" class="code-fn">stream_view_containing_react_components</text>
+  <text x="488" y="292" font-family="ui-monospace, monospace" font-size="9" class="code-text">(template: </text>
+  <text x="568" y="292" font-family="ui-monospace, monospace" font-size="9" class="code-string">"pages/..."</text>
+  <text x="638" y="292" font-family="ui-monospace, monospace" font-size="9" class="code-text">)</text>
+
+  <!-- Feature list -->
+  <rect x="474" y="310" width="190" height="24" rx="5" class="feature-yes" stroke-width="1"/>
+  <text x="569" y="326" text-anchor="middle" font-size="9" class="feature-yes-text">Async components ✓</text>
+  <rect x="676" y="310" width="190" height="24" rx="5" class="feature-yes" stroke-width="1"/>
+  <text x="771" y="326" text-anchor="middle" font-size="9" class="feature-yes-text">Suspense boundaries ✓</text>
+  <rect x="474" y="340" width="190" height="24" rx="5" class="feature-yes" stroke-width="1"/>
+  <text x="569" y="356" text-anchor="middle" font-size="9" class="feature-yes-text">Progressive streaming ✓</text>
+  <rect x="676" y="340" width="190" height="24" rx="5" class="feature-yes" stroke-width="1"/>
+  <text x="771" y="356" text-anchor="middle" font-size="9" class="feature-yes-text">Incremental hydration ✓</text>
+
+  <!-- Bottom callout -->
+  <rect x="100" y="404" width="700" height="28" rx="8" class="note-box" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="422" text-anchor="middle" font-size="10" font-weight="600" class="note-text">RSC requires streaming — use stream_react_component with the ReactOnRailsPro::Stream mixin</text>
+</svg>
