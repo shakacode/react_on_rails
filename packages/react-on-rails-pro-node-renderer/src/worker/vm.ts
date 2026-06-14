@@ -43,11 +43,13 @@ import * as errorReporter from '../shared/errorReporter.js';
 import {
   PREPARE_STACK_TRACE_INSTALL_SCRIPT,
   SOURCE_MAP_RESOLVER_CONTEXT_KEY,
+  SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY,
   registerBundleForSourceMaps,
   unregisterBundleForSourceMaps,
   resetSourceMapSupport,
   resolveOriginalPosition,
   remapErrorStack,
+  remapStackTrace,
 } from './vmSourceMapSupport.js';
 
 const readFileAsync = promisify(fs.readFile);
@@ -206,6 +208,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
       const contextObject = {
         sharedConsoleHistory,
         [SOURCE_MAP_RESOLVER_CONTEXT_KEY]: resolveOriginalPosition,
+        [SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY]: remapStackTrace,
       };
 
       if (supportModules) {

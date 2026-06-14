@@ -25,6 +25,7 @@ import {
   PREPARE_STACK_TRACE_INSTALL_SCRIPT,
   registerBundleForSourceMaps,
   resolveOriginalPosition,
+  SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY,
 } from '../src/worker/vmSourceMapSupport';
 
 const testName = 'vmSourceMapSupport';
@@ -104,6 +105,15 @@ function buildRequireFailureBundleMap(file: string) {
   // line 3, column >= 0 -> Boom.ts L2 C3 (1-based)
   const mappings = ['', '', segment(0, 0, 1, 2)].join(';');
   return { version: 3, file, sources: [ORIGINAL_SOURCE], names: [], mappings };
+}
+
+function buildHostCallbackFailureBundleSource() {
+  return [
+    '// generated banner line 1',
+    '// generated banner line 2',
+    'global.triggerHostCallbackError = function triggerHostCallbackError(){ ' +
+      "require('missing-host-callback-module'); };",
+  ].join('\n');
 }
 
 /**
@@ -400,6 +410,33 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(thrown?.message).toContain("Cannot find module 'missing-host-callback-module'");
     expect(thrown?.stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
     expect(resolveOriginalPosition(bundlePath, 3, 1)).toBeNull();
+  });
+
+  test('host-realm callback stacks serialized inside the VM are remapped', async () => {
+    const bundlePath = await writeVmBundle(
+      `${buildHostCallbackFailureBundleSource()}\n${inlineSourceMapComment(
+        buildRequireFailureBundleMap('bundle.js'),
+      )}\n`,
+    );
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    const result = await runInVM(
+      `
+      (function(){
+        try {
+          global.triggerHostCallbackError();
+        } catch (error) {
+          return ${SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY}(error.stack);
+        }
+      })()
+      `,
+      bundlePath,
+    );
+
+    expect(typeof result).toBe('string');
+    expect(result).toContain("Cannot find module 'missing-host-callback-module'");
+    expect(result).toContain(`${ORIGINAL_SOURCE}:2:3`);
+    expect(result).not.toContain(`${bundlePath}:3:`);
   });
 
   test('frames on generated lines past the last mapping keep the bundled location', async () => {

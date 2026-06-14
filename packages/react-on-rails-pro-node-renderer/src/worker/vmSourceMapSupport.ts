@@ -83,6 +83,12 @@ let warnedMissingSourceMapConstructor = false;
  */
 export const SOURCE_MAP_RESOLVER_CONTEXT_KEY = '__reactOnRailsProResolveOriginalSourcePosition';
 
+/**
+ * Name of the host-callback global injected into the VM context for stacks
+ * serialized by react-on-rails before they can escape to the host formatter.
+ */
+export const SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY = '__reactOnRailsProRemapStackTrace';
+
 function extractSourceMappingUrl(bundleContents: string): string | undefined {
   // Matches `//# sourceMappingURL=...` (or legacy `//@`) comments; the last one wins.
   const sourceMappingUrlRegex = /\/\/[#@] sourceMappingURL=([^\s'"`]+)/g;

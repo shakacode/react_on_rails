@@ -17,6 +17,28 @@ type RenderMetadataSource = {
   isShellReady?: boolean;
 };
 
+const SOURCE_MAPPED_STACK_REMAPPER_KEY = '__reactOnRailsProRemapStackTrace';
+
+type SourceMappedStackRemapper = (stack: unknown) => string | undefined;
+
+type GlobalWithSourceMappedStackRemapper = typeof globalThis & {
+  [SOURCE_MAPPED_STACK_REMAPPER_KEY]?: SourceMappedStackRemapper;
+};
+
+function remapRenderingErrorStack(stack: RenderingError['stack']) {
+  const remapper = (globalThis as GlobalWithSourceMappedStackRemapper)[SOURCE_MAPPED_STACK_REMAPPER_KEY];
+  if (typeof remapper !== 'function') {
+    return stack;
+  }
+
+  try {
+    const remappedStack = remapper(stack);
+    return typeof remappedStack === 'string' ? remappedStack : stack;
+  } catch {
+    return stack;
+  }
+}
+
 export function buildRenderMetadata(
   consoleReplayScript: string,
   renderState: RenderMetadataSource,
@@ -27,7 +49,7 @@ export function buildRenderMetadata(
     hasErrors: renderState.hasErrors,
     renderingError: renderState.error && {
       message: renderState.error.message,
-      stack: renderState.error.stack,
+      stack: remapRenderingErrorStack(renderState.error.stack),
     },
     isShellReady: 'isShellReady' in renderState ? renderState.isShellReady : undefined,
   };
