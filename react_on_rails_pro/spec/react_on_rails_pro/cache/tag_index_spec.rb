@@ -47,6 +47,24 @@ class TimestampedTaggableRecord
   end
 end
 
+class UnpersistedTaggableRecord
+  def id
+    nil
+  end
+
+  def model_name
+    Struct.new(:cache_key).new("posts")
+  end
+
+  def persisted?
+    false
+  end
+
+  def cache_key
+    "posts/new"
+  end
+end
+
 class RelationLikeTag
   def cache_key
     "posts/query"
@@ -93,6 +111,11 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       record = TimestampedTaggableRecord.new(42)
 
       expect(described_class.normalize_tags([record])).to eq(["posts/42"])
+    end
+
+    it "rejects unpersisted AR-style records instead of sharing a posts/new tag" do
+      expect { described_class.normalize_tags([UnpersistedTaggableRecord.new]) }
+        .to raise_error(ReactOnRailsPro::Error, /blank tag/)
     end
 
     it "calls procs, including procs returning arrays of any accepted form" do

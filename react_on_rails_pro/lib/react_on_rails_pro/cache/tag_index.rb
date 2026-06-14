@@ -118,8 +118,7 @@ module ReactOnRailsPro
         def stable_record_identity(resolved)
           return nil unless resolved.respond_to?(:model_name) && resolved.respond_to?(:id)
 
-          id = resolved.id
-          return nil if id.nil?
+          return "" if (resolved.respond_to?(:persisted?) && !resolved.persisted?) || (id = resolved.id).nil?
 
           "#{resolved.model_name.cache_key}/#{id}"
         end
