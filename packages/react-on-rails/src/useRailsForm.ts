@@ -274,6 +274,12 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
     // Refresh) the cleanup runs and the effect re-runs on the same component
     // instance, so without this the ref would stay false after the replay.
     mountedRef.current = true;
+    // If a submission settled during the StrictMode cleanup/replay window,
+    // finishSubmission could have skipped the visible state update while
+    // mountedRef was false. Resync the flag when the same instance remounts.
+    if (pendingSubmissionsRef.current === 0) {
+      setProcessing(false);
+    }
     return () => {
       mountedRef.current = false;
     };
