@@ -31,7 +31,7 @@ const belowRecommendedMin = versionBelowRecommendedMin(recommendedMin);
 
 describe('checkRscPeerCompatibility', () => {
   it('keeps allowed prereleases aligned with the recommended minimum stable base', () => {
-    expect(RSC_PEER_SUPPORT.reactOnRailsRsc.allowedPrereleases).not.toHaveLength(0);
+    // Empty is valid when no prerelease exceptions are needed.
     expect(
       RSC_PEER_SUPPORT.reactOnRailsRsc.allowedPrereleases.every(
         (allowedPrerelease) => stableBase(allowedPrerelease) === recommendedMin,
