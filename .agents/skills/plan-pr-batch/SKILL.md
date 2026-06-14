@@ -53,15 +53,25 @@ Plan a PR batch
    - Build a File-touch map for the batch: list the paths each item changes or
      intends to affect, including creates, deletes, and renames. Never guess
      paths.
-   - File-touch map, PR path discovery: get refs with
-     `gh pr view N --json headRefName,baseRefName`, then fetch the current base
-     branch and PR head into refs without checking out untrusted PR code:
-     `git fetch origin <baseRefName>` and
-     `git fetch origin pull/N/head:refs/tmp/pr-N-head`. A plain
-     `git fetch origin` does not fetch cross-fork heads. Run
-     `git diff --name-status --find-renames origin/<baseRefName>...refs/tmp/pr-N-head`;
+
+   - File-touch map, PR path discovery: get refs from the verified target repo
+     with
+     `gh pr view N --repo OWNER/REPO --json baseRefName,headRefName,headRepository,headRepositoryOwner`,
+     then resolve a local remote or fetch URL that points at the verified base
+     repo. If no verified remote or URL can be resolved, record paths as
+     `UNKNOWN` instead of diffing the current checkout's default remote. Fetch
+     the current base branch and PR head into temporary refs without checking
+     out untrusted PR code. Fetch the base into `refs/tmp/pr-N-base` and the
+     head into `refs/tmp/pr-N-head` using the base repo's `pull/N/head` ref;
+     GitHub keeps that pull ref pointing at fork heads too. If the base pull
+     ref is unavailable, fetch from the verified head repository URL derived
+     from `headRepository.nameWithOwner` and `headRefName`, or use the PR Files
+     API fallback. A plain `git fetch origin` does not fetch cross-fork heads.
+     Run
+     `git diff --name-status --find-renames refs/tmp/pr-N-base...refs/tmp/pr-N-head`;
      three-dot diffs from the merge-base, which matches GitHub's PR file list.
-     Delete the temporary ref after recording paths:
+     Delete the temporary refs on both success and failure, before any API
+     fallback or `UNKNOWN` decision: `git update-ref -d refs/tmp/pr-N-base` and
      `git update-ref -d refs/tmp/pr-N-head`. A rename row (`R100  old  new`)
      owns **both** the old and new path. If a ref cannot be fetched or the diff
      cannot run, try the PR Files API fallback before marking the paths
@@ -71,18 +81,19 @@ Plan a PR batch
      When the local diff succeeds, keep those paths authoritative even if the
      API response is capped, incomplete, or unavailable. Use the API as the
      scheduling source only when the local diff cannot run. Fetch with
-     `gh api --paginate --method GET repos/{owner}/{repo}/pulls/N/files -f per_page=100 | jq -s 'add'`;
+     `gh api --paginate --method GET repos/OWNER/REPO/pulls/N/files -f per_page=100 | jq -s 'add // []'`;
      the default page size is 30, so a small unpaginated page can look complete
-     while truncated. `jq -s 'add'` collects all paginated arrays before
-     counting paths or extracting filenames; no Link header check is needed
-     after the command returns. The response is
-     acceptable only when it records both `.filename` and `.previous_filename`
-     when present, and its listed-file count matches the PR's `changedFiles`
-     value from `gh pr view N --json changedFiles`. GitHub caps the Files API at
-     ~3000 files; if the API is the only available source and `changedFiles` is
-     at or near that cap, the response cannot prove there are no more pages, or
-     it only reports new paths, record the PR paths as `UNKNOWN` and treat the
-     item as serial.
+     while truncated. `jq -s 'add // []'` collects all paginated arrays before
+     counting paths or extracting filenames and returns an empty array for an
+     empty stream; no Link header check is needed after the command returns.
+     The response is acceptable only when it records both `.filename` and
+     `.previous_filename` when present, and its listed-file count matches the
+     PR's `changedFiles` value from
+     `gh pr view N --repo OWNER/REPO --json changedFiles`. GitHub caps the
+     Files API at ~3000 files; if the API is the only available source and
+     `changedFiles` is at or above that cap, the paginated count does not match
+     `changedFiles`, or the response only reports new paths, record the PR paths
+     as `UNKNOWN` and treat the item as serial.
    - File-touch map, issue path discovery: read the issue body, record proposed
      new paths from issue/design notes, and grep the repo to confirm existing
      paths. If paths cannot be determined from the issue body or design notes,
@@ -91,10 +102,9 @@ Plan a PR batch
      path cannot run as parallel worktrees; keep only file-disjoint items in the
      parallel first batch and sequence or defer collisions. An `UNKNOWN` item
      runs as a serial "discovery lane" — a lane that first determines its real
-     paths instead of editing in parallel. Do not run discovery lanes
-     concurrently with active editor lanes. Either complete all discovery lanes
-     first and then dispatch the editor wave, or wait until all active editor
-     lanes have finished before starting discovery lanes.
+     paths instead of editing in parallel. Never run discovery lanes
+     concurrently with active editor lanes: complete discovery before an editor
+     wave starts, or wait until the active editor wave is finished.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
@@ -102,14 +112,20 @@ Plan a PR batch
 4. Output
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
    - Keep the fenced goal prompt under ~4000 bytes total so bulky audit detail stays in the Batch Plan. Measure it, do not eyeball it: `wc -c` gives a locale-independent byte count (`wc -m` counts Unicode code points in a UTF-8 locale and bytes otherwise). Treat 4000 as an approximate budget.
-   - Budget for template overhead: the fixed template plus execution rules already consume roughly 3000 bytes before any items are filled in, leaving little room for the File-touch map and per-item content. Prefer splitting into multiple goals over trimming the safety, ownership, or review content.
-   - Keep full path evidence in the Batch Plan when it would bloat the prompt.
-     In the goal prompt, use the narrowest unambiguous directory/pattern summary
-     that still proves ownership. If compression would hide a collision or make
-     ownership unclear, mark the item `UNKNOWN` and run it serially.
+   - Measure the actual filled template overhead when the prompt is near the
+     byte budget; do not rely on a fixed estimate. Prefer splitting into
+     multiple goals over trimming the safety, ownership, or review content.
+   - Keep full path evidence in the Batch Plan when it would bloat the prompt,
+     but do not leave the worker handoff with an external-only pointer. In the
+     goal prompt, use the narrowest unambiguous directory/pattern summary that
+     still proves ownership, and include any exceptions, renames, deletes, or
+     collision-relevant exact paths inline. If compression would hide a collision
+     or make ownership unclear, mark the item `UNKNOWN` and run it serially.
    - Keep each filled entry terse (target ~150 chars for `Worker notes` and `Done when`). The worker reads the issue/PR URL for full detail; push evidence and audit notes to the Batch Plan instead.
    - If the batch will not fit, split it into smaller goals and output only the first ready goal.
-   - Do not start `$pr-batch` unless the user asks; then hand them the fenced goal prompt and tell them to run `$pr-batch` with it.
+   - Do not start `$pr-batch` unless the user asks; then hand them the fenced
+     goal prompt and any Batch Plan path appendix that the prompt explicitly
+     depends on, in the same request.
 
 ## Batch Plan Format
 
@@ -118,6 +134,7 @@ Plan a PR batch
 - Included items:
   - `PR #N` or `Issue #N`: title, URL, state, role in batch
 - Excluded or deferred:
+- File-touch map and path evidence:
 - Dependencies and sequencing:
 - Subagent split:
 - Concurrent activity and dependency status:
@@ -138,7 +155,7 @@ Repository: OWNER/REPO
 Batch objective: ...
 File-touch map:
 - PR/Issue #N -> changed/affected paths, including create/delete/rename (owner: lane/name)
-- PR/Issue #N -> summarized path pattern(s); full path list in Batch Plan (owner: lane/name)
+- PR/Issue #N -> summarized path pattern(s) plus collision-relevant exact paths/renames/deletes (owner: lane/name)
 - PR/Issue #N -> UNKNOWN (paths not determinable from issue body/design notes; treat as serial)
 # Batch-level reservations, not tied to a single item:
 - Deferred/reserved paths -> path(s) (reason: ... / later owner: lane/name)
