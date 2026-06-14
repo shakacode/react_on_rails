@@ -1246,6 +1246,55 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks severity summaries that say no findings are fixed or resolved" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "none-resolved-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/none-resolved-review",
+          "body" => "P1 issues: none fixed yet.\nP2 findings: none resolved."
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-none-resolved-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
+      expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
+        ["P1 issues: none fixed yet.", "P2 findings: none resolved."]
+      )
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
+    end
+  end
+
   it "blocks mixed severity summary lines that still contain an open higher-priority item" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
