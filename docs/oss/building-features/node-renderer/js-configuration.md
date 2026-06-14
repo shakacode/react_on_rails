@@ -309,6 +309,8 @@ example above or switch the file to `.mjs` or `"type": "module"`.
 > (extra warm-up gates, dependency checks, or custom payloads).
 > If your `configureFastify` callback already registers `/health` or `/ready`, remove or rename the custom route
 > before enabling `enableHealthEndpoints`; Fastify raises a duplicate-route startup error for reused paths.
+> If the duplicate route is registered by an async Fastify plugin during `app.register()` boot, Fastify reports its raw
+> `FST_ERR_DUPLICATED_ROUTE` error instead of the `enableHealthEndpoints` migration hint.
 
 A common need is a `/health` endpoint for container health checks:
 

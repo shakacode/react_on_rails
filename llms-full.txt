@@ -12033,7 +12033,7 @@ available default ENV values if you wire them into your own launch script.
    Because these functions are valid client-side, they are ignored on server-side rendering without errors or warnings.
    Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
-1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS=true` or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
+1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
 
 Deprecated options:
 
@@ -12294,6 +12294,8 @@ example above or switch the file to `.mjs` or `"type": "module"`.
 > (extra warm-up gates, dependency checks, or custom payloads).
 > If your `configureFastify` callback already registers `/health` or `/ready`, remove or rename the custom route
 > before enabling `enableHealthEndpoints`; Fastify raises a duplicate-route startup error for reused paths.
+> If the duplicate route is registered by an async Fastify plugin during `app.register()` boot, Fastify reports its raw
+> `FST_ERR_DUPLICATED_ROUTE` error instead of the `enableHealthEndpoints` migration hint.
 
 A common need is a `/health` endpoint for container health checks:
 
@@ -13280,6 +13282,10 @@ probes cannot carry it). Keep the renderer on `localhost` or private networking 
 The endpoints are **off by default**. Enable them with the `enableHealthEndpoints` config option or the
 `RENDERER_ENABLE_HEALTH_ENDPOINTS` environment variable (`true`, `TRUE`, `yes`, `YES`, or `1`):
 
+Those string values are parsed by the shared node-renderer `truthy()` helper, so the same accepted values also apply
+to other boolean environment variables that use that helper directly, such as `RENDERER_SUPPORT_MODULES` and
+`REPLAY_SERVER_ASYNC_OPERATION_LOGS`.
+
 ```js
 // renderer/node-renderer.js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
@@ -13489,7 +13495,9 @@ services:
   [`configureFastify` health-check recipe](./js-configuration.md#adding-a-health-check-endpoint) still applies and can
   coexist with the built-in endpoints as long as your custom routes use different paths. Remove or rename any existing
   custom `/health` or `/ready` route before enabling `enableHealthEndpoints`; Fastify raises a duplicate-route startup
-  error when built-in and custom routes share the same path.
+  error when built-in and custom routes share the same path. If an async Fastify plugin registers the duplicate route
+  during `app.register()` boot, you will see Fastify's raw `FST_ERR_DUPLICATED_ROUTE` error instead of the
+  `enableHealthEndpoints` migration hint.
 
 ## Rails-Side Readiness
 
@@ -27256,9 +27264,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **[Pro]** **RSC peer compatibility accepts the coordinated React 19.2 floor**: The Pro node renderer now allows React and React DOM `19.2.x` starting at `19.2.7`, matching the floor required by the `react-on-rails-rsc` 19.2 package line while preserving the existing React `19.0.x` support window. Refs [Issue 3865](https://github.com/shakacode/react_on_rails/issues/3865).
+
 #### Added
 
-- **[Pro]** **Built-in node renderer `/health` and `/ready` probe endpoints**: The node renderer can now register first-class liveness (`GET /health` -> `200` with a status-only body) and readiness (`GET /ready` -> `503` until the answering worker is online and has at least one server bundle compiled, then `200`) endpoints, replacing the hand-rolled `configureFastify` health-check recipe for the common case. The endpoints are off by default and enabled with the new `enableHealthEndpoints` config option (or `RENDERER_ENABLE_HEALTH_ENDPOINTS=true`); they are unauthenticated like `/info` but expose no runtime version or path details. Includes a new [Health and Readiness Endpoints](docs/oss/building-features/node-renderer/health-checks.md) docs page with working Kubernetes (`tcpSocket` + `exec` with `curl --http2-prior-knowledge` -- the h2c listener cannot be probed with HTTP/1.1 `httpGet`), ECS, and Docker Compose probe examples. Closes [Issue 3880](https://github.com/shakacode/react_on_rails/issues/3880). [PR 3939](https://github.com/shakacode/react_on_rails/pull/3939) by [justin808](https://github.com/justin808).
+- **[Pro]** **Built-in node renderer `/health` and `/ready` probe endpoints**: The node renderer can now register first-class liveness (`GET /health` -> `200` with a status-only body) and readiness (`GET /ready` -> `503` until the answering worker is online and has at least one server bundle compiled, then `200`) endpoints, replacing the hand-rolled `configureFastify` health-check recipe for the common case. The endpoints are off by default and enabled with the new `enableHealthEndpoints` config option (or `RENDERER_ENABLE_HEALTH_ENDPOINTS=true`, `TRUE`, `yes`, `YES`, or `1`); they are unauthenticated like `/info` but expose no runtime version or path details. Includes a new [Health and Readiness Endpoints](docs/oss/building-features/node-renderer/health-checks.md) docs page with working Kubernetes (`tcpSocket` + `exec` with `curl --http2-prior-knowledge` -- the h2c listener cannot be probed with HTTP/1.1 `httpGet`), ECS, and Docker Compose probe examples. The shared node-renderer truthy parser also accepts `1` for other boolean env vars that use it directly, including `RENDERER_SUPPORT_MODULES` and `REPLAY_SERVER_ASYNC_OPERATION_LOGS`. Closes [Issue 3880](https://github.com/shakacode/react_on_rails/issues/3880). [PR 3939](https://github.com/shakacode/react_on_rails/pull/3939) by [justin808](https://github.com/justin808).
 
 #### Fixed
 

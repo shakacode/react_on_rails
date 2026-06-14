@@ -159,6 +159,16 @@ describe('built-in health endpoints', () => {
     },
   );
 
+  test('GET /health and GET /ready are not registered when config option is false', async () => {
+    app = createWorker({ enableHealthEndpoints: false });
+
+    const healthRes = await app.inject().get('/health').end();
+    expect(healthRes.statusCode).toBe(404);
+
+    const readyRes = await app.inject().get('/ready').end();
+    expect(readyRes.statusCode).toBe(404);
+  });
+
   test('GET /ready returns 503 before a bundle is loaded and 200 after', async () => {
     app = createWorker({ enableHealthEndpoints: true });
 
