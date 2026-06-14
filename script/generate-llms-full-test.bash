@@ -219,6 +219,37 @@ test_unresolvable_sidebar_top_level_entry_fails_check() {
   assert_contains "$out" "External Only"
 }
 
+test_split_produces_oss_and_pro_files() {
+  write_fixture
+
+  if [ ! -f llms-full.txt ]; then
+    fail "expected llms-full.txt (OSS tier) to be generated"
+    return 1
+  fi
+  if [ ! -f llms-full-pro.txt ]; then
+    fail "expected llms-full-pro.txt (Pro tier) to be generated"
+    return 1
+  fi
+
+  local oss pro
+  oss="$(cat llms-full.txt)"
+  pro="$(cat llms-full-pro.txt)"
+
+  # OSS tier carries OSS pages and points at the Pro companion, never Pro pages.
+  assert_contains "$oss" "SOURCE: docs/oss/introduction.md"
+  assert_contains "$oss" "companion file: ./llms-full-pro.txt"
+  if printf '%s' "$oss" | grep -q "SOURCE: docs/pro/"; then
+    fail "llms-full.txt (OSS tier) must not contain Pro pages"
+  fi
+
+  # Pro tier carries Pro pages and points back at the OSS companion.
+  assert_contains "$pro" "SOURCE: docs/pro/installation.md"
+  assert_contains "$pro" "companion file: ./llms-full.txt"
+  if printf '%s' "$pro" | grep -q "SOURCE: docs/oss/"; then
+    fail "llms-full-pro.txt (Pro tier) must not contain OSS pages"
+  fi
+}
+
 test_split_threshold_exceeded_fails_check() {
   write_fixture
   node -e "process.stdout.write('x'.repeat(2100 * 1024))" >> docs/oss/introduction.md
@@ -237,6 +268,7 @@ test_split_threshold_exceeded_fails_check() {
 }
 
 run_test test_complete_sidebar_top_level_sections_pass_check
+run_test test_split_produces_oss_and_pro_files
 run_test test_missing_sidebar_top_level_section_fails_check
 run_test test_unresolvable_sidebar_top_level_entry_fails_check
 run_test test_split_threshold_exceeded_fails_check

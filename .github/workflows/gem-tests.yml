@@ -19,6 +19,7 @@ on:
       - 'docs/**'
       - 'llms.txt'
       - 'llms-full.txt'
+      - 'llms-full-pro.txt'
       - '.lychee.toml'
       - 'packages/**'
       - 'react_on_rails_pro/**'

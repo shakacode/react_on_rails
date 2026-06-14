@@ -160,5 +160,6 @@ bin/rails react_on_rails:doctor
 - Hosted docs: https://reactonrails.com/docs/
 - Getting-started tutorial: https://reactonrails.com/docs/getting-started/tutorial/
 - Machine-readable route map / expanded reference (for agents):
-  https://github.com/shakacode/react_on_rails/blob/main/llms.txt and
-  https://github.com/shakacode/react_on_rails/blob/main/llms-full.txt
+  https://github.com/shakacode/react_on_rails/blob/main/llms.txt,
+  https://github.com/shakacode/react_on_rails/blob/main/llms-full.txt (OSS), and
+  https://github.com/shakacode/react_on_rails/blob/main/llms-full-pro.txt (Pro)

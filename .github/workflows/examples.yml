@@ -15,6 +15,7 @@ on:
       - 'AGENTS_USER_GUIDE.md'
       - 'llms.txt'
       - 'llms-full.txt'
+      - 'llms-full-pro.txt'
   pull_request:
     paths-ignore:
       - '**.md'
@@ -22,6 +23,7 @@ on:
       - 'docs/**'
       - 'llms.txt'
       - 'llms-full.txt'
+      - 'llms-full-pro.txt'
       - '.lychee.toml'
   workflow_dispatch:
     inputs:
