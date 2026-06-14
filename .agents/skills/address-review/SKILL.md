@@ -341,13 +341,14 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    items, remaining `OPTIONAL` items worth tracking, and non-trivial `SKIPPED`
    items. Exclude weak "could consider" optional suggestions, trivial duplicates,
    factually incorrect suggestions, status noise, and already handled autonomous
-   optional nits. For remaining low-risk optional nits that were not already
-   replied to/resolved during the initial `f` gate and are excluded from the
-   bundle as not worth tracking, record the deferred/declined rationale for
-   later reply or summary use, but do not reply or resolve until the
-   tracking/drop outcome is chosen. Do not create a GitHub issue yet.
+   optional nits. For remaining optional items that were not already replied
+   to/resolved during the initial `f` gate and are excluded from the bundle as
+   not worth tracking, including weak "could consider" suggestions, record the
+   deferred/declined rationale for later reply or summary use, but do not reply
+   or resolve until the tracking/drop outcome is chosen. Do not create a GitHub
+   issue yet.
 4. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Do not post replies or resolve bundled items until that tracking/drop outcome is chosen. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
-5. For each deferred item and each remaining excluded low-risk optional nit that
+5. For each deferred item and each remaining excluded optional item that
    was not already handled during the initial `f` gate, post a reply in the
    original location referencing the chosen tracking/drop outcome or recorded
    rationale (use review-comment replies for inline comments and issue comments
@@ -371,14 +372,15 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 ### Action `f+o` — Fix must-fix and optional items inline
 
 Use only `f`'s `MUST-FIX` subflow and commit/push-before-reply ordering; do not
-enter `f` step 2 or any autonomous optional defer/decline filtering. In `f+o`,
-every current `OPTIONAL` item is selected for inline handling: fix it in the
-same PR, or stop and promote it to `DISCUSS` if it turns out to need judgment,
-change behavior, or expand scope. If optional fixes require a separate commit
-to keep the must-fix commit atomic, commit them separately and ask for push
-confirmation before pushing. Then handle `DISCUSS` and `SKIPPED` items using
-`f`'s prompts for those tiers. If there are zero `OPTIONAL` items, behave like
-`f` and note that `f+o` had nothing additional to do.
+enter `f` step 2 or any autonomous optional defer/decline filtering. Before the
+commit/push-before-reply gate, handle every current `OPTIONAL` item inline in
+the same local change phase as the must-fix work: fix it in the same PR, or stop
+and promote it to `DISCUSS` if it turns out to need judgment, change behavior,
+or expand scope. If optional fixes require a separate commit to keep the
+must-fix commit atomic, commit them separately and ask for push confirmation
+before pushing. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts
+for those tiers. If there are zero `OPTIONAL` items, behave like `f` and note
+that `f+o` had nothing additional to do.
 
 ### Action `d` — Discuss items
 
@@ -647,8 +649,8 @@ Rules for follow-up issues:
 
 After any chosen action or completed action chain except `a` and inspect-only
 bare `o` (`f`, `f+i`, `f+o`, `d`, selected `o`, `r`, `m`, or direct item
-selection), post a consolidated PR comment that becomes the next default review
-cutoff.
+selection), post either a marked cutoff-safe summary comment or, when the
+cutoff guard below is not satisfied, an unmarked status comment.
 
 For `a`, do not post a GitHub PR summary comment automatically; return the local summary to the user with the staged-file list and detailed `DISCUSS` recommendations.
 
