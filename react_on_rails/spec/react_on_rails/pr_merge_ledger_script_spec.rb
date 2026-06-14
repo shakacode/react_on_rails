@@ -1701,6 +1701,64 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "requires occurrence-specific dispositions for same-line mixed severities" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 7,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "same-line-mixed-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/same-line-mixed-review",
+          "body" => "P1 issues fixed; P2 still open"
+        }
+      ],
+      "comments" => []
+    }
+    dispositions = {
+      "https://example.com/same-line-mixed-review#L1:1" => "fixed"
+    }
+
+    Tempfile.create(["pr-merge-ledger-same-line-fixture", ".json"]) do |fixture_file|
+      Tempfile.create(["pr-merge-ledger-same-line-dispositions", ".json"]) do |dispositions_file|
+        fixture_file.write(JSON.generate(fixture))
+        fixture_file.flush
+        dispositions_file.write(JSON.generate(dispositions))
+        dispositions_file.flush
+
+        stdout, stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          fixture_file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--finding-dispositions",
+          dispositions_file.path,
+          "--strict",
+          chdir: repo_root
+        )
+
+        expect(status).not_to be_success, stderr
+
+        report = JSON.parse(stdout)
+        findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+        expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
+        expect(findings.map { |finding| finding.fetch("marker_index") }).to eq([1, 2])
+        expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[fixed UNKNOWN])
+        expect(stderr).not_to include("unused disposition keys")
+      end
+    end
+  end
+
   it "warns when finding disposition keys do not match any finding" do
     fixture = {
       "repository" => "shakacode/react_on_rails",

@@ -62,7 +62,7 @@ class PrMergeLedger
   FINDING_SUMMARY_RESOLUTION_PATTERN = /\b(?:none|fixed|resolved|waived)\b/i
   NEGATED_SUMMARY_RESOLUTION_PATTERN = /\bnot\s+(?:yet\s+)?(?:fixed|resolved|waived)\b/i
   ADDITIONAL_SEVERITY_PATTERN =
-    /[.;,(]\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
+    /[.;,(]\s*(?:[-*]\s*)?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
 
   class Error < StandardError; end
 
@@ -134,7 +134,7 @@ class PrMergeLedger
       opts.on("--pretty", "Pretty-print JSON output.") do
         @options[:pretty] = true
       end
-      opts.on("--finding-dispositions FILE", "JSON map from finding URL/id or URL#L<line>/id#L<line>.") do |path|
+      opts.on("--finding-dispositions FILE", "JSON map from finding URL/id, URL#L<line>, or URL#L<line>:<n>.") do |path|
         @options[:finding_dispositions] = path
       end
       opts.on("--changelog-classification CLASS", CHANGELOG_CLASSIFICATIONS) do |classification|
@@ -419,6 +419,7 @@ class PrMergeLedger
         finding.fetch("url"),
         finding.fetch("severity"),
         finding.fetch("source_line"),
+        finding.fetch("marker_index"),
         finding.fetch("text_excerpt")
       ]
     end
@@ -451,27 +452,70 @@ class PrMergeLedger
   def findings_from_text(text, url, id, dispositions, used_disposition_keys)
     text.to_s.each_line.with_index.flat_map do |line, index|
       line_text = line.chomp
-      next [] if non_actionable_finding_summary?(line_text)
-
-      severity = finding_severity(line_text)
-      next [] unless severity
-
-      source_line = index + 1
-      disposition = disposition_for(url, id, source_line, dispositions, used_disposition_keys)
-      [{
-        "id" => id,
-        "url" => url,
-        "severity" => severity,
-        "source_line" => source_line,
-        "text_excerpt" => excerpt(line_text),
-        "disposition" => disposition.fetch("disposition"),
-        "evidence" => disposition["evidence"]
-      }]
+      findings_from_line(line_text, index + 1, { url:, id: }, dispositions, used_disposition_keys)
     end
+  end
+
+  def findings_from_line(line_text, source_line, source, dispositions, used_disposition_keys)
+    return [] if non_actionable_finding_summary?(line_text)
+
+    occurrences = finding_occurrences(line_text)
+    return [] if occurrences.empty?
+
+    context = {
+      multiple_markers: occurrences.length > 1,
+      dispositions:,
+      used_disposition_keys:
+    }
+    occurrences.map do |occurrence|
+      finding_from_occurrence(line_text, source_line, source, occurrence, context)
+    end
+  end
+
+  def finding_from_occurrence(line_text, source_line, source, occurrence, context)
+    finding = source.merge(
+      source_line:,
+      marker_index: occurrence.fetch(:marker_index),
+      multiple_markers: context.fetch(:multiple_markers)
+    )
+    disposition = disposition_for(finding, context.fetch(:dispositions), context.fetch(:used_disposition_keys))
+
+    {
+      "id" => source.fetch(:id),
+      "url" => source.fetch(:url),
+      "severity" => occurrence.fetch(:severity),
+      "source_line" => source_line,
+      "source_column" => occurrence.fetch(:source_column),
+      "marker_index" => occurrence.fetch(:marker_index),
+      "text_excerpt" => excerpt(line_text),
+      "disposition" => disposition.fetch("disposition"),
+      "evidence" => disposition["evidence"]
+    }
   end
 
   def finding_severity(line)
     FINDING_PATTERNS.find { |_severity, pattern| line.match?(pattern) }&.first
+  end
+
+  def finding_occurrences(line)
+    first_severity = finding_severity(line)
+    return [] unless first_severity
+
+    occurrences = [{ severity: first_severity, source_column: 1, marker_index: 1 }]
+    line.to_enum(:scan, ADDITIONAL_SEVERITY_PATTERN).each do
+      match = Regexp.last_match
+      occurrences << {
+        severity: normalize_finding_severity(match[:severity]),
+        source_column: match.begin(:severity) + 1,
+        marker_index: occurrences.length + 1
+      }
+    end
+    occurrences
+  end
+
+  def normalize_finding_severity(raw_severity)
+    normalized = raw_severity.to_s.delete("[]").upcase.tr("- ", "_")
+    normalized == "MUST_FIX" ? "MUST_FIX" : normalized
   end
 
   def non_actionable_finding_summary?(line)
@@ -489,8 +533,10 @@ class PrMergeLedger
     first_clause.match?(FINDING_SUMMARY_RESOLUTION_PATTERN)
   end
 
-  def disposition_for(url, id, source_line, dispositions, used_disposition_keys)
-    disposition_key = disposition_keys(url, id, source_line).find { |key| dispositions.key?(key) }
+  def disposition_for(finding, dispositions, used_disposition_keys)
+    disposition_key = disposition_keys(finding).find do |key|
+      dispositions.key?(key)
+    end
     return { "disposition" => UNKNOWN } unless disposition_key
 
     used_disposition_keys << disposition_key
@@ -513,13 +559,23 @@ class PrMergeLedger
     end
   end
 
-  def disposition_keys(url, id, source_line)
-    [
+  def disposition_keys(finding)
+    url = finding.fetch(:url)
+    id = finding.fetch(:id)
+    source_line = finding.fetch(:source_line)
+    marker_index = finding.fetch(:marker_index)
+    marker_keys = [
+      url && "#{url}#L#{source_line}:#{marker_index}",
+      id && "#{id}#L#{source_line}:#{marker_index}"
+    ]
+    line_keys = [
       url && "#{url}#L#{source_line}",
       id && "#{id}#L#{source_line}",
       url,
       id
-    ].compact
+    ]
+
+    marker_keys.concat(finding.fetch(:multiple_markers) ? [url, id] : line_keys).compact
   end
 
   def warn_unused_dispositions(dispositions, used_disposition_keys)
