@@ -23,14 +23,16 @@
  */
 
 import fs from 'fs';
+import { PassThrough, Readable } from 'stream';
 import { LengthPrefixedStreamParser } from './parseLengthPrefixedStream';
 import path from 'path';
 import http2 from 'http2';
 import FormData from 'form-data';
-import buildApp from '../src/worker';
+import buildApp, { releaseExecutionContextWhenStreamFinishes } from '../src/worker';
 import { createTestConfig } from './testingNodeRendererConfigs';
 import * as errorReporter from '../src/shared/errorReporter';
 import packageJson from '../src/shared/packageJson';
+import { STREAM_CHUNK_TIMEOUT_MS } from '../src/shared/constants';
 
 const BUNDLE_TIMESTAMP = '55555-stream-error';
 
@@ -209,4 +211,31 @@ describe('streaming render error handling - E2E', () => {
     expect(chunks).toHaveLength(1);
     expect(chunks[0]).toContain('ok');
   }, 10000);
+});
+
+describe('standard render stream context retention', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('releases retained execution context for a stream that never finishes without aborting the response', () => {
+    jest.useFakeTimers();
+    const sourceStream = new Readable({ read() {} });
+    const rawResponse = new PassThrough();
+    const executionContext = { release: jest.fn() };
+
+    const releaseHandle = releaseExecutionContextWhenStreamFinishes(
+      sourceStream,
+      { raw: rawResponse } as never,
+      executionContext as never,
+    );
+    jest.advanceTimersByTime(STREAM_CHUNK_TIMEOUT_MS);
+
+    expect(executionContext.release).toHaveBeenCalledTimes(1);
+    expect(rawResponse.destroyed).toBe(false);
+
+    releaseHandle.release();
+    sourceStream.destroy();
+    rawResponse.destroy();
+  });
 });

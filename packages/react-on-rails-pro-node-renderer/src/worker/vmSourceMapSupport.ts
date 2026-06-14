@@ -196,6 +196,8 @@ function readSourceMapJsonForBundle(
   sourceMappingUrl: string | undefined,
 ): string | undefined {
   try {
+    // Stack formatting is synchronous, so source-map discovery stays sync and
+    // is cached per bundle registration.
     if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
       return parseDataUrlSourceMap(sourceMappingUrl);
     }
@@ -446,17 +448,24 @@ function escapeRegExp(value: string) {
  */
 function remapStackTraceForRegistration(stack: string, registration: BundleSourceMapRegistration) {
   const { bundleFilePath } = registration;
+  const stackIncludesBundleLocation = stack.includes(`${bundleFilePath}:`);
   let remappedStack = stack;
-  const bundleLocationRegex = new RegExp(`${escapeRegExp(bundleFilePath)}:(\\d+):(\\d+)`, 'g');
-  remappedStack = remappedStack.replace(bundleLocationRegex, (match, lineNumber, columnNumber) => {
-    const position = resolveOriginalPositionForRegistration(
-      registration,
-      bundleFilePath,
-      Number(lineNumber),
-      Number(columnNumber),
-    );
-    return position ? `${position.source}:${position.line}:${position.column}` : match;
-  });
+  if (stackIncludesBundleLocation) {
+    const bundleLocationRegex = new RegExp(`${escapeRegExp(bundleFilePath)}:(\\d+):(\\d+)`, 'g');
+    remappedStack = remappedStack.replace(bundleLocationRegex, (match, lineNumber, columnNumber) => {
+      const position = resolveOriginalPositionForRegistration(
+        registration,
+        bundleFilePath,
+        Number(lineNumber),
+        Number(columnNumber),
+      );
+      return position ? `${position.source}:${position.line}:${position.column}` : match;
+    });
+  }
+
+  if (!stackIncludesBundleLocation && !stack.includes(`${path.dirname(bundleFilePath)}${path.sep}`)) {
+    return remappedStack;
+  }
 
   const sourceMap = sourceMapForRegistration(registration);
   sourceMap?.sources.forEach((source) => {
@@ -464,8 +473,9 @@ function remapStackTraceForRegistration(stack: string, registration: BundleSourc
       return;
     }
 
-    // Jest applies the map before this pass but coerces URL-like sources such
-    // as `webpack://app/file.ts` into `<bundle-dir>/webpack:/app/file.ts`.
+    // Jest only: it applies the map before this pass but coerces URL-like
+    // sources such as `webpack://app/file.ts` into
+    // `<bundle-dir>/webpack:/app/file.ts`.
     // Other host formatters are handled by the bundle-path regex above; a
     // miss here is benign because the regex simply will not match.
     const hostMappedSourcePath = path.join(path.dirname(bundleFilePath), source.replace('://', ':/'));

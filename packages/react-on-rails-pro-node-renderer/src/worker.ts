@@ -22,6 +22,7 @@ import path from 'path';
 import cluster from 'cluster';
 import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
+import { Transform } from 'stream';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
@@ -65,7 +66,10 @@ import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
 const INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS = 1_000;
-const INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS = STREAM_CHUNK_TIMEOUT_MS;
+// Standard response streams use this only to release retained renderer context;
+// they are not aborted. Incremental responses may still close after request EOF.
+const STREAM_CONTEXT_RELEASE_TIMEOUT_MS = STREAM_CHUNK_TIMEOUT_MS;
+const INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS = STREAM_CONTEXT_RELEASE_TIMEOUT_MS;
 
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
@@ -133,12 +137,72 @@ function runWhenStreamFinishes(
   return finish;
 }
 
-function releaseExecutionContextWhenStreamFinishes(
+/** @internal Used in tests */
+export function releaseExecutionContextWhenStreamFinishes(
   stream: NonNullable<ResponseResult['stream']>,
   res: FastifyReply,
   executionContext: ExecutionContext,
 ) {
-  return runWhenStreamFinishes(stream, res, () => executionContext.release());
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let executionContextReleased = false;
+  const clearResponseFinishTimeout = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = undefined;
+    }
+  };
+  const releaseExecutionContext = () => {
+    if (executionContextReleased) {
+      return;
+    }
+
+    executionContextReleased = true;
+    clearResponseFinishTimeout();
+    executionContext.release();
+  };
+  const refreshResponseFinishTimeout = () => {
+    if (executionContextReleased) {
+      return;
+    }
+
+    const timeoutMs = STREAM_CONTEXT_RELEASE_TIMEOUT_MS;
+    clearResponseFinishTimeout();
+    timeoutId = setTimeout(() => {
+      timeoutId = undefined;
+      log.warn({
+        msg: 'Timed out waiting for render response stream to finish; releasing retained execution context',
+        timeoutMs,
+      });
+      releaseExecutionContext();
+    }, timeoutMs);
+  };
+  const progressStream = new Transform({
+    transform(chunk, encoding, callback) {
+      refreshResponseFinishTimeout();
+      callback(null, chunk);
+    },
+  });
+  const forwardSourceError = (error: Error) => progressStream.destroy(error);
+  const endProgressStream = () => {
+    if (!progressStream.writableEnded && !progressStream.destroyed) {
+      progressStream.end();
+    }
+  };
+  const release = runWhenStreamFinishes(progressStream, res, () => {
+    stream.off('close', endProgressStream);
+    stream.off('error', forwardSourceError);
+    releaseExecutionContext();
+  });
+
+  refreshResponseFinishTimeout();
+  stream.once('close', endProgressStream);
+  stream.once('error', forwardSourceError);
+  stream.pipe(progressStream);
+
+  return {
+    release,
+    stream: progressStream,
+  };
 }
 
 const setResponseAndReleaseExecutionContext = async (
@@ -152,11 +216,11 @@ const setResponseAndReleaseExecutionContext = async (
   }
 
   if (result.stream) {
-    const release = releaseExecutionContextWhenStreamFinishes(result.stream, res, executionContext);
+    const releaseHandle = releaseExecutionContextWhenStreamFinishes(result.stream, res, executionContext);
     try {
-      await setResponse(result, res);
+      await setResponse({ ...result, stream: releaseHandle.stream }, res);
     } catch (error) {
-      release();
+      releaseHandle.release();
       throw error;
     }
     return;

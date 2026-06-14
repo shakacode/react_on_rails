@@ -24,6 +24,7 @@ import { isErrorRenderResult } from '../src/shared/utils';
 import {
   PREPARE_STACK_TRACE_INSTALL_SCRIPT,
   registerBundleForSourceMaps,
+  remapStackTrace,
   resolveOriginalPosition,
   SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY,
 } from '../src/worker/vmSourceMapSupport';
@@ -300,6 +301,45 @@ describe('source-mapped stack traces for VM errors', () => {
         column: 3,
       });
       expect(readFileSyncSpy).not.toHaveBeenCalledWith(bundlePath, 'utf8');
+    } finally {
+      readFileSyncSpy.mockRestore();
+    }
+  });
+
+  test('global host stack remapping skips source-map loads for unrelated registered bundles', async () => {
+    const firstBundlePath = path.join(serverBundleCachePath(testName), 'first', 'bundle.js');
+    const secondBundlePath = path.join(serverBundleCachePath(testName), 'second', 'bundle.js');
+    const firstMapPath = `${firstBundlePath}.map`;
+    const secondMapPath = `${secondBundlePath}.map`;
+    await writeBundleAt(
+      firstBundlePath,
+      `${buildThrowingBundleSource()}\n//# sourceMappingURL=${path.basename(firstMapPath)}\n`,
+    );
+    await fsPromises.writeFile(
+      firstMapPath,
+      JSON.stringify(buildThrowingBundleMap(path.basename(firstBundlePath))),
+    );
+    await writeBundleAt(
+      secondBundlePath,
+      `${buildThrowingBundleSource()}\n//# sourceMappingURL=${path.basename(secondMapPath)}\n`,
+    );
+    await fsPromises.writeFile(
+      secondMapPath,
+      JSON.stringify(buildThrowingBundleMap(path.basename(secondBundlePath), REBUILT_SOURCE)),
+    );
+    registerBundleForSourceMaps(firstBundlePath);
+    registerBundleForSourceMaps(secondBundlePath);
+    const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+
+    try {
+      const remappedStack = remapStackTrace(`Error: host\n    at boom (${firstBundlePath}:3:17)`);
+
+      expect(remappedStack).toContain(`${ORIGINAL_SOURCE}:2:3`);
+      const readPaths = readFileSyncSpy.mock.calls.map(([filePath]) => filePath);
+      expect(readPaths).toContain(firstBundlePath);
+      expect(readPaths).toContain(firstMapPath);
+      expect(readPaths).not.toContain(secondBundlePath);
+      expect(readPaths).not.toContain(secondMapPath);
     } finally {
       readFileSyncSpy.mockRestore();
     }
