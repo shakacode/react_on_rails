@@ -19,12 +19,18 @@ describe('serializeForInlineScript', () => {
   it('escapes script-closing payloads while preserving JSON round trips', () => {
     const payload = {
       cachedHtml: '</script><script>window.evil = true</script>',
+      lineSeparator: 'line\u2028separator',
+      paragraphSeparator: 'paragraph\u2029separator',
     };
 
     const serialized = serializeForInlineScript(payload);
 
     expect(serialized).not.toContain('<');
     expect(serialized).not.toContain('</script>');
+    expect(serialized).not.toContain('\u2028');
+    expect(serialized).not.toContain('\u2029');
+    expect(serialized).toContain('\\u2028');
+    expect(serialized).toContain('\\u2029');
     expect(JSON.parse(serialized)).toEqual(payload);
   });
 });

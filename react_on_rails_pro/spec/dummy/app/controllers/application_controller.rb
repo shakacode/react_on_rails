@@ -42,11 +42,12 @@ class ApplicationController < ActionController::Base
       and the error happen outside the shell
     ERROR
 
+    redirect_path = server_side_log_throw_raise_invoker_path
     error_message = <<~HTML
       <h2>Server-Side Rendering Error</h2>
       <p>We apologize, but an error occurred while rendering the page on the server.</p>
       <p>If you are not redirected, please
-      <a href="#{server_side_log_throw_raise_invoker_path}">click here</a>.</p>
+      <a href="#{ERB::Util.html_escape(redirect_path)}">click here</a>.</p>
     HTML
 
     # The strict CSP (config/initializers/content_security_policy.rb) blocks
@@ -61,13 +62,13 @@ class ApplicationController < ActionController::Base
       <script#{nonce_attribute}>
         document.getElementById('page-container').innerHTML = #{ActiveSupport::JSON.encode(error_message)};
         setTimeout(function() {
-          window.location.href = #{ActiveSupport::JSON.encode(server_side_log_throw_raise_invoker_path)};
+          window.location.href = #{ActiveSupport::JSON.encode(redirect_path)};
         }, 5000);
       </script>
     HTML
 
     meta_refresh = <<~HTML
-      <meta http-equiv='refresh' content='5;url=#{server_side_log_throw_raise_invoker_path}'>
+      <meta http-equiv='refresh' content='5;url=#{ERB::Util.html_escape(redirect_path)}'>
     HTML
 
     response.stream.write(error_message + js_redirect + meta_refresh)

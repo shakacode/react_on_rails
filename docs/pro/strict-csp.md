@@ -29,7 +29,8 @@ Rails.application.configure do
     policy.connect_src :self, :https
   end
 
-  # Per-request nonce — the strictest configuration.
+  # Per-request nonce for normal full-page navigation. Use a session-stable
+  # generator instead when Turbo/Turbolinks keeps the original document policy.
   config.content_security_policy_nonce_generator = ->(_request) { SecureRandom.base64(16) }
 
   # Append the nonce to script-src only.
@@ -40,7 +41,7 @@ end
 Notes:
 
 - With a nonce generator configured and `script-src` in `content_security_policy_nonce_directives`, Rails appends `'nonce-…'` to the `script-src` directive of every response automatically.
-- **Per-request vs. per-session nonce**: `SecureRandom.base64(16)` generates a fresh nonce per request. If your app uses Turbo/Turbolinks, Rails' guides suggest a session-based generator (`->(request) { request.session.id.to_s }`) because inline scripts in Turbo-fetched pages carry the new response's nonce while the document still enforces the original page's policy. React on Rails works with either: component hydration after a Turbo/Turbolinks visit is driven by the (external, `'self'`-allowed) client bundle reading inert JSON data tags, not by the inline scripts.
+- **Per-request vs. per-session nonce**: `SecureRandom.base64(16)` generates a fresh nonce per request. Use it for normal full-page navigations. If your app uses Turbo/Turbolinks visits that can load streamed SSR/RSC pages, prefer a session-based generator (`->(request) { request.session.id.to_s }`) because executable inline scripts in Turbo-fetched pages carry the new response's nonce while the active document still enforces the original page's policy.
 - Browsers ignore `'unsafe-inline'` for a directive once that directive contains a nonce, so adding it as a fallback for legacy browsers is harmless but does not weaken the policy in modern browsers.
 - A development environment usually needs extra allowances for `webpack-dev-server` (the bundle origin, the HMR websocket, and `'unsafe-eval'` for eval-based source maps). See the Pro dummy app's initializer (`react_on_rails_pro/spec/dummy/config/initializers/content_security_policy.rb`) for a working example that stays strict in test/production.
 

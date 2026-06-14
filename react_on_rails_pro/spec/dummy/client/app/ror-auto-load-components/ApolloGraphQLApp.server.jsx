@@ -21,6 +21,7 @@ import { ApolloProvider, ApolloClient, createHttpLink, InMemoryCache } from '@ap
 import { getMarkupFromTree } from '@apollo/client/react/ssr';
 import fetch from 'cross-fetch';
 import ApolloGraphQL from '../components/ApolloGraphQL';
+import { serializeForInlineScript } from '../utils/serializeForInlineScript';
 
 export default async (props, railsContext) => {
   const { csrf, sessionCookie } = props.ssrOnlyProps;
@@ -57,7 +58,7 @@ export default async (props, railsContext) => {
       nonce={railsContext.cspNonce}
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{
-        __html: `window.__APOLLO_STATE__=${JSON.stringify(initialState).replace(/</g, '\\u003c')};`,
+        __html: `window.__APOLLO_STATE__=${serializeForInlineScript(initialState)};`,
       }}
     />,
   );

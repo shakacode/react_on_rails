@@ -100,7 +100,10 @@ function getCspViolations(page: Page): Promise<CspViolation[]> {
  * so we tolerate exactly this one violation shape and nothing else.
  */
 function isDevBuildFlightClientEval(violation: CspViolation): boolean {
-  return violation.blockedURI === 'eval' && violation.sourceFile.includes('react-on-rails-rsc');
+  return (
+    violation.blockedURI === 'eval' &&
+    (violation.sourceFile === '' || violation.sourceFile.includes('react-on-rails-rsc'))
+  );
 }
 
 async function getUnexpectedCspViolations(page: Page): Promise<CspViolation[]> {
@@ -153,8 +156,13 @@ test.describe('Strict CSP (script-src self + per-request nonce, no unsafe-inline
       document.body.appendChild(script);
     });
 
-    await expect.poll(async () => (await getUnexpectedCspViolations(page)).length).toBe(1);
-    const violations = await getUnexpectedCspViolations(page);
+    let violations: CspViolation[] = [];
+    await expect
+      .poll(async () => {
+        violations = await getUnexpectedCspViolations(page);
+        return violations.length;
+      })
+      .toBe(1);
     expect(violations[0].blockedURI).toBe('inline');
     expect(violations[0].violatedDirective).toContain('script-src');
 

@@ -119,8 +119,10 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
       (script-src 'self' 'nonce-...' - see config/initializers/content_security_policy.rb),
       so the auto-submit behavior is attached from a nonced script instead. %>
   <%= javascript_tag nonce: true do %>
-    document.querySelectorAll('#config-override-form select').forEach(function (el) {
-      el.addEventListener('change', function () { el.form.submit(); });
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('#config-override-form select').forEach(function (el) {
+        el.addEventListener('change', function () { el.form.submit(); });
+      });
     });
   <% end %>
 
