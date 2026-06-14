@@ -1415,6 +1415,105 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "does not split priority mentions embedded in a finding title" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "review-with-cross-priority-title",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/review-with-cross-priority-title",
+          "body" => "[P2] Fix handling of P1/P2 summaries"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-cross-priority-title", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+      expect(findings.length).to eq(1)
+      expect(findings.first).to include(
+        "severity" => "P2",
+        "marker_index" => 1,
+        "text_excerpt" => "[P2] Fix handling of P1/P2 summaries"
+      )
+    end
+  end
+
+  it "reports the primary finding marker column for indented list items" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "review-with-indented-marker",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/review-with-indented-marker",
+          "body" => "  - **P0**: Critical issue"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-indented-marker", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+      expect(finding).to include(
+        "severity" => "P0",
+        "source_column" => 7,
+        "marker_index" => 1
+      )
+    end
+  end
+
   it "ignores findings from outdated review-thread comments" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -3704,15 +3803,10 @@ RSpec.describe "script/pr-merge-ledger" do
         "2",
         "--repo",
         "shakacode/react_on_rails",
-        "--strict",
         chdir: repo_root
       )
 
-      expect(status).not_to be_success
-      expect(stderr).to include(
-        "pr-merge-ledger: --strict with multiple PRs always fails until each PR has a " \
-        "non-UNKNOWN changelog classification"
-      )
+      expect(status).to be_success, stderr
 
       report = JSON.parse(stdout)
       expect(report.dig("source", "prs")).to eq([1, 2])
@@ -3722,6 +3816,25 @@ RSpec.describe "script/pr-merge-ledger" do
         "review_decision_review_required"
       )
     end
+  end
+
+  it "rejects strict multiple live PR ledgers before producing an incomplete gate result" do
+    stdout, stderr, status = Open3.capture3(
+      script_path,
+      "1",
+      "2",
+      "--repo",
+      "shakacode/react_on_rails",
+      "--strict",
+      chdir: repo_root
+    )
+
+    expect(status).not_to be_success
+    expect(stdout).to eq("")
+    expect(stderr).to include(
+      "pr-merge-ledger: --strict with multiple PRs requires separate per-PR runs with explicit " \
+      "--changelog-classification"
+    )
   end
 
   it "paginates live review-thread comments before normalizing threads" do

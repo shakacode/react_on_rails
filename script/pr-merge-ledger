@@ -94,7 +94,7 @@ class PrMergeLedger
     /\bno\s+(?:\S+\s+){0,4}?(?:fixed|resolved|waived)\b/i
   )
   ADDITIONAL_SEVERITY_PATTERN = %r{
-    (?:(?<!\d)[.;,(:-]|/|\b(?:and|but|however|or|while|with)\b)\s*
+    (?:(?<!\d)[.;,(:-]|(?<![A-Za-z0-9])/|\b(?:and|but|however|or|while|with)\b)\s*
     (?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?
     (?:\s|:|-|/|$)
   }ix
@@ -170,8 +170,8 @@ class PrMergeLedger
 
     return unless @options[:strict] && @argv.length > 1
 
-    warn "pr-merge-ledger: --strict with multiple PRs always fails until each PR has a " \
-         "non-UNKNOWN changelog classification"
+    raise Error, "--strict with multiple PRs requires separate per-PR runs with explicit " \
+                 "--changelog-classification"
   end
 
   def build_option_parser
@@ -594,19 +594,23 @@ class PrMergeLedger
       lines = lines.first(MAX_BODY_LINES)
     end
 
-    source_finding_count = lines.sum do |line_text|
-      next 0 if non_actionable_finding_summary?(line_text)
+    finding_lines = lines.each_with_index.filter_map do |line_text, index|
+      next if non_actionable_finding_summary?(line_text)
 
-      finding_occurrences(line_text).length
+      occurrences = finding_occurrences(line_text)
+      next if occurrences.empty?
+
+      [line_text, index + 1, occurrences]
     end
+    source_finding_count = finding_lines.sum { |(_line_text, _source_line, occurrences)| occurrences.length }
     line_context = {
       source_finding_count:,
       dispositions: context.fetch(:dispositions),
       used_disposition_keys: context.fetch(:used_disposition_keys)
     }
 
-    lines.each_with_index.flat_map do |line_text, index|
-      findings_from_line(line_text, index + 1, { url:, id: }, line_context)
+    finding_lines.flat_map do |line_text, source_line, occurrences|
+      findings_from_occurrences(line_text, source_line, { url:, id: }, occurrences, line_context)
     end
   end
 
@@ -616,6 +620,10 @@ class PrMergeLedger
     occurrences = finding_occurrences(line_text)
     return [] if occurrences.empty?
 
+    findings_from_occurrences(line_text, source_line, source, occurrences, context)
+  end
+
+  def findings_from_occurrences(line_text, source_line, source, occurrences, context)
     finding_context = context.merge(
       multiple_markers: occurrences.length > 1
     )
@@ -665,7 +673,11 @@ class PrMergeLedger
 
     first_severity, first_match = primary_match
 
-    occurrences = [{ severity: first_severity, source_column: 1, marker_index: 1 }]
+    occurrences = [{
+      severity: first_severity,
+      source_column: primary_finding_source_column(line, first_severity, first_match),
+      marker_index: 1
+    }]
     line.scan(ADDITIONAL_SEVERITY_PATTERN) do
       match = Regexp.last_match
       occurrences << {
@@ -687,7 +699,11 @@ class PrMergeLedger
       next if match.begin(0) < first_marker_end
 
       gap = line[first_marker_end...match.begin(0)].to_s
-      next if gap.match?(/\A\s*\z/)
+      if gap.match?(/\A\s*\z/)
+        next unless match.begin(0).positive? && line[match.begin(0) - 1] == "/"
+      else
+        next unless separate_finding_gap?(gap)
+      end
 
       source_column = match.begin(0) + 1
       next if occurrences.any? { |occurrence| occurrence.fetch(:source_column) == source_column }
@@ -698,6 +714,26 @@ class PrMergeLedger
         marker_index: nil
       }
     end
+  end
+
+  def primary_finding_source_column(line, severity, match)
+    marker_pattern =
+      if severity == "MUST_FIX"
+        /MUST[- ]?FIX/i
+      else
+        /\[?#{Regexp.escape(severity)}\]?/i
+      end
+    matched_text = line[match.begin(0)...match.end(0)].to_s
+    marker_offset = matched_text.index(marker_pattern) || 0
+
+    match.begin(0) + marker_offset + 1
+  end
+
+  def separate_finding_gap?(gap)
+    return true if gap.match?(%r{\A\s*/\s*\z})
+
+    gap.match?(/[.!?;]/) ||
+      gap.match?(/\b(?:also|but|fixed|however|open|please|regression|remaining|resolved|still|unresolved|waived)\b/i)
   end
 
   def normalize_finding_severity(raw_severity)
