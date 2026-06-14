@@ -63,9 +63,11 @@ Before relying on a newly cloned or updated backend, capture the private
 contract marker and prove the commands this public workflow depends on:
 
 Set `AGENT_COORD_REPO` to the private `shakacode/agent-coordination` clone path
-before running this block. Copy the `git describe`, `git rev-parse HEAD`,
-`agent-coord version --json`, and `agent-coord config show --json` output into
-PR evidence.
+before running this block. Public PR evidence should record the private backend
+tag/commit marker, the command names, exit codes, and whether the JSON commands
+parsed successfully. Do not paste raw `agent-coord config show --json` output,
+private defaults, liveness thresholds, or terminal-status details into public
+PRs.
 
 ```bash
 if test -z "${AGENT_COORD_REPO:-}"; then
@@ -80,7 +82,7 @@ else
     git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
     "$AGENT_COORD_REPO/bin/agent-coord" --help &&
     "$AGENT_COORD_REPO/bin/agent-coord" version --json &&
-    "$AGENT_COORD_REPO/bin/agent-coord" config show --json &&
+    "$AGENT_COORD_REPO/bin/agent-coord" config show --json >/dev/null &&
     "$AGENT_COORD_REPO/bin/agent-coord" doctor &&
     "$AGENT_COORD_REPO/bin/agent-coord" status &&
     "$AGENT_COORD_REPO/bin/agent-coord" claim --help &&
