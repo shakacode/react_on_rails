@@ -99,6 +99,10 @@ const NotFoundPage = () => <h2 id="tanstack-starter-not-found">Starter page not 
 // guard, a deep link server-renders the placeholder and the client fetches
 // the payload after mount — the same HTTP-streaming path used on client
 // navigation.
+//
+// Side effect: TanStack Router unmounts this outlet component when leaving the
+// route, so the placeholder can briefly flash on repeat client navigations too.
+// That tradeoff is intentional in this starter.
 const ServerDataPage = () => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -109,7 +113,8 @@ const ServerDataPage = () => {
     <section id="tanstack-starter-server-data">
       <h2>Starter Server Data Page</h2>
       {mounted ? (
-        <Suspense fallback={<p id="tanstack-starter-server-data-loading">Loading server data...</p>}>
+        <Suspense fallback={<p>Loading server data...</p>}>
+          {/* No props needed by this demo server component; keep the empty object explicit for copy-paste. */}
           <RSCRoute componentName="StarterServerData" componentProps={{}} />
         </Suspense>
       ) : (

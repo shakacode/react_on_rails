@@ -105,8 +105,10 @@ describe "TanStack Router Starter" do # rubocop:disable RSpec/FilePath,RSpec/Spe
     let(:log_probe_message) { "tanstack-starter-console-log-probe" }
 
     before do
-      # Drain console entries left over from earlier examples in the shared
-      # browser session (reading the log buffer clears it).
+      # Flush the Selenium log buffer accumulated by preceding examples so
+      # this test only sees logs from its own visit. Reading the buffer clears
+      # it; Capybara initialises the JS driver lazily, so this is safe in
+      # isolation too (the buffer is empty, and the driver starts on get()).
       page.driver.browser.logs.get(:browser)
     end
 

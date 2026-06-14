@@ -17,7 +17,5 @@
 # (see config/routes.rb) renders the same view for every starter URL, so the
 # initial route is server-rendered and subsequent navigation is client-side.
 class TanstackStarterController < ApplicationController
-  def index
-    @starter_props = {}
-  end
+  def index; end
 end
