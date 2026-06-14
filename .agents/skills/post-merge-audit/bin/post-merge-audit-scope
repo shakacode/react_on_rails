@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+# Post-merge audit scope resolver.
+#
+# Resolves the exact audit range for `.agents/skills/post-merge-audit/SKILL.md`
+# from git + GitHub ground truth, so the handoff prompt does not depend on
+# whoever assembles it by hand. It prints:
+#   - resolved base ref + SHA (last *.rc.* tag by default) and head SHA
+#   - the merged-PR list in BASE..HEAD (squash-merge aware)
+#   - carry-over PRs already covered by a prior post-merge-audit issue
+#   - existing finding fingerprints -> issue number/state (so re-runs append
+#     evidence instead of filing duplicate issues)
+#   - "to audit" = merged minus carry-over
+#
+# The pure parsing helpers (pma_extract_prs / pma_parse_affected /
+# pma_parse_fingerprints / pma_diff_prs) are sourceable and covered by
+# post-merge-audit-scope-test.bash. Live `gh`/`git` calls are not unit-tested;
+# run `--self-check` for a no-write smoke test against the current repo.
+#
+# Tests:  bash .agents/skills/post-merge-audit/bin/post-merge-audit-scope-test.bash
+# Lint:   shellcheck -x .agents/skills/post-merge-audit/bin/post-merge-audit-scope
+
+set -euo pipefail
+
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+DIM=$'\033[2m'
+NC=$'\033[0m'
+
+FINGERPRINT_MARKER="post-merge-audit-finding"
+
+show_help() {
+  cat << EOF
+${BLUE}Post-merge audit scope resolver${NC}
+
+Resolves base/head, the merged-PR list, carry-over PRs, and existing finding
+fingerprints for a post-merge audit. Read-only: never writes to git or GitHub.
+
+${YELLOW}Usage:${NC}
+  post-merge-audit-scope [OPTIONS]
+
+${YELLOW}Options:${NC}
+  --base <ref>      Base tag/SHA. Default: most recent *.rc.* tag.
+  --head <ref>      Head ref. Default: origin/main.
+  --repo <o/r>      GitHub repo. Default: derived from gh / origin remote.
+  --audit-id <id>   Audit id to stamp. Default: <YYYY-MM-DD>-postrc.
+  --json            Emit machine-readable JSON on stdout (text report -> stderr).
+  --no-carryover    Skip the GitHub fingerprint/carry-over lookup (git-only).
+  --self-check      No-write smoke test against the current repo, then exit.
+  -h, --help        Show this help.
+
+${YELLOW}Examples:${NC}
+  post-merge-audit-scope                       # last rc tag -> origin/main
+  post-merge-audit-scope --base v17.0.0.rc.1   # explicit base
+  post-merge-audit-scope --json > scope.json   # feed an audit handoff prompt
+EOF
+}
+
+err() {
+  printf '%serror:%s %s\n' "$RED" "$NC" "$1" >&2
+}
+
+# --- Pure helpers (unit-tested; no git/gh/network) --------------------------
+
+# Extract squash-merge PR numbers from git-log subjects on stdin. Only the
+# trailing "(#NNNN)" form counts as the merge PR, so a subject that also
+# mentions "#3592" in prose does not produce a false positive.
+pma_extract_prs() {
+  { grep -oE '\(#[0-9]+\)' || true; } | tr -d '(#)' | sort -un
+}
+
+# Parse PR numbers from "affected_prs: 1,2,3" lines in an issue body on stdin.
+pma_parse_affected() {
+  { grep -oE 'affected_prs:[[:space:]]*[0-9,[:space:]]+' || true; } \
+    | { grep -oE '[0-9]+' || true; } \
+    | sort -un
+}
+
+# Parse "fingerprint: <value>" values from an issue body on stdin (one per line).
+pma_parse_fingerprints() {
+  sed -nE 's/.*fingerprint:[[:space:]]*([^[:space:]]+).*/\1/p'
+}
+
+# Print PR numbers present in file $1 (merged) but absent from file $2 (carry).
+# Both files are one number per line. Output is numerically sorted.
+# Uses FILENAME (not NR==FNR) to identify the carry file, so an empty carry file
+# — the common "nothing audited yet" case — still returns the full merged list.
+pma_diff_prs() {
+  local merged="$1" carry="$2"
+  awk -v cf="$carry" 'FILENAME == cf { c[$1] = 1; next } !($1 in c)' "$carry" "$merged" | sort -un
+}
+
+# --- Live resolution (git/gh) -----------------------------------------------
+
+resolve_repo() {
+  if [ -n "$1" ]; then
+    printf '%s\n' "$1"
+    return 0
+  fi
+  gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null
+}
+
+resolve_base_ref() {
+  if [ -n "$1" ]; then
+    printf '%s\n' "$1"
+    return 0
+  fi
+  # Most recent release-candidate tag, e.g. v17.0.0.rc.1.
+  git tag --sort=-creatordate | grep -E 'rc\.[0-9]+$' | head -1
+}
+
+main() {
+  local base_ref="" head_ref="origin/main" repo_arg="" audit_id=""
+  local want_json=false do_carryover=true
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --base) base_ref="$2"; shift 2 ;;
+      --head) head_ref="$2"; shift 2 ;;
+      --repo) repo_arg="$2"; shift 2 ;;
+      --audit-id) audit_id="$2"; shift 2 ;;
+      --json) want_json=true; shift ;;
+      --no-carryover) do_carryover=false; shift ;;
+      --self-check) self_check; exit $? ;;
+      -h|--help) show_help; exit 0 ;;
+      *) err "unknown option: $1"; show_help >&2; exit 2 ;;
+    esac
+  done
+
+  local repo base head base_sha head_sha
+  repo="$(resolve_repo "$repo_arg")"
+  [ -n "$repo" ] || { err "could not resolve repo (pass --repo owner/name)"; exit 1; }
+
+  base="$(resolve_base_ref "$base_ref")"
+  [ -n "$base" ] || { err "could not resolve a base ref (no rc.* tag found; pass --base)"; exit 1; }
+
+  base_sha="$(git rev-parse --verify --quiet "$base^{commit}" || true)"
+  [ -n "$base_sha" ] || { err "base ref '$base' not found; try: git fetch --tags origin"; exit 1; }
+  head_sha="$(git rev-parse --verify --quiet "$head_ref^{commit}" || true)"
+  [ -n "$head_sha" ] || { err "head ref '$head_ref' not found; try: git fetch origin"; exit 1; }
+  head="$head_ref"
+
+  if [ -z "$audit_id" ]; then
+    audit_id="$(date -u +%Y-%m-%d)-postrc"
+  fi
+
+  local workdir merged_file carry_file fp_file toaudit_file
+  workdir="$(mktemp -d "${TMPDIR:-/tmp}/pma-scope.XXXXXX")"
+  # shellcheck disable=SC2064  # expand workdir now so the trap cleans the right dir
+  trap "rm -rf '$workdir'" EXIT
+  merged_file="$workdir/merged"
+  carry_file="$workdir/carry"
+  fp_file="$workdir/fingerprints"
+  toaudit_file="$workdir/toaudit"
+
+  git log "$base_sha..$head_sha" --format='%s' | pma_extract_prs > "$merged_file"
+  : > "$carry_file"
+  : > "$fp_file"
+
+  local carry_note="skipped (--no-carryover)"
+  if [ "$do_carryover" = true ]; then
+    carry_note="$(collect_carryover "$repo" "$carry_file" "$fp_file")"
+  fi
+
+  pma_diff_prs "$merged_file" "$carry_file" > "$toaudit_file"
+
+  local merged_count carry_count toaudit_count fp_count
+  merged_count="$(wc -l < "$merged_file" | tr -d ' ')"
+  carry_count="$(wc -l < "$carry_file" | tr -d ' ')"
+  toaudit_count="$(wc -l < "$toaudit_file" | tr -d ' ')"
+  fp_count="$(wc -l < "$fp_file" | tr -d ' ')"
+
+  if [ "$want_json" = true ]; then
+    # Human report to stderr so stdout stays clean JSON for piping/redirection.
+    print_text_report >&2
+    print_json_report
+  else
+    print_text_report
+  fi
+}
+
+# Populates carry_file (PR numbers) and fp_file (TSV: fingerprint number state url)
+# from existing post-merge-audit finding issues. Prints a one-line status note.
+collect_carryover() {
+  local repo="$1" carry_out="$2" fp_out="$3"
+  # `gh issue list --search "<marker> in:body"` (NOT `gh search issues`, which
+  # rejects --state all) finds the fingerprint even inside an HTML comment.
+  local issues_json
+  issues_json="$(gh issue list --repo "$repo" --state all \
+    --search "$FINGERPRINT_MARKER in:body" --limit 200 \
+    --json number,state,url,body 2>/dev/null || printf '[]')"
+
+  if [ "$(printf '%s' "$issues_json" | jq 'length')" -eq 0 ]; then
+    printf 'no prior post-merge-audit issues found'
+    return 0
+  fi
+
+  local count
+  count="$(printf '%s' "$issues_json" | jq 'length')"
+
+  local i num state url body
+  for i in $(seq 0 $((count - 1))); do
+    num="$(printf '%s' "$issues_json" | jq -r ".[$i].number")"
+    state="$(printf '%s' "$issues_json" | jq -r ".[$i].state")"
+    url="$(printf '%s' "$issues_json" | jq -r ".[$i].url")"
+    body="$(printf '%s' "$issues_json" | jq -r ".[$i].body")"
+
+    printf '%s' "$body" | pma_parse_affected >> "$carry_out"
+
+    local fp
+    while IFS= read -r fp; do
+      [ -n "$fp" ] || continue
+      printf '%s\t%s\t%s\t%s\n' "$fp" "$num" "$state" "$url" >> "$fp_out"
+    done < <(printf '%s' "$body" | pma_parse_fingerprints)
+  done
+
+  # De-dup carry-over PR numbers in place.
+  sort -un "$carry_out" -o "$carry_out"
+  printf 'scanned %s issue(s) for %s fingerprints' "$count" "$FINGERPRINT_MARKER"
+}
+
+print_text_report() {
+  printf '\n%s== Post-merge audit scope ==%s\n' "$BLUE" "$NC"
+  printf '  audit id : %s%s%s\n' "$GREEN" "$audit_id" "$NC"
+  printf '  repo     : %s\n' "$repo"
+  printf '  base     : %s%s%s  %s(%s)%s\n' "$GREEN" "$base" "$NC" "$DIM" "${base_sha:0:9}" "$NC"
+  printf '  head     : %s%s%s  %s(%s)%s\n' "$GREEN" "$head" "$NC" "$DIM" "${head_sha:0:9}" "$NC"
+
+  printf '\n%sMerged PRs in range:%s %s\n' "$YELLOW" "$NC" "$merged_count"
+  fmt_pr_list "$merged_file"
+
+  printf '\n%sCarry-over (already audited):%s %s  %s%s%s\n' "$YELLOW" "$NC" "$carry_count" "$DIM" "$carry_note" "$NC"
+  fmt_pr_list "$carry_file"
+
+  printf '\n%sTo audit (merged - carry-over):%s %s\n' "$YELLOW" "$NC" "$toaudit_count"
+  fmt_pr_list "$toaudit_file"
+
+  printf '\n%sExisting finding fingerprints:%s %s  %s(append, do not duplicate)%s\n' \
+    "$YELLOW" "$NC" "$fp_count" "$DIM" "$NC"
+  if [ "$fp_count" -gt 0 ]; then
+    sort "$fp_file" | while IFS=$'\t' read -r fp num state url; do
+      printf '  %s%-7s%s #%-5s %s  %s\n' "$DIM" "$state" "$NC" "$num" "$fp" "$url"
+    done
+  else
+    printf '  %s(none)%s\n' "$DIM" "$NC"
+  fi
+  printf '\n'
+}
+
+fmt_pr_list() {
+  local file="$1"
+  if [ ! -s "$file" ]; then
+    printf '  %s(none)%s\n' "$DIM" "$NC"
+    return 0
+  fi
+  # Comma-join into wrapped lines for readable copy/paste.
+  paste -sd, - < "$file" | fold -s -w 76 | sed 's/^/  /'
+}
+
+print_json_report() {
+  jq -n \
+    --arg audit_id "$audit_id" \
+    --arg repo "$repo" \
+    --arg base "$base" --arg base_sha "$base_sha" \
+    --arg head "$head" --arg head_sha "$head_sha" \
+    --argjson merged "$(jq -R . < "$merged_file" | jq -s 'map(tonumber)')" \
+    --argjson carry "$(jq -R . < "$carry_file" | jq -s 'map(tonumber)')" \
+    --argjson to_audit "$(jq -R . < "$toaudit_file" | jq -s 'map(tonumber)')" \
+    --argjson fingerprints "$(fingerprints_json)" \
+    '{audit_id:$audit_id, repo:$repo,
+      base:{ref:$base, sha:$base_sha}, head:{ref:$head, sha:$head_sha},
+      merged_prs:$merged, carry_over_prs:$carry, to_audit_prs:$to_audit,
+      existing_fingerprints:$fingerprints}'
+}
+
+fingerprints_json() {
+  if [ ! -s "$fp_file" ]; then
+    printf '[]'
+    return 0
+  fi
+  jq -R -s 'split("\n") | map(select(length>0) | split("\t"))
+    | map({fingerprint:.[0], issue:(.[1]|tonumber), state:.[2], url:.[3]})' < "$fp_file"
+}
+
+# No-write smoke test: resolves scope against the current repo and asserts the
+# pure helpers behave. Exits non-zero on any failure.
+self_check() {
+  local rc=0
+  local got
+
+  got="$(printf 'Fix x (#10)\nRef #99 only\nB (#20) tail\n' | pma_extract_prs | paste -sd, -)"
+  if [ "$got" != "10,20" ]; then
+    err "self-check: pma_extract_prs expected 10,20 got '$got'"; rc=1
+  fi
+
+  got="$(printf 'affected_prs: 3786,3784, 3817\nnoise\n' | pma_parse_affected | paste -sd, -)"
+  if [ "$got" != "3784,3786,3817" ]; then
+    err "self-check: pma_parse_affected expected 3784,3786,3817 got '$got'"; rc=1
+  fi
+
+  got="$(printf 'fingerprint: pr-3784:foo\nx\nfingerprint: process:bar\n' | pma_parse_fingerprints | paste -sd, -)"
+  if [ "$got" != "pr-3784:foo,process:bar" ]; then
+    err "self-check: pma_parse_fingerprints expected 2 values got '$got'"; rc=1
+  fi
+
+  if [ "$rc" -eq 0 ]; then
+    printf '%sself-check: pure helpers OK%s\n' "$GREEN" "$NC"
+  fi
+  return "$rc"
+}
+
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  main "$@"
+fi

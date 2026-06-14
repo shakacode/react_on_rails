@@ -19,14 +19,31 @@ Use `.agents/workflows/post-merge-audit.md` for reusable copy-paste prompts, inc
 
 ## Scope Gate
 
-Start by resolving the exact audit range:
+Start by resolving the exact audit range. Run the resolver to do steps 1-3 plus
+carry-over and fingerprint dedup deterministically, instead of by hand:
 
-1. Base: the user-supplied tag/commit, or the most recent release candidate tag when the user says "since the last RC".
+```bash
+# Text report (last rc.* tag -> origin/main):
+.agents/skills/post-merge-audit/bin/post-merge-audit-scope --audit-id <AUDIT_ID>
+# Machine-readable for a handoff prompt (clean JSON on stdout):
+.agents/skills/post-merge-audit/bin/post-merge-audit-scope --base <BASE> --json > scope.json
+```
+
+It prints resolved base/head SHAs, the merged-PR list (squash-merge aware),
+carry-over PRs already covered by a prior `post-merge-audit-finding` issue, the
+existing fingerprints to append to, and `to_audit = merged - carry-over`. Pass
+`--base <ref>` to override the default (most recent `*.rc.*` tag). The pure
+helpers are covered by `post-merge-audit-scope-test.bash`; run `--self-check`
+for a no-write smoke test.
+
+Resolve, then present:
+
+1. Base: the resolver default (most recent release candidate tag), or the user-supplied tag/commit.
 2. Head: usually `origin/main` or the current release branch.
-3. Merged PR list: every PR merged between base and head.
+3. Merged PR list: every PR merged between base and head (the resolver's `merged_prs`), minus carry-over.
 4. Batch subset: PRs that appear to be from agent batch work by branch name, PR body, labels, comments, author, merge timing, or linked issues.
 
-Show included PRs, excluded near-matches, base/head SHAs, and assumptions. Ask for confirmation before deep audit unless the user explicitly asks to proceed without confirmation.
+Show included PRs, excluded near-matches, carry-over already audited, base/head SHAs, and assumptions. Ask for confirmation before deep audit unless the user explicitly asks to proceed without confirmation.
 
 ## Audit Checks
 
