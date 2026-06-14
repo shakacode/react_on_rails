@@ -99,7 +99,8 @@ The public contract for a capacity profile is:
   rather than hardcoded model or tool names.
 
 Profiles must be registered at runtime or loaded from a machine-local ignored
-file such as `.agent-coord.local.json`. The repository ignores that path so
+file such as `.agent-coord.local.json` or a per-profile file like
+`.agent-coord.local.<profile>.json`. The repository ignores those paths so
 capacity values can change without source edits. If the backend exposes a
 registration command, use it as the source of truth; otherwise use the private
 backend README and schema files. The installed `agent-coord` 0.1.0 public
