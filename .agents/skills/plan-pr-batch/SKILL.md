@@ -89,7 +89,7 @@ Plan a PR batch
      if either command fails, record the paths as `UNKNOWN` instead of trusting
      an empty array from a broken pipeline. Do not confuse API/auth/rate-limit
      failures with a real empty PR file list.
-     the default page size is 30, so a small unpaginated page can look complete
+     The default page size is 30, so a small unpaginated page can look complete
      while truncated. `jq -s 'add // []'` collects all paginated arrays before
      counting paths or extracting filenames and returns an empty array for an
      empty stream; no Link header check is needed after the command returns.
@@ -111,10 +111,10 @@ Plan a PR batch
      parallel first batch and sequence or defer collisions. An `UNKNOWN` item
      runs as a serial "discovery lane" — a lane that first determines its real
      paths instead of editing in parallel. Never run discovery lanes
-     concurrently with active editor lanes: complete discovery before an editor
-     wave starts. If new items arrive while an editor wave is already running,
-     wait for that wave to finish before starting discovery for those new
-     items.
+     concurrently with active editor lanes: for items known at scheduling time,
+     complete discovery before the editor wave starts. If new items arrive while
+     an editor wave is already running, wait for that wave to finish before
+     starting discovery for those new items.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
