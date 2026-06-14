@@ -4,19 +4,20 @@
 GOAL_PROMPT_CHAR_LIMIT = 4_000
 TEXT_FENCE = "```text\n"
 
-def fail!(message)
-  warn "FAIL: #{message}"
-  exit 1
+def abort_with_failure(message)
+  abort "FAIL: #{message}"
 end
 
 def extract_goal_prompt_template(skill_text)
-  heading_index = skill_text.index("## Goal Prompt for pr-batch") ||
-                  fail!("missing Goal Prompt for pr-batch section")
-  fence_start = skill_text.index(TEXT_FENCE, heading_index) ||
-                fail!("missing text fence in Goal Prompt section")
+  heading_index = skill_text.index("## Goal Prompt for pr-batch")
+  abort_with_failure("missing Goal Prompt for pr-batch section") unless heading_index
+
+  fence_start = skill_text.index(TEXT_FENCE, heading_index)
+  abort_with_failure("missing text fence in Goal Prompt section") unless fence_start
+
   fence_body_start = fence_start + TEXT_FENCE.length
-  closing_fence = skill_text.match(/^```\s*$/, fence_body_start) ||
-                  fail!("missing closing fence in Goal Prompt section")
+  closing_fence = skill_text.match(/^```\s*$/, fence_body_start)
+  abort_with_failure("missing closing fence in Goal Prompt section") unless closing_fence
 
   skill_text[fence_body_start...closing_fence.begin(0)]
 end
@@ -25,7 +26,9 @@ def with_items(prompt_template, items)
   updated_prompt = prompt_template.sub(/Items:\n.*?\nExecution rules:/m) do
     "Items:\n#{items}\nExecution rules:"
   end
-  fail!("goal prompt template must contain Items and Execution rules sections") if updated_prompt == prompt_template
+  if updated_prompt == prompt_template
+    abort_with_failure("goal prompt template must contain Items and Execution rules sections")
+  end
 
   updated_prompt
 end
@@ -53,20 +56,22 @@ required_prompt_phrases = [
 
 required_skill_rule_phrases.each do |phrase|
   # These phrases live in the broader skill rules, not necessarily inside the prompt fence.
-  fail!("SKILL.md is missing required prompt-sizing phrase: #{phrase}") unless skill_text.include?(phrase)
+  abort_with_failure("SKILL.md is missing required prompt-sizing phrase: #{phrase}") unless skill_text.include?(phrase)
 end
 
 required_prompt_phrases.each do |phrase|
-  fail!("Goal prompt template is missing required phrase: #{phrase}") unless prompt_template.include?(phrase)
+  unless prompt_template.include?(phrase)
+    abort_with_failure("Goal prompt template is missing required phrase: #{phrase}")
+  end
 end
 
 if prompt_template.match?(/Batch Plan/i)
-  fail!("goal prompt template must be self-contained and not depend on Batch Plan context")
+  abort_with_failure("goal prompt template must be self-contained and not depend on Batch Plan context")
 end
 
 template_chars = prompt_template.length
 if template_chars >= GOAL_PROMPT_CHAR_LIMIT
-  fail!("goal prompt template is #{template_chars} chars, must stay under #{GOAL_PROMPT_CHAR_LIMIT}")
+  abort_with_failure("goal prompt template is #{template_chars} chars, must stay under #{GOAL_PROMPT_CHAR_LIMIT}")
 end
 
 bulky_items = (1..12).map do |number|
@@ -86,20 +91,21 @@ first_ready_item = <<~ITEM.chomp
 ITEM
 
 oversized_candidate = with_items(prompt_template, bulky_items)
-fail!("oversized fixture did not exceed 4000 chars") unless oversized_candidate.length >= 4_000
+abort_with_failure("oversized fixture did not exceed 4000 chars") unless oversized_candidate.length >= 4_000
 
 fallback_prompt = with_items(prompt_template, first_ready_item)
 # Reject any mention of "Batch Plan" so the prompt stays fully self-contained
 # and workers do not need to read the Batch Plan to execute it.
 if fallback_prompt.match?(/Batch Plan/i)
-  fail!("split fallback prompt must be self-contained and not depend on Batch Plan context")
+  abort_with_failure("split fallback prompt must be self-contained and not depend on Batch Plan context")
 end
 
 fallback_chars = fallback_prompt.length
 if fallback_chars >= GOAL_PROMPT_CHAR_LIMIT
-  fail!("split fallback prompt is #{fallback_chars} chars, must stay under #{GOAL_PROMPT_CHAR_LIMIT}")
+  abort_with_failure("split fallback prompt is #{fallback_chars} chars, must stay under #{GOAL_PROMPT_CHAR_LIMIT}")
 end
 
+puts "All checks passed."
 puts "goal_prompt_template_chars=#{template_chars}"
 puts "oversized_candidate_chars=#{oversized_candidate.length}"
 puts "split_fallback_goal_prompt_chars=#{fallback_chars}"
