@@ -19,6 +19,7 @@ import path from 'path';
 import worker, { disableHttp2 } from '../src/worker';
 import log from '../src/shared/log';
 import packageJson from '../src/shared/packageJson';
+import { STREAM_CHUNK_TIMEOUT_MS } from '../src/shared/constants';
 import * as incremental from '../src/worker/handleIncrementalRenderRequest';
 import {
   createVmBundle,
@@ -868,6 +869,72 @@ describe('incremental render NDJSON endpoint', () => {
       const response = await responsePromise;
       expect(response.statusCode).toBe(200);
     }, 35000);
+
+    test(
+      'destroys a started response when request close hook hangs after stream timeout',
+      async () => {
+        const { responseStream, handleRequestClosed, handleSpy, SERVER_BUNDLE_TIMESTAMP } =
+          await createStreamingTestSetup();
+        let resolveCloseHook: (() => void) | undefined;
+        const closeHookPromise = new Promise<void>((resolve) => {
+          resolveCloseHook = resolve;
+        });
+        handleRequestClosed.mockImplementation(() => closeHookPromise);
+
+        const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
+        const responseClosed = new Promise<void>((resolve, reject) => {
+          let receivedResponse = false;
+
+          req.once('response', (res) => {
+            receivedResponse = true;
+            res.resume();
+            res.once('aborted', resolve);
+            res.once('close', resolve);
+            res.once('end', resolve);
+            res.once('error', resolve);
+          });
+          req.once('error', (error) => {
+            if (receivedResponse) {
+              resolve();
+            } else {
+              reject(error);
+            }
+          });
+        });
+
+        try {
+          req.write(`${JSON.stringify(createInitialObject(SERVER_BUNDLE_TIMESTAMP))}\n`);
+          await waitFor(() => {
+            expect(handleSpy).toHaveBeenCalledTimes(1);
+          });
+          responseStream.push('stream started');
+
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
+          try {
+            await Promise.race([
+              responseClosed,
+              new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(
+                  () => reject(new Error('Timed out waiting for started response to close')),
+                  STREAM_CHUNK_TIMEOUT_MS + 5_000,
+                );
+              }),
+            ]);
+          } finally {
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+            }
+          }
+
+          expect(handleRequestClosed).toHaveBeenCalledTimes(1);
+        } finally {
+          resolveCloseHook?.();
+          req.destroy();
+          responseStream.destroy();
+        }
+      },
+      STREAM_CHUNK_TIMEOUT_MS + 10_000,
+    );
   });
 
   describe('incremental render update chunk functionality', () => {

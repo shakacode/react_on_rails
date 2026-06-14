@@ -64,6 +64,8 @@ import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
 
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
+const INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS = 1_000;
+
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
 //
@@ -472,13 +474,47 @@ export default function run(config: Partial<Config>) {
       releaseIncrementalExecutionContextWhenDone();
     };
 
-    const closeIncrementalRequest = async () => {
+    const waitForIncrementalRequestClose = async (closeRequestPromise: Promise<void>, timeoutMs: number) => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<'timeout'>((resolve) => {
+        timeoutId = setTimeout(() => resolve('timeout'), timeoutMs);
+      });
+
+      const result = await Promise.race([closeRequestPromise.then(() => 'closed' as const), timeoutPromise]);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      if (result === 'timeout') {
+        log.warn({
+          msg: 'Timed out waiting for incremental render close hook after response started',
+          timeoutMs,
+        });
+      }
+    };
+
+    const closeIncrementalRequest = async ({ timeoutMs }: { timeoutMs?: number } = {}) => {
       if (!incrementalSink || incrementalRequestClosed) {
         return;
       }
+      const sink = incrementalSink;
 
       try {
-        await incrementalSink.handleRequestClosed();
+        if (timeoutMs === undefined) {
+          await sink.handleRequestClosed();
+        } else {
+          await waitForIncrementalRequestClose(
+            Promise.resolve()
+              .then(() => sink.handleRequestClosed())
+              .catch((closeError: unknown) => {
+                log.error({
+                  msg: 'Error while closing incremental render request after response started',
+                  error: closeError,
+                });
+              }),
+            timeoutMs,
+          );
+        }
       } finally {
         incrementalRequestClosed = true;
         releaseIncrementalExecutionContextWhenDone();
@@ -608,7 +644,9 @@ export default function run(config: Partial<Config>) {
         // The React stream is waiting for async props (e.g., asyncPropsManager.getProp("researches")).
         // If we don't call endStream(), the stream will hang forever waiting for props that will never arrive.
         // This causes onResponse to never fire, leaving activeRequestsCount stuck and preventing worker shutdown.
-        await closeIncrementalRequest();
+        const closeRequestPromise = closeIncrementalRequest({
+          timeoutMs: INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS,
+        });
 
         // CRITICAL: Destroy the response connection to immediately close it.
         // Without this, the response stream stays open waiting for the client (httpx) to timeout,
@@ -617,6 +655,8 @@ export default function run(config: Partial<Config>) {
         if (!res.raw.destroyed) {
           res.raw.destroy();
         }
+
+        await closeRequestPromise;
       } else {
         // Response hasn't started yet, we can send an error response
         const errorResponse = errorResponseResult(errorMessage, incrementalTracingContext);
