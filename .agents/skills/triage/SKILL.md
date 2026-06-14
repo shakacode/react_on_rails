@@ -54,10 +54,11 @@ Only start phase 2 after phase 1 has a verified worklist and capacity state.
      gitignored local file such as `.agent-coord.local.json`.
    - enabled inboxes determine where queued work can be assigned.
    - optional routing tags come from config, not hardcoded model names.
-2. Set `N` to the number of available lane slots after subtracting live,
-   blocked, or reserved lanes. If live occupancy, blocked lanes, reserved lanes,
-   profiles, or inbox config cannot be verified, stop phase 2 with a precise
-   blocker instead of deriving `N`.
+2. Set `N` to the number of available lane slots after bounding profile slots by
+   enabled inbox count and then subtracting live, blocked, or reserved lanes. If
+   live occupancy, blocked lanes, reserved lanes, profiles, or inbox config
+   cannot be verified, stop phase 2 with a precise blocker instead of deriving
+   `N`.
 3. Split the actionable worklist into up to `N` non-empty groups, honoring
    dependencies, file/risk disjointness, package boundaries, release gates, and
    cross-repo sequencing. If actionable work has fewer items than available
