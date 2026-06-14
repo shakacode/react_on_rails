@@ -59,6 +59,7 @@ interface CspTestGlobals {
 }
 
 const STREAMED_RSC_PAGE = '/stream_async_components_for_testing';
+const FLIGHT_CLIENT_EVAL_MARKERS = ['createFakeFunction', 'react-on-rails-rsc', 'react-server-dom-webpack'];
 
 /**
  * Registers the `securitypolicyviolation` listener before ANY page script
@@ -94,24 +95,53 @@ function getCspViolations(page: Page): Promise<CspViolation[]> {
  * `blockedURI: "eval"` violations, but the library catches the failure and
  * degrades gracefully (stack frames are less precise; nothing breaks).
  *
+ * CSP event `sourceFile` points at the emitted bundle URL, not the original
+ * package, and `sample` is empty unless the policy includes `report-sample`.
  * The PRODUCTION Flight client build contains no eval at all (verified against
  * react-on-rails-rsc dist: 3 eval call sites in the development build, 0 in the
  * production build). The dummy app's test bundles are development-mode builds,
- * so we tolerate exactly this one violation shape and nothing else.
+ * so we tolerate this development-only eval shape and nothing else.
  */
-function isDevBuildFlightClientEval(violation: CspViolation): boolean {
+async function sourceSnippetIncludesFlightClient(violation: CspViolation): Promise<boolean> {
+  try {
+    const response = await fetch(violation.sourceFile);
+    if (!response.ok) {
+      return false;
+    }
+    const source = await response.text();
+    const lines = source.split(/\r?\n/);
+    const lineIndex = Math.max((violation.lineNumber || 1) - 1, 0);
+    const snippet = lines.slice(Math.max(lineIndex - 2, 0), lineIndex + 3).join('\n');
+
+    return FLIGHT_CLIENT_EVAL_MARKERS.some((marker) => snippet.includes(marker));
+  } catch {
+    return false;
+  }
+}
+
+async function isDevBuildFlightClientEval(violation: CspViolation): Promise<boolean> {
   const isEvalBlockedByScriptSrc =
     violation.blockedURI === 'eval' && violation.violatedDirective.includes('script-src');
-  const isReactFlightSource =
-    violation.sourceFile.includes('react-on-rails-rsc') ||
-    violation.sample.includes('react-on-rails-rsc') ||
-    violation.sample.includes('react-server-dom-webpack');
+  if (!isEvalBlockedByScriptSrc) {
+    return false;
+  }
 
-  return isEvalBlockedByScriptSrc && isReactFlightSource;
+  if (
+    FLIGHT_CLIENT_EVAL_MARKERS.some(
+      (marker) => violation.sourceFile.includes(marker) || violation.sample.includes(marker),
+    )
+  ) {
+    return true;
+  }
+
+  return sourceSnippetIncludesFlightClient(violation);
 }
 
 async function getUnexpectedCspViolations(page: Page): Promise<CspViolation[]> {
-  return (await getCspViolations(page)).filter((violation) => !isDevBuildFlightClientEval(violation));
+  const violations = await getCspViolations(page);
+  const allowedDevFlightEvalViolations = await Promise.all(violations.map(isDevBuildFlightClientEval));
+
+  return violations.filter((_violation, index) => !allowedDevFlightEvalViolations[index]);
 }
 
 function collectPageErrors(page: Page): Error[] {

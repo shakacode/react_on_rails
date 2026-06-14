@@ -35,4 +35,8 @@ describe('serializeForInlineScript', () => {
     expect(serialized).toContain('\\u2029');
     expect(JSON.parse(serialized)).toEqual(payload);
   });
+
+  it('serializes undefined as null for valid inline JavaScript assignment values', () => {
+    expect(serializeForInlineScript(undefined)).toBe('null');
+  });
 });

@@ -14,7 +14,7 @@
  */
 
 export function serializeForInlineScript(value: unknown): string {
-  return JSON.stringify(value)
+  return (JSON.stringify(value) ?? 'null')
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
     .replace(/\u2028/g, '\\u2028')
