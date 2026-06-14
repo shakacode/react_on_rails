@@ -73,12 +73,12 @@ Plan a PR batch
      Run
      `git diff --name-status --find-renames refs/tmp/pr-N-base...refs/tmp/pr-N-head`;
      three-dot diffs from the merge-base, which matches GitHub's PR file list.
-     Delete the temporary refs on both success and failure, before any API
-     fallback or `UNKNOWN` decision: `git update-ref -d refs/tmp/pr-N-base` and
-     `git update-ref -d refs/tmp/pr-N-head`. A rename row (`R100  old  new`)
-     owns **both** the old and new path. If a ref cannot be fetched or the diff
-     cannot run, try the PR Files API fallback before marking the paths
-     `UNKNOWN`.
+     Delete the temporary refs on both success and failure, then proceed to the
+     API fallback or `UNKNOWN` decision: `git update-ref -d refs/tmp/pr-N-base`
+     and `git update-ref -d refs/tmp/pr-N-head`. A rename row
+     (`R100  old  new`) owns **both** the old and new path. If a ref cannot be
+     fetched or the diff cannot run, try the PR Files API fallback before
+     marking the paths `UNKNOWN`.
    - File-touch map, PR Files API fallback: prefer the local `git diff` above
      as the authoritative source; treat the API as a best-effort cross-check.
      When the local diff succeeds, keep those paths authoritative even if the
@@ -86,9 +86,11 @@ Plan a PR batch
      scheduling source only when the local diff cannot run. Fetch with
      `set -o pipefail` enabled, then
      `gh api --paginate --method GET repos/OWNER/REPO/pulls/N/files -f per_page=100 | jq -s 'add // []'`;
-     if either command fails, record the paths as `UNKNOWN` instead of trusting
-     an empty array from a broken pipeline. Do not confuse API/auth/rate-limit
-     failures with a real empty PR file list.
+     if either command fails, the response is an error-shaped object such as
+     `{"message": ...}` / `{"errors": ...}`, or any row lacks `.filename`, record
+     the paths as `UNKNOWN` instead of trusting an empty array from a broken
+     pipeline. Do not confuse API/auth/rate-limit failures with a real empty PR
+     file list.
      The default page size is 30, so a small unpaginated page can look complete
      while truncated. `jq -s 'add // []'` collects all paginated arrays before
      counting paths or extracting filenames and returns an empty array for an
@@ -111,9 +113,9 @@ Plan a PR batch
      parallel first batch and sequence or defer collisions. An `UNKNOWN` item
      runs as a serial "discovery lane" — a lane that first determines its real
      paths instead of editing in parallel. Never run discovery lanes
-     concurrently with active editor lanes: for items known at scheduling time,
-     complete discovery before the editor wave starts. If new items arrive while
-     an editor wave is already running, wait for that wave to finish before
+     concurrently with active editor lanes: for items already in the scheduling
+     set, complete discovery before the editor wave starts. If new items arrive
+     while an editor wave is already running, wait for that wave to finish before
      starting discovery for those new items.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
