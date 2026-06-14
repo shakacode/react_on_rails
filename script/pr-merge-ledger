@@ -11,6 +11,7 @@ require "timeout"
 class PrMergeLedger
   SCHEMA_VERSION = "pr-merge-ledger/v1"
   UNKNOWN = "UNKNOWN"
+  # Keep the schema URI on main until a versioned schema hosting policy exists.
   SCHEMA_URI = "https://raw.githubusercontent.com/shakacode/react_on_rails/main/script/pr-merge-ledger.schema.json"
   SCHEMA_PATH = File.expand_path("pr-merge-ledger.schema.json", __dir__)
   CHANGELOG_CLASSIFICATIONS = %w[
@@ -275,6 +276,7 @@ class PrMergeLedger
 
   def load_fixture(path)
     JSON.parse(File.read(path)).tap do |dataset|
+      raise Error, "fixture must be a JSON object" unless dataset.is_a?(Hash)
       raise Error, "fixture is missing repository" unless dataset["repository"]
       raise Error, "fixture is missing pull_request" unless dataset["pull_request"]
     end
@@ -290,10 +292,19 @@ class PrMergeLedger
 
   def source_summary
     if @options[:fixture]
-      { "mode" => "fixture", "path" => @options[:fixture] }
+      { "mode" => "fixture", "path" => fixture_source_path(@options[:fixture]) }
     else
       { "mode" => "live_github", "repo" => @options[:repo], "prs" => @argv.map(&:to_i) }
     end
+  end
+
+  def fixture_source_path(path)
+    expanded_path = File.expand_path(path)
+    repo_prefix = "#{File.expand_path(Dir.pwd)}/"
+
+    return expanded_path.delete_prefix(repo_prefix) if expanded_path.start_with?(repo_prefix)
+
+    File.basename(path)
   end
 
   # rubocop:disable Metrics/AbcSize
@@ -517,7 +528,7 @@ class PrMergeLedger
 
   def unresolved_current_head_thread?(thread)
     # Truncated comment pages are reported through unknown_fields instead of counted from partial evidence.
-    thread.fetch("comments_complete") && !thread.fetch("is_resolved") && thread.fetch("current_head")
+    complete_current_head_thread?(thread) && !thread.fetch("is_resolved")
   end
 
   def finding_dispositions(review_threads, reviews, issue_comments, dispositions)
@@ -574,10 +585,14 @@ class PrMergeLedger
 
   def thread_comments_for_findings(review_threads)
     review_threads
-      .select { |thread| unresolved_current_head_thread?(thread) }
+      .select { |thread| complete_current_head_thread?(thread) }
       # Incomplete comment pages are blocked through unknown_fields; unfetched bodies cannot be scanned for priorities.
       .flat_map { |thread| thread.fetch("comments") }
       .reject { |comment| comment.fetch("outdated") }
+  end
+
+  def complete_current_head_thread?(thread)
+    thread.fetch("comments_complete") && thread.fetch("current_head")
   end
 
   def reviews_for_findings(reviews)

@@ -42,6 +42,9 @@ RSpec.describe "script/pr-merge-ledger" do
     violation_codes = report.fetch("violations").map { |violation| violation.fetch("code") }
 
     expect(report.fetch("schema_version")).to eq("pr-merge-ledger/v1")
+    expect(report.dig("source", "path")).to eq(
+      "react_on_rails/spec/react_on_rails/fixtures/pr_merge_ledger/pr_3613.json"
+    )
     expect(report.fetch("complete_allowed")).to be(false)
     expect(pr_ledger.dig("pr", "number")).to eq(3613)
     expect(pr_ledger.dig("review_objects", "review_decision")).to eq("CHANGES_REQUESTED")
@@ -510,6 +513,20 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status.exitstatus).to eq(2)
       expect(stdout).to be_empty
       expect(stderr).to include("pr-merge-ledger: fixture is missing pull_request")
+      expect(stderr).not_to include("from ")
+    end
+  end
+
+  it "prints a clean error when fixture root data is not an object" do
+    Tempfile.create(["pr-merge-ledger-non-object-fixture", ".json"]) do |file|
+      file.write(JSON.generate([]))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(script_path, "--fixture", file.path, chdir: repo_root)
+
+      expect(status.exitstatus).to eq(2)
+      expect(stdout).to be_empty
+      expect(stderr).to include("pr-merge-ledger: fixture must be a JSON object")
       expect(stderr).not_to include("from ")
     end
   end
@@ -1950,6 +1967,67 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(report.dig("pull_requests", 0, "unresolved_current_head_review_threads", "count")).to eq(1)
       expect(report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")).to be_empty
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).not_to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
+  it "scans resolved current-head review threads for priority finding dispositions" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "resolved-current-comment",
+              "url" => "https://example.com/resolved-current-comment",
+              "body" => "[P1] Finding from a resolved current-head thread.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-resolved-thread-finding", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      pr_ledger = report.fetch("pull_requests").first
+      expect(pr_ledger.dig("unresolved_current_head_review_threads", "count")).to eq(0)
+      expect(pr_ledger.dig("priority_finding_dispositions", "findings").first).to include(
+        "id" => "resolved-current-comment",
+        "severity" => "P1",
+        "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
         "unknown_priority_finding_disposition"
       )
     end
