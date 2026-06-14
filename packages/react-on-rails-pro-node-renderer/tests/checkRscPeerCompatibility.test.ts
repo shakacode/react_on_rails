@@ -84,7 +84,7 @@ describe('checkRscPeerCompatibility', () => {
 
     expect(result.level).toBe('error');
     expect(result.message).toContain(`19.0.x stable >= ${recommendedMin}`);
-    expect(result.message).not.toContain(', or  while upgrading from the RC line');
+    expect(result.message).not.toContain('while upgrading from the RC line');
   });
 
   it('returns ok when react-on-rails-rsc is absent (optional peer not installed)', () => {
