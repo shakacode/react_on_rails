@@ -27,6 +27,11 @@ Gather live state from ground truth, not chat memory:
 1. `agent-coord status --batch-id <batch-id>` when a batch id is known, or full
    `agent-coord status` for a repo-wide sweep. Record active, stale, dead,
    blocked, done, released, and done-unmerged lanes plus `blocked_on` refs.
+
+   Note: `agent-coord` lane state is operational status only. The Classification
+   section defines separate intent-achievement classes; a `done` lane still
+   requires evidence evaluation before it can be classified as `realized`.
+
 2. GitHub issue or PR state for every target under evaluation:
    - issue intent, acceptance criteria, labels, comments, linked PRs
    - PR body, linked issues, changed files, commits, checks, reviews, comments,
@@ -97,7 +102,7 @@ Return a report with these sections:
    - owner, target, branch, last heartbeat, liveness, blocker, and recommended
      resume/reassign/drop decision
 4. **Post-Merge Audit Intake**
-   - merged non-OK findings that should feed `.agents/skills/post-merge-audit`
+   - merged non-OK findings that should feed `.agents/skills/post-merge-audit/SKILL.md`
    - draft issue entries only when useful, with fingerprints and no GitHub
      writes
 5. **Per-Run Table**
@@ -135,13 +140,13 @@ with high-risk findings first and exact commands/data sources used.
 
 ## Integration Notes
 
-- This loop complements, but does not replace, `$plan-pr-batch` and any
+- This loop complements, but does not replace, `.agents/skills/plan-pr-batch/SKILL.md` and any
   capacity-aware triage workflow present in the active branch: planning builds
   the worklist and queue; this loop checks whether assigned work was actually
   realized and whether stalled work needs a decision.
-- This loop complements, but does not replace, `$post-merge-audit`: use the loop
-  for continuous detection and use post-merge audit for approved deep audit and
-  issue-plan creation over merged ranges.
+- This loop complements, but does not replace, `.agents/skills/post-merge-audit/SKILL.md`: use the
+  loop for continuous detection and use post-merge audit for approved deep audit
+  and issue-plan creation over merged ranges.
 - The merge ledger is mechanical evidence about review-thread, review-object,
   changelog, and finding-disposition state. It does not prove issue intent was
   achieved; the evaluator must still compare the issue intent, diff, validation,
