@@ -88,10 +88,13 @@ Plan a PR batch
      GitHub returns today, for example `^[0-9a-f]{40}$`, and try an OID fetch
      from the verified head repository URL
      (`<headRefOid>:refs/tmp/pr-N-<session-id>-head`) before using the PR Files
-     API fallback. If GitHub changes the repository hash format, update this
-     validation before accepting a different OID length. Pass each refspec as
-     one quoted shell argument or via an argument-array API, and never
-     interpolate a raw PR branch name into a shell command. A plain
+     API fallback. Treat an OID fetch rejection as an expected portability
+     outcome on older Git clients or servers that do not advertise reachable SHA
+     fetch support, not as a planner setup failure. If GitHub changes the
+     repository hash format, update this validation before accepting a different
+     OID length. Pass each refspec as one quoted shell argument or via an
+     argument-array API, and never interpolate a raw PR branch name into a shell
+     command. A plain
      `git fetch origin` does not fetch cross-fork heads unless `origin` has
      already been verified as the PR's target repo.
      Run
