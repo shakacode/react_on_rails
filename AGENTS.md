@@ -213,9 +213,11 @@ contract unless a maintainer explicitly narrows the run.
   of the PR diff, directly cited by current review feedback, or required to keep
   touched copies synchronized; it excludes unrelated cleanup, other machine
   lanes, reserved files, and generated output not already in scope.
-  The final-candidate debounce point is the first point after the agent starts
-  the final local validation/review gate for merge readiness or after
-  current-head configured review/check gates are already running or complete.
+  The final-candidate debounce point begins once the agent treats the current
+  head as the merge-readiness candidate by starting the final local
+  validation/review gate for that head, or by triggering or queuing current-head
+  CI/review checks. Earlier incremental per-file checks during the fix phase do
+  not count unless they are part of that final-candidate gate.
   Behavior-preserving means wording, formatting, or mechanical
   whitespace/punctuation cleanup that does not alter public APIs, generated
   output, runtime behavior, validation scope, or reviewer obligations. Low-risk

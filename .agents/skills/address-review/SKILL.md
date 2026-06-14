@@ -318,14 +318,14 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 
 ### Action `f+i` — Fix, deferred-work bundle, and merge-ready
 
-1. Run action `f` through the commit/push-before-reply gate for `MUST-FIX` and
-   autonomous optional changes, including autonomous optional handling. If there
-   are no `MUST-FIX` items, still handle low-risk behavior-preserving optional
-   nits before continuing with deferred-item handling. If that phase produces
-   local changes, commit and ask for push confirmation before building the
-   deferred bundle, replying, resolving, or signaling readiness. Record each
-   autonomous optional outcome before building the deferred bundle: fixed inline,
-   declined, failed validation and dropped/reverted, or promoted to `DISCUSS`.
+1. Apply only the `f` pre-reply subflow: `f` steps 1-5 above for `MUST-FIX`,
+   autonomous optional handling, optional promotion/failure handling, and the
+   commit/push-before-reply gate. Do not inherit later `f` reply/resolve,
+   skipped, or discuss prompts; `f+i` restates those below. If there are no
+   `MUST-FIX` items, still handle low-risk behavior-preserving optional nits
+   before continuing with deferred-item handling. Record each autonomous
+   optional outcome before building the deferred bundle: fixed inline, declined,
+   failed validation and dropped/reverted, or promoted to `DISCUSS`.
 2. Reply to each `MUST-FIX` or autonomous optional thread fixed or recorded
    during the initial `f` gate, citing the pushed commit or recorded outcome,
    and resolve threads when the concern is handled or explicitly
