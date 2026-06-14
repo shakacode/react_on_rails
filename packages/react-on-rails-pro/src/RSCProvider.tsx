@@ -120,8 +120,14 @@ export const createRSCProvider = ({
           return payload;
         };
         const evictPromiseIfRejected = (error: unknown) => {
-          // Keep the rejected promise visible for React's Suspense retry, then
-          // evict it so a later getComponent call can refetch the same key.
+          // Delay eviction by one macrotask so React's Suspense machinery can
+          // observe the rejection before we clear the cache entry. setTimeout(0)
+          // is intentional over queueMicrotask because microtasks could race
+          // with React's own queue and evict before Suspense sees the throw.
+          //
+          // Safe on unmount: this closure captures the current
+          // fetchRSCPromisesRef instance. After unmount the identity guard below
+          // will simply not match and no eviction happens.
           setTimeout(() => {
             if (fetchRSCPromisesRef.current[key] === promise) {
               // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
