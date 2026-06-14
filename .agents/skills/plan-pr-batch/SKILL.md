@@ -60,10 +60,14 @@ Plan a PR batch
      then resolve a local remote or fetch URL that points at the verified base
      repo. If no verified remote or URL can be resolved, use the PR Files API
      fallback before recording paths as `UNKNOWN`; do not diff the current
-     checkout's default remote. Fetch the current base branch and PR head into
-     temporary refs without checking out untrusted PR code:
-     `git fetch <verified-base-repo-url> refs/heads/<baseRefName>:refs/tmp/pr-N-base` and
-     `git fetch <verified-base-repo-url> pull/N/head:refs/tmp/pr-N-head`.
+     checkout's default remote. Choose a session-unique temporary-ref suffix
+     first, such as `pr-N-<session-id>` from a UUID prefix or random token, so
+     concurrent planners for the same PR cannot overwrite each other's refs.
+     Fetch the current base branch and PR head into temporary refs without
+     checking out untrusted PR code:
+     `git fetch <verified-base-repo-url> refs/heads/<baseRefName>:refs/tmp/pr-N-<session-id>-base`
+     and
+     `git fetch <verified-base-repo-url> pull/N/head:refs/tmp/pr-N-<session-id>-head`.
      Fully qualifying the base branch avoids tag/branch name ambiguity.
      GitHub keeps the target repo's pull ref pointing at fork heads too. If the
      target repo pull ref is unavailable, fetch the head from the verified head
@@ -72,12 +76,13 @@ Plan a PR batch
      `git fetch origin` does not fetch cross-fork heads unless `origin` has
      already been verified as the PR's target repo.
      Run
-     `git diff --name-status --find-renames refs/tmp/pr-N-base...refs/tmp/pr-N-head`;
+     `git diff --name-status --find-renames refs/tmp/pr-N-<session-id>-base...refs/tmp/pr-N-<session-id>-head`;
      three-dot diffs from the merge-base, which matches GitHub's PR file list.
      Delete the temporary refs on both success and failure, then proceed to the
-     API fallback or `UNKNOWN` decision: `git update-ref -d refs/tmp/pr-N-base`
-     and `git update-ref -d refs/tmp/pr-N-head`. If cleanup fails, log the ref
-     name and continue to fallback or `UNKNOWN` recording. A rename row
+     API fallback or `UNKNOWN` decision:
+     `git update-ref -d refs/tmp/pr-N-<session-id>-base` and
+     `git update-ref -d refs/tmp/pr-N-<session-id>-head`. If cleanup fails, log
+     the ref name and continue to fallback or `UNKNOWN` recording. A rename row
      (`R100  old  new`) owns **both** the old and new path. If a ref cannot be
      fetched or the diff cannot run, try the PR Files API fallback before
      marking the paths `UNKNOWN`.
@@ -120,7 +125,9 @@ Plan a PR batch
      concurrently with active editor lanes: for items already in the scheduling
      set, complete discovery before the editor wave starts. If the coordinator
      adds items after an editor wave has already started, wait for that wave to
-     finish before starting discovery for those new items.
+     finish before starting discovery for those new items. A collision
+     discovered mid-flight cannot safely redirect an active editor lane; the
+     only recovery is abort-and-restart, which is worse than waiting.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
