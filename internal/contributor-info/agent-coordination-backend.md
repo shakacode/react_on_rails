@@ -192,13 +192,15 @@ the default state root documented in the private repo README.
 
 ```bash
 : "${AGENT_COORD_BIN:?set AGENT_COORD_BIN to the validated agent-coord binary}"
-STATE_ROOT=$(mktemp -d)
-AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" heartbeat \
-  --agent-id smoke-test-0 \
-  --repo shakacode/react_on_rails \
-  --target 9999
-AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" status
-test -n "$STATE_ROOT" && rm -rf "$STATE_ROOT"
+(
+  STATE_ROOT=$(mktemp -d)
+  trap 'rm -rf "$STATE_ROOT"' EXIT INT TERM
+  AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" heartbeat \
+    --agent-id smoke-test-0 \
+    --repo shakacode/react_on_rails \
+    --target 9999
+  AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" status
+)
 ```
 
 ## Heartbeats
