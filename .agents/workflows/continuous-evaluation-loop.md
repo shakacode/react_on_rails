@@ -45,9 +45,6 @@ Gather live state from ground truth, not chat memory:
    current branch. Use ledger violations as mechanical review-state evidence;
    if the script is unavailable, record `merge_ledger: UNKNOWN`.
 
-   Note: `script/pr-merge-ledger` does not yet exist on `main`; keep
-   `merge_ledger: UNKNOWN` until that script is available in the active branch.
-
 5. Post-merge audit findings or prior loop reports for the same PRs, if the
    coordinator supplies them. Do not treat prior reports as ground truth without
    re-checking their cited evidence.
@@ -101,6 +98,8 @@ Return a report with these sections:
    - evidence links or command output references for every finding
    - recommended action: fix PR, revert consideration, maintainer question,
      resume, reassign, drop, post-merge audit intake, or no action
+   - for `stalled` items, include the rank and summary here; put per-lane detail
+     in **Stalled Run Decisions**
 3. **Stalled Run Decisions**
    - one row per lost-heartbeat or blocked lane
    - owner, target, branch, last heartbeat, liveness, blocker, and recommended
@@ -139,8 +138,10 @@ merged non-OK findings, prepare post-merge-audit intake entries and draft
 follow-up issue bodies only. Do not create issues, comments, labels, branches,
 fixes, reverts, PRs, or tracker edits without explicit approval.
 
-Return the report in the format from .agents/workflows/continuous-evaluation-loop.md,
-with high-risk findings first and exact commands/data sources used.
+Return the report with these sections: Scope And Sources, High-Risk Findings,
+Stalled Run Decisions, Post-Merge Audit Intake, Per-Run Table, No-Action Items,
+and UNKNOWNs. Put high-risk findings first and include exact commands/data
+sources used.
 ```
 
 ## Integration Notes
