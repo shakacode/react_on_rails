@@ -483,12 +483,16 @@ class PrMergeLedger
   def latest_reviews_by_reviewer(reviews)
     latest_reviews = reviews.group_by { |review| review.fetch("reviewer") }
                             .map do |_reviewer, reviewer_reviews|
-                              reviewer_reviews.max_by do |review|
-                                timestamp_sort_key(review["submitted_at"], "review #{review.fetch('id')} submitted_at")
-                              end
+                              latest_review_by_timestamp_and_order(reviewer_reviews)
                             end
 
     latest_reviews.sort_by { |review| review.fetch("reviewer") }
+  end
+
+  def latest_review_by_timestamp_and_order(reviewer_reviews)
+    reviewer_reviews.each_with_index.max_by do |review, index|
+      [timestamp_sort_key(review["submitted_at"], "review #{review.fetch('id')} submitted_at"), index]
+    end.first
   end
 
   def current_changes_requested(reviews)
@@ -502,9 +506,7 @@ class PrMergeLedger
            .group_by { |review| review.fetch("reviewer") }
            .values
            .map do |reviewer_reviews|
-             reviewer_reviews.max_by do |review|
-               timestamp_sort_key(review["submitted_at"], "review #{review.fetch('id')} submitted_at")
-             end
+             latest_review_by_timestamp_and_order(reviewer_reviews)
            end
   end
 

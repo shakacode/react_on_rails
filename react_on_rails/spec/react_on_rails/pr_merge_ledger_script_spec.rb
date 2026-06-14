@@ -757,6 +757,66 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "uses API order as the review tie-breaker when timestamps match" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 2,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "requested-changes",
+          "state" => "CHANGES_REQUESTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "current" },
+          "url" => "https://example.com/requested-changes",
+          "body" => "Please fix this."
+        },
+        {
+          "id" => "same-second-approval",
+          "state" => "APPROVED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "current" },
+          "url" => "https://example.com/same-second-approval",
+          "body" => "Approved now."
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-current-approval-tie", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      pr_ledger = report.fetch("pull_requests").first
+      violation_codes = report.fetch("violations").map { |violation| violation.fetch("code") }
+      expect(pr_ledger.dig("review_objects", "latest_by_reviewer").first).to include(
+        "id" => "same-second-approval",
+        "state" => "APPROVED"
+      )
+      expect(pr_ledger.dig("review_objects", "changes_requested")).to be_empty
+      expect(violation_codes).not_to include("changes_requested_review_object")
+    end
+  end
+
   it "ignores stale change-request review objects when the PR decision is clear" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
