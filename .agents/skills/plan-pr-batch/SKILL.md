@@ -62,8 +62,9 @@ Plan a PR batch
      fallback before recording paths as `UNKNOWN`; do not diff the current
      checkout's default remote. Fetch the current base branch and PR head into
      temporary refs without checking out untrusted PR code:
-     `git fetch <verified-base-repo-url> <baseRefName>:refs/tmp/pr-N-base` and
+     `git fetch <verified-base-repo-url> refs/heads/<baseRefName>:refs/tmp/pr-N-base` and
      `git fetch <verified-base-repo-url> pull/N/head:refs/tmp/pr-N-head`.
+     Fully qualifying the base branch avoids tag/branch name ambiguity.
      GitHub keeps the target repo's pull ref pointing at fork heads too. If the
      target repo pull ref is unavailable, fetch the head from the verified head
      repository URL derived from `headRepository.nameWithOwner` and
