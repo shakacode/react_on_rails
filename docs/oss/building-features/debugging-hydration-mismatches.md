@@ -226,7 +226,7 @@ If a hidden field is unavoidable, populate it in `useEffect` (client-only) inste
 
 1. In development, load the page and confirm the `[ReactOnRails] Recoverable hydration error...` message no longer appears.
 2. Keep an `onRecoverableError` callback wired to your error reporter in production — hydration regressions are otherwise invisible (React recovers silently).
-3. For ongoing protection, assert in an E2E test that no recoverable events fire on your critical pages (see `spec/dummy/e2e/playwright/e2e/react_on_rails/root_error_callbacks.spec.js` in the React on Rails repo for a working example).
+3. For ongoing protection, assert in an E2E test that no recoverable events fire on your critical pages (see `react_on_rails/spec/dummy/e2e/playwright/e2e/react_on_rails/root_error_callbacks.spec.js` in the React on Rails repo for a working example).
 
 ## Related documentation
 

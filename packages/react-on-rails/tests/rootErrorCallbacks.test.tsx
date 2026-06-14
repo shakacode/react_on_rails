@@ -10,7 +10,6 @@
  */
 
 import * as React from 'react';
-import { act } from 'react-dom/test-utils';
 import { renderComponent } from '../src/ClientRenderer.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import { setRootErrorHandlers, resetRootErrorHandlers } from '../src/rootErrorHandlers.ts';
@@ -92,7 +91,7 @@ describe('root error callbacks with real react-dom (React 19)', () => {
     // Server-rendered HTML that deliberately differs from the client render output.
     const targetNode = setupComponentDom('MismatchComponent', 'mismatch-dom-id', '<div>server text</div>');
 
-    await act(async () => {
+    await React.act(async () => {
       renderComponent('mismatch-dom-id');
     });
 
@@ -111,7 +110,7 @@ describe('root error callbacks with real react-dom (React 19)', () => {
     ComponentRegistry.register({ MismatchComponent });
     setupComponentDom('MismatchComponent', 'dev-mismatch-dom-id', '<div>server text</div>');
 
-    await act(async () => {
+    await React.act(async () => {
       renderComponent('dev-mismatch-dom-id');
     });
 
@@ -197,7 +196,7 @@ describe('root error callbacks with real react-dom (React 19)', () => {
       ComponentRegistry.register({ BoundaryComponent });
       setupComponentDom('BoundaryComponent', 'boundary-dom-id');
 
-      await act(async () => {
+      await React.act(async () => {
         renderComponent('boundary-dom-id');
       });
 

@@ -73,7 +73,9 @@ export function setRootErrorHandlers(handlers: RootErrorHandlers): void {
       warnedMissingRootApi = true;
     }
   } else if (!supportsReact19RootErrorCallbacks) {
-    const react19OnlyKeys = providedKeys.filter((key) => key !== 'onRecoverableError');
+    const react19OnlyKeys = providedKeys.filter((key) =>
+      (REACT_19_ONLY_HANDLER_KEYS as readonly string[]).includes(key),
+    );
     if (react19OnlyKeys.length > 0 && !warnedMissingReact19Callbacks) {
       console.warn(
         `[ReactOnRails] rootErrorHandlers (${react19OnlyKeys.join(', ')}) require React 19. ` +
