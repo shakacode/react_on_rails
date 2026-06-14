@@ -32,10 +32,6 @@ import {
 import { RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST } from '../src/RSCRouteSSRFalseBailoutError.ts';
 
 type DefaultRSCProviderFactoryArgs = Parameters<Parameters<typeof setDefaultRSCProviderFactory>[0]>[0];
-type RSCPreloadedGlobalsWindow = Window & {
-  REACT_ON_RAILS_RSC_PAYLOADS?: Record<string, string[]>;
-  REACT_ON_RAILS_RSC_ERRORS?: Record<string, Record<string, unknown>>;
-};
 
 jest.mock('react-on-rails/reactHydrateOrRender', () => ({
   __esModule: true,
@@ -618,7 +614,7 @@ describe('ClientSideRenderer', () => {
   });
 
   it('clears page-scoped RSC payload globals without changing same-page append semantics', () => {
-    const rscWindow = window as RSCPreloadedGlobalsWindow;
+    const rscWindow = window;
     const rscPayloadKey = 'TestComponent-stableHash-dom-id';
     rscWindow.REACT_ON_RAILS_RSC_PAYLOADS = {
       [rscPayloadKey]: ['page1-chunk-a', 'page1-chunk-b'],
