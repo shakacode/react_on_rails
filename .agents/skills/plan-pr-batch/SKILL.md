@@ -56,7 +56,7 @@ Plan a PR batch
    - File-touch map, PR path discovery: get refs with
      `gh pr view N --json headRefName,baseRefName`, then fetch the current base
      branch and PR head into refs without checking out untrusted PR code:
-     `git fetch --prune origin <baseRefName>` and
+     `git fetch origin <baseRefName>` and
      `git fetch origin pull/N/head:refs/tmp/pr-N-head`. A plain
      `git fetch origin` does not fetch cross-fork heads. Run
      `git diff --name-status --find-renames origin/<baseRefName>...refs/tmp/pr-N-head`;
@@ -70,11 +70,11 @@ Plan a PR batch
      Fetch with
      `gh api --paginate --method GET repos/{owner}/{repo}/pulls/N/files -f per_page=100`;
      the default page size is 30, so a small unpaginated page can look complete
-     while truncated. The response is acceptable only when it records both
-     `.filename` and
-     `.previous_filename` when present, has no `Link: ...; rel="next"` response
-     header, and its listed-file count matches the PR's `changedFiles` value
-     from `gh pr view N --json changedFiles`. GitHub caps the Files API at
+     while truncated. `--paginate` follows all pages automatically; no Link
+     header check is needed after the command returns. The response is
+     acceptable only when it records both `.filename` and `.previous_filename`
+     when present, and its listed-file count matches the PR's `changedFiles`
+     value from `gh pr view N --json changedFiles`. GitHub caps the Files API at
      ~3000 files; if `changedFiles` is at or near that cap, the response cannot
      prove there are no more pages, or it only reports new paths, record the PR
      paths as `UNKNOWN` and treat the item as serial.
@@ -86,9 +86,10 @@ Plan a PR batch
      path cannot run as parallel worktrees; keep only file-disjoint items in the
      parallel first batch and sequence or defer collisions. An `UNKNOWN` item
      runs as a serial "discovery lane" — a lane that first determines its real
-     paths instead of editing in parallel. Do not dispatch discovery lanes
-     alongside active editor lanes; run them before the parallel edit wave or
-     after the current wave is idle.
+     paths instead of editing in parallel. Do not run discovery lanes
+     concurrently with active editor lanes. Either complete all discovery lanes
+     first and then dispatch the editor wave, or wait until all active editor
+     lanes have finished before starting discovery lanes.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
