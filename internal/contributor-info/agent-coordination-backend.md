@@ -42,6 +42,10 @@ if test ! -x "$INSTALLED_AGENT_COORD_BIN"; then
   return 1 2>/dev/null || exit 1
 fi
 "$INSTALLED_AGENT_COORD_BIN" --help
+if ! command -v agent_coord >/dev/null 2>&1; then
+  echo "agent_coord alias not found; bootstrap may not have installed it" >&2
+  return 1 2>/dev/null || exit 1
+fi
 agent_coord --help # Verify the compatibility alias (underscore form) is also on PATH.
 "$INSTALLED_AGENT_COORD_BIN" version --json
 "$INSTALLED_AGENT_COORD_BIN" config show --json 2>/dev/null # Do not paste raw output publicly.
@@ -124,6 +128,7 @@ if (
   }
 
   require_clean_agent_coord_checkout() {
+    # Non-zero means the index was stale; the diff checks below are the real cleanliness gate.
     git -C "$AGENT_COORD_REPO" update-index -q --refresh || true
     local untracked_files
 
@@ -152,8 +157,8 @@ if (
     "$AGENT_COORD_BIN" --help >/dev/null &&
     AGENT_COORD_VERSION_JSON="$("$AGENT_COORD_BIN" version --json)" &&
     require_json_output "agent-coord version --json" "$AGENT_COORD_VERSION_JSON" &&
-    # Suppress stderr intentionally: private config details must not appear in public PRs.
-    # Non-zero exits still stop the preflight; blank stdout is caught only after a zero exit.
+    # Suppress stderr: diagnostics may expose private config paths or error details.
+    # Non-zero exits still stop the preflight; blank stdout is caught after a zero exit.
     # For private diagnostics, rerun without 2>/dev/null in a private terminal.
     AGENT_COORD_CONFIG_JSON="$("$AGENT_COORD_BIN" config show --json 2>/dev/null)" &&
     require_json_output "agent-coord config show --json" "$AGENT_COORD_CONFIG_JSON" &&
