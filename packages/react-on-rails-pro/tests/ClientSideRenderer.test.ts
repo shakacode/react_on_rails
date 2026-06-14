@@ -615,9 +615,11 @@ describe('ClientSideRenderer', () => {
 
   it('clears page-scoped RSC payload globals without changing same-page append semantics', () => {
     const rscPayloadKey = 'TestComponent-stableHash-dom-id';
-    window.REACT_ON_RAILS_RSC_PAYLOADS = {
-      [rscPayloadKey]: ['page1-chunk-a', 'page1-chunk-b'],
-    };
+    expect(window.REACT_ON_RAILS_RSC_PAYLOADS).toBeUndefined();
+
+    (window.REACT_ON_RAILS_RSC_PAYLOADS ||= {})[rscPayloadKey] ||= [];
+    window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page1-chunk-a');
+    window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page1-chunk-b');
     window.REACT_ON_RAILS_RSC_ERRORS = {
       [rscPayloadKey]: { hasErrors: false },
     };

@@ -616,12 +616,8 @@ function unmountAllStores(): void {
 }
 
 function clearRSCPreloadedPayloadGlobals(): void {
-  const rscGlobal = globalThis as unknown as {
-    REACT_ON_RAILS_RSC_PAYLOADS?: unknown;
-    REACT_ON_RAILS_RSC_ERRORS?: unknown;
-  };
-  delete rscGlobal.REACT_ON_RAILS_RSC_PAYLOADS;
-  delete rscGlobal.REACT_ON_RAILS_RSC_ERRORS;
+  delete window.REACT_ON_RAILS_RSC_PAYLOADS;
+  delete window.REACT_ON_RAILS_RSC_ERRORS;
 }
 
 export function unmountAll(): void {
