@@ -149,7 +149,7 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.level).toBe('error');
     expect(r.message).toContain('react-on-rails-rsc');
     expect(r.message).toContain('19.1.0');
-    expect(r.message).toContain('19.0.x stable >= 19.0.5');
+    expect(r.message).toContain(`19.0.x stable >= ${recommendedMin}`);
     expect(r.message).toContain('19.2.x');
     expect(r.message).not.toContain('Incompatible react version');
   });
@@ -159,7 +159,7 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.level).toBe('error');
     expect(r.message).toContain('react-on-rails-rsc');
     expect(r.message).toContain('19.3.0-rc.1');
-    expect(r.message).toContain('19.0.x stable >= 19.0.5');
+    expect(r.message).toContain(`19.0.x stable >= ${recommendedMin}`);
     expect(r.message).toContain('19.2.x');
   });
 
