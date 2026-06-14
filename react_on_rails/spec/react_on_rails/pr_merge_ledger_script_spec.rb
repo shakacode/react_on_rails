@@ -299,6 +299,46 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks closed unmerged PRs in strict mode" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 5,
+        "state" => "CLOSED",
+        "mergedAt" => nil,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-closed-unmerged", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "closed_unmerged_pr"
+      )
+    end
+  end
+
   it "blocks missing head SHA in strict mode" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -717,7 +757,7 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
-  it "ignores non-outdated review threads from older head commits" do
+  it "blocks non-outdated review threads even when their original review used an older head commit" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
       "pull_request" => {
@@ -762,11 +802,13 @@ RSpec.describe "script/pr-merge-ledger" do
         chdir: repo_root
       )
 
-      expect(status).to be_success, stderr
+      expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      expect(report.dig("pull_requests", 0, "unresolved_current_head_review_threads", "count")).to eq(0)
-      expect(report.fetch("violations")).to be_empty
+      expect(report.dig("pull_requests", 0, "unresolved_current_head_review_threads", "count")).to eq(1)
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unresolved_current_head_review_thread"
+      )
     end
   end
 
@@ -919,6 +961,101 @@ RSpec.describe "script/pr-merge-ledger" do
         "text_excerpt" => "[P1] issue not resolved",
         "disposition" => "UNKNOWN"
       )
+    end
+  end
+
+  it "blocks mixed severity summary lines that still contain an open higher-priority item" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "mixed-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/mixed-review",
+          "body" => "P1 issues: resolved; P0 still open"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-mixed-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      expect(finding).to include(
+        "id" => "mixed-review",
+        "severity" => "P1",
+        "text_excerpt" => "P1 issues: resolved; P0 still open",
+        "disposition" => "UNKNOWN"
+      )
+    end
+  end
+
+  it "ignores resolved first-clause summaries even when later context contains a negation" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "resolved-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/resolved-review",
+          "body" => "P1: Main issue fixed (not yet resolved in the beta branch)."
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-resolved-first-clause", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")).to be_empty
     end
   end
 
@@ -1190,6 +1327,60 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "warns when finding disposition keys do not match any finding" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 7,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [],
+      "comments" => [
+        {
+          "id" => "comment-1",
+          "url" => "https://example.com/comment-1",
+          "body" => "[P1] Top-level PR comment finding.",
+          "author" => { "login" => "reviewer" },
+          "createdAt" => "2026-06-01T00:00:00Z"
+        }
+      ]
+    }
+    dispositions = {
+      "https://example.com/comment-1" => "fixed",
+      "https://example.com/typo" => "fixed"
+    }
+
+    Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
+      Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
+        fixture_file.write(JSON.generate(fixture))
+        fixture_file.flush
+        dispositions_file.write(JSON.generate(dispositions))
+        dispositions_file.flush
+
+        stdout, stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          fixture_file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--finding-dispositions",
+          dispositions_file.path,
+          "--strict",
+          chdir: repo_root
+        )
+
+        expect(status).to be_success, stderr
+        expect(stderr).to include("unused disposition keys: https://example.com/typo")
+
+        report = JSON.parse(stdout)
+        expect(report.fetch("complete_allowed")).to be(true)
+      end
+    end
+  end
+
   it "rejects finding disposition files that are not JSON objects" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -1263,6 +1454,71 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(status.exitstatus).to eq(2)
     expect(stdout).to be_empty
     expect(stderr).to include("--changelog-classification applies to one PR at a time")
+  end
+
+  it "aggregates multiple live PR ledgers in one invocation" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      pr=""
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              pr=*) pr=${1#pr=} ;;
+              query=*) query=${1#query=} ;;
+            esac
+            ;;
+        esac
+        shift
+      done
+
+      review_decision="APPROVED"
+      if [ "$pr" = "2" ]; then
+        review_decision="REVIEW_REQUIRED"
+      fi
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<JSON
+      {"data":{"repository":{"pullRequest":{"number":$pr,"title":"PR $pr","url":"https://example.com/pr/$pr","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-$pr","headRefOid":"head-$pr","mergedAt":null,"reviewDecision":"$review_decision","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<JSON
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<JSON
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<JSON
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+
+    with_fake_gh(fake_gh) do |env|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "2",
+        "--repo",
+        "shakacode/react_on_rails",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.dig("source", "prs")).to eq([1, 2])
+      expect(report.fetch("pull_requests").map { |ledger| ledger.dig("pr", "number") }).to eq([1, 2])
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "review_decision_review_required"
+      )
+    end
   end
 
   it "prints GraphQL response errors from gh API calls" do

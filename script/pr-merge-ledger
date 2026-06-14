@@ -56,10 +56,13 @@ class PrMergeLedger
       /\A\s*(?:[-*]\s*)?(?:\*\*)?\[?P2\]?(?:\*\*)?(?:\s|:|-|$)/i
     )
   }.freeze
-  NON_ACTIONABLE_FINDING_PATTERN =
-    /\A\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-)+
-      (?:findings?|issues?|items?)\b.*\b(?:none|resolved|waived|previous review)\b/ix
-  ACTIONABLE_NEGATED_RESOLUTION_PATTERN = /\bnot\s+(?:yet\s+)?(?:resolved|waived)\b/i
+  FINDING_SUMMARY_PREFIX_PATTERN =
+    /\A\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-)+(?<summary>.*)\z/i
+  FINDING_SUMMARY_SUBJECT_PATTERN = /\b(?:findings?|issues?|items?|main issue)\b/i
+  FINDING_SUMMARY_RESOLUTION_PATTERN = /\b(?:none|fixed|resolved|waived|previous review)\b/i
+  NEGATED_SUMMARY_RESOLUTION_PATTERN = /\bnot\s+(?:yet\s+)?(?:fixed|resolved|waived)\b/i
+  ADDITIONAL_SEVERITY_PATTERN =
+    /[.;]\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
 
   class Error < StandardError; end
 
@@ -381,8 +384,13 @@ class PrMergeLedger
   end
 
   def current_thread?(thread, comments, pull_request)
+    return false if thread["isOutdated"] == true
     return !thread["isOutdated"] if comments.empty?
 
+    current_thread_comment?(comments, pull_request) || comments.any? { |comment| !comment.fetch("outdated") }
+  end
+
+  def current_thread_comment?(comments, pull_request)
     comments.any? { |comment| comment.fetch("current_head") && !comment.fetch("outdated") } ||
       comments.any? { |comment| comment.fetch("comment_head_sha") == pull_request.fetch("head_sha") }
   end
@@ -393,24 +401,13 @@ class PrMergeLedger
 
   def finding_dispositions(review_threads, reviews, issue_comments, dispositions)
     findings = []
+    used_disposition_keys = []
 
-    thread_comments_for_findings(review_threads).each do |comment|
-      findings.concat(
-        findings_from_text(comment.fetch("body"), comment.fetch("url"), comment.fetch("id"), dispositions)
-      )
-    end
+    append_findings(thread_comments_for_findings(review_threads), "body", findings, dispositions, used_disposition_keys)
+    append_findings(reviews_for_findings(reviews), "body_text", findings, dispositions, used_disposition_keys)
+    append_findings(issue_comments, "body", findings, dispositions, used_disposition_keys)
 
-    reviews_for_findings(reviews).each do |review|
-      findings.concat(
-        findings_from_text(review.fetch("body_text"), review.fetch("url"), review.fetch("id"), dispositions)
-      )
-    end
-
-    issue_comments.each do |comment|
-      findings.concat(
-        findings_from_text(comment.fetch("body"), comment.fetch("url"), comment.fetch("id"), dispositions)
-      )
-    end
+    warn_unused_dispositions(dispositions, used_disposition_keys)
 
     unique_findings = findings.uniq do |finding|
       [
@@ -427,6 +424,15 @@ class PrMergeLedger
     }
   end
 
+  def append_findings(records, text_key, findings, dispositions, used_disposition_keys)
+    records.each do |record|
+      findings.concat(
+        findings_from_text(record.fetch(text_key), record.fetch("url"), record.fetch("id"), dispositions,
+                           used_disposition_keys)
+      )
+    end
+  end
+
   def thread_comments_for_findings(review_threads)
     review_threads
       .select { |thread| unresolved_current_head_thread?(thread) }
@@ -437,20 +443,21 @@ class PrMergeLedger
     latest_reviews_by_reviewer(reviews).select { |review| review.fetch("current_head") }
   end
 
-  def findings_from_text(text, url, id, dispositions)
+  def findings_from_text(text, url, id, dispositions, used_disposition_keys)
     text.to_s.each_line.with_index.flat_map do |line, index|
-      next [] if non_actionable_finding_summary?(line)
+      line_text = line.chomp
+      next [] if non_actionable_finding_summary?(line_text)
 
-      severity = finding_severity(line)
+      severity = finding_severity(line_text)
       next [] unless severity
 
-      disposition = disposition_for(url, id, dispositions)
+      disposition = disposition_for(url, id, dispositions, used_disposition_keys)
       [{
         "id" => id,
         "url" => url,
         "severity" => severity,
         "source_line" => index + 1,
-        "text_excerpt" => excerpt(line),
+        "text_excerpt" => excerpt(line_text),
         "disposition" => disposition.fetch("disposition"),
         "evidence" => disposition["evidence"]
       }]
@@ -462,13 +469,27 @@ class PrMergeLedger
   end
 
   def non_actionable_finding_summary?(line)
-    return false if line.match?(ACTIONABLE_NEGATED_RESOLUTION_PATTERN)
+    match = line.match(FINDING_SUMMARY_PREFIX_PATTERN)
+    return false unless match
 
-    line.match?(NON_ACTIONABLE_FINDING_PATTERN)
+    summary = match[:summary].to_s
+    return false unless summary.match?(FINDING_SUMMARY_SUBJECT_PATTERN)
+    return false if summary.match?(ADDITIONAL_SEVERITY_PATTERN)
+
+    first_clause = summary.split(/[.;(]/, 2).first.to_s
+    return false if first_clause.match?(NEGATED_SUMMARY_RESOLUTION_PATTERN)
+
+    first_clause.match?(FINDING_SUMMARY_RESOLUTION_PATTERN)
   end
 
-  def disposition_for(url, id, dispositions)
-    override = dispositions[url] || dispositions[id]
+  def disposition_for(url, id, dispositions, used_disposition_keys)
+    override = if dispositions.key?(url)
+                 used_disposition_keys << url
+                 dispositions[url]
+               elsif dispositions.key?(id)
+                 used_disposition_keys << id
+                 dispositions[id]
+               end
 
     case override
     when String
@@ -483,6 +504,13 @@ class PrMergeLedger
     else
       raise Error, "finding disposition for #{url || id} must be a string or object"
     end
+  end
+
+  def warn_unused_dispositions(dispositions, used_disposition_keys)
+    unused_keys = dispositions.keys - used_disposition_keys.to_a
+    return if unused_keys.empty?
+
+    warn "pr-merge-ledger: unused disposition keys: #{unused_keys.join(', ')}"
   end
 
   def validate_disposition(disposition)
@@ -577,6 +605,7 @@ class PrMergeLedger
     [
       review_decision_violation(pull_request),
       draft_pr_violation(pull_request),
+      closed_unmerged_pr_violation(pull_request),
       changelog_violation(pull_request, changelog),
       *changes_requested_violations(pull_request, changes_requested),
       *unresolved_thread_violations(pull_request, unresolved_threads),
@@ -610,6 +639,17 @@ class PrMergeLedger
       pull_request,
       "draft_pr",
       "PR is still a draft",
+      pull_request["url"]
+    )
+  end
+
+  def closed_unmerged_pr_violation(pull_request)
+    return unless pull_request["state"] == "CLOSED" && pull_request["merged_at"].nil?
+
+    violation(
+      pull_request,
+      "closed_unmerged_pr",
+      "PR is closed without being merged",
       pull_request["url"]
     )
   end
