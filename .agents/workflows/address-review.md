@@ -239,7 +239,7 @@ Execution flow when terminal access is available:
          after `DISCUSS` items are resolved or explicitly deferred; `OPTIONAL`
          items do not block merge-readiness.
    - **`f+i`**:
-     1. Apply only the `f` pre-reply subflow: `f` steps 1-7 above for `MUST-FIX`, autonomous optional handling, optional promotion/failure handling, and the commit/push-before-reply gate. Do not inherit later `f` reply/resolve, skipped, or discuss prompts; `f+i` restates those below.
+     1. Apply only the `f` pre-reply subflow through the commit/push-before-reply gate (inclusive) for `MUST-FIX`, autonomous optional handling, and optional promotion/failure handling. Do not inherit later `f` reply/resolve, skipped, or discuss prompts; `f+i` restates those below.
      2. If that phase produces local changes, commit and ask for push confirmation before building the deferred bundle, replying, resolving, or signaling readiness.
      3. Record each autonomous optional outcome before building the deferred bundle: fixed inline, declined, failed validation and dropped/reverted, or promoted to `DISCUSS`.
      4. After the initial `f` gate, reply to each `MUST-FIX` or autonomous optional thread fixed or recorded during that gate, citing the pushed commit or recorded outcome, and resolve threads when the concern is handled or explicitly deferred/declined under the attention contract.

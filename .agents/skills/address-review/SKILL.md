@@ -318,10 +318,11 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 
 ### Action `f+i` — Fix, deferred-work bundle, and merge-ready
 
-1. Apply only the `f` pre-reply subflow: `f` steps 1-5 above for `MUST-FIX`,
-   autonomous optional handling, optional promotion/failure handling, and the
-   commit/push-before-reply gate. Do not inherit later `f` reply/resolve,
-   skipped, or discuss prompts; `f+i` restates those below. If there are no
+1. Apply only the `f` pre-reply subflow through the
+   commit/push-before-reply gate (inclusive) for `MUST-FIX`, autonomous optional
+   handling, and optional promotion/failure handling. Do not inherit later `f`
+   reply/resolve, skipped, or discuss prompts; `f+i` restates those below. If
+   there are no
    `MUST-FIX` items, still handle low-risk behavior-preserving optional nits
    before continuing with deferred-item handling. Record each autonomous
    optional outcome before building the deferred bundle: fixed inline, declined,
