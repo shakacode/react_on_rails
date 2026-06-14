@@ -135,8 +135,7 @@ const isSupportedRscMinor = (rscTuple: VersionTuple, { supportedRanges }: RscPee
 
 const isAllowedRscPrerelease = (
   rscVersion: string,
-  rscTuple: VersionTuple,
-  { allowedPrereleases, recommendedMin }: RscPeerSupport['reactOnRailsRsc'],
+  { allowedPrereleases }: RscPeerSupport['reactOnRailsRsc'],
 ): boolean => {
   if (!isPrereleaseVersion(rscVersion)) return true;
 
@@ -149,8 +148,7 @@ const isAllowedRscPrerelease = (
     return true;
   }
 
-  const recommendedMinMinor = parseTuple(recommendedMin)[1];
-  return rscTuple[1] !== recommendedMinMinor;
+  return false;
 };
 
 const proLabel = (proVersion?: string) =>
@@ -216,9 +214,9 @@ export function checkRscPeerCompatibility(
     };
   }
 
-  // Keep allowed prereleases aligned with RSC_PEER_SUPPORT.recommendedMin.
+  // Keep allowed prereleases aligned with RSC_PEER_SUPPORT and the Pro package peer exceptions.
   // Older unlisted prereleases intentionally error before the below-min warning.
-  if (!isAllowedRscPrerelease(rscVersion, rscTuple, reactOnRailsRsc)) {
+  if (!isAllowedRscPrerelease(rscVersion, reactOnRailsRsc)) {
     return {
       level: 'error',
       message: errorMessage(

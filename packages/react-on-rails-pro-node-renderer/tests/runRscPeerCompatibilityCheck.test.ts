@@ -161,7 +161,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   it('does not throw on the coordinated React 19.2.7 runtime floor', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.2.0-rc.1', '19.2.7'),
+        resolveVersion: resolveVersions('19.2.0', '19.2.7'),
       }),
     ).not.toThrow();
     expect(warnSpy).not.toHaveBeenCalled();
@@ -179,7 +179,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   it('throws when React 19.0 is paired with the React 19.2 RSC package line', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.2.0-rc.1', '19.0.4'),
+        resolveVersion: resolveVersions('19.2.0', '19.0.4'),
       }),
     ).toThrow(/Incompatible react/);
     expect(warnSpy).not.toHaveBeenCalled();

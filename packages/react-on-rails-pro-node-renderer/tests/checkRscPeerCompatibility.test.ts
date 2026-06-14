@@ -104,7 +104,7 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('returns ok for the React 19.2.7 floor required by the 19.2 RSC package line', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.2.0-rc.1', reactVersion: '19.2.7' }).level).toBe('ok');
+    expect(checkRscPeerCompatibility({ rscVersion: '19.2.0', reactVersion: '19.2.7' }).level).toBe('ok');
   });
 
   it('warns for a prerelease at the stable recommended minimum', () => {
@@ -138,6 +138,14 @@ describe('checkRscPeerCompatibility', () => {
     expect(result.level).toBe('error');
     expect(result.message).toContain('19.0.6-rc.1');
     expect(result.message).toContain(allowedPrereleaseGuidance);
+  });
+
+  it('errors for an unlisted prerelease on a supported non-recommended RSC minor', () => {
+    const result = checkRscPeerCompatibility({ rscVersion: '19.2.0-rc.1', reactVersion: '19.2.7' });
+
+    expect(result.level).toBe('error');
+    expect(result.message).toContain('react-on-rails-rsc');
+    expect(result.message).toContain('19.2.0-rc.1');
   });
 
   it('errors when rsc major is above the supported major', () => {
@@ -188,7 +196,7 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('errors when React 19.2 patch is below the supported minimum', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.2.0-rc.1', reactVersion: '19.2.6' });
+    const r = checkRscPeerCompatibility({ rscVersion: '19.2.0', reactVersion: '19.2.6' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('react');
     expect(r.message).toContain('19.2.6');
@@ -205,7 +213,7 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('errors when React 19.0 is paired with the React 19.2 RSC package line', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.2.0-rc.1', reactVersion: '19.0.4' });
+    const r = checkRscPeerCompatibility({ rscVersion: '19.2.0', reactVersion: '19.0.4' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('react');
     expect(r.message).toContain('19.0.4');
