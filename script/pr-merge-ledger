@@ -221,7 +221,10 @@ class PrMergeLedger
   def build_report
     datasets = @options[:fixture] ? [load_fixture(@options[:fixture])] : fetch_live_pull_requests
     dispositions = load_dispositions(@options[:finding_dispositions])
-    ledgers = datasets.map { |dataset| ledger_for(dataset, dispositions) }
+    enforce_unused_dispositions = datasets.length == 1
+    ledgers = datasets.map do |dataset|
+      ledger_for(dataset, dispositions, enforce_unused_dispositions:)
+    end
 
     violations = ledgers.flat_map { |ledger| ledger.fetch("violations") }
     unknown_fields = ledgers.flat_map { |ledger| ledger.fetch("unknown_fields") }
@@ -308,7 +311,7 @@ class PrMergeLedger
   end
 
   # rubocop:disable Metrics/AbcSize
-  def ledger_for(dataset, dispositions)
+  def ledger_for(dataset, dispositions, enforce_unused_dispositions: true)
     pull_request = normalize_pull_request(dataset.fetch("pull_request"))
     files = file_paths(dataset)
     review_threads = normalized_review_threads(dataset, pull_request)
@@ -321,7 +324,8 @@ class PrMergeLedger
     latest_reviews = latest_reviews_by_reviewer(output_reviews)
     all_changes_requested = output_reviews.select { |review| review.fetch("state") == "CHANGES_REQUESTED" }
     changes_requested = current_changes_requested(output_reviews)
-    finding_report = finding_dispositions(review_threads, reviews, issue_comments, dispositions)
+    finding_report = finding_dispositions(review_threads, reviews, issue_comments, dispositions,
+                                          enforce_unused_dispositions:)
     changelog = changelog_classification
     lockfile = lockfile_diff(files)
 
@@ -533,7 +537,7 @@ class PrMergeLedger
     complete_current_head_thread?(thread) && !thread.fetch("is_resolved")
   end
 
-  def finding_dispositions(review_threads, reviews, issue_comments, dispositions)
+  def finding_dispositions(review_threads, reviews, issue_comments, dispositions, enforce_unused_dispositions: true)
     findings = []
     used_disposition_keys = []
 
@@ -557,7 +561,8 @@ class PrMergeLedger
     )
     append_findings(issue_comments, "body", findings, context)
 
-    unused_disposition_keys = warn_unused_dispositions(dispositions, used_disposition_keys)
+    unused_disposition_keys = unused_disposition_keys(dispositions, used_disposition_keys,
+                                                      enforce_unused_dispositions:)
 
     unique_findings = findings.uniq do |finding|
       [
@@ -859,6 +864,12 @@ class PrMergeLedger
 
     warn "pr-merge-ledger: unused disposition keys: #{unused_keys.join(', ')}"
     unused_keys
+  end
+
+  def unused_disposition_keys(dispositions, used_disposition_keys, enforce_unused_dispositions: true)
+    return [] unless enforce_unused_dispositions
+
+    warn_unused_dispositions(dispositions, used_disposition_keys)
   end
 
   def validate_disposition(disposition)

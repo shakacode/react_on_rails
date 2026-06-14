@@ -4278,6 +4278,86 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "does not report another PR's disposition key as unused in multi-PR aggregate mode" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      pr=""
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              pr=*) pr=${1#pr=} ;;
+              query=*) query=${1#query=} ;;
+            esac
+            ;;
+        esac
+        shift
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<JSON
+      {"data":{"repository":{"pullRequest":{"number":$pr,"title":"PR $pr","url":"https://example.com/pr/$pr","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-$pr","headRefOid":"head-$pr","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<JSON
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<JSON
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif [ "$pr" = "1" ]; then
+        cat <<JSON
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[{"id":"comment-1","url":"https://example.com/pr/1#issuecomment-1","author":{"login":"reviewer"},"createdAt":"2026-06-01T00:00:00Z","body":"[P2] Dispositioned finding."}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<JSON
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+
+    Tempfile.create(["pr-merge-ledger-multi-pr-dispositions", ".json"]) do |dispositions_file|
+      dispositions_file.write(
+        JSON.generate(
+          "https://example.com/pr/1#issuecomment-1#L1" => {
+            "disposition" => "fixed",
+            "evidence" => "Handled in the fixture."
+          }
+        )
+      )
+      dispositions_file.flush
+
+      with_fake_gh(fake_gh) do |env|
+        stdout, stderr, status = Open3.capture3(
+          env,
+          script_path,
+          "1",
+          "2",
+          "--repo",
+          "shakacode/react_on_rails",
+          "--finding-dispositions",
+          dispositions_file.path,
+          chdir: repo_root
+        )
+
+        expect(status).to be_success, stderr
+        expect(stderr).not_to include("unused disposition keys")
+
+        report = JSON.parse(stdout)
+        unused_keys_by_pr = report.fetch("pull_requests").map do |ledger|
+          ledger.dig("priority_finding_dispositions", "unused_keys")
+        end
+        expect(unused_keys_by_pr).to eq([[], []])
+        expect(report.fetch("unknown_fields").map { |field| field.fetch("field") }).not_to include(
+          "priority_finding_dispositions.unused_keys"
+        )
+      end
+    end
+  end
+
   it "rejects strict multiple live PR ledgers before producing an incomplete gate result" do
     stdout, stderr, status = Open3.capture3(
       script_path,
