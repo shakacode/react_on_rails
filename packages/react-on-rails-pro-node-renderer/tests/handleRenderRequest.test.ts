@@ -114,6 +114,16 @@ describe(testName, () => {
     });
   });
 
+  test('rejects bundle timestamp path traversal before reading bundle files', async () => {
+    const result = await handleRenderRequest({
+      renderingRequest: 'ReactOnRails.dummy',
+      bundleTimestamp: '../outside',
+    });
+
+    expect(result.response.status).toBe(400);
+    expect(String(result.response.data)).toContain('Invalid bundle timestamp path component');
+  });
+
   test('If bundle was already uploaded by another thread', async () => {
     expect.assertions(1);
     await createVmBundleForTest();

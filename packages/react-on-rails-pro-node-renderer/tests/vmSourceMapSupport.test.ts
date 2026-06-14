@@ -25,7 +25,7 @@ import {
   PREPARE_STACK_TRACE_INSTALL_SCRIPT,
   registerBundleForSourceMaps,
   remapStackTrace,
-  resolveOriginalPosition,
+  resolveOriginalPositionForRegistration,
   SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY,
 } from '../src/worker/vmSourceMapSupport';
 
@@ -263,9 +263,9 @@ describe('source-mapped stack traces for VM errors', () => {
     const bundlePath = await writeVmBundle(
       `${buildThrowingBundleSource()}\n${inlineSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
     );
-    registerBundleForSourceMaps(bundlePath);
+    const registration = registerBundleForSourceMaps(bundlePath);
 
-    expect(resolveOriginalPosition(bundlePath, 4, 1)).toEqual({
+    expect(resolveOriginalPositionForRegistration(registration, bundlePath, 4, 1)).toEqual({
       source: ORIGINAL_SOURCE,
       line: 4,
       column: 1,
@@ -278,11 +278,9 @@ describe('source-mapped stack traces for VM errors', () => {
     );
     const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
 
-    expect(resolveOriginalPosition(bundlePath, 3, 17)).toEqual({
-      source: SOURCE_ROOTED_SOURCE,
-      line: 2,
-      column: 3,
-    });
+    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).toContain(
+      `${SOURCE_ROOTED_SOURCE}:2:3`,
+    );
 
     const result = await runInVM('global.triggerSsrError()', bundlePath);
     expect(isErrorRenderResult(result)).toBe(true);
@@ -314,11 +312,11 @@ describe('source-mapped stack traces for VM errors', () => {
       buildThrowingBundleMap('bundle.js'),
     )}\n`;
     const bundlePath = await writeVmBundle(bundleContents);
-    registerBundleForSourceMaps(bundlePath, 0, bundleContents);
+    const registration = registerBundleForSourceMaps(bundlePath, 0, bundleContents);
     const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
 
     try {
-      expect(resolveOriginalPosition(bundlePath, 3, 17)).toEqual({
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toEqual({
         source: ORIGINAL_SOURCE,
         line: 2,
         column: 3,
@@ -337,11 +335,11 @@ describe('source-mapped stack traces for VM errors', () => {
     await writeVmBundle(bundleContents);
     await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
 
-    registerBundleForSourceMaps(bundlePath, 0, bundleContents);
+    const registration = registerBundleForSourceMaps(bundlePath, 0, bundleContents);
     const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
 
     try {
-      expect(resolveOriginalPosition(bundlePath, 3, 17)).toEqual({
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toEqual({
         source: ORIGINAL_SOURCE,
         line: 2,
         column: 3,
@@ -449,30 +447,20 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
   });
 
-  const testUnlessRoot = process.getuid?.() === 0 ? test.skip : test;
-  testUnlessRoot(
-    'sourceMappingURL is ignored when realpath fails for reasons other than a missing map',
-    async () => {
-      const bundlePath = vmBundlePath(testName);
-      const bundleDirectory = path.dirname(bundlePath);
-      const lockedDirectoryName = 'locked-map-directory';
-      const lockedDirectoryPath = path.join(bundleDirectory, lockedDirectoryName);
-      const mapFileName = 'permission-denied.map';
-      const sourceMappingUrl = `${lockedDirectoryName}/${mapFileName}`;
-      const mapPath = path.join(lockedDirectoryPath, mapFileName);
-      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${sourceMappingUrl}\n`);
-      await mkdirAsync(lockedDirectoryPath, { recursive: true });
-      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(mapFileName)));
-      await fsPromises.chmod(lockedDirectoryPath, 0o000);
+  test('sourceMappingURL path separators are ignored before map lookup', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const bundleDirectory = path.dirname(bundlePath);
+    const mapDirectory = path.join(bundleDirectory, 'maps');
+    const mapFileName = 'nested.map';
+    const sourceMappingUrl = `maps/${mapFileName}`;
+    const mapPath = path.join(mapDirectory, mapFileName);
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${sourceMappingUrl}\n`);
+    await mkdirAsync(mapDirectory, { recursive: true });
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(mapFileName)));
 
-      try {
-        registerBundleForSourceMaps(bundlePath);
-        expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
-      } finally {
-        await fsPromises.chmod(lockedDirectoryPath, 0o700);
-      }
-    },
-  );
+    const registration = registerBundleForSourceMaps(bundlePath);
+    expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+  });
 
   test('non-JSON data URL source maps are ignored', async () => {
     const bundlePath = await writeVmBundle(
@@ -553,7 +541,9 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(thrown).toBeDefined();
     expect(thrown?.message).toContain("Cannot find module 'missing-host-callback-module'");
     expect(thrown?.stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
-    expect(resolveOriginalPosition(bundlePath, 3, 1)).toBeNull();
+    expect(remapStackTrace(`Error: host\n    at callback (${bundlePath}:3:1)`)).not.toContain(
+      ORIGINAL_SOURCE,
+    );
   });
 
   test('host-realm callback stacks serialized inside the VM are remapped', async () => {
@@ -644,7 +634,7 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
 
     executionContext.release();
-    expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
+    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).not.toContain(ORIGINAL_SOURCE);
   });
 
   test('same-path rebuild does not remap active old VM errors with the new source map', async () => {
@@ -712,17 +702,15 @@ describe('source-mapped stack traces for VM errors', () => {
 
     removeVM(bundlePath);
     expect(hasVMContextForBundle(bundlePath)).toBe(false);
-    expect(resolveOriginalPosition(bundlePath, 3, 17)).toEqual({
-      source: ORIGINAL_SOURCE,
-      line: 2,
-      column: 3,
-    });
+    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).toContain(
+      `${ORIGINAL_SOURCE}:2:3`,
+    );
 
     const stack = await runInVM('global.heldSsrError.stack', bundlePath);
     expect(stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
 
     executionContext.release();
-    expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
+    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).not.toContain(ORIGINAL_SOURCE);
   });
 
   test('bundle without a source map keeps the real bundle path in stack frames', async () => {
@@ -750,15 +738,20 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result).toBe('null');
   });
 
-  test('resolveOriginalPosition validates untrusted inputs', () => {
-    expect(resolveOriginalPosition(42, 1, 1)).toBeNull();
-    expect(resolveOriginalPosition('/some/path.js', '1', 1)).toBeNull();
-    expect(resolveOriginalPosition('/some/path.js', 1, Number.NaN)).toBeNull();
-    expect(resolveOriginalPosition('/some/path.js', 1.5, 1)).toBeNull();
-    expect(resolveOriginalPosition('/some/path.js', 1, 1.5)).toBeNull();
-    expect(resolveOriginalPosition('/some/path.js', 0, 1)).toBeNull();
-    expect(resolveOriginalPosition('/some/path.js', 1, 0)).toBeNull();
-    expect(resolveOriginalPosition('/unregistered/path.js', 1, 1)).toBeNull();
+  test('resolveOriginalPositionForRegistration validates untrusted inputs', async () => {
+    const bundlePath = await writeVmBundle(
+      `${buildThrowingBundleSource()}\n${inlineSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
+    );
+    const registration = registerBundleForSourceMaps(bundlePath);
+
+    expect(resolveOriginalPositionForRegistration(registration, 42, 1, 1)).toBeNull();
+    expect(resolveOriginalPositionForRegistration(registration, bundlePath, '1', 1)).toBeNull();
+    expect(resolveOriginalPositionForRegistration(registration, bundlePath, 1, Number.NaN)).toBeNull();
+    expect(resolveOriginalPositionForRegistration(registration, bundlePath, 1.5, 1)).toBeNull();
+    expect(resolveOriginalPositionForRegistration(registration, bundlePath, 1, 1.5)).toBeNull();
+    expect(resolveOriginalPositionForRegistration(registration, bundlePath, 0, 1)).toBeNull();
+    expect(resolveOriginalPositionForRegistration(registration, bundlePath, 1, 0)).toBeNull();
+    expect(resolveOriginalPositionForRegistration(registration, '/unregistered/path.js', 1, 1)).toBeNull();
   });
 
   test('registering the same path invalidates cached missing source maps', async () => {
@@ -766,20 +759,23 @@ describe('source-mapped stack traces for VM errors', () => {
     const mapFileName = `${path.basename(bundlePath)}.map`;
     await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
 
-    registerBundleForSourceMaps(bundlePath);
-    expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
+    const firstRegistration = registerBundleForSourceMaps(bundlePath);
+    expect(resolveOriginalPositionForRegistration(firstRegistration, bundlePath, 3, 17)).toBeNull();
 
     await fsPromises.writeFile(
       path.join(path.dirname(bundlePath), mapFileName),
       JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))),
     );
 
-    registerBundleForSourceMaps(bundlePath);
-    expect(resolveOriginalPosition(bundlePath, 3, 17)).toEqual({
+    const secondRegistration = registerBundleForSourceMaps(bundlePath);
+    expect(resolveOriginalPositionForRegistration(secondRegistration, bundlePath, 3, 17)).toEqual({
       source: ORIGINAL_SOURCE,
       line: 2,
       column: 3,
     });
+    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).toContain(
+      `${ORIGINAL_SOURCE}:2:3`,
+    );
   });
 
   test('prepareStackTrace falls back when a call site cannot be stringified', () => {

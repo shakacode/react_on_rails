@@ -212,14 +212,29 @@ export const delay = (milliseconds: number) =>
     setTimeout(resolve, milliseconds);
   });
 
+const BUNDLE_TIMESTAMP_PATH_COMPONENT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+function bundleTimestampPathComponent(bundleTimestamp: string | number) {
+  const pathComponent = String(bundleTimestamp);
+  if (!BUNDLE_TIMESTAMP_PATH_COMPONENT_PATTERN.test(pathComponent)) {
+    throw new Error(
+      `Invalid bundle timestamp path component: ${pathComponent}. ` +
+        'Expected only letters, digits, dots, underscores, and hyphens.',
+    );
+  }
+
+  return pathComponent;
+}
+
 export function getBundleDirectory(bundleTimestamp: string | number) {
   const { serverBundleCachePath } = getConfig();
-  return path.join(serverBundleCachePath, `${bundleTimestamp}`);
+  return path.resolve(serverBundleCachePath, bundleTimestampPathComponent(bundleTimestamp));
 }
 
 export function getRequestBundleFilePath(bundleTimestamp: string | number) {
-  const bundleDirectory = getBundleDirectory(bundleTimestamp);
-  return path.join(bundleDirectory, `${bundleTimestamp}.js`);
+  const pathComponent = bundleTimestampPathComponent(bundleTimestamp);
+  const bundleDirectory = getBundleDirectory(pathComponent);
+  return path.join(bundleDirectory, `${pathComponent}.js`);
 }
 
 export function getAssetPath(bundleTimestamp: string | number, filename: string) {

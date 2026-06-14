@@ -216,6 +216,9 @@ async function buildVM(filePath: string): Promise<VMContext> {
       const additionalContextIsObject =
         additionalContext !== null && additionalContext.constructor === Object;
       const sharedConsoleHistory = new SharedConsoleHistory();
+      // Request-derived bundle paths are built from validated timestamp path components.
+      // Direct `buildExecutionContext` callers pass trusted internal bundle paths.
+      // codeql[js/path-injection]
       const bundleContents = await readFileAsync(filePath, 'utf8');
       const firstLineColumnOffset =
         additionalContextIsObject || supportModules ? MODULE_WRAP_FIRST_LINE_PREFIX_LENGTH : 0;

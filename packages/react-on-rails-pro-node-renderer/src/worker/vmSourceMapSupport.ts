@@ -141,9 +141,34 @@ function isPathInsideOrEqual(candidatePath: string, directoryPath: string) {
   );
 }
 
+function sourceMapFileNameFromUrl(bundleFilePath: string, sourceMappingUrl: string) {
+  if (
+    sourceMappingUrl.length === 0 ||
+    sourceMappingUrl.includes('/') ||
+    sourceMappingUrl.includes('\\') ||
+    sourceMappingUrl.includes('?') ||
+    sourceMappingUrl.includes('#') ||
+    path.basename(sourceMappingUrl) !== sourceMappingUrl
+  ) {
+    log.debug(
+      'Ignoring source map path outside bundle directory for bundle %s: %s',
+      bundleFilePath,
+      sourceMappingUrl,
+    );
+    return undefined;
+  }
+
+  return sourceMappingUrl;
+}
+
 function resolveSourceMapPath(bundleFilePath: string, sourceMappingUrl: string): string | undefined {
+  const sourceMapFileName = sourceMapFileNameFromUrl(bundleFilePath, sourceMappingUrl);
+  if (!sourceMapFileName) {
+    return undefined;
+  }
+
   const bundleDirectory = path.dirname(bundleFilePath);
-  const resolvedPath = path.resolve(bundleDirectory, sourceMappingUrl);
+  const resolvedPath = path.resolve(bundleDirectory, sourceMapFileName);
   if (!isPathInsideOrEqual(resolvedPath, bundleDirectory)) {
     log.debug(
       'Ignoring source map outside bundle directory for bundle %s: %s',
@@ -176,28 +201,66 @@ function resolveSourceMapPath(bundleFilePath: string, sourceMappingUrl: string):
       return undefined;
     }
 
-    // Missing maps are handled by the caller; returning the lexical path keeps
-    // the normal "not found" path quiet while still validating existing symlinks.
     return resolvedPath;
   }
 }
 
-function hasReadableFile(candidatePath: string) {
+function fallbackSourceMapPath(bundleFilePath: string) {
+  return path.join(path.dirname(bundleFilePath), `${path.basename(bundleFilePath)}.map`);
+}
+
+function candidateSourceMapPaths(bundleFilePath: string, sourceMappingUrl: string | undefined) {
+  const candidatePaths: string[] = [];
+  if (sourceMappingUrl) {
+    const sourceMapPath = resolveSourceMapPath(bundleFilePath, sourceMappingUrl);
+    if (sourceMapPath) {
+      candidatePaths.push(sourceMapPath);
+    }
+  }
+  candidatePaths.push(fallbackSourceMapPath(bundleFilePath));
+  return Array.from(new Set(candidatePaths));
+}
+
+function resolveReadableSourceMapPath(bundleFilePath: string, candidatePath: string) {
+  const bundleDirectory = path.dirname(bundleFilePath);
   try {
-    fs.accessSync(candidatePath, fs.constants.R_OK);
-    return true;
+    const resolvedPath = path.resolve(candidatePath);
+    if (!isPathInsideOrEqual(resolvedPath, bundleDirectory)) {
+      return undefined;
+    }
+
+    const realBundleDirectory = fs.realpathSync(bundleDirectory);
+    const realSourceMapPath = fs.realpathSync(resolvedPath);
+    if (!isPathInsideOrEqual(realSourceMapPath, realBundleDirectory)) {
+      return undefined;
+    }
+
+    return realSourceMapPath;
   } catch {
-    return false;
+    return undefined;
   }
 }
 
-async function hasReadableFileAsync(candidatePath: string) {
-  try {
-    await fs.promises.access(candidatePath, fs.constants.R_OK);
-    return true;
-  } catch {
-    return false;
+function readSourceMapFile(bundleFilePath: string, candidatePath: string) {
+  const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath);
+  if (!sourceMapPath) {
+    return undefined;
   }
+
+  // `sourceMapPath` is realpath-checked under the bundle directory.
+  // codeql[js/path-injection]
+  return fs.readFileSync(sourceMapPath, 'utf8');
+}
+
+async function readSourceMapFileAsync(bundleFilePath: string, candidatePath: string) {
+  const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath);
+  if (!sourceMapPath) {
+    return undefined;
+  }
+
+  // `sourceMapPath` is realpath-checked under the bundle directory.
+  // codeql[js/path-injection]
+  return fs.promises.readFile(sourceMapPath, 'utf8');
 }
 
 function readSourceMapJsonForBundle(
@@ -211,18 +274,16 @@ function readSourceMapJsonForBundle(
       return parseDataUrlSourceMap(sourceMappingUrl);
     }
 
-    const candidatePaths: string[] = [];
-    if (sourceMappingUrl) {
-      const sourceMapPath = resolveSourceMapPath(bundleFilePath, sourceMappingUrl);
-      if (sourceMapPath) {
-        candidatePaths.push(sourceMapPath);
-      }
-    }
     // Fallback: the uploaded bundle is renamed to `<timestamp>.js`, so a map
     // uploaded alongside it under that name is also worth checking.
-    candidatePaths.push(`${bundleFilePath}.map`);
-    const mapPath = candidatePaths.find(hasReadableFile);
-    return mapPath ? fs.readFileSync(mapPath, 'utf8') : undefined;
+    const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
+    for (const candidatePath of candidatePaths) {
+      const sourceMapJson = readSourceMapFile(bundleFilePath, candidatePath);
+      if (sourceMapJson) {
+        return sourceMapJson;
+      }
+    }
+    return undefined;
   } catch (error) {
     log.debug('Failed to capture source map for bundle %s: %s', bundleFilePath, error);
     return undefined;
@@ -238,23 +299,15 @@ async function readSourceMapJsonForBundleAsync(
       return parseDataUrlSourceMap(sourceMappingUrl);
     }
 
-    const candidatePaths: string[] = [];
-    if (sourceMappingUrl) {
-      const sourceMapPath = resolveSourceMapPath(bundleFilePath, sourceMappingUrl);
-      if (sourceMapPath) {
-        candidatePaths.push(sourceMapPath);
+    const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
+    for (const candidatePath of candidatePaths) {
+      // eslint-disable-next-line no-await-in-loop
+      const sourceMapJson = await readSourceMapFileAsync(bundleFilePath, candidatePath);
+      if (sourceMapJson) {
+        return sourceMapJson;
       }
     }
-    candidatePaths.push(`${bundleFilePath}.map`);
-
-    const readabilityResults = await Promise.all(
-      candidatePaths.map(async (candidatePath) => ({
-        candidatePath,
-        readable: await hasReadableFileAsync(candidatePath),
-      })),
-    );
-    const mapPath = readabilityResults.find(({ readable }) => readable)?.candidatePath;
-    return mapPath ? await fs.promises.readFile(mapPath, 'utf8') : undefined;
+    return undefined;
   } catch (error) {
     log.debug('Failed to capture source map for bundle %s: %s', bundleFilePath, error);
     return undefined;
@@ -355,6 +408,12 @@ function applySourceRoot(sourceRoot: string | undefined, source: string) {
   return `${sourceRoot}/${source}`;
 }
 
+function readRegisteredBundleContentsForSourceMapLookup(bundleFilePath: string) {
+  // `bundleFilePath` comes from a registered bundle path.
+  // codeql[js/path-injection]
+  return fs.readFileSync(bundleFilePath, 'utf8');
+}
+
 function loadSourceMapForBundle(
   bundleFilePath: string,
   registration: BundleSourceMapRegistration,
@@ -362,7 +421,7 @@ function loadSourceMapForBundle(
   try {
     const sourceMappingUrl =
       registration.sourceMappingUrl === undefined
-        ? extractSourceMappingUrl(fs.readFileSync(bundleFilePath, 'utf8'))
+        ? extractSourceMappingUrl(readRegisteredBundleContentsForSourceMapLookup(bundleFilePath))
         : (registration.sourceMappingUrl ?? undefined);
 
     const sourceMapJson =
@@ -473,17 +532,6 @@ export function resolveOriginalPositionForRegistration(
     // dropping the remap; start-of-line is still more useful than bundle glue.
     column: (entry.originalColumn ?? 0) + 1,
   };
-}
-
-export function resolveOriginalPosition(
-  fileName: unknown,
-  lineNumber: unknown,
-  columnNumber: unknown,
-): ResolvedSourcePosition | null {
-  const registration = typeof fileName === 'string' ? registeredBundles.get(fileName) : undefined;
-  return registration
-    ? resolveOriginalPositionForRegistration(registration, fileName, lineNumber, columnNumber)
-    : null;
 }
 
 function escapeRegExp(value: string) {
