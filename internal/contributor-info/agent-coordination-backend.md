@@ -33,16 +33,20 @@ ruby -Itest test/agent_coord_test.rb
 bin/agent-coord --help
 bin/agent-coord bootstrap
 export PATH="$HOME/.local/bin:$PATH"
-if ! AGENT_COORD_BIN=$(command -v agent-coord 2>/dev/null); then
+if ! INSTALLED_AGENT_COORD_BIN=$(command -v agent-coord 2>/dev/null); then
   echo "agent-coord not found; recheck PATH or rerun bin/agent-coord bootstrap" >&2
   return 1 2>/dev/null || exit 1
 fi
-"$AGENT_COORD_BIN" --help
-agent_coord --help
-"$AGENT_COORD_BIN" version --json
-"$AGENT_COORD_BIN" config show --json 2>/dev/null # Do not paste raw output publicly.
-"$AGENT_COORD_BIN" doctor
-"$AGENT_COORD_BIN" status
+if test ! -x "$INSTALLED_AGENT_COORD_BIN"; then
+  echo "agent-coord on PATH is not executable" >&2
+  return 1 2>/dev/null || exit 1
+fi
+"$INSTALLED_AGENT_COORD_BIN" --help
+agent_coord --help # Verify the compatibility alias (underscore form) is also on PATH.
+"$INSTALLED_AGENT_COORD_BIN" version --json
+"$INSTALLED_AGENT_COORD_BIN" config show --json 2>/dev/null # Do not paste raw output publicly.
+"$INSTALLED_AGENT_COORD_BIN" doctor
+"$INSTALLED_AGENT_COORD_BIN" status
 ```
 
 The workflow docs assume the `agent-coord` CLI from the private
@@ -55,6 +59,10 @@ command by its full path inside the private clone. A successful
 as available; the worker or coordinator must run `agent-coord doctor` and
 `agent-coord status` through the same binary validated from `PATH` or from a
 verified private clone.
+
+The setup block uses `INSTALLED_AGENT_COORD_BIN` only as an install smoke-check;
+the later operational snippets require `AGENT_COORD_BIN`, which is exported only
+after the CLI contract preflight validates the selected private checkout.
 
 Fresh conductor, Codex, Claude, and Linux hosts must install or locate
 `agent-coord` before coordination-aware finishing. If out-of-band heartbeat
@@ -116,16 +124,22 @@ if (
   }
 
   require_clean_agent_coord_checkout() {
-    git -C "$AGENT_COORD_REPO" update-index -q --refresh
+    git -C "$AGENT_COORD_REPO" update-index -q --refresh || true
 
     if ! git -C "$AGENT_COORD_REPO" diff --quiet --ignore-submodules -- ||
        ! git -C "$AGENT_COORD_REPO" diff --cached --quiet --ignore-submodules --; then
       echo "agent-coordination checkout has local modifications; commit, stash, or record dirty evidence" >&2
       return 1
     fi
+
+    if git -C "$AGENT_COORD_REPO" ls-files --others --exclude-standard | grep -q .; then
+      echo "agent-coordination checkout has untracked files; commit, clean, or record dirty evidence" >&2
+      return 1
+    fi
   }
 
-  AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord" # Subshell copy; re-exported below after probes pass.
+  AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord" # Subshell-local; parent re-exports after probes pass.
+  # set -eu above handles abort-on-error; && keeps each evidence/probe step explicit.
   require_clean_agent_coord_checkout &&
     git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
     git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
@@ -235,7 +249,10 @@ Use stable agent ids that identify machine role, tool, and lane, for example
 : "${BRANCH_NAME:?set BRANCH_NAME for the lane}"
 
 BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4)-coord-layer"
-BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX")
+BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX") || {
+  echo "mktemp failed" >&2
+  return 1 2>/dev/null || exit 1
+}
 # Set once at kickoff, include a short batch slug plus a unique suffix, and reuse for this batch.
 printf '%s\n' "$BATCH_ID" > "$BATCH_ID_FILE"
 # Record the printed file path in the batch handoff.
