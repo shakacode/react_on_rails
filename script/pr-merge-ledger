@@ -621,15 +621,6 @@ class PrMergeLedger
     end
   end
 
-  def findings_from_line(line_text, source_line, source, context)
-    return [] if non_actionable_finding_summary?(line_text)
-
-    occurrences = finding_occurrences(line_text)
-    return [] if occurrences.empty?
-
-    findings_from_occurrences(line_text, source_line, source, occurrences, context)
-  end
-
   def findings_from_occurrences(line_text, source_line, source, occurrences, context)
     finding_context = context.merge(
       multiple_markers: occurrences.length > 1
@@ -815,7 +806,7 @@ class PrMergeLedger
       validate_disposition(disposition)
       { "disposition" => disposition, "evidence" => override["evidence"] }
     when nil
-      { "disposition" => UNKNOWN }
+      raise Error, "finding disposition for #{disposition_key} cannot be null"
     else
       raise Error, "finding disposition for #{disposition_key} must be a string or object"
     end
@@ -1303,7 +1294,7 @@ class PrMergeLedger
     end
 
     def non_retryable_gh_error?(stderr)
-      stderr.to_s.match?(/\b(?:401|403|404)\b|\b(?:Not Found|Unauthorized|Forbidden)\b/i)
+      stderr.to_s.match?(/\b(?:401|403|404|429)\b|\b(?:Not Found|Unauthorized|Forbidden|Too Many Requests)\b/i)
     end
 
     def capture_gh(args)

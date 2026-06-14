@@ -3714,6 +3714,52 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "rejects null finding dispositions" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 7,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [],
+      "comments" => [
+        {
+          "id" => "comment-1",
+          "url" => "https://example.com/comment-1",
+          "body" => "[P1] Top-level PR comment finding.",
+          "author" => { "login" => "reviewer" },
+          "createdAt" => "2026-06-01T00:00:00Z"
+        }
+      ]
+    }
+    dispositions = { "comment-1" => nil }
+
+    Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
+      Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
+        fixture_file.write(JSON.generate(fixture))
+        fixture_file.flush
+        dispositions_file.write(JSON.generate(dispositions))
+        dispositions_file.flush
+
+        stdout, stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          fixture_file.path,
+          "--finding-dispositions",
+          dispositions_file.path,
+          chdir: repo_root
+        )
+
+        expect(status.exitstatus).to eq(2)
+        expect(stdout).to be_empty
+        expect(stderr).to include("finding disposition for comment-1 cannot be null")
+      end
+    end
+  end
+
   it "prints a clean error for unreadable fixture files" do
     skip "root can read chmod 000 files" if Process.uid.zero?
 
@@ -4270,6 +4316,38 @@ RSpec.describe "script/pr-merge-ledger" do
 
       report = JSON.parse(stdout)
       expect(report.fetch("complete_allowed")).to be(true)
+    end
+  end
+
+  it "does not retry GitHub secondary rate-limit responses" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      count_file="$(dirname "$0")/calls"
+      count=0
+      if [ -f "$count_file" ]; then
+        count=$(cat "$count_file")
+      fi
+      count=$((count + 1))
+      printf '%s\\n' "$count" > "$count_file"
+      printf '%s\\n' 'HTTP 429 Too Many Requests' >&2
+      exit 1
+    SH
+
+    with_fake_gh(fake_gh) do |env|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        chdir: repo_root
+      )
+
+      count_path = File.join(env.fetch("PATH").split(":").first, "calls")
+      expect(status.exitstatus).to eq(2)
+      expect(stdout).to be_empty
+      expect(stderr).to include("HTTP 429 Too Many Requests")
+      expect(File.read(count_path).strip).to eq("1")
     end
   end
 
