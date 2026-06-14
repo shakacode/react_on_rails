@@ -506,13 +506,19 @@ class PrMergeLedger
   end
 
   def findings_from_text(text, url, id, dispositions, used_disposition_keys)
-    text.to_s.each_line.with_index.flat_map do |line, index|
-      line_text = line.chomp
-      findings_from_line(line_text, index + 1, { url:, id: }, dispositions, used_disposition_keys)
+    lines = text.to_s.each_line.map(&:chomp)
+    source_finding_count = lines.sum do |line_text|
+      next 0 if non_actionable_finding_summary?(line_text)
+
+      finding_occurrences(line_text).length
+    end
+
+    lines.each_with_index.flat_map do |line_text, index|
+      findings_from_line(line_text, index + 1, { url:, id: }, dispositions, used_disposition_keys, source_finding_count)
     end
   end
 
-  def findings_from_line(line_text, source_line, source, dispositions, used_disposition_keys)
+  def findings_from_line(line_text, source_line, source, dispositions, used_disposition_keys, source_finding_count = nil)
     return [] if non_actionable_finding_summary?(line_text)
 
     occurrences = finding_occurrences(line_text)
@@ -520,6 +526,7 @@ class PrMergeLedger
 
     context = {
       multiple_markers: occurrences.length > 1,
+      source_finding_count: source_finding_count || occurrences.length,
       dispositions:,
       used_disposition_keys:
     }
@@ -532,7 +539,8 @@ class PrMergeLedger
     finding = source.merge(
       source_line:,
       marker_index: occurrence.fetch(:marker_index),
-      multiple_markers: context.fetch(:multiple_markers)
+      multiple_markers: context.fetch(:multiple_markers),
+      multiple_source_findings: context.fetch(:source_finding_count) > 1
     )
     disposition = disposition_for(finding, context.fetch(:dispositions), context.fetch(:used_disposition_keys))
 
@@ -631,6 +639,7 @@ class PrMergeLedger
     ]
 
     return marker_keys.compact if finding.fetch(:multiple_markers)
+    return marker_keys.concat(line_keys.take(2)).compact if finding.fetch(:multiple_source_findings)
 
     marker_keys.concat(line_keys).compact
   end
@@ -1033,21 +1042,12 @@ class PrMergeLedger
     end
 
     def capture_gh(args)
-      Timeout.timeout(github_api_timeout) do
+      timeout = GITHUB_API_TIMEOUT_SECONDS
+      Timeout.timeout(timeout) do
         Open3.capture3("gh", *args)
       end
     rescue Timeout::Error
-      raise Error, "gh api graphql timed out after #{github_api_timeout} seconds"
-    end
-
-    def github_api_timeout
-      raw_timeout = ENV["GITHUB_API_TIMEOUT"].to_s.strip
-      raw_timeout = GITHUB_API_TIMEOUT_SECONDS.to_s if raw_timeout.empty?
-
-      match = raw_timeout.match(/\A(?<seconds>\d+)(?:s)?\z/)
-      raise Error, "GITHUB_API_TIMEOUT must be an integer number of seconds" unless match
-
-      Integer(match[:seconds], 10)
+      raise Error, "gh api graphql timed out after #{timeout} seconds"
     end
 
     def metadata_query
