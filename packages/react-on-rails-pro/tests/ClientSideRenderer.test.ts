@@ -614,18 +614,17 @@ describe('ClientSideRenderer', () => {
   });
 
   it('clears page-scoped RSC payload globals without changing same-page append semantics', () => {
-    const rscWindow = window;
     const rscPayloadKey = 'TestComponent-stableHash-dom-id';
-    rscWindow.REACT_ON_RAILS_RSC_PAYLOADS = {
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
       [rscPayloadKey]: ['page1-chunk-a', 'page1-chunk-b'],
     };
-    rscWindow.REACT_ON_RAILS_RSC_ERRORS = {
+    window.REACT_ON_RAILS_RSC_ERRORS = {
       [rscPayloadKey]: { hasErrors: false },
     };
 
-    (rscWindow.REACT_ON_RAILS_RSC_PAYLOADS ||= {})[rscPayloadKey] ||= [];
-    rscWindow.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page1-chunk-c');
-    expect(rscWindow.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual([
+    (window.REACT_ON_RAILS_RSC_PAYLOADS ||= {})[rscPayloadKey] ||= [];
+    window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page1-chunk-c');
+    expect(window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual([
       'page1-chunk-a',
       'page1-chunk-b',
       'page1-chunk-c',
@@ -633,12 +632,12 @@ describe('ClientSideRenderer', () => {
 
     unmountAll();
 
-    expect(rscWindow.REACT_ON_RAILS_RSC_PAYLOADS).toBeUndefined();
-    expect(rscWindow.REACT_ON_RAILS_RSC_ERRORS).toBeUndefined();
+    expect(window.REACT_ON_RAILS_RSC_PAYLOADS).toBeUndefined();
+    expect(window.REACT_ON_RAILS_RSC_ERRORS).toBeUndefined();
 
-    (rscWindow.REACT_ON_RAILS_RSC_PAYLOADS ||= {})[rscPayloadKey] ||= [];
-    rscWindow.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page2-chunk-a');
-    expect(rscWindow.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual(['page2-chunk-a']);
+    (window.REACT_ON_RAILS_RSC_PAYLOADS ||= {})[rscPayloadKey] ||= [];
+    window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page2-chunk-a');
+    expect(window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual(['page2-chunk-a']);
   });
 
   it('runs a teardown returned asynchronously by a renderer on unmount', async () => {
