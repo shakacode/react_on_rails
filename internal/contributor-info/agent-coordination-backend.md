@@ -63,34 +63,38 @@ Before relying on a newly cloned or updated backend, capture the private
 contract marker and prove the commands this public workflow depends on:
 
 Set `AGENT_COORD_REPO` to the private `shakacode/agent-coordination` clone path
-before running this block. Public PR evidence should record the private backend
-tag/commit marker, the command names, exit codes, and whether the JSON commands
-parsed successfully. Do not paste raw `agent-coord config show --json` output,
-private defaults, liveness thresholds, or terminal-status details into public
-PRs.
+before running this block. Update that private clone intentionally before this
+preflight if the latest upstream state matters; the block below only records and
+probes the checkout already selected. Public PR evidence should record the
+private backend tag/commit marker, the command names, exit codes, and whether
+the JSON commands parsed successfully. Do not paste raw `agent-coord config
+show --json` output, private defaults, liveness thresholds, or terminal-status
+details into public PRs.
 
 ```bash
-set -o pipefail
+(
+  set -o pipefail
 
-if test -z "${AGENT_COORD_REPO:-}"; then
-  echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
-  false
-elif test ! -x "$AGENT_COORD_REPO/bin/agent-coord"; then
-  echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
-  false
-else
-  git -C "$AGENT_COORD_REPO" fetch --tags --prune &&
+  if test -z "${AGENT_COORD_REPO:-}"; then
+    echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
+    false
+  elif test ! -x "$AGENT_COORD_REPO/bin/agent-coord"; then
+    echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
+    false
+  else
     git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
-    git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
-    "$AGENT_COORD_REPO/bin/agent-coord" --help &&
-    "$AGENT_COORD_REPO/bin/agent-coord" version --json | jq empty &&
-    "$AGENT_COORD_REPO/bin/agent-coord" config show --json 2>/dev/null | jq empty &&
-    "$AGENT_COORD_REPO/bin/agent-coord" doctor &&
-    "$AGENT_COORD_REPO/bin/agent-coord" status &&
-    "$AGENT_COORD_REPO/bin/agent-coord" claim --help &&
-    "$AGENT_COORD_REPO/bin/agent-coord" heartbeat --help &&
-    "$AGENT_COORD_REPO/bin/agent-coord" release --help
-fi
+      git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
+      "$AGENT_COORD_REPO/bin/agent-coord" --help &&
+      "$AGENT_COORD_REPO/bin/agent-coord" version --json | jq empty &&
+      # Suppress stderr intentionally so private config details are not copied into public PRs.
+      "$AGENT_COORD_REPO/bin/agent-coord" config show --json 2>/dev/null | jq empty &&
+      "$AGENT_COORD_REPO/bin/agent-coord" doctor &&
+      "$AGENT_COORD_REPO/bin/agent-coord" status &&
+      "$AGENT_COORD_REPO/bin/agent-coord" claim --help &&
+      "$AGENT_COORD_REPO/bin/agent-coord" heartbeat --help &&
+      "$AGENT_COORD_REPO/bin/agent-coord" release --help
+  fi
+)
 ```
 
 Do not paste private schemas, default TTLs, dead-threshold formulas,
@@ -110,13 +114,13 @@ compare-and-swap gate for concurrent claim races.
 
 Use this outcome matrix when classifying failures:
 
-| Observation                                                                                             | Classification                  | Worker action                                                                                  |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `agent-coord status` exits 0                                                                            | backend available               | continue to claim or dependency checks                                                         |
-| `agent-coord status` cannot run or exits non-zero                                                       | operational failure / `UNKNOWN` | use advisory public claim comments only for independent lanes; stop dependency-sensitive lanes |
-| `agent-coord claim` succeeds after status exited 0                                                      | claim acquired or renewed       | proceed and heartbeat at phase transitions                                                     |
-| `agent-coord claim` clearly refuses because another holder owns a live, stale, or lease-protected claim | refused claim                   | hard-stop the lane and report holder, liveness, and target                                     |
-| `agent-coord claim` exits non-zero for an unclear reason                                                | operational failure / `UNKNOWN` | do not create a competing branch; ask the coordinator or retry after the backend is validated  |
+| Observation                                                                                               | Classification                  | Worker action                                                                                  |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `agent-coord status` exits 0                                                                              | backend available               | continue to claim or dependency checks                                                         |
+| `agent-coord doctor` or `agent-coord status` cannot run or exits non-zero                                 | operational failure / `UNKNOWN` | use advisory public claim comments only for independent lanes; stop dependency-sensitive lanes |
+| `agent-coord claim` succeeds after status exited 0                                                        | claim acquired or renewed       | proceed and heartbeat at phase transitions                                                     |
+| `agent-coord claim` exits 3 / `CLAIM_REFUSED` because another holder owns a live or lease-protected claim | refused claim                   | hard-stop the lane and report holder, liveness, and target                                     |
+| `agent-coord claim` exits non-zero for an unclear reason                                                  | operational failure / `UNKNOWN` | do not create a competing branch; ask the coordinator or retry after the backend is validated  |
 
 Do not use an unverified private clone for hard-stop gates. If the local private
 CLI or README no longer matches this public pointer and the operator cannot
