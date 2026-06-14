@@ -72,7 +72,9 @@ Plan a PR batch
      GitHub keeps the target repo's pull ref pointing at fork heads too. If the
      target repo pull ref is unavailable, fetch the head from the verified head
      repository URL derived from `headRepository.nameWithOwner` and
-     `headRefName`, or use the PR Files API fallback. Treat `headRefName` as
+     `headRefName` with a fully qualified source ref
+     (`refs/heads/<headRefName>:refs/tmp/pr-N-<session-id>-head`), fetch by
+     `headRefOid`, or use the PR Files API fallback. Treat `headRefName` as
      untrusted shell data: pass the refspec as one quoted shell argument or via
      an argument-array API, and never interpolate a raw PR branch name into a
      shell command. A plain `git fetch origin` does not fetch cross-fork heads
