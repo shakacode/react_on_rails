@@ -54,18 +54,23 @@ Plan a PR batch
      intends to affect, including creates, deletes, and renames. For PR
      targets, fetch the PR's base/head refs and run
      `git diff --name-status --find-renames <base>...<head>` for the
-     rename-aware changed-file list. A paginated PR Files API response is
-     acceptable only when it is proven complete and records both `.filename` and
-     `.previous_filename` when present. If the API result may have hit GitHub's
+     rename-aware changed-file list. If the base or head ref is not present
+     locally, fetch the PR head and base branch first; if the fetch or diff
+     still cannot run, record the PR paths as `UNKNOWN` and treat the item as
+     serial. A paginated PR Files API response is acceptable only when it
+     records both `.filename` and `.previous_filename` when present, has no
+     `Link: ...; rel="next"` response header, and its listed-file count matches
+     the PR's `changed_files` value from `gh pr view N --json changedFiles`.
+     If the API result may have hit GitHub's
      file-list cap, cannot prove there are no more pages, or only reports new
      paths, record the PR paths as `UNKNOWN` and treat the item as serial rather
      than parallel. For issue targets, read the issue body, record proposed new
      paths from issue/design notes, and grep the repo to confirm existing paths.
      If paths cannot be determined from the issue body or design notes, record
-     them as `UNKNOWN` and treat the item as serial rather than parallel. Do not
-     guess. Items that affect the same path cannot run as parallel worktrees;
-     keep only file-disjoint items in the parallel first batch and sequence or
-     defer collisions.
+     them as `UNKNOWN` and treat the item as serial rather than parallel.
+     Never guess paths. Items that affect the same path cannot run as parallel
+     worktrees; keep only file-disjoint items in the parallel first batch and
+     sequence or defer collisions.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
@@ -108,6 +113,7 @@ Batch objective: ...
 File-touch map:
 - PR/Issue #N -> changed/affected paths, including create/delete/rename (owner: lane/name)
 - PR/Issue #N -> UNKNOWN (paths not determinable from issue body/design notes; treat as serial)
+# Batch-level reservations, not tied to a single item:
 - Deferred/reserved paths -> path(s) (reason: ... / later owner: lane/name)
 
 Items:
@@ -131,7 +137,9 @@ Execution rules:
   - An `UNKNOWN` item may run only as a serial discovery lane. The worker must
     identify the needed files, report or record those discovered paths with the
     coordinator, and wait for confirmation that no active lane owns them before
-    editing.
+    editing. The coordinator must update the file-touch map entry in
+    `batches/<batch-id>.json` when the private backend is available, or leave an
+    equivalent GitHub/thread comment when it is unavailable.
   - If a worker concludes it needs an unlisted file or another lane's file, stop
     and report so the coordinator can sequence or split the work.
   - Sequenced or dependency-ordered lanes may share declared files only in the
@@ -161,6 +169,8 @@ Execution rules:
 - Do not infer PR vs issue from a bare number.
 - Do not batch unrelated risky changes just because they are small.
 - Do not hide missing GitHub data; say `UNKNOWN`.
+- Do not guess file paths; record unverifiable paths as `UNKNOWN` and treat that
+  item as serial.
 - Do not omit links; use GitHub URLs for every item.
 - Do not put full audit evidence in the goal prompt; put bulky details in the Batch Plan outside the goal.
 - Do not fan out items that change the same file as parallel worktrees; they will conflict — sequence them or split into a later batch.
