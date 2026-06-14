@@ -141,7 +141,11 @@ const isAllowedRscPrerelease = (
   if (!isPrereleaseVersion(rscVersion)) return true;
 
   const normalizedRscVersion = stripVersionPrefixAndBuild(rscVersion).toLowerCase();
-  if (allowedPrereleases.some((allowedVersion) => allowedVersion.toLowerCase() === normalizedRscVersion)) {
+  if (
+    allowedPrereleases.some(
+      (allowedVersion) => stripVersionPrefixAndBuild(allowedVersion).toLowerCase() === normalizedRscVersion,
+    )
+  ) {
     return true;
   }
 

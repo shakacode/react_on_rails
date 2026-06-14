@@ -23,8 +23,11 @@ const { recommendedMin } = RSC_PEER_SUPPORT.reactOnRailsRsc;
 
 const stableBase = (version: string) => version.split('-', 1)[0];
 
+const stableTuple = (version: string) =>
+  stableBase(version).split('.').map(Number) as [number, number, number];
+
 const versionBelowRecommendedMin = (version: string) => {
-  const [major, minor, patch] = stableBase(version).split('.').map(Number);
+  const [major, minor, patch] = stableTuple(version);
   if (patch > 0) return `${major}.${minor}.${patch - 1}`;
   if (minor > 0) return `${major}.${minor - 1}.999`;
   throw new Error('recommendedMin must allow a lower supported-major version for the warn-tier test');
@@ -62,8 +65,12 @@ describe('checkRscPeerCompatibility', () => {
     ) as { peerDependencies: Record<string, string> };
     const peerRange = proPackageJson.peerDependencies['react-on-rails-rsc'];
     const peerPrereleases = [...peerRange.matchAll(/\|\|\s*([^\s|]+-[^\s|]+)/g)].map((match) => match[1]);
+    const [recommendedMajor, recommendedMinor] = stableTuple(recommendedMin);
+    const expectedStableRanges = RSC_PEER_SUPPORT.react.supportedRanges.map(({ rscMinor }) =>
+      rscMinor === recommendedMinor ? `~${recommendedMin}` : `~${recommendedMajor}.${rscMinor}.0`,
+    );
 
-    expect(peerRange).toContain(`~${recommendedMin}`);
+    expect(expectedStableRanges.every((stableRange) => peerRange.includes(stableRange))).toBe(true);
     expect(peerPrereleases).toEqual([...RSC_PEER_SUPPORT.reactOnRailsRsc.allowedPrereleases]);
   });
 
