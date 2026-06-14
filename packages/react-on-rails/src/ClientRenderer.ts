@@ -290,7 +290,10 @@ You should return a React.Component always for the client side entry point.`);
           shouldHydrate,
           // Attach user-registered root error callbacks (and the dev-mode hydration-mismatch
           // logger) to every root, enriched with this mount's component name and dom id.
-          buildRootErrorCallbackOptions({ componentName: name, domNodeId }, shouldHydrate),
+          buildRootErrorCallbackOptions(
+            { componentName: name, domNodeId: domNodeId || undefined },
+            shouldHydrate,
+          ),
         );
         // Track the root for cleanup
         renderedRoots.set(domNodeId, { kind: 'react', root, domNode });
