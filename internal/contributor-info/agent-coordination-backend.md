@@ -73,7 +73,7 @@ details into public PRs.
 
 ```bash
 (
-  set -o pipefail
+  set -eu -o pipefail
 
   if test -z "${AGENT_COORD_REPO:-}"; then
     echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
@@ -86,7 +86,8 @@ details into public PRs.
       git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
       "$AGENT_COORD_REPO/bin/agent-coord" --help &&
       "$AGENT_COORD_REPO/bin/agent-coord" version --json | jq empty &&
-      # Suppress stderr intentionally so private config details are not copied into public PRs.
+      # Suppress stderr intentionally: private config details must not appear in public PRs.
+      # Failures are still caught via pipefail + jq empty; record the exit code in PR evidence.
       "$AGENT_COORD_REPO/bin/agent-coord" config show --json 2>/dev/null | jq empty &&
       "$AGENT_COORD_REPO/bin/agent-coord" doctor &&
       "$AGENT_COORD_REPO/bin/agent-coord" status &&
@@ -116,7 +117,7 @@ Use this outcome matrix when classifying failures:
 
 | Observation                                                                                               | Classification                  | Worker action                                                                                  |
 | --------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `agent-coord status` exits 0                                                                              | backend available               | continue to claim or dependency checks                                                         |
+| `agent-coord doctor` and `agent-coord status` both exit 0                                                 | backend available               | continue to claim or dependency checks                                                         |
 | `agent-coord doctor` or `agent-coord status` cannot run or exits non-zero                                 | operational failure / `UNKNOWN` | use advisory public claim comments only for independent lanes; stop dependency-sensitive lanes |
 | `agent-coord claim` succeeds after status exited 0                                                        | claim acquired or renewed       | proceed and heartbeat at phase transitions                                                     |
 | `agent-coord claim` exits 3 / `CLAIM_REFUSED` because another holder owns a live or lease-protected claim | refused claim                   | hard-stop the lane and report holder, liveness, and target                                     |
