@@ -172,8 +172,16 @@ Plan a PR batch
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
 
 4. Output
+   <!-- prompt-size-check: scripts/check_goal_prompt_size.rb pins selected wording in this section. -->
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
-   - Keep the fenced goal prompt under ~4000 bytes total so bulky audit detail stays in the Batch Plan. Measure it, do not eyeball it: `wc -c` gives a locale-independent byte count (`wc -m` counts characters using the current locale's multibyte rules — UTF-8 gives code points, C/POSIX gives bytes). Treat 4000 as an approximate budget.
+   - Keep the fenced goal prompt under ~4000 bytes total so bulky detail stays in the Batch Plan. Measure it, do not eyeball it: `wc -c` gives a locale-independent byte count (`wc -m` counts characters using the current locale's multibyte rules — UTF-8 gives code points, C/POSIX gives bytes). Treat 4000 as an approximate budget.
+   - Use compact one-line item goals, short worker notes, and canonical workflow references instead of copied
+     audit evidence, repeated issue text, or long rule explanations.
+   - Before responding, measure only the text inside the goal-prompt fence, excluding the fence lines, and print
+     `Goal prompt character count: N characters` after the fence.
+   - If the measured prompt is 4000 characters or more, shrink by moving detail to the Batch Plan. If it still
+     will not fit, split it into smaller goals and output only the first ready goal; list omitted ready items in
+     the Batch Plan for later goal prompts.
    - Measure the actual filled template overhead when the prompt is near the
      byte budget; do not rely on a fixed estimate. Prefer splitting into
      multiple goals over trimming the safety, ownership, or review content.
@@ -202,6 +210,8 @@ Plan a PR batch
 - Concurrent activity and dependency status:
 - Coordination hooks, including backend claim exclusions:
 - Verification expectations:
+- Prompt sizing: `Goal prompt character count: N characters`; note any split fallback and keep omitted item
+  details here, not in the goal prompt.
 - Open questions:
 
 ## Goal Prompt for pr-batch
@@ -215,6 +225,8 @@ Preflight first: if this session cannot run workers without blocking approval pr
 
 Repository: OWNER/REPO
 Batch objective: ...
+Scope summary: compact titles, sequencing, dependencies, and exclusions needed to run this goal. Keep bulky
+evidence, long validation notes, and later-batch details outside this prompt.
 File-touch map (one line per item; pick the applicable format):
 - PR/Issue #N -> changed/affected paths, including create/delete/rename (owner: lane/name)
 - PR/Issue #N -> summarized path pattern(s) plus collision-relevant exact paths/renames/deletes (owner: lane/name)
@@ -224,17 +236,17 @@ Batch-level reservations, not tied to a single item:
 
 Items:
 - PR #N: URL
-  Goal: ...
-  Worker notes: ...
-  Done when: ...
+  Goal: one-line outcome.
+  Worker notes: short scope, branch, or dependency note.
+  Done when: PR merged if confident, or ready/blocked/deferred with evidence.
 - Issue #N: URL
-  Goal: ...
-  Worker notes: ...
-  Done when: ...
+  Goal: one-line outcome.
+  Worker notes: short scope, branch, or dependency note.
+  Done when: PR merged if confident, ready/blocked/no-PR evidence, or documented no-fix rationale.
 
 Execution rules:
 - Follow `.agents/skills/pr-batch/SKILL.md` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
-- Dispatch only the current file-disjoint wave. Hold serial and `UNKNOWN`
+- Dispatch one subagent per independent item; group dependent items only when shared context is required. Dispatch only the current file-disjoint wave. Hold serial and `UNKNOWN`
   discovery lanes until no active editor lane can collide with them.
 - Workers edit only owned File-touch map paths; this map is how the batch makes
   pr-batch's "disjoint write scopes" concrete, since pr-batch's own template has
@@ -243,23 +255,9 @@ Execution rules:
   coordinator confirmation before editing.
 - Sequenced lanes may share declared files only in the stated order.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
-- For concurrent or dependency-sensitive batches, assign a stable agent id and
-  lane name per lane. Declare lane dependencies with `depends_on` refs such as
-  `<batch-id>:<lane-name>`, and create or update the private backend
-  `batches/<batch-id>.json` before dispatching dependent workers.
-  When the private coordination backend is available,
-  verify it with `agent-coord doctor` and `agent-coord status`, use
-  `agent-coord claim` before creating worktrees/branches,
-  `agent-coord heartbeat` at phase transitions, and `agent-coord status` at
-  lane start and before rebase or push. If the lane shows unmet `blocked_on`
-  refs, set heartbeat `--status blocked`, report the blocked refs, and move to
-  another independent lane until dependencies report a backend terminal
-  heartbeat status. If a lane declares `depends_on` but `agent-coord status`
-  shows no matching private batch state, treat dependency state as `UNKNOWN` and
-  stop to report the missing private batch file.
-  If status cannot be checked for a declared dependency lane, stop with
-  dependency state `UNKNOWN` instead of using advisory fallback for that lane.
-- Final handoff must include links, tests, blockers, next action, and merged/ready/blocked/deferred/UNKNOWN sections.
+- For coordination, respect coordination claims and dependencies: assign stable agent ids, run `agent-coord status`, claim before branch/worktree creation when available, heartbeat at phase changes, and stop on unmet `blocked_on` refs or dependency state `UNKNOWN`.
+- Use local validation, self-review, review-comment, CI, and readiness gates from the repo workflow. For PRs, merge if confident and authorized by the current release mode, and document confidence data in the PR description; otherwise report the live ready/blocked/deferred/no-PR state with evidence.
+- Final handoff must include links, tests, blockers, next action, confidence or UNKNOWN facts, and merged/ready/blocked/deferred sections.
 ```
 
 ## Common Mistakes
@@ -273,3 +271,11 @@ Execution rules:
 - Do not put full audit evidence in the goal prompt; put bulky details in the Batch Plan outside the goal.
 - Do not fan out items that change the same path as parallel worktrees; they will conflict — sequence them or split into a later batch.
 - Do not eyeball the goal-prompt length; apply the Output-section size gate and split into smaller goals if it is over budget.
+
+## Self-Check
+
+After editing this skill's goal prompt rules or template, run:
+
+```bash
+ruby .agents/skills/plan-pr-batch/scripts/check_goal_prompt_size.rb
+```
