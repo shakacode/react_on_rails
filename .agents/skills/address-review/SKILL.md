@@ -283,11 +283,11 @@ Do not post the PR summary checkpoint during this triage-only phase. Post it onl
 
 ## Step 8: Execute the Chosen Action
 
+<!-- Keep this action-routing section in sync with .agents/workflows/address-review.md Step 8. -->
+
 ### Action `a` — Apply, stage, and recommend
 
 Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or automatically when `autopilot` was requested at initiation. Run relevant checks and the self-review gate. Stage only the intended changed files with explicit `git add` paths instead of committing them. Do **not** commit, push, post GitHub replies, resolve review threads, create follow-up issues, or post the PR summary checkpoint. Return a local summary with: fixed `MUST-FIX` items, fixed `OPTIONAL` items, staged files, validation commands/results, unresolved/skipped items, and detailed `DISCUSS` recommendations. Each `DISCUSS` recommendation must include the reviewer/comment link, recommended decision (`fix now`, `defer`, `decline`, or `ask user`), rationale/evidence, risk/tradeoff, and concrete next step. If validation fails after reasonable local repair, still report the staged-file state clearly and mark the PR as not ready for commit/push.
-
-<!-- Keep this action-routing section in sync with .agents/workflows/address-review.md Step 8. -->
 
 ### Action `f` — Fix and merge-ready
 
@@ -714,7 +714,8 @@ trap _cleanup_addr_review EXIT
 # Set SCAN_SCOPE before this block, e.g.:
 #   SCAN_SCOPE="since previous summary at ${REVIEW_CUTOFF_AT}"  # cutoff active
 #   SCAN_SCOPE="full history via check all reviews"              # CHECK_ALL_REVIEWS set
-# Set CUTOFF_SAFE=1 for a marked checkpoint, or 0 for a non-cutoff status.
+# Set CUTOFF_SAFE=1 only after verifying the cutoff guard; leave 0 for a non-cutoff status.
+CUTOFF_SAFE=0
 # Set OPTIONAL_OUTCOMES to bullets for optional items with recorded outcomes or
 # intentionally pending/unselected by the chosen action: fixed, explicitly
 # handled, autonomously deferred/declined, declined, deferred to tracking, or
