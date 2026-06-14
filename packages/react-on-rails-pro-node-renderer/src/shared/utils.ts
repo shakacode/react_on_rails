@@ -90,7 +90,8 @@ export type RequestInfo = { renderingRequest: string } | { label: string; conten
 export function formatExceptionMessage(request: RequestInfo, error: unknown, context?: string) {
   const label = 'renderingRequest' in request ? 'JS code for rendering request was:' : request.label;
   const content = 'renderingRequest' in request ? request.renderingRequest : request.content;
-  const stack = remapStackTrace((error as Error).stack) ?? (error as Error).stack;
+  const rawStack = (error as Error).stack;
+  const stack = remapStackTrace(rawStack) ?? rawStack;
 
   return `${context ? `\nContext:\n${context}\n` : ''}
 ${label}

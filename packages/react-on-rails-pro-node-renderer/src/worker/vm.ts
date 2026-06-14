@@ -305,7 +305,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
       // Pass `filename` so stack frames point at the real bundle path (instead of
       // `evalmachine.<anonymous>`), which also keys lazy source map resolution.
       if (additionalContextIsObject || supportModules) {
-        registerBundleForSourceMaps(filePath, MODULE_WRAP_FIRST_LINE_PREFIX_LENGTH);
+        registerBundleForSourceMaps(filePath, MODULE_WRAP_FIRST_LINE_PREFIX_LENGTH, bundleContents);
         vm.runInContext(m.wrap(bundleContents), context, { filename: filePath })(
           exports,
           require,
@@ -314,7 +314,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
           path.dirname(filePath),
         );
       } else {
-        registerBundleForSourceMaps(filePath);
+        registerBundleForSourceMaps(filePath, 0, bundleContents);
         vm.runInContext(bundleContents, context, { filename: filePath });
       }
 

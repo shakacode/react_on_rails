@@ -14,6 +14,7 @@
  */
 
 import path from 'path';
+import fs from 'fs';
 import fsPromises from 'fs/promises';
 import vm from 'vm';
 import { mkdirAsync, serverBundleCachePath, vmBundlePath, resetForTest } from './helper';
@@ -64,6 +65,11 @@ function inlineSourceMapComment(map: object) {
 
 function inlinePercentEncodedSourceMapComment(map: object) {
   return `//# sourceMappingURL=data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(map))}`;
+}
+
+function inlineNonJsonDataUrlSourceMapComment(map: object) {
+  const base64 = Buffer.from(JSON.stringify(map)).toString('base64');
+  return `//# sourceMappingURL=data:text/plain;base64,${base64}`;
 }
 
 /**
@@ -238,6 +244,26 @@ describe('source-mapped stack traces for VM errors', () => {
     });
   });
 
+  test('registered inline sourceMappingURL avoids re-reading the bundle on first lookup', async () => {
+    const bundleContents = `${buildThrowingBundleSource()}\n${inlineSourceMapComment(
+      buildThrowingBundleMap('bundle.js'),
+    )}\n`;
+    const bundlePath = await writeVmBundle(bundleContents);
+    registerBundleForSourceMaps(bundlePath, 0, bundleContents);
+    const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+
+    try {
+      expect(resolveOriginalPosition(bundlePath, 3, 17)).toEqual({
+        source: ORIGINAL_SOURCE,
+        line: 2,
+        column: 3,
+      });
+      expect(readFileSyncSpy).not.toHaveBeenCalledWith(bundlePath, 'utf8');
+    } finally {
+      readFileSyncSpy.mockRestore();
+    }
+  });
+
   test('sourceMappingURL cannot escape the bundle directory with a parent path', async () => {
     const bundlePath = vmBundlePath(testName);
     const outsideMapPath = path.join(path.dirname(path.dirname(bundlePath)), 'outside.map');
@@ -261,6 +287,44 @@ describe('source-mapped stack traces for VM errors', () => {
     await fsPromises.writeFile(
       outsideMapPath,
       JSON.stringify(buildThrowingBundleMap(path.basename(outsideMapPath))),
+    );
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`at boom (${bundlePath}:3:`);
+    expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+  });
+
+  test('sourceMappingURL cannot escape the bundle directory through a symlink', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const bundleDirectory = path.dirname(bundlePath);
+    const outsideMapPath = path.join(serverBundleCachePath(testName), 'outside-symlink.map');
+    const symlinkMapPath = path.join(bundleDirectory, 'inside-link.map');
+    await writeVmBundle(
+      `${buildThrowingBundleSource()}\n//# sourceMappingURL=${path.basename(symlinkMapPath)}\n`,
+    );
+    await fsPromises.writeFile(outsideMapPath, JSON.stringify(buildThrowingBundleMap('outside-symlink.map')));
+    await fsPromises.symlink(outsideMapPath, symlinkMapPath);
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`at boom (${bundlePath}:3:`);
+    expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+  });
+
+  test('non-JSON data URL source maps are ignored', async () => {
+    const bundlePath = await writeVmBundle(
+      `${buildThrowingBundleSource()}\n${inlineNonJsonDataUrlSourceMapComment(
+        buildThrowingBundleMap('bundle.js'),
+      )}\n`,
     );
     const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
 

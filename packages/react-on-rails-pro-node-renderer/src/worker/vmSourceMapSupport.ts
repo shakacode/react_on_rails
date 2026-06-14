@@ -53,6 +53,12 @@ interface BundleSourceMapRegistration {
    * column by its length.
    */
   firstLineColumnOffset: number;
+  /**
+   * `undefined` means the bundle text was not available at registration time
+   * and must be checked lazily. `null` means it was checked and no
+   * sourceMappingURL comment was present.
+   */
+  sourceMappingUrl?: string | null;
 }
 
 interface LoadedSourceMap {
@@ -69,6 +75,7 @@ const registeredBundles = new Map<string, BundleSourceMapRegistration>();
 // bundle has no (usable) source map. Registration invalidates entries so a
 // same-path build retry cannot be poisoned by an earlier failed lookup.
 const sourceMapCache = new Map<string, LoadedSourceMap | null>();
+let warnedMissingSourceMapConstructor = false;
 
 /**
  * Name of the host-callback global injected into the VM context. Used by
@@ -76,11 +83,31 @@ const sourceMapCache = new Map<string, LoadedSourceMap | null>();
  */
 export const SOURCE_MAP_RESOLVER_CONTEXT_KEY = '__reactOnRailsProResolveOriginalSourcePosition';
 
+function extractSourceMappingUrl(bundleContents: string): string | undefined {
+  // Matches `//# sourceMappingURL=...` (or legacy `//@`) comments; the last one wins.
+  const sourceMappingUrlRegex = /\/\/[#@] sourceMappingURL=([^\s'"`]+)/g;
+  let lastMatch: RegExpExecArray | null = null;
+  let match = sourceMappingUrlRegex.exec(bundleContents);
+  while (match !== null) {
+    lastMatch = match;
+    match = sourceMappingUrlRegex.exec(bundleContents);
+  }
+  return lastMatch?.[1];
+}
+
 /**
  * Registers a bundle file so stack frames pointing into it can be remapped.
  */
-export function registerBundleForSourceMaps(bundleFilePath: string, firstLineColumnOffset = 0) {
-  registeredBundles.set(bundleFilePath, { firstLineColumnOffset });
+export function registerBundleForSourceMaps(
+  bundleFilePath: string,
+  firstLineColumnOffset = 0,
+  bundleContents?: string,
+) {
+  registeredBundles.set(bundleFilePath, {
+    firstLineColumnOffset,
+    sourceMappingUrl:
+      bundleContents === undefined ? undefined : (extractSourceMappingUrl(bundleContents) ?? null),
+  });
   sourceMapCache.delete(bundleFilePath);
 }
 
@@ -96,18 +123,7 @@ export function unregisterBundleForSourceMaps(bundleFilePath: string) {
 export function resetSourceMapSupport() {
   registeredBundles.clear();
   sourceMapCache.clear();
-}
-
-function extractSourceMappingUrl(bundleContents: string): string | undefined {
-  // Matches `//# sourceMappingURL=...` (or legacy `//@`) comments; the last one wins.
-  const sourceMappingUrlRegex = /\/\/[#@] sourceMappingURL=([^\s'"`]+)/g;
-  let lastMatch: RegExpExecArray | null = null;
-  let match = sourceMappingUrlRegex.exec(bundleContents);
-  while (match !== null) {
-    lastMatch = match;
-    match = sourceMappingUrlRegex.exec(bundleContents);
-  }
-  return lastMatch?.[1];
+  warnedMissingSourceMapConstructor = false;
 }
 
 function parseDataUrlSourceMap(url: string): string | undefined {
@@ -117,6 +133,10 @@ function parseDataUrlSourceMap(url: string): string | undefined {
   }
 
   const metadata = url.slice('data:'.length, commaIndex).toLowerCase();
+  const mimeType = metadata.split(';')[0]?.trim();
+  if (mimeType !== 'application/json') {
+    return undefined;
+  }
   const payload = url.slice(commaIndex + 1);
   if (metadata.split(';').includes('base64')) {
     return Buffer.from(payload, 'base64').toString('utf8');
@@ -148,13 +168,58 @@ function resolveSourceMapPath(bundleFilePath: string, sourceMappingUrl: string):
     );
     return undefined;
   }
-  return resolvedPath;
+
+  try {
+    const realBundleDirectory = fs.realpathSync(bundleDirectory);
+    const realSourceMapPath = fs.realpathSync(resolvedPath);
+    if (!isPathInsideOrEqual(realSourceMapPath, realBundleDirectory)) {
+      log.debug(
+        'Ignoring source map symlink outside bundle directory for bundle %s: %s',
+        bundleFilePath,
+        sourceMappingUrl,
+      );
+      return undefined;
+    }
+    return realSourceMapPath;
+  } catch {
+    // Missing maps are handled by the caller; returning the lexical path keeps
+    // the normal "not found" path quiet while still validating existing symlinks.
+    return resolvedPath;
+  }
 }
 
-function loadSourceMapForBundle(bundleFilePath: string): LoadedSourceMap | null {
+function hasReadableFile(candidatePath: string) {
   try {
-    const bundleContents = fs.readFileSync(bundleFilePath, 'utf8');
-    const sourceMappingUrl = extractSourceMappingUrl(bundleContents);
+    fs.accessSync(candidatePath, fs.constants.R_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function createSourceMap(payload: ConstructorParameters<typeof SourceMap>[0]): SourceMap | null {
+  if (typeof SourceMap === 'function') {
+    return new SourceMap(payload);
+  }
+
+  if (!warnedMissingSourceMapConstructor) {
+    warnedMissingSourceMapConstructor = true;
+    log.warn(
+      'Source-mapped stack traces require Node >=18.19.0 or >=20.3.0; disabling source map remapping.',
+    );
+  }
+  return null;
+}
+
+function loadSourceMapForBundle(
+  bundleFilePath: string,
+  registration: BundleSourceMapRegistration,
+): LoadedSourceMap | null {
+  try {
+    const sourceMappingUrl =
+      registration.sourceMappingUrl === undefined
+        ? extractSourceMappingUrl(fs.readFileSync(bundleFilePath, 'utf8'))
+        : (registration.sourceMappingUrl ?? undefined);
 
     let sourceMapJson: string | undefined;
     if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
@@ -170,7 +235,7 @@ function loadSourceMapForBundle(bundleFilePath: string): LoadedSourceMap | null 
       // Fallback: the uploaded bundle is renamed to `<timestamp>.js`, so a map
       // uploaded alongside it under that name is also worth checking.
       candidatePaths.push(`${bundleFilePath}.map`);
-      const mapPath = candidatePaths.find((candidate) => fs.existsSync(candidate));
+      const mapPath = candidatePaths.find(hasReadableFile);
       if (mapPath) {
         sourceMapJson = fs.readFileSync(mapPath, 'utf8');
       }
@@ -180,8 +245,12 @@ function loadSourceMapForBundle(bundleFilePath: string): LoadedSourceMap | null 
       return null;
     }
     const payload = JSON.parse(sourceMapJson) as ConstructorParameters<typeof SourceMap>[0];
+    const sourceMap = createSourceMap(payload);
+    if (!sourceMap) {
+      return null;
+    }
     return {
-      sourceMap: new SourceMap(payload),
+      sourceMap,
       sources: Array.isArray(payload.sources)
         ? payload.sources.filter((source): source is string => typeof source === 'string')
         : [],
@@ -195,7 +264,8 @@ function loadSourceMapForBundle(bundleFilePath: string): LoadedSourceMap | null 
 function sourceMapForBundle(bundleFilePath: string): LoadedSourceMap | null {
   let sourceMap = sourceMapCache.get(bundleFilePath);
   if (sourceMap === undefined) {
-    sourceMap = loadSourceMapForBundle(bundleFilePath);
+    const registration = registeredBundles.get(bundleFilePath);
+    sourceMap = registration ? loadSourceMapForBundle(bundleFilePath, registration) : null;
     sourceMapCache.set(bundleFilePath, sourceMap);
   }
   return sourceMap;
@@ -270,6 +340,8 @@ export function resolveOriginalPosition(
   return {
     source: entry.originalSource,
     line: entry.originalLine + 1,
+    // Source Map v3 allows line-only mappings. Report column 1 rather than
+    // dropping the remap; start-of-line is still more useful than bundle glue.
     column: (entry.originalColumn ?? 0) + 1,
   };
 }

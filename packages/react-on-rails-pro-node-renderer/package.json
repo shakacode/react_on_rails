@@ -3,6 +3,9 @@
   "version": "17.0.0-rc.3",
   "protocolVersion": "2.0.0",
   "description": "React on Rails Pro Node Renderer for server-side rendering",
+  "engines": {
+    "node": ">=18.19.0"
+  },
   "main": "lib/ReactOnRailsProNodeRenderer.js",
   "directories": {
     "doc": "docs"
