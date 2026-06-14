@@ -6811,7 +6811,7 @@ Cache keys answer "is this entry still current?" at read time. Tags answer a dif
 ```erb
 <%= cached_react_component("PostShow",
       cache_key: [@post, I18n.locale],
-      cache_tags: ["post:#{@post.id}", @post.author],
+      cache_tags: [@post, @post.author],
       cache_options: { expires_in: 12.hours }) do
       { post: @post.to_props }
     end %>
@@ -6819,8 +6819,8 @@ Cache keys answer "is this entry still current?" at read time. Tags answer a dif
 
 ```ruby
 # Anywhere in Ruby — controller, job, service object, console:
-ReactOnRailsPro.revalidate_tag("post:42")   # => number of cache entries deleted
-ReactOnRailsPro.revalidate_tags("post:42", post.author)
+ReactOnRailsPro.revalidate_tag(post) # => number of cache entries deleted
+ReactOnRailsPro.revalidate_tags(post, post.author)
 ```
 
 `cache_tags:` is accepted by all four cached helpers — `cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, and `cached_async_react_component` — and is purely additive: `cache_key:` semantics are unchanged, and `cache_key:` is still required.

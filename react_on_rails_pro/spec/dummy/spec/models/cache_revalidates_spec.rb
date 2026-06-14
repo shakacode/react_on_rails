@@ -15,6 +15,16 @@
 
 require "rails_helper"
 
+class RelationLikeRevalidationTag
+  def cache_key
+    "posts/query"
+  end
+
+  def to_ary
+    ["posts/expanded"]
+  end
+end
+
 # End-to-end coverage for the ActiveRecord write path of tag revalidation:
 # include ReactOnRailsPro::Cache::Revalidates + revalidates_react_cache fires
 # ReactOnRailsPro.revalidate_tags from after_commit, so a cached component
@@ -114,6 +124,27 @@ RSpec.describe "ReactOnRailsPro::Cache::Revalidates", :caching do
 
       expect(Rails.cache.read(record_key)).to be_nil
       expect(Rails.cache.read(index_key)).to be_nil
+    end
+  end
+
+  context "with a custom tags block returning an array-like cache-key object" do
+    let(:model) do
+      Class.new(ApplicationRecord) do
+        self.table_name = "posts"
+        include ReactOnRailsPro::Cache::Revalidates
+        revalidates_react_cache { RelationLikeRevalidationTag.new }
+      end
+    end
+
+    before { stub_const("RevalidatingPost", model) }
+
+    it "revalidates the object cache_key without expanding it as an array" do
+      post = RevalidatingPost.create!(title: "Hello", body: "World")
+      key = write_tagged_entry(RelationLikeRevalidationTag.new, key: "cached/relation")
+
+      post.update!(title: "Changed")
+
+      expect(Rails.cache.read(key)).to be_nil
     end
   end
 

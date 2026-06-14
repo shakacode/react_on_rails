@@ -48,14 +48,14 @@ Cache keys handle "is this entry still current?" at read time. For the write sid
 ```erb
 <%= cached_react_component("PostShow",
       cache_key: [@post, I18n.locale],
-      cache_tags: ["post:#{@post.id}"],
+      cache_tags: [@post],
       cache_options: { expires_in: 12.hours }) do
       { post: @post.to_props }
     end %>
 ```
 
 ```ruby
-ReactOnRailsPro.revalidate_tag("post:#{post.id}") # deletes every entry tagged "post:<id>"
+ReactOnRailsPro.revalidate_tag(post) # deletes every entry tagged with post.cache_key
 ```
 
 Or let the model own its invalidation via `after_commit`:

@@ -80,8 +80,8 @@ module ReactOnRailsPro
 
       def revalidate_react_on_rails_cache_tags
         resolver = self.class._react_on_rails_cache_tags_resolver
-        tags = resolver ? Array(resolver.call(self)) : [self]
-        ReactOnRailsPro.revalidate_tags(*tags)
+        tags = resolver ? resolver.call(self) : self
+        ReactOnRailsPro.revalidate_tags(*(tags.is_a?(Array) ? tags : [tags]))
       end
     end
   end

@@ -83,12 +83,19 @@ module ReactOnRailsPro
         tags.flat_map do |tag|
           if tag.is_a?(Array)
             meaningful_revalidation_tags(tag)
-          elsif tag.blank?
+          elsif blank_revalidation_tag?(tag)
             []
           else
             [tag]
           end
         end
+      end
+
+      def blank_revalidation_tag?(tag)
+        return true if tag.nil?
+        return false if tag.respond_to?(:cache_key)
+
+        tag.blank?
       end
 
       def use_cache?(options)

@@ -52,6 +52,10 @@ class RelationLikeTag
     "posts/query"
   end
 
+  def blank?
+    true
+  end
+
   def to_ary
     [TaggableRecord.new(cache_key: "posts/1")]
   end
