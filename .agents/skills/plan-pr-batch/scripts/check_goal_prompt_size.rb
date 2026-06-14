@@ -24,8 +24,8 @@ def extract_goal_prompt_template(skill_text)
 end
 
 def with_items(prompt_template, items)
-  updated_prompt = prompt_template.sub(/Items:\n.*?\nExecution rules:/m) do
-    "Items:\n#{items}\nExecution rules:"
+  updated_prompt = prompt_template.sub(/Items:\n.*?\n\nExecution rules:/m) do
+    "Items:\n#{items}\n\nExecution rules:"
   end
   if updated_prompt == prompt_template
     abort_with_failure("goal prompt template must contain Items and Execution rules sections")
