@@ -3366,7 +3366,7 @@ RSpec.describe "script/pr-merge-ledger" do
         }
       ]
     }
-    dispositions = { "comment-1" => "fixd" }
+    dispositions = { "comment-1" => "UNKNOWN" }
 
     Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
@@ -3386,7 +3386,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
         expect(status.exitstatus).to eq(2)
         expect(stdout).to be_empty
-        expect(stderr).to include('finding disposition "fixd" must be one of')
+        expect(stderr).to include('finding disposition "UNKNOWN" must be one of')
       end
     end
   end
@@ -3575,6 +3575,24 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(status.exitstatus).to eq(2)
     expect(stdout).to be_empty
     expect(stderr).to include("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS must be an integer")
+    expect(stderr).not_to include("from ")
+  end
+
+  it "rejects non-positive GitHub API timeout values without a backtrace" do
+    stdout, stderr, status = Open3.capture3(
+      { "PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS" => "0" },
+      script_path,
+      "1",
+      "--repo",
+      "shakacode/react_on_rails",
+      "--changelog-classification",
+      "not_user_visible",
+      chdir: repo_root
+    )
+
+    expect(status.exitstatus).to eq(2)
+    expect(stdout).to be_empty
+    expect(stderr).to include("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS must be a positive integer")
     expect(stderr).not_to include("from ")
   end
 

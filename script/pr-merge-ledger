@@ -20,7 +20,7 @@ class PrMergeLedger
     not_user_visible
     UNKNOWN
   ].freeze
-  DISPOSITIONS = %w[fixed explicitly_waived follow_up_issue not_applicable UNKNOWN].freeze
+  DISPOSITIONS = %w[fixed explicitly_waived follow_up_issue not_applicable].freeze
   REVIEW_DECISION_STATES = %w[APPROVED CHANGES_REQUESTED].freeze
   LOCKFILE_BASENAMES = %w[
     Gemfile.lock
@@ -106,7 +106,10 @@ class PrMergeLedger
   class Error < StandardError; end
 
   def self.github_api_timeout_seconds
-    Integer(ENV.fetch("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS", DEFAULT_GITHUB_API_TIMEOUT_SECONDS), 10)
+    timeout = Integer(ENV.fetch("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS", DEFAULT_GITHUB_API_TIMEOUT_SECONDS), 10)
+    return timeout if timeout.positive?
+
+    raise Error, "PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS must be a positive integer (seconds)"
   rescue ArgumentError
     raise Error, "PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS must be an integer (seconds)"
   end
