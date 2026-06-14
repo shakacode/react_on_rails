@@ -26,10 +26,14 @@ bundle add react_on_rails_pro --version="= VERSION"
 Install the tested React/RSC package set used by the generator:
 
 ```bash
-yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
-# npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
-# pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
-# bun add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+yarn add react@~19.0.4 react-dom@~19.0.4
+yarn add --exact react-on-rails-rsc@19.0.5
+# npm install react@~19.0.4 react-dom@~19.0.4
+# npm install --save-exact react-on-rails-rsc@19.0.5
+# pnpm add react@~19.0.4 react-dom@~19.0.4
+# pnpm add --save-exact react-on-rails-rsc@19.0.5
+# bun add react@~19.0.4 react-dom@~19.0.4
+# bun add --exact react-on-rails-rsc@19.0.5
 ```
 
 > [!NOTE]

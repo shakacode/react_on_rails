@@ -99,7 +99,7 @@ describe('checkRscPeerCompatibility', () => {
     const result = checkRscPeerCompatibility({ rscVersion: '19.0.6-rc.1', reactVersion: '19.0.4' });
     expect(result.level).toBe('error');
     expect(result.message).toContain('19.0.6-rc.1');
-    expect(result.message).toContain('19.0.5-rc.6 / 19.0.5-rc.7');
+    expect(result.message).toContain(RSC_PEER_SUPPORT.reactOnRailsRsc.allowedPrereleases.join(' / '));
   });
 
   it('errors when rsc major is above the supported major', () => {
