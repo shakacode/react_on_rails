@@ -24,7 +24,7 @@ const { recommendedMin } = RSC_PEER_SUPPORT.reactOnRailsRsc;
 const stableBase = (version: string) => version.split('-', 1)[0];
 
 const versionBelowRecommendedMin = (version: string) => {
-  const [major, minor, patch] = version.split('.').map(Number);
+  const [major, minor, patch] = stableBase(version).split('.').map(Number);
   if (patch > 0) return `${major}.${minor}.${patch - 1}`;
   if (minor > 0) return `${major}.${minor - 1}.999`;
   throw new Error('recommendedMin must allow a lower supported-major version for the warn-tier test');
