@@ -36,7 +36,7 @@ This is the React-blessed replacement for the classic "keep the inactive tab ali
 ```
 
 ```tsx
-import React, { Activity, useState } from 'react';
+import { Activity, useState } from 'react';
 
 const TAB_NAMES = ['profile', 'drafts'] as const;
 type TabName = (typeof TAB_NAMES)[number];

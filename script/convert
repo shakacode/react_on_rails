@@ -62,6 +62,11 @@ gsub_file_content("../packages/react-on-rails-pro/package.json", /"react-dom": "
 gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
 gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
 
+# The Activity demo uses a parent-scoped override to keep the normal dummy app on React 19.2.
+# Minimum-dependency CI must remove it so the converted dummy actually installs React 18.
+gsub_file_content("../package.json", /\s+"react_on_rails>react": "\^19\.2\.0",\n/, "")
+gsub_file_content("../package.json", /\s+"react_on_rails>react-dom": "\^19\.2\.0",\n/, "")
+
 # Switch from @dr.pogodin/react-helmet (React 19+) to react-helmet-async (React 18 compatible)
 # Both have the same HelmetProvider API, but different package names
 gsub_file_content(

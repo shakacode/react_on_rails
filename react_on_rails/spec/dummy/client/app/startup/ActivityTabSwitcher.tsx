@@ -38,7 +38,13 @@ function TabPanel({ tab }: { tab: TabName }) {
   }, []);
 
   return (
-    <div className="activity-tab-panel" data-tab-panel={tab}>
+    <div
+      className="activity-tab-panel"
+      data-tab-panel={tab}
+      id={`activity-panel-${tab}`}
+      role="tabpanel"
+      aria-labelledby={`activity-tab-${tab}`}
+    >
       <h4>The {tab} tab</h4>
       <p data-effect-status={tab}>{effectStatus}</p>
       <label htmlFor={`activity-draft-${tab}`}>Draft for {tab}:</label>{' '}
@@ -65,7 +71,9 @@ const ActivityTabSwitcher = ({ initialTab = 'profile' }: ActivityTabSwitcherProp
             key={tab}
             type="button"
             role="tab"
+            id={`activity-tab-${tab}`}
             aria-selected={tab === activeTab}
+            aria-controls={`activity-panel-${tab}`}
             data-tab-button={tab}
             onClick={() => setActiveTab(tab)}
           >

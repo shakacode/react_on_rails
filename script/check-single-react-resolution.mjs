@@ -141,7 +141,7 @@ targetDirs.forEach(checkTargetDir);
 
 const distinctInstallations = new Set(perDirInstallations.values());
 if (distinctInstallations.size > 1) {
-  console.log('Note: target directories use different React installations (intentional, see issue #3883):');
+  console.log('Note: target directories use different React installations (each is intentional):');
   for (const [targetDir, installation] of perDirInstallations) {
     console.log(`  ${targetDir} -> ${installation}`);
   }

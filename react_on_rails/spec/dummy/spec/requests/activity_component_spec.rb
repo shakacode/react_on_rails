@@ -18,11 +18,12 @@ describe "React 19.2 Activity component", :server_rendering do
 
     html_nodes = Nokogiri::HTML(response.body)
     component = html_nodes.at_css("div#ActivityTabSwitcher-react-component-0")
-    expect(component.children.size).to be >= 1
 
     # Visible tab (initialTab: "profile") is prerendered.
-    expect(component.at_css('[data-tab-panel="profile"]')).not_to be_nil
+    profile_panel = component.at_css('[data-tab-panel="profile"]')
+    expect(profile_panel).not_to be_nil
     expect(component.at_css('input[data-draft-input="profile"]')).not_to be_nil
+    expect(profile_panel.at_css('[data-effect-status="profile"]')&.text).to eq("effects never mounted")
 
     # Hidden Activity subtree is omitted from server HTML (renders on client).
     expect(component.at_css('[data-tab-panel="drafts"]')).to be_nil
