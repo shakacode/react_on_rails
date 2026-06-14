@@ -363,15 +363,15 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 
 ### Action `f+o` — Fix must-fix and optional items inline
 
-Use `f`'s `MUST-FIX` handling and commit/push-before-reply ordering, but do not
-run `f`'s autonomous optional defer/decline filtering. In `f+o`, every current
-`OPTIONAL` item is selected for inline handling: fix it in the same PR, or stop
-and promote it to `DISCUSS` if it turns out to need judgment, change behavior,
-or expand scope. If optional fixes require a separate commit to keep the
-must-fix commit atomic, commit them separately and ask for push confirmation
-before pushing. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts
-for those tiers. If there are zero `OPTIONAL` items, behave like `f` and note
-that `f+o` had nothing additional to do.
+Use only `f`'s `MUST-FIX` subflow and commit/push-before-reply ordering; do not
+enter `f` step 2 or any autonomous optional defer/decline filtering. In `f+o`,
+every current `OPTIONAL` item is selected for inline handling: fix it in the
+same PR, or stop and promote it to `DISCUSS` if it turns out to need judgment,
+change behavior, or expand scope. If optional fixes require a separate commit
+to keep the must-fix commit atomic, commit them separately and ask for push
+confirmation before pushing. Then handle `DISCUSS` and `SKIPPED` items using
+`f`'s prompts for those tiers. If there are zero `OPTIONAL` items, behave like
+`f` and note that `f+o` had nothing additional to do.
 
 ### Action `d` — Discuss items
 
