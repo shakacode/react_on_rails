@@ -575,6 +575,7 @@ class PrMergeLedger
   def thread_comments_for_findings(review_threads)
     review_threads
       .select { |thread| unresolved_current_head_thread?(thread) }
+      # Incomplete comment pages are blocked through unknown_fields; unfetched bodies cannot be scanned for priorities.
       .flat_map { |thread| thread.fetch("comments") }
       .reject { |comment| comment.fetch("outdated") }
   end
