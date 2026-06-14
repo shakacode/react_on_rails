@@ -426,15 +426,16 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
   });
 
-  test('sourceMappingURL cannot escape the bundle directory through a symlink', async () => {
+  test('sourceMappingURL supports symlink-staged external source maps', async () => {
     const bundlePath = vmBundlePath(testName);
     const bundleDirectory = path.dirname(bundlePath);
-    const outsideMapPath = path.join(serverBundleCachePath(testName), 'outside-symlink.map');
-    const symlinkMapPath = path.join(bundleDirectory, 'inside-link.map');
+    const sourceMapFileName = 'staged-source-map.js.map';
+    const outsideMapPath = path.join(serverBundleCachePath(testName), sourceMapFileName);
+    const symlinkMapPath = path.join(bundleDirectory, sourceMapFileName);
     await writeVmBundle(
       `${buildThrowingBundleSource()}\n//# sourceMappingURL=${path.basename(symlinkMapPath)}\n`,
     );
-    await fsPromises.writeFile(outsideMapPath, JSON.stringify(buildThrowingBundleMap('outside-symlink.map')));
+    await fsPromises.writeFile(outsideMapPath, JSON.stringify(buildThrowingBundleMap(sourceMapFileName)));
     await fsPromises.symlink(outsideMapPath, symlinkMapPath);
     const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
 
@@ -443,8 +444,7 @@ describe('source-mapped stack traces for VM errors', () => {
     if (!isErrorRenderResult(result)) {
       throw new Error('expected exceptionMessage result');
     }
-    expect(result.exceptionMessage).toContain(`at boom (${bundlePath}:3:`);
-    expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+    expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
   });
 
   test('sourceMappingURL path separators are ignored before map lookup', async () => {

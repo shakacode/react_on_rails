@@ -55,7 +55,7 @@ export function buildRenderMetadata(
   };
 }
 
-function isCrossRealmError(e: unknown): e is { message?: unknown } {
+function isCrossRealmError(e: unknown): e is { message?: unknown; stack?: unknown } {
   return typeof e === 'object' && e !== null && Object.prototype.toString.call(e) === '[object Error]';
 }
 
@@ -146,6 +146,9 @@ export function convertToError(e: unknown): Error {
   // tsconfig uses es2020 libs, which do not type Error.cause even though supported runtimes provide it.
   const error = new Error(message) as Error & { cause?: unknown };
   error.cause = e;
+  if (isCrossRealmError(e) && typeof e.stack === 'string') {
+    error.stack = e.stack;
+  }
   return error;
 }
 

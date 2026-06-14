@@ -68,6 +68,8 @@ export { configureFastify, type FastifyConfigFunction } from './worker/fastifyCo
 const INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS = 1_000;
 // Standard response streams use this only to release retained renderer context;
 // they are not aborted. Incremental responses may still close after request EOF.
+// These release/finish windows are intentionally equal so both stream paths
+// retain VM source-map registrations for the same idle period.
 const STREAM_CONTEXT_RELEASE_TIMEOUT_MS = STREAM_CHUNK_TIMEOUT_MS;
 const INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS = STREAM_CONTEXT_RELEASE_TIMEOUT_MS;
 

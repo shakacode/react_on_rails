@@ -178,31 +178,7 @@ function resolveSourceMapPath(bundleFilePath: string, sourceMappingUrl: string):
     return undefined;
   }
 
-  try {
-    const realBundleDirectory = fs.realpathSync(bundleDirectory);
-    const realSourceMapPath = fs.realpathSync(resolvedPath);
-    if (!isPathInsideOrEqual(realSourceMapPath, realBundleDirectory)) {
-      log.debug(
-        'Ignoring source map symlink outside bundle directory for bundle %s: %s',
-        bundleFilePath,
-        sourceMappingUrl,
-      );
-      return undefined;
-    }
-    return realSourceMapPath;
-  } catch (error) {
-    const code = typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
-    if (code !== 'ENOENT' && code !== 'ENOTDIR') {
-      log.debug(
-        'Ignoring source map after realpath failed for bundle %s: %s',
-        bundleFilePath,
-        sourceMappingUrl,
-      );
-      return undefined;
-    }
-
-    return resolvedPath;
-  }
+  return resolvedPath;
 }
 
 function fallbackSourceMapPath(bundleFilePath: string) {
@@ -232,6 +208,13 @@ function resolveReadableSourceMapPath(bundleFilePath: string, candidatePath: str
     const realBundleDirectory = fs.realpathSync(bundleDirectory);
     const realSourceMapPath = fs.realpathSync(resolvedPath);
     if (!isPathInsideOrEqual(realSourceMapPath, realBundleDirectory)) {
+      const linkStats = fs.lstatSync(resolvedPath);
+      const targetStats = fs.statSync(resolvedPath);
+      // Pro pre-stage symlink mode creates trusted symlink entries inside the
+      // bundle directory. The sourceMappingURL still has to be a plain file name.
+      if (linkStats.isSymbolicLink() && targetStats.isFile()) {
+        return resolvedPath;
+      }
       return undefined;
     }
 
@@ -247,7 +230,8 @@ function readSourceMapFile(bundleFilePath: string, candidatePath: string) {
     return undefined;
   }
 
-  // `sourceMapPath` is realpath-checked under the bundle directory.
+  // `sourceMapPath` is filename-only and either realpath-checked under the bundle
+  // directory or a symlink entry staged inside that directory by trusted Pro tooling.
   // codeql[js/path-injection]
   return fs.readFileSync(sourceMapPath, 'utf8');
 }
@@ -258,7 +242,8 @@ async function readSourceMapFileAsync(bundleFilePath: string, candidatePath: str
     return undefined;
   }
 
-  // `sourceMapPath` is realpath-checked under the bundle directory.
+  // `sourceMapPath` is filename-only and either realpath-checked under the bundle
+  // directory or a symlink entry staged inside that directory by trusted Pro tooling.
   // codeql[js/path-injection]
   return fs.promises.readFile(sourceMapPath, 'utf8');
 }
@@ -338,6 +323,8 @@ export function registerBundleForSourceMaps(
     sourceMappingUrl && sourceMappingUrl.startsWith('data:')
       ? (parseDataUrlSourceMap(sourceMappingUrl) ?? null)
       : undefined;
+  // sourceMapJson states: string = known JSON for this VM generation, null =
+  // confirmed no usable source map, undefined = check lazily on first error.
   const registration = {
     bundleFilePath,
     firstLineColumnOffset,
@@ -602,6 +589,9 @@ export function remapStackTrace(
     return remapStackTraceForRegistration(stack, registration);
   }
 
+  // Callers without a specific registration opt into scanning every registered
+  // bundle path in the stack text. Request paths pass a registration-specific
+  // closure so unrelated bundle registrations cannot rewrite their stacks.
   let remappedStack = stack;
   registeredBundles.forEach((currentRegistration) => {
     remappedStack = remapStackTraceForRegistration(remappedStack, currentRegistration);
@@ -636,8 +626,10 @@ export function remapErrorStack(error: unknown, registration?: BundleSourceMapRe
  * Script run inside the VM context (before the bundle is evaluated) that
  * installs an `Error.prepareStackTrace` mirroring V8's default format but
  * rewriting `file:line:column` locations through the host-side resolver when a
- * source-mapped position is available. Any failure falls back to the original
- * frame text.
+ * source-mapped position is available. Bundle code can replace
+ * `Error.prepareStackTrace` after this script runs; if it does, source mapping
+ * is disabled for that VM context. Any failure falls back to the original frame
+ * text.
  */
 export const PREPARE_STACK_TRACE_INSTALL_SCRIPT = `
 Error.prepareStackTrace = function (error, callSites) {

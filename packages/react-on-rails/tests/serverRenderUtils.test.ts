@@ -65,13 +65,18 @@ describe('serverRenderUtils', () => {
       expect((error as ErrorWithCause).cause).toBe(circular);
     });
 
-    it('wraps errors thrown from another JavaScript realm with their original message', () => {
-      const thrownValue: unknown = new Script('new Error("cross-realm failure")').runInNewContext();
+    it('wraps errors thrown from another JavaScript realm with their original message and stack', () => {
+      const thrownValue: unknown = new Script(`
+        const error = new Error("cross-realm failure");
+        error.stack = "Error: cross-realm failure\\n    at hostCallback (/tmp/bundle.js:3:1)";
+        error;
+      `).runInNewContext();
 
       const error = convertToError(thrownValue);
 
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe('cross-realm failure');
+      expect(error.stack).toBe((thrownValue as { stack?: unknown }).stack);
       expect((error as ErrorWithCause).cause).toBe(thrownValue);
     });
 
