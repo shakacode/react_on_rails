@@ -18,6 +18,8 @@ import { RSC_PEER_SUPPORT } from '../src/shared/rscPeerSupport';
 
 const { recommendedMin } = RSC_PEER_SUPPORT.reactOnRailsRsc;
 
+const stableBase = (version: string) => version.split('-', 1)[0];
+
 const versionBelowRecommendedMin = (version: string) => {
   const [major, minor, patch] = version.split('.').map(Number);
   if (patch > 0) return `${major}.${minor}.${patch - 1}`;
@@ -28,6 +30,15 @@ const versionBelowRecommendedMin = (version: string) => {
 const belowRecommendedMin = versionBelowRecommendedMin(recommendedMin);
 
 describe('checkRscPeerCompatibility', () => {
+  it('keeps allowed prereleases aligned with the recommended minimum stable base', () => {
+    expect(RSC_PEER_SUPPORT.reactOnRailsRsc.allowedPrereleases).not.toHaveLength(0);
+    expect(
+      RSC_PEER_SUPPORT.reactOnRailsRsc.allowedPrereleases.every(
+        (allowedPrerelease) => stableBase(allowedPrerelease) === recommendedMin,
+      ),
+    ).toBe(true);
+  });
+
   it('returns ok when react-on-rails-rsc is absent (optional peer not installed)', () => {
     expect(checkRscPeerCompatibility({ rscVersion: null, reactVersion: '19.0.4' })).toEqual({ level: 'ok' });
   });
@@ -51,6 +62,13 @@ describe('checkRscPeerCompatibility', () => {
     expect(rc7.level).toBe('warn');
     expect(rc7.message).toContain('19.0.5-rc.7');
     expect(rc7.message).toContain('prerelease of the recommended minimum 19.0.5');
+  });
+
+  it('warns for an allowed prerelease with mixed-case prerelease text', () => {
+    const result = checkRscPeerCompatibility({ rscVersion: '19.0.5-RC.6', reactVersion: '19.0.4' });
+    expect(result.level).toBe('warn');
+    expect(result.message).toContain('19.0.5-RC.6');
+    expect(result.message).toContain('prerelease of the recommended minimum 19.0.5');
   });
 
   it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {

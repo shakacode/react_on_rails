@@ -125,8 +125,10 @@ const isAllowedRscPrerelease = (
 ): boolean => {
   if (!isPrereleaseVersion(rscVersion)) return true;
 
-  const normalizedRscVersion = stripVersionPrefixAndBuild(rscVersion);
-  if (allowedPrereleases.some((allowedVersion) => allowedVersion === normalizedRscVersion)) return true;
+  const normalizedRscVersion = stripVersionPrefixAndBuild(rscVersion).toLowerCase();
+  if (allowedPrereleases.some((allowedVersion) => allowedVersion.toLowerCase() === normalizedRscVersion)) {
+    return true;
+  }
 
   const recommendedMinMinor = parseTuple(recommendedMin)[1];
   return rscTuple[1] !== recommendedMinMinor;
@@ -237,7 +239,7 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   }
 
   const recommendedMinTuple = parseTuple(reactOnRailsRsc.recommendedMin);
-  const isPrereleaseAtRecommendedMin = sameTuple(rscTuple, recommendedMinTuple) && isPrerelease;
+  const isPrereleaseAtRecommendedMin = sameTuple(rscTuple, recommendedMinTuple) && isPrereleaseVersion(rscVersion);
   if (!isAtLeast(rscTuple, recommendedMinTuple) || isPrereleaseAtRecommendedMin) {
     const message = isPrereleaseAtRecommendedMin
       ? prereleaseWarnMessage(rscVersion, reactOnRailsRsc.recommendedMin, proVersion)
