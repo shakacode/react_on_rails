@@ -29,8 +29,11 @@ Gather live state from ground truth, not chat memory:
    blocked, done, released, and done-unmerged lanes plus `blocked_on` refs.
 
    Note: `agent-coord` lane state is operational status only. The Classification
-   section defines separate intent-achievement classes; a `done` lane still
-   requires evidence evaluation before it can be classified as `realized`.
+   section defines separate intent-achievement classes; a `done` or `released`
+   lane still requires evidence evaluation before it can be classified as
+   `realized`. A `stalled` operational lane maps to the `stalled` intent class
+   only after verifying a lost heartbeat, blocker, or dependency state that
+   needs a resume, reassign, or drop decision.
 
 2. GitHub issue or PR state for every target under evaluation:
    - issue intent, acceptance criteria, labels, comments, linked PRs
@@ -60,7 +63,8 @@ Classify each run by intent achievement:
 - `regressed`: the run appears to introduce a correctness, security,
   compatibility, release-process, data-loss, or user-visible regression.
 - `stalled`: the lane lost heartbeat or is blocked and needs a resume, reassign,
-  or drop decision.
+  or drop decision. Do not map an `agent-coord` `stalled` operational state here
+  until the evidence confirms a lost heartbeat, blocker, or dependency state.
 - `unknown`: live state or evidence cannot be verified.
 
 When unsure between two categories, choose the higher-risk category and state the
