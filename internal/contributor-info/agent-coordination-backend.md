@@ -114,8 +114,10 @@ repo, issue or PR number, batch id, lane name, planned agent id, and assignment
 status. The inbox "next up" view should hide completed items, show in-flight
 items from live claims and heartbeats, and flag lost-heartbeat items as needing a
 takeover or resume decision instead of silently reassigning them.
-When implemented, `agent-coord status` or `batch-status` should expose this
-per-inbox "next up" view.
+
+> **Planned (not yet in `agent-coord` 0.1.0):** `agent-coord status` or a
+> future `batch-status` subcommand should expose this per-inbox "next up" view
+> once queue state is implemented in the backend.
 
 Capacity-aware triage derives group count from registered state:
 
