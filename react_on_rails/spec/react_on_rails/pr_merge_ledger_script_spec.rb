@@ -1512,7 +1512,8 @@ RSpec.describe "script/pr-merge-ledger" do
             "P1/P2 findings fixed.",
             "P1 and P2 findings fixed.",
             "P1 issues fixed; P2 findings resolved.",
-            "P1 issues fixed and P2 findings were waived."
+            "P1 issues fixed and P2 findings were waived.",
+            "P1 issues fixed or waived."
           ].join("\n")
         }
       ]
@@ -1940,6 +1941,55 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks however-separated mixed severity summary lines with open priority items" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "however-mixed-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/however-mixed-review",
+          "body" => "P1 issues fixed, however P2 still open"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-however-mixed-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
+      expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
+        ["P1 issues fixed, however P2 still open", "P1 issues fixed, however P2 still open"]
+      )
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
+    end
+  end
+
   it "blocks conjunction-separated mixed severity summary lines with open priority items" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -2197,7 +2247,7 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
-  it "blocks P1/P2/Must-Fix findings from top-level PR comments" do
+  it "blocks P0/P1/P2/Must-Fix findings from top-level PR comments" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
       "pull_request" => {
@@ -2212,7 +2262,7 @@ RSpec.describe "script/pr-merge-ledger" do
         {
           "id" => "comment-1",
           "url" => "https://example.com/comment-1",
-          "body" => "[P1] Top-level PR comment finding.",
+          "body" => "[P0] Top-level PR comment finding.",
           "author" => { "login" => "reviewer" },
           "createdAt" => "2026-06-01T00:00:00Z"
         }
@@ -2244,7 +2294,7 @@ RSpec.describe "script/pr-merge-ledger" do
       )
       expect(pr_ledger.dig("priority_finding_dispositions", "findings").first).to include(
         "id" => "comment-1",
-        "severity" => "P1",
+        "severity" => "P0",
         "disposition" => "UNKNOWN"
       )
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
@@ -2985,6 +3035,24 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "rejects non-integer GitHub API timeout values without a backtrace" do
+    stdout, stderr, status = Open3.capture3(
+      { "PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS" => "thirty" },
+      script_path,
+      "1",
+      "--repo",
+      "shakacode/react_on_rails",
+      "--changelog-classification",
+      "not_user_visible",
+      chdir: repo_root
+    )
+
+    expect(status.exitstatus).to eq(2)
+    expect(stdout).to be_empty
+    expect(stderr).to include("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS must be an integer")
+    expect(stderr).not_to include("from ")
+  end
+
   it "records an auto-detected repository in live source output" do
     fake_gh = <<~SH
       #!/bin/sh
@@ -3295,8 +3363,11 @@ RSpec.describe "script/pr-merge-ledger" do
     )
     expect(schema.dig("properties", "schema_version", "const")).to eq("pr-merge-ledger/v1")
     expect(schema.fetch("required")).to include("pull_requests", "violations", "complete_allowed")
+    expect(schema.dig("$defs", "pull_request_ledger", "additionalProperties")).to be(false)
     expect(schema.dig("$defs", "pull_request_ledger", "required")).to include("issue_comments")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "violations", "type")).to eq("array")
+    expect(schema.dig("$defs", "violation", "additionalProperties")).to be(false)
+    expect(schema.dig("$defs", "violation", "properties")).to include("path", "line")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "unknown_fields", "type")).to eq("array")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "complete_allowed", "type")).to eq("boolean")
   end

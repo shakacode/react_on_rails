@@ -29,7 +29,7 @@ class PrMergeLedger
     bun.lock
     bun.lockb
   ].freeze
-  GITHUB_API_TIMEOUT_SECONDS = Integer(ENV.fetch("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS", "30"), 10)
+  DEFAULT_GITHUB_API_TIMEOUT_SECONDS = "30"
   MAX_GRAPHQL_PAGES = 500
   LIST_MARKER_PATTERN = /(?:[-*]|\d+[.)])\s*/
   FINDING_LINE_PREFIX_PATTERN = /(?:#{LIST_MARKER_PATTERN.source})?(?:\#{1,6}\s+)?/
@@ -72,7 +72,8 @@ class PrMergeLedger
       (?:\s+(?:were|was|are|is|has|have|been|got|now|already|previously))*\s+
     )
     (?:fixed|resolved|waived)
-    (?=\s*(?:$|[.;,)]|\b(?:by|in|with|via|from|after|before|on|because|through)\b)) |
+    (?=\s*(?:$|[.;,)]|\bor\s+(?:fixed|resolved|waived)\b|
+      \b(?:by|in|with|via|from|after|before|on|because|through)\b)) |
     \bno\s+(?:findings?|issues?|items?|main\s+issue)\b
     (?=\s*(?:$|[.;,)]|\b(?:found|present|open|remaining|reported|detected)\b))
   /ix
@@ -82,12 +83,18 @@ class PrMergeLedger
     /\bno\s+(?:\S+\s+){0,4}?(?:fixed|resolved|waived)\b/i
   )
   ADDITIONAL_SEVERITY_PATTERN = %r{
-    (?:(?<!\d)[.;,(:-]|/|\b(?:and|but|or|while)\b)\s*
+    (?:(?<!\d)[.;,(:-]|/|\b(?:and|but|however|or|while)\b)\s*
     (?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?
     (?:\s|:|-|/|$)
   }ix
 
   class Error < StandardError; end
+
+  def self.github_api_timeout_seconds
+    Integer(ENV.fetch("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS", DEFAULT_GITHUB_API_TIMEOUT_SECONDS), 10)
+  rescue ArgumentError
+    raise Error, "PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS must be an integer (seconds)"
+  end
 
   def self.run(argv)
     new(argv).run
@@ -226,14 +233,15 @@ class PrMergeLedger
   end
 
   def detect_repo
-    Timeout.timeout(GITHUB_API_TIMEOUT_SECONDS) do
+    timeout = self.class.github_api_timeout_seconds
+    Timeout.timeout(timeout) do
       stdout, stderr, status = Open3.capture3("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
       raise Error, "could not detect gh repo: #{stderr.strip}" unless status.success?
 
       stdout.strip
     end
   rescue Timeout::Error
-    raise Error, "gh repo view timed out after #{GITHUB_API_TIMEOUT_SECONDS} seconds"
+    raise Error, "gh repo view timed out after #{timeout} seconds"
   end
 
   def load_fixture(path)
@@ -273,7 +281,7 @@ class PrMergeLedger
     latest_reviews = latest_reviews_by_reviewer(output_reviews)
     all_changes_requested = output_reviews.select { |review| review.fetch("state") == "CHANGES_REQUESTED" }
     changes_requested = current_changes_requested(latest_reviews)
-    finding_dispositions = finding_dispositions(review_threads, reviews, issue_comments, dispositions)
+    finding_report = finding_dispositions(review_threads, reviews, issue_comments, dispositions)
     changelog = changelog_classification
     lockfile = lockfile_diff(files)
 
@@ -292,12 +300,12 @@ class PrMergeLedger
         "all_changes_requested" => all_changes_requested
       },
       "issue_comments" => output_issue_comments,
-      "priority_finding_dispositions" => finding_dispositions,
+      "priority_finding_dispositions" => finding_report,
       "changelog_classification" => changelog,
       "lockfile_diff" => lockfile
     }
 
-    unknown_fields = unknown_fields_for(pull_request, review_threads, finding_dispositions, changelog, lockfile)
+    unknown_fields = unknown_fields_for(pull_request, review_threads, finding_report, changelog, lockfile)
     violations = violations_for(pull_request, unresolved_threads, changes_requested, changelog, unknown_fields)
     ledger.merge(
       "violations" => violations,
@@ -1071,7 +1079,7 @@ class PrMergeLedger
     end
 
     def capture_gh(args)
-      timeout = GITHUB_API_TIMEOUT_SECONDS
+      timeout = PrMergeLedger.github_api_timeout_seconds
       Timeout.timeout(timeout) do
         Open3.capture3("gh", *args)
       end

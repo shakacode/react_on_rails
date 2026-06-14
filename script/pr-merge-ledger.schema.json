@@ -66,7 +66,7 @@
   "$defs": {
     "pull_request_ledger": {
       "type": "object",
-      "additionalProperties": true,
+      "additionalProperties": false,
       "required": [
         "pr",
         "unresolved_current_head_review_threads",
@@ -168,9 +168,15 @@
         },
         "url": {
           "type": ["string", "null"]
+        },
+        "path": {
+          "type": ["string", "null"]
+        },
+        "line": {
+          "type": ["integer", "null"]
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "unknown_field": {
       "type": "object",
