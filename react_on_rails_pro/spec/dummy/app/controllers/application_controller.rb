@@ -60,9 +60,9 @@ class ApplicationController < ActionController::Base
     nonce_attribute = nonce.present? ? %( nonce="#{ERB::Util.html_escape(nonce)}") : ""
     js_redirect = <<~HTML
       <script#{nonce_attribute}>
-        document.getElementById('page-container').innerHTML = #{ActiveSupport::JSON.encode(error_message)};
+        document.getElementById('page-container').innerHTML = #{ERB::Util.json_escape(ActiveSupport::JSON.encode(error_message))};
         setTimeout(function() {
-          window.location.href = #{ActiveSupport::JSON.encode(redirect_path)};
+          window.location.href = #{ERB::Util.json_escape(ActiveSupport::JSON.encode(redirect_path))};
         }, 5000);
       </script>
     HTML

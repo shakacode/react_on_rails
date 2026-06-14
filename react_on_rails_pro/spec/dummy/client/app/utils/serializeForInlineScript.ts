@@ -14,6 +14,7 @@
  */
 
 export function serializeForInlineScript(value: unknown): string {
+  // Escape the sequences that can break out of a raw-text script body or JS string literal.
   return (JSON.stringify(value) ?? 'null')
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')

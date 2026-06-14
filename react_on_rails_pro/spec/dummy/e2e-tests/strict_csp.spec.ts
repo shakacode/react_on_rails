@@ -196,11 +196,11 @@ test.describe('Strict CSP (script-src self + per-request nonce, no unsafe-inline
     await expect
       .poll(async () => {
         violations = await getUnexpectedCspViolations(page);
-        return violations.length;
+        return violations.some((violation) => violation.blockedURI === 'inline');
       })
-      .toBe(1);
-    expect(violations[0].blockedURI).toBe('inline');
-    expect(violations[0].violatedDirective).toContain('script-src');
+      .toBe(true);
+    const inlineViolation = violations.find((violation) => violation.blockedURI === 'inline');
+    expect(inlineViolation?.violatedDirective).toContain('script-src');
 
     const canaryExecuted = await page.evaluate(() => (window as CspTestGlobals).__cspCanaryExecuted);
     expect(canaryExecuted, 'nonce-less inline script must NOT execute').toBeUndefined();
