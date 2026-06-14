@@ -144,6 +144,8 @@ const routeTree = rootRoute.addChildren([homeRoute, aboutRoute, serverDataRoute]
 
 const TanStackStarterApp = createTanStackRouterRenderFunction(
   {
+    // Keep this as a factory. A shared router instance would leak state across
+    // concurrent server renders and between browser visits.
     createRouter: () => createRouter({ routeTree, defaultNotFoundComponent: NotFoundPage }),
   },
   {
