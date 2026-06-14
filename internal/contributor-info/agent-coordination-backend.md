@@ -65,7 +65,7 @@ elif test ! -x "$AGENT_COORD_REPO/bin/agent-coord"; then
   echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
   false
 else
-  git -C "$AGENT_COORD_REPO" fetch --tags --prune --prune-tags &&
+  git -C "$AGENT_COORD_REPO" fetch --tags --prune &&
     git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
     git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
     "$AGENT_COORD_REPO/bin/agent-coord" --help &&
