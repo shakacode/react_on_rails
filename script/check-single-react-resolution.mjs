@@ -55,7 +55,29 @@ function findPackageRoot(resolvedFile, packageName) {
   }
 }
 
-function checkFamily(requireFromTarget, targetDir, specifiers, packageName) {
+function findResolutionRoot(targetAbsoluteDir, packageRoot, packageName) {
+  let dir = targetAbsoluteDir;
+  for (;;) {
+    const candidate = path.join(dir, 'node_modules', packageName);
+    if (fs.existsSync(candidate)) {
+      try {
+        if (fs.realpathSync(candidate) === packageRoot) {
+          return candidate;
+        }
+      } catch {
+        // Broken or unreadable symlink — keep walking up.
+      }
+    }
+
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      return packageRoot;
+    }
+    dir = parent;
+  }
+}
+
+function checkFamily(requireFromTarget, targetDir, targetAbsoluteDir, specifiers, packageName) {
   const roots = new Map();
 
   for (const specifier of specifiers) {
@@ -73,7 +95,10 @@ function checkFamily(requireFromTarget, targetDir, specifiers, packageName) {
 
       const packageInfo = findPackageRoot(realPath, packageName);
       if (packageInfo) {
-        roots.set(packageInfo.root, packageInfo.version);
+        roots.set(packageInfo.root, {
+          resolutionRoot: findResolutionRoot(targetAbsoluteDir, packageInfo.root, packageName),
+          version: packageInfo.version,
+        });
       } else {
         console.error(
           `Could not locate the ${packageName} package root for "${specifier}" from "${targetDir}"`,
@@ -94,7 +119,13 @@ function checkFamily(requireFromTarget, targetDir, specifiers, packageName) {
   }
 
   const [entry] = roots.entries();
-  return entry ? { root: entry[0], version: entry[1] } : null;
+  return entry
+    ? {
+        root: entry[0],
+        resolutionRoot: entry[1].resolutionRoot,
+        version: entry[1].version,
+      }
+    : null;
 }
 
 const perDirInstallations = new Map();
@@ -112,17 +143,18 @@ function checkTargetDir(targetDir) {
   const requireBase = fs.existsSync(packageJsonPath) ? packageJsonPath : path.join(absoluteDir, 'index.js');
   const requireFromTarget = createRequire(requireBase);
 
-  const react = checkFamily(requireFromTarget, targetDir, reactSpecifiers, 'react');
-  const reactDom = checkFamily(requireFromTarget, targetDir, reactDomSpecifiers, 'react-dom');
+  const react = checkFamily(requireFromTarget, targetDir, absoluteDir, reactSpecifiers, 'react');
+  const reactDom = checkFamily(requireFromTarget, targetDir, absoluteDir, reactDomSpecifiers, 'react-dom');
 
   if (!react || !reactDom) {
     return;
   }
 
-  if (path.dirname(react.root) !== path.dirname(reactDom.root)) {
+  if (path.dirname(react.resolutionRoot) !== path.dirname(reactDom.resolutionRoot)) {
     console.error(
-      `"${targetDir}" mixes React installations: react is in ${path.relative(cwd, react.root)} but ` +
-        `react-dom is in ${path.relative(cwd, reactDom.root)} (different node_modules)`,
+      `"${targetDir}" mixes React installations: react is in ` +
+        `${path.relative(cwd, react.resolutionRoot)} but react-dom is in ` +
+        `${path.relative(cwd, reactDom.resolutionRoot)} (different node_modules)`,
     );
     hasErrors = true;
   }
@@ -134,7 +166,7 @@ function checkTargetDir(targetDir) {
     hasErrors = true;
   }
 
-  perDirInstallations.set(targetDir, `${path.relative(cwd, react.root)} (react ${react.version})`);
+  perDirInstallations.set(targetDir, `${path.relative(cwd, react.resolutionRoot)} (react ${react.version})`);
 }
 
 targetDirs.forEach(checkTargetDir);
