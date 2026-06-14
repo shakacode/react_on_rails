@@ -62,7 +62,7 @@ class PrMergeLedger
   FINDING_SUMMARY_RESOLUTION_PATTERN = /\b(?:none|fixed|resolved|waived)\b/i
   NEGATED_SUMMARY_RESOLUTION_PATTERN = /\bnot\s+(?:yet\s+)?(?:fixed|resolved|waived)\b/i
   ADDITIONAL_SEVERITY_PATTERN =
-    /[.;,]\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
+    /[.;,(]\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
 
   class Error < StandardError; end
 
@@ -134,7 +134,7 @@ class PrMergeLedger
       opts.on("--pretty", "Pretty-print JSON output.") do
         @options[:pretty] = true
       end
-      opts.on("--finding-dispositions FILE", "JSON map from finding URL/id to disposition evidence.") do |path|
+      opts.on("--finding-dispositions FILE", "JSON map from finding URL/id or URL#L<line>/id#L<line>.") do |path|
         @options[:finding_dispositions] = path
       end
       opts.on("--changelog-classification CLASS", CHANGELOG_CLASSIFICATIONS) do |classification|
@@ -161,7 +161,7 @@ class PrMergeLedger
     unknown_fields = ledgers.flat_map { |ledger| ledger.fetch("unknown_fields") }
 
     {
-      "$schema" => "script/pr-merge-ledger.schema.json",
+      "$schema" => "https://reactonrails.com/schemas/pr-merge-ledger-v1.json",
       "schema_version" => SCHEMA_VERSION,
       "generated_at" => Time.now.utc.iso8601,
       "repository" => datasets.first.fetch("repository"),
@@ -177,6 +177,7 @@ class PrMergeLedger
     raise Error, "provide at least one PR number or --fixture" if @argv.empty?
 
     repo = @options[:repo] || detect_repo
+    @options[:repo] = repo
     owner, name = repo.split("/", 2)
     raise Error, "repo must look like OWNER/REPO: #{repo.inspect}" unless owner && name
 
@@ -300,7 +301,7 @@ class PrMergeLedger
   def normalize_review_thread(thread, pull_request)
     comments, comments_complete = review_thread_comments(thread)
     normalized_comments = comments.map { |comment| normalize_thread_comment(comment, pull_request) }
-    latest_comment = normalized_comments.max_by { |comment| comment["created_at"].to_s }
+    latest_comment = normalized_comments.max_by { |comment| timestamp_sort_key(comment["created_at"]) }
 
     {
       "id" => thread.fetch("id"),
@@ -377,20 +378,23 @@ class PrMergeLedger
   end
 
   def latest_reviews_by_reviewer(reviews)
-    reviews
-      .group_by { |review| review.fetch("reviewer") }
-      .map { |_reviewer, reviewer_reviews| reviewer_reviews.max_by { |review| review["submitted_at"].to_s } }
-      .sort_by { |review| review.fetch("reviewer") }
+    latest_reviews = reviews.group_by { |review| review.fetch("reviewer") }
+                            .map do |_reviewer, reviewer_reviews|
+                              reviewer_reviews.max_by { |review| timestamp_sort_key(review["submitted_at"]) }
+                            end
+
+    latest_reviews.sort_by { |review| review.fetch("reviewer") }
   end
 
   def current_thread?(thread, comments, pull_request)
     return false if thread["isOutdated"] == true
-    return !thread["isOutdated"] if comments.empty?
+    return false if comments.empty?
 
     current_thread_comment?(comments, pull_request) || comments.any? { |comment| !comment.fetch("outdated") }
   end
 
   def current_thread_comment?(comments, pull_request)
+    # Exact commit matches are current-head evidence even when GitHub's outdated flag lags behind a force-push.
     comments.any? { |comment| comment.fetch("current_head") && !comment.fetch("outdated") } ||
       comments.any? { |comment| comment.fetch("comment_head_sha") == pull_request.fetch("head_sha") }
   end
@@ -452,12 +456,13 @@ class PrMergeLedger
       severity = finding_severity(line_text)
       next [] unless severity
 
-      disposition = disposition_for(url, id, dispositions, used_disposition_keys)
+      source_line = index + 1
+      disposition = disposition_for(url, id, source_line, dispositions, used_disposition_keys)
       [{
         "id" => id,
         "url" => url,
         "severity" => severity,
-        "source_line" => index + 1,
+        "source_line" => source_line,
         "text_excerpt" => excerpt(line_text),
         "disposition" => disposition.fetch("disposition"),
         "evidence" => disposition["evidence"]
@@ -470,6 +475,7 @@ class PrMergeLedger
   end
 
   def non_actionable_finding_summary?(line)
+    # Suppress only clearly resolved summary prose; ambiguous priority text remains a finding until triaged.
     match = line.match(FINDING_SUMMARY_PREFIX_PATTERN)
     return false unless match
 
@@ -483,15 +489,15 @@ class PrMergeLedger
     first_clause.match?(FINDING_SUMMARY_RESOLUTION_PATTERN)
   end
 
-  def disposition_for(url, id, dispositions, used_disposition_keys)
-    override = if dispositions.key?(url)
-                 used_disposition_keys << url
-                 dispositions[url]
-               elsif dispositions.key?(id)
-                 used_disposition_keys << id
-                 dispositions[id]
-               end
+  def disposition_for(url, id, source_line, dispositions, used_disposition_keys)
+    disposition_key = disposition_keys(url, id, source_line).find { |key| dispositions.key?(key) }
+    return { "disposition" => UNKNOWN } unless disposition_key
 
+    used_disposition_keys << disposition_key
+    normalize_disposition_override(dispositions.fetch(disposition_key), disposition_key)
+  end
+
+  def normalize_disposition_override(override, disposition_key)
     case override
     when String
       validate_disposition(override)
@@ -503,8 +509,17 @@ class PrMergeLedger
     when nil
       { "disposition" => UNKNOWN }
     else
-      raise Error, "finding disposition for #{url || id} must be a string or object"
+      raise Error, "finding disposition for #{disposition_key} must be a string or object"
     end
+  end
+
+  def disposition_keys(url, id, source_line)
+    [
+      url && "#{url}#L#{source_line}",
+      id && "#{id}#L#{source_line}",
+      url,
+      id
+    ].compact
   end
 
   def warn_unused_dispositions(dispositions, used_disposition_keys)
@@ -517,7 +532,13 @@ class PrMergeLedger
   def validate_disposition(disposition)
     return if DISPOSITIONS.include?(disposition)
 
-    raise Error, "finding disposition must be one of #{DISPOSITIONS.join(', ')}"
+    raise Error, "finding disposition #{disposition.inspect} must be one of #{DISPOSITIONS.join(', ')}"
+  end
+
+  def timestamp_sort_key(raw_timestamp)
+    Time.parse(raw_timestamp.to_s)
+  rescue ArgumentError
+    Time.at(0).utc
   end
 
   def changelog_classification
@@ -786,7 +807,9 @@ class PrMergeLedger
     end
 
     def fetch_review_threads(pr_number)
-      fetch_paginated_connection(pr_number, review_threads_query, "reviewThreads")
+      fetch_paginated_connection(pr_number, review_threads_query, "reviewThreads").map do |thread|
+        complete_review_thread_comments(thread)
+      end
     end
 
     def fetch_reviews(pr_number)
@@ -830,6 +853,39 @@ class PrMergeLedger
       end
 
       cursor
+    end
+
+    def complete_review_thread_comments(thread)
+      raw_comments = thread["comments"]
+      return thread unless raw_comments.is_a?(Hash)
+
+      page_info = raw_comments.fetch("pageInfo")
+      return thread unless page_info.fetch("hasNextPage")
+
+      nodes = raw_comments.fetch("nodes")
+      cursor = page_info.fetch("endCursor")
+      page_count = 0
+
+      loop do
+        page_count += 1
+        if page_count > MAX_GRAPHQL_PAGES
+          raise Error, "pagination exceeded #{MAX_GRAPHQL_PAGES} pages for reviewThread.comments"
+        end
+
+        response = graphql(review_thread_comments_query, threadId: thread.fetch("id"), commentsCursor: cursor)
+        fetched_thread = response.dig("data", "node")
+        raise Error, "review thread #{thread.fetch('id')} was not found" unless fetched_thread
+
+        connection = fetched_thread.fetch("comments")
+        nodes.concat(connection.fetch("nodes"))
+        page_info = connection.fetch("pageInfo")
+        break unless page_info.fetch("hasNextPage")
+
+        cursor = next_cursor(page_info, "reviewThread.comments", cursor)
+      end
+
+      raw_comments["pageInfo"] = page_info
+      thread
     end
 
     def graphql(query, variables)
@@ -929,6 +985,41 @@ class PrMergeLedger
                       }
                     }
                     pageInfo { hasNextPage endCursor }
+                  }
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+      GRAPHQL
+    end
+
+    def review_thread_comments_query
+      <<~GRAPHQL
+        query($owner:String!, $name:String!, $threadId:ID!, $commentsCursor:String) {
+          repository(owner:$owner, name:$name) { id }
+          node(id:$threadId) {
+            ... on PullRequestReviewThread {
+              comments(first:100, after:$commentsCursor) {
+                nodes {
+                  id
+                  databaseId
+                  body
+                  author { login }
+                  url
+                  path
+                  line
+                  createdAt
+                  outdated
+                  commit { oid }
+                  originalCommit { oid }
+                  pullRequestReview {
+                    id
+                    state
+                    submittedAt
+                    commit { oid }
+                    author { login }
                   }
                 }
                 pageInfo { hasNextPage endCursor }

@@ -17,7 +17,7 @@
   ],
   "properties": {
     "$schema": {
-      "const": "script/pr-merge-ledger.schema.json"
+      "const": "https://reactonrails.com/schemas/pr-merge-ledger-v1.json"
     },
     "schema_version": {
       "const": "pr-merge-ledger/v1"
