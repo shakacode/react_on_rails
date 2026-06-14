@@ -377,6 +377,8 @@ clutter because "open a tracker" has no matching "close it" step.
 
 Use the current release tracker to decide whether PRs are in normal development, accelerated RC, strict RC, or final-release mode. The tracker is the live source of truth for the mode; committed docs define how to interpret it.
 
+The repo ships releases with a **release train**: `main` never freezes and keeps absorbing batch work, RCs are stabilized on an ephemeral `release/X.Y.Z` branch, and the final is the **last good RC promoted by dropping `-rc`** — not a re-cut from `main`. The merge gate an agent must apply is a function of the **target branch's release phase** (`beta` / `rc` / `final`); the phase composes with the mode below. See **[Release-Train Branching And Phase Gating](#release-train-branching-and-phase-gating)** for the phase→gate table and [`internal/contributor-info/release-train-runbook.md`](internal/contributor-info/release-train-runbook.md) for the full branching runbook.
+
 - An active tracker is an open release gate issue, usually found by the existing `release` and `TRACKING` labels or the `Release gate:` title. Also search closed release gate issues updated within the last 7 days before defaulting to `development`, so agents can detect stale trackers. The mode must be recorded in the issue body, not encoded by adding more labels.
 - Valid tracker modes are `development`, `accelerated-rc`, `strict-rc`, and `final-release`.
 - If no active tracker exists, assume `development` mode. This is not a blocker; it means the repo is moving toward the next beta/RC/final. If a release tracker was closed within the last 7 days and lacks a closing label/comment containing `Released` or `Superseded`, report `release-mode-stale-tracker` and do not auto-merge until a maintainer confirms the mode. A maintainer can resolve the stale signal with a PR or tracker comment such as `No active release, proceed`; verify the comment author has `write`, `maintain`, or `admin` permission before treating it as maintainer confirmation. Inspect tracker labels and comments with `gh issue view <tracker> --comments --json labels,comments` before deciding that the closing signal is absent.
@@ -436,6 +438,25 @@ Finalized by: <different GitHub account or named check/app, with GitHub review/c
 Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode does not use confidence-only auto-merge: run the post-merge audit, update the changelog/release notes as needed, confirm required checks on `main`, and get an explicit maintainer release decision before publishing the final release.
 
 Score from a `10/10` baseline: all checks complete, expected skips explained, changed surfaces validated, no unresolved blocker threads, no known residual risk, and an independent finalizer. A non-trivial concern is any finding that, if correct, would be a correctness bug, security issue, behavioral regression, API contract break, data-loss risk, release-process break, or credible CI/test coverage gap. Deduct 1-2 points for incomplete validation or unknown residual risk, using the larger deduction when unsure, and at least 2 points for any failed or unexplained check. Missing required validation for a changed surface is at least a 2-point deduction. Any unresolved non-trivial concern disqualifies auto-merge regardless of score. A missing independent finalizer disqualifies auto-merge regardless of score.
+
+### Release-Train Branching And Phase Gating
+
+Releases use a release-train branching model. Full mechanics (cut, stabilize, forward-port, promote, close out) live in [`internal/contributor-info/release-train-runbook.md`](internal/contributor-info/release-train-runbook.md). The rules an agent must follow:
+
+- **`main` never freezes.** It stays in the `beta` phase and keeps absorbing batch work the whole time.
+- **RCs stabilize on an ephemeral `release/X.Y.Z` branch** (one branch per final target, deleted after the final ships; tags are the durable record). Only stabilizing fixes target `release/*`; new features keep targeting `main`.
+- **Forward-port every `release/*` fix to `main` with `git cherry-pick -x <sha>`.** Never `git merge release/X.Y.Z` into `main` — that leaks the RC version-bump commits onto `main`.
+- **Final = promote the last good RC by dropping `-rc`**, not a re-cut from `main`. The final's code tree must equal the last good RC's tree (only `version.rb` + `CHANGELOG.md` differ); post-cut `main` commits roll into the next version.
+
+The **merge gate is a function of the target branch's release phase**. Resolve the phase, then apply its row plus the mode rules above:
+
+| Phase     | Target            | Agent merge gate (lowest → highest)                                                                                                             |
+| --------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **beta**  | `main`            | **Lowest.** Confidence note + green required checks. Fast iteration; `main` may be unstable.                                                    |
+| **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`.                         |
+| **final** | `release/*` → tag | **Highest.** Only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion**. No confidence-only auto-merge. |
+
+**Reading the phase.** The active phase per release line is published through the `shakacode/agent-coordination` backend so agents read the current gate without being told. Read it from the machine-readable `agent-coord` status output for the PR's target branch; treat it as available only when `agent-coord doctor` and `agent-coord status` exit 0 (the private backend README and `agent-coord --help` are authoritative for the exact field). The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode or the branch is in the promotion freeze. If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
 
 ## Review Workflow
 

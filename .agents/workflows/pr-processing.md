@@ -140,6 +140,31 @@ path so release rules do not drift.
 4. Do not auto-create release trackers. A maintainer creates one when entering
    accelerated RC, strict RC, or final-release coordination.
 
+### Release Phase Gate
+
+The merge-gate strictness is a function of the **target branch's release phase**,
+which composes with the mode above. The canonical phase->gate table is in
+`AGENTS.md` -> **Release-Train Branching And Phase Gating**; the full branching
+runbook is
+[release-train-runbook.md](../../internal/contributor-info/release-train-runbook.md).
+Worker path:
+
+1. Determine the PR's target branch and resolve its phase. Prefer the published
+   phase from `agent-coord` status for that branch (available only when
+   `agent-coord doctor` and `agent-coord status` exit 0). If the backend is
+   `UNKNOWN`, derive it: `main` -> `beta`; `release/*` -> `rc`, or `final` when
+   the applicable tracker is in `final-release` mode or the branch is in the
+   promotion freeze.
+2. Apply that phase's gate: `beta` (target `main`) is lowest — confidence note +
+   green required checks. `rc` (target `release/*`) adds adversarial-pr-review and
+   requires zero open MUST-FIX, and only stabilizing fixes belong on `release/*`.
+   `final` is highest — only cherry-picked fully-verified fixes, no new features,
+   and explicit human sign-off on the promotion; no confidence-only auto-merge.
+3. Stabilizing fixes that land on `release/*` must be forward-ported to `main`
+   with `git cherry-pick -x <sha>`; never `git merge release/X.Y.Z` into `main`.
+4. If the published phase and the tracker disagree, treat it as a
+   `release-mode-conflict` per `AGENTS.md`, report it, and do not auto-merge.
+
 ### Tracker Update Safety
 
 Tracker issue bodies are shared mutable state. Avoid clobbering another agent's update:

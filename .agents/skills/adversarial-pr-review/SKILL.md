@@ -47,6 +47,11 @@ handoffs, Codex/Claude comparison, and output templates.
 
 ## Merge Gate
 
+This review is a **required** gate for PRs whose target branch is in the `rc` or
+`final` release phase (target `release/*`), per `AGENTS.md` ->
+**Release-Train Branching And Phase Gating**. For `beta`-phase PRs (target `main`)
+it remains advisory unless a maintainer or high-risk policy requests it.
+
 Before marking a PR ready or merging it, all `BLOCKING` and `DISCUSS` findings
 from this review must be fixed, explicitly decided, or waived by a maintainer.
 Do not require an AI reviewer approval object or positive AI issue comment as a

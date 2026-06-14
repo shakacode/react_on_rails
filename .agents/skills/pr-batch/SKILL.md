@@ -22,6 +22,7 @@ Run a Codex batch
 Run `git fetch --prune origin main`, then use `.agents/workflows/pr-processing.md` as the deeper operating model for each issue, PR, review-fix pass, or merge-readiness item. If repo-local `.agents/skills/...` or `.agents/workflows/pr-processing.md` is missing in the checkout but present on `origin/main`, update the worktree before launching workers; if it remains missing, report repo workflow state as `UNKNOWN`.
 If the target scope is not verified yet, use `.agents/skills/plan-pr-batch/SKILL.md` first.
 For release-mode coordination, auto-merge confidence, and shared release tracker updates, follow `AGENTS.md` and the release-mode sections of `.agents/workflows/pr-processing.md`; do not invent new labels or overwrite tracker issue bodies from stale reads.
+Select the merge gate by the target branch's release phase (`beta` for `main`, `rc`/`final` for `release/*`): follow the **Release Phase Gate** in `.agents/workflows/pr-processing.md` and **Release-Train Branching And Phase Gating** in `AGENTS.md`. Prefer the phase published via `agent-coord`; only stabilizing fixes belong on `release/*`, and forward-port them to `main` with `git cherry-pick -x`.
 If any target's value, priority, or proposed fix scope is unclear, use `.agents/skills/evaluate-issue/SKILL.md` before assigning implementation workers.
 Skip issues labeled `needs-customer-feedback` unless the user explicitly provides customer evidence or maintainer approval for that issue; report each skipped target with `needs-customer-feedback` as the reason.
 

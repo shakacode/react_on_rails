@@ -216,5 +216,36 @@ batch file or lane state, the worker must treat dependency state as `UNKNOWN` an
 stop to report the missing private batch state instead of proceeding as
 independent.
 
+## Release Phase
+
+The backend also publishes the current **release phase** for each release line so
+agents pick the right merge gate from the PR's target branch without parsing the
+release tracker on every PR. The phase model, the phase→gate table, and the full
+branching runbook live in
+[release-train-runbook.md](release-train-runbook.md); `AGENTS.md` ->
+**Release-Train Branching And Phase Gating** is the canonical short policy.
+
+Keep the schema and exact subcommand surface in the private backend repo. This
+public pointer carries only the contract:
+
+- The backend exposes a phase value (`beta` | `rc` | `final`) keyed by release
+  line / target branch. Read it from the machine-readable `agent-coord` status
+  output for the PR's target branch. The private backend README,
+  `agent-coord --help`, and `agent-coord config show --json` are authoritative
+  for the exact field and subcommand if they differ from this pointer.
+- Treat the published phase as available only when `agent-coord doctor` and
+  `agent-coord status` exit 0, exactly as for claim and heartbeat state.
+  Otherwise report the phase as `UNKNOWN` and use the `AGENTS.md` fallback:
+  derive it from the target branch (`main` -> `beta`; `release/*` -> `rc`, or
+  `final` during the promotion freeze / `final-release` mode).
+- The release tracker remains the human source of truth for mode and go/no-go.
+  The published phase is the fast machine path. If the published phase and the
+  tracker disagree, treat it as a `release-mode-conflict` per `AGENTS.md`, report
+  it, and do not auto-merge until reconciled.
+- Phase is read-mostly coordination state, not a claim. Only a maintainer (or the
+  release coordinator they designate) publishes or changes a release line's
+  phase, at the transitions in the runbook: `beta` -> `rc` at RC cut, `rc` ->
+  `final` at the promotion freeze, and back to `beta`/none at release close-out.
+
 Do not store secrets, `.env` files, credentials, patches, customer data, or Pro
 source code in the coordination backend. It is only for minimal JSON state files.
