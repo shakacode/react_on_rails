@@ -33,12 +33,13 @@ ruby -Itest test/agent_coord_test.rb
 bin/agent-coord --help
 bin/agent-coord bootstrap
 export PATH="$HOME/.local/bin:$PATH"
-agent-coord --help
+AGENT_COORD_BIN=$(command -v agent-coord)
+"$AGENT_COORD_BIN" --help
 agent_coord --help
-agent-coord version --json
-agent-coord config show --json
-agent-coord doctor
-agent-coord status
+"$AGENT_COORD_BIN" version --json
+"$AGENT_COORD_BIN" config show --json
+"$AGENT_COORD_BIN" doctor
+"$AGENT_COORD_BIN" status
 ```
 
 The workflow docs assume the `agent-coord` CLI from the private
@@ -49,7 +50,8 @@ active shell `PATH` if the shell has not reloaded its profile yet, or run the
 command by its full path inside the private clone. A successful
 `gh repo view shakacode/agent-coordination` is not enough to treat the backend
 as available; the worker or coordinator must run `agent-coord doctor` and
-`agent-coord status` from `PATH` or from a verified private clone.
+`agent-coord status` through the same binary validated from `PATH` or from a
+verified private clone.
 
 Fresh conductor, Codex, Claude, and Linux hosts must install or locate
 `agent-coord` before coordination-aware finishing. If out-of-band heartbeat
@@ -84,19 +86,20 @@ details into public PRs.
     echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
     exit 1
   else
+    AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord"
     git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
       git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
-      "$AGENT_COORD_REPO/bin/agent-coord" --help &&
-      "$AGENT_COORD_REPO/bin/agent-coord" version --json | jq empty &&
+      "$AGENT_COORD_BIN" --help &&
+      "$AGENT_COORD_BIN" version --json | jq empty &&
       # Suppress stderr intentionally: private config details must not appear in public PRs.
       # Failures are still caught via pipefail + jq empty; record the exit code in PR evidence.
       # For private diagnostics, rerun without 2>/dev/null in a private terminal.
-      "$AGENT_COORD_REPO/bin/agent-coord" config show --json 2>/dev/null | jq empty &&
-      "$AGENT_COORD_REPO/bin/agent-coord" doctor &&
-      "$AGENT_COORD_REPO/bin/agent-coord" status &&
-      "$AGENT_COORD_REPO/bin/agent-coord" claim --help &&
-      "$AGENT_COORD_REPO/bin/agent-coord" heartbeat --help &&
-      "$AGENT_COORD_REPO/bin/agent-coord" release --help
+      "$AGENT_COORD_BIN" config show --json 2>/dev/null | jq empty &&
+      "$AGENT_COORD_BIN" doctor &&
+      "$AGENT_COORD_BIN" status &&
+      "$AGENT_COORD_BIN" claim --help &&
+      "$AGENT_COORD_BIN" heartbeat --help &&
+      "$AGENT_COORD_BIN" release --help
   fi
 )
 ```
@@ -106,6 +109,9 @@ terminal-status lists, or full help output into this public repo. Public PR
 evidence should record the private tag or commit, the commands run, and whether
 each command exited 0. When tag state is uncertain, treat the commit SHA from
 `git rev-parse HEAD` as the authoritative evidence.
+For operational snippets below, set `AGENT_COORD_BIN` to the same validated
+binary; if relying on `PATH`, record `command -v agent-coord` and
+`agent-coord version --json` as part of the public-safe evidence.
 
 Treat the backend as available when `agent-coord doctor` and `agent-coord status`
 exit 0. If the command is missing, auth fails, the private repo cannot be read,
@@ -148,12 +154,13 @@ the default state root documented in the private repo README.
 ### Local State Smoke Check
 
 ```bash
+: "${AGENT_COORD_BIN:?set AGENT_COORD_BIN to the validated agent-coord binary}"
 STATE_ROOT=$(mktemp -d)
-AGENT_COORD_STATE_ROOT="$STATE_ROOT" agent-coord heartbeat \
+AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" heartbeat \
   --agent-id smoke-test-0 \
   --repo shakacode/react_on_rails \
   --target 9999
-AGENT_COORD_STATE_ROOT="$STATE_ROOT" agent-coord status
+AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" status
 rm -rf "$STATE_ROOT"
 ```
 
@@ -172,6 +179,7 @@ Use stable agent ids that identify machine role, tool, and lane, for example
 `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
 
 ```bash
+: "${AGENT_COORD_BIN:?set AGENT_COORD_BIN to the validated agent-coord binary}"
 : "${AGENT_ID:?set AGENT_ID, e.g. desktop-codex-lane1}"
 : "${TARGET_PR_NUMBER:?set TARGET_PR_NUMBER for the lane}"
 : "${BRANCH_NAME:?set BRANCH_NAME for the lane}"
@@ -187,13 +195,13 @@ printf 'Batch id file: %s\n' "$BATCH_ID_FILE"
 # BATCH_ID=$(cat "$BATCH_ID_FILE")
 # At batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
 
-agent-coord heartbeat \
+"$AGENT_COORD_BIN" heartbeat \
   --agent-id "$AGENT_ID" \
   --repo shakacode/react_on_rails \
   --target "$TARGET_PR_NUMBER" \
   --batch-id "$BATCH_ID" \
   --branch "$BRANCH_NAME"
-agent-coord status
+"$AGENT_COORD_BIN" status
 ```
 
 Heartbeat liveness is derived from timestamps: `live` before the TTL expires,
