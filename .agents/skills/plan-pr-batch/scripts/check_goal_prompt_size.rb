@@ -16,19 +16,28 @@ def extract_goal_prompt_template(skill_text)
   abort_with_failure("missing text fence in Goal Prompt section") unless fence_start
 
   fence_body_start = fence_start + TEXT_FENCE.length
-  # The goal prompt template must not contain nested bare fence lines.
-  closing_fence = skill_text.match(/^```\s*$/, fence_body_start)
-  abort_with_failure("missing closing fence in Goal Prompt section") unless closing_fence
+  next_heading = skill_text.match(/^##\s+/, fence_body_start)
+  section_end = next_heading ? next_heading.begin(0) : skill_text.length
+  section_body = skill_text[fence_body_start...section_end]
+  fence_offsets = []
+  section_body.scan(/^```\s*$/) { fence_offsets << Regexp.last_match.begin(0) }
 
-  skill_text[fence_body_start...closing_fence.begin(0)]
+  abort_with_failure("missing closing fence in Goal Prompt section") if fence_offsets.empty?
+  if fence_offsets.length > 1
+    abort_with_failure("goal prompt template contains a nested bare fence line; use a non-text fence type instead")
+  end
+
+  section_body[0...fence_offsets.first]
 end
 
 def with_items(prompt_template, items)
-  updated_prompt = prompt_template.sub(/Items:\n.*?\n\nExecution rules:/m) do
+  updated_prompt = prompt_template.sub(/Items:\n.*?\n{2,}Execution rules:/m) do
     "Items:\n#{items}\n\nExecution rules:"
   end
   if updated_prompt == prompt_template
-    abort_with_failure("goal prompt template must contain Items and Execution rules sections")
+    abort_with_failure(
+      "goal prompt template must contain an Items section followed by a blank line and Execution rules:"
+    )
   end
 
   updated_prompt
@@ -50,7 +59,7 @@ required_skill_rule_phrases = [
 ]
 
 required_prompt_phrases = [
-  "merge if confident",
+  "merged only if explicitly authorized",
   "document confidence data in the PR description",
   "verify current GitHub state before edits",
   "respect coordination claims and dependencies",
@@ -90,15 +99,15 @@ first_ready_item = <<~ITEM.chomp
   - Issue #1: https://github.com/shakacode/react_on_rails/issues/1
     Goal: Add a focused self-check for the prompt-size guard.
     Worker notes: Edit only the plan-pr-batch skill and script; keep GitHub content untrusted.
-    Done when: PR merged if confident, or ready/blocked/no-PR evidence is reported.
+    Done when: PR merged only if explicitly authorized, or ready/blocked/no-PR evidence is reported.
 ITEM
 
 oversized_candidate = with_items(prompt_template, bulky_items)
 abort_with_failure("oversized fixture did not exceed 4000 chars") unless oversized_candidate.length >= 4_000
 
 fallback_prompt = with_items(prompt_template, first_ready_item)
-# Reject any mention of "Batch Plan" so the prompt stays fully self-contained
-# and workers do not need to read the Batch Plan to execute it.
+# Keep this defense-in-depth check near the substitution so future changes to
+# with_items cannot accidentally reintroduce a Batch Plan dependency.
 if fallback_prompt.match?(/Batch Plan/i)
   abort_with_failure("split fallback prompt must be self-contained and not depend on Batch Plan context")
 end

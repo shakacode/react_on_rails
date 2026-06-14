@@ -238,11 +238,11 @@ Items:
 - PR #N: URL
   Goal: one-line outcome.
   Worker notes: short scope, branch, or dependency note.
-  Done when: PR merged if confident, or ready/blocked/deferred with evidence.
+  Done when: PR merged only if explicitly authorized by the current user or batch goal and allowed by release-mode gates, or ready/blocked/deferred with evidence.
 - Issue #N: URL
   Goal: one-line outcome.
   Worker notes: short scope, branch, or dependency note.
-  Done when: PR merged if confident, ready/blocked/no-PR evidence, or documented no-fix rationale.
+  Done when: PR merged only if explicitly authorized by the current user or batch goal and allowed by release-mode gates, ready/blocked/no-PR evidence, or documented no-fix rationale.
 
 Execution rules:
 - Follow `.agents/skills/pr-batch/SKILL.md` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
@@ -256,7 +256,7 @@ Execution rules:
 - Sequenced lanes may share declared files only in the stated order.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
 - For coordination, respect coordination claims and dependencies: assign stable agent ids, run `agent-coord doctor` then `agent-coord status`, claim before branch/worktree creation when available, heartbeat at phase changes, and stop on unmet `blocked_on` refs or dependency state `UNKNOWN`.
-- Use local validation, self-review, review-comment, CI, and readiness gates from the repo workflow. For PRs, merge if confident and authorized by the current release mode, and document confidence data in the PR description; otherwise report the live ready/blocked/deferred/no-PR state with evidence.
+- Use local validation, self-review, review-comment, CI, and readiness gates from the repo workflow. For PRs, merge only if explicitly authorized by the current user or batch goal, current release mode permits it, and confidence/readiness gates pass; document confidence data in the PR description. Otherwise report the live ready/blocked/deferred/no-PR state with evidence.
 - Final handoff must include links, tests, blockers, next action, confidence or UNKNOWN facts, and merged/ready/blocked/deferred sections.
 ```
 
