@@ -113,12 +113,14 @@ Return a report with these sections:
    - merged non-OK findings that should feed `.agents/skills/post-merge-audit/SKILL.md`
    - draft issue entries only when useful, with fingerprints and no GitHub
      writes
+   - use the hidden HTML comment fingerprint format from
+     `.agents/workflows/post-merge-audit.md`
 5. **Per-Run Table**
    - target, PR, maker, branch, state, intent-achievement class, validation
      evidence, merge-ledger state, confidence-note quality, residual risk
 6. **No-Action Items**
-   - `realized` or duplicate findings with enough evidence to avoid further
-     work
+   - `realized` findings, or findings already filed as open GitHub issues with
+     the issue number as evidence
 7. **UNKNOWNs**
    - facts that could not be verified and the command or permission needed to
      resolve them
@@ -136,7 +138,7 @@ Evaluate whether each active, stale, dead-heartbeat, stalled, done, released,
 done-unmerged, and recently merged agent run achieved the intent of its issue or
 PR. Classify each as realized, partial, missed, regressed, stalled, or unknown.
 Use a checker identity distinct from the maker where available; otherwise record
-checker independence as UNKNOWN.
+`checker_identity: UNKNOWN` and `checker_independence: UNKNOWN`.
 
 Surface stalled or lost-heartbeat runs as resume/reassign/drop decisions. For
 merged non-OK findings, prepare post-merge-audit intake entries and draft
@@ -165,3 +167,8 @@ sources used.
 - If automation is needed, implement the scheduler and durable state in the
   private `shakacode/agent-coordination` backend. Keep this repo's slice to
   agent-facing contracts, prompts, and public workflow rules.
+- Frequency and termination are scheduler decisions. A loop report is complete
+  for its supplied scope when every lane has a classified outcome, required
+  follow-up is routed, and remaining `UNKNOWN` items name the evidence needed to
+  resolve them; retire a batch only after no lanes need another coordinator
+  decision.
