@@ -87,11 +87,16 @@ export type RequestInfo = { renderingRequest: string } | { label: string; conten
  * @param error The error that was thrown (typed as `unknown` to minimize casts in `catch`)
  * @param context Optional context to include in the error message
  */
-export function formatExceptionMessage(request: RequestInfo, error: unknown, context?: string) {
+export function formatExceptionMessage(
+  request: RequestInfo,
+  error: unknown,
+  context?: string,
+  stackRemapper = remapStackTrace,
+) {
   const label = 'renderingRequest' in request ? 'JS code for rendering request was:' : request.label;
   const content = 'renderingRequest' in request ? request.renderingRequest : request.content;
   const rawStack = (error as Error).stack;
-  const stack = remapStackTrace(rawStack) ?? rawStack;
+  const stack = stackRemapper(rawStack) ?? rawStack;
 
   return `${context ? `\nContext:\n${context}\n` : ''}
 ${label}

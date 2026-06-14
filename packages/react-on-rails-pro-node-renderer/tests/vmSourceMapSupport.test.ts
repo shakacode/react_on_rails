@@ -84,6 +84,7 @@ function inlineNonJsonDataUrlSourceMapComment(map: object) {
  * `webpack://test-app/components/Boom.ts` line 2, column 3 (1-based).
  */
 const ORIGINAL_SOURCE = 'webpack://test-app/components/Boom.ts';
+const REBUILT_SOURCE = 'webpack://test-app/components/RebuiltBoom.ts';
 const SOURCE_ROOT = 'webpack://source-rooted-app';
 const SOURCE_ROOTED_SOURCE = `${SOURCE_ROOT}/components/Boom.ts`;
 
@@ -96,11 +97,11 @@ function buildThrowingBundleSource() {
   ].join('\n');
 }
 
-function buildThrowingBundleMap(file: string) {
+function buildThrowingBundleMap(file: string, source = ORIGINAL_SOURCE) {
   // line 3 mappings: column 0 -> Boom.ts L1 C0; column 16 -> Boom.ts L2 C2 (0-based)
   // line 4 mapping: column 0 -> Boom.ts L4 C0
   const mappings = ['', '', `${segment(0, 0, 0, 0)},${segment(16, 0, 1, 2)}`, segment(0, 0, 2, -2)].join(';');
-  return { version: 3, file, sources: [ORIGINAL_SOURCE], names: [], mappings };
+  return { version: 3, file, sources: [source], names: [], mappings };
 }
 
 function buildSourceRootBundleMap(file: string) {
@@ -552,6 +553,56 @@ describe('source-mapped stack traces for VM errors', () => {
 
     executionContext.release();
     expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
+  });
+
+  test('same-path rebuild does not remap active old VM errors with the new source map', async () => {
+    buildConfig({
+      serverBundleCachePath: serverBundleCachePath(testName),
+      supportModules: true,
+      stubTimers: false,
+      maxVMPoolSize: 1,
+    });
+
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(mapFileName)));
+    const oldExecutionContext = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    const oldRunInVM = oldExecutionContext.runInVM;
+
+    const capturedError = await oldRunInVM(
+      "(function(){ try { global.triggerSsrError(); } catch (e) { global.heldSsrError = e; return 'held'; } })()",
+      bundlePath,
+    );
+    expect(capturedError).toBe('held');
+
+    const otherBundlePath = path.join(serverBundleCachePath(testName), 'same-path-rebuild-evictor.js');
+    await writeBundleAt(otherBundlePath, 'global.otherBundleLoaded = true;');
+    const otherExecutionContext = await buildExecutionContext([otherBundlePath], /* buildVmsIfNeeded */ true);
+    expect(hasVMContextForBundle(bundlePath)).toBe(false);
+
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(mapFileName, REBUILT_SOURCE)));
+    const rebuiltExecutionContext = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    try {
+      const oldStack = await oldRunInVM('global.heldSsrError.stack', bundlePath);
+      expect(oldStack).toContain(`${ORIGINAL_SOURCE}:2:3`);
+      expect(oldStack).not.toContain(REBUILT_SOURCE);
+
+      const rebuiltResult = await rebuiltExecutionContext.runInVM('global.triggerSsrError()', bundlePath);
+      expect(isErrorRenderResult(rebuiltResult)).toBe(true);
+      if (!isErrorRenderResult(rebuiltResult)) {
+        throw new Error('expected exceptionMessage result');
+      }
+      expect(rebuiltResult.exceptionMessage).toContain(`${REBUILT_SOURCE}:2:3`);
+    } finally {
+      oldExecutionContext.release();
+      otherExecutionContext.release();
+      rebuiltExecutionContext.release();
+    }
   });
 
   test('bundle without a source map keeps the real bundle path in stack frames', async () => {

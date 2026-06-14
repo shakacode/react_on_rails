@@ -44,10 +44,11 @@ import {
   PREPARE_STACK_TRACE_INSTALL_SCRIPT,
   SOURCE_MAP_RESOLVER_CONTEXT_KEY,
   SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY,
+  type BundleSourceMapRegistration,
   registerBundleForSourceMaps,
   unregisterBundleForSourceMaps,
   resetSourceMapSupport,
-  resolveOriginalPosition,
+  resolveOriginalPositionForRegistration,
   remapErrorStack,
   remapStackTrace,
 } from './vmSourceMapSupport.js';
@@ -63,6 +64,7 @@ const writeFileAsync = promisify(fs.writeFile);
 export interface VMContext {
   context: Context;
   sharedConsoleHistory: SharedConsoleHistory;
+  sourceMapRegistration: BundleSourceMapRegistration;
   lastUsed: number; // Track when this VM was last used
 }
 
@@ -75,34 +77,42 @@ const vmCreationPromises = new Map<string, Promise<VMContext>>();
 // Execution contexts can outlive VM pool entries while a request is still
 // running. Keep source maps for those evicted contexts until the request
 // releases them, then drop both the registration and parsed-map cache.
-const activeSourceMapRequestCounts = new Map<string, number>();
-const evictedSourceMapRegistrations = new Set<string>();
+const activeSourceMapRequestCounts = new Map<BundleSourceMapRegistration, number>();
+const evictedSourceMapRegistrations = new Set<BundleSourceMapRegistration>();
 
-function retainSourceMapRegistration(bundlePath: string) {
-  activeSourceMapRequestCounts.set(bundlePath, (activeSourceMapRequestCounts.get(bundlePath) ?? 0) + 1);
+function retainSourceMapRegistration(sourceMapRegistration: BundleSourceMapRegistration) {
+  activeSourceMapRequestCounts.set(
+    sourceMapRegistration,
+    (activeSourceMapRequestCounts.get(sourceMapRegistration) ?? 0) + 1,
+  );
 }
 
-function releaseSourceMapRegistration(bundlePath: string) {
-  const currentCount = activeSourceMapRequestCounts.get(bundlePath) ?? 0;
+function releaseSourceMapRegistration(sourceMapRegistration: BundleSourceMapRegistration) {
+  const currentCount = activeSourceMapRequestCounts.get(sourceMapRegistration) ?? 0;
   if (currentCount <= 1) {
-    activeSourceMapRequestCounts.delete(bundlePath);
-    const wasEvicted = evictedSourceMapRegistrations.delete(bundlePath);
+    activeSourceMapRequestCounts.delete(sourceMapRegistration);
+    const wasEvicted = evictedSourceMapRegistrations.delete(sourceMapRegistration);
     // Eviction deletes the VM first today; keep the guard so future callers do
     // not unregister a source map for a live pooled VM.
-    if (wasEvicted && !vmContexts.has(bundlePath)) {
-      unregisterBundleForSourceMaps(bundlePath);
+    if (
+      wasEvicted &&
+      !Array.from(vmContexts.values()).some(
+        (vmContext) => vmContext.sourceMapRegistration === sourceMapRegistration,
+      )
+    ) {
+      unregisterBundleForSourceMaps(sourceMapRegistration);
     }
     return;
   }
 
-  activeSourceMapRequestCounts.set(bundlePath, currentCount - 1);
+  activeSourceMapRequestCounts.set(sourceMapRegistration, currentCount - 1);
 }
 
-function retireSourceMapRegistrationAfterEviction(bundlePath: string) {
-  if ((activeSourceMapRequestCounts.get(bundlePath) ?? 0) > 0) {
-    evictedSourceMapRegistrations.add(bundlePath);
+function retireSourceMapRegistrationAfterEviction(sourceMapRegistration: BundleSourceMapRegistration) {
+  if ((activeSourceMapRequestCounts.get(sourceMapRegistration) ?? 0) > 0) {
+    evictedSourceMapRegistrations.add(sourceMapRegistration);
   } else {
-    unregisterBundleForSourceMaps(bundlePath);
+    unregisterBundleForSourceMaps(sourceMapRegistration);
   }
 }
 
@@ -159,10 +169,11 @@ function manageVMPoolSize() {
   const sortedEntries = Array.from(vmContexts.entries()).sort(([, a], [, b]) => a.lastUsed - b.lastUsed);
 
   while (sortedEntries.length > maxVMPoolSize) {
-    const oldestPath = sortedEntries.shift()?.[0];
-    if (oldestPath) {
+    const oldestEntry = sortedEntries.shift();
+    if (oldestEntry) {
+      const [oldestPath, oldestContext] = oldestEntry;
       vmContexts.delete(oldestPath);
-      retireSourceMapRegistrationAfterEviction(oldestPath);
+      retireSourceMapRegistrationAfterEviction(oldestContext.sourceMapRegistration);
       log.debug(`Removed VM for bundle ${oldestPath} due to pool size limit (max: ${maxVMPoolSize})`);
     }
   }
@@ -197,20 +208,37 @@ async function buildVM(filePath: string): Promise<VMContext> {
   // than a try/finally inside the IIFE, because an IIFE's finally block can
   // execute synchronously (before `vmCreationPromises.set`) when the code throws
   // before the first `await`, which would leave a stale rejected promise in the map.
+  let sourceMapRegistration: BundleSourceMapRegistration | undefined;
   const vmCreationPromise = (async () => {
     try {
       const { supportModules, stubTimers, additionalContext } = getConfig();
       const additionalContextIsObject =
         additionalContext !== null && additionalContext.constructor === Object;
       const sharedConsoleHistory = new SharedConsoleHistory();
+      const bundleContents = await readFileAsync(filePath, 'utf8');
+      const firstLineColumnOffset =
+        additionalContextIsObject || supportModules ? MODULE_WRAP_FIRST_LINE_PREFIX_LENGTH : 0;
+      const currentSourceMapRegistration = registerBundleForSourceMaps(
+        filePath,
+        firstLineColumnOffset,
+        bundleContents,
+      );
+      sourceMapRegistration = currentSourceMapRegistration;
 
       // Host callback used by the in-VM `Error.prepareStackTrace` hook (see
       // vmSourceMapSupport.ts) to remap bundle stack frames to original
       // TS/JS sources. Only resolves positions for registered bundle paths.
       const contextObject = {
         sharedConsoleHistory,
-        [SOURCE_MAP_RESOLVER_CONTEXT_KEY]: resolveOriginalPosition,
-        [SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY]: remapStackTrace,
+        [SOURCE_MAP_RESOLVER_CONTEXT_KEY]: (fileName: unknown, lineNumber: unknown, columnNumber: unknown) =>
+          resolveOriginalPositionForRegistration(
+            currentSourceMapRegistration,
+            fileName,
+            lineNumber,
+            columnNumber,
+          ),
+        [SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY]: (stack: unknown) =>
+          remapStackTrace(stack, currentSourceMapRegistration),
       };
 
       if (supportModules) {
@@ -302,15 +330,11 @@ async function buildVM(filePath: string): Promise<VMContext> {
       // handling (e.g. react-on-rails `handleError`) sees remapped stacks.
       vm.runInContext(PREPARE_STACK_TRACE_INSTALL_SCRIPT, context);
 
-      // Run bundle code in created context:
-      const bundleContents = await readFileAsync(filePath, 'utf8');
-
       // If node-specific code is provided then it must be wrapped into a module wrapper. The bundle
       // may need the `require` function, which is not available when running in vm unless passed in.
       // Pass `filename` so stack frames point at the real bundle path (instead of
       // `evalmachine.<anonymous>`), which also keys lazy source map resolution.
       if (additionalContextIsObject || supportModules) {
-        registerBundleForSourceMaps(filePath, MODULE_WRAP_FIRST_LINE_PREFIX_LENGTH, bundleContents);
         vm.runInContext(m.wrap(bundleContents), context, { filename: filePath })(
           exports,
           require,
@@ -319,7 +343,6 @@ async function buildVM(filePath: string): Promise<VMContext> {
           path.dirname(filePath),
         );
       } else {
-        registerBundleForSourceMaps(filePath, 0, bundleContents);
         vm.runInContext(bundleContents, context, { filename: filePath });
       }
 
@@ -327,6 +350,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
       const newVmContext: VMContext = {
         context,
         sharedConsoleHistory,
+        sourceMapRegistration: currentSourceMapRegistration,
         lastUsed: Date.now(),
       };
       vmContexts.set(filePath, newVmContext);
@@ -355,10 +379,14 @@ async function buildVM(filePath: string): Promise<VMContext> {
       // Materialize/remap the stack before reporting so failed bundle builds
       // still include original source locations, then retire the registration:
       // failed builds never enter the VM pool and cannot be reused.
-      remapErrorStack(error);
+      remapErrorStack(error, sourceMapRegistration);
       log.error({ error }, 'Caught Error when creating context in buildVM');
       errorReporter.error(error as Error);
-      unregisterBundleForSourceMaps(filePath);
+      if (sourceMapRegistration) {
+        unregisterBundleForSourceMaps(sourceMapRegistration);
+      } else {
+        unregisterBundleForSourceMaps(filePath);
+      }
       throw error;
     }
   })();
@@ -436,20 +464,27 @@ export async function buildExecutionContext(
   bundlePaths: string[],
   buildVmsIfNeeded: boolean,
 ): Promise<ExecutionContext> {
-  const retainedBundlePaths = Array.from(new Set(bundlePaths));
-  retainedBundlePaths.forEach(retainSourceMapRegistration);
+  const retainedSourceMapRegistrations = new Set<BundleSourceMapRegistration>();
+  const retainSourceMapRegistrationOnce = (sourceMapRegistration: BundleSourceMapRegistration) => {
+    if (retainedSourceMapRegistrations.has(sourceMapRegistration)) {
+      return;
+    }
 
+    retainSourceMapRegistration(sourceMapRegistration);
+    retainedSourceMapRegistrations.add(sourceMapRegistration);
+  };
   const mapBundleFilePathToVMContext = new Map<string, VMContext>();
   try {
     await Promise.all(
       bundlePaths.map(async (bundleFilePath) => {
         const vmContext = await getOrBuildVMContext(bundleFilePath, buildVmsIfNeeded);
+        retainSourceMapRegistrationOnce(vmContext.sourceMapRegistration);
         vmContext.lastUsed = Date.now();
         mapBundleFilePathToVMContext.set(bundleFilePath, vmContext);
       }),
     );
   } catch (error) {
-    retainedBundlePaths.forEach(releaseSourceMapRegistration);
+    retainedSourceMapRegistrations.forEach(releaseSourceMapRegistration);
     throw error;
   }
 
@@ -460,12 +495,16 @@ export async function buildExecutionContext(
   let released = false;
 
   const runInVM = async (renderingRequest: string, bundleFilePath: string, vmCluster?: typeof cluster) => {
+    let sourceMapRegistrationForRequest: BundleSourceMapRegistration | undefined;
     try {
       const { serverBundleCachePath } = getConfig();
       const vmContext = mapBundleFilePathToVMContext.get(bundleFilePath);
       if (!vmContext) {
         throw new VMContextNotFoundError(bundleFilePath);
       }
+      sourceMapRegistrationForRequest = vmContext.sourceMapRegistration;
+      const remapStackTraceForRequest = (stack: unknown) =>
+        remapStackTrace(stack, vmContext.sourceMapRegistration);
 
       // Update last used timestamp
       vmContext.lastUsed = Date.now();
@@ -510,7 +549,12 @@ export async function buildExecutionContext(
 
       if (isReadableStream(result)) {
         const newStreamAfterHandlingError = handleStreamError(result, (error) => {
-          const msg = formatExceptionMessage({ renderingRequest }, error, 'Error in a rendering stream');
+          const msg = formatExceptionMessage(
+            { renderingRequest },
+            error,
+            'Error in a rendering stream',
+            remapStackTraceForRequest,
+          );
           errorReporter.message(msg);
         });
         return newStreamAfterHandlingError;
@@ -531,7 +575,14 @@ export async function buildExecutionContext(
 
       return result;
     } catch (exception) {
-      const exceptionMessage = formatExceptionMessage({ renderingRequest }, exception);
+      const exceptionMessage = formatExceptionMessage(
+        { renderingRequest },
+        exception,
+        undefined,
+        sourceMapRegistrationForRequest
+          ? (stack: unknown) => remapStackTrace(stack, sourceMapRegistrationForRequest)
+          : undefined,
+      );
       log.debug('Caught exception in rendering request: %s', exceptionMessage);
       return Promise.resolve({ exceptionMessage });
     }
@@ -545,7 +596,7 @@ export async function buildExecutionContext(
         return;
       }
       released = true;
-      retainedBundlePaths.forEach(releaseSourceMapRegistration);
+      retainedSourceMapRegistrations.forEach(releaseSourceMapRegistration);
     },
   };
 }
@@ -564,9 +615,14 @@ export function resetVM() {
  * @public TODO: Remove the line below when this function is actually used
  */
 export function removeVM(bundlePath: string) {
+  const vmContext = vmContexts.get(bundlePath);
   vmContexts.delete(bundlePath);
   vmCreationPromises.delete(bundlePath);
-  activeSourceMapRequestCounts.delete(bundlePath);
-  evictedSourceMapRegistrations.delete(bundlePath);
-  unregisterBundleForSourceMaps(bundlePath);
+  if (vmContext) {
+    activeSourceMapRequestCounts.delete(vmContext.sourceMapRegistration);
+    evictedSourceMapRegistrations.delete(vmContext.sourceMapRegistration);
+    unregisterBundleForSourceMaps(vmContext.sourceMapRegistration);
+  } else {
+    unregisterBundleForSourceMaps(bundlePath);
+  }
 }

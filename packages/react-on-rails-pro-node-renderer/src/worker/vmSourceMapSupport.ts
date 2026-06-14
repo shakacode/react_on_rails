@@ -45,7 +45,8 @@ import { SourceMap } from 'module';
 import type { SourceMapping } from 'module';
 import log from '../shared/log.js';
 
-interface BundleSourceMapRegistration {
+export interface BundleSourceMapRegistration {
+  bundleFilePath: string;
   /**
    * Column correction for frames on line 1 of the bundle. When the bundle is
    * evaluated wrapped in `Module.wrap` (the `supportModules` /
@@ -59,6 +60,13 @@ interface BundleSourceMapRegistration {
    * sourceMappingURL comment was present.
    */
   sourceMappingUrl?: string | null;
+  /**
+   * `undefined` keeps legacy lazy lookup behavior. `null` means registration
+   * time lookup found no usable source map. A string freezes the source-map JSON
+   * for this VM generation so same-path rebuilds cannot remap old bytecode with
+   * a newer map.
+   */
+  sourceMapJson?: string | null;
 }
 
 interface LoadedSourceMap {
@@ -72,10 +80,10 @@ interface LoadedSourceMap {
 // not be usable to probe arbitrary filesystem paths.
 const registeredBundles = new Map<string, BundleSourceMapRegistration>();
 
-// Lazily-populated cache: bundle path -> parsed SourceMap, or null when the
-// bundle has no (usable) source map. Registration invalidates entries so a
-// same-path build retry cannot be poisoned by an earlier failed lookup.
-const sourceMapCache = new Map<string, LoadedSourceMap | null>();
+// Lazily-populated cache per bundle registration generation, or null when that
+// generation has no usable source map. Same-path rebuilds get distinct
+// registrations so old active VM contexts cannot be remapped with newer maps.
+let sourceMapCache = new WeakMap<BundleSourceMapRegistration, LoadedSourceMap | null>();
 let warnedMissingSourceMapConstructor = false;
 
 /**
@@ -100,39 +108,6 @@ function extractSourceMappingUrl(bundleContents: string): string | undefined {
     match = sourceMappingUrlRegex.exec(bundleContents);
   }
   return lastMatch?.[1];
-}
-
-/**
- * Registers a bundle file so stack frames pointing into it can be remapped.
- * Pass `bundleContents` when available; omitting it makes the first error-path
- * lookup synchronously re-read the bundle to find its `sourceMappingURL`.
- */
-export function registerBundleForSourceMaps(
-  bundleFilePath: string,
-  firstLineColumnOffset = 0,
-  bundleContents?: string,
-) {
-  registeredBundles.set(bundleFilePath, {
-    firstLineColumnOffset,
-    sourceMappingUrl:
-      bundleContents === undefined ? undefined : (extractSourceMappingUrl(bundleContents) ?? null),
-  });
-  sourceMapCache.delete(bundleFilePath);
-}
-
-/**
- * Drops the registration and any cached source map for a bundle.
- */
-export function unregisterBundleForSourceMaps(bundleFilePath: string) {
-  registeredBundles.delete(bundleFilePath);
-  sourceMapCache.delete(bundleFilePath);
-}
-
-/** @internal Used in tests */
-export function resetSourceMapSupport() {
-  registeredBundles.clear();
-  sourceMapCache.clear();
-  warnedMissingSourceMapConstructor = false;
 }
 
 function parseDataUrlSourceMap(url: string): string | undefined {
@@ -216,6 +191,85 @@ function hasReadableFile(candidatePath: string) {
   }
 }
 
+function readSourceMapJsonForBundle(
+  bundleFilePath: string,
+  sourceMappingUrl: string | undefined,
+): string | undefined {
+  try {
+    if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
+      return parseDataUrlSourceMap(sourceMappingUrl);
+    }
+
+    const candidatePaths: string[] = [];
+    if (sourceMappingUrl) {
+      const sourceMapPath = resolveSourceMapPath(bundleFilePath, sourceMappingUrl);
+      if (sourceMapPath) {
+        candidatePaths.push(sourceMapPath);
+      }
+    }
+    // Fallback: the uploaded bundle is renamed to `<timestamp>.js`, so a map
+    // uploaded alongside it under that name is also worth checking.
+    candidatePaths.push(`${bundleFilePath}.map`);
+    const mapPath = candidatePaths.find(hasReadableFile);
+    return mapPath ? fs.readFileSync(mapPath, 'utf8') : undefined;
+  } catch (error) {
+    log.debug('Failed to capture source map for bundle %s: %s', bundleFilePath, error);
+    return undefined;
+  }
+}
+
+/**
+ * Registers a bundle file so stack frames pointing into it can be remapped.
+ * Pass `bundleContents` when available; omitting it makes the first error-path
+ * lookup synchronously re-read the bundle to find its `sourceMappingURL`.
+ */
+export function registerBundleForSourceMaps(
+  bundleFilePath: string,
+  firstLineColumnOffset = 0,
+  bundleContents?: string,
+) {
+  const sourceMappingUrl =
+    bundleContents === undefined ? undefined : (extractSourceMappingUrl(bundleContents) ?? null);
+  const registration = {
+    bundleFilePath,
+    firstLineColumnOffset,
+    sourceMappingUrl,
+    sourceMapJson:
+      bundleContents === undefined
+        ? undefined
+        : (readSourceMapJsonForBundle(bundleFilePath, sourceMappingUrl ?? undefined) ?? null),
+  };
+  registeredBundles.set(bundleFilePath, registration);
+  return registration;
+}
+
+/**
+ * Drops the registration and any cached source map for a bundle.
+ */
+export function unregisterBundleForSourceMaps(bundleOrRegistration: string | BundleSourceMapRegistration) {
+  if (typeof bundleOrRegistration === 'string') {
+    const registration = registeredBundles.get(bundleOrRegistration);
+    if (registration) {
+      sourceMapCache.delete(registration);
+    }
+    registeredBundles.delete(bundleOrRegistration);
+    return;
+  }
+
+  const currentRegistration = registeredBundles.get(bundleOrRegistration.bundleFilePath);
+  if (currentRegistration === bundleOrRegistration) {
+    registeredBundles.delete(bundleOrRegistration.bundleFilePath);
+  }
+  sourceMapCache.delete(bundleOrRegistration);
+}
+
+/** @internal Used in tests */
+export function resetSourceMapSupport() {
+  registeredBundles.clear();
+  sourceMapCache = new WeakMap<BundleSourceMapRegistration, LoadedSourceMap | null>();
+  warnedMissingSourceMapConstructor = false;
+}
+
 function createSourceMap(payload: ConstructorParameters<typeof SourceMap>[0]): SourceMap | null {
   if (typeof SourceMap === 'function') {
     return new SourceMap(payload);
@@ -256,25 +310,10 @@ function loadSourceMapForBundle(
         ? extractSourceMappingUrl(fs.readFileSync(bundleFilePath, 'utf8'))
         : (registration.sourceMappingUrl ?? undefined);
 
-    let sourceMapJson: string | undefined;
-    if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
-      sourceMapJson = parseDataUrlSourceMap(sourceMappingUrl);
-    } else {
-      const candidatePaths: string[] = [];
-      if (sourceMappingUrl) {
-        const sourceMapPath = resolveSourceMapPath(bundleFilePath, sourceMappingUrl);
-        if (sourceMapPath) {
-          candidatePaths.push(sourceMapPath);
-        }
-      }
-      // Fallback: the uploaded bundle is renamed to `<timestamp>.js`, so a map
-      // uploaded alongside it under that name is also worth checking.
-      candidatePaths.push(`${bundleFilePath}.map`);
-      const mapPath = candidatePaths.find(hasReadableFile);
-      if (mapPath) {
-        sourceMapJson = fs.readFileSync(mapPath, 'utf8');
-      }
-    }
+    const sourceMapJson =
+      registration.sourceMapJson === undefined
+        ? readSourceMapJsonForBundle(bundleFilePath, sourceMappingUrl)
+        : (registration.sourceMapJson ?? undefined);
 
     if (!sourceMapJson) {
       return null;
@@ -300,12 +339,11 @@ function loadSourceMapForBundle(
   }
 }
 
-function sourceMapForBundle(bundleFilePath: string): LoadedSourceMap | null {
-  let sourceMap = sourceMapCache.get(bundleFilePath);
+function sourceMapForRegistration(registration: BundleSourceMapRegistration): LoadedSourceMap | null {
+  let sourceMap = sourceMapCache.get(registration);
   if (sourceMap === undefined) {
-    const registration = registeredBundles.get(bundleFilePath);
-    sourceMap = registration ? loadSourceMapForBundle(bundleFilePath, registration) : null;
-    sourceMapCache.set(bundleFilePath, sourceMap);
+    sourceMap = loadSourceMapForBundle(registration.bundleFilePath, registration);
+    sourceMapCache.set(registration, sourceMap);
   }
   return sourceMap;
 }
@@ -324,7 +362,8 @@ export interface ResolvedSourcePosition {
  * context, so it validates its inputs and only operates on registered bundle
  * paths.
  */
-export function resolveOriginalPosition(
+export function resolveOriginalPositionForRegistration(
+  registration: BundleSourceMapRegistration,
   fileName: unknown,
   lineNumber: unknown,
   columnNumber: unknown,
@@ -333,6 +372,7 @@ export function resolveOriginalPosition(
     typeof fileName !== 'string' ||
     typeof lineNumber !== 'number' ||
     typeof columnNumber !== 'number' ||
+    fileName !== registration.bundleFilePath ||
     !Number.isFinite(lineNumber) ||
     !Number.isFinite(columnNumber) ||
     !Number.isInteger(lineNumber) ||
@@ -343,12 +383,7 @@ export function resolveOriginalPosition(
     return null;
   }
 
-  const registration = registeredBundles.get(fileName);
-  if (!registration) {
-    return null;
-  }
-
-  const sourceMap = sourceMapForBundle(fileName);
+  const sourceMap = sourceMapForRegistration(registration);
   if (!sourceMap) {
     return null;
   }
@@ -385,6 +420,17 @@ export function resolveOriginalPosition(
   };
 }
 
+export function resolveOriginalPosition(
+  fileName: unknown,
+  lineNumber: unknown,
+  columnNumber: unknown,
+): ResolvedSourcePosition | null {
+  const registration = typeof fileName === 'string' ? registeredBundles.get(fileName) : undefined;
+  return registration
+    ? resolveOriginalPositionForRegistration(registration, fileName, lineNumber, columnNumber)
+    : null;
+}
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -398,42 +444,62 @@ function escapeRegExp(value: string) {
  * pass preserves the same allowlist: only exact registered bundle paths are
  * remapped.
  */
-export function remapStackTrace(stack: unknown): string | undefined {
-  if (typeof stack !== 'string') {
-    return undefined;
-  }
-
+function remapStackTraceForRegistration(stack: string, registration: BundleSourceMapRegistration) {
+  const { bundleFilePath } = registration;
   let remappedStack = stack;
-  registeredBundles.forEach((_registration, bundleFilePath) => {
-    const bundleLocationRegex = new RegExp(`${escapeRegExp(bundleFilePath)}:(\\d+):(\\d+)`, 'g');
-    remappedStack = remappedStack.replace(bundleLocationRegex, (match, lineNumber, columnNumber) => {
-      const position = resolveOriginalPosition(bundleFilePath, Number(lineNumber), Number(columnNumber));
-      return position ? `${position.source}:${position.line}:${position.column}` : match;
-    });
+  const bundleLocationRegex = new RegExp(`${escapeRegExp(bundleFilePath)}:(\\d+):(\\d+)`, 'g');
+  remappedStack = remappedStack.replace(bundleLocationRegex, (match, lineNumber, columnNumber) => {
+    const position = resolveOriginalPositionForRegistration(
+      registration,
+      bundleFilePath,
+      Number(lineNumber),
+      Number(columnNumber),
+    );
+    return position ? `${position.source}:${position.line}:${position.column}` : match;
+  });
 
-    const sourceMap = sourceMapForBundle(bundleFilePath);
-    sourceMap?.sources.forEach((source) => {
-      if (!source.includes('://')) {
-        return;
-      }
+  const sourceMap = sourceMapForRegistration(registration);
+  sourceMap?.sources.forEach((source) => {
+    if (!source.includes('://')) {
+      return;
+    }
 
-      // Jest applies the map before this pass but coerces URL-like sources such
-      // as `webpack://app/file.ts` into `<bundle-dir>/webpack:/app/file.ts`.
-      // Other host formatters are handled by the bundle-path regex above; a
-      // miss here is benign because the regex simply will not match.
-      const hostMappedSourcePath = path.join(path.dirname(bundleFilePath), source.replace('://', ':/'));
-      const hostMappedSourceRegex = new RegExp(`${escapeRegExp(hostMappedSourcePath)}:(\\d+):(\\d+)`, 'g');
-      remappedStack = remappedStack.replace(
-        hostMappedSourceRegex,
-        (_match, lineNumber, columnNumber) => `${source}:${lineNumber}:${columnNumber}`,
-      );
-    });
+    // Jest applies the map before this pass but coerces URL-like sources such
+    // as `webpack://app/file.ts` into `<bundle-dir>/webpack:/app/file.ts`.
+    // Other host formatters are handled by the bundle-path regex above; a
+    // miss here is benign because the regex simply will not match.
+    const hostMappedSourcePath = path.join(path.dirname(bundleFilePath), source.replace('://', ':/'));
+    const hostMappedSourceRegex = new RegExp(`${escapeRegExp(hostMappedSourcePath)}:(\\d+):(\\d+)`, 'g');
+    remappedStack = remappedStack.replace(
+      hostMappedSourceRegex,
+      (_match, lineNumber, columnNumber) => `${source}:${lineNumber}:${columnNumber}`,
+    );
   });
 
   return remappedStack;
 }
 
-export function remapErrorStack(error: unknown) {
+export function remapStackTrace(
+  stack: unknown,
+  registration?: BundleSourceMapRegistration,
+): string | undefined {
+  if (typeof stack !== 'string') {
+    return undefined;
+  }
+
+  if (registration) {
+    return remapStackTraceForRegistration(stack, registration);
+  }
+
+  let remappedStack = stack;
+  registeredBundles.forEach((currentRegistration) => {
+    remappedStack = remapStackTraceForRegistration(remappedStack, currentRegistration);
+  });
+
+  return remappedStack;
+}
+
+export function remapErrorStack(error: unknown, registration?: BundleSourceMapRegistration) {
   if (
     typeof error !== 'object' ||
     error === null ||
@@ -443,7 +509,7 @@ export function remapErrorStack(error: unknown) {
   }
 
   const stackableError = error as { stack: string };
-  const remappedStack = remapStackTrace(stackableError.stack);
+  const remappedStack = remapStackTrace(stackableError.stack, registration);
   if (!remappedStack || remappedStack === stackableError.stack) {
     return;
   }
