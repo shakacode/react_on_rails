@@ -85,9 +85,9 @@ Plan a PR batch
      as the authoritative source; treat the API as a best-effort cross-check.
      When the local diff succeeds, keep those paths authoritative even if the
      API response is capped, incomplete, or unavailable. Use the API as the
-     scheduling source only when the local diff cannot run. Fetch with
-     `set -o pipefail` enabled, then
-     `gh api --paginate --method GET repos/OWNER/REPO/pulls/N/files -f per_page=100 | jq -s 'add // []'`;
+     scheduling source only when the local diff cannot run. Run the API
+     pipeline in one shell invocation with `pipefail` enabled, for example
+     `bash -o pipefail -c 'gh api --paginate --method GET repos/OWNER/REPO/pulls/N/files -f per_page=100 | jq -s '"'"'add // []'"'"''`;
      if either command fails, the response is an error-shaped object such as
      `{"message": ...}` / `{"errors": ...}`, or any row lacks `.filename`, record
      the paths as `UNKNOWN` instead of trusting an empty array from a broken
@@ -98,14 +98,16 @@ Plan a PR batch
      counting paths or extracting filenames and returns an empty array for an
      empty stream; no Link header check is needed after the command returns.
      The response is acceptable only when every row records `.filename`, every
-     row with `status: "renamed"` records `.previous_filename`, and its
-     listed-file count matches the PR's `changedFiles` value from
+     row with `status: "renamed"` records `.previous_filename`, and the
+     listed-file count is sane against the PR's `changedFiles` value from
      `gh pr view N --repo OWNER/REPO --json changedFiles`. GitHub caps the
      Files API at ~3000 files; if the API is the only available source and
-     `changedFiles` is at or above that cap, the paginated count does not match
+     `changedFiles` is at or above that cap, the paginated count is greater than
      `changedFiles`, or any row with `status: "renamed"` is missing
      `.previous_filename`, record the PR paths as `UNKNOWN` and treat the item
-     as serial.
+     as serial. If the paginated count is lower than `changedFiles`, re-read
+     `changedFiles` once before recording `UNKNOWN` so freshly pushed PRs do not
+     fail the sanity check on transient metadata lag.
    - File-touch map, issue path discovery: read the issue body, record proposed
      new paths from issue/design notes, and grep the repo to confirm existing
      paths. If paths cannot be determined from the issue body or design notes,
@@ -116,9 +118,9 @@ Plan a PR batch
      runs as a serial "discovery lane" — a lane that first determines its real
      paths instead of editing in parallel. Never run discovery lanes
      concurrently with active editor lanes: for items already in the scheduling
-     set, complete discovery before the editor wave starts. If new items arrive
-     while an editor wave is already running, wait for that wave to finish before
-     starting discovery for those new items.
+     set, complete discovery before the editor wave starts. If the coordinator
+     adds items after an editor wave has already started, wait for that wave to
+     finish before starting discovery for those new items.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
