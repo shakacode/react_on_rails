@@ -615,7 +615,13 @@ function unmountAllStores(): void {
   storeRenderers.clear();
 }
 
+function clearRSCPreloadedPayloadGlobals(): void {
+  delete window.REACT_ON_RAILS_RSC_PAYLOADS;
+  delete window.REACT_ON_RAILS_RSC_ERRORS;
+}
+
 export function unmountAll(): void {
   unmountAllComponents();
   unmountAllStores();
+  clearRSCPreloadedPayloadGlobals();
 }
