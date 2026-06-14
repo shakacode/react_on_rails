@@ -347,6 +347,38 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "rejects explicit UNKNOWN changelog classification" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 41,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-unknown-changelog", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "UNKNOWN",
+        chdir: repo_root
+      )
+
+      expect(status.exitstatus).to eq(2)
+      expect(stdout).to be_empty
+      expect(stderr).to include("invalid argument: --changelog-classification UNKNOWN")
+    end
+  end
+
   it "allows a clean approved PR in strict mode" do
     fixture = {
       "repository" => "shakacode/react_on_rails",

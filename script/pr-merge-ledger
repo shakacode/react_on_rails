@@ -19,7 +19,6 @@ class PrMergeLedger
     changelog_missing
     deferred_to_update_changelog
     not_user_visible
-    UNKNOWN
   ].freeze
   DISPOSITIONS = %w[fixed explicitly_waived follow_up_issue not_applicable].freeze
   REVIEW_DECISION_STATES = %w[APPROVED CHANGES_REQUESTED].freeze
