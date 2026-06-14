@@ -307,7 +307,8 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 4. If any autonomous nit fix failed local validation or self-review and the
    repair is not mechanical and in scope, drop or revert that nit and record the
    failure rationale before proceeding to commit. Promote the underlying concern
-   to `DISCUSS` if it still matters.
+   to `DISCUSS` only when it is a correctness issue, regression risk, or
+   explicit reviewer request.
 5. Commit/push-before-reply gate: if local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
 6. Reply to each addressed `MUST-FIX` or `OPTIONAL` comment explaining the fix or
    recorded outcome. For autonomously deferred/declined optional nits, include
@@ -477,7 +478,9 @@ After posting the reply, resolve the review thread when all of the following are
   Maintainer Attention Contract with the rationale recorded in the reply or
   summary. Autonomous deferred/declined optional replies must include the tag
   `[auto-deferred]` on its own line plus a one-line rationale before the thread
-  is resolved.
+  is resolved. An auto-resolved optional thread that lacks that tag is a spec
+  violation; do not resolve the thread if you cannot post the tag and rationale
+  first.
 - The thread is not already resolved
 
 Use GitHub GraphQL to resolve the thread:
@@ -731,7 +734,11 @@ Use exact dates/timestamps in this comment when referring to the cutoff or scan 
 
 ## Step 11: Merge-Ready Signal
 
-After completing the chosen action (`f`, `f+i`, `f+o`, `d`, `o`, `r`, `m`, or direct item selection) and posting the PR summary comment, report merge readiness status:
+After completing a chosen action that posts a PR summary comment (`f`, `f+i`,
+`f+o`, `d`, selected `o`, `r`, `m`, or direct item selection), report merge
+readiness status. Inspect-only bare `o` stops after presenting optional items
+for selection; it posts no summary checkpoint and makes no merge-readiness
+claim.
 
 ```text
 All review threads resolved. PR is merge-ready.

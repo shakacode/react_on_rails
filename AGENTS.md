@@ -227,7 +227,7 @@ contract unless a maintainer explicitly narrows the run.
   output, runtime behavior, validation scope, or the semantic meaning of any
   document section under active review. Low-risk means local and mechanically
   checkable, such as a formatter-confirmed cleanup; a rename that requires
-  searching all callers is not low-risk by default.
+  searching all callers is not low-risk.
   Qualifying examples: typo/comment punctuation, whitespace or trailing comma
   cleanup, type-only or linter-confirmed unused import removal after verifying
   the imported module has no side effects, or unambiguous documentation wording.
@@ -241,7 +241,8 @@ contract unless a maintainer explicitly narrows the run.
   If an autonomous nit fix fails local validation or self-review, repair it in
   the same batch only when the repair is still mechanical and in scope;
   otherwise drop or revert that nit, record the failed validation and rationale,
-  and promote the underlying concern to `DISCUSS` only if it still matters.
+  and promote the underlying concern to `DISCUSS` only when it is a correctness
+  issue, regression risk, or explicit reviewer request.
   Never push a failing autonomous nit or ask the maintainer to debug it.
   Escalate only when the item changes behavior, expands scope, conflicts with
   policy, or has unclear risk.

@@ -227,7 +227,8 @@ Execution flow when terminal access is available:
      6. If an autonomous nit fix fails local validation or self-review and the
         repair is not mechanical and in scope, drop or revert that nit, record
         the failure rationale, and promote the underlying concern to `DISCUSS`
-        if it still matters before the commit/push gate.
+        only when it is a correctness issue, regression risk, or explicit
+        reviewer request before the commit/push gate.
      7. If local changes exist, commit, ask for push confirmation, then push; if
         no local changes exist, skip commit/push and continue decision flow.
      8. Reply/resolve addressed must-fix and optional threads, including
@@ -258,7 +259,7 @@ Execution flow when terminal access is available:
      - Issue comments: `gh api repos/${REPO}/issues/${PR_NUMBER}/comments -X POST -f body="<response>"`
      - Review comment replies: use the selected item's review comment id, not the parsed input `COMMENT_ID`: `gh api repos/${REPO}/pulls/${PR_NUMBER}/comments/${REVIEW_COMMENT_ID}/replies -X POST -f body="<response>"`
      - Review summary body replies: `gh api repos/${REPO}/issues/${PR_NUMBER}/comments -X POST -f body="<response>"`
-   - Resolve threads only when the issue is actually handled, explicitly declined with my approval, or autonomously deferred/declined as a low-risk behavior-preserving `OPTIONAL` item under the Maintainer Attention Contract with rationale recorded. Autonomous deferred/declined optional replies must include the tag `[auto-deferred]` on its own line plus a one-line rationale before the thread is resolved:
+   - Resolve threads only when the issue is actually handled, explicitly declined with my approval, or autonomously deferred/declined as a low-risk behavior-preserving `OPTIONAL` item under the Maintainer Attention Contract with rationale recorded. Autonomous deferred/declined optional replies must include the tag `[auto-deferred]` on its own line plus a one-line rationale before the thread is resolved. An auto-resolved optional thread that lacks that tag is a spec violation; do not resolve the thread if you cannot post the tag and rationale first:
      `gh api graphql -f query='mutation($threadId:ID!) { resolveReviewThread(input:{threadId:$threadId}) { thread { id isResolved } } }' -f threadId="<THREAD_ID>"`
    - Do not resolve anything still in progress or uncertain.
    - **Self-review gate**: After making all code changes but before committing, review the diff for issues introduced by the fixes themselves. Check for correctness bugs, style violations, and inconsistencies with surrounding code. Fix critical issues immediately. This prevents new review cycles caused by the fixes. If you have access to a code-review agent or tool, use it; otherwise, do a manual diff review.
@@ -302,6 +303,7 @@ Execution flow when terminal access is available:
    - After `m`, only tell me the PR is merge-ready when no must-fix items were deferred, the deferred bundle has an explicit tracking/drop decision, and any dropped `DISCUSS` items are explicitly declined/resolved; if there were zero deferred items, skip tracking and use the no-must-fix merge-ready rule; otherwise explicitly say it is not merge-ready
    - After direct selection, do not signal merge-ready automatically; first evaluate remaining `MUST-FIX`/`DISCUSS` items and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`. Unresolved `OPTIONAL` items do not block the merge-ready signal.
    - After `d`, `o`, or `r`, if unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready automatically; re-offer `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`. Unresolved `OPTIONAL` items do not block the merge-ready signal.
+   - After inspect-only bare `o`, stop after presenting optional items; do not post a summary checkpoint or make a merge-readiness claim.
    - Show the deferred-work tracking outcome if one was chosen
    - Do not auto-merge
 
