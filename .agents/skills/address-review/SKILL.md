@@ -302,7 +302,8 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    inventing a deferred bundle inside plain `f`.
 4. If any autonomous nit fix failed local validation or self-review and the
    repair is not mechanical and in scope, drop or revert that nit and record the
-   failure rationale before proceeding to commit.
+   failure rationale before proceeding to commit. Promote the underlying concern
+   to `DISCUSS` if it still matters.
 5. Commit/push-before-reply gate: if local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
 6. Reply to each addressed `MUST-FIX` or `OPTIONAL` comment explaining the fix or recorded outcome.
 7. Resolve the corresponding review threads when the issue is handled or explicitly declined.
