@@ -38,6 +38,7 @@ module ReactOnRailsPro
       # Keep the index entry alive slightly longer than the cache entries it
       # points at, so an entry never outlives its index registration.
       INDEX_TTL_SLACK = 300 # 5 minutes, in seconds
+      MAX_EXPIRY_WARN_KEYS = 1_000
       @warned_missing_expiry_cache_keys = {}
       @warned_missing_expiry_mutex = Mutex.new
       @warned_private_key_api = {}
@@ -52,9 +53,10 @@ module ReactOnRailsPro
         def register_normalized(normalized_tags, cache_key, cache_options)
           return if normalized_tags.empty?
 
+          entry_options = merged_cache_options(cache_options)
           entry_key = normalized_entry_key(cache_key, cache_options)
-          warn_if_expires_in_missing(cache_options, entry_key)
-          normalized_tags.uniq.each { |tag| append_entry_key(tag, entry_key, cache_options) }
+          warn_if_expires_in_missing(entry_options, entry_key)
+          normalized_tags.uniq.each { |tag| append_entry_key(tag, entry_key, entry_options) }
         end
 
         # Deletes every cache entry recorded under the given tags, then the
@@ -99,6 +101,8 @@ module ReactOnRailsPro
           # time, regardless of intervening updates.
           stable = stable_record_identity(resolved)
           return stable if stable
+          return nil if stable_record_identity_candidate?(resolved)
+
           # Other objects exposing #cache_key (never #cache_key_with_version,
           # which embeds the recyclable version) pass their cache_key through.
           return resolved.cache_key.to_s if resolved.respond_to?(:cache_key)
@@ -121,12 +125,16 @@ module ReactOnRailsPro
         # cache_versioning = false AR#cache_key embeds updated_at, which would
         # change between registration and revalidation and orphan the entry.
         def stable_record_identity(resolved)
-          return nil unless resolved.respond_to?(:model_name) && resolved.respond_to?(:id)
+          return nil unless stable_record_identity_candidate?(resolved)
 
           id = resolved.id
-          return "" if id.nil? || (resolved.respond_to?(:new_record?) && resolved.new_record?)
+          return nil if id.nil? || (resolved.respond_to?(:new_record?) && resolved.new_record?)
 
           "#{resolved.model_name.cache_key}/#{id}"
+        end
+
+        def stable_record_identity_candidate?(resolved)
+          resolved.respond_to?(:model_name) && resolved.respond_to?(:id)
         end
 
         def append_entry_key(tag, entry_key, cache_options)
@@ -139,7 +147,8 @@ module ReactOnRailsPro
 
           now = Time.now.to_f
           expires_at = [existing_expires_at, now + index_ttl(cache_options)].compact.max
-          Rails.cache.write(key, { "keys" => keys, "expires_at" => expires_at }, expires_in: expires_at - now)
+          ttl = [expires_at - now, 1].max
+          Rails.cache.write(key, { "keys" => keys, "expires_at" => expires_at }, expires_in: ttl)
         end
 
         def read_index(key)
@@ -180,7 +189,10 @@ module ReactOnRailsPro
         # Rails cache expiry options, or nil when the entry has no expiry.
         def entry_ttl(cache_options)
           expires_in = cache_options[:expires_in]
-          return expires_in.to_f if expires_in
+          if expires_in
+            expires_in = expires_in.to_f
+            return expires_in if expires_in.positive?
+          end
 
           expires_at = cache_options[:expires_at]
           return nil unless expires_at
@@ -211,7 +223,8 @@ module ReactOnRailsPro
           @warned_missing_expiry_mutex ||= Mutex.new
           @warned_missing_expiry_cache_keys ||= {}
           @warned_missing_expiry_mutex.synchronize do
-            return false if @warned_missing_expiry_cache_keys[entry_key]
+            next false if @warned_missing_expiry_cache_keys[entry_key]
+            next false if @warned_missing_expiry_cache_keys.size >= MAX_EXPIRY_WARN_KEYS
 
             @warned_missing_expiry_cache_keys[entry_key] = true
           end
@@ -251,7 +264,16 @@ module ReactOnRailsPro
         # across the Rails versions covered by this PR.
         PRIVATE_KEY_METHODS = %i[expanded_key namespace_key merged_options].freeze
 
+        def merged_cache_options(cache_options)
+          cache_options ||= {}
+          store = Rails.cache
+          return cache_options unless store.respond_to?(:merged_options, true)
+
+          store.send(:merged_options, cache_options)
+        end
+
         def normalized_entry_key(cache_key, cache_options)
+          cache_options ||= {}
           # Record the store's *logical* cache name: the expanded key plus any
           # :namespace from the entry's cache_options or the store default —
           # exactly what the store's own normalize_key computes BEFORE

@@ -314,6 +314,31 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("t")["expires_at"]).to be_within(5).of(now + 123)
     end
 
+    it "uses the cache store default expires_in for the index TTL" do
+      store = ActiveSupport::Cache::MemoryStore.new(expires_in: 30.days)
+      allow(Rails).to receive_messages(cache: store, env: ActiveSupport::StringInquirer.new("development"))
+      now = Time.now.to_f
+
+      described_class.register(["t"], "k1", {})
+
+      expected = now + 30.days.to_f + described_class::INDEX_TTL_SLACK
+      expect(index_payload("t")["expires_at"]).to be_within(5).of(expected)
+      expect(logger_mock).not_to have_received(:warn).with(
+        /without cache_options\[:expires_in\].*cache_options\[:expires_at\]/
+      )
+    end
+
+    it "uses at least one second for very short index writes" do
+      allow(ReactOnRailsPro.configuration).to receive(:cache_tag_index_expires_in).and_return(0.001)
+      allow(Rails.cache).to receive(:write).and_call_original
+
+      described_class.register(["t"], "k1", {})
+
+      expect(Rails.cache).to have_received(:write) do |_key, _payload, options|
+        expect(options[:expires_in]).to be >= 1
+      end
+    end
+
     it "covers entries that use expires_at instead of expires_in" do
       now = Time.now.to_f
 
@@ -346,6 +371,18 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       described_class.register(["t"], "k1", {})
       described_class.register(["t"], "k1", {})
       described_class.register(["t"], "k2", {})
+
+      expected_warning = /without cache_options\[:expires_in\].*cache_options\[:expires_at\]/
+      expect(logger_mock).to have_received(:warn).with(expected_warning).twice
+    end
+
+    it "caps the number of remembered missing-expiry warning keys" do
+      stub_const("#{described_class}::MAX_EXPIRY_WARN_KEYS", 2)
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
+
+      described_class.register(["t"], "k1", {})
+      described_class.register(["t"], "k2", {})
+      described_class.register(["t"], "k3", {})
 
       expected_warning = /without cache_options\[:expires_in\].*cache_options\[:expires_at\]/
       expect(logger_mock).to have_received(:warn).with(expected_warning).twice

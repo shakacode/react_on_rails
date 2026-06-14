@@ -65,7 +65,7 @@ RSpec.describe "ReactOnRailsPro::Cache::Revalidates", :caching do
 
     it "revalidates after an update commits" do
       post = RevalidatingPost.create!(title: "Hello", body: "World")
-      key = write_tagged_entry(post.cache_key)
+      key = write_tagged_entry(post)
       expect(Rails.cache.read(key)).to be_present
 
       post.update!(title: "Changed")
@@ -75,7 +75,7 @@ RSpec.describe "ReactOnRailsPro::Cache::Revalidates", :caching do
 
     it "revalidates after a touch" do
       post = RevalidatingPost.create!(title: "Hello", body: "World")
-      key = write_tagged_entry(post.cache_key)
+      key = write_tagged_entry(post)
 
       post.touch
 
@@ -84,7 +84,7 @@ RSpec.describe "ReactOnRailsPro::Cache::Revalidates", :caching do
 
     it "revalidates after a destroy" do
       post = RevalidatingPost.create!(title: "Hello", body: "World")
-      key = write_tagged_entry(post.cache_key)
+      key = write_tagged_entry(post)
 
       post.destroy!
 
@@ -93,7 +93,7 @@ RSpec.describe "ReactOnRailsPro::Cache::Revalidates", :caching do
 
     it "does not revalidate when the transaction rolls back" do
       post = RevalidatingPost.create!(title: "Hello", body: "World")
-      key = write_tagged_entry(post.cache_key)
+      key = write_tagged_entry(post)
 
       ActiveRecord::Base.transaction do
         post.update!(title: "Changed")
@@ -101,6 +101,19 @@ RSpec.describe "ReactOnRailsPro::Cache::Revalidates", :caching do
       end
 
       expect(Rails.cache.read(key)).to be_present
+    end
+
+    it "uses the record normalization path when cache_versioning is disabled" do
+      previous = ActiveRecord::Base.cache_versioning
+      ActiveRecord::Base.cache_versioning = false
+      post = RevalidatingPost.create!(title: "Hello", body: "World")
+      key = write_tagged_entry(post)
+
+      post.update!(title: "Changed")
+
+      expect(Rails.cache.read(key)).to be_nil
+    ensure
+      ActiveRecord::Base.cache_versioning = previous
     end
   end
 

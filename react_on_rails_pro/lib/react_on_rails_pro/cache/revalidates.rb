@@ -69,6 +69,8 @@ module ReactOnRailsPro
         # without stacking a duplicate after_commit callback.
         def revalidates_react_cache(&resolver)
           self._react_on_rails_cache_tags_resolver = resolver
+          # Subclasses rely on the inherited callback; class_attribute
+          # copy-on-write still lets each class provide its own resolver.
           return if _react_on_rails_revalidates_registered
 
           self._react_on_rails_revalidates_registered = true

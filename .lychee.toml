@@ -132,6 +132,7 @@ exclude = [
   # ============================================================================
   # EXTERNAL DOC PAGES WITH CI CONNECTIVITY FAILURES
   # ============================================================================
+  '^https://vite\.dev(/.*)?$', # Connection failed from CI
   '^https://tanstack\.com/query/latest/docs/framework/react/guides/ssr$',  # Connection failed from CI
 
   # ============================================================================
