@@ -116,6 +116,7 @@ test_parse_git_log_extracts_squash_and_merge_subject_prs_once() {
       printf '%s\t%s\n' "b00b00" "Mention issue (#9999) before final text"
       printf '%s\t%s\n' "f00f00" "Revert 'feat: foo (#4010)' (#4012)"
       printf '%s\t%s\n' "dad000" "Revert \"Merge pull request #4015 from shakacode/example\" (#4020)"
+      printf '%s\t%s\n' "bad999" "Revert \"Merge pull request #4016 from shakacode/example\""
       printf '%s\t%s\n' "fedcba" "Duplicate mention (#4014)"
       printf '%s\t%s\n' "999999" "No pull request marker"
     } | pma_scope_parse_git_log
@@ -257,7 +258,7 @@ JSON
   assert_equals "CLOSED" "$fingerprints" "closed markers remain dedupe context"
 }
 
-test_default_base_uses_latest_rc_reachable_from_head() {
+test_default_base_ignores_rc_tags_on_merged_side_branches() {
   local tmpdir repo fake_bin open_json closed_json out base_ref actual
 
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
@@ -279,6 +280,8 @@ test_default_base_uses_latest_rc_reachable_from_head() {
   git -C "$repo" commit --quiet --allow-empty -m "Next release candidate"
   git -C "$repo" tag v2.0.0.rc.1
   git -C "$repo" checkout --quiet main
+  git -C "$repo" commit --quiet --allow-empty -m "Main line before side merge"
+  git -C "$repo" merge --quiet --no-ff next-release -m "Merge pull request #4010 from test/next-release"
   git -C "$repo" commit --quiet --allow-empty -m "Main line change (#4014)"
 
   out="$(
@@ -289,8 +292,8 @@ test_default_base_uses_latest_rc_reachable_from_head() {
   actual="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("to_audit").join(",")' <<< "$out")"
 
   rm -rf "$tmpdir"
-  assert_equals "v1.0.0.rc.1" "$base_ref" "default base reachable from head"
-  assert_equals "4014" "$actual" "default-base to_audit"
+  assert_equals "v1.0.0.rc.1" "$base_ref" "default base on mainline"
+  assert_equals "4010,4014" "$actual" "default-base to_audit"
 }
 
 test_default_base_uses_nearest_rc_on_first_parent_history() {
@@ -470,18 +473,61 @@ test_sourced_main_help_does_not_change_shell_options() {
   assert_equals "$expected" "$out" "sourced pma_scope_main shell options"
 }
 
+test_sourced_main_run_preserves_cwd_and_exit_trap() {
+  local tmpdir repo fake_bin open_json closed_json base out expected expected_pwd
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
+  repo="$tmpdir/repo"
+  fake_bin="$tmpdir/bin"
+  open_json="$tmpdir/open.json"
+  closed_json="$tmpdir/closed.json"
+  mkdir -p "$repo/subdir" "$fake_bin"
+  printf '[]\n' > "$open_json"
+  printf '[]\n' > "$closed_json"
+  make_fake_gh "$fake_bin/gh" "$open_json" "$closed_json"
+
+  git -C "$repo" init --quiet --initial-branch=main
+  git -C "$repo" config user.email "test@example.com"
+  git -C "$repo" config user.name "Test User"
+  git -C "$repo" commit --quiet --allow-empty -m "base"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" commit --quiet --allow-empty -m "Main line change (#4014)"
+  expected_pwd="$(cd "$repo/subdir" && pwd)"
+
+  out="$(
+    bash -c '
+      set -uo pipefail
+      source "$1"
+      cd "$2/subdir"
+      trap '\''printf caller-exit-trap >/dev/null'\'' EXIT
+      PATH="$3:$PATH" pma_scope_main --base "$4" --head HEAD --repo owner/repo --json >/dev/null
+      rc=$?
+      printf "rc=%s\npwd=%s\ntrap=%s\n" "$rc" "$PWD" "$(trap -p EXIT)"
+    ' bash "$RESOLVER" "$repo" "$fake_bin" "$base"
+  )"
+  expected="$(
+    printf 'rc=0\n'
+    printf 'pwd=%s\n' "$expected_pwd"
+    printf "trap=trap -- 'printf caller-exit-trap >/dev/null' EXIT"
+  )"
+
+  rm -rf "$tmpdir"
+  assert_equals "$expected" "$out" "sourced pma_scope_main caller context"
+}
+
 run_test test_parse_git_log_extracts_squash_and_merge_subject_prs_once
 run_test test_extract_issue_markers_from_json_keeps_fingerprint_state_and_affected_prs
 run_test test_subtract_prs_preserves_all_merged_prs_when_carry_over_is_empty
 run_test test_resolver_uses_first_parent_for_merged_pr_scope
 run_test test_closed_markers_do_not_suppress_to_audit
-run_test test_default_base_uses_latest_rc_reachable_from_head
+run_test test_default_base_ignores_rc_tags_on_merged_side_branches
 run_test test_default_base_uses_nearest_rc_on_first_parent_history
 run_test test_resolver_rejects_base_outside_head_history
 run_test test_resolver_rejects_base_outside_first_parent_history
 run_test test_fetch_issue_markers_cleans_inner_tmpdir_on_parse_failure
 run_test test_limit_requires_positive_integer
 run_test test_sourced_main_help_does_not_change_shell_options
+run_test test_sourced_main_run_preserves_cwd_and_exit_trap
 
 if [ "$TESTS_FAILED" -ne 0 ]; then
   printf '\n%d of %d tests failed:\n' "$TESTS_FAILED" "$TESTS_RUN" >&2

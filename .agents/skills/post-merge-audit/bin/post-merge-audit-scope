@@ -64,7 +64,7 @@ ARGF.each_line do |line|
 
   # GitHub squash merges append the PR number at the end. Prefer that marker over quoted refs.
   pr_number = subject[/\s\(#(\d+)\)\s*\z/, 1]
-  pr_number ||= subject[/\bMerge pull request #(\d+)\b/, 1]
+  pr_number ||= subject[/\AMerge pull request #(\d+)\b/, 1]
   next if pr_number.nil? || seen[pr_number]
 
   seen[pr_number] = true
@@ -74,35 +74,20 @@ end
 }
 
 pma_scope_extract_issue_markers_from_json() {
-  ruby -rjson -e '
-raw = STDIN.read
-data = raw.strip.empty? ? [] : JSON.parse(raw)
-issues = data.is_a?(Array) ? data : [data]
-seen = {}
+  local tmpdir input_file rc
 
-issues.each do |issue|
-  body = issue.fetch("body", "").to_s
-  body.scan(/<!--\s*post-merge-audit-finding\s+v1\s*(.*?)-->/m).each do |match|
-    marker = match[0]
-    fingerprint = marker[/^\s*fingerprint:\s*(.+?)\s*$/i, 1]&.strip
-    affected_prs = marker[/^\s*affected_prs:\s*(.+?)\s*$/i, 1]&.strip
-    audit = marker[/^\s*audit:\s*(.+?)\s*$/i, 1]&.strip.to_s
-    next if fingerprint.nil? || affected_prs.nil?
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-json.XXXXXX")" || return 1
+  input_file="$tmpdir/stdin.json"
+  cat > "$input_file" || {
+    rc=$?
+    rm -rf "$tmpdir"
+    return "$rc"
+  }
 
-    prs = affected_prs.scan(/\d+/)
-    next if prs.empty?
-
-    issue_number = issue.fetch("number", "").to_s
-    state = issue.fetch("state", "").to_s
-    url = issue.fetch("url", "").to_s
-    dedupe_key = [fingerprint, issue_number, prs.join(",")].join("\0")
-    next if seen[dedupe_key]
-
-    seen[dedupe_key] = true
-    puts [fingerprint, issue_number, state, prs.join(","), audit, url].join("\t")
-  end
-end
-'
+  pma_scope_extract_issue_markers_from_json_files "$input_file"
+  rc=$?
+  rm -rf "$tmpdir"
+  return "$rc"
 }
 
 pma_scope_extract_issue_markers_from_json_files() {
@@ -488,7 +473,7 @@ JSON
   printf 'self-check passed\n'
 }
 
-pma_scope_main() {
+pma_scope_main() (
   local base_ref=""
   local head_ref=""
   local repo=""
@@ -557,8 +542,8 @@ pma_scope_main() {
     esac
   done
 
-  pma_scope_require_command git
-  pma_scope_require_command ruby
+  pma_scope_require_command git || return 1
+  pma_scope_require_command ruby || return 1
 
   repo_root="$(pma_scope_repo_root)"
   cd "$repo_root"
@@ -568,7 +553,7 @@ pma_scope_main() {
   fi
 
   if [ -z "$repo" ]; then
-    pma_scope_require_command gh
+    pma_scope_require_command gh || return 1
     repo="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
   fi
 
@@ -590,7 +575,7 @@ pma_scope_main() {
     return 1
   }
 
-  first_parent_match="$(git rev-list --first-parent "$head_sha" | grep -Fx "$base_sha" || true)"
+  first_parent_match="$(git rev-list --first-parent "$head_sha" | grep -Fxm1 "$base_sha" || true)"
   if [ "$first_parent_match" != "$base_sha" ]; then
     pma_scope_error "base ref is not on the first-parent history of head ref: $base_ref is not a mainline boundary for $head_ref"
     return 1
@@ -632,7 +617,7 @@ pma_scope_main() {
       return 1
       ;;
   esac
-}
+)
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   set -euo pipefail
