@@ -70,6 +70,8 @@ private defaults, liveness thresholds, or terminal-status details into public
 PRs.
 
 ```bash
+set -o pipefail
+
 if test -z "${AGENT_COORD_REPO:-}"; then
   echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
   false
