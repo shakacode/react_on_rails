@@ -34,9 +34,14 @@ class PrMergeLedger
   GITHUB_API_RETRY_BASE_DELAY_SECONDS = 0.25
   MAX_GRAPHQL_PAGES = 500
   GITHUB_REPO_NAME_PATTERN = /\A[A-Za-z0-9._-]+\z/
-  LIST_MARKER_PATTERN = /(?:[-*]|\d+[.)])\s*/
+  LIST_MARKER_PATTERN = /(?:[-*]\s*(?:\[[ xX]\]\s*)?|\d+[.)]\s*)/
   FINDING_LINE_PREFIX_PATTERN = /(?:#{LIST_MARKER_PATTERN.source})?(?:\#{1,6}\s+)?/
   PRIORITY_MARKER_PATTERN = /MUST[- ]?FIX|\[?P[0-2]\]?/
+  STANDALONE_PRIORITY_MARKER_PATTERN = /
+    (?<![A-Za-z0-9])
+    (?:#{PRIORITY_MARKER_PATTERN.source})
+    (?![A-Za-z0-9])
+  /ix
   FINDING_BADGE_PREFIX = %r{
     \A\s*(?:#{FINDING_LINE_PREFIX_PATTERN.source})(?:\*\*)?
     <sub><sub>!\[%<severity>s\s+Badge\]\([^)]+\)</sub></sub>
@@ -616,7 +621,7 @@ class PrMergeLedger
   end
 
   def append_uncovered_priority_occurrences(line, first_marker_end, occurrences)
-    line.scan(PRIORITY_MARKER_PATTERN) do
+    line.scan(STANDALONE_PRIORITY_MARKER_PATTERN) do
       match = Regexp.last_match
       next if match.begin(0) < first_marker_end
 
@@ -683,7 +688,7 @@ class PrMergeLedger
   end
 
   def priority_marker_count(text)
-    text.to_s.scan(PRIORITY_MARKER_PATTERN).length
+    text.to_s.scan(STANDALONE_PRIORITY_MARKER_PATTERN).length
   end
 
   def disposition_for(finding, dispositions, used_disposition_keys)

@@ -962,6 +962,56 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks task-list priority findings from review summaries" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 5,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "task-list-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/task-list-review",
+          "body" => "- [ ] [P1] Task-list finding.\n- [x] P2: Checked task-list finding."
+        }
+      ],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-task-list-finding", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
+      expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
+        ["- [ ] [P1] Task-list finding.", "- [x] P2: Checked task-list finding."]
+      )
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
+    end
+  end
+
   it "blocks slash-combined priority findings from review summaries" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -1165,6 +1215,55 @@ RSpec.describe "script/pr-merge-ledger" do
         "severity" => "MUST_FIX",
         "text_excerpt" => "MUST-FIX [P1]: duplicated severity markers."
       )
+    end
+  end
+
+  it "does not treat priority-looking text inside words as extra findings" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "review-with-priority-looking-title",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/review-with-priority-looking-title",
+          "body" => "[P1] HTTP2 fallback is broken\n[P1] P256 keys fail"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-priority-looking-title", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+      expect(findings.length).to eq(2)
+      expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
+        ["[P1] HTTP2 fallback is broken", "[P1] P256 keys fail"]
+      )
+      expect(findings.map { |finding| finding.fetch("marker_index") }).to eq([1, 1])
     end
   end
 
