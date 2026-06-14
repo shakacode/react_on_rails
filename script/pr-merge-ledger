@@ -21,6 +21,7 @@ class PrMergeLedger
     UNKNOWN
   ].freeze
   DISPOSITIONS = %w[fixed explicitly_waived follow_up_issue not_applicable UNKNOWN].freeze
+  REVIEW_DECISION_STATES = %w[APPROVED CHANGES_REQUESTED].freeze
   LOCKFILE_BASENAMES = %w[
     Gemfile.lock
     package-lock.json
@@ -93,7 +94,7 @@ class PrMergeLedger
     /\bno\s+(?:\S+\s+){0,4}?(?:fixed|resolved|waived)\b/i
   )
   ADDITIONAL_SEVERITY_PATTERN = %r{
-    (?:(?<!\d)[.;,(:-]|/|\b(?:and|but|however|or|while)\b)\s*
+    (?:(?<!\d)[.;,(:-]|/|\b(?:and|but|however|or|while|with)\b)\s*
     (?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?
     (?:\s|:|-|/|$)
   }ix
@@ -475,7 +476,20 @@ class PrMergeLedger
   end
 
   def current_changes_requested(reviews)
-    reviews.select { |review| review.fetch("state") == "CHANGES_REQUESTED" && review.fetch("current_head") }
+    latest_current_decision_reviews_by_reviewer(reviews).select do |review|
+      review.fetch("state") == "CHANGES_REQUESTED"
+    end
+  end
+
+  def latest_current_decision_reviews_by_reviewer(reviews)
+    reviews.select { |review| review.fetch("current_head") && REVIEW_DECISION_STATES.include?(review.fetch("state")) }
+           .group_by { |review| review.fetch("reviewer") }
+           .values
+           .map do |reviewer_reviews|
+             reviewer_reviews.max_by do |review|
+               timestamp_sort_key(review["submitted_at"], "review #{review.fetch('id')} submitted_at")
+             end
+           end
   end
 
   def current_thread_evidence(thread, comments, pull_request)
@@ -829,6 +843,7 @@ class PrMergeLedger
 
   def lockfile_path?(path)
     basename = File.basename(path)
+    # Keep generic *.lock conservative; narrow this if real closeouts produce false positives.
     LOCKFILE_BASENAMES.include?(basename) || basename.end_with?(".lock")
   end
 
@@ -1222,7 +1237,7 @@ class PrMergeLedger
     end
 
     def non_retryable_gh_error?(stderr)
-      stderr.to_s.match?(/\b(?:401|403|404|Not Found|Unauthorized|Forbidden)\b/i)
+      stderr.to_s.match?(/\b(?:401|403|404)\b|\b(?:Not Found|Unauthorized|Forbidden)\b/i)
     end
 
     def capture_gh(args)
