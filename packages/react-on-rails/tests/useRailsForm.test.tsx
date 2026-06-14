@@ -160,6 +160,29 @@ describe('useRailsForm', () => {
       expect(result.current.processing).toBe(false);
     });
 
+    it('clears stale success and errors when request preflight rejects before fetch', async () => {
+      fetchMock.mockResolvedValueOnce(mockResponse({ status: 201, body: { message: 'ok' } }));
+      const { result } = renderHook(() => useRailsForm({ name: '' }));
+
+      await act(async () => {
+        await result.current.post('/contact_messages');
+      });
+      act(() => {
+        result.current.setError('name', 'client-side check failed');
+      });
+      expect(result.current.wasSuccessful).toBe(true);
+      expect(result.current.errors).toEqual({ name: ['client-side check failed'] });
+
+      await act(async () => {
+        await expect(result.current.post('https://example.com/things')).rejects.toThrow(/same-origin URLs/);
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(result.current.wasSuccessful).toBe(false);
+      expect(result.current.errors).toEqual({});
+      expect(result.current.processing).toBe(false);
+    });
+
     it('rejects submit URLs when no browser origin is available', async () => {
       const { result } = renderHook(() => useRailsForm({ a: 1 }));
       const originalWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
@@ -337,20 +360,68 @@ describe('useRailsForm', () => {
       expect(result.current.processing).toBe(false);
     });
 
-    it('warns when a fetch failure may have been caused by a native Rails redirect', async () => {
-      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
-      const warnMock = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    it.each(['Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed'])(
+      'warns when a %s fetch failure may have been caused by a native Rails redirect',
+      async (message) => {
+        fetchMock.mockRejectedValue(new TypeError(message));
+        const warnMock = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const { result } = renderHook(() => useRailsForm({ a: 1 }));
+
+        try {
+          await act(async () => {
+            await expect(result.current.post('/things')).rejects.toThrow(message);
+          });
+
+          expect(warnMock).toHaveBeenCalledWith(expect.stringContaining('redirect_to'));
+          expect(result.current.processing).toBe(false);
+        } finally {
+          warnMock.mockRestore();
+        }
+      },
+    );
+
+    it('supersedes an in-flight submission when a later CSRF preflight rejects before fetch', async () => {
+      let resolveFirst: (response: Response) => void = () => {};
+      fetchMock.mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveFirst = resolve;
+        }),
+      );
       const { result } = renderHook(() => useRailsForm({ a: 1 }));
+      const csrfMeta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]');
+      const firstOnSuccess = jest.fn();
 
       try {
+        let firstSubmit: Promise<unknown> = Promise.resolve();
+        act(() => {
+          firstSubmit = result.current.post('/things', { onSuccess: firstOnSuccess });
+        });
+        await waitFor(() => expect(result.current.processing).toBe(true));
+
+        csrfMeta?.remove();
         await act(async () => {
-          await expect(result.current.post('/things')).rejects.toThrow('Failed to fetch');
+          await expect(result.current.post('/things')).rejects.toThrow(/csrf-token/);
         });
 
-        expect(warnMock).toHaveBeenCalledWith(expect.stringContaining('redirect_to'));
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(result.current.processing).toBe(true);
+        expect(result.current.wasSuccessful).toBe(false);
+        expect(result.current.errors).toEqual({});
+
+        act(() => {
+          resolveFirst(mockResponse({ status: 200, body: { ok: true } }));
+        });
+        await act(async () => {
+          await firstSubmit;
+        });
+
+        expect(firstOnSuccess).not.toHaveBeenCalled();
         expect(result.current.processing).toBe(false);
+        expect(result.current.wasSuccessful).toBe(false);
       } finally {
-        warnMock.mockRestore();
+        if (csrfMeta && !document.head.contains(csrfMeta)) {
+          document.head.appendChild(csrfMeta);
+        }
       }
     });
 

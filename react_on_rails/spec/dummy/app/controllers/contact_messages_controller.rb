@@ -26,6 +26,10 @@ class ContactMessagesController < ApplicationController
   def contact_message_params
     # useRailsForm posts a flat JSON body; Rails params wrapping may also nest
     # it under :contact_message, so accept both.
-    params.fetch(:contact_message, params).permit(:name, :email, :message)
+    if params.key?(:contact_message)
+      params.require(:contact_message).permit(:name, :email, :message)
+    else
+      params.permit(:name, :email, :message)
+    end
   end
 end

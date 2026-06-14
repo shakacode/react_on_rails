@@ -299,7 +299,7 @@ const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
   if (process.env.NODE_ENV === 'production' || !(fetchError instanceof TypeError)) {
     return;
   }
-  if (!/failed to fetch|networkerror/i.test(fetchError.message)) {
+  if (!/failed to fetch|networkerror|load failed/i.test(fetchError.message)) {
     return;
   }
   console.warn(
@@ -416,6 +416,24 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
 
   const submit = useCallback(
     async (method: RailsFormMethod, url: string, options: RailsFormSubmitOptions = {}) => {
+      submissionIdRef.current += 1;
+      const submissionId = submissionIdRef.current;
+      const isCurrent = () => mountedRef.current && submissionId === submissionIdRef.current;
+      const finishSubmission = () => {
+        pendingSubmissionsRef.current = Math.max(0, pendingSubmissionsRef.current - 1);
+        if (mountedRef.current && pendingSubmissionsRef.current === 0) {
+          setProcessing(false);
+        }
+      };
+
+      if (mountedRef.current && typeof window !== 'undefined') {
+        setWasSuccessful(false);
+        setErrors({});
+        if (pendingSubmissionsRef.current === 0) {
+          setProcessing(false);
+        }
+      }
+
       const requestUrl = resolveSameOriginRequestUrl(url);
       if (requestUrl === null) {
         throw new Error('useRailsForm can only submit to same-origin URLs.');
@@ -429,20 +447,8 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
         );
       }
 
-      submissionIdRef.current += 1;
-      const submissionId = submissionIdRef.current;
-      const isCurrent = () => mountedRef.current && submissionId === submissionIdRef.current;
-      const finishSubmission = () => {
-        pendingSubmissionsRef.current = Math.max(0, pendingSubmissionsRef.current - 1);
-        if (mountedRef.current && pendingSubmissionsRef.current === 0) {
-          setProcessing(false);
-        }
-      };
-
       pendingSubmissionsRef.current += 1;
       setProcessing(true);
-      setWasSuccessful(false);
-      setErrors({});
 
       let response: Response;
       try {
@@ -468,7 +474,7 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
         // RailsFormRequestError below (e.g. the body doesn't match the shape).
         const body = await parseJsonBody(response.clone());
         const validationErrors = mapValidationErrors(body);
-        if (validationErrors) {
+        if (validationErrors !== null) {
           if (isCurrent()) {
             setErrors(validationErrors);
             finishSubmission();

@@ -61,6 +61,20 @@ describe "ContactMessages (useRailsForm 422 round trip)" do
     end
   end
 
+  describe "POST /contact_messages with wrapped valid data" do
+    before do
+      post "/contact_messages",
+           params: {
+             contact_message: { name: "Ada", email: "ada@example.com", message: "A long enough message." }
+           }.to_json,
+           headers: json_headers
+    end
+
+    it "accepts Rails params wrapping" do
+      expect(response).to have_http_status(:created)
+    end
+  end
+
   describe "GET /rails_form" do
     it "renders the form example page" do
       get "/rails_form"
