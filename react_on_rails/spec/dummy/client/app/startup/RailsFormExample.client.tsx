@@ -7,12 +7,12 @@
 import React from 'react';
 import { useRailsForm } from 'react-on-rails/useRailsForm';
 
-function FieldErrors({ messages }: { messages: string[] | undefined }) {
+function FieldErrors({ messages, id }: { messages: string[] | undefined; id?: string }) {
   if (!messages || messages.length === 0) {
     return null;
   }
   return (
-    <ul className="field-errors" style={{ color: 'red' }}>
+    <ul id={id} className="field-errors" style={{ color: 'red' }}>
       {messages.map((message) => (
         <li key={message}>{message}</li>
       ))}
@@ -54,9 +54,11 @@ export default function RailsFormExample() {
           name="name"
           value={form.data.name}
           onChange={(event) => form.setData('name', event.target.value)}
+          aria-describedby={form.errors.name ? 'contact-name-errors' : undefined}
+          aria-invalid={form.errors.name ? true : undefined}
         />
       </label>
-      <FieldErrors messages={form.errors.name} />
+      <FieldErrors id="contact-name-errors" messages={form.errors.name} />
       <label htmlFor="contact-email">
         Email
         <input
@@ -64,9 +66,11 @@ export default function RailsFormExample() {
           name="email"
           value={form.data.email}
           onChange={(event) => form.setData('email', event.target.value)}
+          aria-describedby={form.errors.email ? 'contact-email-errors' : undefined}
+          aria-invalid={form.errors.email ? true : undefined}
         />
       </label>
-      <FieldErrors messages={form.errors.email} />
+      <FieldErrors id="contact-email-errors" messages={form.errors.email} />
       <label htmlFor="contact-message">
         Message
         <textarea
@@ -74,9 +78,11 @@ export default function RailsFormExample() {
           name="message"
           value={form.data.message}
           onChange={(event) => form.setData('message', event.target.value)}
+          aria-describedby={form.errors.message ? 'contact-message-errors' : undefined}
+          aria-invalid={form.errors.message ? true : undefined}
         />
       </label>
-      <FieldErrors messages={form.errors.message} />
+      <FieldErrors id="contact-message-errors" messages={form.errors.message} />
       <button type="submit" disabled={form.processing}>
         {form.processing ? 'Sending…' : 'Send'}
       </button>

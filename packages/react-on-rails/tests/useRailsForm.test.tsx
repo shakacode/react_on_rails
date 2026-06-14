@@ -97,6 +97,25 @@ describe('useRailsForm', () => {
       expect(result.current.processing).toBe(false);
     });
 
+    it('rejects submit URLs when no browser origin is available', async () => {
+      const { result } = renderHook(() => useRailsForm({ a: 1 }));
+      const originalWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
+      Object.defineProperty(globalThis, 'window', { configurable: true, value: undefined });
+
+      try {
+        await act(async () => {
+          await expect(result.current.post('/things')).rejects.toThrow(/same-origin URLs/);
+        });
+      } finally {
+        if (originalWindowDescriptor) {
+          Object.defineProperty(globalThis, 'window', originalWindowDescriptor);
+        }
+      }
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.current.processing).toBe(false);
+    });
+
     it('rejects relative URLs that would resolve through a cross-origin base tag', async () => {
       const base = document.createElement('base');
       base.href = 'https://example.com/';
@@ -334,6 +353,23 @@ describe('useRailsForm', () => {
       });
 
       expect(result.current.errors).toEqual({});
+      expect(result.current.processing).toBe(false);
+    });
+
+    it('rejects an empty 422 errors object instead of resolving with no field errors', async () => {
+      fetchMock.mockResolvedValue(mockResponse({ status: 422, body: { errors: {} } }));
+      const onError = jest.fn();
+      const { result } = renderHook(() => useRailsForm({ name: '' }));
+
+      await act(async () => {
+        await expect(result.current.post('/contact_messages', { onError })).rejects.toThrow(
+          RailsFormRequestError,
+        );
+      });
+
+      expect(onError).not.toHaveBeenCalled();
+      expect(result.current.errors).toEqual({});
+      expect(result.current.hasErrors).toBe(false);
       expect(result.current.processing).toBe(false);
     });
 

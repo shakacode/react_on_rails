@@ -164,11 +164,10 @@ Response handling:
 ## Redirects and `onSuccess`
 
 The hook never navigates on its own. After a successful submit it surfaces a
-redirect target as `result.redirectTo`:
-
-- when the server responded with a Rails `redirect_to` (fetch follows it; the
-  final URL is reported), or
-- when the JSON body contains a `redirect_to` (or `redirectTo`) string hint.
+redirect target as `result.redirectTo` when the JSON body contains a
+`redirect_to` (or `redirectTo`) string hint pointing to a same-origin URL. Native
+fetch redirects are disabled for CSRF-bearing submissions (`redirect: 'error'`),
+so a Rails `redirect_to` response rejects instead of being followed in v1.
 
 Pass it to whatever owns navigation in your app:
 
@@ -233,7 +232,7 @@ Server Functions land, this hook remains the plain-controller bridge.
 v1 is fetch-only and covers submit verbs, `data`/`setData`, `errors`,
 `processing`, `wasSuccessful`, CSRF auto-attach, and 422 error mapping
 ([Issue 3872](https://github.com/shakacode/react_on_rails/issues/3872)).
-Deferred to a follow-up release: `transform`, `recentlySuccessful`, and file
-uploads with `progress` (which needs an `XMLHttpRequest`/duplex-stream
+Deferred to a follow-up release: `transform`, `recentlySuccessful`, `onFinish`,
+and file uploads with `progress` (which needs an `XMLHttpRequest`/duplex-stream
 transport). Navigation, prefetching, and router integration belong to
 [Issue 3873](https://github.com/shakacode/react_on_rails/issues/3873).

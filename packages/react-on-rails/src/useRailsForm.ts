@@ -81,7 +81,10 @@ export class RailsFormRequestError extends Error {
 export interface RailsFormSubmitOptions {
   /** Extra request headers. CSRF headers are always applied on top. */
   headers?: Record<string, string>;
-  /** Called after a 2xx response. */
+  /**
+   * Called after a 2xx response. If this callback throws, the exception
+   * propagates as the submit promise rejection after form state has settled.
+   */
   onSuccess?: (result: RailsFormSuccessResult) => void;
   /** Called after a 422 response whose body matched the documented errors shape. */
   onError?: (errors: RailsFormErrors) => void;
@@ -145,8 +148,12 @@ const mapValidationErrors = (body: unknown): RailsFormErrors | null => {
   if (typeof errors !== 'object' || errors === null || Array.isArray(errors)) {
     return null;
   }
+  const errorEntries = Object.entries(errors);
+  if (errorEntries.length === 0) {
+    return null;
+  }
   const mapped: RailsFormErrors = {};
-  for (const [field, messages] of Object.entries(errors)) {
+  for (const [field, messages] of errorEntries) {
     mapped[field] = toMessageArray(messages);
   }
   return mapped;
@@ -172,6 +179,8 @@ const safeJsonRedirectHint = (redirectTo: string): string | null => {
   }
 
   try {
+    // Resolve JSON hints against the origin, not the current path: query-only
+    // hints such as `?saved=1` intentionally normalize to `/?saved=1`.
     const parsedRedirect = new URL(normalizedRedirect, currentOrigin);
     if (
       (parsedRedirect.protocol === 'http:' || parsedRedirect.protocol === 'https:') &&
@@ -192,7 +201,9 @@ const safeJsonRedirectHint = (redirectTo: string): string | null => {
 const resolveSameOriginRequestUrl = (url: string): string | null => {
   const currentLocation = typeof window === 'undefined' ? null : window.location;
   if (currentLocation === null) {
-    return url;
+    // No browser origin is available in SSR/Node, so the same-origin CSRF
+    // guard cannot be enforced. Refuse the submit instead of guessing.
+    return null;
   }
 
   try {
@@ -212,6 +223,9 @@ const resolveSameOriginRequestUrl = (url: string): string | null => {
 };
 
 const extractRedirectTo = (response: Response, responseData: unknown): string | null => {
+  // Native fetch never reaches this when `redirect: 'error'` is set; it throws
+  // before returning a redirected Response. Keep the filter for custom fetch
+  // implementations and tests that return pre-followed responses.
   if (response.redirected && response.url) {
     return safeJsonRedirectHint(response.url);
   }
@@ -429,9 +443,10 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
       }
       return result;
     },
-    // Intentionally empty: everything read inside is stable — refs (dataRef,
-    // submissionIdRef, mountedRef), useState setters, and module-level imports.
-    // If you add a render-scoped value here, it must go in this array.
+    // Intentionally empty: everything read inside satisfies
+    // react-hooks/exhaustive-deps — refs (dataRef, submissionIdRef, mountedRef),
+    // useState setters, and module-level imports. If you add a render-scoped
+    // value here, it must go in this array.
     [],
   );
 
