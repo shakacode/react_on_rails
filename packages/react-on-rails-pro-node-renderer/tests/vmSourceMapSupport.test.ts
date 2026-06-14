@@ -276,6 +276,47 @@ describe('source-mapped stack traces for VM errors', () => {
     }
   });
 
+  test('external source map lookup retries when the map appears after VM build', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+  });
+
+  test('external source map lookup retries after an error-path miss in the same VM', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    const firstResult = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(firstResult)).toBe(true);
+    if (!isErrorRenderResult(firstResult)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(firstResult.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+    const secondResult = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(secondResult)).toBe(true);
+    if (!isErrorRenderResult(secondResult)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(secondResult.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+  });
+
   test('percent-encoded data URL source maps are used', async () => {
     const bundlePath = await writeVmBundle(
       `${buildThrowingBundleSource()}\n${inlinePercentEncodedSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
@@ -762,6 +803,57 @@ describe('source-mapped stack traces for VM errors', () => {
       oldExecutionContext.release();
       otherExecutionContext.release();
       rebuiltExecutionContext.release();
+    }
+  });
+
+  test('same-path rebuild does not retry a missing old VM source map with the new map', async () => {
+    buildConfig({
+      serverBundleCachePath: serverBundleCachePath(testName),
+      supportModules: true,
+      stubTimers: false,
+      maxVMPoolSize: 1,
+    });
+
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+    const oldExecutionContext = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    const oldRunInVM = oldExecutionContext.runInVM;
+
+    const capturedError = await oldRunInVM(
+      "(function(){ try { global.triggerSsrError(); } catch (e) { global.heldSsrError = e; return 'held'; } })()",
+      bundlePath,
+    );
+    expect(capturedError).toBe('held');
+
+    const otherBundlePath = path.join(serverBundleCachePath(testName), 'missing-map-rebuild-evictor.js');
+    await writeBundleAt(otherBundlePath, 'global.otherBundleLoaded = true;');
+    const otherExecutionContext = await buildExecutionContext([otherBundlePath], /* buildVmsIfNeeded */ true);
+    expect(hasVMContextForBundle(bundlePath)).toBe(false);
+
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(mapFileName, REBUILT_SOURCE)));
+    let rebuiltExecutionContext: Awaited<ReturnType<typeof buildExecutionContext>> | undefined;
+
+    try {
+      const oldStack = await oldRunInVM('global.heldSsrError.stack', bundlePath);
+      expect(oldStack).toContain(`at boom (${bundlePath}:3:`);
+      expect(oldStack).not.toContain(ORIGINAL_SOURCE);
+      expect(oldStack).not.toContain(REBUILT_SOURCE);
+
+      rebuiltExecutionContext = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+      const rebuiltResult = await rebuiltExecutionContext.runInVM('global.triggerSsrError()', bundlePath);
+      expect(isErrorRenderResult(rebuiltResult)).toBe(true);
+      if (!isErrorRenderResult(rebuiltResult)) {
+        throw new Error('expected exceptionMessage result');
+      }
+      expect(rebuiltResult.exceptionMessage).toContain(`${REBUILT_SOURCE}:2:3`);
+    } finally {
+      oldExecutionContext.release();
+      otherExecutionContext.release();
+      rebuiltExecutionContext?.release();
     }
   });
 

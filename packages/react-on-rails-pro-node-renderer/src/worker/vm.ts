@@ -47,6 +47,7 @@ import {
   type BundleSourceMapRegistration,
   registerBundleForSourceMaps,
   unregisterBundleForSourceMaps,
+  retireMissingSourceMapRetry,
   resetSourceMapSupport,
   resolveOriginalPositionForRegistration,
   remapErrorStack,
@@ -113,6 +114,7 @@ function releaseSourceMapRegistration(sourceMapRegistration: BundleSourceMapRegi
 }
 
 function retireSourceMapRegistrationAfterEviction(sourceMapRegistration: BundleSourceMapRegistration) {
+  retireMissingSourceMapRetry(sourceMapRegistration);
   if ((activeSourceMapRequestCounts.get(sourceMapRegistration) ?? 0) > 0) {
     evictedSourceMapRegistrations.add(sourceMapRegistration);
   } else {
@@ -239,6 +241,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
         firstLineColumnOffset,
         bundleContents,
         preloadedSourceMapJson,
+        preloadedSourceMapJson === undefined,
       );
       sourceMapRegistration = currentSourceMapRegistration;
 
