@@ -163,10 +163,7 @@ class CapturingErrorBoundary extends React.Component<
     return pending;
   };
 
-  const usingJestFakeTimers = () => {
-    const timerApi = setTimeout as unknown as { clock?: unknown };
-    return jest.isMockFunction(setTimeout) || Boolean(timerApi.clock);
-  };
+  const usingJestFakeTimers = () => jest.isMockFunction(setTimeout);
 
   // Waits for the deferred eviction scheduled by evictPromiseIfRejected to
   // complete. The eviction uses setTimeout(0), so scheduling a second
@@ -286,6 +283,8 @@ class CapturingErrorBoundary extends React.Component<
       await expect(probeRef.current!.getComponent('UserCard', { id: 1 })).rejects.toThrow(
         'transient RSC fetch failed',
       );
+      // FIFO timer ordering keeps this wait behind the deferred eviction timer,
+      // so the immediate retry below starts from an empty cache entry.
       await waitForRejectedGetComponentEviction();
     });
 
