@@ -75,7 +75,7 @@ Rank findings in this order:
 1. `regressed`, security-sensitive, release-blocking, or data-loss risks.
 2. `missed` intent for merged work, especially when confidence notes or checks
    claimed completion.
-3. `stalled` live, stale, or dead-heartbeat lanes that need a coordinator
+3. `stalled` blocked, stale, or dead-heartbeat lanes that need a coordinator
    decision: resume, reassign, or drop.
 4. `partial` work with missing tests, weak validation, unresolved review
    concerns, missing changelog coverage, or unconvincing confidence notes.
