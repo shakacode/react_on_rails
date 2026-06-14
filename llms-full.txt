@@ -5258,6 +5258,7 @@ export default Reports;
 - **Client navigation**: TanStack Router swaps only the route outlet. The shell stays mounted, and no Rails page load happens.
 - **Navigating to an `RSCRoute` route**: the client fetches the server component's RSC payload over HTTP from the Rails `rsc_payload` endpoint and streams it into the outlet — server-driven data with no separate JSON API layer.
 - **Direct visit to the `RSCRoute` route**: the mounted guard means the server renders the placeholder and the client fetches the RSC payload after hydration. Server-rendering the RSC payload during the initial page load requires the `wrapServerComponentRenderer` + `stream_react_component` setup described in [the RSC guide](../../pro/react-server-components/inside-client-components.md), which is a different entry point than the TanStack SSR helper.
+- **Repeat visits to an `RSCRoute` route**: this starter does not cache the RSC payload between visits to the same route; each revisit refetches. Payload caching is tracked in [issue #3564](https://github.com/shakacode/react_on_rails/issues/3564).
 
 ## How This Compares
 
@@ -5273,8 +5274,10 @@ The Pro dummy app contains the full runnable starter, exercised by a system test
 
 - App: `react_on_rails_pro/spec/dummy/client/app/ror-auto-load-components/TanStackStarterApp.jsx`
 - Server component: `react_on_rails_pro/spec/dummy/client/app/ror-auto-load-components/StarterServerData.jsx`
-- Rails route/controller/view: `config/routes.rb` (`tanstack_starter`), `app/controllers/tanstack_starter_controller.rb`, `app/views/tanstack_starter/index.html.erb`
+- Rails route/controller/view: `react_on_rails_pro/spec/dummy/config/routes.rb` (`tanstack_starter`), `react_on_rails_pro/spec/dummy/app/controllers/tanstack_starter_controller.rb`, `react_on_rails_pro/spec/dummy/app/views/tanstack_starter/index.html.erb`
 - System test (SSR, persistent layout, no-reload navigation, RSC streaming): `react_on_rails_pro/spec/dummy/spec/system/tanstack_starter_spec.rb`
+
+The dummy keeps the running example intentionally small: it passes `props: {}`, so it does not need the `AppWrapper`/`ReportDataContext` pattern shown in Step 3. Use that Step 3 pattern when Rails passes request-specific data into the routed island.
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/building-features/code-splitting

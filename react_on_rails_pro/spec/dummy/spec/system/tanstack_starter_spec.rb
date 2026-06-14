@@ -107,9 +107,11 @@ describe "TanStack Router Starter" do # rubocop:disable RSpec/FilePath,RSpec/Spe
     before do
       # Flush the Selenium log buffer accumulated by preceding examples so
       # this test only sees logs from its own visit. Reading the buffer clears
-      # it; Capybara initialises the JS driver lazily, so this is safe in
-      # isolation too (the buffer is empty, and the driver starts on get()).
+      # it. Isolated runs may reach this hook before the browser has started;
+      # in that case the buffer is empty, so there is nothing to flush.
       page.driver.browser.logs.get(:browser)
+    rescue StandardError
+      # Browser not yet started; buffer is empty, nothing to flush.
     end
 
     it "renders the route by resolving the server component on the client without hydration errors" do
