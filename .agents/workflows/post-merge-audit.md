@@ -76,7 +76,7 @@ After confirmation, audit each included PR for:
 - risky behavior change
 - missing or weak validation
 - missing lockfile content-diff evidence when committed lockfiles changed, using the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`
-- weak closing evidence in any PR whose body or linked issue uses benchmark or investigation evidence to support a `close` disposition: apply the full gate from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md`, including reproducible artifact or justified missing-artifact caveat, internal consistency, production-environment caveats, and refutable-conclusion handling
+- weak closing evidence in any PR whose body or linked issue uses benchmark or investigation evidence to support a `close` or `document/work around` disposition: apply the full gate from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md`, including reproducible artifact or justified missing-artifact caveat, internal consistency, production-environment caveats, and refutable-conclusion handling
 - cross-PR interactions
 - overlapping files or assumptions
 - undocumented non-blocking decisions
