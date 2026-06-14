@@ -30,11 +30,11 @@ shared_examples "Activity tab switcher" do
 
       find('input[data-draft-input="drafts"]').set("draft typed on drafts tab")
 
-      # Switch back: profile draft preserved, effects re-mounted.
+      # Switch back: profile draft preserved, effects reactivated.
       find('button[data-tab-button="profile"]').click
       expect(page).to have_css('[data-tab-panel="profile"]', visible: :visible)
       expect(find('input[data-draft-input="profile"]').value).to eq("draft typed on profile tab")
-      expect(find('[data-effect-status="profile"]')).to have_text("effects mounted")
+      expect(find('[data-effect-status="profile"]')).to have_text("effects active")
 
       # And the drafts draft survives being hidden again.
       find('button[data-tab-button="drafts"]').click

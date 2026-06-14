@@ -23,7 +23,7 @@ describe "React 19.2 Activity component", :server_rendering do
     profile_panel = component.at_css('[data-tab-panel="profile"]')
     expect(profile_panel).not_to be_nil
     expect(component.at_css('input[data-draft-input="profile"]')).not_to be_nil
-    expect(profile_panel.at_css('[data-effect-status="profile"]')&.text).to eq("effects never mounted")
+    expect(profile_panel.at_css('[data-effect-status="profile"]')&.text).to eq("effects never activated")
 
     # Hidden Activity subtree is omitted from server HTML (renders on client).
     expect(component.at_css('[data-tab-panel="drafts"]')).to be_nil

@@ -3,7 +3,7 @@
 // A tab switcher that keeps the inactive tab MOUNTED inside
 // <Activity mode="hidden"> instead of unmounting it. Switching tabs therefore
 // preserves the hidden tab's local state (the draft <input> value), while React
-// unmounts its effects and defers its updates until it becomes visible again.
+// deactivates its effects and defers its updates until it becomes visible again.
 //
 // This component is rendered two ways in the dummy app to prove both paths:
 //   - /client_side_activity (prerender: false -- CSR only)
@@ -27,13 +27,13 @@ function TabPanel({ tab }: { tab: TabName }) {
   // value; a conditional `{active && <TabPanel/>}` render would lose it.
   const [draft, setDraft] = useState('');
 
-  // Effects unmount while hidden and re-run when visible again. The status
+  // Effects deactivate while hidden and re-run when visible again. The status
   // text demonstrates the lifecycle; the draft state survives the whole time.
-  const [effectStatus, setEffectStatus] = useState('effects never mounted');
+  const [effectStatus, setEffectStatus] = useState('effects never activated');
   useEffect(() => {
-    setEffectStatus('effects mounted');
+    setEffectStatus('effects active');
     return () => {
-      setEffectStatus('effects unmounted (state preserved)');
+      setEffectStatus('effects deactivated (state preserved)');
     };
   }, []);
 

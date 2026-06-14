@@ -85,28 +85,30 @@ write_pnpm_style_install() {
   local app_dir="$1"
   local react_parent="${2:-$app_dir/node_modules}"
   local react_dom_parent="${3:-$app_dir/node_modules}"
+  local react_version="${4:-1.0.0}"
+  local react_dom_version="${5:-$react_version}"
 
   mkdir -p "$app_dir" "$react_parent" "$react_dom_parent"
   printf '{ "name": "fixture-app" }\n' > "$app_dir/package.json"
 
   write_package \
-    "$react_parent/.pnpm/react@1.0.0/node_modules/react" \
+    "$react_parent/.pnpm/react@$react_version/node_modules/react" \
     react \
-    1.0.0 \
+    "$react_version" \
     index.js \
     jsx-runtime.js \
     jsx-dev-runtime.js
 
   write_package \
-    "$react_dom_parent/.pnpm/react-dom@1.0.0_react@1.0.0/node_modules/react-dom" \
+    "$react_dom_parent/.pnpm/react-dom@${react_dom_version}_react@$react_version/node_modules/react-dom" \
     react-dom \
-    1.0.0 \
+    "$react_dom_version" \
     index.js \
     client.js \
     server.js
 
-  ln -s .pnpm/react@1.0.0/node_modules/react "$react_parent/react"
-  ln -s .pnpm/react-dom@1.0.0_react@1.0.0/node_modules/react-dom "$react_dom_parent/react-dom"
+  ln -s ".pnpm/react@$react_version/node_modules/react" "$react_parent/react"
+  ln -s ".pnpm/react-dom@${react_dom_version}_react@$react_version/node_modules/react-dom" "$react_dom_parent/react-dom"
 }
 
 test_pnpm_virtual_store_sibling_links_pass() {
@@ -146,8 +148,83 @@ test_different_node_modules_parents_still_fail() {
   assert_contains "$out" "mixes React installations"
 }
 
+test_version_mismatch_still_fails() {
+  write_pnpm_style_install \
+    "$PWD/app" \
+    "$PWD/app/node_modules" \
+    "$PWD/app/node_modules" \
+    1.0.0 \
+    2.0.0
+
+  local out rc
+  set +e
+  out="$(node "$CHECKER" app 2>&1)"
+  rc=$?
+  set -e
+
+  if [ "$rc" -eq 0 ]; then
+    fail "expected mismatched React and ReactDOM versions to fail"
+    echo "$out" >&2
+    return 1
+  fi
+
+  assert_contains "$out" "mismatched versions"
+}
+
+test_multiple_react_roots_in_one_target_still_fail() {
+  write_pnpm_style_install "$PWD/app"
+  write_package "$PWD/app/alternate/node_modules/react" react 1.0.0 jsx-runtime.js
+  rm "$PWD/app/node_modules/.pnpm/react@1.0.0/node_modules/react/jsx-runtime.js"
+  ln -s "$PWD/app/alternate/node_modules/react/jsx-runtime.js" \
+    "$PWD/app/node_modules/.pnpm/react@1.0.0/node_modules/react/jsx-runtime.js"
+
+  local out rc
+  set +e
+  out="$(node "$CHECKER" app 2>&1)"
+  rc=$?
+  set -e
+
+  if [ "$rc" -eq 0 ]; then
+    fail "expected multiple react package roots to fail"
+    echo "$out" >&2
+    return 1
+  fi
+
+  assert_contains "$out" "resolves react specifiers from multiple installations"
+}
+
+test_cross_directory_divergence_is_only_noted() {
+  write_pnpm_style_install \
+    "$PWD/app-one" \
+    "$PWD/app-one/node_modules" \
+    "$PWD/app-one/node_modules" \
+    1.0.0
+  write_pnpm_style_install \
+    "$PWD/app-two" \
+    "$PWD/app-two/node_modules" \
+    "$PWD/app-two/node_modules" \
+    2.0.0
+
+  local out rc
+  set +e
+  out="$(node "$CHECKER" app-one app-two 2>&1)"
+  rc=$?
+  set -e
+
+  if [ "$rc" -ne 0 ]; then
+    fail "expected cross-directory divergence to pass, got exit $rc"
+    echo "$out" >&2
+    return 1
+  fi
+
+  assert_contains "$out" "[NOTE] target directories use different React installations"
+}
+
 run_test test_pnpm_virtual_store_sibling_links_pass
 run_test test_different_node_modules_parents_still_fail
+run_test test_version_mismatch_still_fails
+run_test test_multiple_react_roots_in_one_target_still_fail
+run_test test_cross_directory_divergence_is_only_noted
 
 if [ "$TESTS_FAILED" -ne 0 ]; then
   echo

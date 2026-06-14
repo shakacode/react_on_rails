@@ -5969,7 +5969,7 @@ When `mode="hidden"`:
 
 - The subtree stays **mounted** — all component state (inputs, scroll positions, fetched data held in state) is preserved.
 - Its DOM stays in the document but is hidden with `display: none`.
-- Its **effects are unmounted** (cleanup functions run), and they re-run when the boundary becomes visible again.
+- Its **effects are deactivated** (cleanup functions run), and they reactivate when the boundary becomes visible again.
 - Updates inside the hidden subtree are **deferred** to idle time, so hidden UI never competes with visible UI for rendering priority.
 
 This is the React-blessed replacement for the classic "keep the inactive tab alive" hacks (`display: none` wrappers, lifting every tab's state up, etc.). Typical uses: tab switchers, master/detail panes, and pre-rendering likely-next screens.

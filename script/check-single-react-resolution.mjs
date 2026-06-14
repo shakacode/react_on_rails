@@ -71,7 +71,7 @@ function findResolutionRoot(targetAbsoluteDir, packageRoot, packageName) {
 
     const parent = path.dirname(dir);
     if (parent === dir) {
-      return packageRoot;
+      return null;
     }
     dir = parent;
   }
@@ -150,7 +150,11 @@ function checkTargetDir(targetDir) {
     return;
   }
 
-  if (path.dirname(react.resolutionRoot) !== path.dirname(reactDom.resolutionRoot)) {
+  if (
+    react.resolutionRoot &&
+    reactDom.resolutionRoot &&
+    path.dirname(react.resolutionRoot) !== path.dirname(reactDom.resolutionRoot)
+  ) {
     console.error(
       `"${targetDir}" mixes React installations: react is in ` +
         `${path.relative(cwd, react.resolutionRoot)} but react-dom is in ` +
@@ -166,14 +170,15 @@ function checkTargetDir(targetDir) {
     hasErrors = true;
   }
 
-  perDirInstallations.set(targetDir, `${path.relative(cwd, react.resolutionRoot)} (react ${react.version})`);
+  const displayedRoot = react.resolutionRoot || react.root;
+  perDirInstallations.set(targetDir, `${path.relative(cwd, displayedRoot)} (react ${react.version})`);
 }
 
 targetDirs.forEach(checkTargetDir);
 
 const distinctInstallations = new Set(perDirInstallations.values());
 if (distinctInstallations.size > 1) {
-  console.log('Note: target directories use different React installations (each is intentional):');
+  console.log('[NOTE] target directories use different React installations (each is intentional):');
   for (const [targetDir, installation] of perDirInstallations) {
     console.log(`  ${targetDir} -> ${installation}`);
   }

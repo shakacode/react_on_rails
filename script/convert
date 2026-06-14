@@ -45,7 +45,8 @@ def update_json_file(path)
   end
 
   content = JSON.parse(File.binread(path))
-  yield content
+  return if yield(content) == false
+
   File.binwrite(path, "#{JSON.pretty_generate(content)}\n")
 end
 
@@ -80,7 +81,7 @@ gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react-dom": "[^
 # dummy to React 18, so remove the endpoint, scoped override, demo, and specs.
 update_json_file("../package.json") do |package_json|
   overrides = package_json.dig("pnpm", "overrides")
-  next unless overrides
+  next false unless overrides
 
   overrides.delete("react_on_rails>react")
   overrides.delete("react_on_rails>react-dom")
