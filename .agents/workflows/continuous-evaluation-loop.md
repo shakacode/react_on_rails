@@ -36,6 +36,10 @@ Gather live state from ground truth, not chat memory:
 4. Per-PR merge ledger output when `script/pr-merge-ledger` is available in the
    current branch. Use ledger violations as mechanical review-state evidence;
    if the script is unavailable, record `merge_ledger: UNKNOWN`.
+
+   Note: `script/pr-merge-ledger` does not yet exist on `main`; keep
+   `merge_ledger: UNKNOWN` until that script is available in the active branch.
+
 5. Post-merge audit findings or prior loop reports for the same PRs, if the
    coordinator supplies them. Do not treat prior reports as ground truth without
    re-checking their cited evidence.
@@ -131,9 +135,10 @@ with high-risk findings first and exact commands/data sources used.
 
 ## Integration Notes
 
-- This loop complements, but does not replace, `$triage`: triage builds the
-  capacity-aware worklist and queue; this loop checks whether assigned work was
-  actually realized and whether stalled work needs a decision.
+- This loop complements, but does not replace, `$plan-pr-batch` and any
+  capacity-aware triage workflow present in the active branch: planning builds
+  the worklist and queue; this loop checks whether assigned work was actually
+  realized and whether stalled work needs a decision.
 - This loop complements, but does not replace, `$post-merge-audit`: use the loop
   for continuous detection and use post-merge audit for approved deep audit and
   issue-plan creation over merged ranges.
