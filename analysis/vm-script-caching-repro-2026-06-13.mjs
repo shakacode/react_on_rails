@@ -53,6 +53,7 @@ globalThis.sink = total;
 }
 
 const cases = [
+  // Intentionally not makeScript(): tests a minimal two-operand IIFE, not the loop-accumulator pattern.
   { name: 'tiny', samples: 5000, source: '(() => { globalThis.sink = values[0] + values[1]; })()' },
   { name: 'small', samples: 3000, source: makeScript(16) },
   { name: 'medium', samples: 1000, source: makeScript(400) },
@@ -63,6 +64,7 @@ const cases = [
 const context = vm.createContext({
   values: Array.from({ length: 32 }, (_, index) => index + 1),
 });
+// Sink for compile measurements so new vm.Script() results remain reachable during each sample.
 const measurementSink = {};
 
 console.log('vm.Script caching reproduction');
@@ -85,12 +87,14 @@ for (const benchmarkCase of cases) {
   const cachedMedian = measure(() => {
     compiled.runInContext(context);
   }, samples);
+  // Intentionally after cachedMedian: this shared context has already warmed this script body.
   const sameSourceRunMedian = measure(() => {
     vm.runInContext(source, context);
   }, samples);
   const uniqueSourceRunMedian = measure((index) => {
     vm.runInContext(`${source}\n// unique run ${index}`, context);
   }, samples);
+  // Intentionally after sameSourceRunMedian so this measures a same-source compilation-cache hit.
   const sameSourceCompileMedian = measure(() => {
     measurementSink.script = new vm.Script(source);
   }, samples);
@@ -120,6 +124,7 @@ for (const benchmarkCase of cases) {
 console.log();
 console.log('Note: Same-source compile uses V8/Node compilation-cache behavior by default.');
 console.log('Same-source run also benefits from that cache after warmup.');
+console.log('Cached exec runs before same-source run, so the shared-context JIT is already warmer.');
 console.log('Unique-source compile/run varies the source text each sample to show a colder path.');
 console.log('Same/Precompiled compares stable source text; Unique/Precompiled is colder-path contrast.');
 console.log('Run with `node --no-compilation-cache` to compare with V8 compilation caching disabled.');
