@@ -223,8 +223,8 @@ one batch wait for the other lane's done heartbeat.
    in the same package.
 4. If the heartbeat is dead, a replacement worker may claim the target only
    after checking the branch/PR state and recording the takeover in coordination
-   status. Use the private backend README and CLI help for the current TTL and
-   dead-threshold calculation.
+   status. Use `agent-coord config show --json`, the private backend README, and
+   CLI help for the current TTL and dead-threshold calculation.
 5. If local unpushed work may exist on the laptop, mark the lane blocked instead
    of recreating a competing implementation.
 
