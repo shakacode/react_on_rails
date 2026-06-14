@@ -7310,8 +7310,10 @@ Response handling:
 - **2xx** — `wasSuccessful` flips on, `errors` clears, and `onSuccess` receives
   `{ responseData, redirectTo, response }`.
 - **422 with the documented `errors` shape** — `errors` is populated per field
-  (single strings are normalized to arrays) and `onError` is called. The
-  promise resolves with `{ ok: false, errors, response }`.
+  (single strings are normalized to arrays) and `onError` is called. An empty
+  `errors` object is still handled as a validation response with
+  `{ ok: false, errors: {}, response }`. The promise resolves with
+  `{ ok: false, errors, response }`.
 - **Anything else** (including a 422 whose body doesn't match) — the promise
   rejects with `RailsFormRequestError`; network failures reject with the
   original fetch error.
@@ -7323,9 +7325,10 @@ redirect target as `result.redirectTo` when the JSON body contains a
 `redirect_to` (or `redirectTo`) string hint pointing to a same-origin URL. Native
 fetch redirects are disabled for CSRF-bearing submissions (`redirect: 'error'`),
 so a Rails `redirect_to` response rejects instead of being followed in v1.
-Relative hints resolve against the origin, not the current page path: for
-example, `"?saved=1"` becomes `"/?saved=1"`. Return an explicit path such as
-`"/posts/1?saved=1"` when the current resource path matters.
+Relative hints resolve like browser URLs against the current page URL: for
+example, `"?saved=1"` preserves the current path and changes only the query.
+Return an explicit root-relative path such as `"/posts/1?saved=1"` when the
+redirect should ignore the current page path.
 
 Pass it to whatever owns navigation in your app:
 
@@ -26951,6 +26954,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Added
 
 - **`useRailsForm` hook + `render_model_errors` controller concern (an Inertia `useForm`-style bridge to Rails controllers)**: New React hook `useRailsForm` (importable from `react-on-rails/useRailsForm`) makes posting a React form to a plain Rails controller turnkey: `data`/`setData`, per-field `errors`, `processing`, `wasSuccessful`, submit verbs (`post`/`put`/`patch`/`delete`/`submit`), `reset`/`clearErrors`/`setError`, automatic CSRF attachment from the Rails csrf-token meta tag, JSON request/response handling, and mapping of `422` + `{ errors: { field: ["message"] } }` responses onto per-field error state. Success results surface a `redirectTo` target (followed-redirect URL or JSON `redirect_to` hint) without navigating, forward-compatible with the client-routing work in [Issue 3873](https://github.com/shakacode/react_on_rails/issues/3873). The gem side adds the opt-in `ReactOnRails::Controller::FormResponders` concern whose `render_model_errors(record)` renders ActiveModel errors in exactly that shape, so validations stay in the model with no API layer and no client-side duplication. Includes a new [Forms and Mutations](docs/oss/building-features/forms.md) docs page (with an Inertia `useForm` mapping table and a Server Functions [Issue 3867](https://github.com/shakacode/react_on_rails/issues/3867) cross-link) and a runnable dummy-app example (`/rails_form`). v1 is fetch-only; `transform`, `recentlySuccessful`, and file-upload `progress` are deferred. Closes [Issue 3872](https://github.com/shakacode/react_on_rails/issues/3872). [PR 3942](https://github.com/shakacode/react_on_rails/pull/3942) by [justin808](https://github.com/justin808).
+
+#### Changed
+
+- **[Pro]** **RSC peer compatibility accepts the coordinated React 19.2 floor**: The Pro node renderer now allows React and React DOM `19.2.x` starting at `19.2.7`, matching the floor required by the `react-on-rails-rsc` 19.2 package line while preserving the existing React `19.0.x` support window. Refs [Issue 3865](https://github.com/shakacode/react_on_rails/issues/3865).
 
 #### Fixed
 

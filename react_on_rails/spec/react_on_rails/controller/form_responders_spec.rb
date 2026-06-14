@@ -62,5 +62,21 @@ RSpec.describe ReactOnRails::Controller::FormResponders do
         controller_instance.render_model_errors(record, status: :unprocessable_entity)
       end.to raise_error(ArgumentError, /Integer HTTP status/)
     end
+
+    it "rejects records that do not expose errors.messages" do
+      expect do
+        controller_instance.render_model_errors(Object.new)
+      end.to raise_error(ArgumentError, /errors\.messages/)
+
+      record_with_invalid_errors = Class.new do
+        def errors
+          Object.new
+        end
+      end.new
+
+      expect do
+        controller_instance.render_model_errors(record_with_invalid_errors)
+      end.to raise_error(ArgumentError, /errors\.messages/)
+    end
   end
 end

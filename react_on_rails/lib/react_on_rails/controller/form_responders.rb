@@ -43,7 +43,16 @@ module ReactOnRails
           raise ArgumentError, "render_model_errors status must be an Integer HTTP status code"
         end
 
-        render json: { errors: record.errors.messages }, status:
+        unless record.respond_to?(:errors)
+          raise ArgumentError, "render_model_errors record must respond to errors.messages"
+        end
+
+        errors = record.errors
+        unless errors.respond_to?(:messages)
+          raise ArgumentError, "render_model_errors record must respond to errors.messages"
+        end
+
+        render json: { errors: errors.messages }, status:
       end
     end
   end

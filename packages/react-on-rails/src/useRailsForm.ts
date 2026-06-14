@@ -187,6 +187,7 @@ const toMessageArray = (value: unknown): string[] => {
 /**
  * Normalizes a 422 response body into per-field errors. Returns `null` when the
  * body doesn't match the documented `{ errors: { field: messages } }` shape.
+ * An empty `errors` object is still a handled validation response.
  */
 const mapValidationErrors = (body: unknown): RailsFormErrors | null => {
   if (typeof body !== 'object' || body === null) {
@@ -197,18 +198,12 @@ const mapValidationErrors = (body: unknown): RailsFormErrors | null => {
     return null;
   }
   const errorEntries = Object.entries(errors);
-  if (errorEntries.length === 0) {
-    return null;
-  }
   const mapped: RailsFormErrors = {};
   for (const [field, messages] of errorEntries) {
     const fieldMessages = toMessageArray(messages);
     if (fieldMessages.length > 0) {
       mapped[field] = fieldMessages;
     }
-  }
-  if (Object.keys(mapped).length === 0) {
-    return null;
   }
   return mapped;
 };
@@ -227,19 +222,18 @@ const safeJsonRedirectHint = (redirectTo: string): string | null => {
     return null;
   }
 
-  const currentOrigin = typeof window === 'undefined' ? null : window.location.origin;
-  if (currentOrigin === null) {
+  const currentLocation = typeof window === 'undefined' ? null : window.location;
+  if (currentLocation === null) {
     return null;
   }
 
   try {
-    // Resolve JSON hints against the origin, not the current path: query-only
-    // hints such as `?saved=1` intentionally normalize to `/?saved=1`, and
-    // `posts/1` normalizes to `/posts/1` rather than `/current/page/posts/1`.
-    const parsedRedirect = new URL(normalizedRedirect, currentOrigin);
+    // Match browser relative-URL behavior: query-only hints update the current
+    // page query, while root-relative hints like `/posts/1` stay root-relative.
+    const parsedRedirect = new URL(normalizedRedirect, currentLocation.href);
     if (
       (parsedRedirect.protocol === 'http:' || parsedRedirect.protocol === 'https:') &&
-      parsedRedirect.origin === currentOrigin
+      parsedRedirect.origin === currentLocation.origin
     ) {
       if (/^https?:\/\//i.test(normalizedRedirect)) {
         return parsedRedirect.href;
@@ -299,6 +293,9 @@ const extractRedirectTo = (response: Response, responseData: unknown): string | 
 };
 
 const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
+  // Keep this development-only: browsers surface `redirect: "error"` failures
+  // as opaque TypeErrors, and warning on every production network failure would
+  // be noisy without giving end users an actionable recovery path.
   if (process.env.NODE_ENV === 'production' || !(fetchError instanceof TypeError)) {
     return;
   }

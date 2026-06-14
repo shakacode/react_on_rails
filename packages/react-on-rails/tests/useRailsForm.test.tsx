@@ -8,6 +8,8 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-li
 import { useRailsForm, RailsFormRequestError } from '../src/useRailsForm.ts';
 
 const TEST_CSRF_TOKEN = 'TEST_CSRF_TOKEN';
+let csrfMeta: HTMLMetaElement;
+let originalFetch: typeof globalThis.fetch;
 
 interface MockResponseOptions {
   status?: number;
@@ -39,14 +41,21 @@ const mockResponse = (options: MockResponseOptions = {}): Response => {
 const fetchMock = jest.fn<Promise<Response>, [string, RequestInit]>();
 
 beforeAll(() => {
-  const meta = document.createElement('meta');
-  meta.name = 'csrf-token';
-  meta.content = TEST_CSRF_TOKEN;
-  document.head.appendChild(meta);
+  originalFetch = globalThis.fetch;
+  csrfMeta = document.createElement('meta');
+  csrfMeta.name = 'csrf-token';
+  csrfMeta.content = TEST_CSRF_TOKEN;
+  document.head.appendChild(csrfMeta);
   globalThis.fetch = fetchMock as unknown as typeof fetch;
 });
 
+afterAll(() => {
+  csrfMeta.remove();
+  globalThis.fetch = originalFetch;
+});
+
 beforeEach(() => {
+  window.history.replaceState({}, '', '/');
   fetchMock.mockClear();
   fetchMock.mockResolvedValue(mockResponse({ status: 200, body: {} }));
 });
@@ -446,35 +455,35 @@ describe('useRailsForm', () => {
       expect(result.current.processing).toBe(false);
     });
 
-    it('rejects an empty 422 errors object instead of resolving with no field errors', async () => {
+    it('handles an empty 422 errors object as a validation result', async () => {
       fetchMock.mockResolvedValue(mockResponse({ status: 422, body: { errors: {} } }));
       const onError = jest.fn();
       const { result } = renderHook(() => useRailsForm({ name: '' }));
 
+      let submitResult: Awaited<ReturnType<typeof result.current.post>>;
       await act(async () => {
-        await expect(result.current.post('/contact_messages', { onError })).rejects.toThrow(
-          RailsFormRequestError,
-        );
+        submitResult = await result.current.post('/contact_messages', { onError });
       });
 
-      expect(onError).not.toHaveBeenCalled();
+      expect(submitResult!).toEqual({ ok: false, errors: {}, response: expect.any(Object) });
+      expect(onError).toHaveBeenCalledWith({});
       expect(result.current.errors).toEqual({});
       expect(result.current.hasErrors).toBe(false);
       expect(result.current.processing).toBe(false);
     });
 
-    it('rejects a 422 errors object when every field has no messages', async () => {
+    it('handles a 422 errors object when every field has no messages', async () => {
       fetchMock.mockResolvedValue(mockResponse({ status: 422, body: { errors: { name: [] } } }));
       const onError = jest.fn();
       const { result } = renderHook(() => useRailsForm({ name: '' }));
 
+      let submitResult: Awaited<ReturnType<typeof result.current.post>>;
       await act(async () => {
-        await expect(result.current.post('/contact_messages', { onError })).rejects.toThrow(
-          RailsFormRequestError,
-        );
+        submitResult = await result.current.post('/contact_messages', { onError });
       });
 
-      expect(onError).not.toHaveBeenCalled();
+      expect(submitResult!).toEqual({ ok: false, errors: {}, response: expect.any(Object) });
+      expect(onError).toHaveBeenCalledWith({});
       expect(result.current.errors).toEqual({});
       expect(result.current.hasErrors).toBe(false);
       expect(result.current.processing).toBe(false);
@@ -579,6 +588,7 @@ describe('useRailsForm', () => {
     });
 
     it('exposes same-origin JSON redirect hints and ignores unsafe schemes', async () => {
+      window.history.pushState({}, '', '/current/page');
       fetchMock
         .mockResolvedValueOnce(
           mockResponse({ status: 201, body: { message: 'created', redirectTo: 'http://localhost/posts/1' } }),
@@ -610,13 +620,13 @@ describe('useRailsForm', () => {
       await act(async () => {
         await expect(result.current.post('/posts')).resolves.toMatchObject({
           ok: true,
-          redirectTo: '/posts/1',
+          redirectTo: '/current/posts/1',
         });
       });
       await act(async () => {
         await expect(result.current.post('/posts')).resolves.toMatchObject({
           ok: true,
-          redirectTo: '/?saved=1',
+          redirectTo: '/current/page?saved=1',
         });
       });
       await act(async () => {
@@ -759,6 +769,25 @@ describe('useRailsForm', () => {
 
       expect(secondOnSuccess).toHaveBeenCalledTimes(1);
       expect(firstOnSuccess).not.toHaveBeenCalled();
+    });
+
+    it('propagates onSuccess errors after finishing the successful submission state', async () => {
+      fetchMock.mockResolvedValue(mockResponse({ status: 200, body: { message: 'ok' } }));
+      const onSuccessError = new Error('success handler failed');
+      const { result } = renderHook(() => useRailsForm({ a: 1 }));
+
+      await act(async () => {
+        await expect(
+          result.current.post('/things', {
+            onSuccess: () => {
+              throw onSuccessError;
+            },
+          }),
+        ).rejects.toThrow(onSuccessError);
+      });
+
+      expect(result.current.processing).toBe(false);
+      expect(result.current.wasSuccessful).toBe(true);
     });
   });
 

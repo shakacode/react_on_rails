@@ -165,8 +165,10 @@ Response handling:
 - **2xx** — `wasSuccessful` flips on, `errors` clears, and `onSuccess` receives
   `{ responseData, redirectTo, response }`.
 - **422 with the documented `errors` shape** — `errors` is populated per field
-  (single strings are normalized to arrays) and `onError` is called. The
-  promise resolves with `{ ok: false, errors, response }`.
+  (single strings are normalized to arrays) and `onError` is called. An empty
+  `errors` object is still handled as a validation response with
+  `{ ok: false, errors: {}, response }`. The promise resolves with
+  `{ ok: false, errors, response }`.
 - **Anything else** (including a 422 whose body doesn't match) — the promise
   rejects with `RailsFormRequestError`; network failures reject with the
   original fetch error.
@@ -178,9 +180,10 @@ redirect target as `result.redirectTo` when the JSON body contains a
 `redirect_to` (or `redirectTo`) string hint pointing to a same-origin URL. Native
 fetch redirects are disabled for CSRF-bearing submissions (`redirect: 'error'`),
 so a Rails `redirect_to` response rejects instead of being followed in v1.
-Relative hints resolve against the origin, not the current page path: for
-example, `"?saved=1"` becomes `"/?saved=1"`. Return an explicit path such as
-`"/posts/1?saved=1"` when the current resource path matters.
+Relative hints resolve like browser URLs against the current page URL: for
+example, `"?saved=1"` preserves the current path and changes only the query.
+Return an explicit root-relative path such as `"/posts/1?saved=1"` when the
+redirect should ignore the current page path.
 
 Pass it to whatever owns navigation in your app:
 
