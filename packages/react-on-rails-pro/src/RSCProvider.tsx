@@ -120,10 +120,14 @@ export const createRSCProvider = ({
           return payload;
         };
         const evictPromiseIfRejected = (error: unknown) => {
-          if (fetchRSCPromisesRef.current[key] === promise) {
-            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-            delete fetchRSCPromisesRef.current[key];
-          }
+          // Keep the rejected promise visible for React's Suspense retry, then
+          // evict it so a later getComponent call can refetch the same key.
+          setTimeout(() => {
+            if (fetchRSCPromisesRef.current[key] === promise) {
+              // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+              delete fetchRSCPromisesRef.current[key];
+            }
+          }, 0);
           throw error;
         };
         promise = getServerComponent({ componentName, componentProps }).then(
@@ -178,6 +182,8 @@ export const createRSCProvider = ({
               return payload;
             },
             (error: unknown) => {
+              // Non-recovering refetches keep the rejected promise so the
+              // caller observes the failure; route refetches recover in production.
               if (recoverOnError) {
                 restoreLastSuccessfulPromise();
               }

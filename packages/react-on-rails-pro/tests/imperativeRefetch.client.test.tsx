@@ -103,6 +103,7 @@ class CapturingErrorBoundary extends React.Component<
     ]);
     return null;
   });
+  RSCProbe.displayName = 'RSCProbe';
 
   /**
    * Build a fetcher whose Nth call resolves with payloads[N]. Resolution is
@@ -161,6 +162,11 @@ class CapturingErrorBoundary extends React.Component<
     RSCProvider = createRSCProvider({ getServerComponent });
     return pending;
   };
+
+  const waitForRejectedGetComponentEviction = () =>
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
 
   /**
    * Wrap the initial render in an act() so React drains microtasks queued by
@@ -264,6 +270,7 @@ class CapturingErrorBoundary extends React.Component<
       await expect(probeRef.current!.getComponent('UserCard', { id: 1 })).rejects.toThrow(
         'transient RSC fetch failed',
       );
+      await waitForRejectedGetComponentEviction();
     });
 
     expect(getServerComponent).toHaveBeenCalledTimes(1);
