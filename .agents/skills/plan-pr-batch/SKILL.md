@@ -60,7 +60,7 @@ Plan a PR batch
      serial. A paginated PR Files API response is acceptable only when it
      records both `.filename` and `.previous_filename` when present, has no
      `Link: ...; rel="next"` response header, and its listed-file count matches
-     the PR's `changed_files` value from `gh pr view N --json changedFiles`.
+     the PR's `changedFiles` value from `gh pr view N --json changedFiles`.
      If the API result may have hit GitHub's
      file-list cap, cannot prove there are no more pages, or only reports new
      paths, record the PR paths as `UNKNOWN` and treat the item as serial rather
@@ -70,7 +70,9 @@ Plan a PR batch
      them as `UNKNOWN` and treat the item as serial rather than parallel.
      Never guess paths. Items that affect the same path cannot run as parallel
      worktrees; keep only file-disjoint items in the parallel first batch and
-     sequence or defer collisions.
+     sequence or defer collisions. Do not dispatch `UNKNOWN` discovery lanes
+     alongside active editor lanes; run them before the parallel edit wave or
+     after the current wave is idle.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
@@ -78,6 +80,10 @@ Plan a PR batch
 4. Output
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
    - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan. Measure it with `wc -m`; do not eyeball it.
+   - Keep full path evidence in the Batch Plan when it would bloat the prompt.
+     In the goal prompt, use the narrowest unambiguous directory/pattern summary
+     that still proves ownership. If compression would hide a collision or make
+     ownership unclear, mark the item `UNKNOWN` and run it serially.
    - Record the measured fixed-template section size and the short SHA of the
      `SKILL.md` commit at measurement time in the Batch Plan so it can be
      compared after template edits. Remeasure whenever the template changes.
@@ -112,6 +118,7 @@ Repository: OWNER/REPO
 Batch objective: ...
 File-touch map:
 - PR/Issue #N -> changed/affected paths, including create/delete/rename (owner: lane/name)
+- PR/Issue #N -> summarized path pattern(s); full path list in Batch Plan (owner: lane/name)
 - PR/Issue #N -> UNKNOWN (paths not determinable from issue body/design notes; treat as serial)
 # Batch-level reservations, not tied to a single item:
 - Deferred/reserved paths -> path(s) (reason: ... / later owner: lane/name)
@@ -128,22 +135,12 @@ Items:
 
 Execution rules:
 - Follow `.agents/skills/pr-batch/SKILL.md` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
-- Dispatch one subagent per independent item; group dependent items only when shared context is required.
-- Treat parallel items as file-disjoint: a worker must edit only files owned by
-  its lane in the File-touch map.
-  - Deferred or reserved paths block only lanes that do not own that path; the
-    lane listed as owner in the File-touch map may edit its declared files even
-    when a later deferred item will also need them.
-  - An `UNKNOWN` item may run only as a serial discovery lane. The worker must
-    identify the needed files, report or record those discovered paths with the
-    coordinator, and wait for confirmation that no active lane owns them before
-    editing. The coordinator must update the file-touch map entry in
-    `batches/<batch-id>.json` when the private backend is available, or leave an
-    equivalent GitHub/thread comment when it is unavailable.
-  - If a worker concludes it needs an unlisted file or another lane's file, stop
-    and report so the coordinator can sequence or split the work.
-  - Sequenced or dependency-ordered lanes may share declared files only in the
-    stated order.
+- Dispatch only the current file-disjoint wave. Hold serial and `UNKNOWN`
+  discovery lanes until no active editor lane can collide with them.
+- Workers edit only owned File-touch map paths. If an `UNKNOWN`, unlisted, or
+  other-lane path is needed, stop, report discovered paths, and wait for an
+  updated map or explicit coordinator confirmation before editing.
+- Sequenced lanes may share declared files only in the stated order.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
 - For concurrent or dependency-sensitive batches, assign a stable agent id and
   lane name per lane. Declare lane dependencies with `depends_on` refs such as
