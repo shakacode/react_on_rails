@@ -79,6 +79,18 @@ details into public PRs.
 
   command -v jq >/dev/null 2>&1 || { echo "jq is required for this preflight" >&2; exit 1; }
 
+  require_json_output() {
+    label="$1"
+    output="$2"
+
+    if ! printf '%s' "$output" | grep -q '[^[:space:]]'; then
+      echo "$label produced no JSON output" >&2
+      return 1
+    fi
+
+    printf '%s\n' "$output" | jq -e 'type' >/dev/null
+  }
+
   if test -z "${AGENT_COORD_REPO:-}"; then
     echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
     exit 1
@@ -90,11 +102,13 @@ details into public PRs.
     git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
       git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
       "$AGENT_COORD_BIN" --help &&
-      "$AGENT_COORD_BIN" version --json | jq empty &&
+      AGENT_COORD_VERSION_JSON="$("$AGENT_COORD_BIN" version --json)" &&
+      require_json_output "agent-coord version --json" "$AGENT_COORD_VERSION_JSON" &&
       # Suppress stderr intentionally: private config details must not appear in public PRs.
-      # Failures are still caught via pipefail + jq empty; record the exit code in PR evidence.
+      # Failures and blank stdout are still caught; record the exit code in PR evidence.
       # For private diagnostics, rerun without 2>/dev/null in a private terminal.
-      "$AGENT_COORD_BIN" config show --json 2>/dev/null | jq empty &&
+      AGENT_COORD_CONFIG_JSON="$("$AGENT_COORD_BIN" config show --json 2>/dev/null)" &&
+      require_json_output "agent-coord config show --json" "$AGENT_COORD_CONFIG_JSON" &&
       "$AGENT_COORD_BIN" doctor &&
       "$AGENT_COORD_BIN" status &&
       "$AGENT_COORD_BIN" claim --help &&
