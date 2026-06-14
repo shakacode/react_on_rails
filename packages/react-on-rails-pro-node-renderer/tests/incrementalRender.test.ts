@@ -17,6 +17,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import worker, { disableHttp2 } from '../src/worker';
+import log from '../src/shared/log';
 import packageJson from '../src/shared/packageJson';
 import * as incremental from '../src/worker/handleIncrementalRenderRequest';
 import {
@@ -29,6 +30,7 @@ import {
   resetForTest,
 } from './helper';
 import type { ResponseResult } from '../src/shared/utils';
+import type { ExecutionContext } from '../src/worker/vm';
 
 // Disable HTTP/2 for testing like other tests do
 disableHttp2();
@@ -165,7 +167,7 @@ describe('incremental render NDJSON endpoint', () => {
   /**
    * Helper function to create a streaming test setup
    */
-  const createStreamingTestSetup = async () => {
+  const createStreamingTestSetup = async ({ withExecutionContext = false } = {}) => {
     await createVmBundle(TEST_NAME);
 
     const { Readable } = await import('stream');
@@ -177,11 +179,15 @@ describe('incremental render NDJSON endpoint', () => {
 
     const sinkAdd = jest.fn();
     const handleRequestClosed = jest.fn();
+    const releaseExecutionContext = jest.fn();
 
     const sink: incremental.IncrementalRenderSink = {
       add: sinkAdd,
       handleRequestClosed,
     };
+    if (withExecutionContext) {
+      sink.executionContext = { release: releaseExecutionContext } as unknown as ExecutionContext;
+    }
 
     const mockResponse: ResponseResult = {
       status: 200,
@@ -205,6 +211,7 @@ describe('incremental render NDJSON endpoint', () => {
       sinkAdd,
       handleRequestClosed,
       sink,
+      releaseExecutionContext,
       mockResponse,
       mockResult,
       handleSpy,
@@ -445,6 +452,74 @@ describe('incremental render NDJSON endpoint', () => {
 
     // Verify handleRequestClosed was called when connection closed
     expect(handleRequestClosed).toHaveBeenCalledTimes(1);
+  });
+
+  test('keeps incremental execution context until the streaming response finishes after request EOF', async () => {
+    const {
+      responseStream,
+      handleRequestClosed,
+      releaseExecutionContext,
+      handleSpy,
+      SERVER_BUNDLE_TIMESTAMP,
+    } = await createStreamingTestSetup({ withExecutionContext: true });
+
+    const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
+    const { promise, receivedChunks } = createStreamingResponsePromise(req);
+
+    req.write(`${JSON.stringify(createInitialObject(SERVER_BUNDLE_TIMESTAMP))}\n`);
+    await waitFor(() => {
+      expect(handleSpy).toHaveBeenCalledTimes(1);
+    });
+
+    req.end();
+
+    await waitFor(() => {
+      expect(handleRequestClosed).toHaveBeenCalledTimes(1);
+    });
+    expect(releaseExecutionContext).not.toHaveBeenCalled();
+
+    responseStream.push('late streaming error context still needed');
+    await waitFor(() => {
+      expect(receivedChunks).toEqual(['late streaming error context still needed']);
+    });
+    expect(releaseExecutionContext).not.toHaveBeenCalled();
+
+    responseStream.push(null);
+    await promise;
+
+    expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+  });
+
+  test('logs onRequestClosedUpdateChunk failures returned from runInVM', async () => {
+    await createVmBundle(TEST_NAME);
+    const logErrorSpy = jest.spyOn(log, 'error').mockImplementation(() => undefined);
+
+    const result = await incremental.handleIncrementalRenderRequest({
+      firstRequestChunk: {
+        renderingRequest: 'ReactOnRails.dummy',
+        onRequestClosedUpdateChunk: {
+          bundleTimestamp: BUNDLE_TIMESTAMP,
+          updateChunk: 'throw new Error("close chunk exploded");',
+        },
+      },
+      bundleTimestamp: BUNDLE_TIMESTAMP,
+    });
+
+    try {
+      expect(result.sink).toBeDefined();
+      await result.sink!.handleRequestClosed();
+
+      expect(logErrorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: 'Error running onRequestClosedUpdateChunk',
+          err: expect.objectContaining({
+            message: expect.stringContaining('close chunk exploded'),
+          }),
+        }),
+      );
+    } finally {
+      result.sink?.executionContext?.release();
+    }
   });
 
   test('handles empty lines gracefully in the stream', async () => {

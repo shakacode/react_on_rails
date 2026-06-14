@@ -104,30 +104,38 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   }
 };
 
+function runWhenStreamFinishes(
+  stream: NonNullable<ResponseResult['stream']>,
+  res: FastifyReply,
+  onFinished: () => void,
+) {
+  let finished = false;
+  const finish = () => {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    stream.off('close', finish);
+    stream.off('end', finish);
+    stream.off('error', finish);
+    res.raw.off('close', finish);
+    onFinished();
+  };
+
+  stream.once('close', finish);
+  stream.once('end', finish);
+  stream.once('error', finish);
+  res.raw.once('close', finish);
+
+  return finish;
+}
+
 function releaseExecutionContextWhenStreamFinishes(
   stream: NonNullable<ResponseResult['stream']>,
   res: FastifyReply,
   executionContext: ExecutionContext,
 ) {
-  let released = false;
-  const release = () => {
-    if (released) {
-      return;
-    }
-    released = true;
-    stream.off('close', release);
-    stream.off('end', release);
-    stream.off('error', release);
-    res.raw.off('close', release);
-    executionContext.release();
-  };
-
-  stream.once('close', release);
-  stream.once('end', release);
-  stream.once('error', release);
-  res.raw.once('close', release);
-
-  return release;
+  return runWhenStreamFinishes(stream, res, () => executionContext.release());
 }
 
 const setResponseAndReleaseExecutionContext = async (
@@ -440,7 +448,42 @@ export default function run(config: Partial<Config>) {
     // Track whether we've already started sending a response (streaming or otherwise)
     // If true, we can't send an error response on failure - headers are already sent
     let responseStarted = false;
+    let incrementalRequestClosed = false;
+    let incrementalResponseFinished = false;
+    let incrementalExecutionContextReleased = false;
     let incrementalTracingContext: TracingContext | undefined;
+
+    const releaseIncrementalExecutionContextWhenDone = () => {
+      if (
+        incrementalExecutionContextReleased ||
+        !incrementalRequestClosed ||
+        !incrementalResponseFinished ||
+        !incrementalSink?.executionContext
+      ) {
+        return;
+      }
+
+      incrementalExecutionContextReleased = true;
+      incrementalSink.executionContext.release();
+    };
+
+    const markIncrementalResponseFinished = () => {
+      incrementalResponseFinished = true;
+      releaseIncrementalExecutionContextWhenDone();
+    };
+
+    const closeIncrementalRequest = async () => {
+      if (!incrementalSink || incrementalRequestClosed) {
+        return;
+      }
+
+      try {
+        await incrementalSink.handleRequestClosed();
+      } finally {
+        incrementalRequestClosed = true;
+        releaseIncrementalExecutionContextWhenDone();
+      }
+    };
 
     try {
       await trace(
@@ -515,15 +558,30 @@ export default function run(config: Partial<Config>) {
 
             onResponseStart: async (response: ResponseResult) => {
               responseStarted = true;
-              await setResponse(response, res);
-            },
-
-            onRequestEnded: async () => {
-              if (!incrementalSink) {
+              if (response.stream) {
+                const markFinished = runWhenStreamFinishes(
+                  response.stream,
+                  res,
+                  markIncrementalResponseFinished,
+                );
+                try {
+                  await setResponse(response, res);
+                } catch (error) {
+                  markFinished();
+                  throw error;
+                }
                 return;
               }
 
-              await incrementalSink.handleRequestClosed();
+              try {
+                await setResponse(response, res);
+              } finally {
+                markIncrementalResponseFinished();
+              }
+            },
+
+            onRequestEnded: async () => {
+              await closeIncrementalRequest();
             },
           });
         },
@@ -550,9 +608,7 @@ export default function run(config: Partial<Config>) {
         // The React stream is waiting for async props (e.g., asyncPropsManager.getProp("researches")).
         // If we don't call endStream(), the stream will hang forever waiting for props that will never arrive.
         // This causes onResponse to never fire, leaving activeRequestsCount stuck and preventing worker shutdown.
-        if (incrementalSink) {
-          await incrementalSink.handleRequestClosed();
-        }
+        await closeIncrementalRequest();
 
         // CRITICAL: Destroy the response connection to immediately close it.
         // Without this, the response stream stays open waiting for the client (httpx) to timeout,
