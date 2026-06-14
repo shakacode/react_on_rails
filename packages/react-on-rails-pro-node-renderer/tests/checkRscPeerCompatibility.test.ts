@@ -50,6 +50,7 @@ describe('checkRscPeerCompatibility', () => {
     const rc7 = checkRscPeerCompatibility({ rscVersion: '19.0.5-rc.7', reactVersion: '19.0.4' });
     expect(rc7.level).toBe('warn');
     expect(rc7.message).toContain('19.0.5-rc.7');
+    expect(rc7.message).toContain('prerelease of the recommended minimum 19.0.5');
   });
 
   it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {

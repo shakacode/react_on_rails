@@ -192,6 +192,8 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
     };
   }
 
+  // Keep allowed prereleases aligned with RSC_PEER_SUPPORT.recommendedMin.
+  // Older unlisted prereleases intentionally error before the below-min warning.
   if (!isAllowedRscPrerelease(rscVersion, rscTuple, reactOnRailsRsc)) {
     return {
       level: 'error',
