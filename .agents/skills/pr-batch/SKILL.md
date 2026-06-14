@@ -82,11 +82,15 @@ If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/g
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
 controls. For lockfile changes, include Dependabot ecosystem and
-directory/directories compatibility plus the lockfile content-diff note: changed
-dependencies, rationale, sibling-lock comparison, and any platform-precompiled /
-source-build or build-time dependency change. This per-PR requirement also
-applies to each individual target PR in the batch whose committed lockfiles
-change.
+directory/directories compatibility plus the lockfile content-diff note:
+
+- changed dependencies
+- rationale
+- sibling-lock comparison
+- any platform-precompiled / source-build or build-time dependency change
+
+This per-PR requirement also applies to each individual target PR in the batch
+whose committed lockfiles change.
 
 ## Goal Prompt Template
 

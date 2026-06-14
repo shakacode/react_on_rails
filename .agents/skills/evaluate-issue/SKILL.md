@@ -51,10 +51,12 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - Split complex fixes into prerequisites and decision points; do not let a polished RFC imply immediate priority.
    - For investigation or benchmark conclusions, recommendations to `close` or
      `document/work around` require closing evidence. Cite a reproducible artifact
-     (script, data file, benchmark command plus environment) or state the
-     missing-artifact caveat, verify that headline numbers match the document's
-     own tables, and carry production-environment caveats when the evidence was
-     collected on a different platform. If the conclusion could reasonably be
+     (script, data file, benchmark command plus environment) or, when the
+     artifact is missing, state why it is missing and why the conclusion remains
+     sound from the available data. Do not treat absence alone as satisfying the
+     gate. Verify that headline numbers match the document's own tables, and
+     carry production-environment caveats when the evidence was collected on a
+     different platform. If the conclusion could reasonably be
      challenged from the artifacts alone, such as missing control variables,
      platform-specific data, or non-monotonic/outlier data points, recommend a
      correction, follow-up, or explicit caveat instead of closing as settled. If
