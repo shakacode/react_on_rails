@@ -71,7 +71,7 @@ else
     "$AGENT_COORD_REPO/bin/agent-coord" status &&
     "$AGENT_COORD_REPO/bin/agent-coord" claim --help &&
     "$AGENT_COORD_REPO/bin/agent-coord" heartbeat --help &&
-  "$AGENT_COORD_REPO/bin/agent-coord" release --help
+    "$AGENT_COORD_REPO/bin/agent-coord" release --help
 fi
 ```
 
