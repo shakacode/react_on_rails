@@ -28,9 +28,9 @@ Gather live state from ground truth, not chat memory:
 1. `agent-coord status --batch-id <batch-id>` when a batch id is known, or full
    `agent-coord status` for a repo-wide sweep. Record active, stale, dead,
    blocked, done, released, and done-unmerged lanes plus `blocked_on` refs.
-   If `agent-coord` is not installed or `agent-coord doctor` exits non-zero,
-   record coordination state as `UNKNOWN` and rely on GitHub state plus git
-   history only.
+   If `agent-coord` is not installed, `agent-coord doctor` exits non-zero, or
+   the selected `agent-coord status` command fails, record coordination state as
+   `UNKNOWN` and rely on GitHub state plus git history only.
 
    Note: `agent-coord` lane state is operational status only. The Classification
    section defines separate intent-achievement classes; a `done` or `released`
