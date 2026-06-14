@@ -628,7 +628,7 @@ export async function buildExecutionContext(
         undefined,
         sourceMapRegistrationForRequest
           ? (stack: unknown) => remapStackTrace(stack, sourceMapRegistrationForRequest)
-          : undefined,
+          : (_stack: unknown) => undefined,
       );
       log.debug('Caught exception in rendering request: %s', exceptionMessage);
       return Promise.resolve({ exceptionMessage });

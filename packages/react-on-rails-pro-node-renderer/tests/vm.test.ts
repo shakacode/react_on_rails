@@ -14,14 +14,18 @@
  */
 
 import path from 'path';
+import fs from 'fs';
 import vm from 'vm';
 import {
   uploadedBundlePath,
   createUploadedBundle,
   readRenderingRequest,
   createVmBundle,
+  mkdirAsync,
   resetForTest,
+  serverBundleCachePath,
   BUNDLE_TIMESTAMP,
+  vmBundlePath,
 } from './helper';
 import { buildExecutionContext, hasVMContextForBundle, resetVM } from '../src/worker/vm';
 import { getConfig } from '../src/shared/configBuilder';
@@ -214,6 +218,30 @@ describe('buildVM and runInVM', () => {
     resetVM();
 
     expect(hasVMContextForBundle(uploadedBundlePathForTest())).toBeFalsy();
+  });
+
+  test('missing VM context errors do not scan unrelated source maps', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+    await mkdirAsync(path.dirname(bundlePath), { recursive: true });
+    await fs.promises.writeFile(
+      bundlePath,
+      `global.ReactOnRails = { dummy: { html: 'Dummy Object' } };\n//# sourceMappingURL=${mapFileName}\n`,
+    );
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    const realpathSyncSpy = jest.spyOn(fs, 'realpathSync');
+    try {
+      const result = await runInVM(
+        'ReactOnRails',
+        path.join(serverBundleCachePath(testName), 'missing-bundle.js'),
+      );
+      expect(isErrorRenderResult(result)).toBe(true);
+      expect(realpathSyncSpy.mock.calls.some(([filePath]) => filePath === mapPath)).toBe(false);
+    } finally {
+      realpathSyncSpy.mockRestore();
+    }
   });
 
   test('VM console history', async () => {
