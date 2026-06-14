@@ -132,6 +132,8 @@ const wrapServerComponentRenderer = (
       { componentName, domNodeId },
       shouldHydrate,
       {
+        // Only hydrateRoot receives an onRecoverableError wrapper here. The createRoot branch does
+        // not attach one, so this flag is meaningful only for the hydrate path.
         defaultReportingHandledInternally: shouldHydrate,
       },
     );

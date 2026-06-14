@@ -127,6 +127,53 @@ describe('ReactOnRails', () => {
     ReactOnRails.resetOptions();
   });
 
+  it('setOptions clears all rootErrorHandlers when rootErrorHandlers is explicitly undefined', () => {
+    // eslint-disable-next-line global-require
+    const { getRootErrorHandlers } = require('../src/rootErrorHandlers.ts');
+    ReactOnRails.resetOptions();
+    const onRecoverableError = jest.fn();
+
+    ReactOnRails.setOptions({ rootErrorHandlers: { onRecoverableError } });
+    ReactOnRails.setOptions({ rootErrorHandlers: undefined });
+
+    expect(ReactOnRails.option('rootErrorHandlers')).toBeUndefined();
+    expect(getRootErrorHandlers()).toEqual({});
+  });
+
+  it('deprecated base client clears all rootErrorHandlers when rootErrorHandlers is explicitly undefined', () => {
+    jest.isolateModules(() => {
+      // eslint-disable-next-line global-require
+      const { createBaseClientObject } = require('../src/base/client.ts');
+      // eslint-disable-next-line global-require
+      const { getRootErrorHandlers } = require('../src/rootErrorHandlers.ts');
+      const registries = {
+        ComponentRegistry: {
+          register: jest.fn(),
+          get: jest.fn(),
+          components: jest.fn(() => new Map()),
+        },
+        StoreRegistry: {
+          register: jest.fn(),
+          getStore: jest.fn(),
+          getStoreGenerator: jest.fn(),
+          setStore: jest.fn(),
+          clearHydratedStores: jest.fn(),
+          storeGenerators: jest.fn(() => new Map()),
+          stores: jest.fn(() => new Map()),
+        },
+      };
+      const baseClient = createBaseClientObject(registries);
+      const onRecoverableError = jest.fn();
+
+      baseClient.resetOptions();
+      baseClient.setOptions({ rootErrorHandlers: { onRecoverableError } });
+      baseClient.setOptions({ rootErrorHandlers: undefined });
+
+      expect(baseClient.option('rootErrorHandlers')).toBeUndefined();
+      expect(getRootErrorHandlers()).toEqual({});
+    });
+  });
+
   it('registerStore throws if passed a falsey object (null, undefined, etc)', () => {
     expect(() => ReactOnRails.registerStore(null)).toThrow(/null or undefined/);
 

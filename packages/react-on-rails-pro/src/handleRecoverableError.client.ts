@@ -33,6 +33,10 @@ const isRSCRouteSSRFalseBailout = (error: unknown): boolean =>
  * The RSCRoute `ssr: false` bailout signal is Pro control flow — a deliberate marker that SSR was
  * skipped for the route, not an application error — so it is filtered before BOTH handlers to
  * keep it out of user error reporting (e.g. Sentry) just as it is kept out of Pro's own reporting.
+ *
+ * With no user handler, Pro still installs this wrapper so RSC hydrate roots preserve React's
+ * default recoverable-error reporting while applying the bailout filter above. That is equivalent
+ * to React's native default reporting but keeps Pro's filtering/chaining path uniform.
  */
 export const chainRecoverableErrorHandlers =
   (
