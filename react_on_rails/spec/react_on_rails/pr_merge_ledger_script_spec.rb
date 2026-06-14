@@ -1379,6 +1379,58 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "uses the review-thread comment URL when id fields are missing" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "url-identified-thread",
+          "isResolved" => false,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "url" => "https://example.com/url-identified-comment",
+              "body" => "Current-head comment with no numeric id.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-url-comment-id", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      comment = report.dig("pull_requests", 0, "unresolved_current_head_review_threads", "threads", 0, "comments", 0)
+      expect(comment.fetch("id")).to eq("https://example.com/url-identified-comment")
+    end
+  end
+
   it "does not mark commentless threads as current-head threads" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -3520,6 +3572,68 @@ RSpec.describe "script/pr-merge-ledger" do
       if [ ! -f "$count_file" ]; then
         touch "$count_file"
         printf '%s\\n' 'temporary gateway failure' >&2
+        exit 1
+      fi
+
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              query=*) query=${1#query=} ;;
+            esac
+            ;;
+        esac
+        shift
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"PR 1","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-1","headRefOid":"head-1","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+
+    with_fake_gh(fake_gh) do |env|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.fetch("complete_allowed")).to be(true)
+    end
+  end
+
+  it "retries 422 gh API failures before reporting the live ledger" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      count_file="$(dirname "$0")/failed-422-once"
+      if [ ! -f "$count_file" ]; then
+        touch "$count_file"
+        printf '%s\\n' 'HTTP 422 temporary validation window' >&2
         exit 1
       fi
 

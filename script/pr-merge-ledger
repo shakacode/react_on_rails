@@ -245,9 +245,13 @@ class PrMergeLedger
 
     collector = GitHubCollector.new(owner, name)
     @argv.map do |pr_number|
-      collector.fetch(Integer(pr_number, 10)).merge("repository" => repo)
-    rescue ArgumentError
-      raise Error, "PR number must be an integer: #{pr_number.inspect}"
+      begin
+        pr_int = Integer(pr_number, 10)
+      rescue ArgumentError
+        raise Error, "PR number must be an integer: #{pr_number.inspect}"
+      end
+
+      collector.fetch(pr_int).merge("repository" => repo)
     end
   end
 
@@ -412,7 +416,7 @@ class PrMergeLedger
     review = comment["pullRequestReview"] || {}
 
     {
-      "id" => comment["id"] || comment["databaseId"].to_s,
+      "id" => review_thread_comment_identifier(comment),
       "url" => comment["url"],
       "path" => comment["path"],
       "line" => comment["line"],
@@ -425,6 +429,13 @@ class PrMergeLedger
       "comment_head_sha" => comment.dig("commit", "oid"),
       "current_head" => comment.dig("commit", "oid") == pull_request.fetch("head_sha")
     }
+  end
+
+  def review_thread_comment_identifier(comment)
+    identifier = comment["id"] || comment["databaseId"] || comment["url"]
+    return identifier.to_s if identifier.to_s.match?(/\S/)
+
+    raise Error, "review thread comment is missing id, databaseId, and url"
   end
 
   def normalize_review(review, pull_request)
@@ -1172,7 +1183,7 @@ class PrMergeLedger
     end
 
     def non_retryable_gh_error?(stderr)
-      stderr.to_s.match?(/\b(?:401|403|404|422|Not Found|Unauthorized|Forbidden)\b/i)
+      stderr.to_s.match?(/\b(?:401|403|404|Not Found|Unauthorized|Forbidden)\b/i)
     end
 
     def capture_gh(args)
