@@ -6857,7 +6857,7 @@ One more caveat for custom tag blocks: the block runs in `after_commit` and sees
 
 ### How it works, and the contract
 
-On every tagged cache write, the final cache key is appended to a per-tag index entry in `Rails.cache` (keyed `rorp:tag:v1:<tag>`). `revalidate_tag` reads the index, deletes the recorded entries with `delete_multi`, then deletes the index entry. A missing index (never-written tag, evicted entry, `:null_store`) means "nothing to revalidate" — never an error.
+On every tagged cache write, the final cache key is appended to a per-tag index entry in `Rails.cache` (keyed by a SHA-256 digest under `rorp:tag:v1:` so long tag names and whitespace do not violate cache-store key limits). `revalidate_tag` reads the index, deletes the recorded entries with `delete_multi`, then deletes the index entry. A missing index (never-written tag, evicted entry, `:null_store`) means "nothing to revalidate" — never an error.
 
 **Tag revalidation is best-effort; correctness is bounded by `expires_in`.** `ActiveSupport::Cache` has no atomic set-append, so the index append is a read-modify-write: two processes caching different entries under the same tag at the same moment can race, and one entry can be lost _from the index_ (the cached data itself is never lost). A lost index entry simply survives `revalidate_tag` and expires via its own `expires_in`. The same applies when the index entry itself is LRU-evicted. Therefore:
 

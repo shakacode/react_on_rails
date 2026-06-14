@@ -13,6 +13,8 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+require "digest"
+
 module ReactOnRailsPro
   class Cache
     # Internal tag -> cache-key index behind the `cache_tags:` option and
@@ -21,9 +23,11 @@ module ReactOnRailsPro
     # calling this class directly.
     #
     # v1 index semantics (signed-off RFC on issue #3871):
-    # - One index entry per tag, keyed "rorp:tag:v1:<tag>". The payload holds
-    #   the expanded entry keys written under that tag plus the index entry's
-    #   own absolute expiry so concurrent writers can merge to the max TTL.
+    # - One index entry per tag, keyed by a SHA-256 digest under
+    #   "rorp:tag:v1:" so arbitrary tag names do not violate cache-store key
+    #   limits. The payload holds the expanded entry keys written under that
+    #   tag plus the index entry's own absolute expiry so concurrent writers can
+    #   merge to the max TTL.
     # - Appends are a plain read-modify-write. ActiveSupport::Cache has no
     #   atomic set-append, so concurrent appends under the same tag can lose an
     #   index entry (lossy-OK). A lost entry is lost only from the *index* —
@@ -83,7 +87,7 @@ module ReactOnRailsPro
         end
 
         def index_key(tag)
-          "#{INDEX_KEY_PREFIX}#{tag}"
+          "#{INDEX_KEY_PREFIX}#{Digest::SHA256.hexdigest(tag.to_s)}"
         end
 
         private
@@ -194,22 +198,22 @@ module ReactOnRailsPro
 
         # Remaining lifetime of the tagged entry in seconds, from either of the
         # Rails cache expiry options, or nil when the entry has no expiry.
+        # Rails honors :expires_at over :expires_in when both are present.
         def entry_ttl(cache_options)
-          expires_in = cache_options[:expires_in]
-          if expires_in
-            expires_in = expires_in.to_f
-            return expires_in if expires_in.positive?
+          expires_at = cache_options[:expires_at]
+          if expires_at && ReactOnRailsPro::Cache.cache_supports_expires_at?
+            remaining = expires_at.to_time.to_f - Time.now.to_f
+            # Expired entries fall back to the configured index TTL. The reference
+            # is harmless because revalidation is best-effort and missing entries
+            # simply count as zero deletes.
+            return remaining.positive? ? remaining : nil
           end
 
-          expires_at = cache_options[:expires_at]
-          return nil unless expires_at
-          return nil unless ReactOnRailsPro::Cache.cache_supports_expires_at?
+          expires_in = cache_options[:expires_in]
+          return nil unless expires_in
 
-          remaining = expires_at.to_time.to_f - Time.now.to_f
-          # Expired entries fall back to the configured index TTL. The reference
-          # is harmless because revalidation is best-effort and missing entries
-          # simply count as zero deletes.
-          remaining.positive? ? remaining : nil
+          expires_in = expires_in.to_f
+          expires_in if expires_in.positive?
         end
 
         def warn_if_expires_in_missing(cache_options, entry_key)
@@ -274,8 +278,7 @@ module ReactOnRailsPro
         end
 
         def merged_cache_options(cache_options)
-          cache_options ||= {}
-          cache_options = supported_expiry_options(cache_options)
+          cache_options = index_cache_options(cache_options)
           store = Rails.cache
           return cache_options unless store.respond_to?(:merged_options, true)
 
@@ -288,8 +291,16 @@ module ReactOnRailsPro
           cache_options.except(:expires_at)
         end
 
-        def normalized_entry_key(cache_key, cache_options)
+        def index_cache_options(cache_options)
           cache_options ||= {}
+          if ReactOnRailsPro::Cache.cache_supports_expires_at? && cache_options[:expires_at]
+            cache_options = cache_options.except(:expires_in)
+          end
+          supported_expiry_options(cache_options)
+        end
+
+        def normalized_entry_key(cache_key, cache_options)
+          cache_options = index_cache_options(cache_options)
           # Record the store's *logical* cache name: the expanded key plus any
           # :namespace from the entry's cache_options or the store default —
           # exactly what the store's own normalize_key computes BEFORE

@@ -70,13 +70,22 @@ module ReactOnRailsPro
 
       def cache_write_options(cache_options)
         return cache_options unless cache_options&.key?(:expires_at)
-        return cache_options if cache_supports_expires_at?
-        return cache_options if cache_options[:expires_in]
 
         expires_at = cache_options[:expires_at]
         return cache_options unless expires_at
 
-        cache_options.merge(expires_in: expires_at.to_time.to_f - Time.now.to_f).except(:expires_at)
+        expires_in = expires_at.to_time.to_f - Time.now.to_f
+        return cache_options.merge(expires_in: 0).except(:expires_at) if expires_in <= 0
+
+        if cache_supports_expires_at?
+          return cache_options.except(:expires_in) if cache_options.key?(:expires_in)
+
+          return cache_options
+        end
+
+        return cache_options.except(:expires_at) unless cache_options[:expires_in].nil?
+
+        cache_options.merge(expires_in:).except(:expires_at)
       end
 
       def cache_supports_expires_at?

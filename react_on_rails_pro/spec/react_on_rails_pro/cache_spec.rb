@@ -230,6 +230,15 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(described_class.cache_write_options(cache_options)).to eq(cache_options)
     end
 
+    it "prefers expires_at over explicit expires_in when ActiveSupport supports it" do
+      allow(described_class).to receive(:cache_supports_expires_at?).and_return(true)
+      expires_at = Time.now + 60
+
+      cache_options = described_class.cache_write_options(expires_at:, expires_in: 10, namespace: "components")
+
+      expect(cache_options).to eq(expires_at:, namespace: "components")
+    end
+
     it "converts expires_at to expires_in when ActiveSupport does not support it" do
       allow(described_class).to receive(:cache_supports_expires_at?).and_return(false)
       expires_at = Time.now + 60
@@ -241,11 +250,42 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(cache_options[:namespace]).to eq("components")
     end
 
+    it "clamps converted expires_at to zero when the target time has already passed" do
+      allow(described_class).to receive(:cache_supports_expires_at?).and_return(false)
+
+      cache_options = described_class.cache_write_options(expires_at: Time.now - 60, namespace: "components")
+
+      expect(cache_options).not_to have_key(:expires_at)
+      expect(cache_options[:expires_in]).to eq(0)
+      expect(cache_options[:namespace]).to eq("components")
+    end
+
+    it "clamps expired expires_at before Rails normalizes it" do
+      allow(described_class).to receive(:cache_supports_expires_at?).and_return(true)
+
+      cache_options = described_class.cache_write_options(expires_at: Time.now - 60, namespace: "components")
+
+      expect(cache_options).not_to have_key(:expires_at)
+      expect(cache_options[:expires_in]).to eq(0)
+      expect(cache_options[:namespace]).to eq("components")
+    end
+
     it "preserves explicit expires_in when ActiveSupport does not support expires_at" do
       allow(described_class).to receive(:cache_supports_expires_at?).and_return(false)
       cache_options = { expires_at: Time.now + 60, expires_in: 10 }
 
-      expect(described_class.cache_write_options(cache_options)).to eq(cache_options)
+      expect(described_class.cache_write_options(cache_options)).to eq(expires_in: 10)
+    end
+
+    it "treats nil expires_in as absent when ActiveSupport does not support expires_at" do
+      allow(described_class).to receive(:cache_supports_expires_at?).and_return(false)
+      expires_at = Time.now + 60
+
+      cache_options = described_class.cache_write_options(expires_at:, expires_in: nil, namespace: "components")
+
+      expect(cache_options).not_to have_key(:expires_at)
+      expect(cache_options[:expires_in]).to be_within(5).of(60)
+      expect(cache_options[:namespace]).to eq("components")
     end
   end
 

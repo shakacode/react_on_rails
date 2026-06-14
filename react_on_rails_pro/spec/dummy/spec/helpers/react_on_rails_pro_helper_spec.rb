@@ -860,6 +860,41 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count)
       end
 
+      it "keeps stream tag-index options from shrinking while converting write options at completion" do
+        raw_cache_options = { expires_at: Time.now + 60 }
+        tag_index_cache_options = { expires_in: 60 }
+        write_cache_options = { expires_in: 45 }
+        captured_on_complete = nil
+
+        allow(ReactOnRailsPro::Cache).to receive(:cache_write_options)
+          .with(raw_cache_options)
+          .and_return(tag_index_cache_options, write_cache_options)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).once
+
+        captured_on_complete.call(["chunk"])
+
+        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).twice
+        expect(Rails.cache).to have_received(:write).with("stream-cache-key", ["chunk"], write_cache_options)
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["stream-tag"], "stream-cache-key", tag_index_cache_options)
+      end
+
       it "respects skip_prerender_cache and does not write or hit cache" do
         mock_request_and_response(count: 3)
         # Disable view-level caching for this run via conditional

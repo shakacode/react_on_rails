@@ -178,6 +178,18 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
     end
   end
 
+  describe ".index_key" do
+    it "hashes tags so index keys stay safe for cache stores with Memcached-like key limits" do
+      tag = "#{"tag with whitespace\nand controls " * 10}#{'x' * 300}"
+      key = described_class.index_key(tag)
+
+      expect(key).to start_with(described_class::INDEX_KEY_PREFIX)
+      expect(key.delete_prefix(described_class::INDEX_KEY_PREFIX)).to match(/\A[a-f0-9]{64}\z/)
+      expect(key.bytesize).to eq(described_class::INDEX_KEY_PREFIX.bytesize + 64)
+      expect(key).not_to include(tag)
+    end
+  end
+
   describe ".register and .revalidate" do
     it "deletes every registered entry for a tag and clears the index" do
       Rails.cache.write("entry/one", "one")
@@ -206,6 +218,17 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
 
       expect(index_payload("post:42")["keys"]).to eq(["entry/one"])
       expect(index_payload("tenant:7")["keys"]).to eq(["entry/one"])
+    end
+
+    it "revalidates entries under tags that would be invalid raw Memcached keys" do
+      tag = "#{"tag with whitespace\nand controls " * 10}#{'x' * 300}"
+      Rails.cache.write("entry/one", "one")
+
+      described_class.register([tag], "entry/one", { expires_in: 3600 })
+
+      expect(index_payload(tag)["keys"]).to eq(["entry/one"])
+      expect(described_class.revalidate(tag)).to eq(1)
+      expect(Rails.cache.read("entry/one")).to be_nil
     end
 
     it "expands array cache keys the same way the store does" do
@@ -383,6 +406,16 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("t")["expires_at"]).to be_within(5).of(expected)
     end
 
+    it "prefers expires_at over expires_in when Rails will honor both options" do
+      allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(true)
+      now = Time.now.to_f
+
+      described_class.register(["t"], "k1", { expires_in: 60, expires_at: Time.now + 3600 })
+
+      expected = now + 3600 + described_class::INDEX_TTL_SLACK
+      expect(index_payload("t")["expires_at"]).to be_within(5).of(expected)
+    end
+
     it "uses the fallback index TTL for raw expires_at when the cache store would ignore it" do
       allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(false)
       allow(ReactOnRailsPro.configuration).to receive(:cache_tag_index_expires_in).and_return(123)
@@ -391,6 +424,16 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       described_class.register(["t"], "k1", { expires_at: Time.now + 3600 })
 
       expect(index_payload("t")["expires_at"]).to be_within(5).of(now + 123)
+    end
+
+    it "uses expires_in when both expiry options are provided but Rails would ignore expires_at" do
+      allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(false)
+      now = Time.now.to_f
+
+      described_class.register(["t"], "k1", { expires_in: 60, expires_at: Time.now + 3600 })
+
+      expected = now + 60 + described_class::INDEX_TTL_SLACK
+      expect(index_payload("t")["expires_at"]).to be_within(5).of(expected)
     end
 
     it "does not warn in development when expires_at is set" do

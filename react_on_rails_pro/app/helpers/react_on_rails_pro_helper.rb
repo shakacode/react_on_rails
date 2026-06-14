@@ -386,11 +386,17 @@ module ReactOnRailsProHelper
 
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &)
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
+    raw_cache_options = raw_options[:cache_options] || {}
+    tag_index_cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     cache_aware_options = raw_options.merge(
       on_complete: lambda { |chunks|
-        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_options[:cache_options] || {})
+        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
         Rails.cache.write(view_cache_key, chunks, cache_options)
-        ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, view_cache_key, cache_options)
+        ReactOnRailsPro::Cache.register_normalized_tags(
+          normalized_cache_tags,
+          view_cache_key,
+          tag_index_cache_options
+        )
       }
     )
 
