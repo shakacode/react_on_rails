@@ -39,6 +39,26 @@ describe('checkRscPeerCompatibility', () => {
     ).toBe(true);
   });
 
+  it('omits prerelease guidance from unsupported prerelease errors when no prereleases are allowed', () => {
+    const reactOnRailsRscSupport = RSC_PEER_SUPPORT.reactOnRailsRsc as unknown as {
+      allowedPrereleases: string[];
+    };
+    const originalAllowedPrereleases = reactOnRailsRscSupport.allowedPrereleases;
+    reactOnRailsRscSupport.allowedPrereleases = [];
+
+    try {
+      const result = checkRscPeerCompatibility({
+        rscVersion: `${recommendedMin}-rc.1`,
+        reactVersion: '19.0.4',
+      });
+      expect(result.level).toBe('error');
+      expect(result.message).toContain(`19.0.x stable >= ${recommendedMin}`);
+      expect(result.message).not.toContain(', or  while upgrading from the RC line');
+    } finally {
+      reactOnRailsRscSupport.allowedPrereleases = originalAllowedPrereleases;
+    }
+  });
+
   it('returns ok when react-on-rails-rsc is absent (optional peer not installed)', () => {
     expect(checkRscPeerCompatibility({ rscVersion: null, reactVersion: '19.0.4' })).toEqual({ level: 'ok' });
   });

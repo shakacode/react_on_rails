@@ -96,9 +96,10 @@ const supportedRscRange = (
     .map((minor) => {
       if (minor !== recommendedMinMinor) return `${supportedMajor}.${minor}.x`;
 
-      return `${supportedMajor}.${minor}.x stable >= ${recommendedMin}, or ${allowedPrereleases.join(
-        ' / ',
-      )} while upgrading from the RC line`;
+      const stableRange = `${supportedMajor}.${minor}.x stable >= ${recommendedMin}`;
+      if (allowedPrereleases.length === 0) return stableRange;
+
+      return `${stableRange}, or ${allowedPrereleases.join(' / ')} while upgrading from the RC line`;
     })
     .join(' or ');
 };
