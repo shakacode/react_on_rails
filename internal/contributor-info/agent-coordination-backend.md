@@ -126,7 +126,7 @@ if (
   require_clean_agent_coord_checkout() {
     # Non-zero means the index was stale; the diff checks below are the real cleanliness gate.
     git -C "$AGENT_COORD_REPO" update-index -q --refresh || true
-    local untracked_files
+    local untracked_files # Keep separate so set -e sees git ls-files failures below, not local's exit code.
 
     if ! git -C "$AGENT_COORD_REPO" diff --quiet --ignore-submodules -- ||
        ! git -C "$AGENT_COORD_REPO" diff --cached --quiet --ignore-submodules --; then
@@ -148,14 +148,15 @@ if (
   AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord" # Subshell-local; parent re-exports after probes pass.
   # set -eu above handles abort-on-error; && keeps each evidence/probe step explicit.
   require_clean_agent_coord_checkout &&
-    git -C "$AGENT_COORD_REPO" describe --tags --always --dirty && # --dirty is a canary after the clean-check.
+    # --dirty annotates race-condition dirtiness; the clean-check above is the hard gate.
+    git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
     git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
     "$AGENT_COORD_BIN" --help >/dev/null &&
     AGENT_COORD_VERSION_JSON="$("$AGENT_COORD_BIN" version --json)" &&
     require_json_output "agent-coord version --json" "$AGENT_COORD_VERSION_JSON" &&
     # Suppress stderr: diagnostics may expose private config paths or error details.
     # Non-zero exits still stop the preflight; blank stdout is caught after a zero exit.
-    # For private diagnostics, rerun without 2>/dev/null in a private terminal.
+    # For private diagnostics, run "$AGENT_COORD_REPO/bin/agent-coord config show --json" directly.
     AGENT_COORD_CONFIG_JSON="$("$AGENT_COORD_BIN" config show --json 2>/dev/null)" &&
     require_json_output "agent-coord config show --json" "$AGENT_COORD_CONFIG_JSON" &&
     "$AGENT_COORD_BIN" doctor &&
