@@ -13,6 +13,8 @@ Options:
       --limit N        Max issue-search results per state for existing findings. Default: 200.
       --self-check     Run parser checks plus read-only git/gh smoke checks.
   -h, --help           Show this help.
+
+Requires: ruby, gh (GitHub CLI)
 USAGE
 }
 
@@ -78,6 +80,8 @@ ARGF.each_line do |line|
   pr_number ||= subject[/\AMerge pull request #(\d+)\b/, 1]
   next if pr_number.nil?
 
+  # Keep first-seen position but update to the most-recent commit: with --first-parent
+  # --reverse, the last occurrence of a PR number is its authoritative merge commit.
   order << pr_number unless records.key?(pr_number)
   records[pr_number] = [pr_number, sha, subject]
 end
@@ -564,6 +568,13 @@ pma_scope_main() (
     pma_scope_require_command gh || return 1
     repo="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
   fi
+  case "$repo" in
+    */*) ;;
+    *)
+      pma_scope_error "--repo must be in OWNER/REPO form (got: '$repo')"
+      return 1
+      ;;
+  esac
 
   head_sha="$(pma_scope_resolve_ref_sha "$head_ref")" || {
     pma_scope_error "could not resolve head ref: $head_ref"

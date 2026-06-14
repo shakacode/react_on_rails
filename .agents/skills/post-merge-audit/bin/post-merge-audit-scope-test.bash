@@ -481,6 +481,32 @@ test_limit_requires_positive_integer() {
   esac
 }
 
+test_repo_requires_owner_repo_form() {
+  local tmpdir repo out rc
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
+  repo="$tmpdir/repo"
+  mkdir -p "$repo"
+  git -C "$repo" init --quiet --initial-branch=main
+  git -C "$repo" config user.email "test@example.com"
+  git -C "$repo" config user.name "Test User"
+  git -C "$repo" commit --quiet --allow-empty -m "base"
+
+  set +e
+  out="$(cd "$repo" && env -u BASH_ENV "$RESOLVER" --head HEAD --repo owner --json 2>&1)"
+  rc=$?
+  set -e
+
+  rm -rf "$tmpdir"
+  assert_equals "1" "$rc" "invalid repo rc"
+  case "$out" in
+    *"--repo must be in OWNER/REPO form"*) ;;
+    *)
+      fail "invalid repo error message missing: $out"
+      ;;
+  esac
+}
+
 test_sourced_main_help_does_not_change_shell_options() {
   local out expected
 
@@ -563,6 +589,7 @@ run_test test_resolver_rejects_base_outside_head_history
 run_test test_resolver_rejects_base_outside_first_parent_history
 run_test test_fetch_issue_markers_cleans_inner_tmpdir_on_parse_failure
 run_test test_limit_requires_positive_integer
+run_test test_repo_requires_owner_repo_form
 run_test test_sourced_main_help_does_not_change_shell_options
 run_test test_sourced_main_run_preserves_cwd_and_exit_trap
 
