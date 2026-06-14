@@ -76,7 +76,7 @@ class PrMergeLedger
       (?:\s*/\s*(?:#{PRIORITY_MARKER_PATTERN.source}))*(?:\*\*)?(?:\s|:|-)+(?<summary>.*)\z}ix
   FINDING_SUMMARY_SUBJECT_PATTERN = /\b(?:findings?|issues?|items?|main issue)\b/i
   FINDING_SUMMARY_RESOLUTION_PATTERN = /
-    \bnone(?!\s+of\b)(?=\s*(?:$|[.;,)])) |
+    \bnone(?!\s+of\b)(?=\s*(?:$|[.;,)]|\b(?:open|remaining)\b)) |
     \b(?:findings?|issues?|items?|main\s+issue)\b
     (?:
       \s*[:=-]\s* |
@@ -377,7 +377,7 @@ class PrMergeLedger
   end
 
   def blank_to_unknown(value)
-    value.to_s.empty? ? UNKNOWN : value
+    value.nil? || value.to_s.empty? ? UNKNOWN : value
   end
 
   def normalize_review_thread(thread, pull_request)
@@ -1263,11 +1263,9 @@ class PrMergeLedger
       raise Error, "gh api graphql variable key cannot contain '=': #{key}" if key.to_s.include?("=")
 
       value_string = value.to_s
-      if value.is_a?(String) && value_string.start_with?("@")
-        raise Error, "gh api graphql variable #{key} cannot start with @"
-      end
+      raise Error, "gh api graphql variable #{key} cannot start with @" if value_string.start_with?("@")
 
-      flag = value.is_a?(Integer) ? "-F" : "-f"
+      flag = value.is_a?(Integer) || value == true || value == false ? "-F" : "-f"
       args.push(flag, "#{key}=#{value_string}")
     end
 

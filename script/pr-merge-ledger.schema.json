@@ -82,16 +82,38 @@
       "properties": {
         "pr": {
           "type": "object",
+          "additionalProperties": false,
           "required": ["number", "head_sha", "review_decision"],
           "properties": {
             "number": {
               "type": "integer"
             },
+            "title": {
+              "type": ["string", "null"]
+            },
+            "url": {
+              "type": ["string", "null"]
+            },
+            "state": {
+              "type": ["string", "null"]
+            },
+            "is_draft": {
+              "type": ["boolean", "null"]
+            },
+            "base_ref": {
+              "type": ["string", "null"]
+            },
+            "head_ref": {
+              "type": ["string", "null"]
+            },
             "head_sha": {
               "type": "string"
             },
+            "merged_at": {
+              "type": ["string", "null"]
+            },
             "review_decision": {
-              "type": "string"
+              "enum": ["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED", "UNKNOWN"]
             }
           }
         },
@@ -129,7 +151,7 @@
               "enum": ["known", "UNKNOWN"]
             },
             "review_decision": {
-              "type": "string"
+              "enum": ["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED", "UNKNOWN"]
             },
             "latest_by_reviewer": {
               "type": "array",
@@ -207,7 +229,6 @@
               "enum": ["known", "UNKNOWN"]
             },
             "has_lockfile_diff": {
-              "type": ["boolean", "string"],
               "enum": [true, false, "UNKNOWN"]
             },
             "files": {
