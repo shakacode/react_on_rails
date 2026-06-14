@@ -374,6 +374,29 @@ test_limit_requires_positive_integer() {
   esac
 }
 
+test_sourced_main_help_does_not_change_shell_options() {
+  local out expected
+
+  out="$(
+    bash -c '
+      set +e
+      set -u
+      set -o pipefail
+      source "$1"
+      pma_scope_main --help >/dev/null
+      set -o | awk '\''$1 == "errexit" || $1 == "nounset" || $1 == "pipefail" { print $1 "=" $2 }'\''
+    ' bash "$RESOLVER"
+  )"
+  expected="$(
+    printf '%s\n' \
+      "errexit=off" \
+      "nounset=on" \
+      "pipefail=on"
+  )"
+
+  assert_equals "$expected" "$out" "sourced pma_scope_main shell options"
+}
+
 run_test test_parse_git_log_extracts_squash_and_merge_subject_prs_once
 run_test test_extract_issue_markers_from_json_keeps_fingerprint_state_and_affected_prs
 run_test test_subtract_prs_preserves_all_merged_prs_when_carry_over_is_empty
@@ -383,6 +406,7 @@ run_test test_default_base_uses_latest_rc_reachable_from_head
 run_test test_resolver_rejects_base_outside_head_history
 run_test test_fetch_issue_markers_cleans_inner_tmpdir_on_parse_failure
 run_test test_limit_requires_positive_integer
+run_test test_sourced_main_help_does_not_change_shell_options
 
 if [ "$TESTS_FAILED" -ne 0 ]; then
   printf '\n%d of %d tests failed:\n' "$TESTS_FAILED" "$TESTS_RUN" >&2

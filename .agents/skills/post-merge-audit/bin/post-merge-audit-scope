@@ -489,8 +489,6 @@ JSON
 }
 
 pma_scope_main() {
-  set -euo pipefail
-
   local base_ref=""
   local head_ref=""
   local repo=""
@@ -636,5 +634,6 @@ pma_scope_main() {
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  set -euo pipefail
   pma_scope_main "$@"
 fi
