@@ -640,6 +640,8 @@ describe('ClientSideRenderer', () => {
     (window.REACT_ON_RAILS_RSC_PAYLOADS ||= {})[rscPayloadKey] ||= [];
     window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page2-chunk-a');
     expect(window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual(['page2-chunk-a']);
+    (window.REACT_ON_RAILS_RSC_ERRORS ||= {})[rscPayloadKey] = { hasErrors: true };
+    expect(window.REACT_ON_RAILS_RSC_ERRORS[rscPayloadKey]).toEqual({ hasErrors: true });
   });
 
   it('runs a teardown returned asynchronously by a renderer on unmount', async () => {

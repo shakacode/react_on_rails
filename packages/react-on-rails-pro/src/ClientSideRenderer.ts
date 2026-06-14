@@ -623,5 +623,8 @@ function clearRSCPreloadedPayloadGlobals(): void {
 export function unmountAll(): void {
   unmountAllComponents();
   unmountAllStores();
+  // Keep this synchronous and after component/store unmounts. Mid-stream RSC payload/error
+  // scripts use `||=`, so moving or delaying cleanup could let previous-page writes recreate
+  // these globals and land in the next page's state.
   clearRSCPreloadedPayloadGlobals();
 }
