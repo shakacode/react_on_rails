@@ -172,13 +172,16 @@ describe('rootErrorHandlers', () => {
       expect(options.onUncaughtError).toBeUndefined();
     });
 
-    it('warns once with all React 19-only keys so split registrations are covered', () => {
+    it('warns once with the provided keys and names all React 19-only keys for split registrations', () => {
       const { setRootErrorHandlers, resetRootErrorHandlers } = loadModule('18.3.1');
       const onCaughtError = jest.fn();
       const onUncaughtError = jest.fn();
       setRootErrorHandlers({ onCaughtError });
       expect(console.warn).toHaveBeenCalledWith(
-        expect.stringContaining('rootErrorHandlers (onCaughtError, onUncaughtError) require React 19'),
+        expect.stringContaining('rootErrorHandlers (onCaughtError) require React 19'),
+      );
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('React 19-only callbacks (onCaughtError, onUncaughtError)'),
       );
       setRootErrorHandlers({ onUncaughtError });
       expect(console.warn).toHaveBeenCalledTimes(1);

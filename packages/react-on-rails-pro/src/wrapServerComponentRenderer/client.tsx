@@ -143,6 +143,8 @@ const wrapServerComponentRenderer = (
       : (() => {
           const root = ReactDOMClient.createRoot(domNode, {
             ...rootErrorCallbackOptions,
+            // On createRoot (non-hydrate), Pro's internal chainRecoverableErrorHandlers is not
+            // applied: the user callback is the sole reporter, matching standard React semantics.
             ...(userOnRecoverableError ? { onRecoverableError: userOnRecoverableError } : {}),
             identifierPrefix: domNodeId,
           });

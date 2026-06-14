@@ -76,9 +76,9 @@ export function setRootErrorHandlers(handlers: RootErrorHandlers): void {
     const react19OnlyKeys = providedKeys.filter((key) => key !== 'onRecoverableError');
     if (react19OnlyKeys.length > 0 && !warnedMissingReact19Callbacks) {
       console.warn(
-        `[ReactOnRails] rootErrorHandlers (${REACT_19_ONLY_HANDLER_KEYS.join(', ')}) require React 19. ` +
-          'Only onRecoverableError is supported on React 18; onCaughtError and onUncaughtError callbacks ' +
-          'will never be called with the current React version.',
+        `[ReactOnRails] rootErrorHandlers (${react19OnlyKeys.join(', ')}) require React 19. ` +
+          'Only onRecoverableError is supported on React 18; React 19-only callbacks ' +
+          `(${REACT_19_ONLY_HANDLER_KEYS.join(', ')}) will never be called with the current React version.`,
       );
       warnedMissingReact19Callbacks = true;
     }
@@ -241,6 +241,7 @@ export function buildRootErrorCallbackOptions(
   const options: RootErrorCallbackOptions = {};
   const { onRecoverableError, onCaughtError, onUncaughtError } = registeredHandlers;
 
+  // Capture once at root creation; the callback does not re-check the Rails env per error.
   const logDevDefault = hydrating && inDevelopmentEnv();
   if (logDevDefault || onRecoverableError) {
     options.onRecoverableError = (error, errorInfo) => {
@@ -274,6 +275,9 @@ export function buildRootErrorCallbackOptions(
  * Pro RSC hydration wraps the returned `onRecoverableError` with an internal handler that has already
  * performed React's default recoverable-error reporting. Keep that invariant in one named helper so
  * Pro call sites do not need to remember the lower-level `defaultReportingHandledInternally` flag.
+ *
+ * On non-hydrate (`createRoot`) paths, `defaultReportingHandledInternally` is false, so this
+ * degrades to `buildRootErrorCallbackOptions` with no reporting-behavior change.
  */
 export function buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting(
   context: RootErrorContext,
