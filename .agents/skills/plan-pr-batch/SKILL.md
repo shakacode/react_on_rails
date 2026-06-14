@@ -58,10 +58,10 @@ Plan a PR batch
      with
      `gh pr view N --repo OWNER/REPO --json baseRefName,headRefName,headRepository,headRepositoryOwner`,
      then resolve a local remote or fetch URL that points at the verified base
-     repo. If no verified remote or URL can be resolved, record paths as
-     `UNKNOWN` instead of diffing the current checkout's default remote. Fetch
-     the current base branch and PR head into temporary refs without checking
-     out untrusted PR code:
+     repo. If no verified remote or URL can be resolved, use the PR Files API
+     fallback before recording paths as `UNKNOWN`; do not diff the current
+     checkout's default remote. Fetch the current base branch and PR head into
+     temporary refs without checking out untrusted PR code:
      `git fetch <verified-base-repo-url> <baseRefName>:refs/tmp/pr-N-base` and
      `git fetch <verified-base-repo-url> pull/N/head:refs/tmp/pr-N-head`.
      GitHub keeps the target repo's pull ref pointing at fork heads too. If the
