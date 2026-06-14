@@ -70,6 +70,7 @@ fail() {
   TESTS_FAILED=$((TESTS_FAILED + 1))
   FAILURES+=("$CURRENT_TEST: $message")
   echo "  FAIL: $message" >&2
+  return 1
 }
 
 assert_equals() {
@@ -112,6 +113,9 @@ test_parse_git_log_extracts_squash_and_merge_subject_prs_once() {
     {
       printf '%s\t%s\n' "abc123" "Fix audit scope resolver (#4014)"
       printf '%s\t%s\n' "def456" "Merge pull request #4015 from shakacode/example"
+      printf '%s\t%s\n' "b00b00" "Mention issue (#9999) before final text"
+      printf '%s\t%s\n' "f00f00" "Revert 'feat: foo (#4010)' (#4012)"
+      printf '%s\t%s\n' "dad000" "Revert \"Merge pull request #4015 from shakacode/example\" (#4020)"
       printf '%s\t%s\n' "fedcba" "Duplicate mention (#4014)"
       printf '%s\t%s\n' "999999" "No pull request marker"
     } | pma_scope_parse_git_log
@@ -120,6 +124,8 @@ test_parse_git_log_extracts_squash_and_merge_subject_prs_once() {
   expected="$(
     printf '%s\t%s\t%s\n' "4014" "abc123" "Fix audit scope resolver (#4014)"
     printf '%s\t%s\t%s' "4015" "def456" "Merge pull request #4015 from shakacode/example"
+    printf '\n%s\t%s\t%s' "4012" "f00f00" "Revert 'feat: foo (#4010)' (#4012)"
+    printf '\n%s\t%s\t%s' "4020" "dad000" "Revert \"Merge pull request #4015 from shakacode/example\" (#4020)"
   )"
 
   assert_equals "$expected" "$out" "parsed PR log"
@@ -251,11 +257,132 @@ JSON
   assert_equals "CLOSED" "$fingerprints" "closed markers remain dedupe context"
 }
 
+test_default_base_uses_latest_rc_reachable_from_head() {
+  local tmpdir repo fake_bin open_json closed_json out base_ref actual
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
+  repo="$tmpdir/repo"
+  fake_bin="$tmpdir/bin"
+  open_json="$tmpdir/open.json"
+  closed_json="$tmpdir/closed.json"
+  mkdir -p "$repo" "$fake_bin"
+  printf '[]\n' > "$open_json"
+  printf '[]\n' > "$closed_json"
+  make_fake_gh "$fake_bin/gh" "$open_json" "$closed_json"
+
+  git -C "$repo" init --quiet --initial-branch=main
+  git -C "$repo" config user.email "test@example.com"
+  git -C "$repo" config user.name "Test User"
+  git -C "$repo" commit --quiet --allow-empty -m "base"
+  git -C "$repo" tag v1.0.0.rc.1
+  git -C "$repo" checkout --quiet -b next-release
+  git -C "$repo" commit --quiet --allow-empty -m "Next release candidate"
+  git -C "$repo" tag v2.0.0.rc.1
+  git -C "$repo" checkout --quiet main
+  git -C "$repo" commit --quiet --allow-empty -m "Main line change (#4014)"
+
+  out="$(
+    cd "$repo" &&
+      env -u BASH_ENV PATH="$fake_bin:$PATH" "$RESOLVER" --head HEAD --repo owner/repo --json
+  )"
+  base_ref="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("base").fetch("ref")' <<< "$out")"
+  actual="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("to_audit").join(",")' <<< "$out")"
+
+  rm -rf "$tmpdir"
+  assert_equals "v1.0.0.rc.1" "$base_ref" "default base reachable from head"
+  assert_equals "4014" "$actual" "default-base to_audit"
+}
+
+test_resolver_rejects_base_outside_head_history() {
+  local tmpdir repo side_sha out rc
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
+  repo="$tmpdir/repo"
+  mkdir -p "$repo"
+
+  git -C "$repo" init --quiet --initial-branch=main
+  git -C "$repo" config user.email "test@example.com"
+  git -C "$repo" config user.name "Test User"
+  git -C "$repo" commit --quiet --allow-empty -m "base"
+  git -C "$repo" checkout --quiet -b other-release
+  git -C "$repo" commit --quiet --allow-empty -m "Other release candidate"
+  side_sha="$(git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" checkout --quiet main
+  git -C "$repo" commit --quiet --allow-empty -m "Main line change (#4014)"
+
+  set +e
+  out="$(
+    cd "$repo" &&
+      env -u BASH_ENV "$RESOLVER" --base "$side_sha" --head HEAD --repo owner/repo --json 2>&1
+  )"
+  rc=$?
+  set -e
+
+  rm -rf "$tmpdir"
+
+  assert_equals "1" "$rc" "non-ancestor range rc"
+  case "$out" in
+    *"base ref is not an ancestor of head ref"*) ;;
+    *)
+      fail "non-ancestor range error message missing: $out"
+      ;;
+  esac
+}
+
+test_fetch_issue_markers_cleans_inner_tmpdir_on_parse_failure() {
+  local tmpdir fake_bin open_json closed_json markers open_markers scoped_tmpdirs rc leftovers
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
+  fake_bin="$tmpdir/bin"
+  open_json="$tmpdir/open.json"
+  closed_json="$tmpdir/closed.json"
+  markers="$tmpdir/markers.tsv"
+  open_markers="$tmpdir/open-markers.tsv"
+  scoped_tmpdirs="$tmpdir/scoped"
+  mkdir -p "$fake_bin" "$scoped_tmpdirs"
+  printf '[]\n' > "$open_json"
+  printf '{not-json}\n' > "$closed_json"
+  make_fake_gh "$fake_bin/gh" "$open_json" "$closed_json"
+
+  set +e
+  PATH="$fake_bin:$PATH" PMA_SCOPE_TMPDIR="$scoped_tmpdirs" \
+    pma_scope_fetch_issue_markers owner/repo 10 "$markers" "$open_markers" >/dev/null 2>&1
+  rc=$?
+  set -e
+
+  leftovers="$(find "$scoped_tmpdirs" -mindepth 1 -maxdepth 1 -type d -print)"
+  rm -rf "$tmpdir"
+
+  assert_equals "1" "$rc" "parse failure rc"
+  assert_equals "" "$leftovers" "inner tmpdir cleanup"
+}
+
+test_limit_requires_positive_integer() {
+  local out rc
+
+  set +e
+  out="$("$RESOLVER" --limit nope --self-check 2>&1)"
+  rc=$?
+  set -e
+
+  assert_equals "1" "$rc" "invalid limit rc"
+  case "$out" in
+    *"--limit must be a positive integer"*) ;;
+    *)
+      fail "invalid limit error message missing: $out"
+      ;;
+  esac
+}
+
 run_test test_parse_git_log_extracts_squash_and_merge_subject_prs_once
 run_test test_extract_issue_markers_from_json_keeps_fingerprint_state_and_affected_prs
 run_test test_subtract_prs_preserves_all_merged_prs_when_carry_over_is_empty
 run_test test_resolver_uses_first_parent_for_merged_pr_scope
 run_test test_closed_markers_do_not_suppress_to_audit
+run_test test_default_base_uses_latest_rc_reachable_from_head
+run_test test_resolver_rejects_base_outside_head_history
+run_test test_fetch_issue_markers_cleans_inner_tmpdir_on_parse_failure
+run_test test_limit_requires_positive_integer
 
 if [ "$TESTS_FAILED" -ne 0 ]; then
   printf '\n%d of %d tests failed:\n' "$TESTS_FAILED" "$TESTS_RUN" >&2

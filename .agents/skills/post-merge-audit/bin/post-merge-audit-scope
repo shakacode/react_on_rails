@@ -6,7 +6,7 @@ pma_scope_usage() {
 Usage: post-merge-audit-scope [options]
 
 Options:
-      --base REF       Base tag/commit/ref. Defaults to the most recent *.rc.* tag.
+      --base REF       Base tag/commit/ref. Defaults to the most recent *.rc.* tag reachable from head.
       --head REF       Head ref. Defaults to origin/main when present, otherwise HEAD.
       --repo REPO      GitHub repo in OWNER/REPO form. Defaults to gh repo view.
       --json           Print JSON instead of text.
@@ -42,7 +42,9 @@ pma_scope_default_head_ref() {
 }
 
 pma_scope_default_base_ref() {
-  git tag --list '*.rc.*' --sort=-creatordate | head -n 1
+  local head_ref="$1"
+
+  git tag --list '*.rc.*' --merged "$head_ref" --sort=-creatordate | head -n 1
 }
 
 pma_scope_resolve_ref_sha() {
@@ -60,8 +62,8 @@ ARGF.each_line do |line|
   sha, subject = line.split("\t", 2)
   next if sha.nil? || subject.nil?
 
-  pr_number = nil
-  subject.scan(/\(#(\d+)\)/) { |match| pr_number = match[0] }
+  # GitHub squash merges append the PR number at the end. Prefer that marker over quoted refs.
+  pr_number = subject[/\s\(#(\d+)\)\s*\z/, 1]
   pr_number ||= subject[/\bMerge pull request #(\d+)\b/, 1]
   next if pr_number.nil? || seen[pr_number]
 
@@ -216,7 +218,11 @@ pma_scope_fetch_issue_markers() {
   local tmpdir open_json closed_json
 
   pma_scope_require_command gh || return 1
-  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-gh.XXXXXX")" || return 1
+  if [ -n "${PMA_SCOPE_TMPDIR:-}" ]; then
+    tmpdir="$(mktemp -d "${PMA_SCOPE_TMPDIR}/gh.XXXXXX")" || return 1
+  else
+    tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-gh.XXXXXX")" || return 1
+  fi
   open_json="$tmpdir/open.json"
   closed_json="$tmpdir/closed.json"
 
@@ -242,8 +248,17 @@ pma_scope_fetch_issue_markers() {
     return 1
   fi
 
-  pma_scope_extract_issue_markers_from_json_files "$open_json" > "$open_output_file"
-  pma_scope_extract_issue_markers_from_json_files "$open_json" "$closed_json" > "$output_file"
+  if ! pma_scope_extract_issue_markers_from_json_files "$open_json" > "$open_output_file"; then
+    rm -rf "$tmpdir"
+    pma_scope_error "failed to parse open post-merge audit finding issues"
+    return 1
+  fi
+
+  if ! pma_scope_extract_issue_markers_from_json_files "$open_json" "$closed_json" > "$output_file"; then
+    rm -rf "$tmpdir"
+    pma_scope_error "failed to parse post-merge audit finding issues"
+    return 1
+  fi
   rm -rf "$tmpdir"
 }
 
@@ -520,6 +535,12 @@ pma_scope_main() {
           return 1
         }
         limit="$2"
+        case "$limit" in
+          ''|*[!0-9]*|0)
+            pma_scope_error "--limit must be a positive integer"
+            return 1
+            ;;
+        esac
         shift 2
         ;;
       --self-check)
@@ -544,14 +565,6 @@ pma_scope_main() {
   repo_root="$(pma_scope_repo_root)"
   cd "$repo_root"
 
-  if [ -z "$base_ref" ]; then
-    base_ref="$(pma_scope_default_base_ref)"
-    if [ -z "$base_ref" ]; then
-      pma_scope_error "no *.rc.* tag found; pass --base explicitly"
-      return 1
-    fi
-  fi
-
   if [ -z "$head_ref" ]; then
     head_ref="$(pma_scope_default_head_ref)"
   fi
@@ -561,14 +574,28 @@ pma_scope_main() {
     repo="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
   fi
 
-  base_sha="$(pma_scope_resolve_ref_sha "$base_ref")" || {
-    pma_scope_error "could not resolve base ref: $base_ref"
-    return 1
-  }
   head_sha="$(pma_scope_resolve_ref_sha "$head_ref")" || {
     pma_scope_error "could not resolve head ref: $head_ref"
     return 1
   }
+
+  if [ -z "$base_ref" ]; then
+    base_ref="$(pma_scope_default_base_ref "$head_sha")"
+    if [ -z "$base_ref" ]; then
+      pma_scope_error "no *.rc.* tag found in head history; pass --base explicitly"
+      return 1
+    fi
+  fi
+
+  base_sha="$(pma_scope_resolve_ref_sha "$base_ref")" || {
+    pma_scope_error "could not resolve base ref: $base_ref"
+    return 1
+  }
+
+  if ! git merge-base --is-ancestor "$base_sha" "$head_sha"; then
+    pma_scope_error "base ref is not an ancestor of head ref: $base_ref is not in $head_ref history"
+    return 1
+  fi
 
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope.XXXXXX")"
   PMA_SCOPE_TMPDIR="$tmpdir"
