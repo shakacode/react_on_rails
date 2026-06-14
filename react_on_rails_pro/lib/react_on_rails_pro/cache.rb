@@ -79,10 +79,14 @@ module ReactOnRailsPro
         TagIndex.revalidate(*meaningful_tags)
       end
 
+      private
+
       def meaningful_revalidation_tags(tags)
         tags.flat_map do |tag|
           if tag.is_a?(Array)
             meaningful_revalidation_tags(tag)
+          elsif tag.respond_to?(:call)
+            meaningful_revalidation_tags([tag.call])
           elsif blank_revalidation_tag?(tag)
             []
           else
@@ -93,10 +97,19 @@ module ReactOnRailsPro
 
       def blank_revalidation_tag?(tag)
         return true if tag.nil?
+        return true if unpersisted_record_tag?(tag)
         return false if tag.respond_to?(:cache_key)
 
         tag.blank?
       end
+
+      def unpersisted_record_tag?(tag)
+        return false unless tag.respond_to?(:model_name) && tag.respond_to?(:id)
+
+        tag.id.nil? || (tag.respond_to?(:new_record?) && tag.new_record?)
+      end
+
+      public
 
       def use_cache?(options)
         if options.key?(:if)

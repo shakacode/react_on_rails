@@ -81,6 +81,9 @@ module ReactOnRailsPro
       def revalidate_react_on_rails_cache_tags
         resolver = self.class._react_on_rails_cache_tags_resolver
         tags = resolver ? resolver.call(self) : self
+        # Do not replace with Array(tags): it calls to_ary, which would expand
+        # array-like cache-key objects (for example Relation-like tags) into
+        # their elements before TagIndex can use the object's cache_key.
         ReactOnRailsPro.revalidate_tags(*(tags.is_a?(Array) ? tags : [tags]))
       end
     end

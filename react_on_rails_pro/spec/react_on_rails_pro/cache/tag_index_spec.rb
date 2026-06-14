@@ -48,8 +48,15 @@ class TimestampedTaggableRecord
 end
 
 class UnpersistedTaggableRecord
-  def id
-    nil
+  def initialize(id: nil, new_record: false)
+    @id = id
+    @new_record = new_record
+  end
+
+  attr_reader :id
+
+  def new_record?
+    @new_record
   end
 
   def model_name
@@ -62,6 +69,30 @@ class UnpersistedTaggableRecord
 
   def cache_key
     "posts/new"
+  end
+end
+
+class DestroyedTaggableRecord
+  attr_reader :id
+
+  def initialize(id)
+    @id = id
+  end
+
+  def model_name
+    Struct.new(:cache_key).new("posts")
+  end
+
+  def persisted?
+    false
+  end
+
+  def destroyed?
+    true
+  end
+
+  def new_record?
+    false
   end
 end
 
@@ -84,6 +115,8 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
 
   before do
     allow(Rails).to receive(:logger).and_return(logger_mock)
+    described_class.instance_variable_set(:@warned_missing_expiry_cache_keys, {})
+    described_class.instance_variable_set(:@warned_private_key_api, {})
   end
 
   def index_payload(tag)
@@ -114,8 +147,12 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
     end
 
     it "rejects unpersisted AR-style records instead of sharing a posts/new tag" do
-      expect { described_class.normalize_tags([UnpersistedTaggableRecord.new]) }
+      expect { described_class.normalize_tags([UnpersistedTaggableRecord.new(id: 42, new_record: true)]) }
         .to raise_error(ReactOnRailsPro::Error, /blank tag/)
+    end
+
+    it "keeps stable identity for destroyed records that still have an id" do
+      expect(described_class.normalize_tags([DestroyedTaggableRecord.new(42)])).to eq(["posts/42"])
     end
 
     it "calls procs, including procs returning arrays of any accepted form" do
@@ -303,6 +340,17 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(logger_mock).to have_received(:warn).with(expected_warning)
     end
 
+    it "warns once per entry key when tagged entries omit expires_in and expires_at" do
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
+
+      described_class.register(["t"], "k1", {})
+      described_class.register(["t"], "k1", {})
+      described_class.register(["t"], "k2", {})
+
+      expected_warning = /without cache_options\[:expires_in\].*cache_options\[:expires_at\]/
+      expect(logger_mock).to have_received(:warn).with(expected_warning).twice
+    end
+
     it "does not warn outside development" do
       allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
 
@@ -341,6 +389,19 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
     it "treats blank tags in revalidate_tags as a no-op returning 0" do
       expect(ReactOnRailsPro.revalidate_tag(nil)).to eq(0)
       expect(ReactOnRailsPro.revalidate_tags(nil, "", "   ", [])).to eq(0)
+    end
+
+    it "treats unpersisted AR-style records as no-ops at the revalidation boundary" do
+      tags = [
+        UnpersistedTaggableRecord.new,
+        UnpersistedTaggableRecord.new(id: 42, new_record: true)
+      ]
+
+      expect(ReactOnRailsPro.revalidate_tags(tags)).to eq(0)
+    end
+
+    it "treats Procs resolving to blank as no-ops at the revalidation boundary" do
+      expect(ReactOnRailsPro.revalidate_tags(-> {}, -> { ["", "   "] })).to eq(0)
     end
 
     it "preserves cache-key objects that are also array-like during revalidation" do

@@ -13,6 +13,8 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+require "active_support/duration"
+
 module ReactOnRailsPro
   def self.configure
     yield(configuration)

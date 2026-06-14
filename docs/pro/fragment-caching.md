@@ -70,6 +70,8 @@ end
 
 Tag revalidation is best-effort and bounded by `expires_in` — always set it on tagged entries, and use a shared cache store (Redis/Memcached) in production. See the [Tag-Based Revalidation section](../oss/building-features/caching.md#tag-based-revalidation) of the caching guide for the full contract, tag normalization rules, index configuration, and the Next.js `revalidateTag` mapping.
 
+ActiveRecord-style tag objects normalize to `collection/id` (for example `posts/42`) before they are indexed. Pass an explicit String tag if a value object exposes `model_name` and `id` but should use a custom key.
+
 ## Cache Warming
 
 Every deploy creates new cache keys for prerendered components (because the server bundle digest is included in the cache key when `prerender: true`). For client-only cached components, version your own cache key to invalidate on deploy. To avoid a storm of cold-cache misses under live traffic, warm your highest-traffic pages in background jobs immediately after deploy.

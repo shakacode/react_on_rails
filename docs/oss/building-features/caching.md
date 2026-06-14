@@ -236,8 +236,9 @@ ReactOnRailsPro.revalidate_tags(post, post.author)
 
 A tag can be:
 
-- a **String** (or Symbol/Numeric) — passed through as-is (`"post:42"`)
-- an object responding to **`#cache_key`** (any ActiveRecord model) — ActiveRecord-style records normalize to the stable identity `posts/42` (equal to the version-less `record.cache_key`, and stable even when `cache_versioning` is disabled), so the tag stays valid as the record changes; other objects pass their `#cache_key` through
+- a **String** — passed through unchanged (`"post:42"`)
+- a **Symbol or Numeric** — stringified via `.to_s` (`:featured` -> `"featured"`, `42` -> `"42"`)
+- an object responding to **`#cache_key`** (any ActiveRecord model) — ActiveRecord-style records normalize to the stable identity `posts/42` (equal to the version-less `record.cache_key`, and stable even when `cache_versioning` is disabled), so the tag stays valid as the record changes; other objects pass their `#cache_key` through. Objects with both `model_name` and `id` always resolve to `collection/id`; pass an explicit String tag if you want a different key.
 - a **Proc** (arity 0) returning any accepted form
 - an **Array** of any mix of the above
 

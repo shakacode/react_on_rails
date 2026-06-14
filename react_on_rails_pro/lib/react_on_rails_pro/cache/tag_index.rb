@@ -32,11 +32,16 @@ module ReactOnRailsPro
     #   with correctness bounded by :expires_in.
     # - A missing or evicted index entry means "nothing to revalidate" — never
     #   an error. This also covers :null_store and per-process :memory_store.
+    # rubocop:disable Metrics/ClassLength
     class TagIndex
       INDEX_KEY_PREFIX = "rorp:tag:v1:"
       # Keep the index entry alive slightly longer than the cache entries it
       # points at, so an entry never outlives its index registration.
       INDEX_TTL_SLACK = 300 # 5 minutes, in seconds
+      @warned_missing_expiry_cache_keys = {}
+      @warned_missing_expiry_mutex = Mutex.new
+      @warned_private_key_api = {}
+      @warned_private_key_api_mutex = Mutex.new
 
       class << self
         # Records the cache entry key under each normalized tag after a successful cache write (never on a cache hit).
@@ -47,8 +52,8 @@ module ReactOnRailsPro
         def register_normalized(normalized_tags, cache_key, cache_options)
           return if normalized_tags.empty?
 
-          warn_if_expires_in_missing(cache_options)
           entry_key = normalized_entry_key(cache_key, cache_options)
+          warn_if_expires_in_missing(cache_options, entry_key)
           normalized_tags.uniq.each { |tag| append_entry_key(tag, entry_key, cache_options) }
         end
 
@@ -118,7 +123,8 @@ module ReactOnRailsPro
         def stable_record_identity(resolved)
           return nil unless resolved.respond_to?(:model_name) && resolved.respond_to?(:id)
 
-          return "" if (resolved.respond_to?(:persisted?) && !resolved.persisted?) || (id = resolved.id).nil?
+          id = resolved.id
+          return "" if id.nil? || (resolved.respond_to?(:new_record?) && resolved.new_record?)
 
           "#{resolved.model_name.cache_key}/#{id}"
         end
@@ -180,12 +186,17 @@ module ReactOnRailsPro
           return nil unless expires_at
 
           remaining = expires_at.to_time.to_f - Time.now.to_f
+          # Expired entries fall back to the configured index TTL. The reference
+          # is harmless because revalidation is best-effort and missing entries
+          # simply count as zero deletes.
           remaining.positive? ? remaining : nil
         end
 
-        def warn_if_expires_in_missing(cache_options)
+        def warn_if_expires_in_missing(cache_options, entry_key)
           return unless Rails.env.development?
           return if cache_options[:expires_in].present? || cache_options[:expires_at].present?
+
+          return unless warn_missing_expiry_once?(entry_key)
 
           Rails.logger.warn(
             "[ReactOnRailsPro] cache_tags: used without cache_options[:expires_in] or " \
@@ -196,10 +207,22 @@ module ReactOnRailsPro
           )
         end
 
+        def warn_missing_expiry_once?(entry_key)
+          @warned_missing_expiry_mutex ||= Mutex.new
+          @warned_missing_expiry_cache_keys ||= {}
+          @warned_missing_expiry_mutex.synchronize do
+            return false if @warned_missing_expiry_cache_keys[entry_key]
+
+            @warned_missing_expiry_cache_keys[entry_key] = true
+          end
+        end
+
         def revalidate_tag(tag)
           key = index_key(tag)
           keys, _expires_at = read_index(key)
-          deleted = keys.empty? ? 0 : delete_entries(keys)
+          return 0 if keys.empty?
+
+          deleted = delete_entries(keys)
           Rails.cache.delete(key)
           Rails.logger.debug do
             "[ReactOnRailsPro] revalidate_tag #{tag.inspect}: deleted #{deleted} of #{keys.size} indexed entries"
@@ -223,6 +246,9 @@ module ReactOnRailsPro
         # The private Store methods normalized_entry_key reproduces. Custom or
         # future stores missing any of these fall back to the raw cache key
         # (with a one-time warning) instead of failing registration silently.
+        # Re-run the FileStore round-trip canary when adding a new ActiveSupport
+        # minor; these methods are private even though they have been stable
+        # across the Rails versions covered by this PR.
         PRIVATE_KEY_METHODS = %i[expanded_key namespace_key merged_options].freeze
 
         def normalized_entry_key(cache_key, cache_options)
@@ -250,10 +276,15 @@ module ReactOnRailsPro
         end
 
         def warn_missing_private_key_api(store)
+          @warned_private_key_api_mutex ||= Mutex.new
           @warned_private_key_api ||= {}
-          return if @warned_private_key_api[store.class]
+          should_warn = @warned_private_key_api_mutex.synchronize do
+            next false if @warned_private_key_api[store.class]
 
-          @warned_private_key_api[store.class] = true
+            @warned_private_key_api[store.class] = true
+          end
+          return unless should_warn
+
           Rails.logger.warn do
             "[ReactOnRailsPro] #{store.class} does not implement the private key-normalization API " \
               "(#{PRIVATE_KEY_METHODS.join(', ')}); the cache tag index falls back to raw cache keys, " \
@@ -262,5 +293,6 @@ module ReactOnRailsPro
         end
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

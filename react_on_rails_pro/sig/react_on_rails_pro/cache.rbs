@@ -31,8 +31,6 @@ module ReactOnRailsPro
 
     def self.revalidate_tags: (*untyped tags) -> Integer
 
-    def self.meaningful_revalidation_tags: (Array[untyped] tags) -> Array[untyped]
-
     class TagIndex
       INDEX_KEY_PREFIX: String
       INDEX_TTL_SLACK: Integer
