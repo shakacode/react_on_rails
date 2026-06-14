@@ -29,6 +29,8 @@ const REACT_19_ONLY_HANDLER_KEYS = [
 // `react-on-rails` package instance) read the same registration.
 let registeredHandlers: RootErrorHandlers = {};
 let warnedMissingRootApi = false;
+// One-shot per reset cycle: the warning body names all React-19-only keys so split
+// registrations in the same cycle do not need repeated warnings.
 let warnedMissingReact19Callbacks = false;
 
 /**
@@ -44,6 +46,13 @@ let warnedMissingReact19Callbacks = false;
  * later React upgrade picks them up) but warns that they will never be called.
  */
 export function setRootErrorHandlers(handlers: RootErrorHandlers): void {
+  if (handlers == null) {
+    throw new Error(
+      `Invalid ReactOnRails rootErrorHandlers option: expected an object, got ${handlers}. ` +
+        'Use undefined (or omit the key) to clear all handlers.',
+    );
+  }
+
   const unknownKeys = Object.keys(handlers).filter(
     (key) => !HANDLER_KEYS.includes(key as RootErrorHandlerKey),
   );

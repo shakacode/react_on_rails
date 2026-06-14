@@ -21,6 +21,8 @@ const getRecoverableErrorCause = (error: unknown): unknown =>
   error instanceof Error && 'cause' in error ? (error as Error & { cause?: unknown }).cause : undefined;
 
 const isRSCRouteSSRFalseBailout = (error: unknown): boolean => {
+  // React can wrap the bailout inside a recovery error, so the sentinel can appear
+  // deeper in the cause chain. `seen` prevents loops if that chain is cyclic.
   let current = error;
   const seen = new Set<unknown>();
   while (current != null) {

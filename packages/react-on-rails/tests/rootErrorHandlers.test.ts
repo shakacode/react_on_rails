@@ -45,6 +45,13 @@ describe('rootErrorHandlers', () => {
   });
 
   describe('setRootErrorHandlers validation', () => {
+    it('throws a clear error when rootErrorHandlers is null', () => {
+      const { setRootErrorHandlers } = loadModule('19.0.0');
+      expect(() =>
+        setRootErrorHandlers(null as unknown as Parameters<typeof setRootErrorHandlers>[0]),
+      ).toThrow(/expected an object, got null/);
+    });
+
     it('throws when a handler is not a function', () => {
       const { setRootErrorHandlers } = loadModule('19.0.0');
       expect(() => setRootErrorHandlers({ onRecoverableError: 'nope' as unknown as () => void })).toThrow(
