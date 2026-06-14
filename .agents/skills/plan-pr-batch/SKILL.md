@@ -75,7 +75,8 @@ Plan a PR batch
      three-dot diffs from the merge-base, which matches GitHub's PR file list.
      Delete the temporary refs on both success and failure, then proceed to the
      API fallback or `UNKNOWN` decision: `git update-ref -d refs/tmp/pr-N-base`
-     and `git update-ref -d refs/tmp/pr-N-head`. A rename row
+     and `git update-ref -d refs/tmp/pr-N-head`. If cleanup fails, log the ref
+     name and continue to fallback or `UNKNOWN` recording. A rename row
      (`R100  old  new`) owns **both** the old and new path. If a ref cannot be
      fetched or the diff cannot run, try the PR Files API fallback before
      marking the paths `UNKNOWN`.
@@ -95,15 +96,15 @@ Plan a PR batch
      while truncated. `jq -s 'add // []'` collects all paginated arrays before
      counting paths or extracting filenames and returns an empty array for an
      empty stream; no Link header check is needed after the command returns.
-     The response is acceptable only when it records both `.filename` and
-     `.previous_filename` when present, and its listed-file count matches the
-     PR's `changedFiles` value from
+     The response is acceptable only when every row records `.filename`, every
+     row with `status: "renamed"` records `.previous_filename`, and its
+     listed-file count matches the PR's `changedFiles` value from
      `gh pr view N --repo OWNER/REPO --json changedFiles`. GitHub caps the
      Files API at ~3000 files; if the API is the only available source and
      `changedFiles` is at or above that cap, the paginated count does not match
-     `changedFiles`, or a renamed file is expected but the API row is missing
-     its `.previous_filename`, record the PR paths as `UNKNOWN` and treat the
-     item as serial.
+     `changedFiles`, or any row with `status: "renamed"` is missing
+     `.previous_filename`, record the PR paths as `UNKNOWN` and treat the item
+     as serial.
    - File-touch map, issue path discovery: read the issue body, record proposed
      new paths from issue/design notes, and grep the repo to confirm existing
      paths. If paths cannot be determined from the issue body or design notes,
@@ -123,7 +124,7 @@ Plan a PR batch
 
 4. Output
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
-   - Keep the fenced goal prompt under ~4000 bytes total so bulky audit detail stays in the Batch Plan. Measure it, do not eyeball it: `wc -c` gives a locale-independent byte count (`wc -m` counts Unicode code points in a UTF-8 locale and bytes otherwise). Treat 4000 as an approximate budget.
+   - Keep the fenced goal prompt under ~4000 bytes total so bulky audit detail stays in the Batch Plan. Measure it, do not eyeball it: `wc -c` gives a locale-independent byte count (`wc -m` counts characters using the current locale's multibyte rules — UTF-8 gives code points, C/POSIX gives bytes). Treat 4000 as an approximate budget.
    - Measure the actual filled template overhead when the prompt is near the
      byte budget; do not rely on a fixed estimate. Prefer splitting into
      multiple goals over trimming the safety, ownership, or review content.
