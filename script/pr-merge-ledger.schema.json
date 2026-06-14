@@ -182,7 +182,7 @@
         "priority_finding_dispositions": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["status", "findings", "truncated_sources"],
+          "required": ["status", "findings", "truncated_sources", "unused_keys"],
           "properties": {
             "status": {
               "enum": ["known", "UNKNOWN"]
@@ -197,6 +197,12 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/priority_finding_truncated_source"
+              }
+            },
+            "unused_keys": {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
             }
           }
@@ -367,7 +373,7 @@
     "review_object": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "reviewer", "state", "head_sha", "current_head"],
+      "required": ["id", "reviewer", "state", "head_sha", "body_excerpt", "current_head"],
       "properties": {
         "id": {
           "type": "string"
@@ -504,7 +510,7 @@
           "type": ["integer", "null"]
         },
         "reviewer": {
-          "type": "string"
+          "type": ["string", "null"]
         },
         "head_sha": {
           "type": ["string", "null"]

@@ -22,6 +22,7 @@ class PrMergeLedger
   ].freeze
   DISPOSITIONS = %w[fixed explicitly_waived follow_up_issue not_applicable].freeze
   REVIEW_DECISION_STATES = %w[APPROVED CHANGES_REQUESTED].freeze
+  FINDING_REVIEW_STATES = %w[APPROVED CHANGES_REQUESTED COMMENTED].freeze
   LOCKFILE_BASENAMES = %w[
     Gemfile.lock
     package-lock.json
@@ -143,7 +144,7 @@ class PrMergeLedger
     warn "ledger violations: #{report.fetch('violations').length}; " \
          "unknown fields: #{report.fetch('unknown_fields').length}"
     1
-  rescue Error, JSON::ParserError, Errno::ENOENT, Errno::EACCES, KeyError, NoMethodError, TypeError => e
+  rescue Error, JSON::ParserError, Errno::ENOENT, Errno::EACCES, KeyError => e
     warn "pr-merge-ledger: #{e.message}"
     2
   end
@@ -543,7 +544,7 @@ class PrMergeLedger
     )
     append_findings(issue_comments, "body", findings, context)
 
-    warn_unused_dispositions(dispositions, used_disposition_keys)
+    unused_disposition_keys = warn_unused_dispositions(dispositions, used_disposition_keys)
 
     unique_findings = findings.uniq do |finding|
       [
@@ -558,7 +559,8 @@ class PrMergeLedger
     {
       "status" => truncated_sources.empty? ? "known" : UNKNOWN,
       "findings" => unique_findings,
-      "truncated_sources" => truncated_sources.uniq { |source| source.fetch("url") }
+      "truncated_sources" => truncated_sources.uniq { |source| source.fetch("url") },
+      "unused_keys" => unused_disposition_keys
     }
   end
 
@@ -578,7 +580,9 @@ class PrMergeLedger
   end
 
   def reviews_for_findings(reviews)
-    reviews.select { |review| review.fetch("current_head") }
+    reviews.select do |review|
+      review.fetch("current_head") && FINDING_REVIEW_STATES.include?(review.fetch("state"))
+    end
   end
 
   def findings_from_text(text, url, id, context)
@@ -602,6 +606,8 @@ class PrMergeLedger
 
       [line_text, index + 1, occurrences]
     end
+    # Count before extracting individual findings so broad disposition keys are disabled
+    # whenever one source contains multiple priority markers.
     source_finding_count = finding_lines.sum { |(_line_text, _source_line, occurrences)| occurrences.length }
     line_context = {
       source_finding_count:,
@@ -831,16 +837,17 @@ class PrMergeLedger
     ]
 
     return marker_keys.compact if finding.fetch(:multiple_markers)
-    return marker_keys.concat(line_keys.take(2)).compact if finding.fetch(:multiple_source_findings)
+    return (marker_keys + line_keys.take(2)).compact if finding.fetch(:multiple_source_findings)
 
-    marker_keys.concat(line_keys).compact
+    (marker_keys + line_keys).compact
   end
 
   def warn_unused_dispositions(dispositions, used_disposition_keys)
     unused_keys = dispositions.keys - used_disposition_keys.to_a
-    return if unused_keys.empty?
+    return [] if unused_keys.empty?
 
     warn "pr-merge-ledger: unused disposition keys: #{unused_keys.join(', ')}"
+    unused_keys
   end
 
   def validate_disposition(disposition)
@@ -903,24 +910,7 @@ class PrMergeLedger
       )
     end
 
-    finding_dispositions.fetch("findings").each do |finding|
-      next unless finding.fetch("disposition") == UNKNOWN
-
-      unknowns << unknown_field(
-        pull_request,
-        "priority_finding_dispositions.findings",
-        "P0/P1/P2/Must-Fix finding has no fixed/waived/follow-up disposition",
-        finding["url"]
-      )
-    end
-    finding_dispositions.fetch("truncated_sources").each do |source|
-      unknowns << unknown_field(
-        pull_request,
-        "priority_finding_dispositions.body_scan",
-        "priority finding source body was truncated before full scan",
-        source["url"]
-      )
-    end
+    unknowns.concat(priority_finding_unknown_fields(pull_request, finding_dispositions))
 
     if changelog.fetch("classification") == UNKNOWN
       unknowns << unknown_field(
@@ -935,6 +925,36 @@ class PrMergeLedger
     end
 
     unknowns
+  end
+
+  def priority_finding_unknown_fields(pull_request, finding_dispositions)
+    unknowns = finding_dispositions.fetch("findings").filter_map do |finding|
+      next unless finding.fetch("disposition") == UNKNOWN
+
+      unknown_field(
+        pull_request,
+        "priority_finding_dispositions.findings",
+        "P0/P1/P2/Must-Fix finding has no fixed/waived/follow-up disposition",
+        finding["url"]
+      )
+    end
+
+    finding_dispositions.fetch("truncated_sources").each do |source|
+      unknowns << unknown_field(
+        pull_request,
+        "priority_finding_dispositions.body_scan",
+        "priority finding source body was truncated before full scan",
+        source["url"]
+      )
+    end
+
+    return unknowns if finding_dispositions.fetch("unused_keys").empty?
+
+    unknowns << unknown_field(
+      pull_request,
+      "priority_finding_dispositions.unused_keys",
+      "finding disposition keys did not match any priority finding"
+    )
   end
 
   def pull_request_unknown_fields(pull_request)

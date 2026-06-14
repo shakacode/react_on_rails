@@ -231,6 +231,43 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "exits successfully outside strict mode while still reporting violations" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 2,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "REVIEW_REQUIRED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-non-strict-violations", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "review_decision_review_required"
+      )
+    end
+  end
+
   it "blocks explicit missing changelog classifications in strict mode" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -493,6 +530,25 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(stdout).to be_empty
       expect(stderr).to include("pr-merge-ledger:")
       expect(stderr).not_to include("from ")
+    end
+  end
+
+  it "surfaces unexpected fixture shape errors with a backtrace" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => "not-a-hash"
+    }
+
+    Tempfile.create(["pr-merge-ledger-programming-error", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(script_path, "--fixture", file.path, chdir: repo_root)
+
+      expect(status.exitstatus).not_to eq(2)
+      expect(stdout).to be_empty
+      expect(stderr).to include("undefined method")
+      expect(stderr).to include("script/pr-merge-ledger")
     end
   end
 
@@ -902,6 +958,119 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
         "unknown_priority_finding_disposition"
       )
+    end
+  end
+
+  it "does not scan dismissed or pending review bodies for priority findings" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 4,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "dismissed-review",
+          "state" => "DISMISSED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/dismissed-review",
+          "body" => "[P1] Dismissed review body should not gate closeout."
+        },
+        {
+          "id" => "pending-review",
+          "state" => "PENDING",
+          "submittedAt" => nil,
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/pending-review",
+          "body" => "[P2] Pending review draft should not gate closeout."
+        }
+      ],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-non-gating-review-findings", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")).to be_empty
+    end
+  end
+
+  it "still scans submitted merge-relevant review bodies for priority findings" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 4,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "commented-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/commented-review",
+          "body" => "[P1] Commented review finding still needs disposition."
+        },
+        {
+          "id" => "changes-requested-review",
+          "state" => "CHANGES_REQUESTED",
+          "submittedAt" => "2026-06-02T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/changes-requested-review",
+          "body" => "[P2] Changes-requested finding still needs disposition."
+        }
+      ],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-gating-review-findings", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+      expect(findings.map { |finding| finding.fetch("id") }).to eq(
+        %w[commented-review changes-requested-review]
+      )
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
     end
   end
 
@@ -3397,7 +3566,7 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
-  it "warns when finding disposition keys do not match any finding" do
+  it "blocks unused finding disposition keys in strict mode" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
       "pull_request" => {
@@ -3442,11 +3611,22 @@ RSpec.describe "script/pr-merge-ledger" do
           chdir: repo_root
         )
 
-        expect(status).to be_success, stderr
+        expect(status).not_to be_success
         expect(stderr).to include("unused disposition keys: https://example.com/typo")
 
         report = JSON.parse(stdout)
-        expect(report.fetch("complete_allowed")).to be(true)
+        pr_ledger = report.fetch("pull_requests").first
+        expect(report.fetch("complete_allowed")).to be(false)
+        expect(pr_ledger.dig("priority_finding_dispositions", "unused_keys")).to eq(
+          ["https://example.com/typo"]
+        )
+        expect(report.fetch("unknown_fields").first).to include(
+          "field" => "priority_finding_dispositions.unused_keys",
+          "message" => "finding disposition keys did not match any priority finding"
+        )
+        expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+          "unknown_priority_finding_disposition"
+        )
       end
     end
   end
@@ -4263,12 +4443,22 @@ RSpec.describe "script/pr-merge-ledger" do
       schema.dig("$defs", "pull_request_ledger", "properties", "priority_finding_dispositions", "properties",
                  "truncated_sources", "items", "$ref")
     ).to eq("#/$defs/priority_finding_truncated_source")
+    expect(
+      schema.dig("$defs", "pull_request_ledger", "properties", "priority_finding_dispositions", "required")
+    ).to include("unused_keys")
+    expect(
+      schema.dig("$defs", "pull_request_ledger", "properties", "priority_finding_dispositions", "properties",
+                 "unused_keys", "items", "type")
+    ).to eq("string")
     expect(schema.dig("$defs", "violation", "additionalProperties")).to be(false)
     expect(schema.dig("$defs", "violation", "properties")).to include(
       "path", "line", "reviewer", "head_sha", "current_head"
     )
+    expect(schema.dig("$defs", "violation", "properties", "reviewer", "type")).to eq(%w[string null])
     expect(schema.dig("$defs", "review_thread", "additionalProperties")).to be(false)
+    expect(schema.dig("$defs", "review_object", "required")).to include("body_excerpt")
     expect(schema.dig("$defs", "review_object", "properties")).not_to include("body_text")
+    expect(schema.dig("$defs", "issue_comment", "required")).to include("body_excerpt")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "unknown_fields", "type")).to eq("array")
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "complete_allowed", "type")).to eq("boolean")
   end
