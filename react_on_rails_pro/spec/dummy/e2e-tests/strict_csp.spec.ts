@@ -115,6 +115,8 @@ async function sourceSnippetIncludesFlightClient(violation: CspViolation): Promi
 
     return FLIGHT_CLIENT_EVAL_MARKERS.some((marker) => snippet.includes(marker));
   } catch {
+    // Fail closed: if the emitted bundle cannot be inspected, treat the eval
+    // violation as unexpected so the strict-CSP assertion reports it.
     return false;
   }
 }
