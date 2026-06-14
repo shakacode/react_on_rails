@@ -119,14 +119,22 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
       (script-src 'self' 'nonce-...' - see config/initializers/content_security_policy.rb),
       so the auto-submit behavior is attached from a nonced script instead.
       Delegating from document also keeps this safe for Turbo-style navigations
-      that do not re-run DOMContentLoaded handlers on the active document. %>
+      that do not re-run DOMContentLoaded handlers on the active document. The
+      named window handler avoids stacking duplicate listeners when navigation
+      systems re-evaluate body scripts. %>
   <%= javascript_tag nonce: true do %>
-    document.addEventListener('change', function (event) {
+    if (window.reactOnRailsConfigOverrideChangeHandler) {
+      document.removeEventListener('change', window.reactOnRailsConfigOverrideChangeHandler);
+    }
+
+    window.reactOnRailsConfigOverrideChangeHandler = function (event) {
       var select = event.target;
       if (select.matches && select.matches('#config-override-form select')) {
         select.form.submit();
       }
-    });
+    };
+
+    document.addEventListener('change', window.reactOnRailsConfigOverrideChangeHandler);
   <% end %>
 
   <%= button_to "Reset to dummy defaults", reset_error_configs_path, method: :post,
