@@ -85,9 +85,9 @@ declare module 'fastify' {
 }
 
 const HEALTH_ENDPOINT_ROUTES = ['/health', '/ready'] as const;
+// TODO: Reassess the duplicated-route message format when upgrading Fastify.
 const FASTIFY_DUPLICATED_ROUTE_ERROR_CODE = 'FST_ERR_DUPLICATED_ROUTE';
 const READY_RETRY_AFTER_SECONDS = 5;
-// TODO: Reassess the duplicated-route message format when upgrading Fastify.
 
 function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- fixing it with `void` just violates no-void

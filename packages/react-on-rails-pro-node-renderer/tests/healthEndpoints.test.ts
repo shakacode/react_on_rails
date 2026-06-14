@@ -56,13 +56,16 @@ const renderWithBundle = async (app: ReturnType<typeof createWorker>) => {
     .end();
 };
 
-const expectHealthEndpointConflict = (routePath: '/health' | '/ready') => {
+const expectHealthEndpointConflict = async (routePath: '/health' | '/ready') => {
   let caughtError: unknown;
+  let createdApp: ReturnType<typeof createWorker> | undefined;
 
   try {
-    createWorker({ enableHealthEndpoints: true });
+    createdApp = createWorker({ enableHealthEndpoints: true });
   } catch (error) {
     caughtError = error;
+  } finally {
+    await createdApp?.close();
   }
 
   expect(caughtError).toBeInstanceOf(Error);
@@ -189,23 +192,23 @@ describe('built-in health endpoints', () => {
     expect(JSON.parse(healthAfter.payload)).toEqual({ status: 'ok' });
   });
 
-  test('reports a migration hint when a custom health route conflicts with built-in endpoints', () => {
+  test('reports a migration hint when a custom health route conflicts with built-in endpoints', async () => {
     configureFastify((fastifyApp) => {
       fastifyApp.get('/health', (_req, res) => {
         res.send({ status: 'legacy' });
       });
     });
 
-    expectHealthEndpointConflict('/health');
+    await expectHealthEndpointConflict('/health');
   });
 
-  test('reports a migration hint when a custom ready route conflicts with built-in endpoints', () => {
+  test('reports a migration hint when a custom ready route conflicts with built-in endpoints', async () => {
     configureFastify((fastifyApp) => {
       fastifyApp.get('/ready', (_req, res) => {
         res.send({ status: 'legacy' });
       });
     });
 
-    expectHealthEndpointConflict('/ready');
+    await expectHealthEndpointConflict('/ready');
   });
 });
