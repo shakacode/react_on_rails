@@ -60,6 +60,7 @@ on:
       - 'docs/**'
       - 'llms.txt'
       - 'llms-full.txt'
+      - 'llms-full-pro.txt'
       - '.lychee.toml'
 # Cancel stale PR benchmark runs when new commits are pushed.
 # Main runs are never cancelled so every merge is measured.

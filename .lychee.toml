@@ -84,7 +84,7 @@ exclude = [
   '^https://reactonrails\.com/docs/api-reference/?$',  # Generated-index URL - not a standalone page
   '^https://reactonrails\.com/docs/reference/error-reference(#.*)?$',  # New generated docs page - live after docs deploy
   '^https://reactonrails\.com/docs/pro/react-server-components/rsc-payload-route-data/?$',  # #3783 docs page - live after docs deploy
-  '^https://www\.reactonrails\.com/llms(-full)?\.txt$',  # Machine-readable docs endpoints; serving tracked in reactonrails.com#126
+  '^https://www\.reactonrails\.com/llms(-full(-pro)?)?\.txt$',  # Machine-readable docs endpoints; serving tracked in reactonrails.com#126
 
   # ============================================================================
   # SITES FROM PROJECTS.MD THAT BLOCK BOTS OR ARE UNRELIABLE
