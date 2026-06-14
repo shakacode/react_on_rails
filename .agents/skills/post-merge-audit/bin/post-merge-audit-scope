@@ -181,6 +181,25 @@ end
 RUBY
 }
 
+pma_scope_subtract_prs() {
+  local left_file="$1"
+  local right_file="$2"
+
+  ruby - "$left_file" "$right_file" <<'RUBY'
+left_path, right_path = ARGV
+right = File.readlines(right_path, chomp: true).map(&:strip).reject(&:empty?).to_h { |value| [value, true] }
+seen = {}
+
+File.readlines(left_path, chomp: true).each do |value|
+  value = value.strip
+  next if value.empty? || seen[value] || right[value]
+
+  seen[value] = true
+  puts value
+end
+RUBY
+}
+
 pma_scope_fetch_issue_markers() {
   local repo="$1"
   local limit="$2"
@@ -571,8 +590,7 @@ pma_scope_main() (
   pma_scope_fetch_issue_markers "$repo" "$limit" "$markers_file" "$open_markers_file"
   pma_scope_marker_pr_numbers "$open_markers_file" > "$marker_numbers_file"
   pma_scope_intersect_prs "$merged_numbers_file" "$marker_numbers_file" > "$carry_file"
-  # Prior findings are carry-over context; they do not prove the whole PR was fully audited.
-  cp "$merged_numbers_file" "$to_audit_file"
+  pma_scope_subtract_prs "$merged_numbers_file" "$carry_file" > "$to_audit_file"
 
   case "$output_format" in
     json)

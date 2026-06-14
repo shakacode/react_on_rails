@@ -167,7 +167,7 @@ JSON
   assert_equals "$expected" "$out" "issue markers"
 }
 
-test_open_markers_do_not_suppress_to_audit() {
+test_open_markers_create_carry_over_and_suppress_to_audit() {
   local tmpdir repo fake_bin open_json closed_json base out actual expected carry fingerprints
 
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
@@ -203,11 +203,11 @@ JSON
   actual="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("to_audit").join(",")' <<< "$out")"
   carry="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("carry_over_prs").join(",")' <<< "$out")"
   fingerprints="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("existing_fingerprints").map { |fp| fp.fetch("state") }.join(",")' <<< "$out")"
-  expected="4014"
+  expected=""
 
   rm -rf "$tmpdir"
-  assert_equals "$expected" "$actual" "open markers do not suppress to_audit"
-  assert_equals "$expected" "$carry" "open markers remain carry-over context"
+  assert_equals "$expected" "$actual" "open markers suppress to_audit"
+  assert_equals "4014" "$carry" "open markers remain carry-over context"
   assert_equals "OPEN" "$fingerprints" "open markers remain dedupe context"
 }
 
@@ -547,7 +547,7 @@ test_sourced_main_run_preserves_cwd_and_exit_trap() {
 
 run_test test_parse_git_log_extracts_squash_and_merge_subject_prs_once
 run_test test_extract_issue_markers_from_json_keeps_fingerprint_state_and_affected_prs
-run_test test_open_markers_do_not_suppress_to_audit
+run_test test_open_markers_create_carry_over_and_suppress_to_audit
 run_test test_resolver_uses_first_parent_for_merged_pr_scope
 run_test test_closed_markers_do_not_suppress_to_audit
 run_test test_default_base_ignores_rc_tags_on_merged_side_branches
