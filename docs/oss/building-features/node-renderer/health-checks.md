@@ -223,7 +223,9 @@ services:
   worker processes, and each worker has its own VM pool. A probe therefore checks the one worker that answers it.
   Workers load bundles independently (each compiles the bundle on its first render request), so a freshly restarted
   worker can briefly report `503` on `/ready` while its siblings serve traffic. This is the intended per-process
-  readiness signal for orchestrators probing one container.
+  readiness signal for orchestrators probing one container. During a rollout or cold start, raw probe logs may show a
+  short mix of `503` and `200` responses; Kubernetes smooths that with `failureThreshold` / `successThreshold`, so a
+  single unloaded-worker `503` should not flap pod readiness.
 - **No license check.** License validation happens on the Rails side; `/ready` does not (and cannot) report license
   state.
 - **Liveness checks nothing but the event loop.** Do not point `/health` at dependency monitoring; that is what
