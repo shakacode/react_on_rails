@@ -214,7 +214,8 @@ export const delay = (milliseconds: number) =>
     setTimeout(resolve, milliseconds);
   });
 
-const BUNDLE_TIMESTAMP_PATH_COMPONENT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+// Keep aligned with ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN.
+const BUNDLE_TIMESTAMP_PATH_COMPONENT_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 
 function bundleTimestampPathComponent(bundleTimestamp: string | number) {
   const pathComponent = String(bundleTimestamp);
