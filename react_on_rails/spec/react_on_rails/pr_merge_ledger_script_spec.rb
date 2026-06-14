@@ -1079,6 +1079,106 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks comma-separated mixed severity summary lines with open priority items" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "comma-mixed-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/comma-mixed-review",
+          "body" => "P1 issues fixed, P2 still open"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-comma-mixed-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      expect(finding).to include(
+        "id" => "comma-mixed-review",
+        "severity" => "P1",
+        "text_excerpt" => "P1 issues fixed, P2 still open",
+        "disposition" => "UNKNOWN"
+      )
+    end
+  end
+
+  it "requires an actual resolution word before suppressing previous-review summaries" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "previous-review-still-applies",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/previous-review-still-applies",
+          "body" => "[P1] issue from previous review still applies"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-previous-review-still-applies", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      expect(finding).to include(
+        "id" => "previous-review-still-applies",
+        "severity" => "P1",
+        "text_excerpt" => "[P1] issue from previous review still applies",
+        "disposition" => "UNKNOWN"
+      )
+    end
+  end
+
   it "ignores resolved first-clause summaries even when later context contains a negation" do
     fixture = {
       "repository" => "shakacode/react_on_rails",

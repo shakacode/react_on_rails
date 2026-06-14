@@ -59,10 +59,10 @@ class PrMergeLedger
   FINDING_SUMMARY_PREFIX_PATTERN =
     /\A\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-)+(?<summary>.*)\z/i
   FINDING_SUMMARY_SUBJECT_PATTERN = /\b(?:findings?|issues?|items?|main issue)\b/i
-  FINDING_SUMMARY_RESOLUTION_PATTERN = /\b(?:none|fixed|resolved|waived|previous review)\b/i
+  FINDING_SUMMARY_RESOLUTION_PATTERN = /\b(?:none|fixed|resolved|waived)\b/i
   NEGATED_SUMMARY_RESOLUTION_PATTERN = /\bnot\s+(?:yet\s+)?(?:fixed|resolved|waived)\b/i
   ADDITIONAL_SEVERITY_PATTERN =
-    /[.;]\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
+    /[.;,]\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
 
   class Error < StandardError; end
 
