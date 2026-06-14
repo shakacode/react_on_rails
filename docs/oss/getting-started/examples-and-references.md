@@ -107,7 +107,8 @@ workload as `type: standard` with `minScale: 1`, set its autoscaling metric to
 `disabled`, and enable `capacityAI: true` so Control Plane can right-size idle
 capacity while the demo keeps one warm replica. Do not pin `maxScale: 1` unless
 production predictability or a specific acceptance criterion requires a fixed
-replica count.
+replica count; leave `maxScale` unset or set a reasonable ceiling such as
+`maxScale: 5` when the demo should still absorb traffic bursts.
 
 This is not the same as scale-to-zero: steady RAM usage and background work can
 still drive cost, and shared Postgres should usually stay manually sized. If a

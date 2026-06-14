@@ -390,7 +390,7 @@ cpflow deploy-image -a myapp   # deploy the pushed image to Control Plane
 - **One-off tasks**: Run migrations and other one-off commands via `cpflow run -a myapp -- bundle exec rails db:migrate`.
 - **Public demo and starter staging apps**: Keep `type: standard` workloads
   with `minScale: 1`, the autoscaling metric disabled, and `capacityAI: true`.
-  Use serverless scale-to-zero only as an explicit first-deploy choice or
+  Use `serverless` scale-to-zero only as an explicit first-deploy choice or
   migration. See the
   [Control Plane Cost Posture](../getting-started/examples-and-references.md#control-plane-cost-posture).
 - **Multiple locations**: Control Plane supports multi-region deployment. Add locations to your GVC to deploy globally.
