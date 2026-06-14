@@ -115,12 +115,18 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
 
   before do
     allow(Rails).to receive(:logger).and_return(logger_mock)
-    described_class.instance_variable_set(:@warned_missing_expiry_cache_keys, {})
-    described_class.instance_variable_set(:@warned_private_key_api, {})
+    reset_warning_state
   end
 
   def index_payload(tag)
     Rails.cache.read(described_class.index_key(tag))
+  end
+
+  def reset_warning_state
+    described_class.instance_variable_set(:@warned_missing_expiry_mutex, Mutex.new)
+    described_class.instance_variable_set(:@warned_missing_expiry_cache_keys, {})
+    described_class.instance_variable_set(:@warned_private_key_api_mutex, Mutex.new)
+    described_class.instance_variable_set(:@warned_private_key_api, {})
   end
 
   describe ".normalize_tags" do
@@ -567,7 +573,7 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       allow(bare_store).to receive(:respond_to?).with(:expanded_key, true).and_return(false)
       allow(Rails).to receive(:cache).and_return(bare_store)
       allow(Rails.logger).to receive(:warn)
-      described_class.instance_variable_set(:@warned_private_key_api, nil)
+      reset_warning_state
 
       expect(described_class.send(:normalized_entry_key, "entry/raw", {})).to eq("entry/raw")
       expect(described_class.send(:normalized_entry_key, ["entry", "array", 42], {})).to eq("entry/array/42")

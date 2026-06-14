@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "digest"
+require "react_on_rails_pro/error"
 
 module ReactOnRailsPro
   class Cache
@@ -110,9 +111,12 @@ module ReactOnRailsPro
           # A tag must be a *stable* identity handle: the same record must
           # normalize to the same tag at registration time and revalidation
           # time, regardless of intervening updates.
-          stable = stable_record_identity(resolved)
-          return stable if stable
-          return nil if stable_record_identity_candidate?(resolved)
+          if stable_record_identity_candidate?(resolved)
+            stable = stable_record_identity(resolved)
+            return stable if stable
+
+            return nil
+          end
 
           # Other objects exposing #cache_key (never #cache_key_with_version,
           # which embeds the recyclable version) pass their cache_key through.
@@ -238,8 +242,6 @@ module ReactOnRailsPro
         end
 
         def warn_missing_expiry_once?(entry_key)
-          @warned_missing_expiry_mutex ||= Mutex.new
-          @warned_missing_expiry_cache_keys ||= {}
           @warned_missing_expiry_mutex.synchronize do
             next false if @warned_missing_expiry_cache_keys[entry_key]
             # Bound per-process warning memory. Once full, new keys skip this
@@ -333,8 +335,6 @@ module ReactOnRailsPro
         end
 
         def warn_missing_private_key_api(store)
-          @warned_private_key_api_mutex ||= Mutex.new
-          @warned_private_key_api ||= {}
           should_warn = @warned_private_key_api_mutex.synchronize do
             next false if @warned_private_key_api[store.class]
 

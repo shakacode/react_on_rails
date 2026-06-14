@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require_relative "spec_helper"
+require "open3"
 
 class TestingCache
   def call; end
@@ -24,6 +25,32 @@ class TestingCache
 end
 
 describe ReactOnRailsPro::Cache, :caching do
+  describe "direct require path" do
+    it "loads the Pro error class before tag validation" do
+      lib_path = File.expand_path("../../lib", __dir__)
+      script = <<~RUBY
+        require "active_support/core_ext/object/blank"
+        require "react_on_rails_pro/cache"
+
+        begin
+          ReactOnRailsPro::Cache.normalize_tags([""])
+        rescue ReactOnRailsPro::Error
+          exit 0
+        rescue NameError => e
+          warn e.full_message
+          exit 1
+        end
+
+        warn "expected ReactOnRailsPro::Error"
+        exit 1
+      RUBY
+
+      _stdout, stderr, status = Open3.capture3(RbConfig.ruby, "-I", lib_path, "-e", script)
+
+      expect(status).to be_success, stderr
+    end
+  end
+
   describe ".fetch_react_component" do
     let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
 
