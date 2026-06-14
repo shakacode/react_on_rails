@@ -14,6 +14,7 @@
 
   <%= yield :head %>
 
+  <%= stylesheet_pack_tag %>
   <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: true) %>
 
   <%= csrf_meta_tags %>
