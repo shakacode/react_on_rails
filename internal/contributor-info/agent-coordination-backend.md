@@ -8,11 +8,10 @@ React on Rails repository should only carry this pointer and the public workflow
 rules in [AGENTS.md](../../AGENTS.md), [.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md),
 and [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md).
 
-Until the private repo has tagged releases, pull the private repo and rerun the
-smoke checks below after backend CLI or schema changes. The command examples in
-this page were verified at the initial backend rollout; the private README and
-`bin/agent-coord --help` output are authoritative if they differ from this
-public pointer.
+Until the private repo has tagged releases, use `agent-coord version --json` and
+`agent-coord config show --json` as the CLI contract. The private README,
+`agent-coord --help`, and `agent-coord config show --json` output are
+authoritative if they differ from this public pointer.
 
 ## Setup
 
@@ -26,28 +25,34 @@ gh repo clone shakacode/agent-coordination
 cd agent-coordination
 ruby -Itest test/agent_coord_test.rb
 bin/agent-coord --help
-mkdir -p "$HOME/.local/bin"
-ln -sf "$PWD/bin/agent-coord" "$HOME/.local/bin/agent-coord"
+bin/agent-coord bootstrap
 export PATH="$HOME/.local/bin:$PATH"
 agent-coord --help
+agent_coord --help
+agent-coord version --json
+agent-coord config show --json
+agent-coord doctor
 ```
 
-The workflow docs assume `agent-coord` is available on `PATH`. Add
-`$HOME/.local/bin` to the shell `PATH` if needed, or run the command by its full
-path inside the private clone.
+The workflow docs assume `agent-coord` is available on `PATH`.
+`bin/agent-coord bootstrap` installs both `agent-coord` and the compatibility
+alias `agent_coord` into `$HOME/.local/bin` by default. Add that directory to the
+active shell `PATH` if the shell has not reloaded its profile yet.
 
-Treat the backend as available when `agent-coord status` exits 0. If the command
-is missing, auth fails, the private repo cannot be read, or `status` exits
-non-zero, report private state as `UNKNOWN` and use structured public claim
-comments as an advisory fallback. A successful status check followed by a
-refused `agent-coord claim` is not unavailability; it is a hard stop.
+Treat the backend as available when `agent-coord doctor` and `agent-coord status`
+exit 0. If the command is missing, auth fails, the private repo cannot be read,
+or either command exits non-zero, report private state as `UNKNOWN` and use
+structured public claim comments as an advisory fallback where dependency rules
+allow it. A successful status check followed by a refused `agent-coord claim`
+with exit code 3 / `CLAIM_REFUSED` is not unavailability; it is a hard stop.
 `agent-coord status` is a preflight view; `agent-coord claim` is the backend's
 compare-and-swap gate for concurrent claim races.
 
 Do not use an unverified private clone for hard-stop gates. If the local private
 CLI or README no longer matches this public pointer and the operator cannot
-validate the current private backend version, report private state as `UNKNOWN`
-and stay in advisory fallback mode until a coordinator validates the backend.
+validate the current private backend version/config output, report private state
+as `UNKNOWN` and stay in advisory fallback mode until a coordinator validates the
+backend.
 
 Machine agents must not override a refused private claim on their own. A human
 coordinator may authorize a one-off manual override only after running
@@ -109,22 +114,26 @@ agent-coord status
 ```
 
 Heartbeat liveness is derived from timestamps: `live` before the TTL expires,
-`stale` until 4x TTL, and `dead` after that. See the private backend README and
-CLI help for current default TTL values and the dead-threshold calculation.
+`stale` until the backend dead threshold, and `dead` after that. Use
+`agent-coord config show --json`, the private backend README, and CLI help for
+current default TTL values, terminal heartbeat statuses, and dead-threshold
+calculation.
 Dependent lanes blocked on a dead-heartbeat takeover should wait until current
 backend liveness marks the holder `dead` before takeover is safe. The default
 claim lease TTL is only a fallback when heartbeat liveness is missing or invalid.
-Use the private repo's launchd template for desktop sessions that need
-out-of-band renewal while an agent is between tool calls.
+Use the private repo's scheduler templates, such as macOS `launchd` or Linux
+`systemd --user`, for sessions that need out-of-band renewal while an agent is
+between tool calls.
 
 For dependency-sensitive lanes, coordinators create or update
 `batches/<batch-id>.json` in the private backend before dispatching dependent
 workers. Batch files are edited as JSON in the private repo in v1. Use the
 private backend README and schema files for that JSON layout; this public pointer
 intentionally omits the batch-state schema and terminal-status list. The private
-backend README and CLI are authoritative for the terminal heartbeat statuses that
-unblock `depends_on` refs; re-check them after backend updates. A released claim
-is audit state and does not unblock dependent lanes by itself.
+backend README, schema files, and `agent-coord config show --json` output are
+authoritative for the terminal heartbeat statuses that unblock `depends_on`
+refs; re-check them after backend updates. A released claim is audit state and
+does not unblock dependent lanes by itself.
 
 If a worker lane declares `depends_on` but `agent-coord status` shows no matching
 batch file or lane state, the worker must treat dependency state as `UNKNOWN` and

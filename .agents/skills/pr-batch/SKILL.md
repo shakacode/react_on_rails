@@ -225,11 +225,12 @@ canonical source for coordination state and worker rules. Keep this skill as a
 routing entry point; do not duplicate the full protocol here.
 
 In short: exact lane assignments beat labels; private `agent-coord` state is the
-source of truth when `agent-coord status` exits 0; refused claims hard-stop
-machine agents; workers heartbeat at phase transitions; coordinators create
-private batch files before dependency lanes start; dependency-sensitive lanes run
-`agent-coord status` before rebase, push, readiness, and closeout; and structured
-public claim comments are only advisory fallback state.
+source of truth when `agent-coord doctor` and `agent-coord status` exit 0;
+`CLAIM_REFUSED` / exit code 3 hard-stops machine agents; workers heartbeat at
+phase transitions; coordinators create private batch files before dependency
+lanes start; dependency-sensitive lanes run `agent-coord status` before rebase,
+push, readiness, and closeout; and structured public claim comments are only
+advisory fallback state.
 
 ## Worker Rules
 

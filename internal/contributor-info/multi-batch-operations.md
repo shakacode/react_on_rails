@@ -37,20 +37,23 @@ should use this PR branch or `main` for the current workflow docs.
    cd agent-coordination
    ruby -Itest test/agent_coord_test.rb
    bin/agent-coord --help
-   mkdir -p "$HOME/.local/bin"
-   ln -sf "$PWD/bin/agent-coord" "$HOME/.local/bin/agent-coord"
+   bin/agent-coord bootstrap
    export PATH="$HOME/.local/bin:$PATH"
+   agent-coord doctor
+   agent-coord config show --json
    agent-coord status
    ```
 
    The remaining snippets assume that `PATH` entry is present in the active
    shell. In another shell, add the export first or replace each `agent-coord`
-   command below with `"$HOME/.local/bin/agent-coord"`.
+   command below with `"$HOME/.local/bin/agent-coord"`. The private bootstrap
+   also installs `agent_coord` as an underscore alias for launchers or prompts
+   that use that spelling.
 
-4. If the status command exits non-zero, report private state as `UNKNOWN` and
-   use the structured public claim comment fallback. Do not start a
-   dependency-sensitive lane when the lane declares `depends_on` and private
-   status cannot be checked.
+4. If `doctor` or `status` exits non-zero, report private state as `UNKNOWN` and
+   use the structured public claim comment fallback where dependency rules allow
+   it. Do not start a dependency-sensitive lane when the lane declares
+   `depends_on` and private status cannot be checked.
 5. Before dependent lanes start, the coordinator creates or updates
    `batches/<batch-id>.json` in the private backend so `agent-coord status` can
    render `blocked_on` refs.
@@ -65,8 +68,10 @@ should use this PR branch or `main` for the current workflow docs.
      --branch <branch>
    ```
 
-   A refused claim after successful status is a hard stop. Report the holder,
-   heartbeat liveness, and target instead of creating competing work.
+   A refused claim after successful status exits with `CLAIM_REFUSED` / code 3
+   and is a hard stop. Report the holder, heartbeat liveness, and target instead
+   of creating competing work. Operational failures are `UNKNOWN`, not claim
+   overrides.
 
 7. Each worker heartbeats at item start, branch/PR update, review pass, blocked
    state, resumed state, and done state:
@@ -138,7 +143,10 @@ dead, or explicitly transferred by the coordinator.
 Do not let conductor become an invisible side channel. If conductor takes a PR,
 record the claim in shakacode/agent-coordination with the same repo and target
 identity that batch workers use, then refresh heartbeats while conductor owns
-the lane.
+the lane. If `agent-coord` is not installed in the conductor environment, install
+it with the private backend bootstrap first or use the structured public claim
+comment fallback until the host is configured; do not treat an unbootstrapped
+conductor session as a private claim override.
 
 ## Coordination Lifecycle
 
