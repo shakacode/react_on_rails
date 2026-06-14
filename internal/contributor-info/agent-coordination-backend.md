@@ -64,8 +64,8 @@ elif test ! -x "$AGENT_COORD_REPO/bin/agent-coord"; then
   echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
   false
 else
-  git -C "$AGENT_COORD_REPO" fetch --tags --prune &&
-    git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
+  git -C "$AGENT_COORD_REPO" fetch --tags --prune --prune-tags &&
+    git -C "$AGENT_COORD_REPO" describe --tags --always --dirty && # copy this output into PR evidence
     git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
     "$AGENT_COORD_REPO/bin/agent-coord" --help &&
     "$AGENT_COORD_REPO/bin/agent-coord" status &&
@@ -201,9 +201,9 @@ workflow examples change:
 
 1. Fetch the private backend and record the validated tag or commit.
 2. Run the private backend tests and the `CLI Contract Preflight` commands above.
-3. Run the local-state smoke-check block above with `AGENT_COORD_STATE_ROOT` so
-   examples do not write private coordination records while testing command
-   wiring.
+3. Run the `AGENT_COORD_STATE_ROOT` smoke-check block in the
+   [Heartbeats](#heartbeats) section so examples do not write private
+   coordination records while testing command wiring.
 4. Confirm this public page still documents only command names, verification
    steps, and outcome rules. Keep schemas, private defaults, terminal heartbeat
    statuses, and scheduler snippets in the private backend.
