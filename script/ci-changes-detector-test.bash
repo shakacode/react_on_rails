@@ -253,6 +253,30 @@ test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only() {
   assert_contains "$out" '"benchmarks_changed": false' "docs PR output"
 }
 
+# Regression for PR #4006: a docs-only PR under docs-internal/ that also ships a
+# binary asset (the .png infographic) used to fall through to the uncategorized
+# catch-all, forcing the ENTIRE JS + Ruby + Pro test suite to run. The markdown
+# itself was always caught by the *.md extension; the image was not, and
+# docs-internal/ was not recognized as a documentation directory the way docs/
+# and internal/ are. Everything under docs-internal/ is internal documentation
+# and must stay non-runtime regardless of file type.
+test_docs_internal_tree_with_image_asset_is_non_runtime_only() {
+  setup_repo
+  mkdir -p docs-internal/rsc-architecture-deep-dive/images
+  printf '# Deep dive\n' > docs-internal/rsc-architecture-deep-dive/00-START-HERE.md
+  printf 'binary-ish png bytes\n' > docs-internal/rsc-architecture-deep-dive/images/flow.png
+  commit_change "internal architecture docs with infographic"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": true' "docs-internal image output"
+  assert_contains "$out" '"non_runtime_only": true' "docs-internal image output"
+  assert_contains "$out" '"run_lint": false' "docs-internal image output"
+  assert_contains "$out" '"run_ruby_tests": false' "docs-internal image output"
+  assert_contains "$out" '"run_js_tests": false' "docs-internal image output"
+  assert_contains "$out" '"benchmarks_changed": false' "docs-internal image output"
+}
+
 # Regression for PR #3717: agent/editor tooling under .claude/** and .agents/**
 # is non-runtime. The .claude/skills symlink (a tracked path with no extension)
 # used to miss every category and hit the catch-all, forcing the full test +
@@ -829,6 +853,7 @@ run_test test_docs_changes_are_non_runtime_only
 run_test test_internal_non_markdown_docs_are_non_runtime_only
 run_test test_issue_template_changes_are_non_runtime_only
 run_test test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only
+run_test test_docs_internal_tree_with_image_asset_is_non_runtime_only
 run_test test_agent_tooling_changes_are_non_runtime_only
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
