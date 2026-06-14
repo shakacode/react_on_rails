@@ -117,12 +117,15 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
 
   <%# Inline event handlers (onchange="...") are blocked by the strict CSP
       (script-src 'self' 'nonce-...' - see config/initializers/content_security_policy.rb),
-      so the auto-submit behavior is attached from a nonced script instead. %>
+      so the auto-submit behavior is attached from a nonced script instead.
+      Delegating from document also keeps this safe for Turbo-style navigations
+      that do not re-run DOMContentLoaded handlers on the active document. %>
   <%= javascript_tag nonce: true do %>
-    document.addEventListener('DOMContentLoaded', function () {
-      document.querySelectorAll('#config-override-form select').forEach(function (el) {
-        el.addEventListener('change', function () { el.form.submit(); });
-      });
+    document.addEventListener('change', function (event) {
+      var select = event.target;
+      if (select.matches && select.matches('#config-override-form select')) {
+        select.form.submit();
+      }
     });
   <% end %>
 

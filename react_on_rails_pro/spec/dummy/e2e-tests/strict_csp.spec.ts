@@ -100,10 +100,12 @@ function getCspViolations(page: Page): Promise<CspViolation[]> {
  * so we tolerate exactly this one violation shape and nothing else.
  */
 function isDevBuildFlightClientEval(violation: CspViolation): boolean {
-  return (
-    violation.blockedURI === 'eval' &&
-    (violation.sourceFile === '' || violation.sourceFile.includes('react-on-rails-rsc'))
-  );
+  const isEvalBlockedByScriptSrc =
+    violation.blockedURI === 'eval' && violation.violatedDirective.includes('script-src');
+  const isReactFlightSource = violation.sourceFile.includes('react-on-rails-rsc');
+  const isAnonymousDevFlightEval = violation.sourceFile === '' && violation.sample === '';
+
+  return isEvalBlockedByScriptSrc && (isReactFlightSource || isAnonymousDevFlightEval);
 }
 
 async function getUnexpectedCspViolations(page: Page): Promise<CspViolation[]> {

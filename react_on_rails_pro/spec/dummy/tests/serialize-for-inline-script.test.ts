@@ -26,7 +26,9 @@ describe('serializeForInlineScript', () => {
     const serialized = serializeForInlineScript(payload);
 
     expect(serialized).not.toContain('<');
+    expect(serialized).not.toContain('>');
     expect(serialized).not.toContain('</script>');
+    expect(serialized).toContain('\\u003e');
     expect(serialized).not.toContain('\u2028');
     expect(serialized).not.toContain('\u2029');
     expect(serialized).toContain('\\u2028');
