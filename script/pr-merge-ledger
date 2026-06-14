@@ -5,7 +5,6 @@ require "json"
 require "open3"
 require "optparse"
 require "time"
-require "timeout"
 
 # rubocop:disable Metrics/ClassLength
 class PrMergeLedger
@@ -113,6 +112,47 @@ class PrMergeLedger
     raise Error, "PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS must be a positive integer (seconds)"
   rescue ArgumentError
     raise Error, "PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS must be an integer (seconds)"
+  end
+
+  def self.capture_command_with_timeout(args, timeout:, timeout_message:)
+    Open3.popen3(*args) do |stdin, stdout, stderr, wait_thread|
+      stdin.close
+      stdout_reader = Thread.new { read_stream(stdout) }
+      stderr_reader = Thread.new { read_stream(stderr) }
+
+      unless wait_thread.join(timeout)
+        terminate_process(wait_thread.pid, wait_thread)
+        close_io(stdout)
+        close_io(stderr)
+        stdout_reader.join(1)
+        stderr_reader.join(1)
+        raise Error, timeout_message
+      end
+
+      [stdout_reader.value, stderr_reader.value, wait_thread.value]
+    end
+  end
+
+  def self.terminate_process(pid, wait_thread)
+    Process.kill("TERM", pid)
+    return if wait_thread.join(1)
+
+    Process.kill("KILL", pid)
+    wait_thread.join(1)
+  rescue Errno::ESRCH
+    nil
+  end
+
+  def self.close_io(io)
+    io.close unless io.closed?
+  rescue IOError
+    nil
+  end
+
+  def self.read_stream(io)
+    io.read
+  rescue IOError
+    ""
   end
 
   def self.run(argv)
@@ -266,14 +306,14 @@ class PrMergeLedger
 
   def detect_repo
     timeout = self.class.github_api_timeout_seconds
-    Timeout.timeout(timeout) do
-      stdout, stderr, status = Open3.capture3("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
-      raise Error, "could not detect gh repo: #{stderr.strip}" unless status.success?
+    stdout, stderr, status = self.class.capture_command_with_timeout(
+      ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+      timeout:,
+      timeout_message: "gh repo view timed out after #{timeout} seconds"
+    )
+    raise Error, "could not detect gh repo: #{stderr.strip}" unless status.success?
 
-      stdout.strip
-    end
-  rescue Timeout::Error
-    raise Error, "gh repo view timed out after #{timeout} seconds"
+    stdout.strip
   end
 
   def load_fixture(path)
@@ -1329,18 +1369,16 @@ class PrMergeLedger
     end
 
     def non_retryable_gh_error?(stderr)
-      stderr.to_s.match?(/\b(?:401|403|404|429)\b|\b(?:Not Found|Unauthorized|Forbidden|Too Many Requests)\b/i)
+      stderr.to_s.match?(/\b4\d{2}\b|\b(?:Not Found|Unauthorized|Forbidden|Too Many Requests)\b/i)
     end
 
     def capture_gh(args)
       timeout = PrMergeLedger.github_api_timeout_seconds
-      # Timeout.timeout can interrupt Open3 mid-IO. The risk is acceptable for
-      # short-lived gh calls only; do not extend this pattern to stateful subprocesses.
-      Timeout.timeout(timeout) do
-        Open3.capture3("gh", *args)
-      end
-    rescue Timeout::Error
-      raise Error, "gh api graphql timed out after #{timeout} seconds"
+      PrMergeLedger.capture_command_with_timeout(
+        ["gh", *args],
+        timeout:,
+        timeout_message: "gh api graphql timed out after #{timeout} seconds"
+      )
     end
 
     def metadata_query

@@ -4559,7 +4559,7 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
-  it "retries 422 gh API failures before reporting the live ledger" do
+  it "does not retry 422 gh API failures" do
     fake_gh = <<~SH
       #!/bin/sh
       count_file="$(dirname "$0")/failed-422-once"
@@ -4614,10 +4614,11 @@ RSpec.describe "script/pr-merge-ledger" do
         chdir: repo_root
       )
 
-      expect(status).to be_success, stderr
-
-      report = JSON.parse(stdout)
-      expect(report.fetch("complete_allowed")).to be(true)
+      count_path = File.join(env.fetch("PATH").split(":").first, "failed-422-once")
+      expect(status.exitstatus).to eq(2)
+      expect(stdout).to be_empty
+      expect(stderr).to include("HTTP 422 temporary validation window")
+      expect(File.read(count_path).strip).to be_empty
     end
   end
 
