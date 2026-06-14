@@ -95,12 +95,15 @@ function releaseSourceMapRegistration(sourceMapRegistration: BundleSourceMapRegi
     const wasEvicted = evictedSourceMapRegistrations.delete(sourceMapRegistration);
     // Eviction deletes the VM first today; keep the guard so future callers do
     // not unregister a source map for a live pooled VM.
-    if (
-      wasEvicted &&
-      !Array.from(vmContexts.values()).some(
-        (vmContext) => vmContext.sourceMapRegistration === sourceMapRegistration,
-      )
-    ) {
+    let isStillInPool = false;
+    for (const vmContext of vmContexts.values()) {
+      if (vmContext.sourceMapRegistration === sourceMapRegistration) {
+        isStillInPool = true;
+        break;
+      }
+    }
+
+    if (wasEvicted && !isStillInPool) {
       unregisterBundleForSourceMaps(sourceMapRegistration);
     }
     return;

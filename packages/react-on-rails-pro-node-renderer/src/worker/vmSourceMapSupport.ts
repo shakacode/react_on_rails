@@ -178,6 +178,9 @@ function resolveSourceMapPath(bundleFilePath: string, sourceMappingUrl: string):
     return undefined;
   }
 
+  // `resolvedPath` passed lexical containment only. The actual file read goes
+  // through `resolveReadableSourceMapPath`, which repeats containment checks
+  // with realpaths after the map file exists.
   return resolvedPath;
 }
 
@@ -212,6 +215,9 @@ function resolveReadableSourceMapPath(bundleFilePath: string, candidatePath: str
       const targetStats = fs.statSync(resolvedPath);
       // Pro pre-stage symlink mode creates trusted symlink entries inside the
       // bundle directory. The sourceMappingURL still has to be a plain file name.
+      // SECURITY: that bundle directory must not be writable by untrusted
+      // parties; an attacker-controlled symlink would let the loader read any
+      // file the renderer process can access.
       if (linkStats.isSymbolicLink() && targetStats.isFile()) {
         return resolvedPath;
       }
@@ -462,6 +468,9 @@ export interface ResolvedSourcePosition {
  * SECURITY: this function is exposed to untrusted bundle code inside the VM
  * context, so it validates its inputs and only operates on registered bundle
  * paths.
+ *
+ * @param lineNumber 1-based generated line number, matching V8 CallSite values.
+ * @param columnNumber 1-based generated column number, matching V8 CallSite values.
  */
 export function resolveOriginalPositionForRegistration(
   registration: BundleSourceMapRegistration,
@@ -566,7 +575,7 @@ function remapStackTraceForRegistration(stack: string, registration: BundleSourc
     // `<bundle-dir>/webpack:/app/file.ts`.
     // Other host formatters are handled by the bundle-path regex above; a
     // miss here is benign because the regex simply will not match.
-    const hostMappedSourcePath = path.join(path.dirname(bundleFilePath), source.replace('://', ':/'));
+    const hostMappedSourcePath = path.join(path.dirname(bundleFilePath), source.replace(/:\/\//g, ':/'));
     const hostMappedSourceRegex = new RegExp(`${escapeRegExp(hostMappedSourcePath)}:(\\d+):(\\d+)`, 'g');
     remappedStack = remappedStack.replace(
       hostMappedSourceRegex,
@@ -662,6 +671,9 @@ Error.prepareStackTrace = function (error, callSites) {
           var generatedLocation = fileName + ':' + line + ':' + column;
           var originalLocation = position.source + ':' + position.line + ':' + position.column;
           if (frameText.indexOf(generatedLocation) !== -1) {
+            // String first-arg: replace only the frame's canonical location once.
+            // Do not use a /g regex here; a repeated numeric location elsewhere
+            // in the frame text should not be rewritten.
             frameText = frameText.replace(generatedLocation, function () { return originalLocation; });
           } else {
             frameText = frameText + ' -> ' + originalLocation;

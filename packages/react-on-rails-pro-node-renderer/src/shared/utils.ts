@@ -86,6 +86,8 @@ export type RequestInfo = { renderingRequest: string } | { label: string; conten
  * @param request Either a rendering request (auto-labeled) or a { label, content } pair
  * @param error The error that was thrown (typed as `unknown` to minimize casts in `catch`)
  * @param context Optional context to include in the error message
+ * @param stackRemapper Defaults to scanning registered source-map bundles. VM request paths pass a
+ * registration-scoped remapper to avoid rewriting unrelated bundle paths.
  */
 export function formatExceptionMessage(
   request: RequestInfo,
