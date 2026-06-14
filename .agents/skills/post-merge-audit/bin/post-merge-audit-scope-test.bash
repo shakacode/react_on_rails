@@ -358,9 +358,46 @@ test_resolver_rejects_base_outside_head_history() {
 
   assert_equals "1" "$rc" "non-ancestor range rc"
   case "$out" in
-    *"base ref is not an ancestor of head ref"*) ;;
+    *"base ref is not on the first-parent history of head ref"*) ;;
     *)
       fail "non-ancestor range error message missing: $out"
+      ;;
+  esac
+}
+
+test_resolver_rejects_base_outside_first_parent_history() {
+  local tmpdir repo side_sha out rc
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
+  repo="$tmpdir/repo"
+  mkdir -p "$repo"
+
+  git -C "$repo" init --quiet --initial-branch=main
+  git -C "$repo" config user.email "test@example.com"
+  git -C "$repo" config user.name "Test User"
+  git -C "$repo" commit --quiet --allow-empty -m "base"
+  git -C "$repo" checkout --quiet -b side
+  git -C "$repo" commit --quiet --allow-empty -m "Side branch boundary"
+  side_sha="$(git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" checkout --quiet main
+  git -C "$repo" commit --quiet --allow-empty -m "Main line before merge (#4013)"
+  git -C "$repo" merge --quiet --no-ff side -m "Merge pull request #4014 from test/side"
+
+  set +e
+  out="$(
+    cd "$repo" &&
+      env -u BASH_ENV "$RESOLVER" --base "$side_sha" --head HEAD --repo owner/repo --json 2>&1
+  )"
+  rc=$?
+  set -e
+
+  rm -rf "$tmpdir"
+
+  assert_equals "1" "$rc" "side-branch base rc"
+  case "$out" in
+    *"base ref is not on the first-parent history of head ref"*) ;;
+    *)
+      fail "side-branch base error message missing: $out"
       ;;
   esac
 }
@@ -441,6 +478,7 @@ run_test test_closed_markers_do_not_suppress_to_audit
 run_test test_default_base_uses_latest_rc_reachable_from_head
 run_test test_default_base_uses_nearest_rc_on_first_parent_history
 run_test test_resolver_rejects_base_outside_head_history
+run_test test_resolver_rejects_base_outside_first_parent_history
 run_test test_fetch_issue_markers_cleans_inner_tmpdir_on_parse_failure
 run_test test_limit_requires_positive_integer
 run_test test_sourced_main_help_does_not_change_shell_options

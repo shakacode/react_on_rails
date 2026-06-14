@@ -494,7 +494,7 @@ pma_scope_main() {
   local repo=""
   local output_format="text"
   local limit="200"
-  local repo_root base_sha head_sha tmpdir merged_file merged_numbers_file
+  local repo_root base_sha head_sha first_parent_match tmpdir merged_file merged_numbers_file
   local markers_file open_markers_file marker_numbers_file carry_file to_audit_file
 
   while [ "$#" -gt 0 ]; do
@@ -590,8 +590,9 @@ pma_scope_main() {
     return 1
   }
 
-  if ! git merge-base --is-ancestor "$base_sha" "$head_sha"; then
-    pma_scope_error "base ref is not an ancestor of head ref: $base_ref is not in $head_ref history"
+  first_parent_match="$(git rev-list --first-parent "$head_sha" | grep -Fx "$base_sha" || true)"
+  if [ "$first_parent_match" != "$base_sha" ]; then
+    pma_scope_error "base ref is not on the first-parent history of head ref: $base_ref is not a mainline boundary for $head_ref"
     return 1
   fi
 
