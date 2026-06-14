@@ -17,7 +17,8 @@ import formAutoContent from 'form-auto-content';
 import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
-import worker, { disableHttp2 } from '../src/worker';
+import worker, { configureFastify, disableHttp2 } from '../src/worker';
+import { __resetFastifyConfigFunctionsForTest } from '../src/worker/fastifyConfig';
 import { BUNDLE_TIMESTAMP, getFixtureBundle, resetForTest, serverBundleCachePath } from './helper';
 
 const testName = 'healthEndpoints';
@@ -60,12 +61,14 @@ describe('built-in health endpoints', () => {
 
   beforeEach(async () => {
     delete process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS;
+    __resetFastifyConfigFunctionsForTest();
     await resetForTest(testName);
   });
 
   afterEach(async () => {
     await app?.close();
     app = undefined;
+    __resetFastifyConfigFunctionsForTest();
   });
 
   afterAll(async () => {
@@ -107,6 +110,7 @@ describe('built-in health endpoints', () => {
 
     const readyRes = await app.inject().get('/ready').end();
     expect(readyRes.statusCode).toBe(503);
+    expect(readyRes.headers['retry-after']).toBe('5');
     expect(JSON.parse(readyRes.payload)).toEqual({ status: 'waiting_for_bundle' });
   });
 
@@ -116,6 +120,7 @@ describe('built-in health endpoints', () => {
     // No bundle compiled into the VM pool yet: not ready.
     const notReadyRes = await app.inject().get('/ready').end();
     expect(notReadyRes.statusCode).toBe(503);
+    expect(notReadyRes.headers['retry-after']).toBe('5');
     expect(JSON.parse(notReadyRes.payload)).toEqual({ status: 'waiting_for_bundle' });
 
     // First render request uploads and compiles the bundle.
@@ -140,5 +145,17 @@ describe('built-in health endpoints', () => {
     const healthAfter = await app.inject().get('/health').end();
     expect(healthAfter.statusCode).toBe(200);
     expect(JSON.parse(healthAfter.payload)).toEqual({ status: 'ok' });
+  });
+
+  test('reports a migration hint when a custom health route conflicts with built-in endpoints', () => {
+    configureFastify((fastifyApp) => {
+      fastifyApp.get('/health', (_req, res) => {
+        res.send({ status: 'legacy' });
+      });
+    });
+
+    expect(() => createWorker({ enableHealthEndpoints: true })).toThrow(
+      /enableHealthEndpoints registers built-in GET \/health/,
+    );
   });
 });

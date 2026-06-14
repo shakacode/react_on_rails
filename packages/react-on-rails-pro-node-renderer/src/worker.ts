@@ -30,7 +30,7 @@ import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
 import fileExistsAsync from './shared/fileExistsAsync.js';
 import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
-import type { FastifyReply } from './worker/types.js';
+import type { FastifyInstance, FastifyReply } from './worker/types.js';
 import { performRequestPrechecks } from './worker/requestPrechecks.js';
 import { type AuthBody, authenticate } from './worker/authHandler.js';
 import {
@@ -84,6 +84,9 @@ declare module 'fastify' {
   }
 }
 
+const HEALTH_ENDPOINT_ROUTES = ['/health', '/ready'] as const;
+const FASTIFY_DUPLICATED_ROUTE_ERROR_CODE = 'FST_ERR_DUPLICATED_ROUTE';
+
 function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- fixing it with `void` just violates no-void
   Object.entries(headers).forEach(([key, header]) => res.header(key, header));
@@ -105,6 +108,42 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
 };
 
 const isAsset = (value: unknown): value is Asset => (value as { type?: string }).type === 'asset';
+
+function conflictingHealthEndpointPath(error: unknown): (typeof HEALTH_ENDPOINT_ROUTES)[number] | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  if (code !== FASTIFY_DUPLICATED_ROUTE_ERROR_CODE || typeof message !== 'string') {
+    return undefined;
+  }
+
+  return HEALTH_ENDPOINT_ROUTES.find((routePath) => message.includes(`route '${routePath}'`));
+}
+
+function applyFastifyConfigWithHealthEndpointMigrationHint(
+  app: FastifyInstance,
+  enableHealthEndpoints: boolean,
+) {
+  try {
+    applyFastifyConfigFunctions(app);
+  } catch (error) {
+    const conflictingPath = enableHealthEndpoints ? conflictingHealthEndpointPath(error) : undefined;
+    if (conflictingPath) {
+      const originalMessage = error instanceof Error ? error.message : String(error);
+      const message =
+        `enableHealthEndpoints registers built-in GET ${conflictingPath}, but a configureFastify callback ` +
+        `already registered that route. Remove or rename the custom ${conflictingPath} route when migrating ` +
+        'to the built-in health endpoints. See docs/oss/building-features/node-renderer/health-checks.md.';
+
+      log.error({ err: error, route: conflictingPath }, message);
+      throw new Error(`${message} Original Fastify error: ${originalMessage}`);
+    }
+
+    throw error;
+  }
+}
 
 function assertAsset(value: unknown, key: string): asserts value is Asset {
   if (!isAsset(value)) {
@@ -681,7 +720,7 @@ export default function run(config: Partial<Config>) {
       if (hasAnyVMContext()) {
         res.send({ status: 'ready' });
       } else {
-        res.status(503).send({ status: 'waiting_for_bundle' });
+        res.status(503).header('Retry-After', '5').send({ status: 'waiting_for_bundle' });
       }
     });
   }
@@ -703,7 +742,7 @@ export default function run(config: Partial<Config>) {
 
   // Integration hooks registered before the worker loads are applied here, immediately after
   // listen() is scheduled and before Fastify finishes booting.
-  applyFastifyConfigFunctions(app);
+  applyFastifyConfigWithHealthEndpointMigrationHint(app, enableHealthEndpoints);
 
   return app;
 }
