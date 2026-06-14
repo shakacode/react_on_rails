@@ -73,7 +73,20 @@ the JSON commands parsed successfully. Do not paste raw `agent-coord config
 show --json` output, private defaults, liveness thresholds, or terminal-status
 details into public PRs.
 
+The preflight exports `AGENT_COORD_BIN` in the calling shell before entering the
+subshell that runs the checks. Keep that exported value for the operational
+snippets below so the probed private checkout and later heartbeat/claim commands
+use the same binary.
+
 ```bash
+if test -z "${AGENT_COORD_REPO:-}"; then
+  echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
+  exit 1
+fi
+
+AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord"
+export AGENT_COORD_BIN
+
 (
   set -eu -o pipefail
 
@@ -91,14 +104,10 @@ details into public PRs.
     printf '%s\n' "$output" | jq -e 'type' >/dev/null
   }
 
-  if test -z "${AGENT_COORD_REPO:-}"; then
-    echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
-    exit 1
-  elif test ! -x "$AGENT_COORD_REPO/bin/agent-coord"; then
+  if test ! -x "$AGENT_COORD_BIN"; then
     echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
     exit 1
   else
-    AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord"
     git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
       git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
       "$AGENT_COORD_BIN" --help &&
