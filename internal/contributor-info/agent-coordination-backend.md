@@ -33,11 +33,14 @@ ruby -Itest test/agent_coord_test.rb
 bin/agent-coord --help
 bin/agent-coord bootstrap
 export PATH="$HOME/.local/bin:$PATH"
-AGENT_COORD_BIN=$(command -v agent-coord)
+if ! AGENT_COORD_BIN=$(command -v agent-coord 2>/dev/null); then
+  echo "agent-coord not found; recheck PATH or rerun bin/agent-coord bootstrap" >&2
+  return 1 2>/dev/null || exit 1
+fi
 "$AGENT_COORD_BIN" --help
 agent_coord --help
 "$AGENT_COORD_BIN" version --json
-"$AGENT_COORD_BIN" config show --json
+"$AGENT_COORD_BIN" config show --json 2>/dev/null # Do not paste raw output publicly.
 "$AGENT_COORD_BIN" doctor
 "$AGENT_COORD_BIN" status
 ```
@@ -79,15 +82,19 @@ the operational snippets below so the probed private checkout and later
 heartbeat/claim commands use the same binary.
 
 ```bash
+agent_coord_preflight_abort() {
+  return 1 2>/dev/null || exit 1
+}
+
 if test -z "${AGENT_COORD_REPO:-}"; then
   echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
-  exit 1
-elif ! AGENT_COORD_REPO_ABS="$(cd "$AGENT_COORD_REPO" 2>/dev/null && pwd -P)"; then
+  agent_coord_preflight_abort
+elif ! AGENT_COORD_REPO_ABS="$(cd "$AGENT_COORD_REPO" && pwd -P)"; then
   echo "AGENT_COORD_REPO must point at a readable shakacode/agent-coordination clone" >&2
-  exit 1
+  agent_coord_preflight_abort
 elif test ! -x "$AGENT_COORD_REPO_ABS/bin/agent-coord"; then
-  echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
-  exit 1
+  echo "bin/agent-coord is missing or not executable in '$AGENT_COORD_REPO_ABS'; did bootstrap complete?" >&2
+  agent_coord_preflight_abort
 fi
 
 AGENT_COORD_REPO="$AGENT_COORD_REPO_ABS"
@@ -101,7 +108,7 @@ if (
     local label="$1"
     local output="$2"
 
-    if ! printf '%s' "$output" | grep -q '[^[:space:]]'; then
+    if ! printf '%s\n' "$output" | grep -q '[^[:space:]]'; then
       echo "$label produced no JSON output" >&2
       return 1
     fi
@@ -112,7 +119,7 @@ if (
     fi
   }
 
-  AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord"
+  AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord" # Subshell copy; re-exported below after probes pass.
   git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
     git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
     "$AGENT_COORD_BIN" --help &&
@@ -125,15 +132,15 @@ if (
     require_json_output "agent-coord config show --json" "$AGENT_COORD_CONFIG_JSON" &&
     "$AGENT_COORD_BIN" doctor &&
     "$AGENT_COORD_BIN" status &&
-    "$AGENT_COORD_BIN" claim --help &&
-    "$AGENT_COORD_BIN" heartbeat --help &&
-    "$AGENT_COORD_BIN" release --help
+    "$AGENT_COORD_BIN" claim --help >/dev/null &&
+    "$AGENT_COORD_BIN" heartbeat --help >/dev/null &&
+    "$AGENT_COORD_BIN" release --help >/dev/null
 ); then
   AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord"
   export AGENT_COORD_BIN
   printf 'AGENT_COORD_BIN=%s\n' "$AGENT_COORD_BIN"
 else
-  exit 1
+  agent_coord_preflight_abort
 fi
 ```
 
@@ -195,7 +202,7 @@ AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" heartbeat \
   --repo shakacode/react_on_rails \
   --target 9999
 AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" status
-rm -rf "$STATE_ROOT"
+test -n "$STATE_ROOT" && rm -rf "$STATE_ROOT"
 ```
 
 ## Heartbeats
