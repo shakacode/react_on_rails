@@ -103,6 +103,9 @@ const NotFoundPage = () => <h2 id="tanstack-starter-not-found">Starter page not 
 // Side effect: TanStack Router unmounts this outlet component when leaving the
 // route, so the placeholder can briefly flash on repeat client navigations too.
 // That tradeoff is intentional in this starter.
+// Keep empty componentProps stable; real props should also use a stable reference.
+const EMPTY_PROPS = {};
+
 const ServerDataPage = () => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -114,8 +117,7 @@ const ServerDataPage = () => {
       <h2>Starter Server Data Page</h2>
       {mounted ? (
         <Suspense fallback={<p>Loading server data...</p>}>
-          {/* No props needed by this demo server component; keep the empty object explicit for copy-paste. */}
-          <RSCRoute componentName="StarterServerData" componentProps={{}} />
+          <RSCRoute componentName="StarterServerData" componentProps={EMPTY_PROPS} />
         </Suspense>
       ) : (
         <p id="tanstack-starter-server-data-loading">Loading server data...</p>
