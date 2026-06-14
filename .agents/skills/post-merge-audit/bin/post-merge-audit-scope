@@ -44,7 +44,7 @@ pma_scope_default_head_ref() {
 pma_scope_default_base_ref() {
   local head_ref="$1"
 
-  git tag --list '*.rc.*' --merged "$head_ref" --sort=-creatordate | head -n 1
+  git describe --tags --match '*.rc.*' --first-parent --abbrev=0 "$head_ref" 2>/dev/null || true
 }
 
 pma_scope_resolve_ref_sha() {

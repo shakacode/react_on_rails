@@ -293,6 +293,42 @@ test_default_base_uses_latest_rc_reachable_from_head() {
   assert_equals "4014" "$actual" "default-base to_audit"
 }
 
+test_default_base_uses_nearest_rc_on_first_parent_history() {
+  local tmpdir repo fake_bin open_json closed_json base out base_ref actual
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
+  repo="$tmpdir/repo"
+  fake_bin="$tmpdir/bin"
+  open_json="$tmpdir/open.json"
+  closed_json="$tmpdir/closed.json"
+  mkdir -p "$repo" "$fake_bin"
+  printf '[]\n' > "$open_json"
+  printf '[]\n' > "$closed_json"
+  make_fake_gh "$fake_bin/gh" "$open_json" "$closed_json"
+
+  git -C "$repo" init --quiet --initial-branch=main
+  git -C "$repo" config user.email "test@example.com"
+  git -C "$repo" config user.name "Test User"
+  git -C "$repo" commit --quiet --allow-empty -m "base"
+  base="$(git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" tag -a v1.0.0.rc.1 -m "first rc"
+  git -C "$repo" commit --quiet --allow-empty -m "Second release candidate"
+  git -C "$repo" tag -a v1.0.0.rc.2 -m "second rc"
+  git -C "$repo" tag -a v9.0.0.rc.1 "$base" -m "newer tag on older rc"
+  git -C "$repo" commit --quiet --allow-empty -m "Main line change (#4014)"
+
+  out="$(
+    cd "$repo" &&
+      env -u BASH_ENV PATH="$fake_bin:$PATH" "$RESOLVER" --head HEAD --repo owner/repo --json
+  )"
+  base_ref="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("base").fetch("ref")' <<< "$out")"
+  actual="$(ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("to_audit").join(",")' <<< "$out")"
+
+  rm -rf "$tmpdir"
+  assert_equals "v1.0.0.rc.2" "$base_ref" "nearest default base on first-parent history"
+  assert_equals "4014" "$actual" "nearest default-base to_audit"
+}
+
 test_resolver_rejects_base_outside_head_history() {
   local tmpdir repo side_sha out rc
 
@@ -361,7 +397,7 @@ test_limit_requires_positive_integer() {
   local out rc
 
   set +e
-  out="$("$RESOLVER" --limit nope --self-check 2>&1)"
+  out="$(env -u BASH_ENV "$RESOLVER" --limit nope --self-check 2>&1)"
   rc=$?
   set -e
 
@@ -403,6 +439,7 @@ run_test test_subtract_prs_preserves_all_merged_prs_when_carry_over_is_empty
 run_test test_resolver_uses_first_parent_for_merged_pr_scope
 run_test test_closed_markers_do_not_suppress_to_audit
 run_test test_default_base_uses_latest_rc_reachable_from_head
+run_test test_default_base_uses_nearest_rc_on_first_parent_history
 run_test test_resolver_rejects_base_outside_head_history
 run_test test_fetch_issue_markers_cleans_inner_tmpdir_on_parse_failure
 run_test test_limit_requires_positive_integer
