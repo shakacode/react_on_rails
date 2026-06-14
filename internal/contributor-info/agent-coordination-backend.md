@@ -82,19 +82,15 @@ the operational snippets below so the probed private checkout and later
 heartbeat/claim commands use the same binary.
 
 ```bash
-agent_coord_preflight_abort() {
-  return 1 2>/dev/null || exit 1
-}
-
 if test -z "${AGENT_COORD_REPO:-}"; then
   echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
-  agent_coord_preflight_abort
+  return 1 2>/dev/null || exit 1
 elif ! AGENT_COORD_REPO_ABS="$(cd "$AGENT_COORD_REPO" && pwd -P)"; then
   echo "AGENT_COORD_REPO must point at a readable shakacode/agent-coordination clone" >&2
-  agent_coord_preflight_abort
+  return 1 2>/dev/null || exit 1
 elif test ! -x "$AGENT_COORD_REPO_ABS/bin/agent-coord"; then
   echo "bin/agent-coord is missing or not executable in '$AGENT_COORD_REPO_ABS'; did bootstrap complete?" >&2
-  agent_coord_preflight_abort
+  return 1 2>/dev/null || exit 1
 fi
 
 AGENT_COORD_REPO="$AGENT_COORD_REPO_ABS"
@@ -140,7 +136,7 @@ if (
   export AGENT_COORD_BIN
   printf 'AGENT_COORD_BIN=%s\n' "$AGENT_COORD_BIN"
 else
-  agent_coord_preflight_abort
+  return 1 2>/dev/null || exit 1
 fi
 ```
 
