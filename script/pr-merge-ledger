@@ -61,7 +61,7 @@ class PrMergeLedger
     /\A\s*(?:[-*]\s*)?(?:\*\*)?(?:MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-)+(?<summary>.*)\z/i
   FINDING_SUMMARY_SUBJECT_PATTERN = /\b(?:findings?|issues?|items?|main issue)\b/i
   FINDING_SUMMARY_RESOLUTION_PATTERN = /
-    \bnone(?!\s+of\b) |
+    \bnone(?!\s+of\b)(?=\s*(?:$|[.;,)])) |
     \b(?:findings?|issues?|items?|main\s+issue)\b
     (?:
       \s*[:=-]\s* |
@@ -75,8 +75,11 @@ class PrMergeLedger
     /\b(?:none|nothing)\s+(?:fixed|resolved|waived)\b/i,
     /\bno\s+(?:\S+\s+){0,4}?(?:fixed|resolved|waived)\b/i
   )
-  ADDITIONAL_SEVERITY_PATTERN =
-    /(?:[.;,(:-]|\b(?:and|but|while)\b)\s*(?:[-*]\s*)?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
+  ADDITIONAL_SEVERITY_PATTERN = /
+    (?:[.;,(:-]|\b(?:and|but|while)\b)\s*
+    (?:[-*]\s*)?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?
+    (?:\s|:|-|$)
+  /ix
 
   class Error < StandardError; end
 
@@ -153,15 +156,21 @@ class PrMergeLedger
       opts.on("--pretty", "Pretty-print JSON output.") do
         @options[:pretty] = true
       end
-      opts.on("--finding-dispositions FILE", "JSON map from finding URL/id, URL#L<line>, or URL#L<line>:<n>.") do |path|
-        @options[:finding_dispositions] = path
-      end
+      add_finding_dispositions_option(opts)
       opts.on("--changelog-classification CLASS", CHANGELOG_CLASSIFICATIONS) do |classification|
         @options[:changelog_classification] = classification
         @options[:changelog_classification_provided] = true
       end
       add_help_option(opts)
     end
+  end
+
+  def add_finding_dispositions_option(opts)
+    opts.on("--finding-dispositions FILE", "JSON map from finding URL/id, URL#L<line>, or URL#L<line>:<n>.") do |path|
+      @options[:finding_dispositions] = path
+    end
+    opts.separator "    Top-level PR comments have no head SHA; priority findings in those comments " \
+                   "require dispositions."
   end
 
   def add_help_option(opts)
@@ -234,7 +243,7 @@ class PrMergeLedger
     if @options[:fixture]
       { "mode" => "fixture", "path" => @options[:fixture] }
     else
-      { "mode" => "live_github", "repo" => @options[:repo] || "auto", "prs" => @argv.map(&:to_i) }
+      { "mode" => "live_github", "repo" => @options[:repo], "prs" => @argv.map(&:to_i) }
     end
   end
 

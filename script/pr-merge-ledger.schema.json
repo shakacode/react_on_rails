@@ -135,6 +135,21 @@
         "lockfile_diff": {
           "type": "object",
           "required": ["status", "has_lockfile_diff", "files"]
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/violation"
+          }
+        },
+        "unknown_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/unknown_field"
+          }
+        },
+        "complete_allowed": {
+          "type": "boolean"
         }
       }
     },

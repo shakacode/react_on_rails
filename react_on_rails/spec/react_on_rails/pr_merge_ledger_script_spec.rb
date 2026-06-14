@@ -1433,6 +1433,56 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks severity summaries when none starts a continuing unresolved phrase" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "none-the-less-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/none-the-less-review",
+          "body" => "P1: none the less, one issue remains"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-none-the-less-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      expect(finding).to include(
+        "id" => "none-the-less-review",
+        "severity" => "P1",
+        "text_excerpt" => "P1: none the less, one issue remains",
+        "disposition" => "UNKNOWN"
+      )
+    end
+  end
+
   it "blocks severity summaries that say no findings are fixed or resolved" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -2843,5 +2893,8 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(schema.dig("properties", "schema_version", "const")).to eq("pr-merge-ledger/v1")
     expect(schema.fetch("required")).to include("pull_requests", "violations", "complete_allowed")
     expect(schema.dig("$defs", "pull_request_ledger", "required")).to include("issue_comments")
+    expect(schema.dig("$defs", "pull_request_ledger", "properties", "violations", "type")).to eq("array")
+    expect(schema.dig("$defs", "pull_request_ledger", "properties", "unknown_fields", "type")).to eq("array")
+    expect(schema.dig("$defs", "pull_request_ledger", "properties", "complete_allowed", "type")).to eq("boolean")
   end
 end
