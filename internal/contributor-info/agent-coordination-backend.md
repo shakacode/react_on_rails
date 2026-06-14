@@ -37,10 +37,6 @@ if ! INSTALLED_AGENT_COORD_BIN=$(command -v agent-coord 2>/dev/null); then
   echo "agent-coord not found; recheck PATH or rerun bin/agent-coord bootstrap" >&2
   return 1 2>/dev/null || exit 1
 fi
-if test ! -x "$INSTALLED_AGENT_COORD_BIN"; then
-  echo "agent-coord on PATH is not executable" >&2
-  return 1 2>/dev/null || exit 1
-fi
 "$INSTALLED_AGENT_COORD_BIN" --help # Loose smoke-check; use CLI Contract Preflight for strict validation.
 if ! command -v agent_coord >/dev/null 2>&1; then
   echo "agent_coord alias not found; bootstrap may not have installed it" >&2
@@ -48,7 +44,7 @@ if ! command -v agent_coord >/dev/null 2>&1; then
 fi
 agent_coord --help # Verify the compatibility alias (underscore form) is also on PATH.
 "$INSTALLED_AGENT_COORD_BIN" version --json
-"$INSTALLED_AGENT_COORD_BIN" config show --json 2>/dev/null # Do not paste raw output publicly.
+"$INSTALLED_AGENT_COORD_BIN" config show --json >/dev/null 2>/dev/null # Suppress raw private output.
 "$INSTALLED_AGENT_COORD_BIN" doctor
 "$INSTALLED_AGENT_COORD_BIN" status
 ```
@@ -117,7 +113,7 @@ if (
     local output="$2"
 
     if ! printf '%s\n' "$output" | grep -q '[^[:space:]]'; then
-      echo "$label produced no JSON output" >&2
+      echo "$label produced no output" >&2
       return 1
     fi
 
