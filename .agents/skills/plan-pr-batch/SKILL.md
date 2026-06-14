@@ -216,7 +216,8 @@ Plan a PR batch
 
 ## Goal Prompt for pr-batch
 
-Use this template and fill it with the verified items:
+Use this template and fill it with the verified items. Keep bulky evidence, long
+validation notes, and later-batch details outside the prompt.
 
 ```text
 Use $pr-batch to complete this batch with subagents.
@@ -225,8 +226,7 @@ Preflight first: if this session cannot run workers without blocking approval pr
 
 Repository: OWNER/REPO
 Batch objective: ...
-Scope summary: compact titles, sequencing, dependencies, and exclusions needed to run this goal. Keep bulky
-evidence, long validation notes, and later-batch details outside this prompt.
+Scope summary: [one paragraph: compact titles, sequencing, dependencies, exclusions, and path ownership for this batch. Keep bulky evidence, long validation notes, and later-batch details outside this prompt.]
 File-touch map (one line per item; pick the applicable format):
 - PR/Issue #N -> changed/affected paths, including create/delete/rename (owner: lane/name)
 - PR/Issue #N -> summarized path pattern(s) plus collision-relevant exact paths/renames/deletes (owner: lane/name)
@@ -255,7 +255,7 @@ Execution rules:
   coordinator confirmation before editing.
 - Sequenced lanes may share declared files only in the stated order.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
-- For coordination, respect coordination claims and dependencies: assign stable agent ids, run `agent-coord status`, claim before branch/worktree creation when available, heartbeat at phase changes, and stop on unmet `blocked_on` refs or dependency state `UNKNOWN`.
+- For coordination, respect coordination claims and dependencies: assign stable agent ids, run `agent-coord doctor` then `agent-coord status`, claim before branch/worktree creation when available, heartbeat at phase changes, and stop on unmet `blocked_on` refs or dependency state `UNKNOWN`.
 - Use local validation, self-review, review-comment, CI, and readiness gates from the repo workflow. For PRs, merge if confident and authorized by the current release mode, and document confidence data in the PR description; otherwise report the live ready/blocked/deferred/no-PR state with evidence.
 - Final handoff must include links, tests, blockers, next action, confidence or UNKNOWN facts, and merged/ready/blocked/deferred sections.
 ```

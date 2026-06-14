@@ -16,6 +16,7 @@ def extract_goal_prompt_template(skill_text)
   abort_with_failure("missing text fence in Goal Prompt section") unless fence_start
 
   fence_body_start = fence_start + TEXT_FENCE.length
+  # The goal prompt template must not contain nested bare fence lines.
   closing_fence = skill_text.match(/^```\s*$/, fence_body_start)
   abort_with_failure("missing closing fence in Goal Prompt section") unless closing_fence
 
@@ -34,6 +35,8 @@ def with_items(prompt_template, items)
 end
 
 skill_path = File.expand_path("../SKILL.md", __dir__)
+abort_with_failure("SKILL.md not found at #{skill_path}") unless File.exist?(skill_path)
+
 skill_text = File.read(skill_path, encoding: "UTF-8")
 prompt_template = extract_goal_prompt_template(skill_text)
 
@@ -41,12 +44,12 @@ required_skill_rule_phrases = [
   "Goal prompt character count:",
   "If the measured prompt is 4000 characters or more",
   "output only the first ready goal",
-  "bulky detail stays in the Batch Plan"
+  "bulky detail stays in the Batch Plan",
+  "Keep bulky evidence",
+  "outside the prompt"
 ]
 
 required_prompt_phrases = [
-  "Keep bulky",
-  "outside this prompt",
   "merge if confident",
   "document confidence data in the PR description",
   "verify current GitHub state before edits",
