@@ -71,7 +71,10 @@ export function createCoreCapability(registries: Registries) {
 
     reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType {
       // The component name is unknown on this low-level path; the dom id still ties errors to a mount.
-      const rootErrorCallbackOptions = buildRootErrorCallbackOptions({ domNodeId: domNode.id }, hydrate);
+      const rootErrorCallbackOptions = buildRootErrorCallbackOptions(
+        { domNodeId: domNode.id || undefined },
+        hydrate,
+      );
       return reactHydrateOrRender(domNode, reactElement, hydrate, rootErrorCallbackOptions);
     },
 

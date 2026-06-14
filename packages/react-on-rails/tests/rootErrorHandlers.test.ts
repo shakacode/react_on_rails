@@ -52,6 +52,15 @@ describe('rootErrorHandlers', () => {
       );
     });
 
+    it('throws when a handler key is unknown', () => {
+      const { setRootErrorHandlers } = loadModule('19.0.0');
+      expect(() =>
+        setRootErrorHandlers({
+          onRecoverableErrors: jest.fn(),
+        } as unknown as Parameters<typeof setRootErrorHandlers>[0]),
+      ).toThrow(/unknown key\(s\) onRecoverableErrors/);
+    });
+
     it('stores and resets handlers', () => {
       const { setRootErrorHandlers, getRootErrorHandlers, resetRootErrorHandlers } = loadModule('19.0.0');
       const onRecoverableError = jest.fn();
@@ -373,6 +382,24 @@ describe('rootErrorHandlers', () => {
       setRailsContext('production');
       const options = module.buildRootErrorCallbackOptions({ componentName: 'X', domNodeId: 'x' }, true);
       expect(options.onRecoverableError).toBeUndefined();
+    });
+
+    it('runs a production user callback on createRoot without default reporting', () => {
+      const module = loadModule('19.0.0');
+      setRailsContext('production');
+      const onRecoverableError = jest.fn();
+      module.setRootErrorHandlers({ onRecoverableError });
+
+      const context = { componentName: 'X', domNodeId: 'x' };
+      const options = module.buildRootErrorCallbackOptions(context, false);
+      expect(options.onRecoverableError).toEqual(expect.any(Function));
+
+      const error = new Error('client-only recoverable error');
+      options.onRecoverableError?.(error, undefined);
+
+      expect(onRecoverableError).toHaveBeenCalledWith(error, undefined, context);
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+      expect(console.error).not.toHaveBeenCalled();
     });
   });
 });

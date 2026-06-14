@@ -421,7 +421,8 @@ export type RootErrorHandler = (error: unknown, errorInfo: unknown, context: Roo
  * in the same pack file where you call `ReactOnRails.register`); each root captures the callbacks
  * registered at the moment it is created. Partial updates merge per key: a later
  * `setOptions({ rootErrorHandlers })` call that sets only one callback keeps the others; pass an
- * explicit `undefined` for a key to clear just that callback.
+ * explicit `undefined` for a key to clear just that callback. Passing `null` is invalid and
+ * throws at runtime; use `undefined` to deregister.
  */
 export interface RootErrorHandlers {
   /**

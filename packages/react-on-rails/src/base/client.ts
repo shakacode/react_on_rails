@@ -180,12 +180,15 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
         delete newOptions.logComponentRegistration;
       }
 
-      if (typeof newOptions.rootErrorHandlers !== 'undefined') {
+      if (Object.prototype.hasOwnProperty.call(newOptions, 'rootErrorHandlers')) {
+        const { rootErrorHandlers } = newOptions;
         // Validates and merges the handlers per key (partial updates keep previously registered
         // callbacks); warns when the React runtime cannot support them. Store the merged result so
         // `option('rootErrorHandlers')` reflects the effective registration.
-        setRootErrorHandlers(newOptions.rootErrorHandlers);
-        this.options.rootErrorHandlers = getRootErrorHandlers();
+        if (typeof rootErrorHandlers !== 'undefined') {
+          setRootErrorHandlers(rootErrorHandlers);
+          this.options.rootErrorHandlers = getRootErrorHandlers();
+        }
         // eslint-disable-next-line no-param-reassign
         delete newOptions.rootErrorHandlers;
       }

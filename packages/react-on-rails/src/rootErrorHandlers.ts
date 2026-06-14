@@ -7,6 +7,7 @@ import { isThenable } from './isThenable.ts';
 /**
  * Guide linked from the development-mode hydration-mismatch message.
  * TODO(#3894): swap to the stable error-reference URL once error codes and reference pages land.
+ * @internal
  */
 export const HYDRATION_MISMATCH_GUIDE_URL =
   'https://reactonrails.com/docs/building-features/debugging-hydration-mismatches';
@@ -39,6 +40,16 @@ let warnedMissingReact19Callbacks = false;
  * later React upgrade picks them up) but warns that they will never be called.
  */
 export function setRootErrorHandlers(handlers: RootErrorHandlers): void {
+  const unknownKeys = Object.keys(handlers).filter(
+    (key) => !HANDLER_KEYS.includes(key as RootErrorHandlerKey),
+  );
+  if (unknownKeys.length > 0) {
+    throw new Error(
+      `Invalid ReactOnRails rootErrorHandlers option: unknown key(s) ${unknownKeys.join(', ')}. ` +
+        `Valid keys are: ${HANDLER_KEYS.join(', ')}.`,
+    );
+  }
+
   HANDLER_KEYS.forEach((key) => {
     const value = handlers[key];
     if (typeof value !== 'undefined' && typeof value !== 'function') {
@@ -126,8 +137,8 @@ function safeInvoke(
 }
 
 function inDevelopmentEnv(): boolean {
-  // `getRailsContext` reads from the DOM; this builder only runs client-side, but guard anyway so
-  // an unexpected server-side call cannot throw.
+  // Called from client render paths after #js-react-on-rails-context is in the DOM; keep this
+  // development-only so test suites opt into reporter assertions instead of getting noisy logs.
   if (typeof document === 'undefined') {
     return false;
   }
@@ -160,8 +171,8 @@ function extractComponentStack(errorInfo: unknown): string | undefined {
  * on core paths, or by Pro's internal recoverable-error handler on chained paths).
  */
 function logDevHydrationError(context: RootErrorContext, errorInfo: unknown): void {
-  const componentName = context.componentName || 'unknown';
-  const domNodeId = context.domNodeId || 'unknown';
+  const componentName = context.componentName ?? 'unknown';
+  const domNodeId = context.domNodeId ?? 'unknown';
   const componentStack = extractComponentStack(errorInfo);
   const componentStackSuffix = componentStack ? `\nComponent stack:${componentStack}` : '';
   console.error(
@@ -174,12 +185,16 @@ type RootErrorCallbackOptions = Pick<
   'onRecoverableError' | 'onCaughtError' | 'onUncaughtError'
 >;
 
-interface BuildRootErrorCallbackOptionsExtras {
+export interface BuildRootErrorCallbackOptionsExtras {
   /**
-   * Set by callers (the Pro RSC-wrapped hydrate paths) that chain their own default reporting
-   * around the returned `onRecoverableError`. When true, the dev-mode logger emits only its
-   * branded supplemental line and skips `defaultReportRecoverableError`, so each recoverable
-   * error is default-reported exactly once.
+   * Set by Pro callers that chain their own default reporting around the returned
+   * `onRecoverableError` via `chainRecoverableErrorHandlers` (see
+   * `handleRecoverableError.client.ts`). When true, the dev-mode logger emits only its branded
+   * supplemental line and skips `defaultReportRecoverableError`, so each recoverable error is
+   * default-reported exactly once.
+   *
+   * New Pro hydrate paths MUST set this to `true` when they call `chainRecoverableErrorHandlers`;
+   * omitting it causes double-reporting in development.
    */
   defaultReportingHandledInternally?: boolean;
 }

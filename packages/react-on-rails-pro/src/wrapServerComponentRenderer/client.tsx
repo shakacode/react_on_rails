@@ -124,9 +124,9 @@ const wrapServerComponentRenderer = (
 
     // User-registered root error callbacks (rootErrorHandlers), wrapped with this mount's
     // component name and dom id. On the hydrate path the user onRecoverableError is CHAINED after
-    // Pro's internal recoverable-error handler so both run; the internal handler already
-    // default-reports the error there, so the dev-mode logger emits only its supplemental branded
-    // line (the flag is moot on the createRoot path, where the dev logger is not attached).
+    // Pro's internal recoverable-error handler so both run. This file is always RSC-wrapped; the
+    // internal handler already default-reports on hydrate, so the dev-mode logger emits only its
+    // supplemental branded line (the flag is moot on createRoot, where the dev logger is not attached).
     const shouldHydrate = !!domNode.innerHTML;
     const userErrorCallbackOptions = buildRootErrorCallbackOptions(
       { componentName, domNodeId },
