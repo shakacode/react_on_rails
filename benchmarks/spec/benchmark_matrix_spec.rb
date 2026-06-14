@@ -51,14 +51,16 @@ RSpec.describe "benchmark matrix generation" do
              )).to eq(%w[core pro pro pro-node-renderer])
     end
 
-    it "honors a suite-specific run_output even without labels or push" do
-      # RUN_PRO_BENCHMARKS gates only the Pro suite; core/node-renderer stay off.
+    it "does not select suites on a PR from change-detection alone (label opt-in, #4012)" do
+      # RUN_PRO_BENCHMARKS used to auto-trigger the Pro suite on a same-repo PR.
+      # PRs are now opt-in via a benchmark* label, so change-detection env is
+      # ignored and nothing is selected.
       expect(suite_ids_for(
                "BENCHMARK_EVENT_NAME" => "pull_request",
                "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "shakacode/react_on_rails",
                "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
                "RUN_PRO_BENCHMARKS" => "true"
-             )).to eq(%w[pro pro])
+             )).to eq(["none"])
     end
 
     it "selects suites by label intersection on a same-repo PR" do

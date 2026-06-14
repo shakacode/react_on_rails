@@ -107,8 +107,10 @@ jobs:
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
-      # script/ci-changes-detector owns benchmark-suite selection via
-      # run_core_benchmarks / run_pro_benchmarks / run_pro_node_renderer_benchmarks.
+      # detect-changes controls only non_runtime_only (force-skip every suite) and
+      # benchmarks_changed (run the script specs below). Which suites actually run is
+      # decided by event + labels in benchmarks/generate_matrix.rb: PRs are opt-in via
+      # a benchmark* label, so change-detection no longer auto-selects suites (#4012).
       - name: Set benchmark matrices
         id: benchmark-matrices
         # Always runs. GitHub Actions evaluates `strategy.matrix` for downstream jobs at
@@ -125,9 +127,6 @@ jobs:
           BENCHMARK_PULL_REQUEST_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || '' }}
           BENCHMARK_PULL_REQUEST_LABELS: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '[]' }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          RUN_CORE_BENCHMARKS: ${{ steps.detect.outputs.run_core_benchmarks || 'false' }}
-          RUN_PRO_BENCHMARKS: ${{ steps.detect.outputs.run_pro_benchmarks || 'false' }}
-          RUN_PRO_NODE_RENDERER_BENCHMARKS: ${{ steps.detect.outputs.run_pro_node_renderer_benchmarks || 'false' }}
         run: |
           BENCHMARK_MATRIX=$(ruby benchmarks/generate_matrix.rb)
           export BENCHMARK_MATRIX
@@ -160,9 +159,10 @@ jobs:
   # Initial run of every selected suite/shard. Delegates to the reusable benchmark-suite
   # workflow in "initial" mode. Which events/labels actually select suites is decided in
   # benchmarks/generate_matrix.rb (suite_requested_by_event? / suite_selected_by_input?):
-  # push to main, workflow_dispatch, relevant test-impact changes, or same-repo PRs with
-  # suite-specific benchmark labels. On a main-push alert this no longer fails the suite —
-  # track_benchmarks.rb writes a non-fatal candidate that the gate/confirmation jobs act on.
+  # push to main, workflow_dispatch, or same-repo PRs carrying a suite-specific benchmark
+  # label (PRs are opt-in — change-detection alone no longer triggers them, see #4012). On a
+  # main-push alert this no longer fails the suite — track_benchmarks.rb writes a non-fatal
+  # candidate that the gate/confirmation jobs act on.
   benchmark:
     needs: detect-changes
     name: ${{ matrix.job_name }}
