@@ -292,7 +292,11 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    declined with rationale. Do not ask the user to approve those nits. This
    replaces the old explicit opt-in gate for low-risk optionals; broader
    optional work still requires `a`, `f+o`, `f+i`, `m`, explicit `o <nums>` /
-   `all optional`, or direct selection of those optional items.
+   `all optional`, or direct selection of those optional items. For
+   behavior-preserving optional nits found at or after the final-candidate
+   debounce point, do not fix them in `f`; record the deferred/declined
+   rationale and carry that recorded outcome to the reply/resolve step before
+   merge-ready.
 3. If an optional item needs judgment, changes behavior, or expands scope,
    promote it to `DISCUSS` instead of prompting separately as an optional item.
    If a behavior-preserving optional nit is only deferred because fixing it would

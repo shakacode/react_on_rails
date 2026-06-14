@@ -209,7 +209,11 @@ Execution flow when terminal access is available:
      2. Before the commit/push gate, autonomously handle `OPTIONAL` nits that
         are behavior-preserving, low-risk, in scope, and before the
         final-candidate debounce point: apply straightforward fixes inline, or
-        record them as deferred/declined with rationale.
+        record them as deferred/declined with rationale. For
+        behavior-preserving optional nits found at or after the final-candidate
+        debounce point, do not fix them in `f`; record the deferred/declined
+        rationale and carry that recorded outcome to the reply/resolve step
+        before merge-ready.
      3. Keep broader optional work out of plain `f`; it still requires `a`,
         `f+o`, `f+i`, `m`, explicit `o <nums>` / `all optional`, or direct
         selection of those optional items.

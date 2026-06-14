@@ -562,13 +562,13 @@ The closeout lane is:
    needed. For accelerated-RC merge readiness, refresh the latest finalized
    PR-body `Agent Merge Confidence` block required by `AGENTS.md`; keep this
    distinct from tracker mode/classification updates.
-6. Assemble the attention-contract closeout for each lane: autonomous nit
-   outcomes, human decision-point count, current confidence or readiness note,
-   and any remaining `UNKNOWN` facts.
-7. After the final push, if local validation passed and the only uncertainty is
+6. After the final push, if local validation passed and the only uncertainty is
    whether full CI is needed, request full CI with `+ci-run-full` and record the
    reason as FYI, then loop back to re-fetch and wait for the newly requested
    current-head checks before readiness or merge.
+7. Assemble or refresh the attention-contract closeout for each lane after any
+   full-CI waitback: autonomous nit outcomes, human decision-point count, current
+   confidence or readiness note, and any remaining `UNKNOWN` facts.
 8. Under the current release mode, mark ready or merge PRs that satisfy the
    merge qualification rules, including the merge-endgame debounce and
    waiver-soak rules before merge; report only remaining blockers, questions,
