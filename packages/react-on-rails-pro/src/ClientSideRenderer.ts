@@ -259,7 +259,7 @@ You should return a React.Component always for the client side entry point.`);
               ? buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting
               : buildRootErrorCallbackOptions;
           const userErrorCallbackOptions = buildErrorCallbackOptions(
-            { componentName: name, domNodeId },
+            { componentName: name || undefined, domNodeId: domNodeId || undefined },
             shouldHydrate,
           );
           let renderOptions: Parameters<typeof reactHydrateOrRender>[3] = userErrorCallbackOptions;
