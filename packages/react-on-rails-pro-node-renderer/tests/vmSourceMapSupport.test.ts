@@ -18,7 +18,7 @@ import fs from 'fs';
 import fsPromises from 'fs/promises';
 import vm from 'vm';
 import { mkdirAsync, serverBundleCachePath, vmBundlePath, resetForTest } from './helper';
-import { buildExecutionContext, hasVMContextForBundle, resetVM } from '../src/worker/vm';
+import { buildExecutionContext, hasVMContextForBundle, removeVM, resetVM } from '../src/worker/vm';
 import { buildConfig } from '../src/shared/configBuilder';
 import { isErrorRenderResult } from '../src/shared/utils';
 import {
@@ -86,6 +86,7 @@ function inlineNonJsonDataUrlSourceMapComment(map: object) {
  */
 const ORIGINAL_SOURCE = 'webpack://test-app/components/Boom.ts';
 const REBUILT_SOURCE = 'webpack://test-app/components/RebuiltBoom.ts';
+const DOLLAR_SOURCE = 'webpack://test-app/$&/Boom.ts';
 const SOURCE_ROOT = 'webpack://source-rooted-app';
 const SOURCE_ROOTED_SOURCE = `${SOURCE_ROOT}/components/Boom.ts`;
 
@@ -224,19 +225,24 @@ describe('source-mapped stack traces for VM errors', () => {
   test('external .map file next to the bundle is used', async () => {
     const bundlePath = vmBundlePath(testName);
     const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
     await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
-    await fsPromises.writeFile(
-      path.join(path.dirname(bundlePath), mapFileName),
-      JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))),
-    );
-    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+    const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
 
-    const result = await runInVM('global.triggerSsrError()', bundlePath);
-    expect(isErrorRenderResult(result)).toBe(true);
-    if (!isErrorRenderResult(result)) {
-      throw new Error('expected exceptionMessage result');
+    try {
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+      const result = await runInVM('global.triggerSsrError()', bundlePath);
+      expect(isErrorRenderResult(result)).toBe(true);
+      if (!isErrorRenderResult(result)) {
+        throw new Error('expected exceptionMessage result');
+      }
+      expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+      expect(readFileSyncSpy).not.toHaveBeenCalledWith(mapPath, 'utf8');
+    } finally {
+      readFileSyncSpy.mockRestore();
     }
-    expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
   });
 
   test('percent-encoded data URL source maps are used', async () => {
@@ -286,6 +292,23 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result.exceptionMessage).toContain(`${SOURCE_ROOTED_SOURCE}:2:3`);
   });
 
+  test('VM frame replacement preserves dollar signs in original source paths', async () => {
+    const bundlePath = await writeVmBundle(
+      `${buildThrowingBundleSource()}\n${inlineSourceMapComment(
+        buildThrowingBundleMap('bundle.js', DOLLAR_SOURCE),
+      )}\n`,
+    );
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+    const result = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(result)).toBe(true);
+    if (!isErrorRenderResult(result)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(result.exceptionMessage).toContain(`${DOLLAR_SOURCE}:2:3`);
+    expect(result.exceptionMessage).not.toContain(`${DOLLAR_SOURCE.replace('$&', bundlePath)}:2:3`);
+  });
+
   test('registered inline sourceMappingURL avoids re-reading the bundle on first lookup', async () => {
     const bundleContents = `${buildThrowingBundleSource()}\n${inlineSourceMapComment(
       buildThrowingBundleMap('bundle.js'),
@@ -301,6 +324,31 @@ describe('source-mapped stack traces for VM errors', () => {
         column: 3,
       });
       expect(readFileSyncSpy).not.toHaveBeenCalledWith(bundlePath, 'utf8');
+    } finally {
+      readFileSyncSpy.mockRestore();
+    }
+  });
+
+  test('direct registration with bundle contents still lazy-loads external source maps', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+    const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
+    await writeVmBundle(bundleContents);
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+    registerBundleForSourceMaps(bundlePath, 0, bundleContents);
+    const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+
+    try {
+      expect(resolveOriginalPosition(bundlePath, 3, 17)).toEqual({
+        source: ORIGINAL_SOURCE,
+        line: 2,
+        column: 3,
+      });
+      const readPaths = readFileSyncSpy.mock.calls.map(([filePath]) => filePath);
+      expect(readPaths).not.toContain(bundlePath);
+      expect(readPaths).toContain(mapPath);
     } finally {
       readFileSyncSpy.mockRestore();
     }
@@ -401,26 +449,30 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
   });
 
-  test('sourceMappingURL is ignored when realpath fails for reasons other than a missing map', async () => {
-    const bundlePath = vmBundlePath(testName);
-    const bundleDirectory = path.dirname(bundlePath);
-    const lockedDirectoryName = 'locked-map-directory';
-    const lockedDirectoryPath = path.join(bundleDirectory, lockedDirectoryName);
-    const mapFileName = 'permission-denied.map';
-    const sourceMappingUrl = `${lockedDirectoryName}/${mapFileName}`;
-    const mapPath = path.join(lockedDirectoryPath, mapFileName);
-    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${sourceMappingUrl}\n`);
-    await mkdirAsync(lockedDirectoryPath, { recursive: true });
-    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(mapFileName)));
-    await fsPromises.chmod(lockedDirectoryPath, 0o000);
+  const testUnlessRoot = process.getuid?.() === 0 ? test.skip : test;
+  testUnlessRoot(
+    'sourceMappingURL is ignored when realpath fails for reasons other than a missing map',
+    async () => {
+      const bundlePath = vmBundlePath(testName);
+      const bundleDirectory = path.dirname(bundlePath);
+      const lockedDirectoryName = 'locked-map-directory';
+      const lockedDirectoryPath = path.join(bundleDirectory, lockedDirectoryName);
+      const mapFileName = 'permission-denied.map';
+      const sourceMappingUrl = `${lockedDirectoryName}/${mapFileName}`;
+      const mapPath = path.join(lockedDirectoryPath, mapFileName);
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${sourceMappingUrl}\n`);
+      await mkdirAsync(lockedDirectoryPath, { recursive: true });
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(mapFileName)));
+      await fsPromises.chmod(lockedDirectoryPath, 0o000);
 
-    try {
-      registerBundleForSourceMaps(bundlePath);
-      expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
-    } finally {
-      await fsPromises.chmod(lockedDirectoryPath, 0o700);
-    }
-  });
+      try {
+        registerBundleForSourceMaps(bundlePath);
+        expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
+      } finally {
+        await fsPromises.chmod(lockedDirectoryPath, 0o700);
+      }
+    },
+  );
 
   test('non-JSON data URL source maps are ignored', async () => {
     const bundlePath = await writeVmBundle(
@@ -643,6 +695,34 @@ describe('source-mapped stack traces for VM errors', () => {
       otherExecutionContext.release();
       rebuiltExecutionContext.release();
     }
+  });
+
+  test('removeVM keeps source maps for active execution contexts until release', async () => {
+    const bundlePath = await writeVmBundle(
+      `${buildThrowingBundleSource()}\n${inlineSourceMapComment(buildThrowingBundleMap('bundle.js'))}\n`,
+    );
+    const executionContext = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    const { runInVM } = executionContext;
+
+    const capturedError = await runInVM(
+      "(function(){ try { global.triggerSsrError(); } catch (e) { global.heldSsrError = e; return 'held'; } })()",
+      bundlePath,
+    );
+    expect(capturedError).toBe('held');
+
+    removeVM(bundlePath);
+    expect(hasVMContextForBundle(bundlePath)).toBe(false);
+    expect(resolveOriginalPosition(bundlePath, 3, 17)).toEqual({
+      source: ORIGINAL_SOURCE,
+      line: 2,
+      column: 3,
+    });
+
+    const stack = await runInVM('global.heldSsrError.stack', bundlePath);
+    expect(stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
+
+    executionContext.release();
+    expect(resolveOriginalPosition(bundlePath, 3, 17)).toBeNull();
   });
 
   test('bundle without a source map keeps the real bundle path in stack frames', async () => {

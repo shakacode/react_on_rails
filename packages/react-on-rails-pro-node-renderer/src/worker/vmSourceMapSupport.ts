@@ -34,9 +34,9 @@
  *    `hasErrors: true`, surfaced as `ReactOnRails::PrerenderError`).
  *
  * Performance: `prepareStackTrace` only runs when an error's `.stack` is first
- * accessed, and the source map is read and parsed lazily on the first stack
- * frame that needs it, then cached per bundle path. Requests that do not
- * error never touch the filesystem or the map.
+ * accessed. External source map text is captured asynchronously while building
+ * the VM so same-path rebuilds stay generation-isolated; SourceMap parsing and
+ * position lookups stay lazy and cached per bundle registration.
  */
 
 import fs from 'fs';
@@ -61,7 +61,7 @@ export interface BundleSourceMapRegistration {
    */
   sourceMappingUrl?: string | null;
   /**
-   * `undefined` keeps legacy lazy lookup behavior. `null` means registration
+   * `undefined` keeps lazy synchronous lookup behavior. `null` means registration
    * time lookup found no usable source map. A string freezes the source-map JSON
    * for this VM generation so same-path rebuilds cannot remap old bytecode with
    * a newer map.
@@ -191,6 +191,15 @@ function hasReadableFile(candidatePath: string) {
   }
 }
 
+async function hasReadableFileAsync(candidatePath: string) {
+  try {
+    await fs.promises.access(candidatePath, fs.constants.R_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function readSourceMapJsonForBundle(
   bundleFilePath: string,
   sourceMappingUrl: string | undefined,
@@ -220,26 +229,70 @@ function readSourceMapJsonForBundle(
   }
 }
 
+async function readSourceMapJsonForBundleAsync(
+  bundleFilePath: string,
+  sourceMappingUrl: string | undefined,
+): Promise<string | undefined> {
+  try {
+    if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
+      return parseDataUrlSourceMap(sourceMappingUrl);
+    }
+
+    const candidatePaths: string[] = [];
+    if (sourceMappingUrl) {
+      const sourceMapPath = resolveSourceMapPath(bundleFilePath, sourceMappingUrl);
+      if (sourceMapPath) {
+        candidatePaths.push(sourceMapPath);
+      }
+    }
+    candidatePaths.push(`${bundleFilePath}.map`);
+
+    const readabilityResults = await Promise.all(
+      candidatePaths.map(async (candidatePath) => ({
+        candidatePath,
+        readable: await hasReadableFileAsync(candidatePath),
+      })),
+    );
+    const mapPath = readabilityResults.find(({ readable }) => readable)?.candidatePath;
+    return mapPath ? await fs.promises.readFile(mapPath, 'utf8') : undefined;
+  } catch (error) {
+    log.debug('Failed to capture source map for bundle %s: %s', bundleFilePath, error);
+    return undefined;
+  }
+}
+
+/** @internal Used by VM build to avoid synchronous external-map reads. */
+export async function preloadSourceMapJsonForBundle(bundleFilePath: string, bundleContents: string) {
+  const sourceMappingUrl = extractSourceMappingUrl(bundleContents);
+  return (await readSourceMapJsonForBundleAsync(bundleFilePath, sourceMappingUrl)) ?? null;
+}
+
 /**
  * Registers a bundle file so stack frames pointing into it can be remapped.
  * Pass `bundleContents` when available; omitting it makes the first error-path
- * lookup synchronously re-read the bundle to find its `sourceMappingURL`.
+ * lookup synchronously re-read the bundle to find its `sourceMappingURL`. Pass
+ * `preloadedSourceMapJson` to freeze external map lookup for a VM generation.
  */
 export function registerBundleForSourceMaps(
   bundleFilePath: string,
   firstLineColumnOffset = 0,
   bundleContents?: string,
+  preloadedSourceMapJson?: string | null,
 ) {
   const sourceMappingUrl =
     bundleContents === undefined ? undefined : (extractSourceMappingUrl(bundleContents) ?? null);
+  const inlineSourceMapJson =
+    sourceMappingUrl && sourceMappingUrl.startsWith('data:')
+      ? (parseDataUrlSourceMap(sourceMappingUrl) ?? null)
+      : undefined;
   const registration = {
     bundleFilePath,
     firstLineColumnOffset,
     sourceMappingUrl,
     sourceMapJson:
-      bundleContents === undefined
-        ? undefined
-        : (readSourceMapJsonForBundle(bundleFilePath, sourceMappingUrl ?? undefined) ?? null),
+      preloadedSourceMapJson !== undefined
+        ? preloadedSourceMapJson
+        : (inlineSourceMapJson ?? (sourceMappingUrl === null ? null : undefined)),
   };
   registeredBundles.set(bundleFilePath, registration);
   return registration;
@@ -569,7 +622,7 @@ Error.prepareStackTrace = function (error, callSites) {
           var generatedLocation = fileName + ':' + line + ':' + column;
           var originalLocation = position.source + ':' + position.line + ':' + position.column;
           if (frameText.indexOf(generatedLocation) !== -1) {
-            frameText = frameText.replace(generatedLocation, originalLocation);
+            frameText = frameText.replace(generatedLocation, function () { return originalLocation; });
           } else {
             frameText = frameText + ' -> ' + originalLocation;
           }

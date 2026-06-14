@@ -535,7 +535,7 @@ export default function run(config: Partial<Config>) {
         incrementalExecutionContextReleased ||
         !incrementalRequestClosed ||
         !incrementalResponseFinished ||
-        !incrementalSink?.executionContext
+        !incrementalSink
       ) {
         return;
       }
@@ -556,7 +556,7 @@ export default function run(config: Partial<Config>) {
         incrementalResponseFinishTimeoutId ||
         incrementalResponseFinished ||
         incrementalExecutionContextReleased ||
-        !incrementalSink?.executionContext
+        !incrementalSink
       ) {
         return;
       }

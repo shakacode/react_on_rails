@@ -19,7 +19,7 @@ When an SSR error occurs, the renderer remaps stack frames to the original TypeS
 - **Inline map (simplest):** build the server bundle with `devtool: 'inline-source-map'` (webpack and Rspack). The map travels inside the bundle, so nothing else needs to be uploaded. Inline maps grow the server bundle file, but the server bundle is never served to browsers, so the cost is only disk space and upload size between Rails and the renderer.
 - **External map:** with `devtool: 'source-map'`, make the `.map` file available next to the uploaded bundle in the renderer's bundle cache directory. The renderer resolves the `//# sourceMappingURL=` reference relative to the bundle file, and also checks for `<uploaded-bundle>.js.map`. Never serve server-bundle source maps publicly.
 
-The source map is loaded lazily on the first error and cached per bundle, so requests that do not error pay no cost. If no source map is found, stack traces still name the real bundle file path and line.
+External source map text is captured asynchronously while the VM builds so active requests keep using the map generation they started with. The map is parsed and applied lazily on the first error and cached per bundle generation, so normal requests do not pay stack-formatting cost. If no source map is found, stack traces still name the real bundle file path and line.
 
 ## Debugging the Node Renderer
 

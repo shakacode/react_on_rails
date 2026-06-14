@@ -51,6 +51,7 @@ import {
   resolveOriginalPositionForRegistration,
   remapErrorStack,
   remapStackTrace,
+  preloadSourceMapJsonForBundle,
 } from './vmSourceMapSupport.js';
 
 const readFileAsync = promisify(fs.readFile);
@@ -218,10 +219,12 @@ async function buildVM(filePath: string): Promise<VMContext> {
       const bundleContents = await readFileAsync(filePath, 'utf8');
       const firstLineColumnOffset =
         additionalContextIsObject || supportModules ? MODULE_WRAP_FIRST_LINE_PREFIX_LENGTH : 0;
+      const preloadedSourceMapJson = await preloadSourceMapJsonForBundle(filePath, bundleContents);
       const currentSourceMapRegistration = registerBundleForSourceMaps(
         filePath,
         firstLineColumnOffset,
         bundleContents,
+        preloadedSourceMapJson,
       );
       sourceMapRegistration = currentSourceMapRegistration;
 
@@ -619,9 +622,7 @@ export function removeVM(bundlePath: string) {
   vmContexts.delete(bundlePath);
   vmCreationPromises.delete(bundlePath);
   if (vmContext) {
-    activeSourceMapRequestCounts.delete(vmContext.sourceMapRegistration);
-    evictedSourceMapRegistrations.delete(vmContext.sourceMapRegistration);
-    unregisterBundleForSourceMaps(vmContext.sourceMapRegistration);
+    retireSourceMapRegistrationAfterEviction(vmContext.sourceMapRegistration);
   } else {
     unregisterBundleForSourceMaps(bundlePath);
   }
