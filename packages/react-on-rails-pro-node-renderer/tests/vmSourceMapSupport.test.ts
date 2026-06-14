@@ -335,6 +335,7 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(thrown).toBeDefined();
     expect(thrown?.message).toContain("Cannot find module 'missing-host-callback-module'");
     expect(thrown?.stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
+    expect(resolveOriginalPosition(bundlePath, 3, 1)).toBeNull();
   });
 
   test('frames on generated lines past the last mapping keep the bundled location', async () => {

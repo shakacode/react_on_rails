@@ -347,14 +347,13 @@ async function buildVM(filePath: string): Promise<VMContext> {
 
       return newVmContext;
     } catch (error) {
-      // NOTE: the bundle intentionally stays registered for source map
-      // resolution: the error's `.stack` is materialized lazily (possibly by
-      // the caller, after this catch), and unregistering here would leave
-      // bundle-evaluation errors unmapped. The registration is only a small
-      // allowlist entry keyed by the bundle path.
+      // Materialize/remap the stack before reporting so failed bundle builds
+      // still include original source locations, then retire the registration:
+      // failed builds never enter the VM pool and cannot be reused.
       remapErrorStack(error);
       log.error({ error }, 'Caught Error when creating context in buildVM');
       errorReporter.error(error as Error);
+      unregisterBundleForSourceMaps(filePath);
       throw error;
     }
   })();
