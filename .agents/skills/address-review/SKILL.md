@@ -330,11 +330,17 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    items. Exclude weak "could consider" optional suggestions, trivial duplicates,
    factually incorrect suggestions, status noise, and already handled autonomous
    optional nits. For low-risk optional nits excluded from the bundle as not
-   worth tracking, record the deferred/declined rationale and resolve or reply
-   according to the chosen tracking/drop outcome instead of prompting separately.
-   Do not create a GitHub issue yet.
+   worth tracking, record the deferred/declined rationale for later reply or
+   summary use, but do not reply or resolve until the tracking/drop outcome is
+   chosen. Do not create a GitHub issue yet.
 4. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Do not post replies or resolve bundled items until that tracking/drop outcome is chosen. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
-5. For each deferred item in the chosen tracking outcome, post a reply in the original location referencing that outcome (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists and the conversation is complete. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
+5. For each deferred item and each excluded low-risk optional nit in the chosen
+   tracking/drop outcome, post a reply in the original location referencing that
+   outcome or recorded rationale (use review-comment replies for inline comments
+   and issue comments for review summaries/general comments), and resolve the
+   thread when one exists and the conversation is complete. For general PR
+   comments and review summary bodies (which have no thread), the reply alone is
+   sufficient.
 6. For trivial `SKIPPED` items that are not included in the bundle (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads only when the user confirms.
 7. If the bundle is non-empty and any low-risk optional nits were excluded as
    not worth tracking, record the inline/deferred/declined rationale before
