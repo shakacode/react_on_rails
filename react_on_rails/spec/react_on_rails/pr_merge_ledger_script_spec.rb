@@ -3341,11 +3341,6 @@ RSpec.describe "script/pr-merge-ledger" do
   it "prints GraphQL response errors from gh API calls" do
     fake_gh = <<~SH
       #!/bin/sh
-      case " $* " in
-        *" --retry 3 "*) ;;
-        *) printf '%s\\n' 'missing --retry 3' >&2; exit 42 ;;
-      esac
-
       cat <<'JSON'
       {"data":null,"errors":[{"message":"rate limit exceeded"},{"message":"bad credentials"}]}
       JSON
@@ -3364,6 +3359,68 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status.exitstatus).to eq(2)
       expect(stdout).to be_empty
       expect(stderr).to include("gh api graphql returned errors: rate limit exceeded; bad credentials")
+    end
+  end
+
+  it "retries failed gh API calls before reporting the live ledger" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      count_file="$(dirname "$0")/failed-once"
+      if [ ! -f "$count_file" ]; then
+        touch "$count_file"
+        printf '%s\\n' 'temporary gateway failure' >&2
+        exit 1
+      fi
+
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              query=*) query=${1#query=} ;;
+            esac
+            ;;
+        esac
+        shift
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"PR 1","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-1","headRefOid":"head-1","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+
+    with_fake_gh(fake_gh) do |env|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.fetch("complete_allowed")).to be(true)
     end
   end
 

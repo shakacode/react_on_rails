@@ -30,6 +30,8 @@ class PrMergeLedger
     bun.lockb
   ].freeze
   DEFAULT_GITHUB_API_TIMEOUT_SECONDS = "30"
+  GITHUB_API_MAX_ATTEMPTS = 3
+  GITHUB_API_RETRY_BASE_DELAY_SECONDS = 0.25
   MAX_GRAPHQL_PAGES = 500
   LIST_MARKER_PATTERN = /(?:[-*]|\d+[.)])\s*/
   FINDING_LINE_PREFIX_PATTERN = /(?:#{LIST_MARKER_PATTERN.source})?(?:\#{1,6}\s+)?/
@@ -1079,8 +1081,7 @@ class PrMergeLedger
     end
 
     def graphql(query, variables)
-      args = ["api", "graphql", "--retry", "3", "-f", "owner=#{@owner}", "-f", "name=#{@name}", "-f",
-              "query=#{query}"]
+      args = ["api", "graphql", "-f", "owner=#{@owner}", "-f", "name=#{@name}", "-f", "query=#{query}"]
       variables.each do |key, value|
         next if value.nil?
 
@@ -1088,7 +1089,7 @@ class PrMergeLedger
         args.push(flag, "#{key}=#{value}")
       end
 
-      stdout, stderr, status = capture_gh(args)
+      stdout, stderr, status = capture_gh_with_retries(args)
       raise Error, "gh api graphql failed: #{stderr.strip}" unless status.success?
 
       JSON.parse(stdout).tap do |parsed|
@@ -1096,6 +1097,17 @@ class PrMergeLedger
 
         messages = parsed.fetch("errors").map { |error| error.fetch("message", error.inspect) }
         raise Error, "gh api graphql returned errors: #{messages.join('; ')}"
+      end
+    end
+
+    def capture_gh_with_retries(args)
+      attempt = 0
+      loop do
+        attempt += 1
+        stdout, stderr, status = capture_gh(args)
+        return [stdout, stderr, status] if status.success? || attempt >= GITHUB_API_MAX_ATTEMPTS
+
+        sleep(GITHUB_API_RETRY_BASE_DELAY_SECONDS * (2**(attempt - 1)))
       end
     end
 
