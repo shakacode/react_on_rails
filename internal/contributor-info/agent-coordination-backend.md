@@ -54,7 +54,8 @@ Before relying on a newly cloned or updated backend, capture the private
 contract marker and prove the commands this public workflow depends on:
 
 Set `AGENT_COORD_REPO` to the private `shakacode/agent-coordination` clone path
-before running this block.
+before running this block. Copy the `git describe` output and `git rev-parse
+HEAD` output into PR evidence.
 
 ```bash
 if test -z "${AGENT_COORD_REPO:-}"; then
@@ -65,7 +66,7 @@ elif test ! -x "$AGENT_COORD_REPO/bin/agent-coord"; then
   false
 else
   git -C "$AGENT_COORD_REPO" fetch --tags --prune --prune-tags &&
-    git -C "$AGENT_COORD_REPO" describe --tags --always --dirty && # copy this output into PR evidence
+    git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
     git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
     "$AGENT_COORD_REPO/bin/agent-coord" --help &&
     "$AGENT_COORD_REPO/bin/agent-coord" status &&
@@ -117,6 +118,8 @@ Use a temporary local state directory for smoke checks that should not write to
 GitHub. `AGENT_COORD_STATE_ROOT` sets the directory where `agent-coord` reads
 and writes JSON state; override it here so dry runs stay local instead of using
 the default state root documented in the private repo README.
+
+### Local State Smoke Check
 
 ```bash
 STATE_ROOT=$(mktemp -d)
@@ -202,8 +205,8 @@ workflow examples change:
 1. Fetch the private backend and record the validated tag or commit.
 2. Run the private backend tests and the `CLI Contract Preflight` commands above.
 3. Run the `AGENT_COORD_STATE_ROOT` smoke-check block in the
-   [Heartbeats](#heartbeats) section so examples do not write private
-   coordination records while testing command wiring.
+   [Local State Smoke Check](#local-state-smoke-check) section so examples do not
+   write private coordination records while testing command wiring.
 4. Confirm this public page still documents only command names, verification
    steps, and outcome rules. Keep schemas, private defaults, terminal heartbeat
    statuses, and scheduler snippets in the private backend.
