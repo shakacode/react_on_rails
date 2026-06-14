@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-MAX_GOAL_PROMPT_CHARS = 3_999
+GOAL_PROMPT_CHAR_LIMIT = 4_000
 TEXT_FENCE = "```text\n"
 
 def fail!(message)
@@ -22,7 +22,9 @@ def extract_goal_prompt_template(skill_text)
 end
 
 def with_items(prompt_template, items)
-  updated_prompt = prompt_template.sub(/Items:\n.*?\nExecution rules:/m, "Items:\n#{items}\nExecution rules:")
+  updated_prompt = prompt_template.sub(/Items:\n.*?\nExecution rules:/m) do
+    "Items:\n#{items}\nExecution rules:"
+  end
   fail!("goal prompt template must contain Items and Execution rules sections") if updated_prompt == prompt_template
 
   updated_prompt
@@ -50,6 +52,7 @@ required_prompt_phrases = [
 ]
 
 required_skill_rule_phrases.each do |phrase|
+  # These phrases live in the broader skill rules, not necessarily inside the prompt fence.
   fail!("SKILL.md is missing required prompt-sizing phrase: #{phrase}") unless skill_text.include?(phrase)
 end
 
@@ -62,8 +65,8 @@ if prompt_template.match?(/Batch Plan/i)
 end
 
 template_chars = prompt_template.length
-if template_chars > MAX_GOAL_PROMPT_CHARS
-  fail!("goal prompt template is #{template_chars} chars, above #{MAX_GOAL_PROMPT_CHARS}")
+if template_chars >= GOAL_PROMPT_CHAR_LIMIT
+  fail!("goal prompt template is #{template_chars} chars, must stay under #{GOAL_PROMPT_CHAR_LIMIT}")
 end
 
 bulky_items = (1..12).map do |number|
@@ -86,13 +89,15 @@ oversized_candidate = with_items(prompt_template, bulky_items)
 fail!("oversized fixture did not exceed 4000 chars") unless oversized_candidate.length >= 4_000
 
 fallback_prompt = with_items(prompt_template, first_ready_item)
+# Reject any mention of "Batch Plan" so the prompt stays fully self-contained
+# and workers do not need to read the Batch Plan to execute it.
 if fallback_prompt.match?(/Batch Plan/i)
   fail!("split fallback prompt must be self-contained and not depend on Batch Plan context")
 end
 
 fallback_chars = fallback_prompt.length
-if fallback_chars > MAX_GOAL_PROMPT_CHARS
-  fail!("split fallback prompt is #{fallback_chars} chars, above #{MAX_GOAL_PROMPT_CHARS}")
+if fallback_chars >= GOAL_PROMPT_CHAR_LIMIT
+  fail!("split fallback prompt is #{fallback_chars} chars, must stay under #{GOAL_PROMPT_CHAR_LIMIT}")
 end
 
 puts "goal_prompt_template_chars=#{template_chars}"
