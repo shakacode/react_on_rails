@@ -112,6 +112,44 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks blank review decisions in strict mode" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 1,
+        "headRefOid" => "abc123",
+        "reviewDecision" => ""
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-blank-review-decision", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.dig("pull_requests", 0, "pr", "review_decision")).to eq("UNKNOWN")
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_review_decision"
+      )
+    end
+  end
+
   it "blocks REVIEW_REQUIRED review decisions in strict mode" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -1246,6 +1284,56 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks severity summaries that say an issue is not fully resolved" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "not-fully-resolved-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/not-fully-resolved-review",
+          "body" => "[P1] issue not fully resolved"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-not-fully-resolved-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings", 0)
+      expect(finding).to include(
+        "id" => "not-fully-resolved-review",
+        "severity" => "P1",
+        "text_excerpt" => "[P1] issue not fully resolved",
+        "disposition" => "UNKNOWN"
+      )
+    end
+  end
+
   it "blocks severity summaries that say no findings are fixed or resolved" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -1392,6 +1480,55 @@ RSpec.describe "script/pr-merge-ledger" do
         "text_excerpt" => "P1 issues fixed, P2 still open",
         "disposition" => "UNKNOWN"
       )
+    end
+  end
+
+  it "blocks conjunction-separated mixed severity summary lines with open priority items" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "conjunction-mixed-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/conjunction-mixed-review",
+          "body" => "P1 issues fixed and P2 still open"
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-conjunction-mixed-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "p1_p2_must_fix_dispositions", "findings")
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
+      expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
+        ["P1 issues fixed and P2 still open", "P1 issues fixed and P2 still open"]
+      )
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
     end
   end
 
@@ -2400,9 +2537,9 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(status).to be_success, stderr
 
     schema = JSON.parse(stdout)
-    expect(schema.fetch("$id")).to eq("https://reactonrails.com/schemas/pr-merge-ledger-v1.json")
+    expect(schema.fetch("$id")).to eq("script/pr-merge-ledger.schema.json")
     expect(schema.dig("properties", "$schema", "const")).to eq(
-      "https://reactonrails.com/schemas/pr-merge-ledger-v1.json"
+      "script/pr-merge-ledger.schema.json"
     )
     expect(schema.dig("properties", "schema_version", "const")).to eq("pr-merge-ledger/v1")
     expect(schema.fetch("required")).to include("pull_requests", "violations", "complete_allowed")

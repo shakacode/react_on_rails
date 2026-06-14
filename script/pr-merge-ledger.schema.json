@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://reactonrails.com/schemas/pr-merge-ledger-v1.json",
+  "$id": "script/pr-merge-ledger.schema.json",
   "title": "React on Rails PR merge ledger",
   "type": "object",
   "additionalProperties": false,
@@ -17,7 +17,7 @@
   ],
   "properties": {
     "$schema": {
-      "const": "https://reactonrails.com/schemas/pr-merge-ledger-v1.json"
+      "const": "script/pr-merge-ledger.schema.json"
     },
     "schema_version": {
       "const": "pr-merge-ledger/v1"

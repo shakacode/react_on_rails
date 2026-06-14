@@ -11,6 +11,7 @@ require "timeout"
 class PrMergeLedger
   SCHEMA_VERSION = "pr-merge-ledger/v1"
   UNKNOWN = "UNKNOWN"
+  SCHEMA_URI = "script/pr-merge-ledger.schema.json"
   SCHEMA_PATH = File.expand_path("pr-merge-ledger.schema.json", __dir__)
   CHANGELOG_CLASSIFICATIONS = %w[
     changelog_present
@@ -61,12 +62,12 @@ class PrMergeLedger
   FINDING_SUMMARY_SUBJECT_PATTERN = /\b(?:findings?|issues?|items?|main issue)\b/i
   FINDING_SUMMARY_RESOLUTION_PATTERN = /\b(?:none|fixed|resolved|waived)\b/i
   NEGATED_SUMMARY_RESOLUTION_PATTERN = Regexp.union(
-    /\bnot\s+(?:yet\s+)?(?:fixed|resolved|waived)\b/i,
+    /\bnot\s+(?:\S+\s+){0,3}?(?:fixed|resolved|waived)\b/i,
     /\b(?:none|nothing)\s+(?:fixed|resolved|waived)\b/i,
     /\bno\s+(?:\S+\s+){0,4}?(?:fixed|resolved|waived)\b/i
   )
   ADDITIONAL_SEVERITY_PATTERN =
-    /[.;,(]\s*(?:[-*]\s*)?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
+    /(?:[.;,(]|\b(?:and|but)\b)\s*(?:[-*]\s*)?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?(?:\s|:|-|$)/i
 
   class Error < StandardError; end
 
@@ -165,7 +166,7 @@ class PrMergeLedger
     unknown_fields = ledgers.flat_map { |ledger| ledger.fetch("unknown_fields") }
 
     {
-      "$schema" => "https://reactonrails.com/schemas/pr-merge-ledger-v1.json",
+      "$schema" => SCHEMA_URI,
       "schema_version" => SCHEMA_VERSION,
       "generated_at" => Time.now.utc.iso8601,
       "repository" => datasets.first.fetch("repository"),
@@ -296,10 +297,14 @@ class PrMergeLedger
       "is_draft" => raw_pr["isDraft"],
       "base_ref" => raw_pr["baseRefName"],
       "head_ref" => raw_pr["headRefName"],
-      "head_sha" => raw_pr["headRefOid"] || UNKNOWN,
+      "head_sha" => blank_to_unknown(raw_pr["headRefOid"]),
       "merged_at" => raw_pr["mergedAt"],
-      "review_decision" => raw_pr["reviewDecision"] || UNKNOWN
+      "review_decision" => blank_to_unknown(raw_pr["reviewDecision"])
     }
+  end
+
+  def blank_to_unknown(value)
+    value.to_s.empty? ? UNKNOWN : value
   end
 
   def normalize_review_thread(thread, pull_request)
@@ -398,6 +403,8 @@ class PrMergeLedger
     return false if thread["isOutdated"] == true
     return false if comments.empty?
 
+    # Conservative fallback: if no comment can be confirmed as current-head by SHA but GitHub has not marked
+    # a comment outdated, block rather than silently miss an unresolved thread after a non-force push.
     current_thread_comment?(comments, pull_request) || comments.any? { |comment| !comment.fetch("outdated") }
   end
 
@@ -522,8 +529,7 @@ class PrMergeLedger
   end
 
   def normalize_finding_severity(raw_severity)
-    normalized = raw_severity.to_s.delete("[]").upcase.tr("- ", "_")
-    normalized == "MUST_FIX" ? "MUST_FIX" : normalized
+    raw_severity.to_s.delete("[]").upcase.tr("- ", "_")
   end
 
   def non_actionable_finding_summary?(line)
@@ -1061,8 +1067,7 @@ class PrMergeLedger
 
     def review_thread_comments_query
       <<~GRAPHQL
-        query($owner:String!, $name:String!, $threadId:ID!, $commentsCursor:String) {
-          repository(owner:$owner, name:$name) { id }
+        query($threadId:ID!, $commentsCursor:String) {
           node(id:$threadId) {
             ... on PullRequestReviewThread {
               comments(first:100, after:$commentsCursor) {
