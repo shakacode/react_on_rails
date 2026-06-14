@@ -42,9 +42,11 @@ import {
 import * as errorReporter from '../shared/errorReporter.js';
 import {
   PREPARE_STACK_TRACE_INSTALL_SCRIPT,
+  SOURCE_MAP_LOOKUP_ATTEMPT_CONTEXT_KEY,
   SOURCE_MAP_RESOLVER_CONTEXT_KEY,
   SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY,
   type BundleSourceMapRegistration,
+  createSourceMapLookupAttempt,
   registerBundleForSourceMaps,
   unregisterBundleForSourceMaps,
   retireMissingSourceMapRetry,
@@ -250,12 +252,19 @@ async function buildVM(filePath: string): Promise<VMContext> {
       // TS/JS sources. Only resolves positions for registered bundle paths.
       const contextObject = {
         sharedConsoleHistory,
-        [SOURCE_MAP_RESOLVER_CONTEXT_KEY]: (fileName: unknown, lineNumber: unknown, columnNumber: unknown) =>
+        [SOURCE_MAP_LOOKUP_ATTEMPT_CONTEXT_KEY]: createSourceMapLookupAttempt,
+        [SOURCE_MAP_RESOLVER_CONTEXT_KEY]: (
+          fileName: unknown,
+          lineNumber: unknown,
+          columnNumber: unknown,
+          lookupAttempt?: unknown,
+        ) =>
           resolveOriginalPositionForRegistration(
             currentSourceMapRegistration,
             fileName,
             lineNumber,
             columnNumber,
+            lookupAttempt,
           ),
         [SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY]: (stack: unknown) =>
           remapStackTrace(stack, currentSourceMapRegistration),

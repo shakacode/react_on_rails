@@ -476,6 +476,32 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
   });
 
+  test('retryable misses are counted once per stack remapping attempt', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+    const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
+    const bundleStack = [
+      'Error: SSR kaboom',
+      ...Array.from({ length: 5 }, (_unused, index) => `    at frame${index} (${bundlePath}:3:17)`),
+    ].join('\n');
+    await writeVmBundle(bundleContents);
+
+    const registration = registerBundleForSourceMaps(bundlePath, 0, bundleContents, undefined, true);
+    const realpathSyncSpy = jest.spyOn(fs, 'realpathSync');
+    try {
+      expect(remapStackTrace(bundleStack, registration)).not.toContain(ORIGINAL_SOURCE);
+      const sourceMapPathLookups = realpathSyncSpy.mock.calls.filter(([filePath]) => filePath === mapPath);
+      expect(sourceMapPathLookups).toHaveLength(1);
+    } finally {
+      realpathSyncSpy.mockRestore();
+    }
+
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+    expect(remapStackTrace(bundleStack, registration)).toContain(`${ORIGINAL_SOURCE}:2:3`);
+  });
+
   test('global host stack remapping skips source-map loads for unrelated registered bundles', async () => {
     const firstBundlePath = path.join(serverBundleCachePath(testName), 'first', 'bundle.js');
     const secondBundlePath = path.join(serverBundleCachePath(testName), 'second', 'bundle.js');

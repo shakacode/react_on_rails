@@ -80,6 +80,10 @@ interface LoadedSourceMap {
   sourceRoot?: string;
 }
 
+interface SourceMapLookupAttempt {
+  missingSourceMaps: WeakSet<BundleSourceMapRegistration>;
+}
+
 // Bundles whose stack frames we are willing to resolve. Acts as an allowlist:
 // the resolver is exposed to (untrusted) bundle code inside the VM, so it must
 // not be usable to probe arbitrary filesystem paths.
@@ -91,6 +95,7 @@ const registeredBundles = new Map<string, BundleSourceMapRegistration>();
 let sourceMapCache = new WeakMap<BundleSourceMapRegistration, LoadedSourceMap | null>();
 let retiredMissingSourceMapRetries = new WeakSet<BundleSourceMapRegistration>();
 let missingSourceMapRetryCounts = new WeakMap<BundleSourceMapRegistration, number>();
+const sourceMapLookupAttempts = new WeakSet<SourceMapLookupAttempt>();
 let warnedMissingSourceMapConstructor = false;
 
 const MAX_MISSING_SOURCE_MAP_RETRIES = 5;
@@ -111,7 +116,32 @@ export function retireMissingSourceMapRetry(registration: BundleSourceMapRegistr
   }
 }
 
-function recordMissingSourceMapRetry(registration: BundleSourceMapRegistration) {
+export function createSourceMapLookupAttempt(): SourceMapLookupAttempt {
+  const lookupAttempt = { missingSourceMaps: new WeakSet<BundleSourceMapRegistration>() };
+  sourceMapLookupAttempts.add(lookupAttempt);
+  return lookupAttempt;
+}
+
+function validSourceMapLookupAttempt(lookupAttempt: unknown): SourceMapLookupAttempt | undefined {
+  if (
+    typeof lookupAttempt === 'object' &&
+    lookupAttempt !== null &&
+    sourceMapLookupAttempts.has(lookupAttempt as SourceMapLookupAttempt)
+  ) {
+    return lookupAttempt as SourceMapLookupAttempt;
+  }
+  return undefined;
+}
+
+function recordMissingSourceMapRetry(
+  registration: BundleSourceMapRegistration,
+  lookupAttempt?: SourceMapLookupAttempt,
+) {
+  if (lookupAttempt?.missingSourceMaps.has(registration)) {
+    return;
+  }
+
+  lookupAttempt?.missingSourceMaps.add(registration);
   const retryCount = (missingSourceMapRetryCounts.get(registration) ?? 0) + 1;
   if (retryCount >= MAX_MISSING_SOURCE_MAP_RETRIES) {
     retireMissingSourceMapRetry(registration);
@@ -126,6 +156,12 @@ function recordMissingSourceMapRetry(registration: BundleSourceMapRegistration) 
  * {@link PREPARE_STACK_TRACE_INSTALL_SCRIPT}.
  */
 export const SOURCE_MAP_RESOLVER_CONTEXT_KEY = '__reactOnRailsProResolveOriginalSourcePosition';
+
+/**
+ * Name of the host-callback global used to group resolver calls that belong to
+ * one `.stack` formatting attempt.
+ */
+export const SOURCE_MAP_LOOKUP_ATTEMPT_CONTEXT_KEY = '__reactOnRailsProCreateSourceMapLookupAttempt';
 
 /**
  * Name of the host-callback global injected into the VM context for stacks
@@ -521,9 +557,16 @@ function loadSourceMapForBundle(
   }
 }
 
-function sourceMapForRegistration(registration: BundleSourceMapRegistration): LoadedSourceMap | null {
+function sourceMapForRegistration(
+  registration: BundleSourceMapRegistration,
+  lookupAttempt?: SourceMapLookupAttempt,
+): LoadedSourceMap | null {
   let sourceMap = sourceMapCache.get(registration);
   if (sourceMap === undefined) {
+    if (lookupAttempt?.missingSourceMaps.has(registration)) {
+      return null;
+    }
+
     sourceMap = loadSourceMapForBundle(registration.bundleFilePath, registration);
     if (sourceMap) {
       sourceMapCache.set(registration, sourceMap);
@@ -534,7 +577,7 @@ function sourceMapForRegistration(registration: BundleSourceMapRegistration): Lo
     ) {
       sourceMapCache.set(registration, sourceMap);
     } else {
-      recordMissingSourceMapRetry(registration);
+      recordMissingSourceMapRetry(registration, lookupAttempt);
     }
   }
   return sourceMap;
@@ -562,6 +605,7 @@ export function resolveOriginalPositionForRegistration(
   fileName: unknown,
   lineNumber: unknown,
   columnNumber: unknown,
+  lookupAttempt?: unknown,
 ): ResolvedSourcePosition | null {
   if (
     typeof fileName !== 'string' ||
@@ -578,7 +622,7 @@ export function resolveOriginalPositionForRegistration(
     return null;
   }
 
-  const sourceMap = sourceMapForRegistration(registration);
+  const sourceMap = sourceMapForRegistration(registration, validSourceMapLookupAttempt(lookupAttempt));
   if (!sourceMap) {
     return null;
   }
@@ -628,7 +672,11 @@ function escapeRegExp(value: string) {
  * pass preserves the same allowlist: only exact registered bundle paths are
  * remapped.
  */
-function remapStackTraceForRegistration(stack: string, registration: BundleSourceMapRegistration) {
+function remapStackTraceForRegistration(
+  stack: string,
+  registration: BundleSourceMapRegistration,
+  lookupAttempt: SourceMapLookupAttempt,
+) {
   const { bundleFilePath } = registration;
   const stackIncludesBundleLocation = stack.includes(`${bundleFilePath}:`);
   let remappedStack = stack;
@@ -640,6 +688,7 @@ function remapStackTraceForRegistration(stack: string, registration: BundleSourc
         bundleFilePath,
         Number(lineNumber),
         Number(columnNumber),
+        lookupAttempt,
       );
       return position ? `${position.source}:${position.line}:${position.column}` : match;
     });
@@ -649,7 +698,7 @@ function remapStackTraceForRegistration(stack: string, registration: BundleSourc
     return remappedStack;
   }
 
-  const sourceMap = sourceMapForRegistration(registration);
+  const sourceMap = sourceMapForRegistration(registration, lookupAttempt);
   sourceMap?.sources.forEach((source) => {
     if (!source.includes('://')) {
       return;
@@ -679,8 +728,9 @@ export function remapStackTrace(
     return undefined;
   }
 
+  const lookupAttempt = createSourceMapLookupAttempt();
   if (registration) {
-    return remapStackTraceForRegistration(stack, registration);
+    return remapStackTraceForRegistration(stack, registration, lookupAttempt);
   }
 
   // Callers without a specific registration opt into scanning every registered
@@ -688,7 +738,7 @@ export function remapStackTrace(
   // closure so unrelated bundle registrations cannot rewrite their stacks.
   let remappedStack = stack;
   registeredBundles.forEach((currentRegistration) => {
-    remappedStack = remapStackTraceForRegistration(remappedStack, currentRegistration);
+    remappedStack = remapStackTraceForRegistration(remappedStack, currentRegistration, lookupAttempt);
   });
 
   return remappedStack;
@@ -734,6 +784,14 @@ Error.prepareStackTrace = function (error, callSites) {
     header = '<error>';
   }
   var parts = [header];
+  var sourceMapLookupAttempt;
+  try {
+    if (typeof ${SOURCE_MAP_LOOKUP_ATTEMPT_CONTEXT_KEY} === 'function') {
+      sourceMapLookupAttempt = ${SOURCE_MAP_LOOKUP_ATTEMPT_CONTEXT_KEY}();
+    }
+  } catch (lookupAttemptError) {
+    sourceMapLookupAttempt = undefined;
+  }
   for (var i = 0; i < callSites.length; i++) {
     var frameText;
     try {
@@ -751,7 +809,7 @@ Error.prepareStackTrace = function (error, callSites) {
         column != null &&
         typeof ${SOURCE_MAP_RESOLVER_CONTEXT_KEY} === 'function'
       ) {
-        var position = ${SOURCE_MAP_RESOLVER_CONTEXT_KEY}(fileName, line, column);
+        var position = ${SOURCE_MAP_RESOLVER_CONTEXT_KEY}(fileName, line, column, sourceMapLookupAttempt);
         if (position) {
           var generatedLocation = fileName + ':' + line + ':' + column;
           var originalLocation = position.source + ':' + position.line + ':' + position.column;
