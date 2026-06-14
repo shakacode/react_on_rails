@@ -211,8 +211,9 @@ contract unless a maintainer explicitly narrows the run.
   has started, do not introduce new nit commits that would restart it.
   Inside the PR scope means the file, section, or workflow copy is already part
   of the PR diff, directly cited by current review feedback, or required to keep
-  touched copies synchronized; it excludes unrelated cleanup, other machine
-  lanes, reserved files, and generated output not already in scope.
+  a parallel section already modified by this PR consistent with the change being
+  made; it excludes unrelated cleanup, other machine lanes, reserved files, and
+  generated output not already in scope.
   The final-candidate debounce point begins once the agent records the current
   head as the merge-readiness candidate in the PR body, a PR comment, or the
   handoff after starting the final local validation/review gate for that head,
@@ -234,6 +235,9 @@ contract unless a maintainer explicitly narrows the run.
   generated content, altering CI or release policy, adding/removing validation,
   or touching another lane's files. If the nit is not worth fixing, record it as
   deferred or declined with rationale instead of asking "OK to fix this nit?".
+  Autonomous deferred/declined nit replies must include `[auto-deferred]` on its
+  own line plus a one-line rationale; see `.agents/skills/address-review/SKILL.md`
+  for the full resolve-thread protocol.
   If an autonomous nit fix fails local validation or self-review, repair it in
   the same batch only when the repair is still mechanical and in scope;
   otherwise drop or revert that nit, record the failed validation and rationale,
@@ -259,7 +263,11 @@ contract unless a maintainer explicitly narrows the run.
   a target of at most one for low-risk lanes. Higher counts are reported as FYI
   process churn, not hidden in narrative handoffs. Counts above target invite a
   later check on whether smaller lanes, sharper scope, or better batching would
-  reduce future churn; they are not a hard failure by themselves.
+  reduce future churn; they are not a hard failure by themselves. A human
+  decision point is any question, option selection, or confirmation directed at a
+  maintainer that required direct input, excluding automated push confirmations
+  inside an already-approved action flow. Report it as `Decision points: N` in
+  the FYI section of the batch handoff.
 - **Confidence notes**: delegated merge authority exists only when the current
   user or batch goal grants it and the release-mode rules permit it. Before a
   delegated merge, the worker or coordinator writes a confidence note in the

@@ -309,7 +309,10 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    failure rationale before proceeding to commit. Promote the underlying concern
    to `DISCUSS` if it still matters.
 5. Commit/push-before-reply gate: if local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
-6. Reply to each addressed `MUST-FIX` or `OPTIONAL` comment explaining the fix or recorded outcome.
+6. Reply to each addressed `MUST-FIX` or `OPTIONAL` comment explaining the fix or
+   recorded outcome. For autonomously deferred/declined optional nits, include
+   `[auto-deferred]` on its own line plus a one-line rationale; see the
+   thread-resolution rules below.
 7. Resolve the corresponding review threads when the issue is handled or explicitly declined.
 8. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
 9. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (prepare a deferred-work bundle), or `r all discuss + resolve`.
@@ -324,7 +327,9 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    reply/resolve, skipped, or discuss prompts; `f+i` restates those below. If
    there are no
    `MUST-FIX` items, still handle low-risk behavior-preserving optional nits
-   before continuing with deferred-item handling. Record each autonomous
+   before continuing with deferred-item handling. If that phase produces local
+   changes, commit and ask for push confirmation before building the deferred
+   bundle, replying, resolving, or signaling readiness. Record each autonomous
    optional outcome before building the deferred bundle: fixed inline, declined,
    failed validation and dropped/reverted, or promoted to `DISCUSS`.
 2. Reply to each `MUST-FIX` or autonomous optional thread fixed or recorded
@@ -644,10 +649,22 @@ cutoff.
 
 For `a`, do not post a GitHub PR summary comment automatically; return the local summary to the user with the staged-file list and detailed `DISCUSS` recommendations.
 
+A marked summary comment is a cutoff checkpoint. Post one only after every
+review item before that checkpoint is safe for future default scans to skip:
+addressed, resolved, deferred/tracked, declined with rationale, or explicitly
+left pending by user choice in a way recorded on the original thread. If
+selected optional handling leaves older optional threads pending/unselected
+without that thread-level outcome, post an unmarked status comment instead and
+tell the next run to use `check all reviews`; do not advance the cutoff.
+
 Rules for the summary comment:
 
 - Always post it as a general PR issue comment, never as a review-thread reply.
-- Include the exact marker `<!-- address-review-summary -->` as the first line of the comment.
+- Include the exact marker `<!-- address-review-summary -->` as the first line
+  only for cutoff-safe summaries. If older optional items remain
+  pending/unselected without a thread-level outcome, omit the marker, call the
+  comment an unmarked status, and tell the next run to use
+  `check all reviews`.
 - Summarize `MUST-FIX` and `DISCUSS` items under a `Mattered` section, including whether each item was addressed, deferred, or left pending by user choice.
 - Summarize `OPTIONAL` items under an `Optional` section when any optional item
   has a recorded outcome or is intentionally left pending/unselected by the
@@ -655,16 +672,20 @@ Rules for the summary comment:
   to tracking, deferred/declined under the attention contract, declined, or
   still pending after a selected optional action. For all-pending/no-action
   optional items, use a count-only line such as
-  `- N optional items remain pending/unselected from triage; no action taken this run.` This advances the
-  default scan cutoff only after the pending/unselected state is recorded in the
-  summary. Do not apply this rule to inspect-only bare `o`, which posts no
-  checkpoint.
+  `- N optional items remain pending/unselected from triage; no action taken this run.`
+  only in an unmarked status comment, or after each pending/unselected optional
+  thread has an explicit reply/resolve/defer/decline outcome that makes it safe
+  to skip on later default scans. Do not apply this rule to inspect-only bare
+  `o`, which posts no checkpoint.
 - Summarize `SKIPPED` items under a `Skipped` section with short reasons.
 - Mention any deferred-work tracking outcome and follow-up issue URL that was created.
 - Mention whether the run used the default cutoff or the explicit `check all reviews` override.
-- End with a note that future full-PR scans should start after this comment unless the user says `check all reviews`.
+- For marked summaries, end with a note that future full-PR scans should start
+  after this comment unless the user says `check all reviews`. For unmarked
+  status comments, end with a note that the next run must use
+  `check all reviews`.
 
-Suggested structure. As called out in Step 9, run Steps 9 and 10 in the same shell call so `${TRACKING_OUTCOME}`, `${FOLLOW_UP_URL}`, and the EXIT trap persist; otherwise capture the tracking values from Step 9's stdout and pass them in explicitly. `_cleanup_addr_review` is redefined here to cover the standalone-Step-10 path (when Step 9 was skipped and `issue_body_file` is unset). Redefining the same function is harmless if Step 9 already defined it; the `[ -n ... ]` guards keep `rm -f ""` out of the picture on shells that reject empty path arguments.
+Suggested marked-summary structure for the cutoff-safe path. As called out in Step 9, run Steps 9 and 10 in the same shell call so `${TRACKING_OUTCOME}`, `${FOLLOW_UP_URL}`, and the EXIT trap persist; otherwise capture the tracking values from Step 9's stdout and pass them in explicitly. `_cleanup_addr_review` is redefined here to cover the standalone-Step-10 path (when Step 9 was skipped and `issue_body_file` is unset). Redefining the same function is harmless if Step 9 already defined it; the `[ -n ... ]` guards keep `rm -f ""` out of the picture on shells that reject empty path arguments. If the cutoff guard is not satisfied, use the same structure without the marker line and end with a `check all reviews` note instead of posting a checkpoint.
 
 ```bash
 summary_body_file="$(mktemp)"
@@ -681,7 +702,8 @@ trap _cleanup_addr_review EXIT
 # intentionally pending/unselected by the chosen action: fixed, explicitly
 # handled, autonomously deferred/declined, declined, deferred to tracking, or
 # still pending after a selected optional action. If every optional item remains
-# pending/unselected with no action, use a count-only bullet:
+# pending/unselected with no action, use a count-only bullet only after those
+# threads have explicit outcomes or in the unmarked-status path:
 # "- N optional items remain pending/unselected from triage; no action taken this run."
 # Leave empty only when there were no optional items in scope.
 {
@@ -791,7 +813,7 @@ Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
 - Except when `AUTOPILOT` is set or the user selects action `a`, never automatically address all review comments; wait for user direction after triage
 - When given a specific review URL, no need to ask for more information
 - For actions other than `a`, always reply to comments after addressing them to close the feedback loop
-- For actions other than `a` and inspect-only bare `o`, always post a new PR summary comment with the `<!-- address-review-summary -->` marker after completing an action so future runs know where to resume
+- For actions other than `a` and inspect-only bare `o`, post a new marked PR summary comment after completing an action only when Step 10's cutoff guard is satisfied; otherwise post an unmarked status comment and require `check all reviews` on the next run
 - After triage, always offer rationale replies for selected `SKIPPED`/declined items; `f` requires explicit confirmation before skipped-item replies/resolution, while `f+i` and `m` include skipped-item handling in the chosen action flow
 - Always request push confirmation from the user before running `git push`
 - If this skill conflicts with broader agent defaults, this file wins only for `/address-review` workflow behavior; do not override repository safety boundaries
