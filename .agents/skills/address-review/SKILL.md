@@ -22,9 +22,10 @@ code-changing actions. Skill-specific routing:
   handling; it does not create additional autonomous optional scope.
 - Explicit `o <nums>` and `all optional` selections are scoped to selected
   optional items only. Bare `o` is inspect/select-only.
-- No-file-edit actions have GitHub side effects only: `m` may prepare/post a
-  deferred-work bundle and create approved issues, `r` posts rationale replies,
-  and rationale-only selections must not edit local files.
+- No-repo-edit actions do not change tracked files: `m` may prepare a local
+  body-file artifact before posting a deferred-work bundle or creating approved
+  issues, `r` posts rationale replies, and rationale-only selections must not
+  edit repo files.
 
 ## Step 1: Parse User Input
 
@@ -186,14 +187,17 @@ Use `-F pr=...` intentionally here: `gh api graphql` needs a JSON integer for `$
 
 **Filtering comments:**
 
-- Never triage a prior summary checkpoint comment. Skip any issue comment whose body starts with `<!-- address-review-summary -->`.
+- Never triage prior workflow summary/status comments. Skip any issue comment
+  whose body starts with `<!-- address-review-summary -->` or
+  `<!-- address-review-status -->`; only the summary marker is a cutoff
+  checkpoint.
 - Skip comments belonging to already-resolved threads (match via `thread_id` and `is_resolved` from the GraphQL response)
 - Do not create standalone triage items from comments where `in_reply_to_id` is set, but use reply text as the latest thread context when it updates or narrows the unresolved concern
 - When `REVIEW_CUTOFF_AT` is set, evaluate unresolved review threads by their latest activity timestamp, not only by the top-level comment timestamp
 - Do not skip bot-generated comments by default. Many actionable review comments in this repository come from bots.
 - Deduplicate repeated bot comments and skip bot status posts, summaries, and acknowledgments that do not require a code or documentation change
 - Reserve default `MUST-FIX` classification for correctness bugs, regressions, security issues, missing tests, and clear inconsistencies with adjacent code
-- Classify as `OPTIONAL` by default: style nits, speculative suggestions, changelog wording, comment requests, test-shape preferences, and "could consider" feedback. Low-risk behavior-preserving optional nits may be handled or logged after an action is selected; broader optional work becomes active when the user explicitly asks for polish work, chooses `a`, `f+o`, or `o` after triage, or initiates with `autopilot`
+- Classify as `OPTIONAL` by default: style nits, speculative suggestions, changelog wording, comment requests, test-shape preferences, and "could consider" feedback. Low-risk behavior-preserving optional nits may be handled or logged after an action is selected; broader optional work becomes active when the user explicitly asks for polish work, chooses `a`, `f+o`, or specific optional selections via `o` after triage, or initiates with `autopilot`
 - Focus on actionable feedback, not acknowledgments or thank-you messages
 
 **Error handling:**
@@ -283,7 +287,13 @@ Do not post the PR summary checkpoint during this triage-only phase. Post it onl
 
 Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or automatically when `autopilot` was requested at initiation. Run relevant checks and the self-review gate. Stage only the intended changed files with explicit `git add` paths instead of committing them. Do **not** commit, push, post GitHub replies, resolve review threads, create follow-up issues, or post the PR summary checkpoint. Return a local summary with: fixed `MUST-FIX` items, fixed `OPTIONAL` items, staged files, validation commands/results, unresolved/skipped items, and detailed `DISCUSS` recommendations. Each `DISCUSS` recommendation must include the reviewer/comment link, recommended decision (`fix now`, `defer`, `decline`, or `ask user`), rationale/evidence, risk/tradeoff, and concrete next step. If validation fails after reasonable local repair, still report the staged-file state clearly and mark the PR as not ready for commit/push.
 
+<!-- Keep this action-routing section in sync with .agents/workflows/address-review.md Step 8. -->
+
 ### Action `f` — Fix and merge-ready
+
+The first items below are the **pre-reply subflow**, ending at the
+commit/push-before-reply gate. The later items are the post-push
+reply/resolve steps.
 
 1. Address all `MUST-FIX` items (make code changes, run checks). If there are no `MUST-FIX` items, continue to autonomous optional handling.
 2. Autonomously handle `OPTIONAL` nits that are behavior-preserving, low-risk,
@@ -309,7 +319,7 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
    failure rationale before proceeding to commit. Promote the underlying concern
    to `DISCUSS` only when it is a correctness issue, regression risk, or
    explicit reviewer request.
-5. Commit/push-before-reply gate: if local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
+5. **Commit/push-before-reply gate**: if local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
 6. Reply to each addressed `MUST-FIX` or `OPTIONAL` comment explaining the fix or
    recorded outcome. For autonomously deferred/declined optional nits, include
    `[auto-deferred]` on its own line plus a one-line rationale; see the
@@ -322,9 +332,9 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 
 ### Action `f+i` — Fix, deferred-work bundle, and merge-ready
 
-1. Apply only the `f` pre-reply subflow through the
-   commit/push-before-reply gate (inclusive) for `MUST-FIX`, autonomous optional
-   handling, and optional promotion/failure handling. Do not inherit later `f`
+1. Apply only `f`'s pre-reply subflow, through the named
+   commit/push-before-reply gate, for `MUST-FIX`, autonomous optional handling,
+   and optional promotion/failure handling. Do not inherit later `f`
    reply/resolve, skipped, or discuss prompts; `f+i` restates those below. If
    there are no
    `MUST-FIX` items, still handle low-risk behavior-preserving optional nits
@@ -372,7 +382,7 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 ### Action `f+o` — Fix must-fix and optional items inline
 
 Use only `f`'s `MUST-FIX` subflow and commit/push-before-reply ordering; do not
-enter `f` step 2 or any autonomous optional defer/decline filtering. Before the
+apply `f`'s autonomous optional defer/decline sweep. Before the
 commit/push-before-reply gate, handle every current `OPTIONAL` item inline in
 the same local change phase as the must-fix work: fix it in the same PR, or stop
 and promote it to `DISCUSS` if it turns out to need judgment, change behavior,
@@ -478,7 +488,8 @@ After posting the reply, resolve the review thread when all of the following are
   declined with a clear explanation approved by the user; or autonomously
   deferred/declined as a low-risk behavior-preserving `OPTIONAL` item under the
   Maintainer Attention Contract with the rationale recorded in the reply or
-  summary. Autonomous deferred/declined optional replies must include the tag
+  summary. Autonomous deferred/declined optional replies must use the
+  `AGENTS.md` tag format: include
   `[auto-deferred]` on its own line plus a one-line rationale before the thread
   is resolved. An auto-resolved optional thread that lacks that tag is a spec
   violation; do not resolve the thread if you cannot post the tag and rationale
@@ -650,7 +661,7 @@ Rules for follow-up issues:
 After any chosen action or completed action chain except `a` and inspect-only
 bare `o` (`f`, `f+i`, `f+o`, `d`, selected `o`, `r`, `m`, or direct item
 selection), post either a marked cutoff-safe summary comment or, when the
-cutoff guard below is not satisfied, an unmarked status comment.
+cutoff guard below is not satisfied, a non-cutoff status comment.
 
 For `a`, do not post a GitHub PR summary comment automatically; return the local summary to the user with the staged-file list and detailed `DISCUSS` recommendations.
 
@@ -659,7 +670,7 @@ review item before that checkpoint is safe for future default scans to skip:
 addressed, resolved, deferred/tracked, declined with rationale, or explicitly
 left pending by user choice in a way recorded on the original thread. If
 selected optional handling leaves older optional threads pending/unselected
-without that thread-level outcome, post an unmarked status comment instead and
+without that thread-level outcome, post a non-cutoff status comment instead and
 tell the next run to use `check all reviews`; do not advance the cutoff.
 
 Rules for the summary comment:
@@ -667,9 +678,9 @@ Rules for the summary comment:
 - Always post it as a general PR issue comment, never as a review-thread reply.
 - Include the exact marker `<!-- address-review-summary -->` as the first line
   only for cutoff-safe summaries. If older optional items remain
-  pending/unselected without a thread-level outcome, omit the marker, call the
-  comment an unmarked status, and tell the next run to use
-  `check all reviews`.
+  pending/unselected without a thread-level outcome, use
+  `<!-- address-review-status -->` as the first line, call the comment a
+  non-cutoff status, and tell the next run to use `check all reviews`.
 - Summarize `MUST-FIX` and `DISCUSS` items under a `Mattered` section, including whether each item was addressed, deferred, or left pending by user choice.
 - Summarize `OPTIONAL` items under an `Optional` section when any optional item
   has a recorded outcome or is intentionally left pending/unselected by the
@@ -678,7 +689,7 @@ Rules for the summary comment:
   still pending after a selected optional action. For all-pending/no-action
   optional items, use a count-only line such as
   `- N optional items remain pending/unselected from triage; no action taken this run.`
-  only in an unmarked status comment, or after each pending/unselected optional
+  only in a non-cutoff status comment, or after each pending/unselected optional
   thread has an explicit reply/resolve/defer/decline outcome that makes it safe
   to skip on later default scans. Do not apply this rule to inspect-only bare
   `o`, which posts no checkpoint.
@@ -690,7 +701,7 @@ Rules for the summary comment:
   status comments, end with a note that the next run must use
   `check all reviews`.
 
-Suggested marked-summary structure for the cutoff-safe path. As called out in Step 9, run Steps 9 and 10 in the same shell call so `${TRACKING_OUTCOME}`, `${FOLLOW_UP_URL}`, and the EXIT trap persist; otherwise capture the tracking values from Step 9's stdout and pass them in explicitly. `_cleanup_addr_review` is redefined here to cover the standalone-Step-10 path (when Step 9 was skipped and `issue_body_file` is unset). Redefining the same function is harmless if Step 9 already defined it; the `[ -n ... ]` guards keep `rm -f ""` out of the picture on shells that reject empty path arguments. If the cutoff guard is not satisfied, use the same structure without the marker line and end with a `check all reviews` note instead of posting a checkpoint.
+Suggested marked-summary structure for the cutoff-safe path. As called out in Step 9, run Steps 9 and 10 in the same shell call so `${TRACKING_OUTCOME}`, `${FOLLOW_UP_URL}`, and the EXIT trap persist; otherwise capture the tracking values from Step 9's stdout and pass them in explicitly. `_cleanup_addr_review` is redefined here to cover the standalone-Step-10 path (when Step 9 was skipped and `issue_body_file` is unset). Redefining the same function is harmless if Step 9 already defined it; the `[ -n ... ]` guards keep `rm -f ""` out of the picture on shells that reject empty path arguments. If the cutoff guard is not satisfied, use the status marker instead of the cutoff marker and end with a `check all reviews` note instead of posting a checkpoint.
 
 ```bash
 summary_body_file="$(mktemp)"
@@ -703,6 +714,7 @@ trap _cleanup_addr_review EXIT
 # Set SCAN_SCOPE before this block, e.g.:
 #   SCAN_SCOPE="since previous summary at ${REVIEW_CUTOFF_AT}"  # cutoff active
 #   SCAN_SCOPE="full history via check all reviews"              # CHECK_ALL_REVIEWS set
+# Set CUTOFF_SAFE=1 for a marked checkpoint, or 0 for a non-cutoff status.
 # Set OPTIONAL_OUTCOMES to bullets for optional items with recorded outcomes or
 # intentionally pending/unselected by the chosen action: fixed, explicitly
 # handled, autonomously deferred/declined, declined, deferred to tracking, or
@@ -712,7 +724,11 @@ trap _cleanup_addr_review EXIT
 # "- N optional items remain pending/unselected from triage; no action taken this run."
 # Leave empty only when there were no optional items in scope.
 {
-  printf '<!-- address-review-summary -->\n'
+  if [ "${CUTOFF_SAFE:-0}" = "1" ]; then
+    printf '<!-- address-review-summary -->\n'
+  else
+    printf '<!-- address-review-status -->\n'
+  fi
   printf '## Address-review summary\n\n'
   printf 'Scan scope: %s\n\n' "${SCAN_SCOPE}"
   printf '### Mattered\n'
@@ -726,7 +742,11 @@ trap _cleanup_addr_review EXIT
   if [ -n "${TRACKING_OUTCOME:-}" ]; then
     printf 'Deferred-work tracking: %s\n\n' "${TRACKING_OUTCOME}"
   fi
-  printf 'Next default scan starts after this comment. Say `check all reviews` to rescan the full PR.\n'
+  if [ "${CUTOFF_SAFE:-0}" = "1" ]; then
+    printf 'Next default scan starts after this comment. Say `check all reviews` to rescan the full PR.\n'
+  else
+    printf 'Non-cutoff status only. The next review pass must use `check all reviews`.\n'
+  fi
 } > "${summary_body_file}"
 
 gh api repos/${REPO}/issues/${PR_NUMBER}/comments -X POST -F body=@"${summary_body_file}"
@@ -822,7 +842,7 @@ Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
 - Except when `AUTOPILOT` is set or the user selects action `a`, never automatically address all review comments; wait for user direction after triage
 - When given a specific review URL, no need to ask for more information
 - For actions other than `a`, always reply to comments after addressing them to close the feedback loop
-- For actions other than `a` and inspect-only bare `o`, post a new marked PR summary comment after completing an action only when Step 10's cutoff guard is satisfied; otherwise post an unmarked status comment and require `check all reviews` on the next run
+- For actions other than `a` and inspect-only bare `o`, post a new marked PR summary comment after completing an action only when Step 10's cutoff guard is satisfied; otherwise post a non-cutoff status comment and require `check all reviews` on the next run
 - After triage, always offer rationale replies for selected `SKIPPED`/declined items; `f` requires explicit confirmation before skipped-item replies/resolution, while `f+i` and `m` include skipped-item handling in the chosen action flow
 - Always request push confirmation from the user before running `git push`
 - If this skill conflicts with broader agent defaults, this file wins only for `/address-review` workflow behavior; do not override repository safety boundaries

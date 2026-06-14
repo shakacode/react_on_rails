@@ -210,34 +210,42 @@ contract unless a maintainer explicitly narrows the run.
   before the final-candidate debounce point: once a merge-readiness review cycle
   has started, do not introduce new nit commits that would restart it.
   Inside the PR scope means the file, section, or workflow copy is already part
-  of the PR diff, directly cited by current review feedback, or required to keep
-  a parallel section already modified by this PR consistent with the change being
-  made; it excludes unrelated cleanup, other machine lanes, reserved files, and
-  generated output not already in scope.
-  The final-candidate debounce point begins once the agent records the current
-  head as the merge-readiness candidate in the PR body, a PR comment, or the
-  handoff after starting the final local validation/review gate for that head,
-  or once current-head CI/review checks have been explicitly triggered or queued
-  as the declared final readiness gate. Automatically queued checks from
-  ordinary PR pushes do not count unless they are part of that recorded
-  final-candidate gate. Earlier incremental per-file checks during the fix phase
-  do not count unless they are part of that recorded final-candidate gate.
+  of the PR diff or directly cited by current review feedback. Cross-copy
+  consistency edits are in scope only when the paired section is already in the
+  PR diff or directly cited by current review feedback; this excludes unrelated
+  cleanup, other machine lanes, reserved files, generated output not already in
+  scope, and separate workflow files that merely discuss the same concept.
+  The final-candidate debounce point begins when the agent writes a PR body,
+  PR comment, or handoff that names the current head as the merge-readiness or
+  final candidate, or when the agent pushes after completing the final local
+  validation/review gate and records that push as the candidate. Automatically
+  queued checks from ordinary fix-phase pushes do not count unless that push or
+  check set has been declared as the final readiness gate. Earlier incremental
+  per-file checks during the fix phase do not count.
   Behavior-preserving means wording, formatting, or mechanical
   whitespace/punctuation cleanup that does not alter public APIs, generated
   output, runtime behavior, validation scope, or the semantic meaning of any
   document section under active review. Low-risk means local and mechanically
   checkable, such as a formatter-confirmed cleanup; a rename that requires
-  searching all callers is not low-risk.
+  searching all callers is not low-risk. Mechanical means deterministic and
+  local, such as rerunning a formatter or fixing whitespace introduced by the
+  nit, without reasoning about runtime behavior, callers, or policy.
   Qualifying examples: typo/comment punctuation, whitespace or trailing comma
-  cleanup, type-only or linter-confirmed unused import removal after verifying
-  the imported module has no side effects, or unambiguous documentation wording.
+  cleanup, or unambiguous documentation wording.
   Disqualifying examples: renaming a public method or constant, changing
   generated content, altering CI or release policy, adding/removing validation,
-  or touching another lane's files. If the nit is not worth fixing, record it as
-  deferred or declined with rationale instead of asking "OK to fix this nit?".
+  removing an import or `require` whose module side effects are not proven by a
+  dedicated tool or code inspection, or touching another lane's files. If the nit
+  is not worth fixing, record it as deferred or declined with rationale instead
+  of asking "OK to fix this nit?".
   Autonomous deferred/declined nit replies must include `[auto-deferred]` on its
-  own line plus a one-line rationale; see `.agents/skills/address-review/SKILL.md`
-  for the full resolve-thread protocol.
+  own line plus a one-line rationale, for example:
+  ```text
+  [auto-deferred]
+  Whitespace cleanup deferred to avoid restarting the final-candidate gate.
+  ```
+  Post the tag and rationale before resolving the review thread; do not resolve
+  an auto-deferred thread without that reply.
   If an autonomous nit fix fails local validation or self-review, repair it in
   the same batch only when the repair is still mechanical and in scope;
   otherwise drop or revert that nit, record the failed validation and rationale,
@@ -251,7 +259,9 @@ contract unless a maintainer explicitly narrows the run.
   that does not require pushing the active PR head, or another independent lane.
   Do not introduce optional cleanup commits that restart current-head gates after
   the final-candidate debounce point. Do not interrupt the maintainer for routine
-  "CI is still running", "CI is green", or "review arrived" updates.
+  "CI is still running", "CI is green", or "review arrived" updates. CI failures
+  and new `MUST-FIX`-tier review findings are not routine; surface them
+  immediately.
 - **One decision point per lane**: batch genuine judgment calls into one decision
   block at lane completion or hard block. The block must include the question,
   options, recommendation, evidence links or command output, and the next action
@@ -261,20 +271,31 @@ contract unless a maintainer explicitly narrows the run.
   screenshots, repro scripts, `gh` state, or code inspection must arrive with
   that evidence attached. Use `UNKNOWN` for facts that could not be verified.
 - **Attention metric**: batch closeouts count human decision points per PR, with
-  a target of at most one for low-risk lanes. Higher counts are reported as FYI
-  process churn, not hidden in narrative handoffs. Counts above target invite a
-  later check on whether smaller lanes, sharper scope, or better batching would
-  reduce future churn; they are not a hard failure by themselves. A human
-  decision point is any question, option selection, or confirmation directed at a
-  maintainer that required direct input, excluding automated push confirmations
-  inside an already-approved action flow. Report it as `Decision points: N` in
-  the FYI section of the batch handoff.
+  a target of at most one for low-risk lanes: lanes with no `MUST-FIX` items,
+  no blocking questions, and only documentation, process, or mechanical changes.
+  Higher counts are reported as FYI process churn, not hidden in narrative
+  handoffs. Counts above target invite a later check on whether smaller lanes,
+  sharper scope, or better batching would reduce future churn; they are not a
+  hard failure by themselves. A human decision point is any question, option
+  selection, or confirmation directed at a maintainer that required direct input,
+  excluding push confirmations that are mandatory sub-steps of an action the
+  maintainer already selected, such as the required push confirmation after
+  committing action `f`. A standalone "should I push this nit fix?" question
+  counts. Report it as `Decision points: N` in the FYI section of the batch
+  handoff.
 - **Confidence notes**: delegated merge authority exists only when the current
   user or batch goal grants it and the release-mode rules permit it. Before a
   delegated merge, the worker or coordinator writes a confidence note in the
   issue, PR body, or batch handoff covering validated commands, evidence links,
   remaining `UNKNOWN` facts, and residual risk. When merge authority is not
-  delegated, use the same format for merge-readiness evidence without merging.
+  delegated, use the same format for merge-readiness evidence without merging:
+  ```text
+  Confidence note:
+  - Validated: <commands or checks run and outcomes>
+  - Evidence: <links to CI, screenshots, logs, or inline output>
+  - UNKNOWN: <facts that could not be verified, or "none">
+  - Residual risk: <one-line risk summary, or "none">
+  ```
 
 ## Release Mode And Auto-Merge Coordination
 
