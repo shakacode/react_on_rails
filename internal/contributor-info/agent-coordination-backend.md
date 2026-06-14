@@ -133,12 +133,12 @@ if (
       return 1
     fi
 
-    if ! untracked_files="$(git -C "$AGENT_COORD_REPO" ls-files --others --exclude-standard)"; then
-      echo "agent-coordination checkout untracked-file scan failed" >&2
+    untracked_files="$(git -C "$AGENT_COORD_REPO" ls-files --others --exclude-standard)" || {
+      echo "git ls-files failed in '$AGENT_COORD_REPO'" >&2
       return 1
-    fi
+    }
 
-    if test -n "$untracked_files"; then
+    if [ -n "$untracked_files" ]; then
       echo "agent-coordination checkout has untracked files; commit, clean, or record dirty evidence" >&2
       return 1
     fi
@@ -224,7 +224,11 @@ the default state root documented in the private repo README.
 ```bash
 : "${AGENT_COORD_BIN:?set AGENT_COORD_BIN to the validated agent-coord binary}"
 (
-  STATE_ROOT=$(mktemp -d)
+  set -eu
+  STATE_ROOT=$(mktemp -d) || {
+    echo "mktemp failed" >&2
+    exit 1
+  }
   trap 'rm -rf "$STATE_ROOT"' EXIT INT TERM
   AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" heartbeat \
     --agent-id smoke-test-0 \
