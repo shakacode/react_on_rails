@@ -58,15 +58,25 @@ const isAtLeast = (actual: VersionTuple, floor: VersionTuple): boolean => {
 const sameTuple = (left: VersionTuple, right: VersionTuple): boolean =>
   left.every((value, index) => value === right[index]);
 
+const supportedRscRange = (
+  { supportedMajor }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
+  { supportedRanges }: typeof RSC_PEER_SUPPORT.react,
+): string => {
+  const supportedMinors = [...new Set(supportedRanges.map((range) => range.rscMinor))].sort(
+    (left, right) => left - right,
+  );
+
+  return supportedMinors.map((minor) => `${supportedMajor}.${minor}.x`).join(' or ');
+};
+
 const supportedReactRange = (
   rscTuple: VersionTuple,
   { supportedMajor, supportedRanges }: typeof RSC_PEER_SUPPORT.react,
 ): string => {
   const rscMinor = rscTuple[1];
   const matchingRanges = supportedRanges.filter((range) => range.rscMinor === rscMinor);
-  const ranges = matchingRanges.length > 0 ? matchingRanges : supportedRanges;
 
-  return ranges
+  return matchingRanges
     .map(
       ({ minor, minPatch }) =>
         `${supportedMajor}.${minor}.x with patch >= ${supportedMajor}.${minor}.${minPatch}`,
@@ -83,6 +93,11 @@ const isSupportedReactTuple = (
   supportedRanges.some(
     (range) => rscTuple[1] === range.rscMinor && minor === range.minor && patch >= range.minPatch,
   );
+
+const isSupportedRscMinor = (
+  rscTuple: VersionTuple,
+  { supportedRanges }: typeof RSC_PEER_SUPPORT.react,
+): boolean => supportedRanges.some((range) => rscTuple[1] === range.rscMinor);
 
 const proLabel = (proVersion?: string) =>
   proVersion ? `React on Rails Pro (${proVersion})` : 'React on Rails Pro';
@@ -120,6 +135,18 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
         'react-on-rails-rsc',
         rscVersion,
         `${reactOnRailsRsc.supportedMajor}.x`,
+        proVersion,
+      ),
+    };
+  }
+
+  if (!isSupportedRscMinor(rscTuple, react)) {
+    return {
+      level: 'error',
+      message: errorMessage(
+        'react-on-rails-rsc',
+        rscVersion,
+        supportedRscRange(reactOnRailsRsc, react),
         proVersion,
       ),
     };

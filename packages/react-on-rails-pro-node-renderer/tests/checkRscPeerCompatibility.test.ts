@@ -59,6 +59,23 @@ describe('checkRscPeerCompatibility', () => {
     expect(checkRscPeerCompatibility({ rscVersion: '18.3.1', reactVersion: '19.0.4' }).level).toBe('error');
   });
 
+  it('errors on unsupported rsc minors before suggesting React changes', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: '19.1.0', reactVersion: '19.0.4' });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('react-on-rails-rsc');
+    expect(r.message).toContain('19.1.0');
+    expect(r.message).toContain('19.0.x or 19.2.x');
+    expect(r.message).not.toContain('Incompatible react version');
+  });
+
+  it('errors on future unlisted rsc minors before suggesting React changes', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: '19.3.0-rc.1', reactVersion: '19.2.7' });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('react-on-rails-rsc');
+    expect(r.message).toContain('19.3.0-rc.1');
+    expect(r.message).toContain('19.0.x or 19.2.x');
+  });
+
   it('errors when React major is below the RSC minimum', () => {
     const r = checkRscPeerCompatibility({ rscVersion: '19.0.4', reactVersion: '18.3.1' });
     expect(r.level).toBe('error');

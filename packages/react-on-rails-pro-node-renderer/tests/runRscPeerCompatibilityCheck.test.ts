@@ -99,6 +99,15 @@ describe('runRscPeerCompatibilityCheck', () => {
     ).toThrow(/Incompatible react-on-rails-rsc/);
   });
 
+  it('throws on an unsupported rsc minor', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.1.0', '19.0.4'),
+      }),
+    ).toThrow(/Incompatible react-on-rails-rsc/);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it('warns (does not throw) when below recommendedMin', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
