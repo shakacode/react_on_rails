@@ -64,16 +64,18 @@ Plan a PR batch
      Delete the temporary ref after recording paths:
      `git update-ref -d refs/tmp/pr-N-head`. A rename row (`R100  old  new`)
      owns **both** the old and new path. If a ref cannot be fetched or the diff
-     cannot run, record the PR paths as `UNKNOWN` and treat the item as serial.
+     cannot run, try the PR Files API fallback before marking the paths
+     `UNKNOWN`.
    - File-touch map, PR Files API fallback: prefer the local `git diff` above
      as the authoritative source; treat the API as a best-effort cross-check.
      When the local diff succeeds, keep those paths authoritative even if the
      API response is capped, incomplete, or unavailable. Use the API as the
      scheduling source only when the local diff cannot run. Fetch with
-     `gh api --paginate --method GET repos/{owner}/{repo}/pulls/N/files -f per_page=100`;
+     `gh api --paginate --method GET repos/{owner}/{repo}/pulls/N/files -f per_page=100 | jq -s 'add'`;
      the default page size is 30, so a small unpaginated page can look complete
-     while truncated. `--paginate` follows all pages automatically; no Link
-     header check is needed after the command returns. The response is
+     while truncated. `jq -s 'add'` collects all paginated arrays before
+     counting paths or extracting filenames; no Link header check is needed
+     after the command returns. The response is
      acceptable only when it records both `.filename` and `.previous_filename`
      when present, and its listed-file count matches the PR's `changedFiles`
      value from `gh pr view N --json changedFiles`. GitHub caps the Files API at
@@ -99,8 +101,8 @@ Plan a PR batch
 
 4. Output
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
-   - Keep the fenced goal prompt under ~4000 characters total so bulky audit detail stays in the Batch Plan. Measure it, do not eyeball it: `wc -c` gives a locale-independent byte ceiling (`wc -m` counts characters only in a UTF-8 locale and bytes otherwise). Treat 4000 as an approximate budget.
-   - Budget for template overhead: the fixed template plus execution rules already consume roughly 3000 characters before any items are filled in, leaving little room for the File-touch map and per-item content. Prefer splitting into multiple goals over trimming the safety, ownership, or review content.
+   - Keep the fenced goal prompt under ~4000 bytes total so bulky audit detail stays in the Batch Plan. Measure it, do not eyeball it: `wc -c` gives a locale-independent byte count (`wc -m` counts Unicode code points in a UTF-8 locale and bytes otherwise). Treat 4000 as an approximate budget.
+   - Budget for template overhead: the fixed template plus execution rules already consume roughly 3000 bytes before any items are filled in, leaving little room for the File-touch map and per-item content. Prefer splitting into multiple goals over trimming the safety, ownership, or review content.
    - Keep full path evidence in the Batch Plan when it would bloat the prompt.
      In the goal prompt, use the narrowest unambiguous directory/pattern summary
      that still proves ownership. If compression would hide a collision or make
