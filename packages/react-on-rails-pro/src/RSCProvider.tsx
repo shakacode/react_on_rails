@@ -128,9 +128,10 @@ export const createRSCProvider = ({
           // already-rejected promise and see the same failure; the next macrotask
           // starts the retry.
           //
-          // Safe on unmount: this closure captures the current
-          // fetchRSCPromisesRef instance. After unmount the identity guard below
-          // will simply not match and no eviction happens.
+          // Safe on unmount: this closure captures the unmounted provider
+          // instance's ref and may evict from that old ref, but a remounted
+          // provider gets a fresh ref. The old timeout cannot delete the new
+          // instance's in-flight promise.
           setTimeout(() => {
             if (fetchRSCPromisesRef.current[key] === promise) {
               // eslint-disable-next-line @typescript-eslint/no-dynamic-delete

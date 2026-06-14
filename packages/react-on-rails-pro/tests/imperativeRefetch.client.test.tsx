@@ -163,15 +163,26 @@ class CapturingErrorBoundary extends React.Component<
     return pending;
   };
 
+  const usingJestFakeTimers = () => {
+    const timerApi = setTimeout as unknown as { clock?: unknown };
+    return jest.isMockFunction(setTimeout) || Boolean(timerApi.clock);
+  };
+
   // Waits for the deferred eviction scheduled by evictPromiseIfRejected to
   // complete. The eviction uses setTimeout(0), so scheduling a second
   // setTimeout(0) here guarantees via FIFO macrotask ordering that the eviction
-  // fires before this promise resolves. Keep this helper in real-timer test
-  // scopes, or explicitly advance fake timers if a future test enables them.
-  const waitForRejectedGetComponentEviction = () =>
-    new Promise<void>((resolve) => {
+  // fires before this promise resolves.
+  const waitForRejectedGetComponentEviction = () => {
+    if (usingJestFakeTimers()) {
+      throw new Error(
+        'waitForRejectedGetComponentEviction requires real timers; advance fake timers explicitly',
+      );
+    }
+
+    return new Promise<void>((resolve) => {
       setTimeout(resolve, 0);
     });
+  };
 
   /**
    * Wrap the initial render in an act() so React drains microtasks queued by
