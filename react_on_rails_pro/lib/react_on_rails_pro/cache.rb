@@ -84,14 +84,12 @@ module ReactOnRailsPro
         expires_at = cache_options[:expires_at]
         return cache_options unless expires_at
 
+        return cache_options.except(:expires_at) if unsupported_expires_at_with_explicit_expires_in?(cache_options)
+
         expires_in = expires_at.to_time.to_f - Time.now.to_f
         return cache_options.merge(expires_in: EXPIRED_CACHE_WRITE_TTL).except(:expires_at) if expires_in <= 0
 
-        if cache_supports_expires_at?
-          return cache_options.except(:expires_in) if cache_options.key?(:expires_in)
-
-          return cache_options
-        end
+        return supported_expires_at_write_options(cache_options) if cache_supports_expires_at?
 
         return cache_options.except(:expires_at) unless cache_options[:expires_in].nil?
 
@@ -102,11 +100,23 @@ module ReactOnRailsPro
         return false unless cache_options&.key?(:expires_at)
 
         expires_at = cache_options[:expires_at]
+        return false if expires_at && unsupported_expires_at_with_explicit_expires_in?(cache_options)
+
         expires_at && expires_at.to_time.to_f <= Time.now.to_f
       end
 
       def cache_supports_expires_at?
         ActiveSupport.gem_version >= ACTIVE_SUPPORT_EXPIRES_AT_VERSION
+      end
+
+      def supported_expires_at_write_options(cache_options)
+        return cache_options.except(:expires_in) if cache_options.key?(:expires_in)
+
+        cache_options
+      end
+
+      def unsupported_expires_at_with_explicit_expires_in?(cache_options)
+        !cache_supports_expires_at? && cache_options.key?(:expires_in) && !cache_options[:expires_in].nil?
       end
 
       # Deletes every cached component entry registered under the given tags

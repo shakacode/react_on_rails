@@ -321,7 +321,9 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(cache_options[:namespace]).to eq("components")
     end
 
-    it "detects when expires_at has already passed" do
+    it "detects when a supported expires_at has already passed" do
+      allow(described_class).to receive(:cache_supports_expires_at?).and_return(true)
+
       expect(described_class.cache_write_expired?(expires_at: Time.now - 60)).to be(true)
       expect(described_class.cache_write_expired?(expires_at: Time.now + 60)).to be(false)
       expect(described_class.cache_write_expired?(expires_in: 60)).to be(false)
@@ -333,6 +335,14 @@ describe ReactOnRailsPro::Cache, :caching do
       cache_options = { expires_at: Time.now + 60, expires_in: 10 }
 
       expect(described_class.cache_write_options(cache_options)).to eq(expires_in: 10)
+    end
+
+    it "preserves explicit expires_in when unsupported expires_at has already passed" do
+      allow(described_class).to receive(:cache_supports_expires_at?).and_return(false)
+      cache_options = { expires_at: Time.now - 60, expires_in: 10, namespace: "components" }
+
+      expect(described_class.cache_write_options(cache_options)).to eq(expires_in: 10, namespace: "components")
+      expect(described_class.cache_write_expired?(cache_options)).to be(false)
     end
 
     it "treats nil expires_in as absent when ActiveSupport does not support expires_at" do
