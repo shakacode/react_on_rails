@@ -130,10 +130,8 @@ const isSupportedReactTuple = (
     (range) => rscTuple[1] === range.rscMinor && minor === range.minor && patch >= range.minPatch,
   );
 
-const isSupportedRscMinor = (
-  rscTuple: VersionTuple,
-  { supportedRanges }: RscPeerSupport['react'],
-): boolean => supportedRanges.some((range) => rscTuple[1] === range.rscMinor);
+const isSupportedRscMinor = (rscTuple: VersionTuple, { supportedRanges }: RscPeerSupport['react']): boolean =>
+  supportedRanges.some((range) => rscTuple[1] === range.rscMinor);
 
 const isAllowedRscPrerelease = (
   rscVersion: string,
@@ -259,7 +257,8 @@ export function checkRscPeerCompatibility(
   }
 
   const recommendedMinTuple = parseTuple(reactOnRailsRsc.recommendedMin);
-  const isPrereleaseAtRecommendedMin = sameTuple(rscTuple, recommendedMinTuple) && isPrereleaseVersion(rscVersion);
+  const isPrereleaseAtRecommendedMin =
+    sameTuple(rscTuple, recommendedMinTuple) && isPrereleaseVersion(rscVersion);
   if (!isAtLeast(rscTuple, recommendedMinTuple) || isPrereleaseAtRecommendedMin) {
     const message = isPrereleaseAtRecommendedMin
       ? prereleaseWarnMessage(rscVersion, reactOnRailsRsc.recommendedMin, proVersion)
