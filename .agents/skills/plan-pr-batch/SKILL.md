@@ -50,27 +50,43 @@ Plan a PR batch
      Coordinators must create or update the private backend
      `batches/<batch-id>.json` with those lane refs before dependent workers
      start; otherwise `agent-coord status` cannot report `blocked_on` lanes.
-   - Build a file-touch map for the batch: list the paths each item changes or
-     intends to affect, including creates, deletes, and renames. For PR
-     targets, fetch the PR's base/head refs and run
-     `git diff --name-status --find-renames <base>...<head>` for the
-     rename-aware changed-file list. If the base or head ref is not present
-     locally, fetch the PR head and base branch first; if the fetch or diff
-     still cannot run, record the PR paths as `UNKNOWN` and treat the item as
-     serial. A paginated PR Files API response is acceptable only when it
-     records both `.filename` and `.previous_filename` when present, has no
-     `Link: ...; rel="next"` response header, and its listed-file count matches
-     the PR's `changedFiles` value from `gh pr view N --json changedFiles`.
-     If the API result may have hit GitHub's
-     file-list cap, cannot prove there are no more pages, or only reports new
-     paths, record the PR paths as `UNKNOWN` and treat the item as serial rather
-     than parallel. For issue targets, read the issue body, record proposed new
-     paths from issue/design notes, and grep the repo to confirm existing paths.
-     If paths cannot be determined from the issue body or design notes, record
-     them as `UNKNOWN` and treat the item as serial rather than parallel.
-     Never guess paths. Items that affect the same path cannot run as parallel
-     worktrees; keep only file-disjoint items in the parallel first batch and
-     sequence or defer collisions. Do not dispatch `UNKNOWN` discovery lanes
+   - Build a File-touch map for the batch: list the paths each item changes or
+     intends to affect, including creates, deletes, and renames. Never guess
+     paths.
+   - File-touch map, PR path discovery: get refs with
+     `gh pr view N --json headRefName,baseRefName`, then fetch the current base
+     branch and PR head into refs without checking out untrusted PR code:
+     `git fetch --prune origin <baseRefName>` and
+     `git fetch origin pull/N/head:refs/tmp/pr-N-head`. A plain
+     `git fetch origin` does not fetch cross-fork heads. Run
+     `git diff --name-status --find-renames origin/<baseRefName>...refs/tmp/pr-N-head`;
+     three-dot diffs from the merge-base, which matches GitHub's PR file list.
+     Delete the temporary ref after recording paths:
+     `git update-ref -d refs/tmp/pr-N-head`. A rename row (`R100  old  new`)
+     owns **both** the old and new path. If a ref cannot be fetched or the diff
+     cannot run, record the PR paths as `UNKNOWN` and treat the item as serial.
+   - File-touch map, PR Files API fallback: prefer the local `git diff` above
+     as the authoritative source; treat the API as a best-effort cross-check.
+     Fetch with
+     `gh api --paginate --method GET repos/{owner}/{repo}/pulls/N/files -f per_page=100`;
+     the default page size is 30, so a small unpaginated page can look complete
+     while truncated. The response is acceptable only when it records both
+     `.filename` and
+     `.previous_filename` when present, has no `Link: ...; rel="next"` response
+     header, and its listed-file count matches the PR's `changedFiles` value
+     from `gh pr view N --json changedFiles`. GitHub caps the Files API at
+     ~3000 files; if `changedFiles` is at or near that cap, the response cannot
+     prove there are no more pages, or it only reports new paths, record the PR
+     paths as `UNKNOWN` and treat the item as serial.
+   - File-touch map, issue path discovery: read the issue body, record proposed
+     new paths from issue/design notes, and grep the repo to confirm existing
+     paths. If paths cannot be determined from the issue body or design notes,
+     record them as `UNKNOWN` and treat the item as serial.
+   - File-touch map, collision and wave scheduling: items that affect the same
+     path cannot run as parallel worktrees; keep only file-disjoint items in the
+     parallel first batch and sequence or defer collisions. An `UNKNOWN` item
+     runs as a serial "discovery lane" — a lane that first determines its real
+     paths instead of editing in parallel. Do not dispatch discovery lanes
      alongside active editor lanes; run them before the parallel edit wave or
      after the current wave is idle.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
@@ -79,14 +95,12 @@ Plan a PR batch
 
 4. Output
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
-   - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan. Measure it with `wc -m`; do not eyeball it.
+   - Keep the fenced goal prompt under ~4000 characters total so bulky audit detail stays in the Batch Plan. Measure it, do not eyeball it: `wc -c` gives a locale-independent byte ceiling (`wc -m` counts characters only in a UTF-8 locale and bytes otherwise). Treat 4000 as an approximate budget.
+   - Budget for template overhead: the fixed template plus execution rules already consume roughly 3000 characters before any items are filled in, leaving little room for the File-touch map and per-item content. Prefer splitting into multiple goals over trimming the safety, ownership, or review content.
    - Keep full path evidence in the Batch Plan when it would bloat the prompt.
      In the goal prompt, use the narrowest unambiguous directory/pattern summary
      that still proves ownership. If compression would hide a collision or make
      ownership unclear, mark the item `UNKNOWN` and run it serially.
-   - Record the measured fixed-template section size and the short SHA of the
-     `SKILL.md` commit at measurement time in the Batch Plan so it can be
-     compared after template edits. Remeasure whenever the template changes.
    - Keep each filled entry terse (target ~150 chars for `Worker notes` and `Done when`). The worker reads the issue/PR URL for full detail; push evidence and audit notes to the Batch Plan instead.
    - If the batch will not fit, split it into smaller goals and output only the first ready goal.
    - Do not start `$pr-batch` unless the user asks; then hand them the fenced goal prompt and tell them to run `$pr-batch` with it.
@@ -137,9 +151,11 @@ Execution rules:
 - Follow `.agents/skills/pr-batch/SKILL.md` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
 - Dispatch only the current file-disjoint wave. Hold serial and `UNKNOWN`
   discovery lanes until no active editor lane can collide with them.
-- Workers edit only owned File-touch map paths. If an `UNKNOWN`, unlisted, or
-  other-lane path is needed, stop, report discovered paths, and wait for an
-  updated map or explicit coordinator confirmation before editing.
+- Workers edit only owned File-touch map paths; this map is how the batch makes
+  pr-batch's "disjoint write scopes" concrete, since pr-batch's own template has
+  no File-touch map slot. If an `UNKNOWN`, unlisted, or other-lane path is
+  needed, stop, report discovered paths, and wait for an updated map or explicit
+  coordinator confirmation before editing.
 - Sequenced lanes may share declared files only in the stated order.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
 - For concurrent or dependency-sensitive batches, assign a stable agent id and
@@ -170,5 +186,5 @@ Execution rules:
   item as serial.
 - Do not omit links; use GitHub URLs for every item.
 - Do not put full audit evidence in the goal prompt; put bulky details in the Batch Plan outside the goal.
-- Do not fan out items that change the same file as parallel worktrees; they will conflict — sequence them or split into a later batch.
-- Do not eyeball the goal-prompt length; measure it (e.g. `wc -m`) and split into smaller goals if it exceeds 4000 characters.
+- Do not fan out items that change the same path as parallel worktrees; they will conflict — sequence them or split into a later batch.
+- Do not eyeball the goal-prompt length; apply the Output-section size gate and split into smaller goals if it is over budget.
