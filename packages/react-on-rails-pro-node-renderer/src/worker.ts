@@ -119,6 +119,10 @@ function conflictingHealthEndpointPath(error: unknown): (typeof HEALTH_ENDPOINT_
     return undefined;
   }
 
+  // Format-dependent: Fastify's FST_ERR_DUPLICATED_ROUTE message currently
+  // includes `route '/health'` or `route '/ready'`. If that wording changes,
+  // this safely returns undefined and the caller rethrows the raw Fastify error,
+  // losing only the migration hint; verify this when upgrading Fastify.
   return HEALTH_ENDPOINT_ROUTES.find((routePath) => message.includes(`route '${routePath}'`));
 }
 
