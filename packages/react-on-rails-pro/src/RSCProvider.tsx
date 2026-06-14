@@ -124,6 +124,9 @@ export const createRSCProvider = ({
           // observe the rejection before we clear the cache entry. setTimeout(0)
           // is intentional over queueMicrotask because microtasks could race
           // with React's own queue and evict before Suspense sees the throw.
+          // During that same macrotask, duplicate callers for the key reuse the
+          // already-rejected promise and see the same failure; the next macrotask
+          // starts the retry.
           //
           // Safe on unmount: this closure captures the current
           // fetchRSCPromisesRef instance. After unmount the identity guard below

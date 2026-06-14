@@ -166,7 +166,8 @@ class CapturingErrorBoundary extends React.Component<
   // Waits for the deferred eviction scheduled by evictPromiseIfRejected to
   // complete. The eviction uses setTimeout(0), so scheduling a second
   // setTimeout(0) here guarantees via FIFO macrotask ordering that the eviction
-  // fires before this promise resolves.
+  // fires before this promise resolves. Keep this helper in real-timer test
+  // scopes, or explicitly advance fake timers if a future test enables them.
   const waitForRejectedGetComponentEviction = () =>
     new Promise<void>((resolve) => {
       setTimeout(resolve, 0);
