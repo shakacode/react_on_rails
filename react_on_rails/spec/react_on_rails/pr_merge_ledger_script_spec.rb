@@ -912,6 +912,56 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks slash-combined priority findings from review summaries" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 5,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "slash-combined-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/slash-combined-review",
+          "body" => "P1/P2 findings still need disposition."
+        }
+      ],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-slash-combined-finding", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
+      expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
+        ["P1/P2 findings still need disposition.", "P1/P2 findings still need disposition."]
+      )
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
+    end
+  end
+
   it "keeps same-severity findings from distinct lines in one source" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -1352,6 +1402,7 @@ RSpec.describe "script/pr-merge-ledger" do
           "commit" => { "oid" => "abc123" },
           "url" => "https://example.com/resolved-multi-severity-review",
           "body" => [
+            "P1/P2 findings fixed.",
             "P1 and P2 findings fixed.",
             "P1 issues fixed; P2 findings resolved.",
             "P1 issues fixed and P2 findings were waived."
