@@ -437,6 +437,7 @@ class PrMergeLedger
     review_threads
       .select { |thread| unresolved_current_head_thread?(thread) }
       .flat_map { |thread| thread.fetch("comments") }
+      .reject { |comment| comment.fetch("outdated") }
   end
 
   def reviews_for_findings(reviews)
