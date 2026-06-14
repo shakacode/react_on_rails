@@ -61,12 +61,15 @@ Plan a PR batch
      repo. If no verified remote or URL can be resolved, record paths as
      `UNKNOWN` instead of diffing the current checkout's default remote. Fetch
      the current base branch and PR head into temporary refs without checking
-     out untrusted PR code. Fetch the base into `refs/tmp/pr-N-base` and the
-     head into `refs/tmp/pr-N-head` using the base repo's `pull/N/head` ref;
-     GitHub keeps that pull ref pointing at fork heads too. If the base pull
-     ref is unavailable, fetch from the verified head repository URL derived
-     from `headRepository.nameWithOwner` and `headRefName`, or use the PR Files
-     API fallback. A plain `git fetch origin` does not fetch cross-fork heads.
+     out untrusted PR code:
+     `git fetch <verified-base-repo-url> <baseRefName>:refs/tmp/pr-N-base` and
+     `git fetch <verified-base-repo-url> pull/N/head:refs/tmp/pr-N-head`.
+     GitHub keeps the target repo's pull ref pointing at fork heads too. If the
+     target repo pull ref is unavailable, fetch the head from the verified head
+     repository URL derived from `headRepository.nameWithOwner` and
+     `headRefName`, or use the PR Files API fallback. A plain
+     `git fetch origin` does not fetch cross-fork heads unless `origin` has
+     already been verified as the PR's target repo.
      Run
      `git diff --name-status --find-renames refs/tmp/pr-N-base...refs/tmp/pr-N-head`;
      three-dot diffs from the merge-base, which matches GitHub's PR file list.
@@ -81,7 +84,11 @@ Plan a PR batch
      When the local diff succeeds, keep those paths authoritative even if the
      API response is capped, incomplete, or unavailable. Use the API as the
      scheduling source only when the local diff cannot run. Fetch with
+     `set -o pipefail` enabled, then
      `gh api --paginate --method GET repos/OWNER/REPO/pulls/N/files -f per_page=100 | jq -s 'add // []'`;
+     if either command fails, record the paths as `UNKNOWN` instead of trusting
+     an empty array from a broken pipeline. Do not confuse API/auth/rate-limit
+     failures with a real empty PR file list.
      the default page size is 30, so a small unpaginated page can look complete
      while truncated. `jq -s 'add // []'` collects all paginated arrays before
      counting paths or extracting filenames and returns an empty array for an
@@ -92,8 +99,9 @@ Plan a PR batch
      `gh pr view N --repo OWNER/REPO --json changedFiles`. GitHub caps the
      Files API at ~3000 files; if the API is the only available source and
      `changedFiles` is at or above that cap, the paginated count does not match
-     `changedFiles`, or the response only reports new paths, record the PR paths
-     as `UNKNOWN` and treat the item as serial.
+     `changedFiles`, or a renamed file is expected but the API row is missing
+     its `.previous_filename`, record the PR paths as `UNKNOWN` and treat the
+     item as serial.
    - File-touch map, issue path discovery: read the issue body, record proposed
      new paths from issue/design notes, and grep the repo to confirm existing
      paths. If paths cannot be determined from the issue body or design notes,
@@ -104,7 +112,9 @@ Plan a PR batch
      runs as a serial "discovery lane" — a lane that first determines its real
      paths instead of editing in parallel. Never run discovery lanes
      concurrently with active editor lanes: complete discovery before an editor
-     wave starts, or wait until the active editor wave is finished.
+     wave starts. If new items arrive while an editor wave is already running,
+     wait for that wave to finish before starting discovery for those new
+     items.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
