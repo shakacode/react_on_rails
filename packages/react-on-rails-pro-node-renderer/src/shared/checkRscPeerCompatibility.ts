@@ -86,7 +86,7 @@ const errorMessage = (pkg: string, found: string, want: string, proVersion?: str
 
 const warnMessage = (found: string, recommendedMin: string, proVersion?: string) =>
   [
-    `[ReactOnRails] react-on-rails-rsc ${found} is older than the recommended stable minimum ${recommendedMin}.`,
+    `[ReactOnRails] react-on-rails-rsc ${found} does not meet the recommended stable minimum ${recommendedMin}.`,
     `  ${proLabel(proVersion)} may behave incorrectly (missing coordinated RSC fixes).`,
     `  Upgrade react-on-rails-rsc to ${recommendedMin} or a newer stable release.`,
   ].join('\n');

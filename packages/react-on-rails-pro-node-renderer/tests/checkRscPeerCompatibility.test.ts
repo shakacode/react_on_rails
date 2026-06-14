@@ -43,6 +43,13 @@ describe('checkRscPeerCompatibility', () => {
     expect(result.message).toContain('recommended stable minimum');
   });
 
+  it('warns for prereleases above the stable floor', () => {
+    const result = checkRscPeerCompatibility({ rscVersion: '19.0.6-rc.1', reactVersion: '19.0.4' });
+
+    expect(result.level).toBe('warn');
+    expect(result.message).toContain('recommended stable minimum');
+  });
+
   it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {
     expect(checkRscPeerCompatibility({ rscVersion: 'v19.0.5', reactVersion: '19.0.4' }).level).toBe('ok');
   });
