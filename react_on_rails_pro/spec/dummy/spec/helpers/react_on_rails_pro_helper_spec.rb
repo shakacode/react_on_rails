@@ -1285,6 +1285,34 @@ describe ReactOnRailsProHelper do
         expect(Rails.cache.read(component_cache_key)).to be_nil
       end
 
+      it "recomputes async write options at completion while keeping tag-index options from miss time" do
+        raw_cache_options = { expires_at: Time.now + 60 }
+        tag_index_cache_options = { expires_in: 60 }
+        write_cache_options = { expires_in: 45 }
+        raw_options = {
+          cache_key: "async-expiry-recompute",
+          cache_tags: ["async-tag"],
+          cache_options: raw_cache_options
+        }
+        component_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", raw_options)
+
+        allow(ReactOnRailsPro::Cache).to receive(:cache_write_options)
+          .with(raw_cache_options)
+          .and_return(tag_index_cache_options, write_cache_options)
+        allow(Rails.cache).to receive(:read).with(component_cache_key, tag_index_cache_options).and_return(nil)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:react_component).and_return("<div>async</div>")
+
+        async_value = send(:fetch_async_react_component, "App", raw_options) { { a: 1 } }
+
+        expect(async_value.value).to eq("<div>async</div>")
+        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).twice
+        expect(Rails.cache).to have_received(:write).with(component_cache_key, "<div>async</div>", write_cache_options)
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["async-tag"], component_cache_key, tag_index_cache_options)
+      end
+
       it "respects :if option for conditional caching" do
         cache_key = "async-if-test-#{SecureRandom.hex(4)}"
 

@@ -492,7 +492,7 @@ module ReactOnRailsProHelper
     raw_options,
     cache_key,
     raw_cache_options,
-    cache_options,
+    tag_index_cache_options,
     &
   )
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
@@ -501,8 +501,9 @@ module ReactOnRailsProHelper
     task = @react_on_rails_async_barrier.async do
       result = react_component(component_name, options)
       unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
         Rails.cache.write(cache_key, result, cache_options)
-        ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+        ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, tag_index_cache_options)
       end
       result
     end
