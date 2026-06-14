@@ -194,7 +194,7 @@ export default Reports;
 - **Client navigation**: TanStack Router swaps only the route outlet. The shell stays mounted, and no Rails page load happens.
 - **Navigating to an `RSCRoute` route**: the client fetches the server component's RSC payload over HTTP from the Rails `rsc_payload` endpoint and streams it into the outlet — server-driven data with no separate JSON API layer.
 - **Direct visit to the `RSCRoute` route**: the mounted guard means the server renders the placeholder and the client fetches the RSC payload after hydration. Server-rendering the RSC payload during the initial page load requires the `wrapServerComponentRenderer` + `stream_react_component` setup described in [the RSC guide](../../pro/react-server-components/inside-client-components.md), which is a different entry point than the TanStack SSR helper.
-- **Repeat visits to an `RSCRoute` route**: this starter does not cache the RSC payload between visits to the same route; each revisit refetches. Payload caching is tracked in [issue #3564](https://github.com/shakacode/react_on_rails/issues/3564).
+- **Repeat visits to an `RSCRoute` route**: the default RSC provider caches payload promises by `componentName` plus serialized `componentProps` while the provider stays mounted, so returning to the same route can reuse the already-fetched payload. The local mounted guard can still briefly show the placeholder when the route outlet remounts before the cached payload is read.
 
 ## How This Compares
 
@@ -204,8 +204,8 @@ export default Reports;
 
 **Honest gaps (current state).**
 
-- **No prefetch or RSC payload caching yet.** No hover/viewport prefetch API exists yet for warming RSC payloads before navigation — that depends on the RSC payload cache work tracked in [issue #3564](https://github.com/shakacode/react_on_rails/issues/3564).
-- **Repeat-visit flash on `RSCRoute` routes.** When the user navigates away from an `RSCRoute`-backed route and returns, TanStack Router unmounts the outlet component, so the placeholder briefly reappears before the payload is refetched. You can avoid that by lifting mount state above the outlet, but the starter keeps the simpler local-state pattern.
+- **No prefetch or bounded RSC payload-cache eviction yet.** The default provider already keeps payload promises in memory while mounted, keyed by `componentName` plus serialized `componentProps`. What is still missing is hover/viewport prefetch and a bounded eviction or invalidation policy for production-sized caches, tracked in [issue #3564](https://github.com/shakacode/react_on_rails/issues/3564).
+- **Repeat-visit flash on `RSCRoute` routes.** When the user navigates away from an `RSCRoute`-backed route and returns, TanStack Router unmounts the outlet component, so the placeholder briefly reappears before the cached or fetched payload is read. You can avoid that by lifting mount state above the outlet, but the starter keeps the simpler local-state pattern.
 - **Turbo coexistence is scoped-off, not integrated.** Deeper Turbo integration is tracked in [issue #3485](https://github.com/shakacode/react_on_rails/issues/3485).
 
 ## Working Example in This Repo
