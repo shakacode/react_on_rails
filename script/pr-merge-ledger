@@ -79,7 +79,7 @@ class PrMergeLedger
     /\bno\s+(?:\S+\s+){0,4}?(?:fixed|resolved|waived)\b/i
   )
   ADDITIONAL_SEVERITY_PATTERN = %r{
-    (?:(?<!\d)[.;,(:-]|/|\b(?:and|but|while)\b)\s*
+    (?:(?<!\d)[.;,(:-]|/|\b(?:and|but|or|while)\b)\s*
     (?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?(?<severity>MUST[- ]?FIX|\[?P[0-2]\]?)(?:\*\*)?
     (?:\s|:|-|/|$)
   }ix

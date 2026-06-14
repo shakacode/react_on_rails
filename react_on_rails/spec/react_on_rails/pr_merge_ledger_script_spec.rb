@@ -962,6 +962,63 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks or-separated priority findings after the first marker is dispositioned" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 5,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "or-separated-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/or-separated-review",
+          "body" => "P1 issue fixed or P2 still open."
+        }
+      ],
+      "comments" => []
+    }
+    dispositions = {
+      "https://example.com/or-separated-review#L1:1" => "fixed"
+    }
+
+    Tempfile.create(["pr-merge-ledger-or-separated-finding", ".json"]) do |fixture_file|
+      Tempfile.create(["pr-merge-ledger-or-separated-dispositions", ".json"]) do |dispositions_file|
+        fixture_file.write(JSON.generate(fixture))
+        fixture_file.flush
+        dispositions_file.write(JSON.generate(dispositions))
+        dispositions_file.flush
+
+        stdout, stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          fixture_file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--finding-dispositions",
+          dispositions_file.path,
+          "--strict",
+          chdir: repo_root
+        )
+
+        expect(status).not_to be_success, stderr
+
+        report = JSON.parse(stdout)
+        findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+        expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
+        expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[fixed UNKNOWN])
+        expect(stderr).not_to include("unused disposition keys")
+      end
+    end
+  end
+
   it "keeps same-severity findings from distinct lines in one source" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
