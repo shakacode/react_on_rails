@@ -23,6 +23,7 @@ export const RSC_PEER_SUPPORT = {
     recommendedMin: '19.0.5',
     supportedMajor: 19,
     // Clear prereleases when recommendedMin advances past their stable base.
+    // Keep these in sync with the react-on-rails-rsc peer exceptions in packages/react-on-rails-pro/package.json.
     allowedPrereleases: ['19.0.5-rc.6', '19.0.5-rc.7'],
   },
   react: {

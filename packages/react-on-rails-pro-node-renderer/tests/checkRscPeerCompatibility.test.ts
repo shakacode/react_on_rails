@@ -56,6 +56,17 @@ describe('checkRscPeerCompatibility', () => {
     ).toBe(true);
   });
 
+  it('keeps allowed prereleases aligned with the Pro package peer exceptions', () => {
+    const proPackageJson = JSON.parse(
+      readFileSync(path.resolve(__dirname, '../../..', 'packages/react-on-rails-pro/package.json'), 'utf8'),
+    ) as { peerDependencies: Record<string, string> };
+    const peerRange = proPackageJson.peerDependencies['react-on-rails-rsc'];
+    const peerPrereleases = [...peerRange.matchAll(/\|\|\s*([^\s|]+-[^\s|]+)/g)].map((match) => match[1]);
+
+    expect(peerRange).toContain(`~${recommendedMin}`);
+    expect(peerPrereleases).toEqual([...RSC_PEER_SUPPORT.reactOnRailsRsc.allowedPrereleases]);
+  });
+
   it('omits prerelease guidance from unsupported prerelease errors when no prereleases are allowed', () => {
     const result = checkRscPeerCompatibility(
       {
