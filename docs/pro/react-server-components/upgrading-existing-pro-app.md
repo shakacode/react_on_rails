@@ -271,7 +271,7 @@ Then run `bundle install` before retrying the generator.
 
 If the RSC bundle build fails but server and client builds succeed, the issue is likely in `rscWebpackConfig.js`. Common causes:
 
-- **Missing `react-on-rails-rsc` package**: Run `pnpm add react-on-rails-rsc@19.0.5`
+- **Missing `react-on-rails-rsc` package**: Run `pnpm add --save-exact react-on-rails-rsc@19.0.5`
 - **React or `react-on-rails-rsc` version mismatch**: RSC currently requires React 19.0.x with patch >= 19.0.4 and the exact `react-on-rails-rsc@19.0.5` pin. Check with `pnpm list react react-dom react-on-rails-rsc`
 - **Custom webpack config incompatibility**: If your `serverWebpackConfig.js` was heavily customized, the generator's transforms may not apply cleanly. See [Preparing Your App: Step 4](../../oss/migrating/rsc-preparing-app.md#step-4-set-up-the-rsc-webpack-bundle) for the underlying intent of each webpack change
 
