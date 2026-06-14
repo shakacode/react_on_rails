@@ -115,10 +115,21 @@ if (
     fi
   }
 
+  require_clean_agent_coord_checkout() {
+    git -C "$AGENT_COORD_REPO" update-index -q --refresh
+
+    if ! git -C "$AGENT_COORD_REPO" diff --quiet --ignore-submodules -- ||
+       ! git -C "$AGENT_COORD_REPO" diff --cached --quiet --ignore-submodules --; then
+      echo "agent-coordination checkout has local modifications; commit, stash, or record dirty evidence" >&2
+      return 1
+    fi
+  }
+
   AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord" # Subshell copy; re-exported below after probes pass.
-  git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
+  require_clean_agent_coord_checkout &&
+    git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
     git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
-    "$AGENT_COORD_BIN" --help &&
+    "$AGENT_COORD_BIN" --help >/dev/null &&
     AGENT_COORD_VERSION_JSON="$("$AGENT_COORD_BIN" version --json)" &&
     require_json_output "agent-coord version --json" "$AGENT_COORD_VERSION_JSON" &&
     # Suppress stderr intentionally: private config details must not appear in public PRs.
@@ -198,7 +209,7 @@ the default state root documented in the private repo README.
   AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" heartbeat \
     --agent-id smoke-test-0 \
     --repo shakacode/react_on_rails \
-    --target 9999
+    --target 9999 # sentinel/fake PR number for local smoke tests only
   AGENT_COORD_STATE_ROOT="$STATE_ROOT" "$AGENT_COORD_BIN" status
 )
 ```
