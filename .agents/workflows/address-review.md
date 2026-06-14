@@ -33,7 +33,22 @@ Behavior rules:
   - the output of the required `gh api` commands.
 - Do not auto-fix everything. Stop after triage and wait for my selection unless the parsed input includes `autopilot`; in that case, present the triage for transparency and immediately execute action `a`.
 - Default to real issues only, and surface polish as `OPTIONAL` so it is visible without becoming a blocking merge gate.
-- For action `f` and the initial `f+i` phase, do not ask whether to fix behavior-preserving optional nits. Apply low-risk in-scope nits inline, or log them as deferred/declined with rationale, using `AGENTS.md` for the behavior-preserving, low-risk, and final-candidate debounce definitions. Explicit optional-code actions (`a`, `f+o`, `o <nums>`, and `all optional`) are code-changing only for their selected optional items; fix those items inline or report why they remain unresolved, and do not sweep unrelated optional nits. Bare `o` presents optional items for selection only and must not edit files. For no-code actions (`m`, `r`, or rationale-only selections), only log, defer, decline, reply, or resolve threads after an allowed rationale/closeout; do not edit files. Promote optional items that need judgment, change behavior, or expand scope to `DISCUSS`; record behavior-preserving nits that would only create review churn as deferred/declined instead.
+- Optional-item routing:
+  - For action `f` and the initial `f+i` phase, do not ask whether to fix
+    behavior-preserving optional nits. Apply low-risk in-scope nits inline, or
+    log them as deferred/declined with rationale, using `AGENTS.md` for the
+    behavior-preserving, low-risk, and final-candidate debounce definitions.
+  - Explicit optional-code actions (`a`, `f+o`, `o <nums>`, and `all optional`)
+    are code-changing only for their selected optional items: fix those items
+    inline or report why they remain unresolved, and do not sweep unrelated
+    optional nits.
+  - Bare `o` presents optional items for selection only and must not edit files.
+  - No-code actions (`m`, `r`, or rationale-only selections) only log, defer,
+    decline, reply, or resolve threads after an allowed rationale/closeout; do
+    not edit files.
+  - Promote optional items that need judgment, change behavior, or expand scope
+    to `DISCUSS`; record behavior-preserving nits that would only create review
+    churn as deferred/declined instead.
 - For full-PR scans, default to feedback after the latest PR summary comment whose body starts with `<!-- address-review-summary -->` on its very first line.
 - If I say `check all reviews`, ignore that cutoff and rescan the full PR history.
 - If I give a specific review URL or specific issue-comment URL, fetch that exact target even if it predates the latest summary comment.
@@ -188,16 +203,46 @@ Execution flow when terminal access is available:
 
 8. Execute the chosen action:
    - **`a` — Apply, stage, and recommend**: Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or automatically when `autopilot` was requested at initiation. Run relevant checks and the self-review gate. Stage only the intended changed files with explicit `git add` paths instead of committing them. Do **not** commit, push, post GitHub replies, resolve review threads, create follow-up issues, or post the PR summary checkpoint. Return a local summary with: fixed `MUST-FIX` items, fixed `OPTIONAL` items, staged files, validation commands/results, unresolved/skipped items, and detailed `DISCUSS` recommendations. Each `DISCUSS` recommendation must include the reviewer/comment link, recommended decision (`fix now`, `defer`, `decline`, or `ask user`), rationale/evidence, risk/tradeoff, and concrete next step. If validation fails after reasonable local repair, still report the staged-file state clearly and mark the PR as not ready for commit/push.
-   - **`f`**: Fix all must-fix items (if none exist, continue to autonomous optional handling). Before the commit/push gate, autonomously handle `OPTIONAL` nits that are behavior-preserving, low-risk, in scope, and before the final-candidate debounce point: apply straightforward fixes inline, or record them as deferred/declined with rationale. This replaces the old explicit opt-in gate for low-risk optionals; broader optional work still requires `a`, `f+o`, `f+i`, `m`, explicit `o <nums>` / `all optional`, or direct selection of those optional items. Promote optional items that need judgment, change behavior, or expand scope to `DISCUSS`; if a behavior-preserving optional nit is only deferred because fixing it would restart an expensive review cycle, record the deferred/declined rationale instead of promoting it. Route substantive deferred handling through the later `DISCUSS` decision path, such as `f+i`, rather than inventing a deferred bundle inside plain `f`. If an autonomous nit fix fails local validation or self-review and the repair is not mechanical and in scope, drop or revert that nit, record the failure rationale, and promote the underlying concern to `DISCUSS` if it still matters before the commit/push gate. If local changes exist, commit, ask for push confirmation, then push; if no local changes, skip commit/push and continue decision flow. Then reply/resolve addressed must-fix and optional threads, including recorded optional outcomes. If skipped items exist, ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for one explicit follow-up decision block (`d`, `f+i`, or `r all discuss + resolve`). Tell me the PR is merge-ready after `DISCUSS` items are resolved or explicitly deferred; `OPTIONAL` items do not block merge-readiness.
+   - **`f`**:
+     1. Fix all must-fix items. If none exist, continue directly to autonomous
+        optional handling.
+     2. Before the commit/push gate, autonomously handle `OPTIONAL` nits that
+        are behavior-preserving, low-risk, in scope, and before the
+        final-candidate debounce point: apply straightforward fixes inline, or
+        record them as deferred/declined with rationale.
+     3. Keep broader optional work out of plain `f`; it still requires `a`,
+        `f+o`, `f+i`, `m`, explicit `o <nums>` / `all optional`, or direct
+        selection of those optional items.
+     4. Promote optional items that need judgment, change behavior, or expand
+        scope to `DISCUSS`. If a behavior-preserving optional nit is only
+        deferred because fixing it would restart an expensive review cycle,
+        record the deferred/declined rationale instead of promoting it.
+     5. Route substantive deferred handling through the later `DISCUSS` decision
+        path, such as `f+i`, rather than inventing a deferred bundle inside
+        plain `f`.
+     6. If an autonomous nit fix fails local validation or self-review and the
+        repair is not mechanical and in scope, drop or revert that nit, record
+        the failure rationale, and promote the underlying concern to `DISCUSS`
+        if it still matters before the commit/push gate.
+     7. If local changes exist, commit, ask for push confirmation, then push; if
+        no local changes exist, skip commit/push and continue decision flow.
+     8. Reply/resolve addressed must-fix and optional threads, including
+        recorded optional outcomes.
+     9. If skipped items exist, ask for explicit confirmation before posting
+        rationale replies/resolving skipped threads.
+     10. Keep discuss items for one explicit follow-up decision block (`d`,
+         `f+i`, or `r all discuss + resolve`). Tell me the PR is merge-ready
+         after `DISCUSS` items are resolved or explicitly deferred; `OPTIONAL`
+         items do not block merge-readiness.
    - **`f+i`**:
      1. Run action `f` through the commit/push-before-reply gate for `MUST-FIX` and autonomous optional changes, including autonomous optional handling even when there are no `MUST-FIX` items.
      2. If that phase produces local changes, commit and ask for push confirmation before building the deferred bundle, replying, resolving, or signaling readiness.
      3. Record each autonomous optional outcome before building the deferred bundle: fixed inline, declined, failed validation and dropped/reverted, or promoted to `DISCUSS`.
      4. After the initial `f` gate, reply to each `MUST-FIX` or autonomous optional thread fixed or recorded during that gate, citing the pushed commit or recorded outcome, and resolve threads when the concern is handled or explicitly deferred/declined under the attention contract.
-     5. Prepare one deferred-work bundle for discuss items, remaining optional items worth tracking, and non-trivial skipped items in distinct sections. Exclude weak "could consider" optional suggestions, trivial duplicates, factually incorrect suggestions, status noise, and already handled autonomous optional nits from the bundle. For low-risk optional nits excluded from the bundle as not worth tracking, record the deferred/declined rationale for later reply or summary use, but do not reply or resolve until the tracking/drop outcome is chosen.
+     5. Prepare one deferred-work bundle for discuss items, remaining optional items worth tracking, and non-trivial skipped items in distinct sections. Exclude weak "could consider" optional suggestions, trivial duplicates, factually incorrect suggestions, status noise, and already handled autonomous optional nits from the bundle. For remaining low-risk optional nits that were not already replied to/resolved during the initial `f` gate and are excluded from the bundle as not worth tracking, record the deferred/declined rationale for later reply or summary use, but do not reply or resolve until the tracking/drop outcome is chosen.
      6. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Do not post replies or resolve bundled items until that tracking/drop outcome is chosen.
      7. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
-     8. For each deferred item and each excluded low-risk optional nit in the chosen tracking/drop outcome, post the deferred/tracking reply or recorded rationale in the original location, then resolve the thread when one exists and the conversation is complete.
+     8. For each deferred item and each remaining excluded low-risk optional nit that was not already handled during the initial `f` gate, post the deferred/tracking reply or recorded rationale in the original location, then resolve the thread when one exists and the conversation is complete.
      9. For trivial skipped items excluded from the bundle, ask whether to post rationale replies and resolve those threads; default is no replies unless I opt in. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
      10. If there are no deferred items, tell the user if any optional items were excluded from the bundle as not worth tracking, then continue with skipped rationale confirmation (if any `SKIPPED` items exist) and discuss decisions (if any `DISCUSS` items remain). Do not signal merge-ready until those remaining prompts are complete. After the initial `f` gate, no additional commit is needed unless later steps introduce local changes.
    - **`f+o`**: Use `f`'s `MUST-FIX` handling and commit/push-before-reply ordering, but do not run `f`'s autonomous optional defer/decline filtering. Every current `OPTIONAL` item is selected for inline handling: fix it in the same PR, or stop and promote it to `DISCUSS` if it turns out to need judgment, change behavior, or expand scope. If optional fixes require a separate commit to keep the must-fix commit atomic, commit them and ask for push confirmation before pushing the additional commit. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts for those tiers. Tell me the PR is merge-ready once all selected work is pushed and `DISCUSS` items are resolved or explicitly deferred. If there are zero `OPTIONAL` items, behave like `f` and note that `f+o` had nothing additional to do.
