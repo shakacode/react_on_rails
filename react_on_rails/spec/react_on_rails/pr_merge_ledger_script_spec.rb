@@ -3792,6 +3792,58 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "rejects non-string finding disposition evidence" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 7,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [],
+      "comments" => [
+        {
+          "id" => "comment-1",
+          "url" => "https://example.com/comment-1",
+          "body" => "[P1] Top-level PR comment finding.",
+          "author" => { "login" => "reviewer" },
+          "createdAt" => "2026-06-01T00:00:00Z"
+        }
+      ]
+    }
+    dispositions = {
+      "comment-1" => {
+        "disposition" => "fixed",
+        "evidence" => { "url" => "https://example.com/evidence" }
+      }
+    }
+
+    Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
+      Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
+        fixture_file.write(JSON.generate(fixture))
+        fixture_file.flush
+        dispositions_file.write(JSON.generate(dispositions))
+        dispositions_file.flush
+
+        stdout, stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          fixture_file.path,
+          "--finding-dispositions",
+          dispositions_file.path,
+          chdir: repo_root
+        )
+
+        expect(status.exitstatus).to eq(2)
+        expect(stdout).to be_empty
+        expect(stderr).to include("finding disposition evidence for comment-1 must be a string")
+        expect(stderr).not_to include("from ")
+      end
+    end
+  end
+
   it "rejects null finding dispositions" do
     fixture = {
       "repository" => "shakacode/react_on_rails",

@@ -819,7 +819,9 @@ class PrMergeLedger
     when Hash
       disposition = override.fetch("disposition")
       validate_disposition(disposition)
-      { "disposition" => disposition, "evidence" => override["evidence"] }
+      evidence = override["evidence"]
+      validate_disposition_evidence(evidence, disposition_key)
+      { "disposition" => disposition, "evidence" => evidence }
     when nil
       raise Error, "finding disposition for #{disposition_key} cannot be null"
     else
@@ -861,6 +863,12 @@ class PrMergeLedger
     return if DISPOSITIONS.include?(disposition)
 
     raise Error, "finding disposition #{disposition.inspect} must be one of #{DISPOSITIONS.join(', ')}"
+  end
+
+  def validate_disposition_evidence(evidence, disposition_key)
+    return if evidence.nil? || evidence.is_a?(String)
+
+    raise Error, "finding disposition evidence for #{disposition_key} must be a string"
   end
 
   def timestamp_sort_key(raw_timestamp, warning_context = nil)

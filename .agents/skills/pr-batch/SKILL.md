@@ -170,7 +170,7 @@ At merge readiness and batch closeout, run the machine-checkable per-PR merge
 ledger with `script/pr-merge-ledger <PR> --strict`, supplying explicit changelog
 classification and any P0/P1/P2/Must-Fix disposition evidence. Do not report a
 target `complete` while the ledger has any `UNKNOWN` field, unresolved
-current-head review thread, `CHANGES_REQUESTED` review object, or
+current-head review thread, active `review_objects.changes_requested` entry, or
 `complete_allowed: false`. Include the ledger JSON artifact path or table in the
 final handoff.
 

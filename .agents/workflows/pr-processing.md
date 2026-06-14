@@ -586,7 +586,8 @@ The closeout lane is:
    explicit changelog classification and any P0/P1/P2/Must-Fix disposition
    evidence. Store the JSON artifact or table for the final handoff. Do not
    mark a target complete while the ledger has `UNKNOWN` fields, unresolved
-   current-head review threads, `CHANGES_REQUESTED` review objects, or
+   current-head review threads, active `review_objects.changes_requested`
+   entries, or
    `complete_allowed: false`.
 6. Refresh stale release-mode classification from the release tracker when
    needed. For accelerated-RC merge readiness, refresh the latest finalized
