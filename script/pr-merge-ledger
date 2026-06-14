@@ -32,9 +32,10 @@ class PrMergeLedger
   GITHUB_API_TIMEOUT_SECONDS = Integer(ENV.fetch("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS", "30"), 10)
   MAX_GRAPHQL_PAGES = 500
   LIST_MARKER_PATTERN = /(?:[-*]|\d+[.)])\s*/
+  FINDING_LINE_PREFIX_PATTERN = /(?:#{LIST_MARKER_PATTERN.source})?(?:\#{1,6}\s+)?/
   PRIORITY_MARKER_PATTERN = /MUST[- ]?FIX|\[?P[0-2]\]?/
   FINDING_BADGE_PREFIX = %r{
-    \A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?
+    \A\s*(?:#{FINDING_LINE_PREFIX_PATTERN.source})(?:\*\*)?
     <sub><sub>!\[%<severity>s\s+Badge\]\([^)]+\)</sub></sub>
     (?:\*\*)?(?:\s|:|-|$)
   }ix
@@ -45,22 +46,22 @@ class PrMergeLedger
     ]
   end.freeze
   FINDING_PATTERNS = {
-    "MUST_FIX" => %r{\A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?MUST[- ]?FIX(?:\*\*)?(?:\s|:|-|/|$)}i,
+    "MUST_FIX" => %r{\A\s*(?:#{FINDING_LINE_PREFIX_PATTERN.source})(?:\*\*)?MUST[- ]?FIX(?:\*\*)?(?:\s|:|-|/|$)}i,
     "P0" => Regexp.union(
       BADGE_FINDING_PATTERNS.fetch("P0"),
-      %r{\A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?\[?P0\]?(?:\*\*)?(?:\s|:|-|/|$)}i
+      %r{\A\s*(?:#{FINDING_LINE_PREFIX_PATTERN.source})(?:\*\*)?\[?P0\]?(?:\*\*)?(?:\s|:|-|/|$)}i
     ),
     "P1" => Regexp.union(
       BADGE_FINDING_PATTERNS.fetch("P1"),
-      %r{\A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?\[?P1\]?(?:\*\*)?(?:\s|:|-|/|$)}i
+      %r{\A\s*(?:#{FINDING_LINE_PREFIX_PATTERN.source})(?:\*\*)?\[?P1\]?(?:\*\*)?(?:\s|:|-|/|$)}i
     ),
     "P2" => Regexp.union(
       BADGE_FINDING_PATTERNS.fetch("P2"),
-      %r{\A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?\[?P2\]?(?:\*\*)?(?:\s|:|-|/|$)}i
+      %r{\A\s*(?:#{FINDING_LINE_PREFIX_PATTERN.source})(?:\*\*)?\[?P2\]?(?:\*\*)?(?:\s|:|-|/|$)}i
     )
   }.freeze
   FINDING_SUMMARY_PREFIX_PATTERN =
-    %r{\A\s*(?:#{LIST_MARKER_PATTERN.source})?(?:\*\*)?(?:#{PRIORITY_MARKER_PATTERN.source})
+    %r{\A\s*(?:#{FINDING_LINE_PREFIX_PATTERN.source})(?:\*\*)?(?:#{PRIORITY_MARKER_PATTERN.source})
       (?:\s*/\s*(?:#{PRIORITY_MARKER_PATTERN.source}))*(?:\*\*)?(?:\s|:|-)+(?<summary>.*)\z}ix
   FINDING_SUMMARY_SUBJECT_PATTERN = /\b(?:findings?|issues?|items?|main issue)\b/i
   FINDING_SUMMARY_RESOLUTION_PATTERN = /
@@ -71,7 +72,9 @@ class PrMergeLedger
       (?:\s+(?:were|was|are|is|has|have|been|got|now|already|previously))*\s+
     )
     (?:fixed|resolved|waived)
-    (?=\s*(?:$|[.;,)]|\b(?:by|in|with|via|from|after|before|on|because|through)\b))
+    (?=\s*(?:$|[.;,)]|\b(?:by|in|with|via|from|after|before|on|because|through)\b)) |
+    \bno\s+(?:findings?|issues?|items?|main\s+issue)\b
+    (?=\s*(?:$|[.;,)]|\b(?:found|present|open|remaining|reported|detected)\b))
   /ix
   NEGATED_SUMMARY_RESOLUTION_PATTERN = Regexp.union(
     /\bnot\s+(?:\S+\s+){0,3}?(?:fixed|resolved|waived)\b/i,

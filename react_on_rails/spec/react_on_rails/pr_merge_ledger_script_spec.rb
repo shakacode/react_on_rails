@@ -912,6 +912,56 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks heading-style priority findings from review summaries" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 5,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "heading-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/heading-review",
+          "body" => "### [P1] Cache invalidation is broken\n## P2: Secondary issue remains"
+        }
+      ],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-heading-finding", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+      expect(findings.map { |finding| finding.fetch("severity") }).to eq(%w[P1 P2])
+      expect(findings.map { |finding| finding.fetch("text_excerpt") }).to eq(
+        ["### [P1] Cache invalidation is broken", "## P2: Secondary issue remains"]
+      )
+      expect(findings.map { |finding| finding.fetch("disposition") }).to eq(%w[UNKNOWN UNKNOWN])
+    end
+  end
+
   it "blocks slash-combined priority findings from review summaries" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -1469,6 +1519,56 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-resolved-multi-severity-summary", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      pr_ledger = report.fetch("pull_requests").first
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(pr_ledger.dig("priority_finding_dispositions", "findings")).to be_empty
+    end
+  end
+
+  it "ignores priority summaries that explicitly report no issues or findings" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "clean-no-issues-review",
+          "state" => "COMMENTED",
+          "submittedAt" => "2026-06-01T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/clean-no-issues-review",
+          "body" => [
+            "P1: no issues found.",
+            "P1/P2: no findings",
+            "### P2: no items remaining"
+          ].join("\n")
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-no-issues-summary", ".json"]) do |file|
       file.write(JSON.generate(fixture))
       file.flush
 
