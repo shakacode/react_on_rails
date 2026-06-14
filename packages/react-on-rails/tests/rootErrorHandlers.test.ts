@@ -59,6 +59,13 @@ describe('rootErrorHandlers', () => {
       );
     });
 
+    it('throws a clear error when a handler value is null', () => {
+      const { setRootErrorHandlers } = loadModule('19.0.0');
+      expect(() => setRootErrorHandlers({ onRecoverableError: null as unknown as () => void })).toThrow(
+        /onRecoverableError must be a function, got null/,
+      );
+    });
+
     it('throws when a handler key is unknown', () => {
       const { setRootErrorHandlers } = loadModule('19.0.0');
       expect(() =>

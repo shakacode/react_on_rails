@@ -67,7 +67,9 @@ export function setRootErrorHandlers(handlers: RootErrorHandlers): void {
     const value = handlers[key];
     if (typeof value !== 'undefined' && typeof value !== 'function') {
       throw new Error(
-        `Invalid ReactOnRails rootErrorHandlers option: ${key} must be a function, got ${typeof value}.`,
+        `Invalid ReactOnRails rootErrorHandlers option: ${key} must be a function, got ${
+          value === null ? 'null' : typeof value
+        }.`,
       );
     }
   });
