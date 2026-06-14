@@ -35,6 +35,9 @@ module ReactOnRails
       #         Content), which is what the hook's error mapping keys on. The
       #         numeric default sidesteps the Rack 3.1 rename of
       #         :unprocessable_entity to :unprocessable_content.
+      # SECURITY: ActiveModel error messages are sent to the browser verbatim.
+      # Review custom validations for internal IDs, admin-only details, or
+      # security-sensitive wording before using this on a model.
       def render_model_errors(record, status: 422)
         render json: { errors: record.errors.messages }, status:
       end

@@ -75,15 +75,29 @@ describe('useRailsForm', () => {
       });
     });
 
-    it('merges custom headers but never drops the CSRF header', async () => {
+    it('merges custom headers but never drops the pinned JSON and CSRF headers', async () => {
       const { result } = renderHook(() => useRailsForm({ a: 1 }));
 
       await act(async () => {
-        await result.current.post('/things', { headers: { 'X-Custom': 'yes' } });
+        await result.current.post('/things', {
+          headers: {
+            accept: 'text/html',
+            'content-type': 'text/plain',
+            'x-csrf-token': 'CUSTOM_CSRF_TOKEN',
+            'X-Custom': 'yes',
+            'X-Requested-With': 'fetch',
+          },
+        });
       });
 
       const [, init] = fetchMock.mock.calls[0];
-      expect(init.headers).toMatchObject({ 'X-Custom': 'yes', 'X-CSRF-Token': TEST_CSRF_TOKEN });
+      expect(init.headers).toEqual({
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Custom': 'yes',
+        'X-CSRF-Token': TEST_CSRF_TOKEN,
+        'X-Requested-With': 'XMLHttpRequest',
+      });
     });
 
     it('rejects cross-origin submit URLs before attaching CSRF headers', async () => {
@@ -253,6 +267,23 @@ describe('useRailsForm', () => {
       });
 
       expect(result.current.processing).toBe(false);
+    });
+
+    it('warns when a fetch failure may have been caused by a native Rails redirect', async () => {
+      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+      const warnMock = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const { result } = renderHook(() => useRailsForm({ a: 1 }));
+
+      try {
+        await act(async () => {
+          await expect(result.current.post('/things')).rejects.toThrow('Failed to fetch');
+        });
+
+        expect(warnMock).toHaveBeenCalledWith(expect.stringContaining('redirect_to'));
+        expect(result.current.processing).toBe(false);
+      } finally {
+        warnMock.mockRestore();
+      }
     });
 
     it('stays processing until all overlapping submissions settle', async () => {

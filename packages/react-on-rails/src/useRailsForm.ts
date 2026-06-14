@@ -79,7 +79,7 @@ export class RailsFormRequestError extends Error {
 }
 
 export interface RailsFormSubmitOptions {
-  /** Extra request headers. CSRF headers are always applied on top. */
+  /** Extra request headers. JSON and CSRF headers are always applied on top. */
   headers?: Record<string, string>;
   /**
    * Called after a 2xx response. If this callback throws, the exception
@@ -128,6 +128,27 @@ export interface UseRailsForm<TData extends object> {
   /** Manually set the errors for one field (e.g. client-side pre-checks). */
   setError: (field: string, messages: string | string[]) => void;
 }
+
+const PINNED_RAILS_FORM_HEADER_NAMES = new Set([
+  'accept',
+  'content-type',
+  'x-csrf-token',
+  'x-requested-with',
+]);
+
+const railsFormJsonHeaders = (customHeaders: Record<string, string> = {}): Record<string, string> => {
+  const filteredCustomHeaders = Object.fromEntries(
+    Object.entries(customHeaders).filter(
+      ([headerName]) => !PINNED_RAILS_FORM_HEADER_NAMES.has(headerName.toLowerCase()),
+    ),
+  );
+
+  return {
+    ...filteredCustomHeaders,
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
+};
 
 const toMessageArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
@@ -248,6 +269,19 @@ const extractRedirectTo = (response: Response, responseData: unknown): string | 
     }
   }
   return null;
+};
+
+const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
+  if (process.env.NODE_ENV === 'production' || !(fetchError instanceof TypeError)) {
+    return;
+  }
+  if (!/failed to fetch|networkerror/i.test(fetchError.message)) {
+    return;
+  }
+  console.warn(
+    '[useRailsForm] The request may have been rejected because the server responded with a redirect. ' +
+      'useRailsForm requires `render json:` for success responses; Rails `redirect_to` is not supported in v1.',
+  );
 };
 
 /**
@@ -392,17 +426,14 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
           // Never follow redirects while carrying explicit CSRF headers; an
           // open redirect could otherwise leak the token to another origin.
           redirect: 'error',
-          headers: authenticityHeaders({
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            ...options.headers,
-          }),
+          headers: authenticityHeaders(railsFormJsonHeaders(options.headers)),
           // DELETE bodies are legal per RFC 9110 but are stripped or rejected by
           // many proxies/CDNs in practice — identify the resource in the URL.
           body: method === 'delete' ? undefined : JSON.stringify(dataRef.current),
         });
       } catch (fetchError) {
         finishSubmission();
+        warnOnPossibleRedirectFetchError(fetchError);
         throw fetchError;
       }
 
