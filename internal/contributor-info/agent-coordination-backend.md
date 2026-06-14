@@ -75,12 +75,14 @@ details into public PRs.
 (
   set -eu -o pipefail
 
+  command -v jq >/dev/null 2>&1 || { echo "jq is required for this preflight" >&2; exit 1; }
+
   if test -z "${AGENT_COORD_REPO:-}"; then
     echo "Set AGENT_COORD_REPO to the shakacode/agent-coordination clone path" >&2
-    false
+    exit 1
   elif test ! -x "$AGENT_COORD_REPO/bin/agent-coord"; then
     echo "AGENT_COORD_REPO must point at a shakacode/agent-coordination clone" >&2
-    false
+    exit 1
   else
     git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
       git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
@@ -120,7 +122,7 @@ Use this outcome matrix when classifying failures:
 | --------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `agent-coord doctor` and `agent-coord status` both exit 0                                                 | backend available               | continue to claim or dependency checks                                                         |
 | `agent-coord doctor` or `agent-coord status` cannot run or exits non-zero                                 | operational failure / `UNKNOWN` | use advisory public claim comments only for independent lanes; stop dependency-sensitive lanes |
-| `agent-coord claim` succeeds after status exited 0                                                        | claim acquired or renewed       | proceed and heartbeat at phase transitions                                                     |
+| `agent-coord claim` exits 0 after status exited 0                                                         | claim acquired or renewed       | proceed and heartbeat at phase transitions                                                     |
 | `agent-coord claim` exits 3 / `CLAIM_REFUSED` because another holder owns a live or lease-protected claim | refused claim                   | hard-stop the lane and report holder, liveness, and target                                     |
 | `agent-coord claim` exits non-zero for an unclear reason                                                  | operational failure / `UNKNOWN` | do not create a competing branch; ask the coordinator or retry after the backend is validated  |
 
