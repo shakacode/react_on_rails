@@ -168,6 +168,9 @@ redirect target as `result.redirectTo` when the JSON body contains a
 `redirect_to` (or `redirectTo`) string hint pointing to a same-origin URL. Native
 fetch redirects are disabled for CSRF-bearing submissions (`redirect: 'error'`),
 so a Rails `redirect_to` response rejects instead of being followed in v1.
+Relative hints resolve against the origin, not the current page path: for
+example, `"?saved=1"` becomes `"/?saved=1"`. Return an explicit path such as
+`"/posts/1?saved=1"` when the current resource path matters.
 
 Pass it to whatever owns navigation in your app:
 
@@ -198,6 +201,9 @@ It renders `record.errors.messages` (any ActiveModel/ActiveRecord object) as
 `{ errors: { field: [messages] } }`. It is deliberately tiny: if your API
 already returns errors another way (JSON:API, custom serializers), keep it —
 just map your shape to the documented one at the endpoint the form posts to.
+Because those ActiveModel messages are sent to the browser verbatim, review
+custom validations for internal IDs, admin-only details, or security-sensitive
+wording before using the concern on a model.
 
 ## Comparison with Inertia's `useForm`
 

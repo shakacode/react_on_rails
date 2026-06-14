@@ -154,7 +154,13 @@ const mapValidationErrors = (body: unknown): RailsFormErrors | null => {
   }
   const mapped: RailsFormErrors = {};
   for (const [field, messages] of errorEntries) {
-    mapped[field] = toMessageArray(messages);
+    const fieldMessages = toMessageArray(messages);
+    if (fieldMessages.length > 0) {
+      mapped[field] = fieldMessages;
+    }
+  }
+  if (Object.keys(mapped).length === 0) {
+    return null;
   }
   return mapped;
 };

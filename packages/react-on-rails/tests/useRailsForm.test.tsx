@@ -373,6 +373,23 @@ describe('useRailsForm', () => {
       expect(result.current.processing).toBe(false);
     });
 
+    it('rejects a 422 errors object when every field has no messages', async () => {
+      fetchMock.mockResolvedValue(mockResponse({ status: 422, body: { errors: { name: [] } } }));
+      const onError = jest.fn();
+      const { result } = renderHook(() => useRailsForm({ name: '' }));
+
+      await act(async () => {
+        await expect(result.current.post('/contact_messages', { onError })).rejects.toThrow(
+          RailsFormRequestError,
+        );
+      });
+
+      expect(onError).not.toHaveBeenCalled();
+      expect(result.current.errors).toEqual({});
+      expect(result.current.hasErrors).toBe(false);
+      expect(result.current.processing).toBe(false);
+    });
+
     it('keeps the response readable and exposes responseBody on an unmappable 422', async () => {
       fetchMock.mockResolvedValue(mockResponse({ status: 422, body: { message: 'nope' } }));
       const { result } = renderHook(() => useRailsForm({ name: '' }));
@@ -573,6 +590,38 @@ describe('useRailsForm', () => {
       }
       expect(submitResult!.responseData).toEqual({ message: 'created' });
       await expect(submitResult!.response.json()).resolves.toEqual({ message: 'created' });
+    });
+
+    it('clears errors set during an in-flight submit when the submit succeeds', async () => {
+      let resolveFetch!: (response: Response) => void;
+      fetchMock.mockReturnValue(
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+      );
+      const { result } = renderHook(() => useRailsForm({ name: '' }));
+
+      let submitPromise: Promise<unknown>;
+      act(() => {
+        submitPromise = result.current.post('/contact_messages');
+      });
+      await waitFor(() => expect(result.current.processing).toBe(true));
+
+      act(() => {
+        result.current.setError('name', 'client-side check failed');
+      });
+      expect(result.current.errors).toEqual({ name: ['client-side check failed'] });
+
+      act(() => {
+        resolveFetch(mockResponse({ status: 201, body: { message: 'ok' } }));
+      });
+      await act(async () => {
+        await submitPromise;
+      });
+
+      expect(result.current.errors).toEqual({});
+      expect(result.current.hasErrors).toBe(false);
+      expect(result.current.wasSuccessful).toBe(true);
     });
 
     it('rejects with RailsFormRequestError for non-422 failures', async () => {
