@@ -41,7 +41,7 @@ if test ! -x "$INSTALLED_AGENT_COORD_BIN"; then
   echo "agent-coord on PATH is not executable" >&2
   return 1 2>/dev/null || exit 1
 fi
-"$INSTALLED_AGENT_COORD_BIN" --help
+"$INSTALLED_AGENT_COORD_BIN" --help # Loose smoke-check; use CLI Contract Preflight for strict validation.
 if ! command -v agent_coord >/dev/null 2>&1; then
   echo "agent_coord alias not found; bootstrap may not have installed it" >&2
   return 1 2>/dev/null || exit 1
@@ -152,7 +152,7 @@ if (
   AGENT_COORD_BIN="$AGENT_COORD_REPO/bin/agent-coord" # Subshell-local; parent re-exports after probes pass.
   # set -eu above handles abort-on-error; && keeps each evidence/probe step explicit.
   require_clean_agent_coord_checkout &&
-    git -C "$AGENT_COORD_REPO" describe --tags --always --dirty &&
+    git -C "$AGENT_COORD_REPO" describe --tags --always --dirty && # --dirty is a canary after the clean-check.
     git -C "$AGENT_COORD_REPO" rev-parse HEAD &&
     "$AGENT_COORD_BIN" --help >/dev/null &&
     AGENT_COORD_VERSION_JSON="$("$AGENT_COORD_BIN" version --json)" &&
