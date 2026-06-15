@@ -138,9 +138,7 @@ const PINNED_RAILS_FORM_HEADER_NAMES = new Set([
 
 const REQUIRED_REACT_HOOK_NAMES = ['useCallback', 'useEffect', 'useRef', 'useState'] as const;
 
-type RequiredReactHooks = Pick<typeof React, (typeof REQUIRED_REACT_HOOK_NAMES)[number]>;
-
-const getReactHooks = (): RequiredReactHooks => {
+const assertReactHooksAvailable = (): void => {
   const missingHooks = REQUIRED_REACT_HOOK_NAMES.filter((hookName) => typeof React[hookName] !== 'function');
   if (missingHooks.length > 0) {
     throw new Error(
@@ -149,8 +147,9 @@ const getReactHooks = (): RequiredReactHooks => {
       )}.`,
     );
   }
-  return React as RequiredReactHooks;
 };
+
+assertReactHooksAvailable();
 
 const railsFormJsonHeaders = (customHeaders: Record<string, string> = {}): Record<string, string> => {
   const filteredCustomHeaders = Object.fromEntries(
@@ -175,13 +174,35 @@ const railsFormHeaders = (
   'X-Requested-With': 'XMLHttpRequest',
 });
 
+const validationMessageToString = (value: unknown): string => {
+  switch (typeof value) {
+    case 'string':
+      return value;
+    case 'number':
+    case 'boolean':
+    case 'bigint':
+    case 'symbol':
+      return value.toString();
+    default: {
+      try {
+        return JSON.stringify(value) ?? Object.prototype.toString.call(value);
+      } catch {
+        return Object.prototype.toString.call(value);
+      }
+    }
+  }
+};
+
 const toMessageArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
-    return value.map(String);
+    return value.filter((message) => message != null).map(validationMessageToString);
   }
-  // The documented Rails shape is string-or-string-array messages. Preserve
-  // unexpected custom-endpoint values visibly instead of silently dropping them.
-  return [String(value)];
+  if (value == null) {
+    return [];
+  }
+  // Preserve unexpected custom-endpoint values visibly instead of silently
+  // dropping them, but ignore nullish values that cannot be displayed helpfully.
+  return [validationMessageToString(value)];
 };
 
 /**
@@ -325,31 +346,29 @@ const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
  * responses reject with `RailsFormRequestError`.
  */
 export function useRailsForm<TData extends object>(initialData: TData): UseRailsForm<TData> {
-  const { useCallback, useEffect, useRef, useState } = getReactHooks();
-
   // Captured once on first render (Inertia useForm semantics): reset() restores
   // these mount-time values even if the initialData prop changes later.
-  const initialDataRef = useRef(initialData);
-  const [data, setDataState] = useState<TData>(initialData);
-  const [errors, setErrors] = useState<RailsFormErrors>({});
-  const [processing, setProcessing] = useState(false);
-  const [wasSuccessful, setWasSuccessful] = useState(false);
+  const initialDataRef = React.useRef(initialData);
+  const [data, setDataState] = React.useState<TData>(initialData);
+  const [errors, setErrors] = React.useState<RailsFormErrors>({});
+  const [processing, setProcessing] = React.useState(false);
+  const [wasSuccessful, setWasSuccessful] = React.useState(false);
 
   // Latest data for submit(). Updated eagerly by commitData (not on render) so
   // `setData(...); submit(...)` in the same tick posts the just-set values —
   // React batches the state update, so `data` itself is stale until re-render.
-  const dataRef = useRef(data);
+  const dataRef = React.useRef(data);
 
-  const commitData = useCallback((updater: (previousData: TData) => TData) => {
+  const commitData = React.useCallback((updater: (previousData: TData) => TData) => {
     dataRef.current = updater(dataRef.current);
     setDataState(dataRef.current);
   }, []);
 
   // Guards against state updates from stale (superseded) or unmounted submissions.
-  const submissionIdRef = useRef(0);
-  const pendingSubmissionsRef = useRef(0);
-  const mountedRef = useRef(true);
-  useEffect(() => {
+  const submissionIdRef = React.useRef(0);
+  const pendingSubmissionsRef = React.useRef(0);
+  const mountedRef = React.useRef(true);
+  React.useEffect(() => {
     // Re-assigning true is NOT redundant: under React StrictMode (and Fast
     // Refresh) the cleanup runs and the effect re-runs on the same component
     // instance, so without this the ref would stay false after the replay.
@@ -365,7 +384,7 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
     };
   }, []);
 
-  const setData = useCallback(
+  const setData = React.useCallback(
     (keyOrValues: keyof TData | Partial<TData> | ((previousData: TData) => TData), value?: unknown) => {
       if (typeof keyOrValues === 'function') {
         commitData(keyOrValues);
@@ -378,7 +397,7 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
     [commitData],
   ) as UseRailsForm<TData>['setData'];
 
-  const clearErrors = useCallback((...fields: string[]) => {
+  const clearErrors = React.useCallback((...fields: string[]) => {
     if (fields.length === 0) {
       setErrors({});
       return;
@@ -388,11 +407,11 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
     );
   }, []);
 
-  const setError = useCallback((field: string, messages: string | string[]) => {
+  const setError = React.useCallback((field: string, messages: string | string[]) => {
     setErrors((previousErrors) => ({ ...previousErrors, [field]: toMessageArray(messages) }));
   }, []);
 
-  const reset = useCallback(
+  const reset = React.useCallback(
     (...fields: Extract<keyof TData, string>[]) => {
       // A reset starts a fresh editing cycle: a pristine form should not still
       // report the previous submission as successful.
@@ -414,7 +433,7 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
     [clearErrors, commitData],
   );
 
-  const submit = useCallback(
+  const submit = React.useCallback(
     async (method: RailsFormMethod, url: string, options: RailsFormSubmitOptions = {}) => {
       submissionIdRef.current += 1;
       const submissionId = submissionIdRef.current;
@@ -429,6 +448,8 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
       if (mountedRef.current && typeof window !== 'undefined') {
         setWasSuccessful(false);
         setErrors({});
+        // Safety valve: a prior submission can settle during a StrictMode
+        // cleanup window, leaving processing true even with no in-flight work.
         if (pendingSubmissionsRef.current === 0) {
           setProcessing(false);
         }
@@ -519,19 +540,19 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
     [],
   );
 
-  const post = useCallback(
+  const post = React.useCallback(
     (url: string, options?: RailsFormSubmitOptions) => submit('post', url, options),
     [submit],
   );
-  const put = useCallback(
+  const put = React.useCallback(
     (url: string, options?: RailsFormSubmitOptions) => submit('put', url, options),
     [submit],
   );
-  const patch = useCallback(
+  const patch = React.useCallback(
     (url: string, options?: RailsFormSubmitOptions) => submit('patch', url, options),
     [submit],
   );
-  const destroy = useCallback(
+  const destroy = React.useCallback(
     (url: string, options?: RailsFormSubmitOptions) => submit('delete', url, options),
     [submit],
   );

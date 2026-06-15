@@ -44,9 +44,13 @@ export default function ContactForm() {
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    void form.post('/contact_messages', {
-      onSuccess: () => form.reset(),
-    });
+    void form
+      .post('/contact_messages', {
+        onSuccess: () => form.reset(),
+      })
+      .catch(() => {
+        form.setError('base', 'Something went wrong. Please try again.');
+      });
   };
 
   return (

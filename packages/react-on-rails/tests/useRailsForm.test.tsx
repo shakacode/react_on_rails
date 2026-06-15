@@ -72,11 +72,7 @@ describe('useRailsForm', () => {
         useState: undefined,
       }));
 
-      const legacyReactModule = require('../src/useRailsForm.ts') as typeof import('../src/useRailsForm.ts');
-
-      expect(() => legacyReactModule.useRailsForm({ name: '' })).toThrow(
-        /useRailsForm requires React 16\.8 or newer/,
-      );
+      expect(() => require('../src/useRailsForm.ts')).toThrow(/useRailsForm requires React 16\.8 or newer/);
     });
     jest.dontMock('react');
   });
@@ -512,6 +508,22 @@ describe('useRailsForm', () => {
       });
 
       expect(result.current.errors).toEqual({ name: ["can't be blank"] });
+    });
+
+    it('drops nullish validation messages while preserving visible scalar values', async () => {
+      fetchMock.mockResolvedValue(
+        mockResponse({
+          status: 422,
+          body: { errors: { name: null, email: [null, 'is invalid', undefined], count: 0 } },
+        }),
+      );
+      const { result } = renderHook(() => useRailsForm({ name: '', email: '', count: 0 }));
+
+      await act(async () => {
+        await result.current.post('/contact_messages');
+      });
+
+      expect(result.current.errors).toEqual({ email: ['is invalid'], count: ['0'] });
     });
 
     it('rejects when a 422 body does not match the errors shape', async () => {
