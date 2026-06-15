@@ -391,9 +391,11 @@ cpflow deploy-image -a myapp   # deploy the pushed image to Control Plane
 - **Public demo and starter staging apps**: Keep `type: standard` workloads
   with `minScale: 1`, the autoscaling metric disabled, and `capacityAI: true`.
   Avoid CPU Utilization autoscaling pinned to `minScale: 1` / `maxScale: 1`,
-  because that prevents Capacity AI from right-sizing the warm workload. Use
-  `serverless` scale-to-zero only as an explicit first-deploy choice or
-  planned delete/recreate migration. See the
+  because that prevents Capacity AI from right-sizing the warm workload. When
+  the autoscaling metric is disabled, do not rely on `maxScale` for bursts; use
+  a compatible autoscaling metric for that separate scaling posture. Use
+  `serverless` scale-to-zero only as an explicit first-deploy choice or planned
+  delete/recreate migration. See the
   [Control Plane Cost Posture](../getting-started/examples-and-references.md#control-plane-cost-posture).
 - **Multiple locations**: Control Plane supports multi-region deployment. Add locations to your GVC to deploy globally.
 
