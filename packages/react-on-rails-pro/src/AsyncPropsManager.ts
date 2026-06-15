@@ -123,6 +123,10 @@ class AsyncPropsManager {
     }
 
     if (!promiseController.resolved) {
+      // Prevent unhandledRejection when reject arrives before getProp — the
+      // promise has no consumer yet, so Node would warn. A later getProp call
+      // returns this same (already-rejected) promise, which React will handle.
+      promiseController.promise.catch(() => {});
       promiseController.reject(new Error(`Prop "${propName}" rejected by server: ${reason}`));
       promiseController.resolved = true;
     }
