@@ -33,9 +33,11 @@ coordination state, and a capacity-aware split into implementation groups.
 
 `$triage` is not a fixed-lane batch planner. It must read the current
 `agent-coord` capacity profiles, inbox config, claims, and heartbeats before
-phase 2. The group count is the number of available lane slots derived from
-registered profiles and enabled inboxes, not a value committed in this repo or
-hardcoded in the skill.
+phase 2. The group count is derived by summing registered
+`max_concurrent_batches`, bounding that total by enabled inboxes, and subtracting
+live, blocked, and reserved lanes. If any of those inputs cannot be verified,
+phase 2 stops instead of inventing a group count. The value is never committed in
+this repo or hardcoded in the skill.
 
 If live capacity profiles or enabled inbox config are unavailable, `$triage` may
 still produce the phase-1 inventory and graph, but phase 2 must stop with a
