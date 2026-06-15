@@ -6,7 +6,6 @@ on:
 
 jobs:
   stop-full-ci:
-    # Only run on PR comments that match the command
     if: |
       github.event.issue.pull_request &&
       (
@@ -16,111 +15,71 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
-      pull-requests: write
       issues: write
     steps:
-      - name: Check if user has write access
-        id: check_access
+      - name: Stop full CI mode
         uses: actions/github-script@v7
         with:
           script: |
-            try {
-              const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                username: context.actor
-              });
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.issue.number;
+            const actor = context.actor;
 
-              const hasAccess = ['admin', 'write'].includes(permission.permission);
-              console.log(`User ${context.actor} has permission: ${permission.permission}`);
+            const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner,
+              repo,
+              username: actor
+            });
 
-              if (!hasAccess) {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  body: `@${context.actor} Sorry, only repository collaborators with write access can stop full CI runs. 🔒`
-                });
-              }
-
-              return hasAccess;
-            } catch (error) {
-              console.error('Error checking permissions:', error);
-              return false;
-            }
-
-      - name: Exit if no access
-        if: steps.check_access.outputs.result == 'false'
-        run: |
-          echo "User does not have permission to stop full CI"
-          exit 1
-
-      - name: Add reaction to comment
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          comment-id: ${{ github.event.comment.id }}
-          reactions: 'eyes'
-
-      - name: Remove full-ci label
-        uses: actions/github-script@v7
-        with:
-          script: |
-            try {
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                name: 'full-ci'
-              });
-              console.log('✅ Removed full-ci label from PR');
-
-              // Post success comment
-              const successBody = [
-                '✅ **Full CI Mode Disabled**',
-                '',
-                'The `full-ci` label has been removed. Future commits will use the standard CI suite (skipping tests for unchanged code).',
-                '',
-                'To re-enable full CI mode, use the `/run-skipped-ci` command.'
-              ].join('\n');
-
+            if (!['admin', 'write'].includes(permission.permission)) {
               await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: successBody
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: `@${actor} Sorry, only repository collaborators with write access can stop full CI runs.`
               });
-            } catch (error) {
-              if (error.status === 404) {
-                console.log('ℹ️  Label not found - already removed or never added');
+              core.setFailed(`User ${actor} does not have permission to stop full CI`);
+              return;
+            }
 
-                const notFoundBody = [
-                  'ℹ️  **Full CI Mode Already Disabled**',
-                  '',
-                  'The `full-ci` label is not present on this PR. CI is already running in standard mode.'
-                ].join('\n');
+            await github.rest.reactions.createForIssueComment({
+              owner,
+              repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
 
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  body: notFoundBody
+            let removed = false;
+            for (const labelName of ['ready-for-full-ci', 'full-ci']) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  name: labelName
                 });
-              } else {
-                console.error('❌ Failed to remove label:', error);
-
-                const errorBody = [
-                  '❌ **Error Removing Label**',
-                  '',
-                  'Failed to remove the `full-ci` label: ' + error.message
-                ].join('\n');
-
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  body: errorBody
-                });
-                // Use core.setFailed instead of throw to properly fail the workflow
-                core.setFailed(`Failed to remove label: ${error.message}`);
+                removed = true;
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
               }
             }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body: removed
+                ? [
+                    '## Full CI Mode Disabled',
+                    '',
+                    'Removed full CI readiness labels. Future commits will use the fast required gate until full CI is requested again.'
+                  ].join('\n')
+                : [
+                    '## Full CI Mode Already Disabled',
+                    '',
+                    'No full CI readiness labels are present on this PR.'
+                  ].join('\n')
+            });

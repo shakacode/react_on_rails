@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+      issues: write
       pull-requests: write
     steps:
       - name: Check for similar commands
@@ -83,12 +84,12 @@ jobs:
             ## Available GitHub Comment Commands
 
             ### 1. \\\`+ci-run-full\\\` - Enable Full CI Mode
-            Triggers all CI workflows that were skipped due to unchanged code.
+            Marks the PR ready for the full GitHub CI suite.
 
             **What it does:**
             - Runs tests across all supported versions (Ruby 3.3-4.0, Node 20-22, Shakapacker 8-10, React 18-19)
-            - Adds the \\\`full-ci\\\` label to persist full testing on future commits
-            - Triggers: Main tests, Generator tests, and React on Rails Pro tests
+            - Dispatches full-CI-capable workflows for the current head SHA
+            - Adds the \\\`ready-for-full-ci\\\` label to persist full testing on future commits
 
             **Requirements:**
             - Must have write access to the repository
@@ -102,11 +103,11 @@ jobs:
             ---
 
             ### 2. \\\`+ci-stop-full\\\` - Disable Full CI Mode
-            Returns to standard CI behavior (optimized suite, skips tests for unchanged code).
+            Returns to fast required-gate behavior for future commits.
 
             **What it does:**
-            - Removes the \\\`full-ci\\\` label from the PR
-            - Future commits will use the fast feedback CI suite
+            - Removes full CI readiness labels from the PR
+            - Future commits use the fast required gate until full CI is requested again
             - Does NOT stop currently running workflows
 
             **Requirements:**

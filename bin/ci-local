@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local CI Runner
 # Runs appropriate CI checks based on changes in current branch
-# Usage: bin/ci-local [--all] [--fast] [base-ref]
+# Usage: bin/ci-local [--all] [--fast] [--changed] [base-ref]
 
 set -euo pipefail
 
@@ -18,6 +18,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --fast)
       FAST_MODE=true
+      shift
+      ;;
+    --changed)
+      RUN_ALL=false
       shift
       ;;
     *)

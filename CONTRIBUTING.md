@@ -610,7 +610,7 @@ Post one CI command per comment. If a comment contains multiple `+ci-*` commands
 
 #### `+ci-run-full` - Enable Full CI Mode
 
-Runs all skipped CI checks and enables full CI mode for the PR:
+Adds the full CI readiness label and enables full CI mode for the PR:
 
 ```
 +ci-run-full
@@ -618,8 +618,8 @@ Runs all skipped CI checks and enables full CI mode for the PR:
 
 **What it does:**
 
-- Triggers all CI workflows that were skipped due to unchanged code
-- Adds the `full-ci` label to the PR
+- Adds the `ready-for-full-ci` label to the PR
+- Dispatches full-CI-capable workflows for the current head SHA
 - **Persists across future commits** - all subsequent pushes will run the full test suite
 - Runs latest dependency tests (Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19)
 - Runs minimum dependency tests (Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18)
@@ -633,7 +633,7 @@ Runs all skipped CI checks and enables full CI mode for the PR:
 
 #### `+ci-stop-full` - Disable Full CI Mode
 
-Removes the `full-ci` label and returns to standard CI behavior:
+Removes full CI readiness labels and returns to fast required-gate behavior:
 
 ```
 +ci-stop-full
@@ -641,8 +641,8 @@ Removes the `full-ci` label and returns to standard CI behavior:
 
 **What it does:**
 
-- Removes the `full-ci` label from the PR
-- Future commits will use the optimized CI suite (tests only changed code)
+- Removes `ready-for-full-ci` and the legacy `full-ci` label from the PR
+- Future commits will use the fast required gate until full CI is requested again
 - Does not stop currently running workflows
 
 **When to use:**
@@ -664,25 +664,25 @@ The reason is optional. If omitted, the bot records `not provided`.
 
 - Posts an audit comment with the current head SHA
 - Does not cancel or block any workflow run
-- Removes `full-ci` if present
-- Does not skip the standard optimized CI selected for the changed files
+- Removes full CI readiness labels if present
+- Does not skip the required fast gate
 - Does not apply to later pushes, because the waiver is bound to the SHA in the comment
 
 Use this when you intentionally choose not to run full CI before merge, especially when acting as an administrator.
 
 #### `+ci-status` and `+ci-help`
 
-Use `+ci-status` to summarize the current head SHA, whether the PR matches the docs-only metadata paths, whether `full-ci` is present, and whether the current SHA has a waiver comment.
+Use `+ci-status` to summarize the current head SHA, whether the PR matches the docs-only metadata paths, whether full CI readiness labels are present, and whether the current SHA has a waiver comment.
 
 Use `+ci-help` to list the available CI commands.
 
-**Note:** The `full-ci` label is preserved on merged PRs as a historical record of which PRs ran with comprehensive testing.
+**Note:** The `ready-for-full-ci` label is preserved on merged PRs as a historical record of which PRs ran with comprehensive testing. The legacy `full-ci` label is still accepted as an alias.
 
 Legacy slash commands (`/run-skipped-ci`, `/run-skipped-tests`, and `/stop-run-skipped-ci`) still work, but the `+ci-*` commands are preferred because GitHub's comment editor uses `/` for built-in slash command autocomplete.
 
 #### Important Notes
 
-- **Force-pushes:** The `+ci-run-full` command adds the `full-ci` label to your PR. If you force-push after commenting, the initial workflow run will test the old commit, but subsequent pushes will automatically run full CI because the label persists.
+- **Force-pushes:** The `+ci-run-full` command dispatches full CI for the current head SHA and adds the `ready-for-full-ci` label to your PR. If you force-push after commenting, the initial workflow run may test the old commit, but subsequent pushes will automatically run full CI because the label persists.
 - **Waivers:** The `+ci-skip-full` command records the exact SHA in the PR conversation. If you push another commit, use `+ci-skip-full` again if you still intend to waive full CI.
 - **Branch operations:** Avoid deleting or force-pushing branches while workflows are running, as this may cause failures.
 

@@ -11,6 +11,9 @@ on:
   push:
     branches: [main]
     # Always trigger on main; non-runtime detection handles skipping heavy jobs
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
 
 jobs:
@@ -18,19 +21,24 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
       non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Check for full CI readiness label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
       - name: Detect relevant changes
         id: detect
         run: |
-          BASE_REF="${{ github.event.before || 'origin/main' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Guard docs-only main pushes
@@ -44,10 +52,16 @@ jobs:
     needs: detect-changes
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'workflow_dispatch' || !(
+      !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.non_runtime_only == 'true'
+      ) && (
+        github.event_name != 'pull_request' ||
+        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
+        startsWith(github.base_ref, 'release/') ||
+        startsWith(github.base_ref, 'releases/') ||
+        startsWith(github.base_ref, 'release-')
       )
     steps:
       - uses: actions/checkout@v4

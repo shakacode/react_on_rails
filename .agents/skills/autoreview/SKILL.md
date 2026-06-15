@@ -43,7 +43,7 @@ This is the portable core. Hold it regardless of which engine runs.
 - Be patient. `codex review` runs an external model and can take several minutes on a large diff. Progress that looks quiet is usually still working; do not kill it before about 5 minutes unless it has clearly errored.
 - Do not launch multiple reviewers by default. One selected engine, one structured result, then verify it.
 - A gated second-engine pass is appropriate only when the user asks or the diff falls into the
-  `AGENTS.md` high-risk / `full-ci` / `benchmark` categories. Run it after the primary review is
+  `AGENTS.md` high-risk / `ready-for-full-ci` / `benchmark` categories. Run it after the primary review is
   clean, keep it to one extra pass, and verify its findings the same way.
 - If you reject a finding as intentional/not worth fixing, add a brief inline code comment only when it documents a real invariant or ownership decision a future reviewer should know.
 - **Do not push just to review.** Push only when the user asked for push/ship/PR. Follow `AGENTS.md` git boundaries (never force-push `main`/`master`).
@@ -146,7 +146,7 @@ capacity, retry the same engine a few times rather than swapping it.
 
 ### High-risk second pass
 
-For high-risk changes listed in `AGENTS.md` under `full-ci` or `benchmark`, or when the user asks
+For high-risk changes listed in `AGENTS.md` under `ready-for-full-ci` or `benchmark`, or when the user asks
 for a panel/second model, run one additional review after the primary review is clean:
 
 - If the primary review used `codex review`, use Claude review tooling if it is available in the
@@ -193,8 +193,8 @@ Report:
 - review engine used (`codex review` or the available Claude review command)
 - tests/proof run, with pass/fail
 - findings accepted vs rejected, briefly why
-- PR label recommendation from `AGENTS.md` (`Labels: none`, `Labels: full-ci`,
-  `Labels: benchmark`, or `Labels: full-ci, benchmark`) when the work is headed to a PR
+- PR label recommendation from `AGENTS.md` (`Labels: none`, `Labels: ready-for-full-ci`,
+  `Labels: benchmark`, or `Labels: ready-for-full-ci, benchmark`) when the work is headed to a PR
 - the final clean review result, or why a remaining finding was consciously left unfixed
 
 Do not run another review solely to improve the report wording. If the final review came back

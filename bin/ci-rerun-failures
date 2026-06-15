@@ -225,6 +225,7 @@ job_name_matches() {
 
 declare -A JOB_MAP
 JOB_MAP["lint-js-and-ruby"]="lint-js-and-ruby"
+JOB_MAP["required-pr-gate"]="required-pr-gate"
 JOB_MAP["rspec-package-tests"]="rspec-package-tests"
 JOB_MAP["package-js-tests"]="package-js-tests"
 # Split dummy app callers include build jobs too, so only match the reusable integration job.
@@ -234,6 +235,14 @@ JOB_MAP["rspack-dummy-app-tests / dummy-app-integration-tests*"]="dummy-app-inte
 JOB_MAP["dummy-app-integration-tests (4.0, 22, latest)"]="dummy-app-integration-tests"
 JOB_MAP["dummy-app-integration-tests (3.3, 20, minimum)"]="dummy-app-integration-tests"
 JOB_MAP["examples"]="examples"
+JOB_MAP["precompile-check"]="precompile-check"
+JOB_MAP["pro-lint"]="pro-lint"
+JOB_MAP["build-dummy-app-webpack-test-bundles"]="pro-dummy-build"
+JOB_MAP["package-js-tests"]="package-js-tests"
+JOB_MAP["rspec-gem-specs"]="pro-rspec-gem-specs"
+JOB_MAP["rspec-dummy-app-node-renderer"]="pro-dummy-rspec"
+JOB_MAP["dummy-app-node-renderer-e2e-tests"]="pro-dummy-e2e"
+JOB_MAP["dummy-app-rspack-rsc-runtime-gate"]="pro-rspack-rsc-runtime-gate"
 
 # Function to execute commands without eval
 run_command() {
@@ -243,6 +252,13 @@ run_command() {
       bundle_command "$ROOT_GEMFILE" bundle exec rubocop &&
         pnpm run eslint --report-unused-disable-directives &&
         pnpm start format.listDifferent
+      ;;
+    "required-pr-gate")
+      ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.load_file(f); puts f }" &&
+        for script in bin/ci-local bin/ci-rerun-failures bin/request-full-ci script/ci-changes-detector; do
+          bash -n "$script"
+        done &&
+        script/ci-changes-detector origin/main
       ;;
     "rspec-package-tests")
       ensure_oss_dependencies
@@ -258,6 +274,23 @@ run_command() {
     "examples")
       ensure_oss_dependencies
       (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle exec rake run_rspec:shakapacker_examples)
+      ;;
+    "precompile-check")
+      ensure_oss_dependencies
+      (cd "$ROOT_DIR/react_on_rails/spec/dummy" && bundle exec rake assets:precompile)
+      ;;
+    "pro-lint")
+      (cd "$ROOT_DIR/react_on_rails_pro" &&
+        bundle_command "$ROOT_GEMFILE" bundle exec rubocop --ignore-parent-exclusion &&
+        bundle_command "$ROOT_DIR/react_on_rails_pro/Gemfile" bundle exec rake rbs:validate &&
+        pnpm run nps check-typescript)
+      ;;
+    "pro-dummy-build"|"pro-dummy-rspec"|"pro-dummy-e2e"|"pro-rspack-rsc-runtime-gate")
+      echo "No exact local equivalent for $cmd_id. Run the matching Pro dummy workflow or use bin/ci-local --all."
+      return 1
+      ;;
+    "pro-rspec-gem-specs")
+      (cd "$ROOT_DIR/react_on_rails_pro" && bundle_command "$ROOT_DIR/react_on_rails_pro/Gemfile" bundle exec rspec spec/react_on_rails_pro)
       ;;
     *)
       echo "Unknown command ID: $cmd_id"

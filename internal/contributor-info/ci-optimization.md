@@ -1,259 +1,124 @@
 # CI Optimization Guide
 
-This document explains the CI optimization strategy implemented for React on Rails.
+This document explains the React on Rails PR CI policy.
 
-## Overview
+## Goals
 
-The CI pipeline has been optimized to:
+CI should give fast feedback during review without weakening merge safety:
 
-1. **Skip unnecessary workflows** for documentation-only changes
-2. **Run reduced test matrices on PRs** (full matrix only on main)
-3. **Provide local CI tooling** to run appropriate tests before pushing
+1. Local machines catch routine failures before a push.
+2. Every PR update gets a stable required check: `ci-required / required-pr-gate`.
+3. Heavy GitHub CI runs only when the PR is ready for full validation, on merge queue, on `main`, on release-target PRs, or by manual dispatch.
+4. Required checks do not depend on workflow-level `paths` or `paths-ignore` filters that can leave branch protection waiting on a skipped workflow.
 
-## Optimization Strategies
+## Required PR Gate
 
-### 1. Path-Based Filtering
+`.github/workflows/ci-required.yml` is the branch-protection-friendly gate. It always starts for PR updates, label changes, merge queue, and manual dispatch.
 
-All workflows now use `paths-ignore` to skip when only certain files change:
+The `required-pr-gate` job intentionally stays lightweight:
 
-```yaml
-on:
-  pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-```
+- validates workflow YAML can be loaded by Ruby
+- syntax-checks CI shell helpers
+- runs `script/ci-changes-detector`
+- checks basic repository structure
 
-**Benefits:**
+Repository branch protection should require `ci-required / required-pr-gate`. Do not require heavyweight jobs for ordinary review pushes unless the repository policy intentionally wants every PR update to run full CI.
 
-- Documentation changes don't trigger CI
-- Workflows skip when irrelevant files change
-- Reduces GitHub Actions minutes usage
+## Full CI Triggers
 
-### 2. Change Detection
+Heavy workflows start but keep expensive jobs behind job-level conditions. Full CI jobs run when any of these is true:
 
-The main test workflow includes a `detect-changes` job that:
+- the event is a push to `main`
+- the event is `merge_group`
+- the workflow is manually dispatched
+- the PR targets a release branch (`release/*`, `releases/*`, or `release-*`)
+- the PR has `ready-for-full-ci`
 
-- Analyzes which files changed
-- Determines if tests are needed
-- Skips downstream jobs for docs-only changes
+The legacy `full-ci` label is still accepted as an alias so older comments and labels do not break. New automation should use `ready-for-full-ci`.
 
-**Example:**
+## Requesting Full CI
 
-```yaml
-jobs:
-  detect-changes:
-    runs-on: ubuntu-22.04
-    outputs:
-      skip_tests: ${{ steps.changes.outputs.skip_tests }}
-    steps:
-      - name: Detect changes
-        # ... analyzes git diff
-```
-
-### 3. Reduced Test Matrix on PRs
-
-On PRs, we run a reduced test matrix for faster feedback:
-
-| Environment   | Main Branch     | Pull Requests |
-| ------------- | --------------- | ------------- |
-| Ruby versions | 3.3, 4.0        | 4.0 only      |
-| Node versions | 20, 22          | 22 only       |
-| Dependencies  | minimum, latest | latest only   |
-
-**Benefits:**
-
-- ~75% reduction in CI time for PRs
-- Faster feedback for developers
-- Full coverage still runs on main before release
-
-**Implementation:**
-
-```yaml
-matrix:
-  ruby-version: ${{ github.ref == 'refs/heads/main' && fromJSON('["3.3", "4.0"]') || fromJSON('["4.0"]') }}
-  node-version: ${{ github.ref == 'refs/heads/main' && fromJSON('["20", "22"]') || fromJSON('["22"]') }}
-```
-
-### 4. Smart Path Filtering per Workflow
-
-Each workflow ignores paths that don't affect its tests:
-
-- **JS tests**: Skip when only Ruby files change (`lib/**`, `spec/react_on_rails/**`)
-- **Ruby tests**: Skip when only JS files change (`packages/react-on-rails/src/**`)
-- **All tests**: Skip for docs-only changes
-
-## Local CI Tools
-
-### `bin/ci-local` - Smart Local CI Runner
-
-Runs appropriate CI checks based on your changes:
+Use the helper from a PR branch:
 
 ```bash
-# Auto-detect what to test based on changes
+bin/request-full-ci
+```
+
+Or add the label directly:
+
+```bash
+gh pr edit <number> --add-label ready-for-full-ci
+```
+
+Maintainers can also comment:
+
+```text
++ci-run-full
+```
+
+Legacy slash aliases still work:
+
+```text
+/run-skipped-ci
+```
+
+Both command paths dispatch the full-CI-capable workflows for the current head SHA, create `ready-for-full-ci` if needed, and add it so future pushes keep running full CI. This explicit dispatch is required because labels added by a workflow's `GITHUB_TOKEN` do not start new `pull_request` workflow runs.
+
+To return a PR to fast-gate mode for future commits:
+
+```text
++ci-stop-full
+```
+
+or:
+
+```text
+/stop-run-skipped-ci
+```
+
+## Local CI Contract
+
+Before pushing review-comment fixes or CI-sensitive changes, run:
+
+```bash
 bin/ci-local
-
-# Run all CI checks (same as main)
-bin/ci-local --all
-
-# Run only fast checks
-bin/ci-local --fast
-
-# Compare against specific branch
-bin/ci-local origin/develop
 ```
 
-**Features:**
-
-- Analyzes your git diff
-- Skips unnecessary tests
-- Shows clear success/failure summary
-- Provides feedback before pushing
-
-### `script/ci-changes-detector` - Change Analysis Tool
-
-Analyzes which files changed and recommends CI jobs:
+For narrow changes, this equivalent alias documents the intent:
 
 ```bash
-# Check changes since main
+bin/ci-local --changed
+```
+
+Use the detector directly when you need to inspect routing:
+
+```bash
 script/ci-changes-detector origin/main
-
-# Check changes between any refs
-script/ci-changes-detector origin/develop HEAD
 ```
 
-**Output:**
+See `internal/contributor-info/local-ci-contract.md` for the short AI/dev contract.
 
-```
-=== CI Changes Analysis ===
-Changed file categories:
-  • Ruby source code
-  • JavaScript/TypeScript code
+## Merge Safety
 
-Recommended CI jobs:
-  ✓ Lint (Ruby + JS)
-  ✓ RSpec gem tests
-  ✓ JS unit tests
-  ✓ Dummy app integration tests
-```
+If GitHub merge queue is enabled, keep the full-CI-capable workflows on `merge_group`. That gives merge candidates a full validation pass even when ordinary PR review pushes only ran the fast gate.
 
-### `/run-ci` Claude Skill
+If merge queue is not enabled, maintainers should add `ready-for-full-ci` and wait for full CI to pass before merging. Branch protection should still require `ci-required / required-pr-gate` so every PR update has a stable required check.
 
-Claude Code skill for interactive CI execution:
+## Rerunning Failures
 
-```
-/run-ci
+Use:
+
+```bash
+bin/ci-rerun-failures
 ```
 
-Claude will:
-
-1. Analyze your changes
-2. Show recommended CI jobs
-3. Ask which option you prefer
-4. Execute and report results
-
-## CI Workflow Reference
-
-### Workflows and Their Triggers
-
-| Workflow                   | Runs On           | Skips For        | Matrix Reduction       |
-| -------------------------- | ----------------- | ---------------- | ---------------------- |
-| `main.yml`                 | Code changes      | Docs only        | Yes (75% faster)       |
-| `lint-js-and-ruby.yml`     | Code changes      | Docs only        | No (already fast)      |
-| `examples.yml`             | Generator changes | Docs only        | Yes (50% faster)       |
-| `package-js-tests.yml`     | JS changes        | Docs, Ruby files | Yes (50% faster)       |
-| `rspec-package-specs.yml`  | Ruby changes      | Docs, JS files   | Yes (75% faster)       |
-| `check-markdown-links.yml` | Markdown changes  | Non-docs         | No (already optimized) |
-
-## Expected Time Savings
-
-### Before Optimization
-
-- PR with code changes: ~45 minutes (all matrices)
-- PR with docs changes: ~45 minutes (unnecessary)
-- Total CI time per day: High
-
-### After Optimization
-
-- PR with code changes: ~12 minutes (reduced matrix)
-- PR with docs changes: 0 minutes (skipped)
-- Main merge: ~45 minutes (full matrix)
-- Total CI time saved: ~70%
-
-## Best Practices
-
-### For Developers
-
-1. **Run local CI before pushing:**
-
-   ```bash
-   bin/ci-local
-   ```
-
-2. **Use fast mode for quick checks:**
-
-   ```bash
-   bin/ci-local --fast
-   ```
-
-3. **Separate doc changes from code changes:**
-   - Docs-only PRs skip CI entirely
-   - Mixed PRs run full CI
-
-4. **Trust the PR CI:**
-   - Reduced matrix is sufficient for most changes
-   - Main branch validates full matrix before release
-
-### For Maintainers
-
-1. **Monitor CI performance:**
-   - Check GitHub Actions usage
-   - Identify slow tests
-   - Adjust matrix as needed
-
-2. **Update path filters:**
-   - Add new file patterns as project evolves
-   - Keep filters accurate
-
-3. **Review main CI failures:**
-   - Main runs full matrix
-   - Catches edge cases not found in PR CI
-
-## Troubleshooting
-
-### CI not skipping for docs changes
-
-Check if:
-
-- Changes are truly docs-only (use `git diff --name-only`)
-- Path patterns match your files
-- Workflow has correct `paths-ignore`
-
-### CI taking too long on PRs
-
-- Ensure you're not on main branch
-- Check if matrix reduction is working
-- Use `bin/ci-local --fast` for local testing
-
-### Tests pass locally but fail in CI
-
-- Different dependency versions
-- Environment differences
-- Run `bin/ci-local --all` to match CI exactly
-
-## Future Improvements
-
-Potential further optimizations:
-
-1. **Parallel test execution** within jobs
-2. **Smarter caching** of dependencies
-3. **Test splitting** for faster execution
-4. **Conditional job dependencies** based on changes
-5. **Reusable workflows** to reduce duplication
+The script maps common GitHub check names to local commands, including the required PR gate. Some Pro dummy-app checks do not have exact local equivalents; use the matching GitHub workflow or `bin/ci-local --all` when a local reproduction is not precise.
 
 ## Related Files
 
-- `script/ci-changes-detector` - Change detection script
-- `bin/ci-local` - Local CI runner
-- `.agents/skills/run-ci/SKILL.md` - shared CI skill exposed to Claude Code as `/run-ci`
-- `.github/workflows/*.yml` - All CI workflows
+- `.github/workflows/ci-required.yml` - fast required gate
+- `.github/actions/check-full-ci-label/action.yml` - accepts `ready-for-full-ci` and legacy `full-ci`
+- `script/ci-changes-detector` - changed-file classification
+- `bin/ci-local` - local changed-files CI runner
+- `bin/request-full-ci` - adds `ready-for-full-ci`
+- `bin/ci-rerun-failures` - maps failed checks to local commands

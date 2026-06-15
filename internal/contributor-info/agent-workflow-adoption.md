@@ -55,7 +55,7 @@ Copy these only when the target repo wants PR-comment commands such as `+ci-run-
 
 - [.github/read-me.md](../../.github/read-me.md) - maintainer-facing explanation of the CI command workflow.
 - [.github/workflows/ci-commands.yml](../../.github/workflows/ci-commands.yml) - comment-command handler.
-- [.github/actions/check-full-ci-label/action.yml](../../.github/actions/check-full-ci-label/action.yml) - helper used by workflows that react to the `full-ci` label.
+- [.github/actions/check-full-ci-label/action.yml](../../.github/actions/check-full-ci-label/action.yml) - helper used by workflows that react to `ready-for-full-ci` and the legacy `full-ci` label.
 
 Do not copy the CI workflow files as a bundle unless the target repo has the same workflow names, labels, permissions, and matrix strategy. Treat these files as implementation examples to adapt.
 
@@ -109,9 +109,9 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - Update bot assumptions, reviewer names, and any repo-specific reply or resolution rules.
 
 7. Decide whether to adopt CI comment commands.
-   - If adopted, create the labels the workflow expects, especially `full-ci`.
-   - Update the workflow map in `ci-commands.yml` so it dispatches the target repo's actual expensive workflows.
-   - Ensure each expensive workflow knows how to react to `full-ci` or manual dispatch.
+   - If adopted, create the labels the workflow expects, especially `ready-for-full-ci`.
+   - Keep `ci-commands.yml` aligned with the target repo's actual full-CI trigger mechanism.
+   - Ensure each expensive workflow knows how to react to `ready-for-full-ci` or manual dispatch.
    - If not adopted, remove `+ci-*` language from `AGENTS.md` and `pr-processing.md`, and replace it with the target repo's real full-CI trigger.
 
 8. Validate with a dry run.
@@ -132,7 +132,7 @@ Update these before considering the workflow adopted:
 - Unit, integration, E2E, type-check, docs, and workflow-lint commands.
 - Local change detector or equivalent path-based CI guidance.
 - Manual developer-flow checks for app startup, generated apps, examples, or test fixtures.
-- PR labels such as `full-ci`, `benchmark`, and `ready-to-merge`.
+- PR labels such as `ready-for-full-ci`, `benchmark`, and `ready-to-merge`.
 - Batch coordination labels such as `codex-ready`, `codex-wip`, or `codex-pending-question`, if adopted; otherwise remove or replace those examples and rely on exact lane assignments plus structured claim comments.
 - Cross-repo coordination backend, agent-id format, claim/heartbeat/status lifecycle, and package-routing rules if the repo will share multi-batch operations with other repos.
 - Full-CI trigger mechanism if `+ci-*` is not installed.

@@ -364,7 +364,7 @@ Fetch/prune main first, confirm the expected repo root, and verify any nested re
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
-For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config,
+For non-trivial, high-risk, `ready-for-full-ci`, `benchmark`, workflow/build-config,
 dependency/runtime-version, or broad refactor PRs, commit the intended
 implementation locally before pushing so there is a clean branch diff. Run
 repo-specific validation, formatter/lint/type checks as applicable, then run the
@@ -372,7 +372,7 @@ primary local/adversarial self-review gate, normally
 `codex review --base origin/<base>` or the PR's real base, before PR creation or
 update.
 
-When requested by a maintainer or when the change is high-risk, `full-ci`,
+When requested by a maintainer or when the change is high-risk, `ready-for-full-ci`,
 `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor
 scoped, run one additional Claude Code review pass if available, such as
 `/code-review` or `/code-review ultra`.
@@ -661,7 +661,7 @@ asking GitHub reviewers or CI to spend another cycle.
 2. Apply the local/adversarial self-review gate on the committed branch diff, normally via
    `.agents/skills/autoreview/SKILL.md`. The default engine is `codex review --base origin/main` or
    the PR's real base.
-3. When the maintainer asks for Claude review, or when the change is high-risk, `full-ci`,
+3. When the maintainer asks for Claude review, or when the change is high-risk, `ready-for-full-ci`,
    `benchmark`, workflow/build-config, dependency/runtime-version, or broad-refactor scoped, run
    one additional Claude Code review pass if the current environment provides it, for example
    `/code-review` or `/code-review ultra`. If Claude review tooling is unavailable, state that in
@@ -772,13 +772,13 @@ and the next action the agent will take after a response. Do not post routine pr
 Use the `+ci-*` PR comment commands from the CI command workflow for full-CI decisions. These commands provide the audit trail for running, stopping, checking, or waiving full CI.
 
 - During active implementation or review-fix churn, do not request full CI.
-- If a PR is still being iterated and already has `full-ci`, ask whether to comment `+ci-stop-full` before pushing more batches.
+- If a PR is still being iterated and already has `ready-for-full-ci`, ask whether to comment `+ci-stop-full` before pushing more batches.
 - Use `+ci-status` before deciding whether full CI is already enabled or waived for the current SHA.
 - Use `+ci-run-full` only after local validation, self-review, review-thread triage, and the final push for the current batch. At that point, if you are unsure whether path-selected CI is enough, request full CI and record the reason in FYI; then re-fetch and wait for the newly requested current-head checks before readiness or merge. Do not request full CI speculatively during active churn.
 - Use `+ci-skip-full [reason]` only with explicit maintainer approval and only for low-risk/current-SHA cases where the reason is auditable.
 - Use `+ci-help` when the command syntax or current behavior is unclear.
 - Put one `+ci-*` command per PR comment; the workflow handles only the first command in a comment.
-- Do not add or remove `full-ci` directly when a `+ci-*` command would create a clearer audit trail.
+- Do not add or remove `ready-for-full-ci` directly when a `+ci-*` command would create a clearer audit trail.
 
 ## CI Polling And Live State
 
@@ -830,7 +830,7 @@ Do not let follow-up issues become a substitute for finishing the PR. Follow-up 
 
 ## Merge Endgame Debounce And Waiver Soak
 
-For `full-ci`, `benchmark`, accelerated-RC, high-risk, concurrent-batch, or repeatedly churny PRs,
+For `ready-for-full-ci`, `benchmark`, accelerated-RC, high-risk, concurrent-batch, or repeatedly churny PRs,
 declare a final candidate before the final configured review pass. After that review pass completes,
 do not push nit-only, comment-only, optional wording-only, or evidence-only commits. Batch any
 remaining must-fix file changes into one final push and restart the current-head review/check gate;

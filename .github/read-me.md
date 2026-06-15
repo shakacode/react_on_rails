@@ -4,9 +4,9 @@ This directory contains GitHub Actions workflows for continuous integration and 
 
 ## PR Comment Commands
 
-### `+ci-run-full` - Run Full CI Suite
+### `+ci-run-full` - Request Full CI
 
-When you open a PR, CI automatically runs a subset of tests for faster feedback (latest Ruby/Node versions only). To run the **complete CI suite** including all dependency combinations, add a comment to your PR:
+When you open or update a PR, GitHub runs the fast required gate. To run the **complete CI suite** including all dependency combinations, add a comment to your PR:
 
 ```
 +ci-run-full
@@ -14,14 +14,12 @@ When you open a PR, CI automatically runs a subset of tests for faster feedback 
 
 Post one CI command per comment. If a comment contains multiple `+ci-*` commands, the command workflow handles only the first one.
 
-This command will trigger:
+This command dispatches the full-CI-capable workflows for the current head SHA, creates `ready-for-full-ci` if needed, and adds it so future pushes on the PR keep running full CI:
 
 - ✅ Main test suite with both latest and minimum supported versions
 - ✅ All example app generator tests
 - ✅ React on Rails Pro integration tests
 - ✅ React on Rails Pro package tests
-
-`+ci-run-full` dispatches this manually maintained workflow map:
 
 - **Lint JS and Ruby** (`lint-js-and-ruby.yml`)
 - **JS unit tests for Renderer package** (`package-js-tests.yml`)
@@ -29,26 +27,21 @@ This command will trigger:
 - **Integration Tests** (`integration-tests.yml`)
 - **Assets Precompile Check** (`precompile-check.yml`)
 - **Generator tests** (`examples.yml`)
+- **Playwright E2E Tests** (`playwright.yml`)
 - **React on Rails Pro - Integration Tests** (`pro-integration-tests.yml`)
 - **React on Rails Pro - Package Tests** (`pro-test-package-and-gem.yml`)
 
-When adding or removing a full-CI-capable workflow, update both this list and the `workflowMap` in `ci-commands.yml`.
-
 The bot will:
 
-1. React to your comment (`rocket` when workflows are triggered, `confused` when the command cannot run)
-2. Post a confirmation message with links to the triggered workflows
-3. Start all CI jobs on your PR branch
+1. React to your comment (`rocket` when at least one workflow is dispatched, `confused` when the command cannot run)
+2. Post a confirmation message for the current head SHA and any dispatch failures
+3. Keep future commits on the PR in full-CI mode until `+ci-stop-full` removes the label
 
-If the PR branch is from a fork or the PR head repository is unavailable, the bot posts maintainer guidance and exits without dispatching workflows.
+If the PR branch is from a fork or the PR head repository is unavailable, the bot posts maintainer guidance and exits without dispatching workflows or adding the label.
 
 ### Why This Exists
 
-By default, PRs run a subset of CI jobs to provide fast feedback:
-
-- Only latest dependency versions (Ruby 4.0, Node 22)
-- Skips example generator tests
-- Skips some Pro package tests
+By default, PRs run a fast required gate and rely on local validation during review.
 
 This is intentional to keep PR feedback loops fast. However, before merging high-risk changes, you should verify compatibility across all supported versions. The `+ci-run-full` command makes this easy without waiting for the PR to be merged to main.
 
@@ -74,7 +67,7 @@ The job-level `contains('+ci-')` prefilter is intentionally broad because GitHub
 
 ### Concurrency Protection
 
-Multiple CI command comments on the same PR run one at a time so a status/help command cannot interrupt a full-CI dispatch.
+Multiple CI command comments on the same PR run one at a time so status/help commands cannot race label changes.
 
 ## Testing Comment-Triggered Workflows
 
@@ -108,6 +101,7 @@ For more details, see [GitHub's documentation on issue_comment events](https://d
 
 ### Utility Workflows
 
+- **`ci-required.yml`** - Fast required PR gate
 - **`ci-commands.yml`** - Triggered by `+ci-*` comments on PRs
 - **`run-skipped-ci.yml`** - Legacy workflow triggered by `/run-skipped-ci` or `/run-skipped-tests` comment on PRs
 - **`pr-welcome-comment.yml`** - Auto-comments on new PRs with helpful info
@@ -129,14 +123,14 @@ Most workflows use minimal permissions. The comment-triggered workflows require:
 - `contents: read` - To read the repository code
 - `pull-requests: read` - To inspect PR metadata and changed files
 - `issues: write` - To post comments, labels, and reactions
-- `actions: write` - To trigger other workflows
+- `actions: write` - To dispatch full-CI workflows for comment commands
 
 ## Conditional Execution
 
-Many workflows use change detection to skip unnecessary jobs:
+Many workflows use job-level conditions to skip unnecessary heavyweight jobs:
 
 - Runs all jobs on pushes to `main`
-- Runs only relevant jobs on PRs based on changed files
+- Runs full CI on merge queue, manual dispatch, release-target PRs, or PRs labeled `ready-for-full-ci`
 - Can be overridden with `workflow_dispatch` or `+ci-run-full`
 
 See `script/ci-changes-detector` for the change detection logic.

@@ -113,7 +113,7 @@ Run `git fetch --prune origin main` first, confirm the expected repo root, verif
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
-For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config,
+For non-trivial, high-risk, `ready-for-full-ci`, `benchmark`, workflow/build-config,
 dependency/runtime-version, or broad refactor PRs, commit the intended
 implementation locally before pushing so there is a clean branch diff. Run
 repo-specific validation, formatter/lint/type checks as applicable, then run the
@@ -121,7 +121,7 @@ primary local/adversarial self-review gate, normally
 `codex review --base origin/<base>` or the PR's real base, before PR creation or
 update.
 
-When requested by a maintainer or when the change is high-risk, `full-ci`,
+When requested by a maintainer or when the change is high-risk, `ready-for-full-ci`,
 `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor
 scoped, run one additional Claude Code review pass if available, such as
 `/code-review` or `/code-review ultra`.

@@ -13,15 +13,8 @@ on:
       - 'main'
     # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'AGENTS_USER_GUIDE.md'
-      - 'docs/**'
-      - 'llms.txt'
-      - 'llms-full.txt'
-      - 'llms-full-pro.txt'
-      - '.lychee.toml'
-      - 'react_on_rails_pro/**'
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
     inputs:
       force_run:
@@ -35,6 +28,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
@@ -51,13 +45,13 @@ jobs:
           # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
           fetch-depth: 50
           persist-credentials: false
-      - name: Check for full-ci label
+      - name: Check for full CI readiness label
         id: check-label
         uses: ./.github/actions/check-full-ci-label
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR full-ci label is present, run everything
+          # If force_run is true OR a full CI readiness label is present, run everything
           if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
             {
               echo "run_lint=true"
@@ -108,6 +102,7 @@ jobs:
           MINIMUM_NODE_VERSION: ${{ steps.tool-versions.outputs.minimum-node-major-version }}
           WORKFLOW_REF: ${{ github.ref }}
           WORKFLOW_EVENT: ${{ github.event_name }}
+          IS_RELEASE_TARGET: ${{ startsWith(github.base_ref, 'release/') || startsWith(github.base_ref, 'releases/') || startsWith(github.base_ref, 'release-') }}
           FORCE_RUN: ${{ inputs.force_run }}
           HAS_FULL_CI_LABEL: ${{ needs.detect-changes.outputs.has_full_ci_label }}
         run: |
@@ -118,9 +113,10 @@ jobs:
           minimum_ruby_version="$MINIMUM_RUBY_VERSION"
           minimum_node_version="$MINIMUM_NODE_VERSION"
 
-          # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label).
+          # Determine if we should run full matrix (main, merge queue, manual, release target, or full CI readiness label).
           if [[ "$WORKFLOW_REF" == "refs/heads/main" ]] || \
-             [[ "$WORKFLOW_EVENT" == "workflow_dispatch" ]] || \
+             [[ "$WORKFLOW_EVENT" != "pull_request" ]] || \
+             [[ "$IS_RELEASE_TARGET" == "true" ]] || \
              [[ "$FORCE_RUN" == "true" ]] || \
              [[ "$HAS_FULL_CI_LABEL" == "true" ]]; then
             run_full_matrix=true
@@ -182,8 +178,8 @@ jobs:
   # One reusable-workflow call per independent bundler/dependency-level chain. Each call owns its
   # own build -> integration job chain (see dummy-app-bundler-tests.yml), so a build failure in one
   # chain no longer skips another chain's integration tests. Refs #3593 / #3622.
-  # The shared gating preserves the prior skip behavior (docs/comment-only commits skip heavy jobs
-  # while main code changes always run full CI). The webpack minimum call adds the full-matrix gate.
+  # The shared gating keeps regular PR updates cheap while preserving full CI on main, manual runs,
+  # merge queue, release targets, and PRs marked ready for full validation.
   webpack-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
     if: |
@@ -192,9 +188,11 @@ jobs:
         github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_dummy_tests == 'true'
+        github.event_name != 'pull_request' ||
+        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
+        startsWith(github.base_ref, 'release/') ||
+        startsWith(github.base_ref, 'releases/') ||
+        startsWith(github.base_ref, 'release-')
       )
     permissions:
       contents: read
@@ -210,9 +208,11 @@ jobs:
         github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_dummy_tests == 'true'
+        github.event_name != 'pull_request' ||
+        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
+        startsWith(github.base_ref, 'release/') ||
+        startsWith(github.base_ref, 'releases/') ||
+        startsWith(github.base_ref, 'release-')
       )
     permissions:
       contents: read
@@ -228,9 +228,11 @@ jobs:
         github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_dummy_tests == 'true'
+        github.event_name != 'pull_request' ||
+        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
+        startsWith(github.base_ref, 'release/') ||
+        startsWith(github.base_ref, 'releases/') ||
+        startsWith(github.base_ref, 'release-')
       )
     permissions:
       contents: read

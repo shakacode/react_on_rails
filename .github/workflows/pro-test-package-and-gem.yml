@@ -9,17 +9,8 @@ on:
       - 'main'
     # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'AGENTS_USER_GUIDE.md'
-      - 'docs/**'
-      - 'llms.txt'
-      - 'llms-full.txt'
-      - 'llms-full-pro.txt'
-      - '.lychee.toml'
-      - 'react_on_rails/lib/**'
-      - 'react_on_rails/spec/**'
-      - 'packages/react_on_rails/**'
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
     inputs:
       force_run:
@@ -40,6 +31,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
@@ -52,14 +44,14 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check for full-ci label
+      - name: Check for full CI readiness label
         id: check-label
         uses: ./.github/actions/check-full-ci-label
       - name: Detect relevant changes
         id: detect
         working-directory: .
         run: |
-          # If force_run is true OR full-ci label is present, run everything
+          # If force_run is true OR a full CI readiness label is present, run everything
           if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
             {
               echo "run_pro_lint=true"
@@ -88,9 +80,11 @@ jobs:
         github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_lint == 'true'
+        github.event_name != 'pull_request' ||
+        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
+        startsWith(github.base_ref, 'release/') ||
+        startsWith(github.base_ref, 'releases/') ||
+        startsWith(github.base_ref, 'release-')
       )
     runs-on: ubuntu-22.04
     env:
@@ -211,9 +205,11 @@ jobs:
         github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_tests == 'true'
+        github.event_name != 'pull_request' ||
+        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
+        startsWith(github.base_ref, 'release/') ||
+        startsWith(github.base_ref, 'releases/') ||
+        startsWith(github.base_ref, 'release-')
       )
     runs-on: ubuntu-22.04
     env:
@@ -315,9 +311,11 @@ jobs:
         github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_tests == 'true'
+        github.event_name != 'pull_request' ||
+        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
+        startsWith(github.base_ref, 'release/') ||
+        startsWith(github.base_ref, 'releases/') ||
+        startsWith(github.base_ref, 'release-')
       )
     runs-on: ubuntu-22.04
     # Redis service container
@@ -418,9 +416,11 @@ jobs:
         github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_tests == 'true'
+        github.event_name != 'pull_request' ||
+        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
+        startsWith(github.base_ref, 'release/') ||
+        startsWith(github.base_ref, 'releases/') ||
+        startsWith(github.base_ref, 'release-')
       )
     runs-on: ubuntu-22.04
     env:
