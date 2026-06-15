@@ -317,6 +317,29 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(secondResult.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
   });
 
+  test('fallback source map lookup retries after an error-path miss in the same VM', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapPath = `${bundlePath}.map`;
+    await writeVmBundle(buildThrowingBundleSource());
+
+    const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    const firstResult = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(firstResult)).toBe(true);
+    if (!isErrorRenderResult(firstResult)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(firstResult.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+    const secondResult = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(secondResult)).toBe(true);
+    if (!isErrorRenderResult(secondResult)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(secondResult.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+  });
+
   test('external source map lookup retries after preload reads partial map content', async () => {
     const bundlePath = vmBundlePath(testName);
     const mapFileName = `${path.basename(bundlePath)}.map`;
@@ -1014,7 +1037,9 @@ describe('source-mapped stack traces for VM errors', () => {
       expect(result.exceptionMessage).toContain('SSR kaboom');
       // The `filename` option means frames now name the bundle file, not `evalmachine.<anonymous>`.
       expect(result.exceptionMessage).toContain(`at boom (${bundlePath}:3:`);
-      expect(realpathSyncSpy.mock.calls.some(([filePath]) => filePath === fallbackMapPath)).toBe(false);
+      const fallbackLookups = realpathSyncSpy.mock.calls.filter(([filePath]) => filePath === fallbackMapPath);
+      expect(fallbackLookups.length).toBeGreaterThan(0);
+      expect(fallbackLookups.length).toBeLessThanOrEqual(5);
     } finally {
       realpathSyncSpy.mockRestore();
     }

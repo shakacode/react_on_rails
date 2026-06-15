@@ -411,11 +411,9 @@ export async function preloadSourceMapJsonForBundle(bundleFilePath: string, bund
 
   // External maps can arrive just after the bundle during upload/pre-stage flows.
   // Leave misses lazy; VM registrations mark them retryable so a first error
-  // before the map copy finishes does not cache a permanent miss.
-  const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
-  const existingCandidate = candidatePaths.some((candidatePath) =>
-    Boolean(resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory)),
-  );
+  // before the map copy finishes does not cache a permanent miss. This includes
+  // the documented `<bundle>.js.map` fallback, which may not exist yet when the
+  // VM is built.
   const sourceMapJson = await readSourceMapJsonForBundleAsync(
     bundleFilePath,
     sourceMappingUrl,
@@ -427,10 +425,9 @@ export async function preloadSourceMapJsonForBundle(bundleFilePath: string, bund
   }
 
   return {
-    // Without a sourceMappingURL or an observed fallback map, do not keep
-    // retrying every error-path stack lookup for bundles that have no map.
-    retryMissingSourceMap:
-      sourceMapJson === undefined && (sourceMappingUrl !== undefined || existingCandidate),
+    // Bounded retries cover both explicit sourceMappingURL maps and the
+    // documented fallback path. True no-map bundles retire after the retry cap.
+    retryMissingSourceMap: sourceMapJson === undefined,
     sourceMapJson,
   };
 }
