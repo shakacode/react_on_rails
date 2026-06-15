@@ -176,17 +176,31 @@ fi
 # Map CI job names to identifiers
 # NOTE: Version numbers below must match .github/workflows/main.yml matrix configuration
 declare -A JOB_MAP
+JOB_MAP["required-pr-gate"]="ci-required"
 JOB_MAP["lint-js-and-ruby"]="lint-js-and-ruby"
 JOB_MAP["rspec-package-tests"]="rspec-package-tests"
 JOB_MAP["package-js-tests"]="package-js-tests"
 JOB_MAP["dummy-app-integration-tests (3.4, 22, latest)"]="dummy-app-integration-tests"
 JOB_MAP["dummy-app-integration-tests (3.2, 20, minimum)"]="dummy-app-integration-tests"
 JOB_MAP["examples"]="examples"
+JOB_MAP["precompile-check"]="precompile-check"
+JOB_MAP["pro-lint-js-and-ruby"]="pro-lint-js-and-ruby"
+JOB_MAP["rspec-gem-specs"]="pro-rspec-gem-specs"
+JOB_MAP["rspec-dummy-app-node-renderer"]="pro-rspec-dummy-app-node-renderer"
+JOB_MAP["dummy-app-node-renderer-e2e-tests"]="pro-dummy-app-node-renderer-e2e-tests"
 
 # Function to execute commands without eval
 run_command() {
   local cmd_id="$1"
   case "$cmd_id" in
+    "ci-required")
+      ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.load_file(f); puts f }" &&
+        bash -n bin/ci-local &&
+        bash -n bin/ci-rerun-failures &&
+        bash -n script/ci-changes-detector &&
+        bash -n bin/request-full-ci &&
+        script/ci-changes-detector origin/main
+      ;;
     "lint-js-and-ruby")
       bundle exec rubocop && pnpm run eslint --report-unused-disable-directives && pnpm start format.listDifferent
       ;;
@@ -201,6 +215,26 @@ run_command() {
       ;;
     "examples")
       bundle exec rake run_rspec:shakapacker_examples
+      ;;
+    "precompile-check")
+      cd react_on_rails/spec/dummy && RAILS_ENV=production bundle exec rake assets:precompile
+      ;;
+    "pro-lint-js-and-ruby")
+      cd react_on_rails_pro &&
+        bundle exec rubocop --ignore-parent-exclusion &&
+        bundle exec rake rbs:validate &&
+        pnpm run nps eslint &&
+        pnpm run nps format.listDifferent &&
+        pnpm run nps check-typescript
+      ;;
+    "pro-rspec-gem-specs")
+      cd react_on_rails_pro && bundle exec rspec spec/react_on_rails_pro
+      ;;
+    "pro-rspec-dummy-app-node-renderer")
+      cd react_on_rails_pro/spec/dummy && bundle exec rspec
+      ;;
+    "pro-dummy-app-node-renderer-e2e-tests")
+      cd react_on_rails_pro/spec/dummy && pnpm e2e-test
       ;;
     *)
       echo "Unknown command ID: $cmd_id"

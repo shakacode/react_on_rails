@@ -6,12 +6,8 @@ on:
       - 'main'
     # Always trigger on main; docs-only detection handles skipping heavy jobs
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'react_on_rails/lib/**'
-      - 'react_on_rails/spec/react_on_rails/**'
-      - 'react_on_rails_pro/**'
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
     inputs:
       force_run:
@@ -25,6 +21,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
@@ -40,20 +37,22 @@ jobs:
           # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
           fetch-depth: 50
           persist-credentials: false
-      - name: Check for full-ci label
+      - name: Check for full CI readiness label
         id: check-label
         uses: ./.github/actions/check-full-ci-label
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR full-ci label is present, run everything
+          # If force_run is true OR a full CI readiness label is present, run everything
           if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_lint=true" >> "$GITHUB_OUTPUT"
-            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_generators=true" >> "$GITHUB_OUTPUT"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "run_lint=true"
+              echo "run_js_tests=true"
+              echo "run_ruby_tests=true"
+              echo "run_dummy_tests=true"
+              echo "run_generators=true"
+              echo "docs_only=false"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -69,26 +68,32 @@ jobs:
 
   build:
     needs: detect-changes
-    # Run on main OR when JS tests needed on PR
+    # Regular PRs use ci-required only. Heavy jobs run for main, merge queue, manual dispatch,
+    # release branch PRs, or PRs labeled for full CI.
     if: |
       !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
-        needs.detect-changes.outputs.run_js_tests == 'true'
+        github.event_name == 'push' ||
+        github.event_name == 'merge_group' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
+        startsWith(github.base_ref, 'release/') ||
+        startsWith(github.base_ref, 'releases/') ||
+        startsWith(github.base_ref, 'release-')
       )
     strategy:
       matrix:
         node-version:
           # Always run: Latest Node version (fast feedback on PRs)
           - '22'
-          # Main and full-ci label: Minimum supported Node version (full coverage)
+          # Main and full CI readiness label: Minimum supported Node version (full coverage)
           - '20'
         exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on main or with full-ci label)
-          - node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/main' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
+          # Skip minimum dependency matrix on regular PRs.
+          - node-version: ${{ github.event_name == 'pull_request' && needs.detect-changes.outputs.has_full_ci_label != 'true' && !startsWith(github.base_ref, 'release/') && !startsWith(github.base_ref, 'releases/') && !startsWith(github.base_ref, 'release-') && '20' || '' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -102,7 +107,7 @@ jobs:
         uses: pnpm/action-setup@v4
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
       - name: Setup pnpm cache
         uses: actions/cache@v4
         with:

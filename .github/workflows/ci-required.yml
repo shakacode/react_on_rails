@@ -1,0 +1,48 @@
+name: ci-required
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-required-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  required-pr-gate:
+    name: required-pr-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+          persist-credentials: false
+
+      - name: Validate workflow files
+        run: |
+          ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.load_file(f); puts f }"
+
+      - name: Validate CI shell scripts
+        run: |
+          bash -n bin/ci-local
+          bash -n bin/ci-rerun-failures
+          bash -n script/ci-changes-detector
+          if [ -f bin/request-full-ci ]; then
+            bash -n bin/request-full-ci
+          fi
+
+      - name: Run changed-files detector
+        run: script/ci-changes-detector "${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+
+      - name: Lightweight repo sanity check
+        run: |
+          test -f Gemfile
+          test -f package.json
+          test -d .github/workflows

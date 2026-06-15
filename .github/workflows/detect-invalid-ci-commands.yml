@@ -80,11 +80,11 @@ jobs:
             ## Available GitHub Comment Commands
 
             ### 1. \\\`/run-skipped-ci\\\` (or \\\`/run-skipped-tests\\\`) - Enable Full CI Mode
-            Triggers all CI workflows that were skipped due to unchanged code.
+            Requests full CI for this PR.
 
             **What it does:**
             - Runs tests across all supported versions (Ruby 3.2-3.4, Node 20-22, Shakapacker 8-9, React 18-19)
-            - Adds the \\\`full-ci\\\` label to persist full testing on future commits
+            - Adds the \\\`ready-for-full-ci\\\` label to persist full testing on future commits
             - Triggers: Main tests, Generator tests, and React on Rails Pro tests
 
             **Requirements:**
@@ -101,10 +101,11 @@ jobs:
             ---
 
             ### 2. \\\`/stop-run-skipped-ci\\\` - Disable Full CI Mode
-            Returns to standard CI behavior (optimized suite, skips tests for unchanged code).
+            Returns to standard CI behavior (fast required PR gate only until full CI is requested).
 
             **What it does:**
-            - Removes the \\\`full-ci\\\` label from the PR
+            - Removes the \\\`ready-for-full-ci\\\` label from the PR
+            - Also removes legacy \\\`full-ci\\\` if present
             - Future commits will use the fast feedback CI suite
             - Does NOT stop currently running workflows
 
