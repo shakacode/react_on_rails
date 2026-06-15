@@ -16,3 +16,4 @@ The authoritative rubric lives in `.agents/skills/evaluate-issue/SKILL.md`. Read
    - Exclude `park / P3`, `close`, and `product decision` items from implementation batches unless the batch is explicitly audit/comment-only.
    - Convert low-value assigned issues into no-PR evidence comments rather than speculative PRs.
    - Carry the disposition into `$pr-batch` as the target outcome: implementation PR, no-PR evidence comment, `document/work around`, or product-decision blocker.
+   - For recurring process misses, also carry the Process Gap Disposition fields from `.agents/skills/evaluate-issue/SKILL.md`: `Mechanism target`, `Motivating miss`, `Replay evidence or park reason`, and `Non-goal`.

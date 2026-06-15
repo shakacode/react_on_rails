@@ -102,6 +102,9 @@ For every non-OK finding, include a draft issue entry but do not create it:
 - evidence
 - recommended owner/action
 - suggested labels if they already exist in the repo
+- for process findings only: `Mechanism target` (`script`, `schema`,
+  `checklist+replay`, or `park`), `Motivating miss`, `Replay evidence or park
+  reason`, and `Non-goal`
 
 Return high-risk findings first, then a PR-by-PR table. Include exact commands and data sources used. Do not make code changes, comments, labels, issues, reverts, or PRs without approval.
 ```
@@ -122,6 +125,9 @@ For each finding:
 - evidence
 - duplicate/overlap analysis against the other report
 - whether this needs manual maintainer review, a fix PR, a follow-up issue, a changelog update, revert consideration, or no action
+- for process findings only, the proposed Process Gap Disposition fields:
+  `Mechanism target` (`script`, `schema`, `checklist+replay`, or `park`),
+  `Motivating miss`, `Replay evidence or park reason`, and `Non-goal`
 
 Pay special attention to disagreements:
 - one agent flags risk and the other misses it
@@ -155,6 +161,9 @@ Rules:
 - If there are two or more related child issues, create one parent issue first.
 - Create one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
 - For missing changelog findings, prefer one bundled changelog issue or recommend `/update-changelog`; do not create one issue per missing entry unless explicitly approved.
+- For process findings, preserve the approved Process Gap Disposition fields:
+  `Mechanism target`, `Motivating miss`, `Replay evidence or park reason`, and
+  `Non-goal`.
 - Include the hidden `post-merge-audit-finding` fingerprint in every child issue body.
 - Link child issues from the parent issue and link the parent from each child issue.
 - Use existing repo labels only. If a suggested label does not exist, omit it and mention that omission in the summary.

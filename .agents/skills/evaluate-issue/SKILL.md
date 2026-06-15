@@ -50,7 +50,13 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - Be skeptical of broad identity, runtime, CI, workflow, dependency, or Pro/RSC changes unless impact justifies the complexity.
    - Split complex fixes into prerequisites and decision points; do not let a polished RFC imply immediate priority.
 
-5. Recommend disposition
+5. Classify recurring process misses
+   - Use this only when the issue would add or change agent, review, CI, release, or audit process.
+   - Do not add a prose-only rule by default. Choose one `Mechanism target`: `script`, `schema`, `checklist+replay`, or `park`.
+   - Record the `Motivating miss`, `Replay evidence or park reason`, and `Non-goal` before recommending a process issue or PR.
+   - Prefer `park` when the miss is plausible but not worth mechanizing yet, or when a maintainer/product decision is needed first.
+
+6. Recommend disposition
    - `fix now / P0`: release blocker, merge-this-week severity, security/data-loss risk, or active severe regression.
    - `fix now / P1`: verified urgency with a manageable scope, but not an immediate release blocker.
    - `fix later / P2`: real impact but not urgent, or needs sequencing.
@@ -59,7 +65,7 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - `close / not planned`: low-value, speculative, harmful, duplicate, or superseded.
    - `product decision`: maintainer input required before implementation would be safe.
 
-6. Apply labels only when authorized
+7. Apply labels only when authorized
    - "Authorized" means the current user prompt, worker goal, or task instructions explicitly allow label changes, or the user granted issue-triage/write permission for the current task. If unsure, report the label recommendation without changing GitHub.
    - Use `P0` for merge-this-week blockers, `P1` for target-this-sprint work, `P2` for backlog, and `P3` for parked priority.
    - Keep `discussion` for RFCs and unresolved product decisions.
@@ -86,6 +92,13 @@ Complexity:
 
 - <files/surfaces/risk/sequencing>
 
+Process Gap Disposition:
+
+- Mechanism target: <script | schema | checklist+replay | park | N/A>
+- Motivating miss: <PR/review/audit/incident or N/A>
+- Replay evidence or park reason: <command/fixture/historical artifact/reason or N/A>
+- Non-goal: <broad prose-only rule to avoid or N/A>
+
 Next action:
 
 - <issue comment, label update, docs/workflow update, follow-up issue, no-PR evidence comment, or implementation PR>
@@ -99,6 +112,7 @@ When evaluating candidates for a batch:
 - Exclude `park`, `close`, and `product decision` items from implementation batches unless the batch goal is an audit/comment-only pass.
 - Convert low-value assigned issues into no-PR evidence comments instead of speculative PRs.
 - Carry the disposition into `$pr-batch` as the target outcome: implementation PR, no-PR evidence comment, `document/work around`, or product-decision blocker.
+- For recurring process misses, carry the Process Gap Disposition fields into the batch plan or no-PR evidence comment.
 
 ## Common Mistakes
 
