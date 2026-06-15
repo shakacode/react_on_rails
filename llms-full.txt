@@ -8265,7 +8265,7 @@ export class AppGreeting extends HTMLElement {
     this.render();
   }
 
-  attributeChangedCallback() {
+  attributeChangedCallback(_name: string, _oldValue: string | null, _newValue: string | null) {
     this.render();
   }
 
@@ -8277,10 +8277,11 @@ export class AppGreeting extends HTMLElement {
         .greeting { padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; }
       </style>
       <div class="greeting">
-        <p>Hello, ${name}!</p>
+        <p class="name"></p>
         <slot></slot>
       </div>
     `;
+    this.shadowRoot!.querySelector('.name')!.textContent = `Hello, ${name}!`;
   }
 }
 
@@ -8301,9 +8302,9 @@ Create a central registration file that imports all your web component definitio
 export {};
 
 if (typeof window !== 'undefined') {
-  import('./app-greeting');
-  import('./app-counter');
-  import('./app-toggle');
+  void import('./app-greeting');
+  void import('./app-counter');
+  void import('./app-toggle');
 }
 ```
 
@@ -8325,6 +8326,31 @@ The `typeof window` guard ensures dynamic imports only run in the browser. On th
 ### Server-Rendered Components (`prerender: true`)
 
 Web component tags work in server-rendered React components. The tags are included in the initial HTML response with their attributes:
+
+If you use TypeScript, declare your custom element tags so JSX type-checking accepts them:
+
+```typescript
+// client/app/types/web-components.d.ts
+
+import 'react';
+
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'app-greeting': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+        name?: string;
+        variant?: string;
+      };
+      'app-counter': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+        value?: string;
+        label?: string;
+      };
+    }
+  }
+}
+```
+
+Then use the tags in your component:
 
 ```tsx
 // client/app/startup/Dashboard.tsx
@@ -8372,10 +8398,6 @@ const InteractiveDemo: React.FC = () => {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    import('../web-components/register');
-  }, []);
-
-  useEffect(() => {
     const el = counterRef.current;
     if (!el) return;
 
@@ -8397,6 +8419,8 @@ const InteractiveDemo: React.FC = () => {
 
 export default InteractiveDemo;
 ```
+
+Web components are already registered by the `client-bundle.ts` import shown above — there is no need to import `register.ts` again in individual components.
 
 > [!TIP]
 > React 19 sets properties directly on custom elements when a property of that name exists on the element instance. For attributes that must be strings (like `value`), explicitly convert with `String()`.
@@ -8480,7 +8504,7 @@ export class WcClosedShadow extends HTMLElement {
   }
 
   getCount(): number {
-    return parseInt(this._shadow.querySelector('.count')!.textContent || '0');
+    return parseInt(this._shadow.querySelector('.count')!.textContent || '0', 10);
   }
 
   reset(): void {
@@ -8633,13 +8657,15 @@ Place important visible content in slots rather than inside shadow DOM. Slotted 
 
 ## Testing with Playwright
 
-Playwright's CSS locators pierce **open** shadow DOM automatically. For **closed** shadow DOM, expose public methods and use `page.evaluate()`:
+Playwright's built-in selector engine pierces **open** shadow DOM automatically when using `page.locator()`. This is a Playwright feature — native `document.querySelector()` does not cross shadow boundaries.
+
+For **closed** shadow DOM, Playwright cannot pierce it either. Expose public methods on your element class and use `page.evaluate()`:
 
 ```javascript
-// Open shadow — Playwright pierces automatically:
+// Open shadow — Playwright's selector engine pierces open shadow roots:
 await expect(page.locator('.shadow-inner-class')).toBeVisible();
 
-// Closed shadow — use public API methods:
+// Closed shadow — use public API methods via page.evaluate():
 await page.evaluate(() => {
   const el = document.querySelector('my-closed-component');
   el.reset();
