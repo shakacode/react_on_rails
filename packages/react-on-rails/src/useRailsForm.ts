@@ -57,7 +57,22 @@ export interface RailsFormValidationErrorResult {
   response: Response;
 }
 
-export type RailsFormSubmitResult = RailsFormSuccessResult | RailsFormValidationErrorResult;
+export interface RailsFormStaleResult {
+  ok: false;
+  /**
+   * True when this submit was superseded by a newer submit before it settled.
+   * Stale submissions do not update form state, run submit callbacks, or reject
+   * stale caller `.catch()` handlers after the newer submit has won.
+   */
+  stale: true;
+  response?: Response;
+  error?: unknown;
+}
+
+export type RailsFormSubmitResult =
+  | RailsFormSuccessResult
+  | RailsFormValidationErrorResult
+  | RailsFormStaleResult;
 
 /** Thrown (as a promise rejection) for non-2xx responses other than a mappable 422. */
 export class RailsFormRequestError extends Error {
@@ -329,6 +344,17 @@ const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
   );
 };
 
+const staleSubmitResult = (response?: Response, error?: unknown): RailsFormStaleResult => {
+  const result: RailsFormStaleResult = { ok: false, stale: true };
+  if (response) {
+    result.response = response;
+  }
+  if (error !== undefined) {
+    result.error = error;
+  }
+  return result;
+};
+
 /**
  * React hook for submitting form data to a Rails controller action.
  *
@@ -486,6 +512,9 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
         });
       } catch (fetchError) {
         finishSubmission();
+        if (!isCurrent()) {
+          return staleSubmitResult(undefined, fetchError);
+        }
         warnOnPossibleRedirectFetchError(fetchError);
         throw fetchError;
       }
@@ -502,15 +531,22 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
             options.onError?.(validationErrors);
           } else {
             finishSubmission();
+            return staleSubmitResult(response);
           }
           return { ok: false as const, errors: validationErrors, response };
         }
         finishSubmission();
+        if (!isCurrent()) {
+          return staleSubmitResult(response);
+        }
         throw new RailsFormRequestError(response, body);
       }
 
       if (!response.ok) {
         finishSubmission();
+        if (!isCurrent()) {
+          return staleSubmitResult(response);
+        }
         throw new RailsFormRequestError(response);
       }
 

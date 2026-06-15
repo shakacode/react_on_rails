@@ -822,6 +822,81 @@ describe('useRailsForm', () => {
       expect(result.current.wasSuccessful).toBe(false);
     });
 
+    it('resolves stale non-422 failures after a newer submit succeeds', async () => {
+      let resolveFirst!: (response: Response) => void;
+      fetchMock
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveFirst = resolve;
+            }),
+        )
+        .mockResolvedValueOnce(mockResponse({ status: 201, body: { message: 'ok' } }));
+
+      const { result } = renderHook(() => useRailsForm({ a: 1 }));
+      const firstCatch = jest.fn();
+
+      let firstSubmit: Promise<unknown> = Promise.resolve();
+      await act(async () => {
+        firstSubmit = result.current.post('/things').catch((error: unknown) => {
+          firstCatch(error);
+          return error;
+        });
+        await result.current.post('/things');
+      });
+
+      let firstResult: unknown;
+      await act(async () => {
+        resolveFirst(mockResponse({ status: 500, body: { error: 'too late' } }));
+        firstResult = await firstSubmit;
+      });
+
+      expect(firstCatch).not.toHaveBeenCalled();
+      expect(firstResult).toMatchObject({
+        ok: false,
+        stale: true,
+        response: expect.objectContaining({ status: 500 }),
+      });
+      expect(result.current.wasSuccessful).toBe(true);
+      expect(result.current.errors).toEqual({});
+    });
+
+    it('resolves stale fetch rejections after a newer submit succeeds', async () => {
+      let rejectFirst!: (error: TypeError) => void;
+      fetchMock
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((_resolve, reject) => {
+              rejectFirst = reject;
+            }),
+        )
+        .mockResolvedValueOnce(mockResponse({ status: 201, body: { message: 'ok' } }));
+
+      const { result } = renderHook(() => useRailsForm({ a: 1 }));
+      const firstCatch = jest.fn();
+      const networkError = new TypeError('network down after success');
+
+      let firstSubmit: Promise<unknown> = Promise.resolve();
+      await act(async () => {
+        firstSubmit = result.current.post('/things').catch((error: unknown) => {
+          firstCatch(error);
+          return error;
+        });
+        await result.current.post('/things');
+      });
+
+      let firstResult: unknown;
+      await act(async () => {
+        rejectFirst(networkError);
+        firstResult = await firstSubmit;
+      });
+
+      expect(firstCatch).not.toHaveBeenCalled();
+      expect(firstResult).toEqual({ ok: false, stale: true, error: networkError });
+      expect(result.current.wasSuccessful).toBe(true);
+      expect(result.current.errors).toEqual({});
+    });
+
     it('does not fire onSuccess for a submission superseded by a newer one', async () => {
       // A slow first request must not run its callbacks (e.g. navigate on
       // redirectTo) after a newer submission has already completed.

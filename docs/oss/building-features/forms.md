@@ -180,6 +180,11 @@ Response handling:
 - **Anything else** (including a 422 whose body doesn't match) — the promise
   rejects with `RailsFormRequestError`; network failures reject with the
   original fetch error.
+- **Superseded submissions** — when an older in-flight submit settles after a
+  newer submit has started, it resolves with `{ ok: false, stale: true }` plus
+  the stale `response` or `error`. Stale submits do not update form state, call
+  submit callbacks, or reject into an older `.catch()` handler after the newer
+  submit has won.
 
 ## Redirects and `onSuccess`
 
