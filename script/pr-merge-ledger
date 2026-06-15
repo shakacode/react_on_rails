@@ -1369,7 +1369,7 @@ class PrMergeLedger
     end
 
     def non_retryable_gh_error?(stderr)
-      stderr.to_s.match?(/\b4\d{2}\b|\b(?:Not Found|Unauthorized|Forbidden|Too Many Requests)\b/i)
+      stderr.to_s.match?(/\b4(?:0\d|1\d|2[0-8]|[3-9]\d)\b|\b(?:Not Found|Unauthorized|Forbidden)\b/i)
     end
 
     def capture_gh(args)
