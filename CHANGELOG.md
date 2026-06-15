@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** **RSC and client-only FOUC reveal gating**: Pro now waits for auto-loaded generated component stylesheets before mounting client-only roots and promotes streamed RSC client chunk stylesheet preloads to real stylesheet links before reveal, including when stream chunks split `<link>` tags. Shared generated CSS is matched through manifest-derived stylesheet href metadata, while app-authored preload links remain untouched. Fixes [Issue 4031](https://github.com/shakacode/react_on_rails/issues/4031), [Issue 4032](https://github.com/shakacode/react_on_rails/issues/4032). [PR 4047](https://github.com/shakacode/react_on_rails/pull/4047) by [justin808](https://github.com/justin808).
+
 ### [17.0.0.rc.4] - 2026-06-14
 
 #### Added
