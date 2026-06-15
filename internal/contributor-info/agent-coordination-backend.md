@@ -108,7 +108,9 @@ elif test ! -x "$AGENT_COORD_REPO_ABS/bin/agent-coord"; then
   return 1 2>/dev/null || exit 1
 fi
 
-AGENT_COORD_REPO="$AGENT_COORD_REPO_ABS" # Canonicalize in the caller: further references use the absolute path.
+# Intentionally update the caller's variable before the subshell.
+# Later snippets inherit the canonical path.
+AGENT_COORD_REPO="$AGENT_COORD_REPO_ABS"
 
 if (
   set -eu -o pipefail
@@ -130,6 +132,13 @@ if (
       echo "$label did not produce a JSON object" >&2
       return 1
     fi
+  }
+
+  load_agent_coord_config_json() {
+    "$AGENT_COORD_BIN" config show --json 2>/dev/null || {
+      echo 'agent-coord config show --json failed; rerun it directly for private diagnostics' >&2
+      return 1
+    }
   }
 
   require_clean_agent_coord_checkout() {
@@ -155,19 +164,37 @@ if (
   }
 
   require_published_agent_coord_head() {
-    local head_sha
+    local head_sha remote_tag_refs
     head_sha="$(git -C "$AGENT_COORD_REPO" rev-parse HEAD)" || {
       echo "could not read agent-coordination HEAD" >&2
       return 1
     }
 
+    # This mutates the private clone's remote-tracking refs and local tag namespace.
+    # Run it only against the private checkout selected by AGENT_COORD_REPO.
     git -C "$AGENT_COORD_REPO" fetch --quiet --prune --tags origin || {
       echo "could not fetch private agent-coordination origin; backend SHA reachability is UNKNOWN" >&2
       return 1
     }
 
+    remote_tag_refs="$(git -C "$AGENT_COORD_REPO" ls-remote --tags --refs origin)" || {
+      echo "could not list private agent-coordination origin tags; backend SHA reachability is UNKNOWN" >&2
+      return 1
+    }
+
+    remote_tag_contains_head() {
+      local tag_ref
+
+      while IFS= read -r tag_ref; do
+        test -n "$tag_ref" || continue
+        git -C "$AGENT_COORD_REPO" merge-base --is-ancestor "$head_sha" "$tag_ref" && return 0
+      done < <(printf '%s\n' "$remote_tag_refs" | awk '{print $2}')
+
+      return 1
+    }
+
     if ! git -C "$AGENT_COORD_REPO" branch -r --contains "$head_sha" | grep -q '[^[:space:]]' &&
-       ! git -C "$AGENT_COORD_REPO" tag --contains "$head_sha" | grep -q '[^[:space:]]'; then
+       ! remote_tag_contains_head; then
       echo "agent-coordination HEAD $head_sha is not reachable from a fetched remote branch or tag" >&2
       return 1
     fi
@@ -186,9 +213,10 @@ if (
     AGENT_COORD_VERSION_JSON="$("$AGENT_COORD_BIN" version --json)" &&
     require_json_output "agent-coord version --json" "$AGENT_COORD_VERSION_JSON" &&
     # Suppress stderr: diagnostics may expose private config paths or error details.
-    # Non-zero exits still stop the preflight; blank stdout is caught after a zero exit.
+    # Non-zero exits still stop the preflight after printing the sanitized hint above.
+    # Blank stdout after a zero exit is caught by require_json_output.
     # For private diagnostics, run "$AGENT_COORD_REPO/bin/agent-coord config show --json" directly.
-    AGENT_COORD_CONFIG_JSON="$("$AGENT_COORD_BIN" config show --json 2>/dev/null)" &&
+    AGENT_COORD_CONFIG_JSON="$(load_agent_coord_config_json)" &&
     require_json_output "agent-coord config show --json" "$AGENT_COORD_CONFIG_JSON" &&
     "$AGENT_COORD_BIN" doctor &&
     "$AGENT_COORD_BIN" status &&
@@ -297,6 +325,10 @@ BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX"
   echo "mktemp failed" >&2
   return 1 2>/dev/null || exit 1
 }
+cleanup_batch_id_file_on_interrupt() {
+  rm -f "$BATCH_ID_FILE"
+}
+trap cleanup_batch_id_file_on_interrupt INT TERM
 # Set once at kickoff, include a short batch slug plus a unique suffix, and reuse for this batch.
 printf '%s\n' "$BATCH_ID" > "$BATCH_ID_FILE"
 # Record the printed file path in the batch handoff.
@@ -304,7 +336,9 @@ printf 'Batch id file: %s\n' "$BATCH_ID_FILE"
 # In a fresh shell, set BATCH_ID_FILE to the recorded path, then restore:
 # BATCH_ID_FILE=/tmp/agent-coord-batch-id.coord-layer.abc123
 # BATCH_ID=$(cat "$BATCH_ID_FILE")
-# At batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
+# During normal batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
+# If the coordinator shell is interrupted before closeout, the recorded file may remain in /tmp;
+# use the handoff path to remove it once no workers need to restore this batch id.
 
 "$AGENT_COORD_BIN" heartbeat \
   --agent-id "$AGENT_ID" \
