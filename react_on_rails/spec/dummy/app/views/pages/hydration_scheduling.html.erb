@@ -16,6 +16,14 @@
                     id: "hydrate-idle",
                     hydrate_on: :idle) %>
 
+<%= react_component("HydrationSchedulingProbe",
+                    props: { label: "Client-only visible island",
+                             mode: "visible-client-only",
+                             testId: "hydrate-visible-client-only" },
+                    prerender: false,
+                    id: "hydrate-visible-client-only",
+                    hydrate_on: :visible) %>
+
 <div style="height: 220vh" aria-hidden="true"></div>
 
 <%= react_component("HydrationSchedulingProbe",

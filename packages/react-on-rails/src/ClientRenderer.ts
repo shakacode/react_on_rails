@@ -97,6 +97,18 @@ function teardownEntry(entry: RenderedEntry, domNodeId: string): void {
   }
 }
 
+function teardownErrorLabel(entry: RenderedEntry, domNodeId: string): string {
+  if (entry.kind === 'renderer') {
+    return `Error in renderer teardown for dom node "${domNodeId}":`;
+  }
+
+  if (entry.kind === 'scheduled') {
+    return `Error canceling scheduled render for dom node "${domNodeId}":`;
+  }
+
+  return `Error unmounting component for dom node "${domNodeId}":`;
+}
+
 function initializeStore(el: Element, railsContext: RailsContext): void {
   const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
   const props = el.textContent !== null ? (JSON.parse(el.textContent) as Record<string, unknown>) : {};
@@ -122,26 +134,41 @@ function hydrateOnForEl(el: Element): HydrateOnMode {
     return (hydrateOn || 'immediate') as HydrateOnMode;
   }
 
-  console.warn(
-    `[react-on-rails] Unsupported hydrate_on mode "${hydrateOn}". Falling back to immediate hydration.`,
-  );
+  console.warn(`[react-on-rails] Unsupported hydrate_on: ${hydrateOn}.`);
   return 'immediate';
+}
+
+function hasObservableArea(element: Element): boolean {
+  const rects = element.getClientRects();
+  for (let index = 0; index < rects.length; index += 1) {
+    const rect = rects[index];
+    if (rect.width > 0 && rect.height > 0) return true;
+  }
+
+  const boundingRect = element.getBoundingClientRect();
+  return boundingRect.width > 0 && boundingRect.height > 0;
+}
+
+function scheduleTimeout(callback: () => void, delay: number): () => void {
+  const timeoutId = window.setTimeout(callback, delay);
+  return () => window.clearTimeout(timeoutId);
 }
 
 function scheduleWhenVisible(domNode: Element, callback: () => void): () => void {
   if (typeof IntersectionObserver === 'undefined') {
-    const timeoutId = window.setTimeout(callback, 0);
-    return () => window.clearTimeout(timeoutId);
+    console.warn('[react-on-rails] No IntersectionObserver.');
+    return scheduleTimeout(callback, 0);
   }
 
-  let active = true;
+  if (!domNode.hasChildNodes() && !hasObservableArea(domNode)) {
+    return scheduleTimeout(callback, 0);
+  }
+
   const observer = new IntersectionObserver(
     (entries) => {
-      if (!active) return;
       const isVisible = entries.some((entry) => entry.isIntersecting || entry.intersectionRatio > 0);
       if (!isVisible) return;
 
-      active = false;
       observer.disconnect();
       callback();
     },
@@ -150,7 +177,6 @@ function scheduleWhenVisible(domNode: Element, callback: () => void): () => void
   observer.observe(domNode);
 
   return () => {
-    active = false;
     observer.disconnect();
   };
 }
@@ -166,8 +192,7 @@ function scheduleWhenIdle(callback: () => void): () => void {
     };
   }
 
-  const timeoutId = window.setTimeout(callback, 1);
-  return () => window.clearTimeout(timeoutId);
+  return scheduleTimeout(callback, 50);
 }
 
 function scheduleHydration(hydrateOn: HydrateOnMode, domNode: Element, callback: () => void): () => void {
@@ -183,11 +208,19 @@ function scheduleHydration(hydrateOn: HydrateOnMode, domNode: Element, callback:
   return () => {};
 }
 
-function raiseRenderError(componentName: string, error: unknown): never {
+function prepareRenderError(componentName: string, error: unknown): Error {
   const renderError = error as Error;
-  console.error(renderError.message);
+  console.error(renderError);
   renderError.message = `ReactOnRails encountered an error while rendering component: ${componentName}. See above error message.`;
-  throw renderError;
+  return renderError;
+}
+
+function raiseRenderError(componentName: string, error: unknown): never {
+  throw prepareRenderError(componentName, error);
+}
+
+function reportRenderError(componentName: string, error: unknown): void {
+  console.error(prepareRenderError(componentName, error));
 }
 
 // Result of attempting renderer delegation. Core carries the raw RendererResult (which may still be
@@ -339,11 +372,7 @@ function renderElement(el: Element, railsContext: RailsContext): void {
           // Surface the failure unconditionally (matching unmountAllComponents) so a teardown/unmount
           // error on node replacement is as visible as one on page unload, using the same greppable
           // labels. We still continue: the old mount may leak, but the new node must be rendered.
-          const label =
-            existing.kind === 'renderer'
-              ? `Error in renderer teardown for dom node "${domNodeId}":`
-              : `Error unmounting component for dom node "${domNodeId}":`;
-          console.error(label, unmountError);
+          console.error(teardownErrorLabel(existing, domNodeId), unmountError);
         }
         renderedRoots.delete(domNodeId);
       }
@@ -411,7 +440,7 @@ You should return a React.Component always for the client side entry point.`);
           mountReactRoot();
         } catch (scheduledError) {
           renderedRoots.delete(domNodeId);
-          raiseRenderError(name, scheduledError);
+          reportRenderError(name, scheduledError);
         }
       };
 
@@ -486,15 +515,7 @@ function unmountAllComponents(): void {
     try {
       teardownEntry(entry, domNodeId);
     } catch (error) {
-      // Use the same label as the async-rejection path so renderer-teardown failures are greppable
-      // whether the teardown threw synchronously (here) or rejected (invokeRendererTeardown).
-      let label = `Error unmounting component for dom node "${domNodeId}":`;
-      if (entry.kind === 'renderer') {
-        label = `Error in renderer teardown for dom node "${domNodeId}":`;
-      } else if (entry.kind === 'scheduled') {
-        label = `Error canceling scheduled render for dom node "${domNodeId}":`;
-      }
-      console.error(label, error);
+      console.error(teardownErrorLabel(entry, domNodeId), error);
     }
   });
   renderedRoots.clear();

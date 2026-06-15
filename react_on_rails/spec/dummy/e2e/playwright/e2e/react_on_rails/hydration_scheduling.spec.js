@@ -51,6 +51,16 @@ test.describe('hydrate_on scheduling', () => {
     await expect(idle.getByRole('button')).toBeEnabled();
   });
 
+  test('renders client-only visible mode even when the empty root has no observable area', async ({
+    page,
+  }) => {
+    await page.goto('/hydration_scheduling');
+
+    const clientOnlyVisible = page.getByTestId('hydrate-visible-client-only');
+    await expect(clientOnlyVisible).toHaveAttribute('data-hydrated', 'true');
+    await expect(clientOnlyVisible.getByRole('button')).toBeEnabled();
+  });
+
   test('hydrates visible mode only after the island scrolls into view', async ({ page }) => {
     await page.goto('/hydration_scheduling');
 
