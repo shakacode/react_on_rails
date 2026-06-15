@@ -37,6 +37,7 @@ describe('package scripts', () => {
     expect(script).toContain('npx playwright test');
     expect(script).toContain('e2e-tests/rsc_echo_props.spec.ts');
     expect(script).toContain('e2e-tests/rsc_route_ssr_false.spec.ts');
+    expect(script).toContain('e2e-tests/rsc_fouc.spec.ts');
     expect(script).not.toContain('e2e-tests/rsc_use_client_css.spec.ts');
   });
 });
