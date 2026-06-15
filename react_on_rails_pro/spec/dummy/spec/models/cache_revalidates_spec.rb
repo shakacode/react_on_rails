@@ -181,4 +181,30 @@ RSpec.describe "ReactOnRailsPro::Cache::Revalidates", :caching do
       expect(ReactOnRailsPro).to have_received(:revalidate_tags).once.with("second:#{post.id}")
     end
   end
+
+  context "when an STI subclass registers before its parent" do
+    let(:base_model) do
+      Class.new(ApplicationRecord) do
+        self.table_name = "posts"
+        include ReactOnRailsPro::Cache::Revalidates
+      end
+    end
+
+    let(:child_model) { Class.new(base_model) }
+
+    before do
+      stub_const("RevalidatingBasePost", base_model)
+      stub_const("RevalidatingChildPost", child_model)
+    end
+
+    it "does not stack a parent callback on top of the subclass callback" do
+      RevalidatingChildPost.revalidates_react_cache { |post| "child:#{post.id}" }
+      RevalidatingBasePost.revalidates_react_cache { |post| "base:#{post.id}" }
+      allow(ReactOnRailsPro).to receive(:revalidate_tags)
+
+      post = RevalidatingChildPost.create!(title: "Hello", body: "World")
+
+      expect(ReactOnRailsPro).to have_received(:revalidate_tags).once.with("child:#{post.id}")
+    end
+  end
 end

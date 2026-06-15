@@ -115,7 +115,7 @@ module ReactOnRailsPro
             stable = stable_record_identity(resolved)
             return stable if stable
 
-            return nil
+            raise_unpersisted_record_tag_error(resolved)
           end
 
           # Other objects exposing #cache_key (never #cache_key_with_version,
@@ -150,6 +150,12 @@ module ReactOnRailsPro
 
         def stable_record_identity_candidate?(resolved)
           resolved.respond_to?(:model_name) && resolved.respond_to?(:id)
+        end
+
+        def raise_unpersisted_record_tag_error(resolved)
+          raise ReactOnRailsPro::Error,
+                "cache_tags: received an unpersisted ActiveRecord-style object (#{resolved.class}). " \
+                "Save the record before using it as a cache tag, or use an explicit String tag."
         end
 
         def append_entry_key(tag, entry_key, cache_options)
@@ -273,10 +279,18 @@ module ReactOnRailsPro
         # Returns an Integer count of deleted cache entries.
         def delete_entries(keys)
           if Rails.cache.respond_to?(:delete_multi)
-            Rails.cache.delete_multi(keys, namespace: nil)
+            coerce_delete_multi_count(Rails.cache.delete_multi(keys, namespace: nil), keys)
           else
             keys.count { |key| Rails.cache.delete(key, namespace: nil) }
           end
+        end
+
+        def coerce_delete_multi_count(result, keys)
+          return result if result.is_a?(Integer)
+          return [keys.size - result.size, 0].max if result.is_a?(Array)
+          return result.to_i if result.respond_to?(:to_i)
+
+          0
         end
 
         def merged_cache_options(cache_options)

@@ -153,8 +153,13 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
     end
 
     it "rejects unpersisted AR-style records instead of sharing a posts/new tag" do
-      expect { described_class.normalize_tags([UnpersistedTaggableRecord.new(id: 42, new_record: true)]) }
-        .to raise_error(ReactOnRailsPro::Error, /blank tag/)
+      [
+        UnpersistedTaggableRecord.new,
+        UnpersistedTaggableRecord.new(id: 42, new_record: true)
+      ].each do |record|
+        expect { described_class.normalize_tags([record]) }
+          .to raise_error(ReactOnRailsPro::Error, /unpersisted ActiveRecord-style object/)
+      end
     end
 
     it "keeps stable identity for destroyed records that still have an id" do
@@ -317,6 +322,26 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(described_class.revalidate("t")).to eq(2)
       expect(Rails.cache.read("entry/one")).to be_nil
       expect(Rails.cache.read("entry/two")).to be_nil
+    end
+
+    it "coerces nil delete_multi results from custom stores to zero deletes" do
+      Rails.cache.write("entry/one", "one")
+      described_class.register(["t"], "entry/one", {})
+      allow(Rails.cache).to receive(:delete_multi).with(["entry/one"], namespace: nil).and_return(nil)
+
+      expect(described_class.revalidate("t")).to eq(0)
+    end
+
+    it "counts deleted entries from custom stores that return undeleted keys" do
+      Rails.cache.write("entry/one", "one")
+      Rails.cache.write("entry/two", "two")
+      described_class.register(["t"], "entry/one", {})
+      described_class.register(["t"], "entry/two", {})
+      allow(Rails.cache).to receive(:delete_multi)
+        .with(%w[entry/one entry/two], namespace: nil)
+        .and_return(["entry/two"])
+
+      expect(described_class.revalidate("t")).to eq(1)
     end
 
     it "returns 0 and does not raise for tags that were never written" do

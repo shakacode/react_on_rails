@@ -19,7 +19,7 @@ require "react_on_rails_pro/cache/tag_index"
 module ReactOnRailsPro
   class Cache
     ACTIVE_SUPPORT_EXPIRES_AT_VERSION = Gem::Version.new("7.0.0")
-    EXPIRED_CACHE_WRITE_TTL = 1
+    EXPIRED_CACHE_WRITE_TTL = 1 # seconds; minimum positive TTL for race-expired writes
 
     class << self
       # options[:cache_options] can include :compress, :expires_in, :race_condition_ttl and
