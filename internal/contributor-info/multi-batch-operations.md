@@ -209,9 +209,10 @@ registered capacity profiles and enabled inboxes. The flow is:
    stop phase 2 with a precise blocker instead of deriving a group count.
 4. If no lane slots remain while actionable work remains, report "all lanes
    currently occupied" and stop phase 2 instead of inventing groups.
-5. Split the actionable worklist into up to one non-empty group per available
-   lane slot, and report idle slots separately when capacity exceeds actionable
-   work.
+5. Split the current wave into up to one non-empty group per available lane slot,
+   capped by the per-batch limits above. When actionable work exceeds the capped
+   current wave, report the remaining backlog/next wave; when capacity exceeds
+   actionable work, report idle slots separately.
 6. Write assigned-but-not-started work to the per-inbox queues when the backend
    supports queue state. Queue state is advisory; if it is unsupported, omit the
    queue summary and note that queue state is unavailable.

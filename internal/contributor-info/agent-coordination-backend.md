@@ -132,10 +132,12 @@ Capacity-aware triage derives group count from registered state:
 4. Let `N` be the resulting available lane-slot count.
 5. If `N` is 0 while actionable work remains, report "all lanes currently
    occupied" and stop phase 2 instead of inventing groups.
-6. Split work into up to `N` non-empty groups, or stop phase 2 with a blocker
-   when `N` cannot be verified. When actionable work has fewer items than
-   available slots, report the remaining idle slots instead of creating empty
-   groups or prompts.
+6. Split the current wave into up to `N` non-empty groups, capped by the
+   `$pr-batch` per-batch limits: 8 items when files or risk overlap, or 10 fully
+   independent items. Stop phase 2 with a blocker when `N` cannot be verified.
+   When actionable work exceeds the capped current wave, report the remaining
+   backlog/next wave; when actionable work has fewer items than available slots,
+   report the remaining idle slots instead of creating empty groups or prompts.
 
 Do not multiply per-batch item caps by an assumed number of machines. The
 registered profiles and inbox config are the only source for capacity-aware
