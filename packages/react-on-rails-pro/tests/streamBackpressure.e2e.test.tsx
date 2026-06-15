@@ -41,6 +41,7 @@ import ReactOnRails from '../src/ReactOnRails.node.ts';
 import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
 
 const HIGHWATER_MARK = 16 * 1024; // Node.js default PassThrough highWaterMark: 16KB
+const INCOMPLETE_LENGTH_PREFIXED_STREAM_WARNING = '[react_on_rails] Incomplete length-prefixed stream';
 
 const testingRailsContext = {
   serverSideRSCPayloadParameters: {},
@@ -73,6 +74,24 @@ const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk
     const chunks: StreamResultChunk[] = [];
     const parser = new LengthPrefixedStreamParser();
     const decoder = new TextDecoder();
+
+    const flushParserOrThrow = () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        parser.flush();
+        const incompleteStreamWarning = consoleWarnSpy.mock.calls.find(([message]) =>
+          String(message).includes(INCOMPLETE_LENGTH_PREFIXED_STREAM_WARNING),
+        );
+
+        if (incompleteStreamWarning) {
+          throw new Error(String(incompleteStreamWarning[0]));
+        }
+      } finally {
+        consoleWarnSpy.mockRestore();
+      }
+    };
+
     stream.on('data', (chunk: Buffer) => {
       try {
         parser.feed(chunk, (content, metadata) => {
@@ -86,8 +105,12 @@ const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk
       }
     });
     stream.on('end', () => {
-      parser.flush();
-      resolve(chunks);
+      try {
+        flushParserOrThrow();
+        resolve(chunks);
+      } catch (error) {
+        reject(error);
+      }
     });
     stream.on('error', reject);
   });
@@ -100,6 +123,17 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     ComponentRegistry.clear();
     source = new PassThrough();
     generateRSCPayload = jest.fn().mockResolvedValue(source);
+  });
+
+  it('rejects if the rendered result stream ends with an incomplete length-prefixed chunk', async () => {
+    const truncatedStream = new PassThrough();
+    const completeChunk = toLengthPrefixedPayload('truncated payload');
+    const result = collectChunks(truncatedStream);
+
+    truncatedStream.push(completeChunk.subarray(0, completeChunk.length - 1));
+    truncatedStream.push(null);
+
+    await expect(result).rejects.toThrow(INCOMPLETE_LENGTH_PREFIXED_STREAM_WARNING);
   });
 
   const renderComponent = (name: string) =>

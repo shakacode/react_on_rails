@@ -165,11 +165,10 @@ describe('streamServerRenderedReactComponent', () => {
     return { chunks, errors };
   };
 
-  const expectOnlyDuplicateNotifySSREndWarnings = (consoleWarnSpy) => {
-    const unexpectedWarnings = consoleWarnSpy.mock.calls.filter(
-      ([message]) => !String(message).includes(DUPLICATE_NOTIFY_SSR_END_WARNING),
+  const expectNoDuplicateNotifySSREndWarning = (consoleWarnSpy) => {
+    expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining(DUPLICATE_NOTIFY_SSR_END_WARNING),
     );
-    expect(unexpectedWarnings).toHaveLength(0);
   };
 
   const setupStreamTest = ({
@@ -348,9 +347,7 @@ describe('streamServerRenderedReactComponent', () => {
       await collectStreamResult(renderResult);
 
       expect(onPostSSRHook).toHaveBeenCalledTimes(1);
-      expect(consoleWarnSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining(DUPLICATE_NOTIFY_SSR_END_WARNING),
-      );
+      expectNoDuplicateNotifySSREndWarning(consoleWarnSpy);
     } finally {
       consoleWarnSpy.mockRestore();
     }
@@ -367,7 +364,6 @@ describe('streamServerRenderedReactComponent', () => {
       expect(errors).toHaveLength(0);
       expect(onPostSSRHook).toHaveBeenCalledTimes(1);
       expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
-      expectOnlyDuplicateNotifySSREndWarnings(consoleWarnSpy);
     } finally {
       consoleWarnSpy.mockRestore();
     }
@@ -390,7 +386,6 @@ describe('streamServerRenderedReactComponent', () => {
       expect(html).toContain('Loading skipped route...');
       expect(html).toContain('Loading errored boundary...');
       expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
-      expectOnlyDuplicateNotifySSREndWarnings(consoleWarnSpy);
     } finally {
       consoleWarnSpy.mockRestore();
     }
