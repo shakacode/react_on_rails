@@ -5088,11 +5088,11 @@ The starter is **a React-routed island inside a normal Rails app**, not a framew
 
 ## Requirements
 
-| Capability                           | Needs                                                                                  |
-| ------------------------------------ | -------------------------------------------------------------------------------------- |
-| Client-only TanStack Router (no SSR) | Open-source React on Rails — it's just a React app                                     |
-| SSR of the initial route             | **Pro**: Node Renderer + `config.rendering_returns_promises = true`                    |
-| `RSCRoute` server-component routes   | **Pro**: RSC support enabled (`enable_rsc_support`, `rsc_payload_generation_url_path`) |
+| Capability                           | Needs                                                                                                                                                     |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client-only TanStack Router (no SSR) | Open-source React on Rails — it's just a React app                                                                                                        |
+| SSR of the initial route             | **Pro**: Node Renderer + `config.rendering_returns_promises = true`                                                                                       |
+| `RSCRoute` server-component routes   | **Pro**: RSC support enabled (`enable_rsc_support`, `rsc_payload_generation_url_path`) and the matching `rsc_payload_route` mounted in `config/routes.rb` |
 
 See [Using TanStack Router](./tanstack-router.md) for the SSR helper details and [React Server Components inside client components](../../pro/react-server-components/inside-client-components.md) for `RSCRoute`.
 
