@@ -79,6 +79,9 @@ after phase 1 with a precise blocker.
      heartbeat liveness, blocked state, reserved state, profiles, or inbox
      config cannot be verified, stop phase 2 with a precise blocker instead of
      deriving `N`.
+   - If the subtraction result is negative, report "occupied/reserved lanes
+     exceed registered capacity" with the bounded slot count and occupied lane
+     refs, then stop phase 2 instead of clamping or inventing groups.
    - If `N` is 0 after subtracting occupied/reserved lane refs, report "all
      lanes currently occupied" and stop phase 2 instead of inventing groups.
 

@@ -131,10 +131,13 @@ Capacity-aware triage derives group count from registered state:
    heartbeat liveness, blocked state, reserved state, profiles, or inbox config
    cannot be verified, stop phase 2 with a precise blocker instead of deriving
    `N`.
-4. Let `N` be the resulting available lane-slot count.
-5. If `N` is 0 while actionable work remains, report "all lanes currently
+4. If the subtraction result is negative, report "occupied/reserved lanes exceed
+   registered capacity" with the bounded slot count and occupied lane refs, then
+   stop phase 2 instead of clamping or inventing groups.
+5. Let `N` be the resulting non-negative available lane-slot count.
+6. If `N` is 0 while actionable work remains, report "all lanes currently
    occupied" and stop phase 2 instead of inventing groups.
-6. Split the current wave into up to `N` non-empty groups, capped by the
+7. Split the current wave into up to `N` non-empty groups, capped by the
    `$pr-batch` per-batch limits: 8 items when files or risk overlap, or 10 fully
    independent items. Stop phase 2 with a blocker when `N` cannot be verified.
    When actionable work exceeds the capped current wave, report the remaining
