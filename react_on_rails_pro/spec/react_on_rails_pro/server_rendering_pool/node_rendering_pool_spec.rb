@@ -160,9 +160,11 @@ module ReactOnRailsPro
           let(:render_options) do
             instance_double(
               ReactOnRails::ReactComponent::RenderOptions,
-              rsc_payload_streaming?: false,
-              internal_option: async_props_block
-            )
+              rsc_payload_streaming?: false
+            ).tap do |opts|
+              allow(opts).to receive(:internal_option).with(:async_props_block).and_return(async_props_block)
+              allow(opts).to receive(:internal_option).with(:push_props).and_return(nil)
+            end
           end
 
           it "calls prepare_incremental_render_path and render_code_with_incremental_updates" do
@@ -177,7 +179,7 @@ module ReactOnRailsPro
             expect(described_class).to have_received(:prepare_incremental_render_path)
               .with(js_code, render_options)
             expect(ReactOnRailsPro::Request).to have_received(:render_code_with_incremental_updates)
-              .with(expected_path, js_code, async_props_block:)
+              .with(expected_path, js_code, async_props_block:, push_props: nil)
           end
         end
 
