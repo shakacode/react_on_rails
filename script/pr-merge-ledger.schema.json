@@ -1,0 +1,544 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/shakacode/react_on_rails/main/script/pr-merge-ledger.schema.json",
+  "title": "React on Rails PR merge ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "generated_at",
+    "repository",
+    "source",
+    "pull_requests",
+    "violations",
+    "unknown_fields",
+    "complete_allowed"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://raw.githubusercontent.com/shakacode/react_on_rails/main/script/pr-merge-ledger.schema.json"
+    },
+    "schema_version": {
+      "const": "pr-merge-ledger/v1"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^[^/]+/[^/]+$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["fixture", "live_github"]
+        }
+      }
+    },
+    "pull_requests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/pull_request_ledger"
+      }
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/violation"
+      }
+    },
+    "unknown_fields": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unknown_field"
+      }
+    },
+    "complete_allowed": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "pull_request_ledger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pr",
+        "unresolved_current_head_review_threads",
+        "review_objects",
+        "issue_comments",
+        "priority_finding_dispositions",
+        "changelog_classification",
+        "lockfile_diff",
+        "violations",
+        "unknown_fields",
+        "complete_allowed"
+      ],
+      "properties": {
+        "pr": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["number", "head_sha", "review_decision"],
+          "properties": {
+            "number": {
+              "type": "integer"
+            },
+            "title": {
+              "type": ["string", "null"]
+            },
+            "url": {
+              "type": ["string", "null"]
+            },
+            "state": {
+              "type": ["string", "null"]
+            },
+            "is_draft": {
+              "type": ["boolean", "null"]
+            },
+            "base_ref": {
+              "type": ["string", "null"]
+            },
+            "head_ref": {
+              "type": ["string", "null"]
+            },
+            "head_sha": {
+              "type": "string"
+            },
+            "merged_at": {
+              "type": ["string", "null"]
+            },
+            "review_decision": {
+              "enum": ["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED", "UNKNOWN"]
+            }
+          }
+        },
+        "unresolved_current_head_review_threads": {
+          "type": "object",
+          "required": ["status", "count", "threads"],
+          "properties": {
+            "status": {
+              "enum": ["known", "UNKNOWN"]
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "threads": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/review_thread"
+              }
+            }
+          }
+        },
+        "review_objects": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "review_decision",
+            "latest_by_reviewer",
+            "changes_requested",
+            "all_changes_requested"
+          ],
+          "properties": {
+            "status": {
+              "enum": ["known", "UNKNOWN"]
+            },
+            "review_decision": {
+              "enum": ["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED", "UNKNOWN"]
+            },
+            "latest_by_reviewer": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/review_object"
+              }
+            },
+            "changes_requested": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/review_object"
+              }
+            },
+            "all_changes_requested": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/review_object"
+              }
+            }
+          }
+        },
+        "issue_comments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue_comment"
+          }
+        },
+        "priority_finding_dispositions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "findings", "truncated_sources", "unused_keys"],
+          "properties": {
+            "status": {
+              "enum": ["known", "UNKNOWN"]
+            },
+            "findings": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/priority_finding"
+              }
+            },
+            "truncated_sources": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/priority_finding_truncated_source"
+              }
+            },
+            "unused_keys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "changelog_classification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "classification"],
+          "properties": {
+            "status": {
+              "enum": ["known", "UNKNOWN"]
+            },
+            "classification": {
+              "enum": [
+                "changelog_present",
+                "changelog_missing",
+                "deferred_to_update_changelog",
+                "not_user_visible",
+                "UNKNOWN"
+              ]
+            }
+          }
+        },
+        "lockfile_diff": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "has_lockfile_diff", "files"],
+          "properties": {
+            "status": {
+              "enum": ["known", "UNKNOWN"]
+            },
+            "has_lockfile_diff": {
+              "enum": [true, false, "UNKNOWN"]
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/violation"
+          }
+        },
+        "unknown_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/unknown_field"
+          }
+        },
+        "complete_allowed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "review_thread": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "is_resolved",
+        "is_outdated",
+        "current_head",
+        "comments_complete",
+        "comments"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "is_resolved": {
+          "type": "boolean"
+        },
+        "is_outdated": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": ["string", "null"]
+        },
+        "line": {
+          "type": ["integer", "null"]
+        },
+        "url": {
+          "type": ["string", "null"]
+        },
+        "author": {
+          "type": ["string", "null"]
+        },
+        "created_at": {
+          "type": ["string", "null"]
+        },
+        "body_excerpt": {
+          "type": "string"
+        },
+        "review_state": {
+          "type": ["string", "null"]
+        },
+        "review_head_sha": {
+          "type": ["string", "null"]
+        },
+        "comment_head_sha": {
+          "type": ["string", "null"]
+        },
+        "current_head": {
+          "type": "boolean"
+        },
+        "current_head_evidence": {
+          "type": ["string", "null"]
+        },
+        "comments_complete": {
+          "type": "boolean"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/review_thread_comment"
+          }
+        }
+      }
+    },
+    "review_thread_comment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "body", "outdated", "current_head"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": ["string", "null"]
+        },
+        "path": {
+          "type": ["string", "null"]
+        },
+        "line": {
+          "type": ["integer", "null"]
+        },
+        "created_at": {
+          "type": ["string", "null"]
+        },
+        "author": {
+          "type": ["string", "null"]
+        },
+        "body": {
+          "type": "string"
+        },
+        "outdated": {
+          "type": "boolean"
+        },
+        "review_state": {
+          "type": ["string", "null"]
+        },
+        "review_head_sha": {
+          "type": ["string", "null"]
+        },
+        "comment_head_sha": {
+          "type": ["string", "null"]
+        },
+        "current_head": {
+          "type": "boolean"
+        }
+      }
+    },
+    "review_object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "reviewer", "state", "head_sha", "body_excerpt", "current_head"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "reviewer": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "submitted_at": {
+          "type": ["string", "null"]
+        },
+        "head_sha": {
+          "type": "string"
+        },
+        "url": {
+          "type": ["string", "null"]
+        },
+        "body_excerpt": {
+          "type": "string"
+        },
+        "current_head": {
+          "type": "boolean"
+        }
+      }
+    },
+    "issue_comment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "body_excerpt"],
+      "properties": {
+        "id": {
+          "type": ["string", "integer"]
+        },
+        "url": {
+          "type": ["string", "null"]
+        },
+        "author": {
+          "type": ["string", "null"]
+        },
+        "created_at": {
+          "type": ["string", "null"]
+        },
+        "body_excerpt": {
+          "type": "string"
+        }
+      }
+    },
+    "priority_finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "url",
+        "severity",
+        "source_line",
+        "source_column",
+        "marker_index",
+        "text_excerpt",
+        "disposition"
+      ],
+      "properties": {
+        "id": {
+          "type": ["string", "integer"]
+        },
+        "url": {
+          "type": ["string", "null"]
+        },
+        "severity": {
+          "enum": ["MUST_FIX", "P0", "P1", "P2"]
+        },
+        "source_line": {
+          "type": "integer"
+        },
+        "source_column": {
+          "type": "integer"
+        },
+        "marker_index": {
+          "type": "integer"
+        },
+        "text_excerpt": {
+          "type": "string"
+        },
+        "disposition": {
+          "enum": ["fixed", "explicitly_waived", "follow_up_issue", "not_applicable", "UNKNOWN"]
+        },
+        "evidence": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "priority_finding_truncated_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "url", "line_count", "scanned_line_count"],
+      "properties": {
+        "id": {
+          "type": ["string", "integer"]
+        },
+        "url": {
+          "type": ["string", "null"]
+        },
+        "line_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scanned_line_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "violation": {
+      "type": "object",
+      "required": ["pr_number", "code", "message"],
+      "properties": {
+        "pr_number": {
+          "type": "integer"
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "url": {
+          "type": ["string", "null"]
+        },
+        "path": {
+          "type": ["string", "null"]
+        },
+        "line": {
+          "type": ["integer", "null"]
+        },
+        "reviewer": {
+          "type": ["string", "null"]
+        },
+        "head_sha": {
+          "type": ["string", "null"]
+        },
+        "current_head": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "unknown_field": {
+      "type": "object",
+      "required": ["pr_number", "field", "message"],
+      "properties": {
+        "pr_number": {
+          "type": "integer"
+        },
+        "field": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "url": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

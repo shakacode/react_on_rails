@@ -399,6 +399,43 @@ export interface Root {
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- inherited from React 16/17, can't avoid here
 export type RenderReturnType = void | Element | Component | Root;
 
+/** Extra context React on Rails adds when invoking registered root error callbacks. */
+export interface RootErrorContext {
+  /** Name of the registered component rendered into the affected React root, when known. */
+  componentName?: string;
+  /** DOM id of the element the affected React root was mounted in, when known. */
+  domNodeId?: string;
+}
+
+/**
+ * A root error callback registered through `ReactOnRails.setOptions({ rootErrorHandlers })`.
+ * Receives React's original `(error, errorInfo)` arguments plus React on Rails context about the
+ * affected root. `errorInfo` typically contains `componentStack` (see the `react-dom/client`
+ * `createRoot`/`hydrateRoot` option docs for the exact per-callback shape).
+ */
+export type RootErrorHandler = (error: unknown, errorInfo: unknown, context: RootErrorContext) => void;
+
+/**
+ * User-registered React root error callbacks, applied to every React root that React on Rails
+ * creates via `hydrateRoot`/`createRoot`. Register them before your components render (typically
+ * in the same pack file where you call `ReactOnRails.register`); each root captures the callbacks
+ * registered at the moment it is created. Partial updates merge per key: a later
+ * `setOptions({ rootErrorHandlers })` call that sets only one callback keeps the others; pass an
+ * explicit `undefined` for a key to clear just that callback. Passing `null` is invalid and
+ * throws at runtime; use `undefined` to deregister.
+ */
+export interface RootErrorHandlers {
+  /**
+   * Called when React automatically recovers from an error, e.g. a hydration mismatch.
+   * Requires React 18+.
+   */
+  onRecoverableError?: RootErrorHandler;
+  /** Called for errors caught by an error boundary. Requires React 19+. */
+  onCaughtError?: RootErrorHandler;
+  /** Called for errors not caught by any error boundary. Requires React 19+. */
+  onUncaughtError?: RootErrorHandler;
+}
+
 export interface ReactOnRailsOptions {
   /** Gives you debugging messages on Turbolinks events. */
   traceTurbolinks?: boolean;
@@ -408,6 +445,12 @@ export interface ReactOnRailsOptions {
   debugMode?: boolean;
   /** Log component registration details including timing and size information. */
   logComponentRegistration?: boolean;
+  /**
+   * React root error callbacks (`onRecoverableError`, `onCaughtError`, `onUncaughtError`)
+   * applied to every React root created by React on Rails.
+   * @see {RootErrorHandlers}
+   */
+  rootErrorHandlers?: RootErrorHandlers;
 }
 
 export interface ReactOnRails {
