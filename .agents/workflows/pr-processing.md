@@ -301,9 +301,11 @@ Classify each target before assigning a worker:
 
 For investigation or benchmark conclusions, apply the closing-evidence gate from
 the "Evaluate the fix plan separately" step in
-`.agents/skills/evaluate-issue/SKILL.md` to every outcome path: implementation
-PRs, combined investigation PRs, and no-PR evidence comments that recommend
-`close` or `document/work around`.
+`.agents/skills/evaluate-issue/SKILL.md` before carrying a target as `close` or
+`document/work around`, or before using that conclusion to justify close/workaround
+language in an implementation PR, combined investigation PR, or no-PR evidence
+comment. Concrete corrective implementation PRs are not blocked merely because
+the target involves investigation or benchmark evidence.
 
 See the gate criteria in `.agents/skills/evaluate-issue/SKILL.md` (step 4d --
 "Evaluate the fix plan separately"). When the gate cannot be satisfied, carry
