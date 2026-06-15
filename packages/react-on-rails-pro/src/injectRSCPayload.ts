@@ -96,6 +96,7 @@ const RSC_CLIENT_CHUNK_STYLESHEET_PATH = /\/css\/client\d+-[^/]+\.css$/;
 const RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET = /"((?:client)\d+)"\s*,\s*"js\/client\d+-[^"]+\.chunk\.js"/g;
 const REACT_SUSPENSE_REVEAL_SCRIPT = /\$RC\(/;
 const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
+const RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS = 100;
 
 type LoadableStats = {
   assetsByChunkName?: Record<string, string | string[]>;
@@ -184,6 +185,54 @@ function createStylesheetTag(href: string) {
 
 function includesReactSuspenseRevealScript(htmlBuffer: Buffer) {
   return REACT_SUSPENSE_REVEAL_SCRIPT.test(htmlBuffer.toString('utf8'));
+}
+
+function findReactSuspenseRevealSplitIndex(htmlString: string) {
+  const revealCallIndex = htmlString.search(REACT_SUSPENSE_REVEAL_SCRIPT);
+  if (revealCallIndex === -1) return -1;
+
+  const scriptStartIndex = htmlString.lastIndexOf('<script', revealCallIndex);
+  const revealedContentId = htmlString
+    .slice(revealCallIndex)
+    .match(/\$RC\(\s*(["'])(?:(?!\1).)*\1\s*,\s*(["'])(.*?)\2/)?.[3];
+
+  if (revealedContentId) {
+    const hiddenBoundaryPattern = new RegExp(
+      `<div\\b(?=[^>]*\\bhidden\\b)(?=[^>]*\\bid=(?:"${escapeRegExpLiteral(
+        revealedContentId,
+      )}"|'${escapeRegExpLiteral(revealedContentId)}'))[^>]*>`,
+      'gi',
+    );
+    const searchEndIndex = scriptStartIndex === -1 ? revealCallIndex : scriptStartIndex;
+    let hiddenBoundaryStartIndex = -1;
+
+    for (
+      let hiddenBoundaryMatch = hiddenBoundaryPattern.exec(htmlString);
+      hiddenBoundaryMatch;
+      hiddenBoundaryMatch = hiddenBoundaryPattern.exec(htmlString)
+    ) {
+      if (hiddenBoundaryMatch.index >= searchEndIndex) break;
+      hiddenBoundaryStartIndex = hiddenBoundaryMatch.index;
+    }
+
+    if (hiddenBoundaryStartIndex !== -1) return hiddenBoundaryStartIndex;
+  }
+
+  return scriptStartIndex === -1 ? revealCallIndex : scriptStartIndex;
+}
+
+function splitReactSuspenseRevealHtmlBuffer(htmlBuffer: Buffer) {
+  const htmlString = htmlBuffer.toString('utf8');
+  const splitIndex = findReactSuspenseRevealSplitIndex(htmlString);
+
+  if (splitIndex === -1) {
+    return { flushableHtmlBuffer: htmlBuffer, deferredRevealHtmlBuffer: undefined };
+  }
+
+  return {
+    flushableHtmlBuffer: Buffer.from(htmlString.slice(0, splitIndex)),
+    deferredRevealHtmlBuffer: Buffer.from(htmlString.slice(splitIndex)),
+  };
 }
 
 function stylesheetTagsForRSCClientChunks(
@@ -322,7 +371,8 @@ export default function injectRSCPayload(
   const resultStream = new PassThrough();
   let rscPromise: Promise<void> | null = null;
   const emittedRSCClientStylesheetHrefs = new Set<string>();
-  let hasResolvedInitialRSCClientStylesheetInference = rscClientChunkStylesheetHrefsByChunkName.size === 0;
+  const shouldInferRSCClientStylesheets = rscClientChunkStylesheetHrefsByChunkName.size > 0;
+  let pendingRSCClientStylesheetInferenceStreams = 0;
 
   // ========================================
   // BUFFER ARRAYS - Three data sources
@@ -364,6 +414,7 @@ export default function injectRSCPayload(
 
   let flushFallbackTimeout: NodeJS.Timeout | null = null;
   let hasReceivedFirstHtmlChunk = false;
+  let hasFlushedOutputChunk = false;
 
   /**
    * Combines all buffered data into a single chunk and sends it to the result stream.
@@ -392,20 +443,24 @@ export default function injectRSCPayload(
       htmlBuffer,
       holdIncompleteLinkTagTail,
     );
+    const shouldDeferRevealHtml =
+      rscPromise &&
+      shouldInferRSCClientStylesheets &&
+      pendingRSCClientStylesheetInferenceStreams > 0 &&
+      includesReactSuspenseRevealScript(gatedHtmlBuffer);
+    const { flushableHtmlBuffer, deferredRevealHtmlBuffer } = shouldDeferRevealHtml
+      ? splitReactSuspenseRevealHtmlBuffer(gatedHtmlBuffer)
+      : { flushableHtmlBuffer: gatedHtmlBuffer, deferredRevealHtmlBuffer: undefined };
     const rscClientStylesheetSize = rscClientStylesheetBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const rscPayloadSize = rscPayloadBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const totalSize =
-      rscInitializationSize + rscClientStylesheetSize + gatedHtmlBuffer.length + rscPayloadSize;
+      rscInitializationSize + rscClientStylesheetSize + flushableHtmlBuffer.length + rscPayloadSize;
 
     if (hasIncompleteLinkTagTail && holdIncompleteLinkTagTail) {
       return;
     }
 
-    if (
-      !hasResolvedInitialRSCClientStylesheetInference &&
-      rscPromise &&
-      includesReactSuspenseRevealScript(gatedHtmlBuffer)
-    ) {
+    if (deferredRevealHtmlBuffer && flushableHtmlBuffer.length === 0 && !hasFlushedOutputChunk) {
       return;
     }
 
@@ -446,9 +501,9 @@ export default function injectRSCPayload(
 
     // 3. HTML chunks THIRD
     // Component markup that references the initialized arrays
-    if (gatedHtmlBuffer.length > 0) {
-      gatedHtmlBuffer.copy(combinedBuffer, offset);
-      offset += gatedHtmlBuffer.length;
+    if (flushableHtmlBuffer.length > 0) {
+      flushableHtmlBuffer.copy(combinedBuffer, offset);
+      offset += flushableHtmlBuffer.length;
     }
 
     // 4. RSC payload chunk scripts LAST
@@ -460,11 +515,15 @@ export default function injectRSCPayload(
 
     // Send combined chunk to output stream
     resultStream.push(combinedBuffer);
+    hasFlushedOutputChunk = true;
 
     // Clear all buffers to free memory and prepare for next flush cycle
     rscInitializationBuffers.length = 0;
     rscClientStylesheetBuffers.length = 0;
     htmlBuffers.length = 0;
+    if (deferredRevealHtmlBuffer) {
+      htmlBuffers.push(deferredRevealHtmlBuffer);
+    }
     rscPayloadBuffers.length = 0;
   };
 
@@ -578,6 +637,25 @@ export default function injectRSCPayload(
         // This creates a global array that the client-side RSCProvider monitors for new chunks.
         const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
         rscInitializationBuffers.push(Buffer.from(initializationScript));
+        let inferenceTimeout: NodeJS.Timeout | undefined;
+        let hasResolvedRSCClientStylesheetInferenceForStream = !shouldInferRSCClientStylesheets;
+        const resolveRSCClientStylesheetInferenceForStream = () => {
+          if (hasResolvedRSCClientStylesheetInferenceForStream) return;
+
+          hasResolvedRSCClientStylesheetInferenceForStream = true;
+          pendingRSCClientStylesheetInferenceStreams -= 1;
+          if (inferenceTimeout) {
+            clearTimeout(inferenceTimeout);
+          }
+          scheduleFlushFallback();
+        };
+        if (shouldInferRSCClientStylesheets) {
+          pendingRSCClientStylesheetInferenceStreams += 1;
+          inferenceTimeout = setTimeout(
+            resolveRSCClientStylesheetInferenceForStream,
+            RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS,
+          );
+        }
 
         // Process RSC payload stream asynchronously.
         // The stream uses the length-prefixed protocol: metadata\tcontent_len\ncontent.
@@ -602,9 +680,9 @@ export default function injectRSCPayload(
                 rscClientChunkStylesheetHrefsByChunkName,
                 emittedRSCClientStylesheetHrefs,
               ).forEach((stylesheetTag) => {
-                hasResolvedInitialRSCClientStylesheetInference = true;
                 rscClientStylesheetBuffers.push(Buffer.from(stylesheetTag));
               });
+              resolveRSCClientStylesheetInferenceForStream();
               const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
 
@@ -617,12 +695,14 @@ export default function injectRSCPayload(
               // Schedule fallback in case flush() is never called.
               scheduleFlushFallback();
             };
-            for await (const chunk of stream ?? []) {
-              const chunkBuf = chunk instanceof Uint8Array ? chunk : new TextEncoder().encode(chunk);
-              parser.feed(chunkBuf, handleParsedChunk);
+            try {
+              for await (const chunk of stream ?? []) {
+                const chunkBuf = chunk instanceof Uint8Array ? chunk : new TextEncoder().encode(chunk);
+                parser.feed(chunkBuf, handleParsedChunk);
+              }
+            } finally {
+              resolveRSCClientStylesheetInferenceForStream();
             }
-            hasResolvedInitialRSCClientStylesheetInference = true;
-            scheduleFlushFallback();
           })(),
         );
       });
