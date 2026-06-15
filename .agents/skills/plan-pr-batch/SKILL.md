@@ -174,7 +174,9 @@ Plan a PR batch
 4. Output
    <!-- prompt-size-check: scripts/check_goal_prompt_size.rb pins selected wording in this section. -->
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
-   - Keep the fenced goal prompt under ~4000 bytes total so bulky detail stays in the Batch Plan. Measure it, do not eyeball it: `wc -c` gives a locale-independent byte count (`wc -m` counts characters using the current locale's multibyte rules — UTF-8 gives code points, C/POSIX gives bytes). Treat 4000 as an approximate budget.
+   - Keep the fenced goal prompt under 4000 characters total so bulky detail stays in the Batch Plan. Measure it,
+     do not eyeball it: use the guard script below, or pipe only the extracted fence body to a character-counting
+     command such as `ruby -e 'print STDIN.read.length'`. Do not use byte-oriented counts such as `wc -c`.
    - Use compact one-line item goals, short worker notes, and canonical workflow references instead of copied
      audit evidence, repeated issue text, or long rule explanations.
    - Before responding, measure only the text inside the goal-prompt fence, excluding the fence lines, and print
@@ -183,7 +185,7 @@ Plan a PR batch
      will not fit, split it into smaller goals and output only the first ready goal; list omitted ready items in
      the Batch Plan for later goal prompts.
    - Measure the actual filled template overhead when the prompt is near the
-     byte budget; do not rely on a fixed estimate. Prefer splitting into
+     character budget; do not rely on a fixed estimate. Prefer splitting into
      multiple goals over trimming the safety, ownership, or review content.
    - Keep full path evidence in the Batch Plan when it would bloat the prompt,
      but do not leave the worker handoff with an external-only pointer. In the
