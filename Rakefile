@@ -70,7 +70,7 @@ end
 
 def root_rubocop_paths
   # Root lint covers repo-root tooling only; package-owned rakelib files stay under package RuboCop.
-  %w[Gemfile Rakefile rakelib]
+  %w[Gemfile Rakefile rakelib script/pr-merge-ledger]
 end
 
 def define_package_task(task_name, *arg_names)
