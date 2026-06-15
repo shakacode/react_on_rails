@@ -100,6 +100,18 @@ const createMockHTMLStream = (chunks: string[] | { [key: number]: string | strin
   return passThrough;
 };
 
+const createFlushingHTMLStream = (html: string) =>
+  ({
+    pipe(destination: PassThrough & { flush?: () => void }) {
+      setTimeout(() => {
+        destination.write(new TextEncoder().encode(html));
+        destination.flush?.();
+        destination.end();
+      }, 0);
+      return destination;
+    },
+  }) as Readable;
+
 const collectStreamData = async (stream: Readable) => {
   const chunks: string[] = [];
   for await (const chunk of stream) {
@@ -278,6 +290,45 @@ describe('injectRSCPayload', () => {
     expect(revealHtmlIndex).toBeGreaterThanOrEqual(0);
     expect(stylesheetIndex).toBeLessThan(revealHtmlIndex);
     expect(resultStr).toContain(expectedPayloadPushScript(flightData));
+  });
+
+  it('waits for inferred RSC client chunk stylesheets before flushing reveal HTML', async () => {
+    const flightData =
+      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client1","js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +
+      '0:["$","$L2",null,{},null]\n';
+    const mockRSC = createMockRSCStream({ 10: flightData });
+    const mockHTML = createFlushingHTMLStream(
+      '<div hidden id="RscFoucProbe-react-component-0S:0">' +
+        '<section data-testid="rsc-fouc-probe">RSC streamed FOUC probe</section>' +
+        '</div>' +
+        '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>',
+    );
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+    const injectWithStylesheetMap = injectRSCPayload as unknown as (
+      html: Readable,
+      tracker: RSCRequestTracker,
+      nodeId: string,
+      nonce: string | undefined,
+      stylesheetHrefsByChunkName: Map<string, string[]>,
+    ) => Readable;
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
+    );
+    const resultStr = await collectStreamData(result);
+
+    const stylesheetIndex = resultStr.indexOf(
+      '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">',
+    );
+    const revealHtmlIndex = resultStr.indexOf('<div hidden id="RscFoucProbe-react-component-0S:0">');
+
+    expect(stylesheetIndex).toBeGreaterThanOrEqual(0);
+    expect(revealHtmlIndex).toBeGreaterThanOrEqual(0);
+    expect(stylesheetIndex).toBeLessThan(revealHtmlIndex);
   });
 
   it('promotes streamed RSC stylesheet preloads split across fallback flush chunks', async () => {

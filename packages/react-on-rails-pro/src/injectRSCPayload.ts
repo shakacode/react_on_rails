@@ -94,6 +94,7 @@ function createRSCDiagnosticScript(
 
 const RSC_CLIENT_CHUNK_STYLESHEET_PATH = /\/css\/client\d+-[^/]+\.css$/;
 const RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET = /"((?:client)\d+)"\s*,\s*"js\/client\d+-[^"]+\.chunk\.js"/g;
+const REACT_SUSPENSE_REVEAL_SCRIPT = /\$RC\(/;
 const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
 
 type LoadableStats = {
@@ -105,8 +106,14 @@ type RSCClientChunkStylesheetHrefsByChunkName = Map<string, string[]>;
 
 let cachedRSCClientChunkStylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName | undefined;
 
+function escapeRegExpLiteral(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function getQuotedAttribute(tag: string, attributeName: string) {
-  const attributeMatch = tag.match(new RegExp(`\\s${attributeName}=(["'])(.*?)\\1`, 'i'));
+  const attributeMatch = tag.match(
+    new RegExp(`\\s${escapeRegExpLiteral(attributeName)}=(["'])(.*?)\\1`, 'i'),
+  );
   return attributeMatch?.[2];
 }
 
@@ -173,6 +180,10 @@ function escapeAttributeValue(value: string) {
 
 function createStylesheetTag(href: string) {
   return `<link rel="stylesheet" href="${escapeAttributeValue(href)}" data-precedence="rsc-css">`;
+}
+
+function includesReactSuspenseRevealScript(htmlBuffer: Buffer) {
+  return REACT_SUSPENSE_REVEAL_SCRIPT.test(htmlBuffer.toString('utf8'));
 }
 
 function stylesheetTagsForRSCClientChunks(
@@ -311,6 +322,7 @@ export default function injectRSCPayload(
   const resultStream = new PassThrough();
   let rscPromise: Promise<void> | null = null;
   const emittedRSCClientStylesheetHrefs = new Set<string>();
+  let hasResolvedInitialRSCClientStylesheetInference = rscClientChunkStylesheetHrefsByChunkName.size === 0;
 
   // ========================================
   // BUFFER ARRAYS - Three data sources
@@ -386,6 +398,14 @@ export default function injectRSCPayload(
       rscInitializationSize + rscClientStylesheetSize + gatedHtmlBuffer.length + rscPayloadSize;
 
     if (hasIncompleteLinkTagTail && holdIncompleteLinkTagTail) {
+      return;
+    }
+
+    if (
+      !hasResolvedInitialRSCClientStylesheetInference &&
+      rscPromise &&
+      includesReactSuspenseRevealScript(gatedHtmlBuffer)
+    ) {
       return;
     }
 
@@ -581,7 +601,10 @@ export default function injectRSCPayload(
                 flightData,
                 rscClientChunkStylesheetHrefsByChunkName,
                 emittedRSCClientStylesheetHrefs,
-              ).forEach((stylesheetTag) => rscClientStylesheetBuffers.push(Buffer.from(stylesheetTag)));
+              ).forEach((stylesheetTag) => {
+                hasResolvedInitialRSCClientStylesheetInference = true;
+                rscClientStylesheetBuffers.push(Buffer.from(stylesheetTag));
+              });
               const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
 
@@ -598,6 +621,8 @@ export default function injectRSCPayload(
               const chunkBuf = chunk instanceof Uint8Array ? chunk : new TextEncoder().encode(chunk);
               parser.feed(chunkBuf, handleParsedChunk);
             }
+            hasResolvedInitialRSCClientStylesheetInference = true;
+            scheduleFlushFallback();
           })(),
         );
       });

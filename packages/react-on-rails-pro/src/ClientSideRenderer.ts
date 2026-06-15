@@ -128,6 +128,7 @@ function waitForStylesheet(link: HTMLLinkElement): Promise<void> {
 
 function waitForGeneratedComponentStylesheets(componentName: string, componentSpec: Element): Promise<void> {
   const generatedStylesheetHrefs = generatedStylesheetHrefsForComponent(componentSpec);
+  // Generated stylesheet links are emitted into <head> before the component script runs.
   const stylesheetLinks = Array.from(
     document.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href]'),
   ).filter((link) => generatedStylesheetMatchesComponent(link, componentName, generatedStylesheetHrefs));
