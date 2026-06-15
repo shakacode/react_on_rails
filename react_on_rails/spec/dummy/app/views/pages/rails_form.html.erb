@@ -1,0 +1,17 @@
+<%= react_component("RailsFormExample", prerender: false, trace: true, id: "RailsFormExample-react-component-0") %>
+
+<hr/>
+<h2>useRailsForm 422 round trip</h2>
+<p>
+  This form is built with the <code>useRailsForm</code> hook
+  (<code>react-on-rails/useRailsForm</code>) and posts JSON to
+  <code>ContactMessagesController#create</code>, a plain Rails action that uses
+  the opt-in <code>ReactOnRails::Controller::FormResponders</code> concern.
+</p>
+<ol>
+  <li>Submit the empty form: the controller responds 422 with
+    <code>{ errors: { field: ["message"] } }</code> and each field renders its
+    errors.</li>
+  <li>Fill in valid values (a real email, a message of 10+ characters) and the
+    submit succeeds.</li>
+</ol>
