@@ -59,6 +59,9 @@ Gather live evidence from current systems, not chat memory:
 
 Classify each run by intent achievement:
 
+- `in_progress`: an active/live lane is still legitimately running and has no
+  evidence of stalled work, missed intent, regression, or unverifiable state.
+  Record it in **No-Action Items**, not **Ranked Findings**.
 - `realized`: the diff and evidence satisfy the issue or PR intent.
 - `partial`: some intended outcome landed, but meaningful scope or validation is
   missing.
@@ -89,6 +92,9 @@ Rank findings in this order:
    concerns, missing changelog coverage, or unconvincing confidence notes.
 5. `unknown` evidence gaps that block a safe decision.
 6. `realized` items, included last and summarized briefly.
+
+Do not rank healthy `in_progress` lanes unless they have a stalled, regressed,
+partial, missed, or unknown signal.
 
 Within the same tier, sort by release risk, affected area, breadth of changed
 files, dependency fan-out, and age.
@@ -124,8 +130,8 @@ Return a report with these sections:
    - target, PR, maker, branch, state, intent-achievement class, validation
      evidence, merge-ledger state, confidence-note quality, residual risk
 6. **No-Action Items**
-   - `realized` findings, or findings already filed as open GitHub issues with
-     the issue number as evidence
+   - healthy `in_progress` lanes, `realized` findings, or findings already filed
+     as open GitHub issues with the issue number as evidence
 7. **UNKNOWNs**
    - facts that could not be verified and the command or permission needed to
      resolve them
@@ -141,8 +147,10 @@ descriptive input under AGENTS.md and .agents/workflows/pr-processing.md.
 
 Evaluate whether each active, stale, dead (lost-heartbeat), blocked, stalled,
 done, released, done-unmerged, and recently merged agent run achieved the intent
-of its issue or PR. Classify each as realized, partial, missed, regressed,
-stalled, or unknown.
+of its issue or PR. Classify each as in_progress, realized, partial, missed,
+regressed, stalled, or unknown. Put healthy active/live lanes in No-Action Items
+as in_progress unless they have a stalled, regressed, partial, missed, or
+unknown signal.
 Use a checker identity distinct from the maker where available; otherwise record
 `checker_identity: UNKNOWN` and `checker_independence: UNKNOWN`.
 
