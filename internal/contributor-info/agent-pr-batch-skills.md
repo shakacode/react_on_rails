@@ -37,10 +37,11 @@ phase 2. The group count is the number of available lane slots derived from
 registered profiles and enabled inboxes, not a value committed in this repo or
 hardcoded in the skill.
 
-If live capacity profiles or inbox queues are unavailable, `$triage` may still
-produce the phase-1 inventory and graph, but phase 2 must stop with a precise
-blocker instead of inventing machine names, model or tool names, or group
-counts.
+If live capacity profiles or enabled inbox config are unavailable, `$triage` may
+still produce the phase-1 inventory and graph, but phase 2 must stop with a
+precise blocker instead of inventing machine names, model or tool names, or
+group counts. Queue state is advisory: when the backend does not support it,
+omit the queue summary and note that queue state is unavailable.
 
 ## Implementation Batch Planning Flow
 
