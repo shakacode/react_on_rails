@@ -117,11 +117,6 @@ function setStringResponseHeaders(headers: ResponseResult['headers'], res: Fasti
   }
 }
 
-function setPlainTextResponseHeaders(res: FastifyReply) {
-  res.type('text/plain; charset=utf-8');
-  res.header('X-Content-Type-Options', 'nosniff');
-}
-
 const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   const { status, data, headers, stream } = result;
   if (status !== 200 && status !== 410) {
@@ -129,13 +124,10 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   }
   if (!stream && typeof data === 'string' && status >= 400) {
     setHeaders(headers, res);
-    setPlainTextResponseHeaders(res);
+    res.header('Content-Type', 'text/plain; charset=utf-8');
+    res.header('X-Content-Type-Options', 'nosniff');
     res.status(status);
-    // Non-success renderer strings are diagnostics, not HTML. They are forced
-    // to text/plain with nosniff above, and Ruby raises the body verbatim.
-    // lgtm[js/reflected-xss]
-    // codeql[js/reflected-xss]
-    res.send(Buffer.from(data, 'utf8'));
+    res.send(data);
     return;
   }
 
