@@ -281,28 +281,6 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   };
 };
 
-/**
- * Encodes a propRequest message in the length-prefixed wire format.
- * Sent from Node → Rails when a React component calls getProp() for a lazy prop.
- * Content body is empty — the prop name is in the metadata.
- */
-export function formatPropRequestChunk(propName: string): Buffer {
-  const metadata = JSON.stringify({ messageType: 'propRequest', propName, payloadType: 'string' });
-  const header = `${metadata}\t${'0'.padStart(8, '0')}\n`;
-  return Buffer.from(header);
-}
-
-/**
- * Encodes a renderComplete message in the length-prefixed wire format.
- * Sent from Node → Rails when React finishes rendering (stream ends).
- * Tells Rails to close the pull_requests queue — no more propRequests will come.
- */
-export function formatRenderCompleteChunk(): Buffer {
-  const metadata = JSON.stringify({ messageType: 'renderComplete', payloadType: 'string' });
-  const header = `${metadata}\t${'0'.padStart(8, '0')}\n`;
-  return Buffer.from(header);
-}
-
 export type StreamingTrackers = {
   postSSRHookTracker: PostSSRHookTracker;
   rscRequestTracker: RSCRequestTracker;

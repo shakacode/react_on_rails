@@ -164,6 +164,8 @@ module ReactOnRailsPro
       return if @closed || @pushed_props.include?(prop_name)
 
       @queue.enqueue(prop_name)
+    rescue Async::Queue::ClosedError
+      # Queue was closed between the guard check and the enqueue call
     end
 
     # Blocks until a prop name is available, or returns nil if closed.

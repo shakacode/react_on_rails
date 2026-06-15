@@ -133,6 +133,7 @@ class AsyncPropsManager {
     this.propNameToPromiseController.forEach((promiseController, propName) => {
       if (!promiseController.resolved) {
         promiseController.reject(AsyncPropsManager.getNoPropFoundError(propName));
+        promiseController.resolved = true;
       }
     });
   }
