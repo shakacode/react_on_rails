@@ -194,8 +194,11 @@ if (
     }
 
     origin_branch_contains_head() {
-      git -C "$AGENT_COORD_REPO" for-each-ref --contains "$head_sha" \
-        --format='%(refname)' refs/remotes/origin | grep -q '[^[:space:]]'
+      local origin_ref
+
+      origin_ref="$(git -C "$AGENT_COORD_REPO" for-each-ref --count=1 --contains "$head_sha" \
+        --format='%(refname)' refs/remotes/origin)" || return 1
+      test -n "$origin_ref"
     }
 
     if ! origin_branch_contains_head &&
