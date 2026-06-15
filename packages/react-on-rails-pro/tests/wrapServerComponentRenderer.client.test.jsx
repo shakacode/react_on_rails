@@ -201,6 +201,24 @@ describe('wrapServerComponentRenderer/client recoverable errors', () => {
     }
   });
 
+  it('reports cyclic cause-chain recoverable errors instead of looping in the bailout filter', async () => {
+    const reportError = jest.fn();
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    setReportError(reportError);
+    const error = new Error('Recoverable hydration error with cyclic cause');
+    error.cause = error;
+
+    try {
+      const { hydrateOptions } = await setupWrappedHydration();
+      hydrateOptions.onRecoverableError(error);
+
+      expect(reportError).toHaveBeenCalledWith(error);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
   it('falls back to console.error for non-bailout recoverable errors when reportError is unavailable', async () => {
     setReportError(undefined);
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);

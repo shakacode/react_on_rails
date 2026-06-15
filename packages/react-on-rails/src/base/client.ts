@@ -19,6 +19,12 @@ import buildConsoleReplay, { consoleReplay } from '../buildConsoleReplay.ts';
 import reactHydrateOrRender from '../reactHydrateOrRender.ts';
 import createReactOutput from '../createReactOutput.ts';
 import componentRegistrationMetric from '../componentRegistrationMetric.ts';
+import {
+  buildRootErrorCallbackOptions,
+  getRootErrorHandlers,
+  resetRootErrorHandlers,
+  setRootErrorHandlers,
+} from '../rootErrorHandlers.ts';
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
@@ -138,42 +144,56 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
     },
 
     reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType {
-      return reactHydrateOrRender(domNode, reactElement, hydrate);
+      // The component name is unknown on this low-level path; the dom id still ties errors to a mount.
+      const rootErrorCallbackOptions = buildRootErrorCallbackOptions(
+        { domNodeId: domNode.id || undefined },
+        hydrate,
+      );
+      return reactHydrateOrRender(domNode, reactElement, hydrate, rootErrorCallbackOptions);
     },
 
     setOptions(newOptions: Partial<ReactOnRailsOptions>): void {
-      if (typeof newOptions.traceTurbolinks !== 'undefined') {
-        this.options.traceTurbolinks = newOptions.traceTurbolinks;
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.traceTurbolinks;
+      const { traceTurbolinks, turbo, debugMode, logComponentRegistration, rootErrorHandlers, ...rest } =
+        newOptions;
+
+      if (typeof traceTurbolinks !== 'undefined') {
+        this.options.traceTurbolinks = traceTurbolinks;
       }
 
-      if (typeof newOptions.turbo !== 'undefined') {
-        this.options.turbo = newOptions.turbo;
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.turbo;
+      if (typeof turbo !== 'undefined') {
+        this.options.turbo = turbo;
       }
 
-      if (typeof newOptions.debugMode !== 'undefined') {
-        this.options.debugMode = newOptions.debugMode;
-        if (newOptions.debugMode) {
+      if (typeof debugMode !== 'undefined') {
+        this.options.debugMode = debugMode;
+        if (debugMode) {
           console.log('[ReactOnRails] Debug mode enabled');
         }
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.debugMode;
       }
 
-      if (typeof newOptions.logComponentRegistration !== 'undefined') {
-        this.options.logComponentRegistration = newOptions.logComponentRegistration;
-        if (newOptions.logComponentRegistration) {
+      if (typeof logComponentRegistration !== 'undefined') {
+        this.options.logComponentRegistration = logComponentRegistration;
+        if (logComponentRegistration) {
           console.log('[ReactOnRails] Component registration logging enabled');
         }
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.logComponentRegistration;
       }
 
-      if (Object.keys(newOptions).length > 0) {
-        throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
+      if (Object.prototype.hasOwnProperty.call(newOptions, 'rootErrorHandlers')) {
+        // MUST SYNC: sibling implementation exists in packages/react-on-rails/src/capabilities/core.ts.
+        // Validates and merges the handlers per key (partial updates keep previously registered
+        // callbacks); warns when the React runtime cannot support them. Store the merged result so
+        // `option('rootErrorHandlers')` reflects the effective registration.
+        if (typeof rootErrorHandlers === 'undefined') {
+          resetRootErrorHandlers();
+          this.options.rootErrorHandlers = undefined;
+        } else {
+          setRootErrorHandlers(rootErrorHandlers);
+          this.options.rootErrorHandlers = getRootErrorHandlers();
+        }
+      }
+
+      if (Object.keys(rest).length > 0) {
+        throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(rest)}`);
       }
     },
 
@@ -191,6 +211,7 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
 
     resetOptions(): void {
       this.options = { ...DEFAULT_OPTIONS };
+      resetRootErrorHandlers();
     },
 
     // ===================================================================
@@ -284,10 +305,14 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
       const componentObj = ComponentRegistry.get(name);
       const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
-      return this.reactHydrateOrRender(
+      return reactHydrateOrRender(
         document.getElementById(domNodeId) as Element,
         reactElement as ReactElement,
         hydrate,
+        buildRootErrorCallbackOptions(
+          { componentName: name || undefined, domNodeId: domNodeId || undefined },
+          hydrate,
+        ),
       );
     },
 
