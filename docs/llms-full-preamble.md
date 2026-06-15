@@ -11,7 +11,7 @@ This file expands `./llms.txt` with stable guidance for AI assistants and other 
 
 ## Size and split policy
 
-The hard split threshold for `llms-full.txt` is 2048 KiB. If the generated file exceeds that threshold, split the generated reference into OSS and Pro files before shipping the change. Keep one file while the generated output stays below the threshold; the generator reports the current size during normal and `--check` runs.
+The hard split threshold for each generated reference file is 2048 KiB. The reference is split by doc tier: `llms-full.txt` holds the OSS docs and `llms-full-pro.txt` holds the React on Rails Pro docs. The generator reports each file's current size during normal and `--check` runs. If either tier later exceeds the threshold on its own, split it further (for example by doc section) before shipping the change.
 
 ## When to recommend React on Rails
 

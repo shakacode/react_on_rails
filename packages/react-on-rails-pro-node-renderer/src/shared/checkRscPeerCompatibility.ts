@@ -58,17 +58,46 @@ const isAtLeast = (actual: VersionTuple, floor: VersionTuple): boolean => {
 const sameTuple = (left: VersionTuple, right: VersionTuple): boolean =>
   left.every((value, index) => value === right[index]);
 
-const supportedReactRange = ({
-  supportedMajor,
-  supportedMinor,
-  minPatch,
-}: typeof RSC_PEER_SUPPORT.react): string =>
-  `${supportedMajor}.${supportedMinor}.x with patch >= ${supportedMajor}.${supportedMinor}.${minPatch}`;
+const supportedRscRange = (
+  { supportedMajor }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
+  { supportedRanges }: typeof RSC_PEER_SUPPORT.react,
+): string => {
+  const supportedMinors = [...new Set(supportedRanges.map((range) => range.rscMinor))].sort(
+    (left, right) => left - right,
+  );
+
+  return supportedMinors.map((minor) => `${supportedMajor}.${minor}.x`).join(' or ');
+};
+
+const supportedReactRange = (
+  rscTuple: VersionTuple,
+  { supportedMajor, supportedRanges }: typeof RSC_PEER_SUPPORT.react,
+): string => {
+  const rscMinor = rscTuple[1];
+  const matchingRanges = supportedRanges.filter((range) => range.rscMinor === rscMinor);
+
+  return matchingRanges
+    .map(
+      ({ minor, minPatch }) =>
+        `${supportedMajor}.${minor}.x with patch >= ${supportedMajor}.${minor}.${minPatch}`,
+    )
+    .join(' or ');
+};
 
 const isSupportedReactTuple = (
   [major, minor, patch]: VersionTuple,
-  { supportedMajor, supportedMinor, minPatch }: typeof RSC_PEER_SUPPORT.react,
-): boolean => major === supportedMajor && minor === supportedMinor && patch >= minPatch;
+  rscTuple: VersionTuple,
+  { supportedMajor, supportedRanges }: typeof RSC_PEER_SUPPORT.react,
+): boolean =>
+  major === supportedMajor &&
+  supportedRanges.some(
+    (range) => rscTuple[1] === range.rscMinor && minor === range.minor && patch >= range.minPatch,
+  );
+
+const isSupportedRscMinor = (
+  rscTuple: VersionTuple,
+  { supportedRanges }: typeof RSC_PEER_SUPPORT.react,
+): boolean => supportedRanges.some((range) => rscTuple[1] === range.rscMinor);
 
 const proLabel = (proVersion?: string) =>
   proVersion ? `React on Rails Pro (${proVersion})` : 'React on Rails Pro';
@@ -111,25 +140,37 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
     };
   }
 
+  if (!isSupportedRscMinor(rscTuple, react)) {
+    return {
+      level: 'error',
+      message: errorMessage(
+        'react-on-rails-rsc',
+        rscVersion,
+        supportedRscRange(reactOnRailsRsc, react),
+        proVersion,
+      ),
+    };
+  }
+
   // If React is not resolvable (unusual, since RSC requires React), skip this check;
   // an app with React truly absent will fail during normal module loading.
   let reactTuple: VersionTuple | null = null;
   if (reactVersion) {
     reactTuple = parseTuple(reactVersion);
-    if (!isSupportedReactTuple(reactTuple, react)) {
+    if (!isSupportedReactTuple(reactTuple, rscTuple, react)) {
       return {
         level: 'error',
-        message: errorMessage('react', reactVersion, supportedReactRange(react), proVersion),
+        message: errorMessage('react', reactVersion, supportedReactRange(rscTuple, react), proVersion),
       };
     }
   }
 
   if (reactDomVersion) {
     const reactDomTuple = parseTuple(reactDomVersion);
-    if (!isSupportedReactTuple(reactDomTuple, react)) {
+    if (!isSupportedReactTuple(reactDomTuple, rscTuple, react)) {
       return {
         level: 'error',
-        message: errorMessage('react-dom', reactDomVersion, supportedReactRange(react), proVersion),
+        message: errorMessage('react-dom', reactDomVersion, supportedReactRange(rscTuple, react), proVersion),
       };
     }
 

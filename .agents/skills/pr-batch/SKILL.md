@@ -99,6 +99,11 @@ Coordination: follow `.agents/workflows/pr-processing.md` under Coordination
 State and Worker Rules before creating worktrees or branches. Include stable
 agent ids, `agent-coord status` / claim outcomes, batch ids, dependency refs,
 and any `UNKNOWN` state in every worker lane and handoff.
+Attention contract: follow `AGENTS.md` under Maintainer Attention Contract and
+`.agents/workflows/pr-processing.md` under Maintainer Attention Contract. Do
+not escalate behavior-preserving optional nits, batch real questions into one
+decision block per lane, self-verify machine-checkable claims before escalation,
+and include decision-point counts plus confidence notes in handoffs.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
@@ -208,6 +213,15 @@ Suggested PR description section:
 
 Before merge or final readiness, scan the PR description for the decision log and make sure each non-blocking decision is still accurate after review changes.
 
+## Maintainer Attention Contract
+
+Use `AGENTS.md` and the canonical
+[Maintainer Attention Contract](../../workflows/pr-processing.md#maintainer-attention-contract)
+section in `.agents/workflows/pr-processing.md`. Keep this skill as a routing
+entry point: worker goals should carry the contract before target assignment,
+and the goal prompt template above repeats the key worker-facing rules. The
+detailed policy belongs in the canonical workflow.
+
 ## Batch Handoff Format
 
 <!-- Keep this handoff summary in sync with `.agents/workflows/pr-processing.md` -> `### Batch Handoff Format`. -->
@@ -216,7 +230,8 @@ Use the canonical Batch Handoff Format in
 `.agents/workflows/pr-processing.md`. In short, split final batch handoffs into
 **Immediate maintainer attention** for true blockers and questions only, and
 **FYI / decisions made** for decisions, validations, review state, full-CI
-requests already handled, and no-PR rationales.
+requests already handled, no-PR rationales, autonomous nit outcomes,
+confidence notes, and decision-point counts per PR.
 
 ## Coordination State
 
@@ -225,11 +240,12 @@ canonical source for coordination state and worker rules. Keep this skill as a
 routing entry point; do not duplicate the full protocol here.
 
 In short: exact lane assignments beat labels; private `agent-coord` state is the
-source of truth when `agent-coord status` exits 0; refused claims hard-stop
-machine agents; workers heartbeat at phase transitions; coordinators create
-private batch files before dependency lanes start; dependency-sensitive lanes run
-`agent-coord status` before rebase, push, readiness, and closeout; and structured
-public claim comments are only advisory fallback state.
+source of truth when `agent-coord doctor` and `agent-coord status` exit 0;
+`CLAIM_REFUSED` / exit code 3 hard-stops machine agents; workers heartbeat at
+phase transitions; coordinators create private batch files before dependency
+lanes start; dependency-sensitive lanes run `agent-coord status` before rebase,
+push, readiness, and closeout; and structured public claim comments are only
+advisory fallback state.
 
 ## Worker Rules
 

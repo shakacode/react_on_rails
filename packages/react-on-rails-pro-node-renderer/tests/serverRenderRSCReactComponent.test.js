@@ -72,6 +72,7 @@ describe('serverRenderRSCReactComponent', () => {
     buildConfig({
       serverBundleCachePath: tempDir,
       supportModules: true,
+      additionalContext: { AbortController, AbortSignal },
       stubTimers: false,
       maxVMPoolSize: 2,
     });

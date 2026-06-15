@@ -99,6 +99,15 @@ describe('runRscPeerCompatibilityCheck', () => {
     ).toThrow(/Incompatible react-on-rails-rsc/);
   });
 
+  it('throws on an unsupported rsc minor', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.1.0', '19.0.4'),
+      }),
+    ).toThrow(/Incompatible react-on-rails-rsc/);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it('warns (does not throw) when below recommendedMin', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
@@ -146,6 +155,33 @@ describe('runRscPeerCompatibilityCheck', () => {
         resolveVersion: resolveVersions('19.0.4', '19.0.4', '19.0.5'),
       }),
     ).toThrow(/Incompatible react-dom/);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not throw on the coordinated React 19.2.7 runtime floor', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.2.0-rc.1', '19.2.7'),
+      }),
+    ).not.toThrow();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('throws when React 19.2 is paired with the React 19.0 RSC package line', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.0.5', '19.2.7'),
+      }),
+    ).toThrow(/Incompatible react/);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('throws when React 19.0 is paired with the React 19.2 RSC package line', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.2.0-rc.1', '19.0.4'),
+      }),
+    ).toThrow(/Incompatible react/);
     expect(warnSpy).not.toHaveBeenCalled();
   });
 

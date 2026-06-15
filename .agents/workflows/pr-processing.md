@@ -29,14 +29,15 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
 3. Isolate the work:
    - Fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
    - When the private `shakacode/agent-coordination` backend is available
-     (`agent-coord status` exits 0), acquire an `agent-coord claim` for each
-     issue/PR lane before creating that lane's worktree or branch. Machine
-     agents must hard-stop when the claim is refused and report the holder plus
-     heartbeat liveness. `agent-coord status` is a preflight view; the claim
-     operation is the backend's compare-and-swap gate, so the claim result is the
-     source of truth for races. If `agent-coord status` cannot be checked,
-     report private state as `UNKNOWN` and use structured public claim comments
-     as an advisory fallback.
+     (`agent-coord doctor` and `agent-coord status` exit 0), acquire an
+     `agent-coord claim` for each issue/PR lane before creating that lane's
+     worktree or branch. Machine agents must hard-stop when the claim is refused
+     with `CLAIM_REFUSED` / exit code 3 and report the holder plus heartbeat
+     liveness. `agent-coord status` is a preflight view; the claim operation is
+     the backend's compare-and-swap gate, so the claim result is the source of
+     truth for races. If `agent-coord doctor` or `agent-coord status` cannot be
+     checked, report private state as `UNKNOWN` and use structured public claim
+     comments as an advisory fallback.
    - For lanes declared in `batches/<batch-id>.json` with `depends_on`, run
      `agent-coord status` at lane start and before rebase or push. If the lane
      shows unmet `blocked_on` refs, set that lane's heartbeat status to
@@ -312,6 +313,12 @@ private batch state, report dependency state as `UNKNOWN` and stop that lane.
 If status cannot be checked for a declared dependency lane, stop with dependency
 state `UNKNOWN` instead of using advisory fallback for that lane.
 
+Attention contract: follow `AGENTS.md` under Maintainer Attention Contract.
+Autonomously handle behavior-preserving optional nits when they stay in scope,
+batch genuine questions into one decision block per lane, self-verify
+machine-checkable claims before escalation, and include decision-point counts
+plus confidence notes in handoffs.
+
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
@@ -391,7 +398,7 @@ After workers finish, the coordinator must keep working through the Coordinator 
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
-Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: merged PR; open PR waiting on checks/review; blocked needing user input with the surfaced question/comment URL; or no-PR with an evidence-backed issue/PR comment URL. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, and full-CI uncertainty that was already handled by requesting full CI in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, blockers, no-PR comments, and next actions.
+Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: merged PR; open PR waiting on checks/review; blocked needing user input with the surfaced question/comment URL; or no-PR with an evidence-backed issue/PR comment URL. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, autonomous nit outcomes, decision-point counts, confidence notes, and full-CI uncertainty that was already handled by requesting full CI in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, blockers, no-PR comments, and next actions.
 ```
 
 ### Question And Decision Handling
@@ -400,6 +407,15 @@ Classify every unresolved question before continuing:
 
 - **Blocking question**: the implementation, validation, or merge decision would be unsafe without maintainer input. Stop work on that target until answered. Subagents should return the blocking question to the coordinator instead of guessing. For multi-machine batches, post a structured issue or PR comment and, if the repo uses labels for this workflow, apply `codex-pending-question`. A worker handoff should include the question/comment URL as that target's blocked final state.
 - **Non-blocking decision**: a reasonable local decision can be made without increasing merge risk. Continue work, but add a clearly formatted decision note to the PR description so later review across merged PRs can surface these items quickly.
+
+### Maintainer Attention Contract
+
+Follow `AGENTS.md` under **Maintainer Attention Contract** verbatim for PR,
+review, and batch work. In this workflow, apply that contract at three points:
+review triage, CI/review waits, and final handoff. Record autonomous nit
+outcomes, decision-point counts, confidence/readiness notes, and `UNKNOWN`
+facts in the PR description or handoff instead of turning them into separate
+maintainer pings.
 
 <!-- Keep this full-CI uncertainty rule in sync with `.agents/skills/pr-batch/SKILL.md`. -->
 
@@ -433,7 +449,8 @@ Split batch handoffs into two sections:
   unresolved `DISCUSS` feedback, or a merge/release-mode conflict.
 - **FYI / decisions made**: no-PR rationales, non-blocking decisions, full CI
   requested because the coordinator was unsure at readiness time, validation
-  evidence, review churn notes, and already-answered questions.
+  evidence, review churn notes, autonomous nit outcomes, confidence notes,
+  decision-point counts per PR, and already-answered questions.
 
 Do not put full-CI uncertainty in Immediate at final readiness after local
 validation and the final push. Request full CI and log it in FYI.
@@ -447,10 +464,12 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
 - For concurrent or multi-machine batches, use the private `shakacode/agent-coordination`
   backend when available. Each lane gets a stable agent id such as
   `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
-- Treat the backend as available when `agent-coord status` exits 0. If the
-  command is missing, auth fails, or status exits non-zero, report private state
-  as `UNKNOWN` and use advisory public claim comments. A refused
-  `agent-coord claim` after a successful status check remains a hard stop.
+- Treat the backend as available when `agent-coord doctor` and
+  `agent-coord status` exit 0. If the command is missing, auth fails, doctor
+  fails, or status exits non-zero, report private state as `UNKNOWN` and use
+  advisory public claim comments where dependency rules allow it. A refused
+  `agent-coord claim` after a successful status check returns `CLAIM_REFUSED` /
+  exit code 3 and remains a hard stop.
 - Acquire an `agent-coord claim` for each issue/PR lane before creating that
   lane's worktree or branch. A refused claim is a hard stop for machine agents:
   report the holder, heartbeat liveness, and target instead of creating a
@@ -461,9 +480,10 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
   start, branch or PR update, review pass, blocked state, resumed state, and
   done state.
   Heartbeat liveness is timestamp-derived: `live` before the TTL expires,
-  `stale` until the backend dead threshold, and `dead` after that. Check the
-  private backend README and CLI help for current TTL defaults and threshold
-  calculations; do not model liveness with sticky labels.
+  `stale` until the backend dead threshold, and `dead` after that. Check
+  `agent-coord config show --json`, the private backend README, and CLI help for
+  current TTL defaults, terminal heartbeat statuses, and threshold calculations;
+  do not model liveness with sticky labels.
 - Use `agent-coord status` before starting dependency-sensitive lanes and before
   rebase, push, readiness, or closeout decisions that depend on another lane.
   If `agent-coord status` cannot be checked for a declared dependency lane, stop
@@ -550,11 +570,14 @@ The closeout lane is:
    whether full CI is needed, request full CI with `+ci-run-full` and record the
    reason as FYI, then loop back to re-fetch and wait for the newly requested
    current-head checks before readiness or merge.
-7. Under the current release mode, mark ready or merge PRs that satisfy the
+7. Assemble or refresh the attention-contract closeout for each lane after any
+   full-CI waitback: autonomous nit outcomes, human decision-point count, current
+   confidence or readiness note, and any remaining `UNKNOWN` facts.
+8. Under the current release mode, mark ready or merge PRs that satisfy the
    merge qualification rules, including the merge-endgame debounce and
    waiver-soak rules before merge; report only remaining blockers, questions,
    or `UNKNOWN` live state.
-8. After any closeout-lane merge action, run a lightweight sweep for late
+9. After any closeout-lane merge action, run a lightweight sweep for late
    post-merge bot findings before the final batch handoff: confirm the PR landed,
    check `main` status, and inspect late review/check comments that arrived
    around or after merge. Route release-relevant findings into the next
@@ -745,7 +768,10 @@ Use `.agents/skills/address-review/SKILL.md` when skills are available; Claude C
 
 - `MUST-FIX`: fix in the PR.
 - `DISCUSS`: ask the user or make a narrow, evidence-backed decision.
-- `OPTIONAL`: address inline only when the user opts in.
+- `OPTIONAL`: in `f` and `f+i`, apply low-risk behavior-preserving nits inline
+  or record them as deferred/declined; promote anything needing judgment to
+  `DISCUSS`. For `f+o`, `o <nums>`, and `all optional`, fix each selected item
+  inline or escalate it to `DISCUSS`; autonomous defer does not apply.
 - `SKIPPED`: reply with rationale only when useful; do not create work from noise.
 
 Do not let follow-up issues become a substitute for finishing the PR. Follow-up tracking is allowed only for real, non-blocking work that remains valuable outside the PR context.

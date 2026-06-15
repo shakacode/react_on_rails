@@ -9,6 +9,8 @@ overrides:
   react-dom: ~19.0.4
   app>react: ^18.3.1
   app>react-dom: ^18.3.1
+  react_on_rails>react: ^19.2.0
+  react_on_rails>react-dom: ^19.2.0
   sentry-testkit>body-parser: npm:empty-npm-package@1.0.0
   sentry-testkit>express: npm:empty-npm-package@1.0.0
   lodash@>=4.0.0 <=4.17.22: '>=4.17.23 <5'
@@ -114,7 +116,7 @@ importers:
         version: 10.1.8(eslint@9.39.1(jiti@2.6.1))
       eslint-config-shakacode:
         specifier: ^19.0.0
-        version: 19.0.0(eslint-plugin-import@2.32.0)(eslint-plugin-jsx-a11y@6.10.2(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react-hooks@5.2.0(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react@7.37.5(eslint@9.39.1(jiti@2.6.1)))(eslint@9.39.1(jiti@2.6.1))
+        version: 19.0.0(eslint-plugin-import@2.32.0)(eslint-plugin-jsx-a11y@6.10.2(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react-hooks@6.1.1(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react@7.37.5(eslint@9.39.1(jiti@2.6.1)))(eslint@9.39.1(jiti@2.6.1))
       eslint-import-resolver-alias:
         specifier: ^1.1.2
         version: 1.1.2(eslint-plugin-import@2.32.0)
@@ -137,8 +139,8 @@ importers:
         specifier: ^7.37.5
         version: 7.37.5(eslint@9.39.1(jiti@2.6.1))
       eslint-plugin-react-hooks:
-        specifier: ^5.2.0
-        version: 5.2.0(eslint@9.39.1(jiti@2.6.1))
+        specifier: ^6.1.1
+        version: 6.1.1(eslint@9.39.1(jiti@2.6.1))
       eslint-plugin-testing-library:
         specifier: ^7.1.1
         version: 7.13.5(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3)
@@ -408,7 +410,7 @@ importers:
         version: 7.28.4
       '@dr.pogodin/react-helmet':
         specifier: ^3.0.4
-        version: 3.0.6(react@19.0.7)
+        version: 3.0.6(react@19.2.7)
       '@hotwired/turbo-rails':
         specifier: ^8.0.4
         version: 8.0.23
@@ -437,20 +439,20 @@ importers:
         specifier: ^15.7.2
         version: 15.8.1
       react:
-        specifier: ~19.0.4
-        version: 19.0.7
+        specifier: ^19.2.0
+        version: 19.2.7
       react-dom:
-        specifier: ~19.0.4
-        version: 19.0.7(react@19.0.7)
+        specifier: ^19.2.0
+        version: 19.2.7(react@19.2.7)
       react-on-rails:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails
       react-redux:
         specifier: ^9.2.0
-        version: 9.2.0(@types/react@19.2.7)(react@19.0.7)(redux@5.0.1)
+        version: 9.2.0(@types/react@19.2.7)(react@19.2.7)(redux@5.0.1)
       react-router-dom:
         specifier: ^6.0.0
-        version: 6.30.3(react-dom@19.0.7(react@19.0.7))(react@19.0.7)
+        version: 6.30.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       redux:
         specifier: ^5.0.1
         version: 5.0.1
@@ -481,7 +483,7 @@ importers:
         version: 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.4)(webpack@5.105.2)
       '@rescript/react':
         specifier: ^0.13.0
-        version: 0.13.1(react-dom@19.0.7(react@19.0.7))(react@19.0.7)
+        version: 0.13.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@rspack/cli':
         specifier: ^2.0.0
         version: 2.0.5(@rspack/core@2.0.5)
@@ -5616,9 +5618,9 @@ packages:
       eslint-config-prettier:
         optional: true
 
-  eslint-plugin-react-hooks@5.2.0:
-    resolution: {integrity: sha512-+f15FfK64YQwZdJNELETdn5ibXEUQmW1DZL6KXhNnc2heoy/sg9VJJeT7n8TlMWouzWqSWavFkIhHyIbIAEapg==}
-    engines: {node: '>=10'}
+  eslint-plugin-react-hooks@6.1.1:
+    resolution: {integrity: sha512-St9EKZzOAQF704nt2oJvAKZHjhrpg25ClQoaAlHmPZuajFldVLqRDW4VBNAS01NzeiQF0m0qhG1ZA807K6aVaQ==}
+    engines: {node: '>=18'}
     peerDependencies:
       eslint: ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0 || ^9.0.0
 
@@ -8425,6 +8427,11 @@ packages:
     peerDependencies:
       react: ~19.0.4
 
+  react-dom@19.2.7:
+    resolution: {integrity: sha512-t0BRVXvbiE/o20Hfw669rLbMCDWtYZLvmJigy2f0MxsXF+71pxhR3xOkspmsO8h3ZlNzyibAmtCa3l4lYKk6gQ==}
+    peerDependencies:
+      react: ~19.0.4
+
   react-error-boundary@4.1.2:
     resolution: {integrity: sha512-GQDxZ5Jd+Aq/qUxbCm1UtzmL/s++V7zKgE8yMktJiCQXCCFZnMZh9ng+6/Ne6PjNSXH0L9CjeOEREfRnq6Duag==}
     peerDependencies:
@@ -8500,6 +8507,10 @@ packages:
 
   react@19.0.7:
     resolution: {integrity: sha512-RmJKQ4jeqxrOUF3mjX4G9RIhfkYSQmUDpiM1G/wud3Ctm/xMtGBZoL8BYBFhZ0Q0JgNrtc99CXlnu4EZ6RbvRQ==}
+    engines: {node: '>=0.10.0'}
+
+  react@19.2.7:
+    resolution: {integrity: sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ==}
     engines: {node: '>=0.10.0'}
 
   read-cache@1.0.0:
@@ -10340,6 +10351,12 @@ packages:
   zlibjs@0.3.1:
     resolution: {integrity: sha512-+J9RrgTKOmlxFSDHo0pI1xM6BLVUv+o0ZT9ANtCxGkjIVCCUdx9alUF8Gm+dGLKbkkkidWIHFDZHDMpfITt4+w==}
 
+  zod-validation-error@4.0.2:
+    resolution: {integrity: sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
@@ -11283,6 +11300,11 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.28.6
       react: 19.0.7
+
+  '@dr.pogodin/react-helmet@3.0.6(react@19.2.7)':
+    dependencies:
+      '@babel/runtime': 7.28.6
+      react: 19.2.7
 
   '@dual-bundle/import-meta-resolve@4.2.1': {}
 
@@ -12810,10 +12832,10 @@ snapshots:
 
   '@remix-run/router@1.23.2': {}
 
-  '@rescript/react@0.13.1(react-dom@19.0.7(react@19.0.7))(react@19.0.7)':
+  '@rescript/react@0.13.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      react: 19.0.7
-      react-dom: 19.0.7(react@19.0.7)
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
 
   '@rspack/binding-darwin-arm64@2.0.5':
     optional: true
@@ -15508,14 +15530,14 @@ snapshots:
       object.entries: 1.1.9
       semver: 6.3.1
 
-  eslint-config-airbnb@19.0.4(eslint-plugin-import@2.32.0)(eslint-plugin-jsx-a11y@6.10.2(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react-hooks@5.2.0(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react@7.37.5(eslint@9.39.1(jiti@2.6.1)))(eslint@9.39.1(jiti@2.6.1)):
+  eslint-config-airbnb@19.0.4(eslint-plugin-import@2.32.0)(eslint-plugin-jsx-a11y@6.10.2(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react-hooks@6.1.1(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react@7.37.5(eslint@9.39.1(jiti@2.6.1)))(eslint@9.39.1(jiti@2.6.1)):
     dependencies:
       eslint: 9.39.1(jiti@2.6.1)
       eslint-config-airbnb-base: 15.0.0(eslint-plugin-import@2.32.0)(eslint@9.39.1(jiti@2.6.1))
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.48.0(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-typescript@4.4.4)(eslint@9.39.1(jiti@2.6.1))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.1(jiti@2.6.1))
       eslint-plugin-react: 7.37.5(eslint@9.39.1(jiti@2.6.1))
-      eslint-plugin-react-hooks: 5.2.0(eslint@9.39.1(jiti@2.6.1))
+      eslint-plugin-react-hooks: 6.1.1(eslint@9.39.1(jiti@2.6.1))
       object.assign: 4.1.7
       object.entries: 1.1.9
 
@@ -15523,10 +15545,10 @@ snapshots:
     dependencies:
       eslint: 9.39.1(jiti@2.6.1)
 
-  eslint-config-shakacode@19.0.0(eslint-plugin-import@2.32.0)(eslint-plugin-jsx-a11y@6.10.2(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react-hooks@5.2.0(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react@7.37.5(eslint@9.39.1(jiti@2.6.1)))(eslint@9.39.1(jiti@2.6.1)):
+  eslint-config-shakacode@19.0.0(eslint-plugin-import@2.32.0)(eslint-plugin-jsx-a11y@6.10.2(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react-hooks@6.1.1(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react@7.37.5(eslint@9.39.1(jiti@2.6.1)))(eslint@9.39.1(jiti@2.6.1)):
     dependencies:
       eslint: 9.39.1(jiti@2.6.1)
-      eslint-config-airbnb: 19.0.4(eslint-plugin-import@2.32.0)(eslint-plugin-jsx-a11y@6.10.2(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react-hooks@5.2.0(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react@7.37.5(eslint@9.39.1(jiti@2.6.1)))(eslint@9.39.1(jiti@2.6.1))
+      eslint-config-airbnb: 19.0.4(eslint-plugin-import@2.32.0)(eslint-plugin-jsx-a11y@6.10.2(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react-hooks@6.1.1(eslint@9.39.1(jiti@2.6.1)))(eslint-plugin-react@7.37.5(eslint@9.39.1(jiti@2.6.1)))(eslint@9.39.1(jiti@2.6.1))
       eslint-config-airbnb-base: 15.0.0(eslint-plugin-import@2.32.0)(eslint@9.39.1(jiti@2.6.1))
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.48.0(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-typescript@4.4.4)(eslint@9.39.1(jiti@2.6.1))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.1(jiti@2.6.1))
@@ -15648,9 +15670,15 @@ snapshots:
       '@types/eslint': 9.6.1
       eslint-config-prettier: 10.1.8(eslint@9.39.1(jiti@2.6.1))
 
-  eslint-plugin-react-hooks@5.2.0(eslint@9.39.1(jiti@2.6.1)):
+  eslint-plugin-react-hooks@6.1.1(eslint@9.39.1(jiti@2.6.1)):
     dependencies:
+      '@babel/core': 7.28.5
+      '@babel/parser': 7.28.5
       eslint: 9.39.1(jiti@2.6.1)
+      zod: 4.1.13
+      zod-validation-error: 4.0.2(zod@4.1.13)
+    transitivePeerDependencies:
+      - supports-color
 
   eslint-plugin-react@7.37.5(eslint@9.39.1(jiti@2.6.1)):
     dependencies:
@@ -19032,6 +19060,11 @@ snapshots:
       react: 19.0.7
       scheduler: 0.25.0
 
+  react-dom@19.2.7(react@19.2.7):
+    dependencies:
+      react: 19.2.7
+      scheduler: 0.27.0
+
   react-error-boundary@4.1.2(react@19.0.7):
     dependencies:
       '@babel/runtime': 7.28.4
@@ -19087,6 +19120,15 @@ snapshots:
       '@types/react': 19.2.7
       redux: 5.0.1
 
+  react-redux@9.2.0(@types/react@19.2.7)(react@19.2.7)(redux@5.0.1):
+    dependencies:
+      '@types/use-sync-external-store': 0.0.6
+      react: 19.2.7
+      use-sync-external-store: 1.6.0(react@19.2.7)
+    optionalDependencies:
+      '@types/react': 19.2.7
+      redux: 5.0.1
+
   react-refresh@0.11.0: {}
 
   react-refresh@0.14.2: {}
@@ -19098,16 +19140,30 @@ snapshots:
       react-dom: 19.0.7(react@19.0.7)
       react-router: 6.30.3(react@19.0.7)
 
+  react-router-dom@6.30.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      '@remix-run/router': 1.23.2
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      react-router: 6.30.3(react@19.2.7)
+
   react-router@6.30.3(react@19.0.7):
     dependencies:
       '@remix-run/router': 1.23.2
       react: 19.0.7
+
+  react-router@6.30.3(react@19.2.7):
+    dependencies:
+      '@remix-run/router': 1.23.2
+      react: 19.2.7
 
   react@18.3.1:
     dependencies:
       loose-envify: 1.4.0
 
   react@19.0.7: {}
+
+  react@19.2.7: {}
 
   read-cache@1.0.0:
     dependencies:
@@ -20975,6 +21031,10 @@ snapshots:
     dependencies:
       react: 19.0.7
 
+  use-sync-external-store@1.6.0(react@19.2.7):
+    dependencies:
+      react: 19.2.7
+
   util-deprecate@1.0.2: {}
 
   util@0.10.4:
@@ -21564,6 +21624,10 @@ snapshots:
       readable-stream: 4.7.0
 
   zlibjs@0.3.1: {}
+
+  zod-validation-error@4.0.2(zod@4.1.13):
+    dependencies:
+      zod: 4.1.13
 
   zod@3.25.76: {}
 

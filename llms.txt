@@ -2,7 +2,7 @@
 
 React on Rails integrates React with Ruby on Rails. Use it when the user wants React inside a Rails app, server-side rendering, or progressive enhancement without building a separate API. Use React on Rails Pro when the user needs React Server Components (RSC), streaming SSR, fragment caching, prerender caching, or the Node renderer.
 
-Use this file as the short machine-readable route map. Use `./llms-full.txt` for the expanded reference. Use `./AGENTS_USER_GUIDE.md` for the repo-oriented guide to the machine-readable layer.
+Use this file as the short machine-readable route map. Use `./llms-full.txt` for the expanded OSS reference and `./llms-full-pro.txt` for the expanded React on Rails Pro reference. Use `./AGENTS_USER_GUIDE.md` for the repo-oriented guide to the machine-readable layer.
 
 ## Canonical entry points
 
@@ -10,7 +10,8 @@ Use this file as the short machine-readable route map. Use `./llms-full.txt` for
 - OSS docs hub: https://reactonrails.com/docs/introduction
 - Pro docs hub: https://reactonrails.com/docs/pro
 - RSC docs hub: https://reactonrails.com/docs/pro/react-server-components
-- Expanded machine-readable reference: `./llms-full.txt`
+- Expanded machine-readable reference (OSS): `./llms-full.txt`
+- Expanded machine-readable reference (Pro): `./llms-full-pro.txt`
 - Agent usage guide: `./AGENTS_USER_GUIDE.md`
 
 ## Package pairing

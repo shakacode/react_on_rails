@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 /**
- * Generates llms-full.txt: the curated preamble (docs/llms-full-preamble.md)
- * followed by the full content of every published doc under docs/oss and
- * docs/pro, in sidebar order, with canonical reactonrails.com URLs.
+ * Generates the expanded machine-readable reference, split by doc tier to keep
+ * each file under the SPLIT_THRESHOLD_KIB gate:
+ *   - llms-full.txt      → curated preamble + every published OSS doc
+ *   - llms-full-pro.txt  → curated preamble + every published Pro doc
+ * Both follow sidebar order and carry canonical reactonrails.com URLs. Pro docs
+ * are the ones whose doc ID begins with `pro/` (see docIdForFile).
  *
  * Also validates that every reactonrails.com/docs URL referenced from
  * llms.txt and the preamble resolves to a published doc or docs directory,
  * and that llms.txt represents every sidebar top-level section.
  *
  * Usage:
- *   node script/generate-llms-full.mjs           # regenerate llms-full.txt
+ *   node script/generate-llms-full.mjs           # regenerate both llms-full files
  *   node script/generate-llms-full.mjs --check   # CI mode: fail on drift
  *
  * Doc ID rules mirror script/check-docs-sidebar:
@@ -34,6 +37,7 @@ const KNOWN_REDIRECTS_FILE = path.join(DOCS_DIR, '.llms-known-redirects');
 const SIDEBARS_FILE = path.join(DOCS_DIR, 'sidebars.ts');
 const LLMS_FILE = path.join(ROOT, 'llms.txt');
 const OUTPUT_FILE = path.join(ROOT, 'llms-full.txt');
+const OUTPUT_FILE_PRO = path.join(ROOT, 'llms-full-pro.txt');
 const SITE_DOCS_URL = 'https://reactonrails.com/docs';
 const SPLIT_THRESHOLD_KIB = 2048;
 
@@ -250,7 +254,7 @@ function sidebarTopLevelSections(docs) {
     .filter(Boolean);
 }
 
-function generate(docs, orderedIds) {
+function generate(docs, orderedIds, { heading, crossLink }) {
   const preamble = fs.readFileSync(PREAMBLE_FILE, 'utf8').trimEnd();
   const parts = [
     '<!-- GENERATED FILE — DO NOT EDIT DIRECTLY. -->',
@@ -260,11 +264,13 @@ function generate(docs, orderedIds) {
     preamble,
     '',
     '',
-    '# Full documentation content',
+    heading,
     '',
-    'Every published documentation page follows, in sidebar order. Each page begins',
-    'with a `PAGE:` line holding its canonical URL and a `SOURCE:` line holding its',
-    'repository path.',
+    crossLink,
+    '',
+    'Every published documentation page in this tier follows, in sidebar order. Each',
+    'page begins with a `PAGE:` line holding its canonical URL and a `SOURCE:` line',
+    'holding its repository path.',
     '',
   ];
   for (const docId of orderedIds) {
@@ -360,12 +366,12 @@ function validateSidebarTopLevelSections(docs, llmsUrls) {
   return sections.length;
 }
 
-function validateSplitThreshold(output) {
+function validateSplitThreshold(output, label) {
   const outputSizeKib = Buffer.byteLength(output) / 1024;
   if (outputSizeKib > SPLIT_THRESHOLD_KIB) {
     fail(
-      `llms-full.txt is ${outputSizeKib.toFixed(0)} KiB, above the ${SPLIT_THRESHOLD_KIB} KiB split threshold. ` +
-        'Split the generated reference into OSS and Pro files before shipping this size.',
+      `${label} is ${outputSizeKib.toFixed(0)} KiB, above the ${SPLIT_THRESHOLD_KIB} KiB split threshold. ` +
+        'Split the generated reference further (for example by doc section) before shipping this size.',
     );
   }
   return outputSizeKib;
@@ -373,30 +379,53 @@ function validateSplitThreshold(output) {
 
 const docs = collectDocs();
 const orderedIds = sidebarOrderedIds(docs);
-const output = generate(docs, orderedIds);
+const ossIds = orderedIds.filter((id) => !id.startsWith('pro/'));
+const proIds = orderedIds.filter((id) => id.startsWith('pro/'));
+const ossOutput = generate(docs, ossIds, {
+  heading: '# Full documentation content (OSS)',
+  crossLink: 'React on Rails Pro pages are in the companion file: ./llms-full-pro.txt',
+});
+const proOutput = generate(docs, proIds, {
+  heading: '# Full documentation content (Pro)',
+  crossLink: 'OSS pages are in the companion file: ./llms-full.txt',
+});
+
 const docsUrlsByFile = new Map([
   [LLMS_FILE, docsUrlsFromFile(LLMS_FILE)],
   [PREAMBLE_FILE, docsUrlsFromFile(PREAMBLE_FILE)],
 ]);
 const validatedUrlCount = validateDocUrls(docs, docsUrlsByFile);
 const validatedSidebarSectionCount = validateSidebarTopLevelSections(docs, docsUrlsByFile.get(LLMS_FILE));
-const outputSizeKib = validateSplitThreshold(output);
+
+const outputs = [
+  { file: OUTPUT_FILE, output: ossOutput, label: 'llms-full.txt', ids: ossIds },
+  { file: OUTPUT_FILE_PRO, output: proOutput, label: 'llms-full-pro.txt', ids: proIds },
+];
+for (const entry of outputs) {
+  entry.sizeKib = validateSplitThreshold(entry.output, entry.label);
+}
 
 if (checkMode) {
-  const existing = fs.existsSync(OUTPUT_FILE) ? fs.readFileSync(OUTPUT_FILE, 'utf8') : '';
-  if (existing !== output) {
-    fail('llms-full.txt is stale. Run `node script/generate-llms-full.mjs` and commit the result.');
+  for (const { file, output, label } of outputs) {
+    const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+    if (existing !== output) {
+      fail(`${label} is stale. Run \`node script/generate-llms-full.mjs\` and commit the result.`);
+    }
   }
 } else if (process.exitCode === 1) {
-  console.error('✗ Not writing llms-full.txt while URL validation is failing; fix the URLs above first.');
+  console.error('✗ Not writing llms-full files while URL validation is failing; fix the URLs above first.');
 } else {
-  fs.writeFileSync(OUTPUT_FILE, output);
+  for (const { file, output } of outputs) {
+    fs.writeFileSync(file, output);
+  }
 }
 
 if (process.exitCode !== 1) {
+  const summary = outputs
+    .map(({ label, ids, sizeKib }) => `${label} ${sizeKib.toFixed(0)} KiB (${ids.length} pages)`)
+    .join(', ');
   console.log(
-    `✓ llms-full.txt ${checkMode ? 'is current' : 'generated'}: ${orderedIds.length} pages, ` +
-      `${outputSizeKib.toFixed(0)} KiB ` +
+    `✓ llms-full files ${checkMode ? 'are current' : 'generated'}: ${summary} ` +
       `(split threshold ${SPLIT_THRESHOLD_KIB} KiB); ${validatedUrlCount} docs URLs and ` +
       `${validatedSidebarSectionCount} sidebar top-level sections validated.`,
   );

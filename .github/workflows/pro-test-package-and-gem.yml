@@ -15,6 +15,7 @@ on:
       - 'docs/**'
       - 'llms.txt'
       - 'llms-full.txt'
+      - 'llms-full-pro.txt'
       - '.lychee.toml'
       - 'react_on_rails/lib/**'
       - 'react_on_rails/spec/**'
