@@ -277,6 +277,65 @@ test_docs_internal_tree_with_image_asset_is_non_runtime_only() {
   assert_contains "$out" '"benchmarks_changed": false' "docs-internal image output"
 }
 
+# Companion to PR #4006: the contract is that EVERYTHING under docs-internal/ is
+# non-runtime regardless of file type, not just markdown and images. A plain
+# non-markdown text file (here a .yml) is matched by the docs-internal/ directory
+# globs alone — .yml is not one of the extensions the documentation branch
+# recognizes, so without those globs it would hit the uncategorized catch-all and
+# force the full suite, exactly as the .png did. Mirrors the internal/ sibling
+# (test_internal_non_markdown_docs_are_non_runtime_only).
+test_docs_internal_non_markdown_file_is_non_runtime_only() {
+  setup_repo
+  write_file_change "docs-internal/rsc-architecture-deep-dive/metrics.yml" "rps: 1000"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": true' "docs-internal yaml output"
+  assert_contains "$out" '"non_runtime_only": true' "docs-internal yaml output"
+  assert_contains "$out" '"run_lint": false' "docs-internal yaml output"
+  assert_contains "$out" '"run_ruby_tests": false' "docs-internal yaml output"
+  assert_contains "$out" '"run_js_tests": false' "docs-internal yaml output"
+  assert_contains "$out" '"benchmarks_changed": false' "docs-internal yaml output"
+}
+
+# Isolation guard for PR #4006: the binary asset ALONE (no accompanying markdown)
+# must be non-runtime. The combined regression test above ships both a .md and the
+# .png; the .md is caught by *.md whether or not the docs-internal/ globs exist, so
+# this strips it to prove the image is precisely what those globs rescue from the
+# catch-all. Defends against a future partial revert (e.g. dropping the binary glob
+# while keeping a docs-internal/**/*.md one) that the combined test would not catch.
+test_docs_internal_image_only_is_non_runtime_only() {
+  setup_repo
+  write_file_change "docs-internal/rsc-architecture-deep-dive/images/flow.png" "binary-ish png bytes"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": true' "docs-internal image-only output"
+  assert_contains "$out" '"non_runtime_only": true' "docs-internal image-only output"
+  assert_contains "$out" '"run_js_tests": false' "docs-internal image-only output"
+  assert_contains "$out" '"run_ruby_tests": false' "docs-internal image-only output"
+}
+
+# Guard: the docs-internal/ globs must not swallow a genuine runtime change shipped
+# in the same PR. An internal doc paired with a real core-gem source edit still runs
+# the Ruby suite and benchmarks — non_runtime_only flips false the moment any non-doc
+# file appears, exactly as it does for the other documentation directories.
+test_docs_internal_doc_plus_runtime_source_still_runs_tests() {
+  setup_repo
+  mkdir -p docs-internal/rsc-architecture-deep-dive
+  printf '# Deep dive\n' > docs-internal/rsc-architecture-deep-dive/00-START-HERE.md
+  # A genuine executable edit (string value change, not a comment) to core gem code.
+  perl -0pi -e 's/"ok"/"changed"/' react_on_rails/lib/react_on_rails/example.rb
+  commit_change "internal docs plus real source change"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "docs-internal mixed output"
+  assert_contains "$out" '"run_ruby_tests": true' "docs-internal mixed output"
+  # Core gem source underlies all three benchmark suites.
+  assert_contains "$out" '"run_core_benchmarks": true' "docs-internal mixed output"
+}
+
 # Regression for PR #3717: agent/editor tooling under .claude/** and .agents/**
 # is non-runtime. The .claude/skills symlink (a tracked path with no extension)
 # used to miss every category and hit the catch-all, forcing the full test +
@@ -854,6 +913,9 @@ run_test test_internal_non_markdown_docs_are_non_runtime_only
 run_test test_issue_template_changes_are_non_runtime_only
 run_test test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only
 run_test test_docs_internal_tree_with_image_asset_is_non_runtime_only
+run_test test_docs_internal_non_markdown_file_is_non_runtime_only
+run_test test_docs_internal_image_only_is_non_runtime_only
+run_test test_docs_internal_doc_plus_runtime_source_still_runs_tests
 run_test test_agent_tooling_changes_are_non_runtime_only
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
