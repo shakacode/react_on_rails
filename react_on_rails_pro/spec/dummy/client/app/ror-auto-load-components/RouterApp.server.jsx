@@ -28,7 +28,11 @@ const dataServerRouter = async (_props, railsContext) => {
   const routerContext = await handler.query(request);
   const router = createStaticRouter(handler.dataRoutes, routerContext);
 
-  return renderToString(<StaticRouterProvider router={router} context={routerContext} />);
+  // nonce: the strict CSP (config/initializers/content_security_policy.rb) would
+  // otherwise block the inline hydration-data script StaticRouterProvider emits.
+  return renderToString(
+    <StaticRouterProvider router={router} context={routerContext} nonce={railsContext.cspNonce} />,
+  );
 };
 
 export default dataServerRouter;

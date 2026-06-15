@@ -124,6 +124,62 @@ describe ReactOnRailsProHelper do
           end.not_to yield_control
         end
 
+        context "with cache_tags" do
+          it "serves from cache until revalidate_tag, then renders fresh content" do
+            props_calls = 0
+            render_cached = lambda do
+              cached_react_component("App", cache_key: "tagged-cache-key", cache_tags: ["post:42"],
+                                            cache_options: { expires_in: 3600 }) do
+                props_calls += 1
+                { a: 1, b: 2 }
+              end
+            end
+
+            render_cached.call
+            render_cached.call
+            expect(props_calls).to eq(1)
+            expect(cache_data.keys).to include(%r{/App/tagged-cache-key})
+
+            expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(1)
+            expect(cache_data.keys).not_to include(%r{/App/tagged-cache-key})
+
+            result = render_cached.call
+            expect(props_calls).to eq(2)
+            expect(result).to match(/div id="App-react-component"/)
+            expect(cache_data.keys).to include(%r{/App/tagged-cache-key})
+          end
+
+          it "revalidates every entry registered under the tag" do
+            cached_react_component("App", cache_key: "tagged-key-one", cache_tags: ["shared-tag"],
+                                          cache_options: { expires_in: 3600 }) do
+              { a: 1 }
+            end
+            cached_react_component("App", cache_key: "tagged-key-two", cache_tags: ["shared-tag"],
+                                          cache_options: { expires_in: 3600 }) do
+              { a: 2 }
+            end
+
+            expect(ReactOnRailsPro.revalidate_tags("shared-tag")).to eq(2)
+            expect(cache_data.keys).not_to include(%r{/App/tagged-key-one})
+            expect(cache_data.keys).not_to include(%r{/App/tagged-key-two})
+          end
+
+          it "is a no-op for tags that were never written" do
+            expect(ReactOnRailsPro.revalidate_tag("never-written-tag")).to eq(0)
+          end
+
+          it "validates tags before writing a cache miss" do
+            expect do
+              cached_react_component("App", cache_key: "invalid-tagged-key", cache_tags: [""],
+                                            cache_options: { expires_in: 3600 }) do
+                { a: 1 }
+              end
+            end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
+
+            expect(cache_data.keys).not_to include(%r{/App/invalid-tagged-key})
+          end
+        end
+
         context "with multiple cache keys" do
           it "caches the content using cache keys" do
             props = { a: 1, b: 2 }
@@ -781,6 +837,91 @@ describe ReactOnRailsProHelper do
         expect(second_run_chunks).to eq(first_run_chunks)
       end
 
+      it "re-renders after revalidate_tag busts the tagged stream cache" do
+        mock_request_and_response(count: 2)
+        render_with_cached_stream(cache_tags: ["stream-tag"])
+
+        # First render (MISS → write-through registers the tag)
+        run_stream
+        expect(chunks_read.count).to eq(chunks.count)
+
+        # Second render (HIT)
+        reset_stream_buffers
+        @rendered_rails_context = nil
+        run_stream
+        expect(chunks_read.count).to eq(0)
+
+        expect(ReactOnRailsPro.revalidate_tag("stream-tag")).to eq(1)
+
+        # Third render (MISS again — the tagged chunks were deleted)
+        reset_stream_buffers
+        @rendered_rails_context = nil
+        run_stream
+        expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "keeps stream tag-index options from shrinking while converting write options at completion" do
+        raw_cache_options = { expires_at: Time.now + 60 }
+        tag_index_cache_options = { expires_in: 60 }
+        write_cache_options = { expires_in: 45 }
+        captured_on_complete = nil
+
+        allow(ReactOnRailsPro::Cache).to receive(:cache_write_options)
+          .with(raw_cache_options)
+          .and_return(tag_index_cache_options, write_cache_options)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).once
+
+        captured_on_complete.call(["chunk"])
+
+        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).twice
+        expect(Rails.cache).to have_received(:write).with("stream-cache-key", ["chunk"], write_cache_options)
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["stream-tag"], "stream-cache-key", tag_index_cache_options)
+      end
+
+      it "does not write or register stream cache entries whose expires_at passed before completion" do
+        raw_cache_options = { expires_at: Time.now - 60 }
+        captured_on_complete = nil
+
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+
+        captured_on_complete.call(["chunk"])
+
+        expect(Rails.cache).not_to have_received(:write)
+        expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
+      end
+
       it "respects skip_prerender_cache and does not write or hit cache" do
         mock_request_and_response(count: 3)
         # Disable view-level caching for this run via conditional
@@ -1101,6 +1242,75 @@ describe ReactOnRailsProHelper do
         expect do |block|
           cached_async_react_component("App", cache_key:, &block)
         end.not_to yield_control
+      end
+
+      it "re-renders after revalidate_tag busts the tagged entry" do
+        cache_key = "async-tag-test-#{SecureRandom.hex(4)}"
+
+        first_value = cached_async_react_component("RandomValue", cache_key:, cache_tags: ["async-tag"],
+                                                                  cache_options: { expires_in: 3600 }) do
+          { a: 1 }
+        end
+        first_html = first_value.value
+
+        # Cache hit: served without re-render (and without re-registering the tag)
+        second_value = cached_async_react_component("RandomValue", cache_key:, cache_tags: ["async-tag"],
+                                                                   cache_options: { expires_in: 3600 }) do
+          { a: 1 }
+        end
+        expect(second_value).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
+        expect(second_value.value).to eq(first_html)
+
+        expect(ReactOnRailsPro.revalidate_tag("async-tag")).to eq(1)
+
+        # Miss again after revalidation — RandomValue renders different content
+        third_value = cached_async_react_component("RandomValue", cache_key:, cache_tags: ["async-tag"],
+                                                                  cache_options: { expires_in: 3600 }) do
+          { a: 1 }
+        end
+        expect(third_value).to be_a(ReactOnRailsPro::AsyncValue)
+        expect(third_value.value).not_to eq(first_html)
+      end
+
+      it "validates tags before writing an async cache miss" do
+        cache_key = "async-invalid-tag-test-#{SecureRandom.hex(4)}"
+        component_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
+
+        expect do
+          cached_async_react_component("App", cache_key:, cache_tags: [""],
+                                              cache_options: { expires_in: 3600 }) do
+            { a: 1 }
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
+        expect(Rails.cache.read(component_cache_key)).to be_nil
+      end
+
+      it "recomputes async write options at completion while keeping tag-index options from miss time" do
+        raw_cache_options = { expires_at: Time.now + 60 }
+        tag_index_cache_options = { expires_in: 60 }
+        write_cache_options = { expires_in: 45 }
+        raw_options = {
+          cache_key: "async-expiry-recompute",
+          cache_tags: ["async-tag"],
+          cache_options: raw_cache_options
+        }
+        component_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", raw_options)
+
+        allow(ReactOnRailsPro::Cache).to receive(:cache_write_options)
+          .with(raw_cache_options)
+          .and_return(tag_index_cache_options, write_cache_options)
+        allow(Rails.cache).to receive(:read).with(component_cache_key, tag_index_cache_options).and_return(nil)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:react_component).and_return("<div>async</div>")
+
+        async_value = send(:fetch_async_react_component, "App", raw_options) { { a: 1 } }
+
+        expect(async_value.value).to eq("<div>async</div>")
+        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).twice
+        expect(Rails.cache).to have_received(:write).with(component_cache_key, "<div>async</div>", write_cache_options)
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["async-tag"], component_cache_key, tag_index_cache_options)
       end
 
       it "respects :if option for conditional caching" do

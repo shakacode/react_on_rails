@@ -28,6 +28,8 @@ require "react_on_rails_pro/configuration"
 require "react_on_rails_pro/license_public_key"
 require "react_on_rails_pro/license_validator"
 require "react_on_rails_pro/cache"
+require "react_on_rails_pro/cache/tag_index"
+require "react_on_rails_pro/cache/revalidates"
 require "react_on_rails_pro/stream_cache"
 require "react_on_rails_pro/server_rendering_pool/pro_rendering"
 require "react_on_rails_pro/server_rendering_pool/node_rendering_pool"
@@ -46,3 +48,25 @@ require "react_on_rails_pro/concerns/async_rendering"
 require "react_on_rails_pro/async_value"
 require "react_on_rails_pro/immediate_async_value"
 require "react_on_rails_pro/routes"
+
+module ReactOnRailsPro
+  # Deletes every cached component entry registered under +tag+ (written via
+  # the `cache_tags:` option on the cached_* helpers) and clears the tag's
+  # index entry. A missing/never-written tag is a no-op. Returns the number of
+  # cache entries deleted.
+  #
+  # Revalidation is best-effort: the tag index is itself stored in Rails.cache
+  # and its appends are lossy under concurrency, so correctness is bounded by
+  # the :expires_in of the tagged entries. See docs/pro/fragment-caching.md.
+  def self.revalidate_tag(tag)
+    Cache.revalidate_tags(tag)
+  end
+
+  # Splat form of revalidate_tag. Tags accept the same forms as the
+  # `cache_tags:` option (String, object responding to #cache_key such as an
+  # ActiveRecord model, Proc, or Array of any mix). Returns the total number
+  # of cache entries deleted.
+  def self.revalidate_tags(*tags)
+    Cache.revalidate_tags(*tags)
+  end
+end

@@ -42,24 +42,33 @@ class ApplicationController < ActionController::Base
       and the error happen outside the shell
     ERROR
 
+    redirect_path = server_side_log_throw_raise_invoker_path
     error_message = <<~HTML
       <h2>Server-Side Rendering Error</h2>
       <p>We apologize, but an error occurred while rendering the page on the server.</p>
       <p>If you are not redirected, please
-      <a href="#{server_side_log_throw_raise_invoker_path}">click here</a>.</p>
+      <a href="#{ERB::Util.html_escape(redirect_path)}">click here</a>.</p>
     HTML
 
-    js_redirect = <<~JAVASCRIPT
-      <script>
-        document.getElementById('page-container').innerHTML = #{ActiveSupport::JSON.encode(error_message)};
+    # The strict CSP (config/initializers/content_security_policy.rb) blocks
+    # inline scripts without the per-request nonce, so this late-streamed error
+    # script must carry it. The meta refresh below stays as a no-JS fallback.
+    # html_escape guards against a custom nonce generator emitting characters
+    # (e.g. `"` or `>`) that could break out of the attribute; Rails' built-in
+    # base64/session generators are already safe.
+    nonce = request.content_security_policy_nonce
+    nonce_attribute = nonce.present? ? %( nonce="#{ERB::Util.html_escape(nonce)}") : ""
+    js_redirect = <<~HTML
+      <script#{nonce_attribute}>
+        document.getElementById('page-container').innerHTML = #{ERB::Util.json_escape(ActiveSupport::JSON.encode(error_message))};
         setTimeout(function() {
-          window.location.href = '#{server_side_log_throw_raise_invoker_path}';
+          window.location.href = #{ERB::Util.json_escape(ActiveSupport::JSON.encode(redirect_path))};
         }, 5000);
       </script>
-    JAVASCRIPT
+    HTML
 
     meta_refresh = <<~HTML
-      <meta http-equiv='refresh' content='5;url=#{server_side_log_throw_raise_invoker_path}'>
+      <meta http-equiv='refresh' content='5;url=#{ERB::Util.html_escape(redirect_path)}'>
     HTML
 
     response.stream.write(error_message + js_redirect + meta_refresh)
