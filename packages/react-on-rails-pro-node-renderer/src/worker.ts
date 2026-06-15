@@ -131,6 +131,10 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
     setHeaders(headers, res);
     setPlainTextResponseHeaders(res);
     res.status(status);
+    // Non-success renderer strings are diagnostics, not HTML. They are forced
+    // to text/plain with nosniff above, and Ruby raises the body verbatim.
+    // lgtm[js/reflected-xss]
+    // codeql[js/reflected-xss]
     res.send(Buffer.from(data, 'utf8'));
     return;
   }
