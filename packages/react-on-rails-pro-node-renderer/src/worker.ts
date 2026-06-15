@@ -98,10 +98,27 @@ function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
   Object.entries(headers).forEach(([key, header]) => res.header(key, header));
 }
 
+function hasHeader(headers: ResponseResult['headers'], headerName: string) {
+  const lowerHeaderName = headerName.toLowerCase();
+  return Object.keys(headers).some((key) => key.toLowerCase() === lowerHeaderName);
+}
+
+function setStringResponseHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
+  if (!hasHeader(headers, 'Content-Type')) {
+    res.type('text/plain; charset=utf-8');
+  }
+  if (!hasHeader(headers, 'X-Content-Type-Options')) {
+    res.header('X-Content-Type-Options', 'nosniff');
+  }
+}
+
 const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   const { status, data, headers, stream } = result;
   if (status !== 200 && status !== 410) {
     log.info({ msg: 'Sending non-200, non-410 data back', data });
+  }
+  if (!stream && typeof data === 'string') {
+    setStringResponseHeaders(headers, res);
   }
   setHeaders(headers, res);
   res.status(status);

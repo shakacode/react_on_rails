@@ -59,6 +59,11 @@ const createWorker = (options: Parameters<typeof worker>[0] = {}) =>
     ...options,
   });
 
+function expectPlainTextNosniffResponse(res: { headers: Record<string, unknown> }) {
+  expect(res.headers['content-type']).toMatch(/^text\/plain; charset=utf-8/);
+  expect(res.headers['x-content-type-options']).toBe('nosniff');
+}
+
 describe('worker', () => {
   beforeEach(async () => {
     await resetForTest(testName);
@@ -143,6 +148,7 @@ describe('worker', () => {
       .end();
 
     expect(res.statusCode).toBe(400);
+    expectPlainTextNosniffResponse(res);
     expect(res.payload).toContain('Invalid "renderingRequest" field in render request.');
     expect(res.payload).toContain('Received type: undefined.');
     expect(res.payload).toContain('Likely causes: request body truncation');
@@ -797,6 +803,7 @@ describe('worker', () => {
     const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
     // The endpoint requires at least one bundle_<hash> field
     expect(res.statusCode).toBe(400);
+    expectPlainTextNosniffResponse(res);
     expect(res.payload).toContain('No bundle_<hash> fields provided');
   });
 

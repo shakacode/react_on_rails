@@ -60,7 +60,12 @@ export function smartTrim(value: unknown, maxLength = getConfig().maxDebugSnippe
 }
 
 export interface ResponseResult {
-  headers: { 'Cache-Control'?: string };
+  headers: {
+    'Cache-Control'?: string;
+    'Content-Type'?: string;
+    'X-Content-Type-Options'?: string;
+    [key: string]: string | undefined;
+  };
   status: number;
   data?: unknown;
   stream?: Readable;
