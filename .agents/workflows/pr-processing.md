@@ -93,6 +93,22 @@ gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMB
 
 Use `-F pr=...` intentionally here: `gh api graphql` needs a JSON integer for `$pr:Int!`, and raw `-f pr=...` sends a string.
 
+At merge readiness or batch closeout, build the machine-checkable per-PR merge
+ledger. The command uses GitHub GraphQL/API reviewThreads, reviews, and PR
+comments, then emits JSON against `script/pr-merge-ledger.schema.json`:
+
+```bash
+script/pr-merge-ledger <PR> --repo "${REPO}" \
+  --changelog-classification <changelog_present|changelog_missing|deferred_to_update_changelog|not_user_visible> \
+  --finding-dispositions <optional-dispositions.json> \
+  --strict --pretty > "/tmp/pr-<PR>-merge-ledger.json"
+script/pr-merge-ledger --schema
+```
+
+If changelog classification or P0/P1/P2/Must-Fix dispositions are not supplied,
+the ledger records those fields as `UNKNOWN`. `--strict` exits non-zero when any
+ledger violation exists or any field is `UNKNOWN`.
+
 For an issue, gather enough context to avoid duplicate work:
 
 ```bash
@@ -394,11 +410,11 @@ it as an immediate maintainer question. Also apply the merge-endgame debounce
 and waiver-soak rule under **Merge Endgame Debounce And Waiver Soak** before
 the final merge/readiness decision.
 
-After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, update stale release-mode classification, refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it, request full CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
+After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, run `script/pr-merge-ledger <PR> --strict` with explicit changelog classification and P0/P1/P2/Must-Fix dispositions, update stale release-mode classification, refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it, request full CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
-Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: merged PR; open PR waiting on checks/review; blocked needing user input with the surfaced question/comment URL; or no-PR with an evidence-backed issue/PR comment URL. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, autonomous nit outcomes, decision-point counts, confidence notes, and full-CI uncertainty that was already handled by requesting full CI in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, blockers, no-PR comments, and next actions.
+Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: merged PR; open PR waiting on checks/review; blocked needing user input with the surfaced question/comment URL; or no-PR with an evidence-backed issue/PR comment URL. Do not report a target `complete` while its merge ledger has any `UNKNOWN` field or `complete_allowed: false`. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, autonomous nit outcomes, decision-point counts, confidence notes, full-CI uncertainty that was already handled by requesting full CI, and the per-PR merge-ledger summary in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, merge-ledger path or JSON artifact, blockers, no-PR comments, and next actions.
 ```
 
 ### Question And Decision Handling
@@ -450,10 +466,14 @@ Split batch handoffs into two sections:
 - **FYI / decisions made**: no-PR rationales, non-blocking decisions, full CI
   requested because the coordinator was unsure at readiness time, validation
   evidence, review churn notes, autonomous nit outcomes, confidence notes,
-  decision-point counts per PR, and already-answered questions.
+  decision-point counts per PR, already-answered questions, and a per-PR
+  merge-ledger table or JSON artifact path.
 
 Do not put full-CI uncertainty in Immediate at final readiness after local
 validation and the final push. Request full CI and log it in FYI.
+Do not report a PR/target as `complete` while `script/pr-merge-ledger <PR>
+--strict` reports `UNKNOWN` fields, review-thread/review-object violations, or
+`complete_allowed: false`.
 
 ### Coordination State
 
@@ -562,28 +582,35 @@ The closeout lane is:
    polling.
 4. Fetch current unresolved review threads and triage them as fixed, waived, or
    still blocking.
-5. Refresh stale release-mode classification from the release tracker when
+5. Run `script/pr-merge-ledger <PR> --strict` for every worker PR, supplying
+   explicit changelog classification and any P0/P1/P2/Must-Fix disposition
+   evidence. Store the JSON artifact or table for the final handoff. Do not
+   mark a target complete while the ledger has `UNKNOWN` fields, unresolved
+   current-head review threads, active `review_objects.changes_requested`
+   entries, or
+   `complete_allowed: false`.
+6. Refresh stale release-mode classification from the release tracker when
    needed. For accelerated-RC merge readiness, refresh the latest finalized
    PR-body `Agent Merge Confidence` block required by `AGENTS.md`; keep this
    distinct from tracker mode/classification updates.
-6. After the final push, if local validation passed and the only uncertainty is
+7. After the final push, if local validation passed and the only uncertainty is
    whether full CI is needed, request full CI with `+ci-run-full` and record the
    reason as FYI, then loop back to re-fetch and wait for the newly requested
    current-head checks before readiness or merge.
-7. Assemble or refresh the attention-contract closeout for each lane after any
+8. Assemble or refresh the attention-contract closeout for each lane after any
    full-CI waitback: autonomous nit outcomes, human decision-point count, current
    confidence or readiness note, and any remaining `UNKNOWN` facts.
-8. Under the current release mode, mark ready or merge PRs that satisfy the
+9. Under the current release mode, mark ready or merge PRs that satisfy the
    merge qualification rules, including the merge-endgame debounce and
    waiver-soak rules before merge; report only remaining blockers, questions,
    or `UNKNOWN` live state.
-9. After any closeout-lane merge action, run a lightweight sweep for late
-   post-merge bot findings before the final batch handoff: confirm the PR landed,
-   check `main` status, and inspect late review/check comments that arrived
-   around or after merge. Route release-relevant findings into the next
-   post-merge audit intake. Reserve the full post-merge audit workflow for
-   final-release readiness, suspected bad merges, or a lightweight sweep that
-   finds a blocker, failed post-merge check, or credible release-readiness risk.
+10. After any closeout-lane merge action, run a lightweight sweep for late
+    post-merge bot findings before the final batch handoff: confirm the PR landed,
+    check `main` status, and inspect late review/check comments that arrived
+    around or after merge. Route release-relevant findings into the next
+    post-merge audit intake. Reserve the full post-merge audit workflow for
+    final-release readiness, suspected bad merges, or a lightweight sweep that
+    finds a blocker, failed post-merge check, or credible release-readiness risk.
 
 ## Self-Review Gate
 
@@ -867,6 +894,9 @@ Before saying a PR is ready to merge:
 gh pr view <PR> --json headRefOid,mergeStateStatus,reviewDecision,isDraft,labels,latestReviews,reviews,comments,mergedAt
 gh pr checks <PR> --required
 gh pr checks <PR>
+script/pr-merge-ledger <PR> \
+  --changelog-classification <changelog_present|changelog_missing|deferred_to_update_changelog|not_user_visible> \
+  --strict
 ```
 
 Before evaluating review feedback at this gate, also fetch inline PR review
@@ -885,6 +915,7 @@ Also verify:
 - No requested adversarial review has unresolved `BLOCKING` or `DISCUSS` findings.
 - Required checks are green, or the user has explicitly accepted an auditable waiver for full CI.
 - The PR body or latest agent comment includes exact local validation commands and results.
+- The merge ledger has no `UNKNOWN` fields and reports `complete_allowed: true`.
 
 Merge qualification follows the canonical rule in `AGENTS.md` -> Review Workflow -> For All PRs: CI is passing, all current review comments and threads are addressed or explicitly triaged by tier, no major question or discussion item needs maintainer attention, and advisory AI systems such as CodeRabbit.ai are not special approval gates.
 

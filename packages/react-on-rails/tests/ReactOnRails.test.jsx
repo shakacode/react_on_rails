@@ -85,6 +85,95 @@ describe('ReactOnRails', () => {
     expect(() => ReactOnRails.setOptions({ foobar: true })).toThrow(/Invalid option/);
   });
 
+  it('setOptions accepts rootErrorHandlers and resetOptions clears them', () => {
+    // eslint-disable-next-line global-require
+    const { getRootErrorHandlers } = require('../src/rootErrorHandlers.ts');
+    ReactOnRails.resetOptions();
+    const onRecoverableError = jest.fn();
+    const onUncaughtError = jest.fn();
+    ReactOnRails.setOptions({ rootErrorHandlers: { onRecoverableError, onUncaughtError } });
+
+    expect(ReactOnRails.option('rootErrorHandlers')).toEqual({ onRecoverableError, onUncaughtError });
+    // setOptions writes through to the module-level registration the renderers read.
+    expect(getRootErrorHandlers().onRecoverableError).toBe(onRecoverableError);
+    expect(getRootErrorHandlers().onUncaughtError).toBe(onUncaughtError);
+
+    ReactOnRails.resetOptions();
+    expect(ReactOnRails.option('rootErrorHandlers')).toBeUndefined();
+    expect(getRootErrorHandlers()).toEqual({});
+  });
+
+  it('setOptions throws when a rootErrorHandlers entry is not a function', () => {
+    ReactOnRails.resetOptions();
+    expect(() => ReactOnRails.setOptions({ rootErrorHandlers: { onCaughtError: 'nope' } })).toThrow(
+      /onCaughtError must be a function/,
+    );
+  });
+
+  it('setOptions merges partial rootErrorHandlers updates per key', () => {
+    // eslint-disable-next-line global-require
+    const { getRootErrorHandlers } = require('../src/rootErrorHandlers.ts');
+    ReactOnRails.resetOptions();
+    const onRecoverableError = jest.fn();
+    const onUncaughtError = jest.fn();
+    ReactOnRails.setOptions({ rootErrorHandlers: { onRecoverableError } });
+    // A later call that sets only another key must not drop the earlier registration
+    // (consistent with how traceTurbolinks/turbo update independently).
+    ReactOnRails.setOptions({ rootErrorHandlers: { onUncaughtError } });
+
+    expect(getRootErrorHandlers()).toEqual({ onRecoverableError, onUncaughtError });
+    expect(ReactOnRails.option('rootErrorHandlers')).toEqual({ onRecoverableError, onUncaughtError });
+
+    ReactOnRails.resetOptions();
+  });
+
+  it('setOptions clears all rootErrorHandlers when rootErrorHandlers is explicitly undefined', () => {
+    // eslint-disable-next-line global-require
+    const { getRootErrorHandlers } = require('../src/rootErrorHandlers.ts');
+    ReactOnRails.resetOptions();
+    const onRecoverableError = jest.fn();
+
+    ReactOnRails.setOptions({ rootErrorHandlers: { onRecoverableError } });
+    ReactOnRails.setOptions({ rootErrorHandlers: undefined });
+
+    expect(ReactOnRails.option('rootErrorHandlers')).toBeUndefined();
+    expect(getRootErrorHandlers()).toEqual({});
+  });
+
+  it('deprecated base client clears all rootErrorHandlers when rootErrorHandlers is explicitly undefined', () => {
+    jest.isolateModules(() => {
+      // eslint-disable-next-line global-require
+      const { createBaseClientObject } = require('../src/base/client.ts');
+      // eslint-disable-next-line global-require
+      const { getRootErrorHandlers } = require('../src/rootErrorHandlers.ts');
+      const registries = {
+        ComponentRegistry: {
+          register: jest.fn(),
+          get: jest.fn(),
+          components: jest.fn(() => new Map()),
+        },
+        StoreRegistry: {
+          register: jest.fn(),
+          getStore: jest.fn(),
+          getStoreGenerator: jest.fn(),
+          setStore: jest.fn(),
+          clearHydratedStores: jest.fn(),
+          storeGenerators: jest.fn(() => new Map()),
+          stores: jest.fn(() => new Map()),
+        },
+      };
+      const baseClient = createBaseClientObject(registries);
+      const onRecoverableError = jest.fn();
+
+      baseClient.resetOptions();
+      baseClient.setOptions({ rootErrorHandlers: { onRecoverableError } });
+      baseClient.setOptions({ rootErrorHandlers: undefined });
+
+      expect(baseClient.option('rootErrorHandlers')).toBeUndefined();
+      expect(getRootErrorHandlers()).toEqual({});
+    });
+  });
+
   it('registerStore throws if passed a falsey object (null, undefined, etc)', () => {
     expect(() => ReactOnRails.registerStore(null)).toThrow(/null or undefined/);
 
