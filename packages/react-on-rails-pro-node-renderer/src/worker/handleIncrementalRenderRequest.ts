@@ -13,12 +13,32 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import { PassThrough } from 'stream';
+
 import type { ResponseResult } from '../shared/utils';
 import { handleRenderRequest } from './handleRenderRequest';
 import log from '../shared/log';
 import { getRequestBundleFilePath, isErrorRenderResult } from '../shared/utils';
 import { subSpan } from '../shared/tracing.js';
 import type { ExecutionContext } from './vm';
+
+// These keys must match the constants in AsyncPropsManager.ts (react-on-rails-pro package)
+const PULL_ENABLED_KEY = 'pullEnabled';
+const PUSH_PROPS_KEY = 'pushProps';
+const PROP_REQUEST_EMITTER_KEY = 'propRequestEmitter';
+const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
+
+function formatPropRequestChunk(propName: string): Buffer {
+  const metadata = JSON.stringify({ messageType: 'propRequest', propName, payloadType: 'string' });
+  const header = `${metadata}\t${'0'.padStart(8, '0')}\n`;
+  return Buffer.from(header);
+}
+
+function formatRenderCompleteChunk(): Buffer {
+  const metadata = JSON.stringify({ messageType: 'renderComplete', payloadType: 'string' });
+  const header = `${metadata}\t${'0'.padStart(8, '0')}\n`;
+  return Buffer.from(header);
+}
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
@@ -61,6 +81,8 @@ export type IncrementalRenderInitialRequest = {
 export type FirstIncrementalRenderRequestChunk = {
   renderingRequest: string;
   onRequestClosedUpdateChunk?: UpdateChunk;
+  pullEnabled?: boolean;
+  pushProps?: string[];
 };
 
 function assertFirstIncrementalRenderRequestChunk(
@@ -139,9 +161,57 @@ export async function handleIncrementalRenderRequest(
       return { response };
     }
 
+    // Set up pull mode if enabled: inject propRequest emitter into sharedExecutionContext
+    // so AsyncPropsManager (inside VM) can emit propRequests to the response stream.
+    let finalResponse = response;
+    const { pullEnabled, pushProps } = firstRequestChunk as FirstIncrementalRenderRequestChunk;
+    if (pullEnabled && response.stream) {
+      const { sharedExecutionContext } = executionContext;
+      sharedExecutionContext.set(PULL_ENABLED_KEY, true);
+      sharedExecutionContext.set(PUSH_PROPS_KEY, new Set(pushProps || []));
+
+      // Create injectable PassThrough — sits after the length-prefixed transform.
+      // Both HTML chunks (from React) and propRequest chunks (from us) flow through it.
+      const injectableStream = new PassThrough();
+      // { end: false } prevents pipe from auto-closing injectableStream when
+      // the source ends — we need to write renderComplete before closing.
+      response.stream.pipe(injectableStream, { end: false });
+
+      // When React finishes rendering, emit renderComplete so Rails closes the pull queue.
+      response.stream.on('end', () => {
+        try {
+          injectableStream.write(formatRenderCompleteChunk());
+        } catch {
+          // Stream may already be closed
+        }
+        injectableStream.end();
+      });
+      response.stream.on('error', (err) => {
+        injectableStream.destroy(err);
+      });
+
+      // Set the emitter callback — AsyncPropsManager calls this from inside the VM
+      sharedExecutionContext.set(PROP_REQUEST_EMITTER_KEY, (propName: string) => {
+        try {
+          injectableStream.write(formatPropRequestChunk(propName));
+        } catch (err) {
+          log.error({ msg: 'Failed to write propRequest chunk', propName, err });
+        }
+      });
+
+      // Flush any propRequests that were buffered during the initial render
+      // (before the emitter was available)
+      const manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY) as
+        | { flushPendingPullRequests?: () => void }
+        | undefined;
+      manager?.flushPendingPullRequests?.();
+
+      finalResponse = { ...response, stream: injectableStream };
+    }
+
     // Return the result with a sink that uses the execution context
     return {
-      response,
+      response: finalResponse,
       sink: {
         executionContext,
         add: async (chunk: unknown) => {

@@ -118,9 +118,11 @@ module ReactOnRailsPro
       @status_recorded
     end
 
-    def initialize(first_chunk_warn_callback: nil, &request_block)
+    def initialize(first_chunk_warn_callback: nil, pull_enabled: false, &request_block)
       @request_executor = request_block
       @first_chunk_warn_callback = first_chunk_warn_callback
+      @pull_enabled = pull_enabled
+      @emitter = nil
       @status = nil
       @status_recorded = false
     end
@@ -133,8 +135,8 @@ module ReactOnRailsPro
       Sync { consume_with_bundle_reupload(&block) }
     end
 
-    def self.create(first_chunk_warn_callback: nil, &request_block)
-      StreamDecorator.new(new(first_chunk_warn_callback:, &request_block))
+    def self.create(first_chunk_warn_callback: nil, pull_enabled: false, &request_block)
+      StreamDecorator.new(new(first_chunk_warn_callback:, pull_enabled:, &request_block))
     end
 
     private
@@ -151,9 +153,16 @@ module ReactOnRailsPro
           # response attempt.
           reset_response_status
           @received_first_chunk = false
-          stream_response = @request_executor.call(send_bundle, tasks)
+          result = @request_executor.call(send_bundle, tasks)
+
+          if @pull_enabled
+            stream_response, @emitter = result
+          else
+            stream_response = result
+          end
 
           process_response_chunks(stream_response, &block)
+          @emitter&.render_complete!
           break
         rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
           stop_tasks(tasks) if retrying_with_bundle_upload?(e, send_bundle)
@@ -182,12 +191,8 @@ module ReactOnRailsPro
         record_status(stream_response) unless @status_recorded
         next if stream_response.error?
 
-        unless @received_first_chunk
-          @received_first_chunk = true
-          @first_chunk_warn_callback&.call(Time.now - request_start_time)
-        end
-
-        parser.feed(chunk, &block)
+        record_first_chunk(request_start_time)
+        parse_and_route_chunk(parser, chunk, &block)
       end
       record_status(stream_response) unless @status_recorded
       parser.flush
@@ -197,6 +202,34 @@ module ReactOnRailsPro
     rescue ReactOnRailsPro::RendererHttpClient::Error
       record_status(stream_response)
       raise
+    end
+
+    def record_first_chunk(request_start_time)
+      return if @received_first_chunk
+
+      @received_first_chunk = true
+      @first_chunk_warn_callback&.call(Time.now - request_start_time)
+    end
+
+    def parse_and_route_chunk(parser, chunk)
+      parser.feed(chunk) do |parsed|
+        if parsed.key?("messageType")
+          route_control_message(parsed)
+        else
+          yield parsed
+        end
+      end
+    end
+
+    def route_control_message(parsed)
+      return unless @emitter
+
+      case parsed["messageType"]
+      when "propRequest"
+        @emitter.pull_requests&.enqueue(parsed["propName"])
+      when "renderComplete"
+        @emitter.render_complete!
+      end
     end
 
     # Retrying after first chunk would duplicate content in the page.

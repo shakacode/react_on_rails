@@ -127,6 +127,17 @@ module ReactOnRails
       raw_content = @buf.byteslice(0, @content_len).force_encoding(Encoding::UTF_8)
       @buf = @buf.byteslice(@content_len, @buf.bytesize - @content_len)
 
+      # Control messages (propRequest, renderComplete) have no HTML payload.
+      # Yield metadata as-is so the consumer can route on messageType.
+      if @metadata.key?("messageType")
+        @metadata.delete("payloadType")
+        result = @metadata
+        @metadata = nil
+        @state = :header
+        yield result
+        return true
+      end
+
       # Reconstruct html type based on payloadType:
       #   "object" → JSON-serialized value (ServerRenderHash or null), needs JSON.parse
       #   "string" → raw HTML string, used as-is

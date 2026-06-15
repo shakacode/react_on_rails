@@ -213,6 +213,26 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/redis_receiver")
   end
 
+  def lazy_props_for_testing
+    stream_view_containing_react_components(template: "/pages/lazy_props_for_testing")
+  end
+
+  def lazy_props_redis_for_testing
+    stream_view_containing_react_components(template: "/pages/lazy_props_redis_for_testing")
+  end
+
+  def mixed_props_for_testing
+    stream_view_containing_react_components(template: "/pages/mixed_props_for_testing")
+  end
+
+  def mixed_props_redis_for_testing
+    stream_view_containing_react_components(template: "/pages/mixed_props_redis_for_testing")
+  end
+
+  def rejection_props_for_testing
+    stream_view_containing_react_components(template: "/pages/rejection_props_for_testing")
+  end
+
   def async_on_server_sync_on_client
     @render_on_server = true
     stream_view_containing_react_components(template: "/pages/async_on_server_sync_on_client")
@@ -321,7 +341,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   # See files in spec/dummy/app/views/pages
 
   helper_method :calc_slow_app_props_server_render, :error_hub_config_value
-  helper_method :read_async_props_from_redis
+  helper_method :read_async_props_from_redis, :read_lazy_props_from_redis
 
   private
 
@@ -417,6 +437,40 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
           sleep 0.1
           # Key starts with :
           emitter.call(message_key[1..], JSON.parse(message_value))
+        end
+      end
+    end
+  end
+
+  def read_lazy_props_from_redis(emitter)
+    redis = ::Redis.new
+    request_id = params[:request_id]
+
+    unless request_id
+      sleep 1
+      raise "You must pass the request_id param to the page, this page is intended to be used for testing only"
+    end
+
+    ended = false
+    last_received_id = "0-0"
+    stream_id = "stream:#{request_id}"
+    until ended
+      received_messages = redis.xread(stream_id, last_received_id, block: 0)[stream_id]
+      last_received_id = received_messages.last.first
+      received_messages.each do |_message_id, message_entries| # rubocop:disable Style/HashEachMethods
+        message_entries.each do |message_key, message_value|
+          if message_key == "end"
+            ended = true
+            next
+          end
+
+          if message_key.start_with?("!")
+            # "!" prefix means reject the prop
+            emitter.reject(message_key[1..], message_value)
+          else
+            # ":" prefix means set the prop (same as existing convention)
+            emitter.call(message_key[1..], JSON.parse(message_value))
+          end
         end
       end
     end

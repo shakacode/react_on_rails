@@ -72,10 +72,12 @@ module ReactOnRailsPro
           if async_props_block
             # Use incremental rendering when async props block is provided
             path = prepare_incremental_render_path(js_code, render_options)
+            push_props = render_options.internal_option(:push_props)
             ReactOnRailsPro::Request.render_code_with_incremental_updates(
               path,
               js_code,
-              async_props_block:
+              async_props_block:,
+              push_props:
             )
           else
             # Use standard streaming when no async props block
