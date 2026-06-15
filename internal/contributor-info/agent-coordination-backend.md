@@ -162,9 +162,11 @@ Workers refresh heartbeats at every phase transition:
 Use stable agent ids that identify machine role, capability profile, and lane,
 for example `mobile-batch2-lane1` or `desktop-highcap-lane1`.
 
-**Migration note:** Existing `<machine>-<tool>-<batch>` ids remain valid until
-claim expiry. Re-key them to `<machine-or-profile>-<batch>-<lane>` on the next
-session start.
+**Migration note:** Existing `<machine>-<tool>-<batch>` ids remain valid while
+their old claim or heartbeat is live. A restarted worker must continue using the
+old id until that claim is released or expired; re-key to
+`<machine-or-profile>-<batch>-<lane>` only for new lanes or after the old claim
+is gone.
 
 ```bash
 BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4)-coord-layer"

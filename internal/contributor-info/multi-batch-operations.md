@@ -164,7 +164,9 @@ for example `mobile-batch2-lane1`, `desktop-highcap-lane1`, or
 simultaneously-heartbeating lanes on the same machine or profile, add a short
 lane suffix after the batch id so each heartbeat remains distinguishable.
 Existing registrations using the older `<machine>-<tool>-<batch>` format remain
-valid until claim expiry; re-key them on the next session start.
+valid while their old claim or heartbeat is live. A restarted worker must keep
+using the old id until that claim is released or expired; re-key only for new
+lanes or after the old claim is gone.
 
 Use this lifecycle for every lane:
 
