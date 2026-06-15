@@ -190,11 +190,11 @@ This requires the client bundle (which imports `register.ts`) to be loaded on th
 
 Web components support three encapsulation levels:
 
-| Mode | External CSS Affects It? | External JS Can Access Children? | `element.shadowRoot` |
-|------|------------------------|--------------------------------|---------------------|
-| **Light DOM** (no shadow) | Yes | Yes, via `querySelector` | `null` |
-| **Open Shadow** | No | Yes, via `element.shadowRoot.querySelector()` | Accessible |
-| **Closed Shadow** | No | No | `null` |
+| Mode                      | External CSS Affects It? | External JS Can Access Children?              | `element.shadowRoot` |
+| ------------------------- | ------------------------ | --------------------------------------------- | -------------------- |
+| **Light DOM** (no shadow) | Yes                      | Yes, via `querySelector`                      | `null`               |
+| **Open Shadow**           | No                       | Yes, via `element.shadowRoot.querySelector()` | Accessible           |
+| **Closed Shadow**         | No                       | No                                            | `null`               |
 
 ### Light DOM (No Shadow)
 
@@ -267,11 +267,13 @@ Web components communicate with React through [Custom Events](https://developer.
 
 ```typescript
 // Inside a shadow DOM web component:
-this.dispatchEvent(new CustomEvent('status-change', {
-  detail: { status: 'active' },
-  bubbles: true,
-  composed: true,   // required to reach React listeners outside shadow DOM
-}));
+this.dispatchEvent(
+  new CustomEvent('status-change', {
+    detail: { status: 'active' },
+    bubbles: true,
+    composed: true, // required to reach React listeners outside shadow DOM
+  }),
+);
 ```
 
 In React, listen with `addEventListener` on a ref:
