@@ -118,7 +118,7 @@ const ServerDataPage = () => {
     <section id="tanstack-starter-server-data">
       <h2>Starter Server Data Page</h2>
       {mounted ? (
-        <Suspense fallback={<p>Loading server data...</p>}>
+        <Suspense fallback={<p id="tanstack-starter-server-data-suspended">Loading server data...</p>}>
           <RSCRoute componentName="StarterServerData" componentProps={EMPTY_PROPS} />
         </Suspense>
       ) : (

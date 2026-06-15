@@ -5231,7 +5231,7 @@ export default DashboardApp;
 ```
 
 > [!NOTE]
-> Keep `componentProps` references stable for values derived during render, and wrap production `RSCRoute` routes in an app-specific error boundary so payload fetch or render failures degrade to your chosen error UI.
+> Keep `componentProps` references stable for values derived during render, and wrap production `RSCRoute` routes in an app-specific error boundary so payload fetch or render failures degrade to your chosen error UI. For constant or empty props, prefer a module-level constant over `useMemo`.
 
 With [auto-bundling](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md), placing this file in your components subdirectory registers it automatically — the generated client pack also sets up the default RSC provider that `RSCRoute` needs in the browser.
 

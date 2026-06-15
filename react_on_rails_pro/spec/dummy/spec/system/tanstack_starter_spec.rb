@@ -112,6 +112,7 @@ describe "TanStack Router Starter" do # rubocop:disable RSpec/FilePath,RSpec/Spe
       page.driver.browser.logs.get(:browser)
     rescue Selenium::WebDriver::Error::NoSuchDriverError
       # Driver session gone; nothing to flush.
+      # Other WebDriver errors stay unrescued so a misconfigured driver fails visibly.
     end
 
     it "renders the route by resolving the server component on the client without hydration errors" do
