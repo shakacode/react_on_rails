@@ -29,9 +29,10 @@ import type { ReactComponent, ReactComponentRenderFunction, RendererFunction } f
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { isRendererTeardownResult } from 'react-on-rails/@internal/rendererTeardown';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
+import { buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting } from 'react-on-rails/@internal/rootErrorHandlers';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
-import handleRecoverableError from '../handleRecoverableError.client.ts';
+import { chainRecoverableErrorHandlers } from '../handleRecoverableError.client.ts';
 
 ensureReactUseAvailable();
 
@@ -121,13 +122,32 @@ const wrapServerComponentRenderer = (
       </RSCProvider>
     );
 
-    const reactRoot = domNode.innerHTML
+    // User-registered root error callbacks (rootErrorHandlers), wrapped with this mount's
+    // component name and dom id. On the hydrate path the user onRecoverableError is CHAINED after
+    // Pro's internal recoverable-error handler so both run. This file is always RSC-wrapped; the
+    // helper records that the internal handler already default-reports on hydrate, so the dev-mode
+    // logger emits only its supplemental branded line.
+    const shouldHydrate = !!domNode.innerHTML;
+    const userErrorCallbackOptions = buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting(
+      { componentName, domNodeId },
+      shouldHydrate,
+    );
+    const { onRecoverableError: userOnRecoverableError, ...rootErrorCallbackOptions } =
+      userErrorCallbackOptions;
+    const reactRoot = shouldHydrate
       ? ReactDOMClient.hydrateRoot(domNode, rootElement, {
+          ...rootErrorCallbackOptions,
           identifierPrefix: domNodeId,
-          onRecoverableError: handleRecoverableError,
+          onRecoverableError: chainRecoverableErrorHandlers(userOnRecoverableError),
         })
       : (() => {
-          const root = ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId });
+          const root = ReactDOMClient.createRoot(domNode, {
+            ...rootErrorCallbackOptions,
+            // On createRoot (non-hydrate), Pro's internal chainRecoverableErrorHandlers is not
+            // applied: the user callback is the sole reporter, matching standard React semantics.
+            ...(userOnRecoverableError ? { onRecoverableError: userOnRecoverableError } : {}),
+            identifierPrefix: domNodeId,
+          });
           root.render(rootElement);
           return root;
         })();

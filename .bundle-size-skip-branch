@@ -1,7 +1,5 @@
-# This file allows skipping the bundle size CI check for a specific branch.
-# When a branch name in this file matches the PR branch, the size check is skipped.
-#
-# Usage: Run `bin/skip-bundle-size-check` to set the current branch, then commit and push.
-#
-# This is useful when you have an intentional size increase that exceeds the 0.5KB threshold.
-jg-conductor/3209-fix
+# Audited intentional growth for PR #3933 (rootErrorHandlers feature, +0.75KB gzip client):
+# 91% of the module-level delta is the new feature module; no accidental imports.
+# Audit evidence: https://github.com/shakacode/react_on_rails/pull/3933#issuecomment-4688270487
+# Clear this file in a follow-up after the PR merges.
+jg/3892-react19-root-error-callbacks
