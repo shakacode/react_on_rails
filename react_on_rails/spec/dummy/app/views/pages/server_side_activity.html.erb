@@ -1,0 +1,15 @@
+<h1>React 19.2 &lt;Activity&gt; — Server Side Rendering + Hydration</h1>
+
+<p>
+  This page server-renders (<code>prerender: true</code>) and then hydrates the
+  <code>ActivityTabSwitcher</code> component. Only the visible tab's content is
+  included in the server HTML — React 19.2's server renderer skips
+  <code>&lt;Activity mode="hidden"&gt;</code> subtrees, and the client renders them
+  after hydration with no hydration mismatch.
+  See <code>docs/oss/building-features/react-19-activity.md</code>.
+</p>
+
+<%= react_component("ActivityTabSwitcher",
+  props: { initialTab: "profile" },
+  prerender: true,
+  id: "ActivityTabSwitcher-react-component-0") %>

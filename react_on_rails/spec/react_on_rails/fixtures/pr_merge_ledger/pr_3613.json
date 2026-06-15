@@ -1,0 +1,88 @@
+{
+  "repository": "shakacode/react_on_rails",
+  "pull_request": {
+    "number": 3613,
+    "title": "ci(rspack): decouple per-bundler build + integration jobs so one bundler's build failure doesn't skip the other (#3593)",
+    "url": "https://github.com/shakacode/react_on_rails/pull/3613",
+    "state": "MERGED",
+    "isDraft": false,
+    "baseRefName": "main",
+    "headRefName": "jg-conductor/3593-fix",
+    "headRefOid": "62ecd5760e3466726a3be1ed77b0071665c5cf2d",
+    "mergedAt": "2026-06-05T01:32:12Z",
+    "reviewDecision": "CHANGES_REQUESTED"
+  },
+  "files": [
+    ".github/workflows/dummy-app-bundler-tests.yml",
+    ".github/workflows/integration-tests.yml"
+  ],
+  "review_threads": [
+    {
+      "id": "PRRT_kwDOAnNnU86HM4iZ",
+      "isResolved": false,
+      "isOutdated": false,
+      "path": ".github/workflows/integration-tests.yml",
+      "line": 131,
+      "comments": [
+        {
+          "id": "PRRC_kwDOAnNnU87INkFj",
+          "databaseId": 3358998883,
+          "body": "**P2** Keep CI rerun helper aligned with new check names.",
+          "author": {
+            "login": "chatgpt-codex-connector"
+          },
+          "url": "https://github.com/shakacode/react_on_rails/pull/3613#discussion_r3358998883",
+          "path": ".github/workflows/integration-tests.yml",
+          "line": 131,
+          "createdAt": "2026-06-04T21:26:41Z",
+          "outdated": false,
+          "commit": {
+            "oid": "62ecd5760e3466726a3be1ed77b0071665c5cf2d"
+          },
+          "originalCommit": {
+            "oid": "d4d94358873321664b1e3a8c2a297f793a8ae3ed"
+          },
+          "pullRequestReview": {
+            "id": "PRR_kwDOAnNnU88AAAABCCSc3Q",
+            "state": "COMMENTED",
+            "submittedAt": "2026-06-04T21:26:41Z",
+            "commit": {
+              "oid": "d4d94358873321664b1e3a8c2a297f793a8ae3ed"
+            },
+            "author": {
+              "login": "chatgpt-codex-connector"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "reviews": [
+    {
+      "id": "PRR_kwDOAnNnU88AAAABCCTgOg",
+      "state": "CHANGES_REQUESTED",
+      "submittedAt": "2026-06-04T21:29:57Z",
+      "author": {
+        "login": "coderabbitai"
+      },
+      "commit": {
+        "oid": "d4d94358873321664b1e3a8c2a297f793a8ae3ed"
+      },
+      "url": "https://github.com/shakacode/react_on_rails/pull/3613#pullrequestreview-4431601722",
+      "body": "**P2** Run this PR under full-ci before merge."
+    },
+    {
+      "id": "PRR_kwDOAnNnU88AAAABCC6cRg",
+      "state": "COMMENTED",
+      "submittedAt": "2026-06-04T23:36:33Z",
+      "author": {
+        "login": "coderabbitai"
+      },
+      "commit": {
+        "oid": "62ecd5760e3466726a3be1ed77b0071665c5cf2d"
+      },
+      "url": "https://github.com/shakacode/react_on_rails/pull/3613#pullrequestreview-4432239686",
+      "body": "Nitpick comments only."
+    }
+  ]
+}

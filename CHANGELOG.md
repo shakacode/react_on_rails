@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **React 19 root error callbacks**: `ReactOnRails.setOptions({ rootErrorHandlers: { onRecoverableError, onCaughtError, onUncaughtError } })` registers React's root error callbacks globally; React on Rails applies them to every `hydrateRoot`/`createRoot` call it makes and invokes them with an extra context argument whose `componentName` and `domNodeId` fields are optional. In development, recoverable hydration errors now log an actionable React on Rails message (component name, dom id, component stack, and a link to the new [Debugging Hydration Mismatches guide](https://reactonrails.com/docs/building-features/debugging-hydration-mismatches)) alongside React's default error reporting, which stays intact so window-'error'-based tooling keeps working. Partial `rootErrorHandlers` updates merge per key, so registering one callback later does not drop the others. On React <19 (and <18 for `onRecoverableError`), React on Rails retains registrations for future upgrades, but the current runtime cannot invoke unsupported callbacks and logs a one-time console warning. On React on Rails Pro RSC/streaming hydration paths, user callbacks chain with (never replace) Pro's internal recoverable-error handler. Addresses [Issue 3892](https://github.com/shakacode/react_on_rails/issues/3892). [PR 3933](https://github.com/shakacode/react_on_rails/pull/3933) by [justin808](https://github.com/justin808).
+
 #### Changed
 
 - **[Pro]** **RSC peer compatibility accepts the coordinated React 19.2 floor**: The Pro node renderer now allows React and React DOM `19.2.x` starting at `19.2.7`, matching the floor required by the `react-on-rails-rsc` 19.2 package line while preserving the existing React `19.0.x` support window. Refs [Issue 3865](https://github.com/shakacode/react_on_rails/issues/3865).

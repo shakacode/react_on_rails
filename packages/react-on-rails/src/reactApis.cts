@@ -19,6 +19,10 @@ export const supportsRootApi = reactMajorVersion >= 18;
 
 export const supportsHydrate = supportsRootApi || 'hydrate' in ReactDOM;
 
+// React 19 added the `onCaughtError`/`onUncaughtError` root options. React 18's root API only
+// supports `identifierPrefix` and `onRecoverableError`.
+export const supportsReact19RootErrorCallbacks = reactMajorVersion >= 19;
+
 // TODO: once React dependency is updated to >= 18, we can remove this and just
 // import ReactDOM from 'react-dom/client';
 let reactDomClient: typeof import('react-dom/client');
