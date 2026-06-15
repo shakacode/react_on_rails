@@ -1401,7 +1401,8 @@ describe ReactOnRailsHelper do
         react_component_name: "HelloWorld",
         trace: false,
         store_dependencies: nil,
-        html_streaming?: false
+        html_streaming?: false,
+        auto_load_bundle: false
       )
     end
 
@@ -1443,6 +1444,30 @@ describe ReactOnRailsHelper do
       it "does not include a hydration script" do
         result = helper.send(:generate_component_script, render_options)
         expect(result).not_to include("reactOnRailsComponentLoaded")
+      end
+    end
+
+    context "when auto-loaded generated stylesheet hrefs are available" do
+      let(:stylesheet_sources) do
+        [{ source: "css/shared-generated-pack-deadbeef.css", source_type: :stylesheet }]
+      end
+
+      before do
+        allow(render_options).to receive(:auto_load_bundle).and_return(true)
+        allow(helper).to receive(:preload_sources_for_stylesheet_pack)
+          .with("generated/HelloWorld")
+          .and_return(stylesheet_sources)
+        allow(helper).to receive(:unique_preload_sources_by_href)
+          .with(stylesheet_sources)
+          .and_return([{ href: "/webpack/test/css/shared-generated-pack-deadbeef.css" }])
+      end
+
+      it "adds generated stylesheet href metadata to the component specification script" do
+        result = helper.send(:generate_component_script, render_options)
+        script = Nokogiri::HTML.fragment(result).css("script.js-react-on-rails-component").first
+
+        expect(script["data-generated-stylesheet-hrefs"])
+          .to eq(["/webpack/test/css/shared-generated-pack-deadbeef.css"].to_json)
       end
     end
   end

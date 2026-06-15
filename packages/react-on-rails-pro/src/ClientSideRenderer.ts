@@ -44,6 +44,100 @@ import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
+const GENERATED_STYLESHEET_HREFS_ATTRIBUTE = 'data-generated-stylesheet-hrefs';
+const STYLESHEET_LOAD_TIMEOUT_MS = 10_000;
+
+function normalizeStylesheetHref(href: string): string {
+  try {
+    return new URL(href, document.baseURI).href;
+  } catch {
+    return href;
+  }
+}
+
+function generatedStylesheetHrefMatches(link: HTMLLinkElement, expectedHref: string): boolean {
+  const rawLinkHref = link.getAttribute('href') || link.href;
+  const normalizedExpectedHref = normalizeStylesheetHref(expectedHref);
+
+  return rawLinkHref === expectedHref || link.href === normalizedExpectedHref;
+}
+
+function generatedStylesheetMatchesComponent(
+  link: HTMLLinkElement,
+  componentName: string,
+  generatedStylesheetHrefs: string[],
+): boolean {
+  if (generatedStylesheetHrefs.some((href) => generatedStylesheetHrefMatches(link, href))) {
+    return true;
+  }
+
+  const href = link.getAttribute('href') || link.href;
+  const generatedComponentPath = `/generated/${componentName}`;
+
+  return href.includes(`${generatedComponentPath}-`) || href.includes(`${generatedComponentPath}.`);
+}
+
+function generatedStylesheetHrefsForComponent(componentSpec: Element): string[] {
+  const serializedHrefs = componentSpec.getAttribute(GENERATED_STYLESHEET_HREFS_ATTRIBUTE);
+  if (!serializedHrefs) {
+    return [];
+  }
+
+  try {
+    const hrefs: unknown = JSON.parse(serializedHrefs);
+    if (!Array.isArray(hrefs)) {
+      return [];
+    }
+
+    return hrefs.filter((href): href is string => typeof href === 'string' && href.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function stylesheetAlreadyLoaded(link: HTMLLinkElement): boolean {
+  if (link.sheet) return true;
+
+  return Array.from(document.styleSheets).some((styleSheet) => styleSheet.href === link.href);
+}
+
+function waitForStylesheet(link: HTMLLinkElement): Promise<void> {
+  if (stylesheetAlreadyLoaded(link)) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const done = () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      link.removeEventListener('load', done);
+      link.removeEventListener('error', done);
+      resolve();
+    };
+
+    link.addEventListener('load', done);
+    link.addEventListener('error', done);
+    timeout = setTimeout(done, STYLESHEET_LOAD_TIMEOUT_MS);
+    if (stylesheetAlreadyLoaded(link)) {
+      done();
+    }
+  });
+}
+
+function waitForGeneratedComponentStylesheets(componentName: string, componentSpec: Element): Promise<void> {
+  const generatedStylesheetHrefs = generatedStylesheetHrefsForComponent(componentSpec);
+  const stylesheetLinks = Array.from(
+    document.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href]'),
+  ).filter((link) => generatedStylesheetMatchesComponent(link, componentName, generatedStylesheetHrefs));
+
+  if (stylesheetLinks.length === 0) {
+    return Promise.resolve();
+  }
+
+  return Promise.all(stylesheetLinks.map(waitForStylesheet)).then(() => undefined);
+}
 
 /**
  * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
@@ -196,7 +290,10 @@ class ComponentRenderer {
       const domNode = document.getElementById(domNodeId);
       if (domNode) {
         this.domNode = domNode;
-        const componentObj = await ComponentRegistry.getOrWaitForComponent(name);
+        const [componentObj] = await Promise.all([
+          ComponentRegistry.getOrWaitForComponent(name),
+          waitForGeneratedComponentStylesheets(name, el),
+        ]);
         if (this.state === 'unmounted') {
           return;
         }

@@ -224,6 +224,70 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
   });
 
+  it('promotes streamed RSC client chunk stylesheet preloads to gate reveal', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream([
+      '<link rel="preload" as="style" href="/webpack/test/css/client1-46072b81.css?body=1" crossorigin="anonymous"/>',
+    ]);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(
+      '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css?body=1" crossorigin="anonymous" data-precedence="rsc-css"/>',
+    );
+    expect(resultStr).not.toContain('rel="preload" as="style"');
+  });
+
+  it('promotes streamed RSC stylesheet preloads split across fallback flush chunks', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream({
+      0: 'before<link rel="preload" as="style" href="/webpack/test/css/client1-',
+      10: '46072b81.css">after',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(
+      'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
+    );
+    expect(resultStr).not.toContain('rel="preload" as="style"');
+  });
+
+  it('promotes streamed RSC stylesheet preloads split inside the link token', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream({
+      0: 'before<li',
+      10: 'nk rel="preload" as="style" href="/webpack/test/css/client1-46072b81.css">after',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(
+      'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
+    );
+    expect(resultStr).not.toContain('rel="preload" as="style"');
+  });
+
+  it('leaves app-authored style preloads as fetch hints', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const appStylePreload =
+      '<link rel="preload" as="style" href="/assets/next-route-theme.css" media="print">';
+    const mockHTML = createMockHTMLStream([appStylePreload]);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(appStylePreload);
+    expect(resultStr).not.toContain('data-precedence="rsc-css"');
+  });
+
   it('should add all ready html chunks before adding RSC payloads', async () => {
     const mockRSC = createMockRSCStream(['{"test": "data"}', '{"test": "data2"}']);
     const mockHTML = createMockHTMLStream([

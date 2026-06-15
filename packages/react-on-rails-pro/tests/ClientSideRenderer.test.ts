@@ -202,6 +202,58 @@ describe('ClientSideRenderer', () => {
     expect(reactElement.type).toBe(TestComponent);
   });
 
+  it('waits for manifest-derived shared generated-pack stylesheets before rendering', async () => {
+    const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
+    ComponentRegistry.register({ TestComponent });
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = '/webpack/test/css/shared-generated-pack-deadbeef.css';
+    document.head.appendChild(stylesheet);
+    const componentSpec = setupTestComponentDom('dom-id-shared-stylesheet');
+    componentSpec.setAttribute(
+      'data-generated-stylesheet-hrefs',
+      JSON.stringify(['/webpack/test/css/shared-generated-pack-deadbeef.css']),
+    );
+    addRailsContext();
+
+    const renderPromise = renderOrHydrateComponent(componentSpec);
+    await Promise.resolve();
+
+    expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+
+    stylesheet.dispatchEvent(new Event('load'));
+    await renderPromise;
+
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails open if a generated stylesheet never reports load or error', async () => {
+    jest.useFakeTimers();
+    try {
+      const TestComponent = ({ greeting }: { greeting: string }) =>
+        React.createElement('div', null, greeting);
+      ComponentRegistry.register({ TestComponent });
+      const stylesheet = document.createElement('link');
+      stylesheet.rel = 'stylesheet';
+      stylesheet.href = '/webpack/test/css/generated/TestComponent-deadbeef.css';
+      document.head.appendChild(stylesheet);
+      const componentSpec = setupTestComponentDom('dom-id-stylesheet-timeout');
+      addRailsContext();
+
+      const renderPromise = renderOrHydrateComponent(componentSpec);
+      await Promise.resolve();
+
+      expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(10_000);
+      await renderPromise;
+
+      expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('rejects non-callable renderer entries before invoking them', async () => {
     const componentSpec = setupTestComponentDom('dom-id-non-callable-renderer');
     addRailsContext();

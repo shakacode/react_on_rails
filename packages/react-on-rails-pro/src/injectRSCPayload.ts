@@ -90,6 +90,100 @@ function createRSCDiagnosticScript(
   );
 }
 
+const RSC_CLIENT_CHUNK_STYLESHEET_PATH = /\/css\/client\d+-[^/]+\.css$/;
+
+function getQuotedAttribute(tag: string, attributeName: string) {
+  const attributeMatch = tag.match(new RegExp(`\\s${attributeName}=(["'])(.*?)\\1`, 'i'));
+  return attributeMatch?.[2];
+}
+
+function isRSCClientChunkStylesheetHref(href: string) {
+  try {
+    return RSC_CLIENT_CHUNK_STYLESHEET_PATH.test(new URL(href, 'http://react-on-rails.local').pathname);
+  } catch {
+    return RSC_CLIENT_CHUNK_STYLESHEET_PATH.test(href.split(/[?#]/, 1)[0]);
+  }
+}
+
+function shouldPromoteStylesheetPreloadTag(linkTag: string) {
+  const href = getQuotedAttribute(linkTag, 'href');
+  return href ? isRSCClientChunkStylesheetHref(href) : false;
+}
+
+function splitIncompleteLinkTagTail(htmlString: string) {
+  const lowerHtmlString = htmlString.toLowerCase();
+  const lastCompleteTagEnd = htmlString.lastIndexOf('>');
+  const lastLinkStart = lowerHtmlString.lastIndexOf('<link');
+
+  if (lastLinkStart !== -1 && lastLinkStart > lastCompleteTagEnd) {
+    return {
+      completeHtml: htmlString.slice(0, lastLinkStart),
+      incompleteLinkTagTail: htmlString.slice(lastLinkStart),
+    };
+  }
+
+  const linkToken = '<link';
+  for (let suffixLength = linkToken.length - 1; suffixLength > 0; suffixLength -= 1) {
+    const possibleLinkTokenPrefix = lowerHtmlString.slice(-suffixLength);
+
+    if (linkToken.startsWith(possibleLinkTokenPrefix)) {
+      return {
+        completeHtml: htmlString.slice(0, -suffixLength),
+        incompleteLinkTagTail: htmlString.slice(-suffixLength),
+      };
+    }
+  }
+
+  if (lastLinkStart === -1 || lastLinkStart < lastCompleteTagEnd) {
+    return { completeHtml: htmlString, incompleteLinkTagTail: '' };
+  }
+
+  return {
+    completeHtml: htmlString.slice(0, lastLinkStart),
+    incompleteLinkTagTail: htmlString.slice(lastLinkStart),
+  };
+}
+
+function promoteStylesheetPreloadTag(linkTag: string) {
+  const promotedTag = linkTag
+    .replace(/\srel=(["'])(.*?)\1/i, (_match, quote: string, relValue: string) => {
+      const relTokens = relValue
+        .split(/\s+/)
+        .filter(Boolean)
+        .filter((token) => token.toLowerCase() !== 'preload');
+
+      return ` rel=${quote}${[
+        'stylesheet',
+        ...relTokens.filter((token) => token.toLowerCase() !== 'stylesheet'),
+      ].join(' ')}${quote}`;
+    })
+    .replace(/\sas=(["'])style\1/i, '');
+
+  if (/\sdata-precedence=/.test(promotedTag)) {
+    return promotedTag;
+  }
+
+  const closing = promotedTag.endsWith('/>') ? '/>' : '>';
+  return promotedTag.replace(/\s*\/?>$/, ` data-precedence="rsc-css"${closing}`);
+}
+
+function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteLinkTagTail: boolean) {
+  const htmlString = html.toString();
+  const { completeHtml, incompleteLinkTagTail: nextIncompleteLinkTagTail } = holdIncompleteLinkTagTail
+    ? splitIncompleteLinkTagTail(htmlString)
+    : { completeHtml: htmlString, incompleteLinkTagTail: '' };
+  const gatedHtml = completeHtml.replace(
+    /<link\b(?=[^>]*\brel=(["'])(?:(?!\1).)*\bpreload\b(?:(?!\1).)*\1)(?=[^>]*\bas=(["'])style\2)(?=[^>]*\bhref=(["'])(?:(?!\3).)+\3)[^>]*\/?>/gi,
+    (linkTag) =>
+      shouldPromoteStylesheetPreloadTag(linkTag) ? promoteStylesheetPreloadTag(linkTag) : linkTag,
+  );
+
+  return {
+    gatedHtmlBuffer: gatedHtml === htmlString && !nextIncompleteLinkTagTail ? html : Buffer.from(gatedHtml),
+    hasIncompleteLinkTagTail: Boolean(nextIncompleteLinkTagTail),
+  };
+}
+
 /**
  * Embeds RSC payloads into the HTML stream for optimal hydration.
  *
@@ -145,6 +239,7 @@ export default function injectRSCPayload(
    * CONSTRAINT: The first output chunk must contain HTML data to begin streaming.
    */
   const htmlBuffers: Buffer[] = [];
+  let holdIncompleteLinkTagTail = true;
 
   /**
    * Buffer for RSC payload chunk scripts.
@@ -182,9 +277,17 @@ export default function injectRSCPayload(
 
     // Calculate total buffer size for efficient memory allocation
     const rscInitializationSize = rscInitializationBuffers.reduce((sum, buf) => sum + buf.length, 0);
-    const htmlSize = htmlBuffers.reduce((sum, buf) => sum + buf.length, 0);
+    const htmlBuffer = Buffer.concat(htmlBuffers);
+    const { gatedHtmlBuffer, hasIncompleteLinkTagTail } = applyStreamedStylesheetPreloadGating(
+      htmlBuffer,
+      holdIncompleteLinkTagTail,
+    );
     const rscPayloadSize = rscPayloadBuffers.reduce((sum, buf) => sum + buf.length, 0);
-    const totalSize = rscInitializationSize + htmlSize + rscPayloadSize;
+    const totalSize = rscInitializationSize + gatedHtmlBuffer.length + rscPayloadSize;
+
+    if (hasIncompleteLinkTagTail && holdIncompleteLinkTagTail) {
+      return;
+    }
 
     // Skip flush if no data is buffered
     if (totalSize === 0) {
@@ -215,9 +318,9 @@ export default function injectRSCPayload(
 
     // 2. HTML chunks SECOND
     // Component markup that references the initialized arrays
-    for (const buffer of htmlBuffers) {
-      buffer.copy(combinedBuffer, offset);
-      offset += buffer.length;
+    if (gatedHtmlBuffer.length > 0) {
+      gatedHtmlBuffer.copy(combinedBuffer, offset);
+      offset += gatedHtmlBuffer.length;
     }
 
     // 3. RSC payload chunk scripts LAST
@@ -237,6 +340,7 @@ export default function injectRSCPayload(
   };
 
   const endResultStream = () => {
+    holdIncompleteLinkTagTail = false;
     // Cancel any pending fallback timer unconditionally.
     // flush() only clears the timer when it actually flushes data (past the
     // early-return guards). If we're closing with empty buffers, the timer
