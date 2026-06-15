@@ -23,7 +23,7 @@ role, not a maker role.
 
 ## Inputs
 
-Gather live evidence from current systems, not chat memory:
+Gather live evidence from git, GitHub, and agent-coord, not chat memory:
 
 1. `agent-coord status --batch-id <batch-id>` when a batch id is known, or full
    `agent-coord status` for a repo-wide sweep. Record active, stale, dead
@@ -59,9 +59,11 @@ Gather live evidence from current systems, not chat memory:
 
 Classify each run by intent achievement:
 
-- `in_progress`: an active/live lane is still legitimately running and has no
-  evidence of stalled work, missed intent, regression, or unverifiable state.
-  Record it in **No-Action Items**, not **Ranked Findings**.
+- `in_progress`: an active/live lane is still legitimately running, has positive
+  evidence of recent forward progress such as a recent heartbeat, recent
+  commits, or open review activity, and has no evidence of stalled work, missed
+  intent, regression, or unverifiable state. Record it in **No-Action Items**,
+  not **Ranked Findings**.
 - `realized`: the diff and evidence satisfy the issue or PR intent.
 - `partial`: some intended outcome landed, but meaningful scope or validation is
   missing.
@@ -179,8 +181,9 @@ sources used.
   achieved; the evaluator must still compare the issue intent, diff, validation,
   and residual risk.
 - If automation is needed, implement the scheduler and durable state in the
-  private `shakacode/agent-coordination` backend. Keep this repo's slice to
-  agent-facing contracts, prompts, and public workflow rules.
+  private coordination backend, such as a dedicated `agent-coordination` repo.
+  Keep this repo's slice to agent-facing contracts, prompts, and public workflow
+  rules.
 - Frequency and termination are scheduler decisions. A loop report is complete
   for its supplied scope when every lane has a classified outcome, required
   follow-up is routed, and remaining `UNKNOWN` items name the evidence needed to
