@@ -207,10 +207,12 @@ registered capacity profiles and enabled inboxes. The flow is:
    inboxes, then subtract live, blocked, and reserved lanes. If live occupancy,
    blocked lanes, reserved lanes, profiles, or inbox config cannot be verified,
    stop phase 2 with a precise blocker instead of deriving a group count.
-4. Split the actionable worklist into up to one non-empty group per available
+4. If no lane slots remain while actionable work remains, report "all lanes
+   currently occupied" and stop phase 2 instead of inventing groups.
+5. Split the actionable worklist into up to one non-empty group per available
    lane slot, and report idle slots separately when capacity exceeds actionable
    work.
-5. Write assigned-but-not-started work to the per-inbox queues when the backend
+6. Write assigned-but-not-started work to the per-inbox queues when the backend
    supports queue state. Queue state is advisory; if it is unsupported, omit the
    queue summary and note that queue state is unavailable.
 
