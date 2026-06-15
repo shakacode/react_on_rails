@@ -193,7 +193,12 @@ if (
       return 1
     }
 
-    if ! git -C "$AGENT_COORD_REPO" branch -r --contains "$head_sha" | grep -q '[^[:space:]]' &&
+    origin_branch_contains_head() {
+      git -C "$AGENT_COORD_REPO" for-each-ref --contains "$head_sha" \
+        --format='%(refname)' refs/remotes/origin | grep -q '[^[:space:]]'
+    }
+
+    if ! origin_branch_contains_head &&
        ! remote_tag_contains_head; then
       echo "agent-coordination HEAD $head_sha is not reachable from a fetched remote branch or tag" >&2
       return 1
@@ -325,11 +330,8 @@ BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX"
   echo "mktemp failed" >&2
   return 1 2>/dev/null || exit 1
 }
-cleanup_batch_id_file_on_interrupt() {
-  rm -f "$BATCH_ID_FILE"
-}
-trap cleanup_batch_id_file_on_interrupt INT TERM
 # Set once at kickoff, include a short batch slug plus a unique suffix, and reuse for this batch.
+# Do not install an interrupt trap here: the pointer may be needed by a fresh shell after interruption.
 printf '%s\n' "$BATCH_ID" > "$BATCH_ID_FILE"
 # Record the printed file path in the batch handoff.
 printf 'Batch id file: %s\n' "$BATCH_ID_FILE"
