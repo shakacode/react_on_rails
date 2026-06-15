@@ -318,9 +318,43 @@ function promoteStylesheetPreloadTag(linkTag: string) {
   return promotedTag.replace(/\s*\/?>$/, ` data-precedence="rsc-css"${closing}`);
 }
 
-function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteLinkTagTail: boolean) {
+function hasIncompleteUTF8Tail(buffer: Buffer) {
+  let continuationBytes = 0;
+  let leadByteIndex = buffer.length - 1;
+
+  while (leadByteIndex >= 0 && buffer[leadByteIndex] >= 0x80 && buffer[leadByteIndex] <= 0xbf) {
+    continuationBytes += 1;
+    leadByteIndex -= 1;
+  }
+
+  if (leadByteIndex < 0) {
+    return continuationBytes > 0;
+  }
+
+  const leadByte = buffer[leadByteIndex];
+  if (leadByte <= 0x7f) return false;
+
+  let expectedContinuationBytes = 0;
+  if (leadByte >= 0xc2 && leadByte <= 0xdf) {
+    expectedContinuationBytes = 1;
+  } else if (leadByte >= 0xe0 && leadByte <= 0xef) {
+    expectedContinuationBytes = 2;
+  } else if (leadByte >= 0xf0 && leadByte <= 0xf4) {
+    expectedContinuationBytes = 3;
+  } else {
+    return false;
+  }
+
+  return continuationBytes < expectedContinuationBytes;
+}
+
+function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteHtmlTail: boolean) {
+  if (holdIncompleteHtmlTail && hasIncompleteUTF8Tail(html)) {
+    return { gatedHtmlBuffer: html, hasIncompleteHtmlTail: true };
+  }
+
   const htmlString = html.toString();
-  const { completeHtml, incompleteLinkTagTail: nextIncompleteLinkTagTail } = holdIncompleteLinkTagTail
+  const { completeHtml, incompleteLinkTagTail: nextIncompleteLinkTagTail } = holdIncompleteHtmlTail
     ? splitIncompleteLinkTagTail(htmlString)
     : { completeHtml: htmlString, incompleteLinkTagTail: '' };
   const gatedHtml = completeHtml.replace(
@@ -331,7 +365,7 @@ function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteLinkTa
 
   return {
     gatedHtmlBuffer: gatedHtml === htmlString && !nextIncompleteLinkTagTail ? html : Buffer.from(gatedHtml),
-    hasIncompleteLinkTagTail: Boolean(nextIncompleteLinkTagTail),
+    hasIncompleteHtmlTail: Boolean(nextIncompleteLinkTagTail),
   };
 }
 
@@ -394,7 +428,7 @@ export default function injectRSCPayload(
    * CONSTRAINT: The first output chunk must contain HTML data to begin streaming.
    */
   const htmlBuffers: Buffer[] = [];
-  let holdIncompleteLinkTagTail = true;
+  let holdIncompleteHtmlTail = true;
 
   /**
    * Buffer for stylesheet links inferred from RSC client chunk references.
@@ -441,9 +475,9 @@ export default function injectRSCPayload(
     // Calculate total buffer size for efficient memory allocation
     const rscInitializationSize = rscInitializationBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const htmlBuffer = Buffer.concat(htmlBuffers);
-    const { gatedHtmlBuffer, hasIncompleteLinkTagTail } = applyStreamedStylesheetPreloadGating(
+    const { gatedHtmlBuffer, hasIncompleteHtmlTail } = applyStreamedStylesheetPreloadGating(
       htmlBuffer,
-      holdIncompleteLinkTagTail,
+      holdIncompleteHtmlTail,
     );
     const shouldDeferRevealHtml =
       rscPromise &&
@@ -458,7 +492,7 @@ export default function injectRSCPayload(
     const totalSize =
       rscInitializationSize + rscClientStylesheetSize + flushableHtmlBuffer.length + rscPayloadSize;
 
-    if (hasIncompleteLinkTagTail && holdIncompleteLinkTagTail) {
+    if (hasIncompleteHtmlTail && holdIncompleteHtmlTail) {
       return;
     }
 
@@ -530,7 +564,7 @@ export default function injectRSCPayload(
   };
 
   const endResultStream = () => {
-    holdIncompleteLinkTagTail = false;
+    holdIncompleteHtmlTail = false;
     // Cancel any pending fallback timer unconditionally.
     // flush() only clears the timer when it actually flushes data (past the
     // early-return guards). If we're closing with empty buffers, the timer

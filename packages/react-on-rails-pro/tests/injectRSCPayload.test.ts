@@ -554,6 +554,29 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('rel="preload" as="style"');
   });
 
+  it('preserves split UTF-8 bytes when promoting streamed RSC stylesheet preloads', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<link rel="preload" as="style" href="/webpack/test/css/client1-46072b81.css">caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from(' after')]);
+    const mockHTML = createMockHTMLByteStream({
+      0: firstHtmlChunk,
+      10: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = (await collectStreamBuffer(result)).toString('utf8');
+
+    expect(resultStr).toContain(
+      'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">café after',
+    );
+    expect(resultStr).not.toContain('\uFFFD');
+  });
+
   it('leaves app-authored style preloads as fetch hints', async () => {
     const mockRSC = createMockRSCStream(['{"test": "data"}']);
     const appStylePreload =
