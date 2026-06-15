@@ -149,6 +149,10 @@ Workers refresh heartbeats at every phase transition:
 Use stable agent ids that identify machine role, capability profile, and lane,
 for example `mobile-batch2-lane1` or `desktop-highcap-lane1`.
 
+**Migration note:** Existing `<machine>-<tool>-<batch>` ids remain valid until
+claim expiry. Re-key them to `<machine-or-profile>-<batch>-<lane>` on the next
+session start.
+
 ```bash
 BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4)-coord-layer"
 BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX")

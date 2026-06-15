@@ -85,9 +85,11 @@ after phase 1 with a precise blocker.
    slots, report the idle slots instead of creating empty groups.
 4. Keep dependencies inside a group where practical. When a dependency must cross
    groups, express it as a `depends_on` ref for the private batch state.
-5. Produce one `$pr-batch` goal prompt per group, within the per-group prompt
-   size limit defined in `$pr-batch`, with a stable batch id, lane name, agent
-   id, target list, validation expectations, and coordination hooks.
+5. Produce one `$pr-batch` goal prompt per group, keeping each goal prompt under
+   the 4 000-character limit described for `$plan-pr-batch` in
+   `internal/contributor-info/agent-pr-batch-skills.md`, with a stable batch id,
+   lane name, agent id, target list, validation expectations, and coordination
+   hooks.
 6. Assign queued-but-not-started work to the matching inbox queue when the
    backend supports queue state. A queue entry is advisory assignment only; each
    worker must still acquire an `agent-coord claim` before editing.
