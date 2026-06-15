@@ -98,6 +98,10 @@ ssr-generated
 # AI assistant internal files
 .Codex/
 
+# Machine-local agent coordination profiles (capacity, inbox config; never commit)
+/.agent-coord.local.json
+/.agent-coord.local.*.json
+
 # Workspace package build outputs (but track source code)
 packages/*/lib/
 packages/**/node_modules/

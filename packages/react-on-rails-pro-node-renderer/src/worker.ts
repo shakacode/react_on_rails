@@ -30,7 +30,7 @@ import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
 import fileExistsAsync from './shared/fileExistsAsync.js';
 import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
-import type { FastifyReply } from './worker/types.js';
+import type { FastifyInstance, FastifyReply } from './worker/types.js';
 import { performRequestPrechecks } from './worker/requestPrechecks.js';
 import { type AuthBody, authenticate } from './worker/authHandler.js';
 import {
@@ -60,6 +60,7 @@ import {
 } from './shared/utils.js';
 import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './shared/tracing.js';
 import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
+import { hasAnyVMContext } from './worker/vm.js';
 
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
@@ -83,6 +84,11 @@ declare module 'fastify' {
   }
 }
 
+const HEALTH_ENDPOINT_ROUTES = ['/health', '/ready'] as const;
+// TODO: Reassess the duplicated-route message format when upgrading Fastify.
+const FASTIFY_DUPLICATED_ROUTE_ERROR_CODE = 'FST_ERR_DUPLICATED_ROUTE';
+const READY_RETRY_AFTER_SECONDS = 5;
+
 function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- fixing it with `void` just violates no-void
   Object.entries(headers).forEach(([key, header]) => res.header(key, header));
@@ -104,6 +110,49 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
 };
 
 const isAsset = (value: unknown): value is Asset => (value as { type?: string }).type === 'asset';
+
+function conflictingHealthEndpointPath(error: unknown): (typeof HEALTH_ENDPOINT_ROUTES)[number] | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  if (code !== FASTIFY_DUPLICATED_ROUTE_ERROR_CODE || typeof message !== 'string') {
+    return undefined;
+  }
+
+  // Format-dependent: Fastify's FST_ERR_DUPLICATED_ROUTE message currently
+  // includes `route '/health'` or `route '/ready'`. If that wording changes,
+  // this safely returns undefined and the caller rethrows the raw Fastify error,
+  // losing only the migration hint; verify this when upgrading Fastify.
+  return HEALTH_ENDPOINT_ROUTES.find((routePath) => message.includes(`route '${routePath}'`));
+}
+
+function applyFastifyConfigWithHealthEndpointMigrationHint(
+  app: FastifyInstance,
+  enableHealthEndpoints: boolean,
+) {
+  // This wraps synchronous configureFastify route registration only. Async
+  // Fastify plugins still surface Fastify's duplicate-route error during boot.
+  try {
+    applyFastifyConfigFunctions(app);
+  } catch (error) {
+    const conflictingPath = enableHealthEndpoints ? conflictingHealthEndpointPath(error) : undefined;
+    if (conflictingPath) {
+      const message =
+        `enableHealthEndpoints registers built-in GET ${conflictingPath} before configureFastify callbacks run, ` +
+        `and a configureFastify callback also tried to register that route. Remove or rename the custom ${conflictingPath} route when migrating ` +
+        'to the built-in health endpoints. See docs/oss/building-features/node-renderer/health-checks.md.';
+
+      log.error({ err: error, route: conflictingPath }, message);
+      const migrationError = new Error(message) as Error & { cause?: unknown };
+      migrationError.cause = error;
+      throw migrationError;
+    }
+
+    throw error;
+  }
+}
 
 function assertAsset(value: unknown, key: string): asserts value is Asset {
   if (!isAsset(value)) {
@@ -211,7 +260,15 @@ export default function run(config: Partial<Config>) {
   // getConfig():
   buildConfig(config);
 
-  const { serverBundleCachePath, logHttpLevel, port, host, fastifyServerOptions, workersCount } = getConfig();
+  const {
+    serverBundleCachePath,
+    logHttpLevel,
+    port,
+    host,
+    fastifyServerOptions,
+    workersCount,
+    enableHealthEndpoints,
+  } = getConfig();
 
   // The renderer uses cleartext HTTP/2 (h2c). Node's `allowHTTP1` option only
   // applies to TLS servers (http2.createSecureServer), so it cannot enable
@@ -645,6 +702,50 @@ export default function run(config: Partial<Config>) {
     });
   });
 
+  // Built-in, opt-in probe endpoints (enableHealthEndpoints config option).
+  // Like /info, they are plain GET routes outside the authenticated render and
+  // asset endpoints: orchestrator probes cannot carry the renderer password.
+  // Both intentionally return status-only bodies — no versions, paths, or
+  // license details — so leaving them reachable exposes nothing sensitive.
+  // NOTE: this listener speaks cleartext HTTP/2 (h2c), so HTTP/1.1-only probes
+  // (e.g. Kubernetes httpGet) cannot reach these routes. Use tcpSocket or exec
+  // probes (`curl --http2-prior-knowledge`). See
+  // docs/oss/building-features/node-renderer/health-checks.md.
+  if (enableHealthEndpoints) {
+    // Liveness: 200 whenever this process can answer — i.e. the event loop is
+    // responsive. Intentionally checks no dependencies (no bundle, Rails, or
+    // license state) so a transient dependency issue never restarts the pod.
+    // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
+    // this is an internal renderer service not exposed to the internet, returns
+    // a static status string, and exposes no sensitive runtime data.
+    // codeql[js/missing-rate-limiting]
+    // lgtm[js/missing-rate-limiting]
+    app.get('/health', (_req, res) => {
+      res.send({ status: 'ok' });
+    });
+
+    // Readiness: 200 only when this process can actually serve render requests.
+    // Answering at all proves the worker is online; additionally require at
+    // least one bundle compiled into the VM pool, because a renderer with zero
+    // bundles responds 410 to renders until the Rails client uploads one.
+    // With workersCount > 1 the cluster module distributes probe connections
+    // across workers, so a probe checks one worker per request.
+    // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
+    // same rationale as /health; this returns only a static readiness status.
+    // codeql[js/missing-rate-limiting]
+    // lgtm[js/missing-rate-limiting]
+    app.get('/ready', (_req, res) => {
+      if (hasAnyVMContext()) {
+        res.send({ status: 'ready' });
+      } else {
+        res
+          .status(503)
+          .header('Retry-After', String(READY_RETRY_AFTER_SECONDS))
+          .send({ status: 'waiting_for_bundle' });
+      }
+    });
+  }
+
   // In tests we will run worker in master thread, so we need to ensure server
   // will not listen:
   // we are extracting worker from cluster to avoid false TS error
@@ -662,7 +763,7 @@ export default function run(config: Partial<Config>) {
 
   // Integration hooks registered before the worker loads are applied here, immediately after
   // listen() is scheduled and before Fastify finishes booting.
-  applyFastifyConfigFunctions(app);
+  applyFastifyConfigWithHealthEndpointMigrationHint(app, enableHealthEndpoints);
 
   return app;
 }

@@ -3,10 +3,12 @@
 Concurrent agent batches can use the private `shakacode/agent-coordination`
 repository for shared claim, heartbeat, and batch dependency state.
 
-Keep schema definitions and examples in the private backend repository. This
-React on Rails repository should only carry this pointer and the public workflow
-rules in [AGENTS.md](../../AGENTS.md), [.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md),
-and [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md).
+Keep authoritative JSON schema definitions and examples in the private backend
+repository. This React on Rails repository carries the operator-facing contract
+and public workflow rules in [AGENTS.md](../../AGENTS.md),
+[.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md),
+[.agents/skills/triage/SKILL.md](../../.agents/skills/triage/SKILL.md), and
+[.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md).
 
 Until the private repo has tagged releases, use `agent-coord version --json` and
 `agent-coord config show --json` as the CLI contract. The private README,
@@ -78,6 +80,74 @@ AGENT_COORD_STATE_ROOT="$STATE_ROOT" agent-coord status
 rm -rf "$STATE_ROOT"
 ```
 
+## Capacity Profiles And Inbox Queues
+
+Capacity profiles and per-inbox assignment queues are backend-owned runtime
+state. Do not commit operator hardware values, machine names, inbox identities,
+model or tool names, or active group counts to this public repository.
+
+The public contract for a capacity profile is:
+
+- `profile_id`: stable runtime id chosen by the operator or backend.
+- `ram_gb`: positive integer reported by runtime registration or a gitignored
+  local config file.
+- `max_concurrent_batches`: positive integer capacity for simultaneous batch
+  lane ownership from that profile.
+- `inboxes`: operator-configured inbox ids that can receive assigned-but-not-
+  started work for that profile.
+- optional routing metadata, such as capability tags, read from runtime config
+  rather than hardcoded model or tool names.
+
+Profiles must be registered at runtime or loaded from a machine-local ignored
+file such as `.agent-coord.local.json` or a per-profile file like
+`.agent-coord.local.<profile>.json`. The repository ignores those paths so
+capacity values can change without source edits. If the backend exposes a
+registration command, use it as the source of truth; otherwise use the private
+backend README and schema files. The installed `agent-coord` 0.1.0 public
+contract exposes claim, heartbeat, status, version, config, doctor, and
+bootstrap commands, but does not yet expose a public capacity-profile or queue
+subcommand.
+
+The per-inbox queue is an assignment view, not a lock. A queued item means "this
+inbox should pick this up next"; the worker must still acquire an
+`agent-coord claim` before editing. Queue entries should reference the target
+repo, issue or PR number, batch id, lane name, planned agent id, and assignment
+status. The inbox "next up" view should hide completed items, show in-flight
+items from live claims and heartbeats, and flag lost-heartbeat items as needing a
+takeover or resume decision instead of silently reassigning them.
+
+> **Planned (not yet in `agent-coord` 0.1.0):** `agent-coord status` or a
+> future `batch-status` subcommand should expose this per-inbox "next up" view
+> once queue state is implemented in the backend.
+
+Capacity-aware triage derives group count from registered state:
+
+1. Read current capacity profiles and enabled inbox config.
+2. Convert profiles into available lane slots from `max_concurrent_batches`,
+   bounded by enabled inboxes.
+3. Build a unique occupied/reserved lane-ref set from live in-progress lanes,
+   live blocked lanes, blocked lanes without a live heartbeat, and reserved
+   lanes, then subtract that set size from the bounded total. If lane refs,
+   heartbeat liveness, blocked state, reserved state, profiles, or inbox config
+   cannot be verified, stop phase 2 with a precise blocker instead of deriving
+   `N`.
+4. If the subtraction result is negative, report "occupied/reserved lanes exceed
+   registered capacity" with the bounded slot count and occupied lane refs, then
+   stop phase 2 instead of clamping or inventing groups.
+5. Let `N` be the resulting non-negative available lane-slot count.
+6. If `N` is 0 while actionable work remains, report "all lanes currently
+   occupied" and stop phase 2 instead of inventing groups.
+7. Split the current wave into up to `N` non-empty groups, capped by the
+   `$pr-batch` per-batch limits: 8 items when files or risk overlap, or 10 fully
+   independent items. Stop phase 2 with a blocker when `N` cannot be verified.
+   When actionable work exceeds the capped current wave, report the remaining
+   backlog/next wave; when actionable work has fewer items than available slots,
+   report the remaining idle slots instead of creating empty groups or prompts.
+
+Do not multiply per-batch item caps by an assumed number of machines. The
+registered profiles and inbox config are the only source for capacity-aware
+group count.
+
 ## Heartbeats
 
 Workers refresh heartbeats at every phase transition:
@@ -89,8 +159,14 @@ Workers refresh heartbeats at every phase transition:
 - resumed state
 - done state
 
-Use stable agent ids that identify machine role, tool, and lane, for example
-`mobile-codex-batch2` or `desktop-claude-fable-lane1`.
+Use stable agent ids that identify machine role, capability profile, and lane,
+for example `mobile-batch2-lane1` or `desktop-highcap-lane1`.
+
+**Migration note:** Existing `<machine>-<tool>-<batch>` ids remain valid while
+their old claim or heartbeat is live. A restarted worker must continue using the
+old id until that claim is released or expired; re-key to
+`<machine-or-profile>-<batch>-<lane>` only for new lanes or after the old claim
+is gone.
 
 ```bash
 BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4)-coord-layer"
@@ -105,7 +181,7 @@ printf 'Batch id file: %s\n' "$BATCH_ID_FILE"
 # At batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
 
 agent-coord heartbeat \
-  --agent-id mobile-codex-batch2 \
+  --agent-id mobile-batch2-lane1 \
   --repo shakacode/react_on_rails \
   --target 3970 \
   --batch-id "$BATCH_ID" \
