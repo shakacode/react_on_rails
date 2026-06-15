@@ -98,6 +98,7 @@ const sidebars: SidebarsConfig = {
             'building-features/fast-images',
             'building-features/fonts',
             'building-features/rails-engine-integration',
+            'building-features/web-components',
             'building-features/turbolinks',
           ],
         },
