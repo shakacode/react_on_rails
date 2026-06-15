@@ -72,6 +72,11 @@ const INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS = 1_000;
 // retain VM source-map registrations for the same idle period.
 const STREAM_CONTEXT_RELEASE_TIMEOUT_MS = STREAM_CHUNK_TIMEOUT_MS;
 const INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS = STREAM_CONTEXT_RELEASE_TIMEOUT_MS;
+const HTML_ESCAPE_REPLACEMENTS: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+};
 
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
@@ -112,12 +117,18 @@ function setStringResponseHeaders(headers: ResponseResult['headers'], res: Fasti
   }
 }
 
+function escapeHtmlText(value: string) {
+  return value.replace(/[&<>]/g, (char) => HTML_ESCAPE_REPLACEMENTS[char] ?? char);
+}
+
 const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   const { status, data, headers, stream } = result;
   if (status !== 200 && status !== 410) {
     log.info({ msg: 'Sending non-200, non-410 data back', data });
   }
-  if (!stream && typeof data === 'string') {
+  const stringResponse = !stream && typeof data === 'string';
+  const responseData = stringResponse && status >= 400 ? escapeHtmlText(data) : data;
+  if (stringResponse) {
     setStringResponseHeaders(headers, res);
   }
   setHeaders(headers, res);
@@ -126,7 +137,10 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   if (stream) {
     await res.send(stream);
   } else {
-    res.send(data);
+    // Non-success strings are escaped above and sent as nosniff text/plain; success
+    // strings include renderer JSON/HTML payloads for the Ruby client and stay intact.
+    // codeql[js/reflected-xss]
+    res.send(responseData);
   }
 };
 
