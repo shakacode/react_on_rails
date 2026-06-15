@@ -21,8 +21,9 @@ import { ApolloProvider, ApolloClient, createHttpLink, InMemoryCache } from '@ap
 import { getMarkupFromTree } from '@apollo/client/react/ssr';
 import fetch from 'cross-fetch';
 import ApolloGraphQL from '../components/ApolloGraphQL';
+import { serializeForInlineScript } from '../utils/serializeForInlineScript';
 
-export default async (props, _railsContext) => {
+export default async (props, railsContext) => {
   const { csrf, sessionCookie } = props.ssrOnlyProps;
   const client = new ApolloClient({
     ssrMode: true,
@@ -52,9 +53,12 @@ export default async (props, _railsContext) => {
   // you need to return additional property `apolloStateTag`, to fulfill the state for hydration
   const apolloStateTag = renderToString(
     <script
+      // Carry the per-request CSP nonce so the strict policy
+      // (config/initializers/content_security_policy.rb) allows this inline script.
+      nonce={railsContext.cspNonce}
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{
-        __html: `window.__APOLLO_STATE__=${JSON.stringify(initialState).replace(/</g, '\\u003c')};`,
+        __html: `window.__APOLLO_STATE__=${serializeForInlineScript(initialState)};`,
       }}
     />,
   );

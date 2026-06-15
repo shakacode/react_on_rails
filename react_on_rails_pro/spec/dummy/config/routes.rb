@@ -75,6 +75,7 @@ Rails.application.routes.draw do
   get "async_render_function_returns_string" => "pages#async_render_function_returns_string"
   get "async_render_function_returns_component" => "pages#async_render_function_returns_component"
   get "tanstack_router_async(/*all)" => "tanstack_router#index", as: :tanstack_router_async
+  get "tanstack_starter(/*all)" => "tanstack_starter#index", as: :tanstack_starter
   get "async_components_demo" => "pages#async_components_demo", as: :async_components_demo
   get "native_metadata" => "pages#native_metadata", as: :native_metadata
   get "stream_native_metadata" => "pages#stream_native_metadata", as: :stream_native_metadata

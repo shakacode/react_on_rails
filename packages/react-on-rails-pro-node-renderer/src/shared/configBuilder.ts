@@ -123,6 +123,13 @@ export interface Config {
   // are needed - one for the server bundle and one for React Server Components (RSC) if enabled.
   // Older contexts are removed when this limit is reached.
   maxVMPoolSize: number;
+  // If set to true, the renderer registers built-in, unauthenticated GET /health (liveness) and
+  // GET /ready (readiness) probe endpoints. Both return status-only JSON bodies and never expose
+  // runtime version or path details. Defaults to false.
+  // NOTE: the renderer listens with cleartext HTTP/2 (h2c), so HTTP/1.1-only probes (e.g.
+  // Kubernetes httpGet) cannot reach these endpoints. Use tcpSocket or exec probes
+  // (`curl --http2-prior-knowledge`). See docs/oss/building-features/node-renderer/health-checks.md.
+  enableHealthEndpoints: boolean;
 }
 
 let config: Config | undefined;
@@ -209,6 +216,10 @@ function defaultReplayServerAsyncOperationLogs() {
   return env.NODE_ENV?.toLowerCase() === 'development';
 }
 
+function truthyHealthEndpointFlag(value: unknown) {
+  return value === '1' || truthy(value);
+}
+
 const defaultConfig: Config = {
   // Use env port if we run on Heroku
   port: Number(env.RENDERER_PORT) || DEFAULT_PORT,
@@ -259,6 +270,9 @@ const defaultConfig: Config = {
   // Maximum number of VM contexts to keep in memory. Defaults to 2 since typically only two contexts
   // are needed - one for the server bundle and one for React Server Components (RSC) if enabled.
   maxVMPoolSize: (env.MAX_VM_POOL_SIZE && parseInt(env.MAX_VM_POOL_SIZE, 10)) || 2,
+
+  // Built-in /health and /ready probe endpoints are opt-in.
+  enableHealthEndpoints: truthyHealthEndpointFlag(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
 };
 
 function envValuesUsed() {
@@ -287,6 +301,8 @@ function envValuesUsed() {
     REPLAY_SERVER_ASYNC_OPERATION_LOGS:
       !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
     MAX_VM_POOL_SIZE: !userConfig.maxVMPoolSize && env.MAX_VM_POOL_SIZE,
+    RENDERER_ENABLE_HEALTH_ENDPOINTS:
+      !('enableHealthEndpoints' in userConfig) && env.RENDERER_ENABLE_HEALTH_ENDPOINTS,
   };
 }
 
@@ -398,6 +414,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     password: env.RENDERER_PASSWORD,
     // Re-evaluate env-derived defaults at build time in case env vars are set post-import.
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
+    enableHealthEndpoints: truthyHealthEndpointFlag(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
   };
   config = { ...runtimeDefaultConfig, ...userConfig };
   if (explicitUndefinedPassword) {
@@ -427,6 +444,8 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   }
 
   config.supportModules = truthy(config.supportModules);
+  // Coerce in case a user config passes an env-derived string (e.g. "true").
+  config.enableHealthEndpoints = truthyHealthEndpointFlag(config.enableHealthEndpoints);
 
   if (config.maxVMPoolSize <= 0 || !Number.isInteger(config.maxVMPoolSize)) {
     throw new Error('maxVMPoolSize must be a positive integer');

@@ -21,6 +21,8 @@ describe('configBuilder', () => {
     'RENDERER_PASSWORD',
     'RAILS_ENV',
     'REPLAY_SERVER_ASYNC_OPERATION_LOGS',
+    'RENDERER_ENABLE_HEALTH_ENDPOINTS',
+    'RENDERER_SUPPORT_MODULES',
     'RENDERER_WORKERS_COUNT',
   ] as const;
   const savedEnvValues = Object.fromEntries(envVarsToRestore.map((key) => [key, process.env[key]]));
@@ -100,6 +102,36 @@ describe('configBuilder', () => {
     >;
 
     expect(envValues.RENDERER_PASSWORD).toBe(false);
+  });
+
+  it('keeps shared boolean env parsing backward-compatible for RENDERER_SUPPORT_MODULES=1', () => {
+    process.env.NODE_ENV = 'test';
+    process.env.RENDERER_SUPPORT_MODULES = '1';
+
+    const { buildConfig } = loadConfigBuilderWithMockedLogger();
+    const config = buildConfig();
+
+    expect(config.supportModules).toBe(false);
+  });
+
+  it('keeps shared boolean env parsing backward-compatible for REPLAY_SERVER_ASYNC_OPERATION_LOGS=1', () => {
+    process.env.NODE_ENV = 'test';
+    process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS = '1';
+
+    const { buildConfig } = loadConfigBuilderWithMockedLogger();
+    const config = buildConfig();
+
+    expect(config.replayServerAsyncOperationLogs).toBe(false);
+  });
+
+  it('accepts RENDERER_ENABLE_HEALTH_ENDPOINTS=1 without changing other boolean env flags', () => {
+    process.env.NODE_ENV = 'test';
+    process.env.RENDERER_ENABLE_HEALTH_ENDPOINTS = '1';
+
+    const { buildConfig } = loadConfigBuilderWithMockedLogger();
+    const config = buildConfig();
+
+    expect(config.enableHealthEndpoints).toBe(true);
   });
 
   it('masks module-load password defaults in sanitized logs', () => {

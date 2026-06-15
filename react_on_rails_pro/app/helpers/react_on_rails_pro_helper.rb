@@ -22,16 +22,23 @@ require "async/promise"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
-  def fetch_react_component(component_name, options)
+  def fetch_react_component(component_name, options, &)
     if ReactOnRailsPro::Cache.use_cache?(options)
       cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
       Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
-      cache_options = options[:cache_options]
+      cache_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
+      if ReactOnRailsPro::Cache.cache_write_expired?(options[:cache_options])
+        return render_expired_cache_miss(cache_key, &)
+      end
+
       cache_hit = true
+      normalized_cache_tags = []
       result = Rails.cache.fetch(cache_key, cache_options) do
         cache_hit = false
+        normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
         yield
       end
+      ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
       if cache_hit
         render_options = ReactOnRails::ReactComponent::RenderOptions.new(
           react_component_name: component_name,
@@ -62,6 +69,10 @@ module ReactOnRailsProHelper
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
   # 4. Provide boolean values for `:if` or `:unless` to conditionally use caching.
+  # 5. Optionally provide the `:cache_tags` option: String or Array (or Proc, or any object responding
+  #    to `cache_key`, such as an ActiveRecord model) of revalidation tags. Tagged cache entries can be
+  #    deleted later with `ReactOnRailsPro.revalidate_tag(tag)`. Tag revalidation is best-effort, so
+  #    also set `cache_options: { expires_in: ... }` to bound staleness.
   def cached_react_component(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
@@ -89,6 +100,10 @@ module ReactOnRailsProHelper
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
   # 4. Provide boolean values for `:if` or `:unless` to conditionally use caching.
+  # 5. Optionally provide the `:cache_tags` option: String or Array (or Proc, or any object responding
+  #    to `cache_key`, such as an ActiveRecord model) of revalidation tags. Tagged cache entries can be
+  #    deleted later with `ReactOnRailsPro.revalidate_tag(tag)`. Tag revalidation is best-effort, so
+  #    also set `cache_options: { expires_in: ... }` to bound staleness.
   def cached_react_component_hash(component_name, raw_options = {}, &block)
     raw_options[:prerender] = true
 
@@ -251,6 +266,10 @@ module ReactOnRailsProHelper
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
   # 4. Provide boolean values for `:if` or `:unless` to conditionally use caching.
+  # 5. Optionally provide the `:cache_tags` option: String or Array (or Proc, or any object responding
+  #    to `cache_key`, such as an ActiveRecord model) of revalidation tags. Tagged cache entries can be
+  #    deleted later with `ReactOnRailsPro.revalidate_tag(tag)`. Tag revalidation is best-effort, so
+  #    also set `cache_options: { expires_in: ... }` to bound staleness.
   def cached_stream_react_component(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
@@ -298,6 +317,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   # 3. Optionally provide :cache_options for Rails.cache (expires_in, etc.)
   # 4. Provide :if or :unless for conditional caching
+  # 5. Optionally provide :cache_tags for revalidation via ReactOnRailsPro.revalidate_tag
   #
   # @param component_name [String] Name of your registered component
   # @param options [Hash] Options including cache_key and cache_options
@@ -328,6 +348,9 @@ module ReactOnRailsProHelper
     auto_load_bundle = ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
 
     unless ReactOnRailsPro::Cache.use_cache?(raw_options)
+      return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &)
+    end
+    if ReactOnRailsPro::Cache.cache_write_expired?(raw_options[:cache_options])
       return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &)
     end
 
@@ -369,9 +392,20 @@ module ReactOnRailsProHelper
   end
 
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &)
+    normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
+    raw_cache_options = raw_options[:cache_options] || {}
+    tag_index_cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     cache_aware_options = raw_options.merge(
       on_complete: lambda { |chunks|
-        Rails.cache.write(view_cache_key, chunks, raw_options[:cache_options] || {})
+        next if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+
+        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+        Rails.cache.write(view_cache_key, chunks, cache_options)
+        ReactOnRailsPro::Cache.register_normalized_tags(
+          normalized_cache_tags,
+          view_cache_key,
+          tag_index_cache_options
+        )
       }
     )
 
@@ -417,7 +451,12 @@ module ReactOnRailsProHelper
     end
 
     cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, raw_options)
-    cache_options = raw_options[:cache_options] || {}
+    raw_cache_options = raw_options[:cache_options] || {}
+    if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+      return render_async_react_component_uncached(component_name, raw_options, &)
+    end
+
+    cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     Rails.logger.debug { "React on Rails Pro async cache_key is #{cache_key.inspect}" }
 
     # Synchronous cache lookup
@@ -433,7 +472,7 @@ module ReactOnRailsProHelper
     end
 
     Rails.logger.debug { "React on Rails Pro async cache MISS for #{cache_key.inspect}" }
-    render_async_react_component_with_cache(component_name, raw_options, cache_key, cache_options, &)
+    render_async_react_component_with_cache(component_name, raw_options, cache_key, raw_cache_options, cache_options, &)
   end
 
   # Renders async without caching (when :if/:unless conditions disable cache)
@@ -448,16 +487,37 @@ module ReactOnRailsProHelper
   end
 
   # Renders async and writes to cache on completion
-  def render_async_react_component_with_cache(component_name, raw_options, cache_key, cache_options, &)
+  def render_async_react_component_with_cache(
+    component_name,
+    raw_options,
+    cache_key,
+    raw_cache_options,
+    cache_options_at_miss,
+    &
+  )
+    normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
     options = prepare_async_render_options(raw_options, &)
 
     task = @react_on_rails_async_barrier.async do
       result = react_component(component_name, options)
-      Rails.cache.write(cache_key, result, cache_options)
+      unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+        Rails.cache.write(cache_key, result, cache_options)
+        ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options_at_miss)
+      end
       result
     end
 
     ReactOnRailsPro::AsyncValue.new(task:)
+  end
+
+  def render_expired_cache_miss(cache_key)
+    result = yield
+    if result.is_a?(Hash)
+      result[:RORP_CACHE_KEY] = cache_key
+      result[:RORP_CACHE_HIT] = false
+    end
+    result
   end
 
   def prepare_async_render_options(raw_options)

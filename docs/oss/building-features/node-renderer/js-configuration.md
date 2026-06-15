@@ -48,6 +48,7 @@ available default ENV values if you wire them into your own launch script.
    Because these functions are valid client-side, they are ignored on server-side rendering without errors or warnings.
    Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
+1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
 
 Deprecated options:
 
@@ -302,6 +303,15 @@ example above or switch the file to `.mjs` or `"type": "module"`.
 
 ### Adding a Health Check Endpoint
 
+> **Built-in alternative:** The renderer now ships built-in `GET /health` (liveness) and `GET /ready` (readiness)
+> endpoints behind the `enableHealthEndpoints` config option — no custom Fastify code required. See
+> [Health and Readiness Endpoints](./health-checks.md). Use the recipe below only when you need custom probe logic
+> (extra warm-up gates, dependency checks, or custom payloads).
+> If your `configureFastify` callback already registers `/health` or `/ready`, remove or rename the custom route
+> before enabling `enableHealthEndpoints`; Fastify raises a duplicate-route startup error for reused paths.
+> If the duplicate route is registered by an async Fastify plugin during `app.register()` boot, Fastify reports its raw
+> `FST_ERR_DUPLICATED_ROUTE` error instead of the `enableHealthEndpoints` migration hint.
+
 A common need is a `/health` endpoint for container health checks:
 
 ```js
@@ -417,9 +427,10 @@ Keep the three probe types distinct:
 
 - **Startup** answers whether the renderer has finished booting. Separate it from readiness and liveness so slow startup
   does not cause premature restarts or block traffic.
-- **Readiness** answers whether the renderer should receive new render requests. Use an application-level endpoint such
-  as the `/health` route in [Adding a Health Check Endpoint](#adding-a-health-check-endpoint), or the built-in `/info`
-  endpoint for a shallow process check.
+- **Readiness** answers whether the renderer should receive new render requests. Use the built-in `/ready` endpoint
+  only when an out-of-band warm-up render can compile a bundle before probe-gated traffic begins. Without that warm-up
+  path, prefer a shallow TCP readiness check or the built-in `/info` endpoint, and use `/ready` for monitoring or
+  post-deploy verification. See [Health and Readiness Endpoints](./health-checks.md) for the full cold-start semantics.
 - **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer. Prefer
   `tcpSocket` as the default so transient CPU or GC pauses do not restart an otherwise recoverable renderer; use an
   h2c-aware `exec` check only when you intentionally need stricter hung-process detection.

@@ -63,7 +63,11 @@ const sidebars: SidebarsConfig = {
         {
           type: 'category',
           label: 'Routing',
-          items: ['building-features/react-router', 'building-features/tanstack-router'],
+          items: [
+            'building-features/react-router',
+            'building-features/tanstack-router',
+            'building-features/client-side-routing-instant-navigation',
+          ],
         },
         {
           type: 'category',
@@ -86,6 +90,7 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Integrations',
           items: [
+            'building-features/forms',
             'building-features/react-and-redux',
             'building-features/styling-with-tailwind',
             'building-features/i18n',
@@ -117,6 +122,7 @@ const sidebars: SidebarsConfig = {
             'building-features/node-renderer/basics',
             'building-features/node-renderer/js-configuration',
             'building-features/node-renderer/container-deployment',
+            'building-features/node-renderer/health-checks',
             'building-features/node-renderer/debugging',
             'building-features/node-renderer/error-reporting-and-tracing',
             'building-features/node-renderer/heroku',
@@ -211,6 +217,7 @@ const sidebars: SidebarsConfig = {
         'pro/deployment/review-app-security',
         'pro/upgrading-to-pro',
         'pro/streaming-ssr',
+        'pro/strict-csp',
         'pro/async-props-database-queries',
         'pro/node-renderer',
         'pro/rolling-deploy-adapters',

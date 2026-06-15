@@ -717,6 +717,28 @@ For detailed proof criteria and migration contribution guidance, see
   legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
   source.
 
+## Control Plane Cost Posture
+
+For public demo and starter staging deployments on Control Plane, keep the app
+workload as `type: standard` with `minScale: 1`, set its autoscaling metric to
+`disabled`, and enable `capacityAI: true` so Control Plane can right-size idle
+capacity while the demo keeps one warm replica. With the autoscaling metric set
+to `disabled`, treat replica count as fixed; `maxScale` is not a burst-scaling
+lever in this posture. If a demo must absorb traffic bursts, choose a compatible
+autoscaling metric deliberately and set a tested `maxScale` ceiling for that
+separate scaling posture.
+Avoid `CPU Utilization` autoscaling with `minScale: 1` / `maxScale: 1` for
+these small staging apps because that combination prevents Capacity AI from
+right-sizing the warm workload.
+
+This is not the same as scale-to-zero: steady RAM usage and background work can
+still drive cost, and shared Postgres should usually stay manually sized. If a
+demo explicitly needs true idle scale-to-zero, create a separate `serverless`
+workload before first deploy or plan a delete/recreate migration because Control
+Plane will not change an existing `standard` workload to `serverless` in place.
+The reusable guidance lives in
+[Control Plane Flow: Enable Capacity AI for Demo and Starter Staging Apps](https://github.com/shakacode/control-plane-flow/blob/main/docs/tips.md#enable-capacity-ai-for-demo-and-starter-staging-apps).
+
 ## Legacy Repos
 
 Version-specific demos, `test-*` repos, generator snapshots, and older tutorial
@@ -5063,6 +5085,236 @@ end
 - [React Router Guide](./react-router.md)
 
 ================================================================================
+PAGE: https://reactonrails.com/docs/building-features/client-side-routing-instant-navigation
+SOURCE: docs/oss/building-features/client-side-routing-instant-navigation.md
+================================================================================
+
+# Client-Side Routing & Instant Navigation
+
+React on Rails defaults to **component-per-page**: each page is its own `react_component` mount, and clicking a link is a normal Rails request. That is the right default for incremental adoption — but teams building a substantial React section often want **SPA navigation**: instant client-side transitions, a persistent shell layout that never unmounts, and server-driven data per route.
+
+This guide shows the **opt-in starter pattern** for exactly that, built entirely from existing React on Rails Pro APIs:
+
+- [`createTanStackRouterRenderFunction`](./tanstack-router.md) — SSR + hydration for a TanStack Router app
+- [`RSCRoute`](../../pro/react-server-components/inside-client-components.md) — streams a React Server Component's payload from a Rails endpoint during client navigation
+
+A complete runnable example lives in the Pro dummy app — see [Working example](#working-example-in-this-repo) below.
+
+## Opt-In, Not a Takeover
+
+The starter is **a React-routed island inside a normal Rails app**, not a framework takeover:
+
+- One Rails catch-all route hands a URL subtree (for example `/dashboard/*`) to the React router. Every other route stays server-rendered Rails (ERB, Hotwire, anything).
+- Inertia replaces the view layer per route; Next.js owns the whole app. Here, the rest of your app doesn't change.
+- You can mount several independent React-routed sections, or none — adoption stays incremental.
+
+## Requirements
+
+| Capability                           | Needs                                                                                                                                                     |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client-only TanStack Router (no SSR) | Open-source React on Rails — it's just a React app                                                                                                        |
+| SSR of the initial route             | **Pro**: Node Renderer + `config.rendering_returns_promises = true`                                                                                       |
+| `RSCRoute` server-component routes   | **Pro**: RSC support enabled (`enable_rsc_support`, `rsc_payload_generation_url_path`) and the matching `rsc_payload_route` mounted in `config/routes.rb` |
+
+See [Using TanStack Router](./tanstack-router.md) for the SSR helper details and [React Server Components inside client components](../../pro/react-server-components/inside-client-components.md) for `RSCRoute`.
+
+## Why TanStack Router?
+
+The starter blesses **TanStack Router** because it is the router with a first-class React on Rails Pro SSR helper (`react-on-rails-pro/tanstack-router`), end-to-end TypeScript route types, and built-in data loading.
+
+**React Router remains the documented manual alternative.** [Using React Router](./react-router.md) covers the manual integration pattern, and recommends React Router **v6** over v7 (v7 merged with Remix and uses an architecture that is not a clean fit for React on Rails' manual SSR approach). If your team is already a React Router shop, that guide is the supported path — the starter pattern here (catch-all Rails route, persistent layout, scoped Turbo boundary) carries over; only the SSR dehydration/hydration helper is TanStack-specific.
+
+## The Starter, Piece by Piece
+
+### 1. One Rails route owns the subtree
+
+```ruby
+# config/routes.rb
+get "dashboard(/*all)" => "dashboard#index", as: :dashboard
+```
+
+Every URL under `/dashboard` renders the same view, so deep links server-render the matching route and navigation after that is client-side.
+
+### 2. The view mounts the app and scopes Turbo off
+
+Prepare request-specific route data in Rails first (for example, `@reports = current_user.reports.visible.select(:id, :title)` in the controller), then pass display-safe fields into the React-routed island:
+
+```erb
+<%# app/views/dashboard/index.html.erb %>
+<div data-turbo="false">
+  <%= react_component("DashboardApp",
+                      props: {
+                        reports: @reports.as_json(only: [:id, :title])
+                      },
+                      prerender: true,
+                      raise_on_prerender_error: true) %>
+</div>
+```
+
+`raise_on_prerender_error: true` makes SSR failures raise during development and test instead of silently serving a broken page. Decide separately whether that behavior fits your production error-handling policy.
+
+The `data-turbo="false"` boundary keeps Turbo Drive from intercepting link clicks inside the React-routed subtree, so the two routers never compete. Outside this boundary, Turbo keeps working as usual. This guide does not address **deeper Turbo integration** (shared back/forward handling, scroll restoration across the boundary, Turbo Frames around streamed HTML) — that coexistence track is open in [issue #3485](https://github.com/shakacode/react_on_rails/issues/3485).
+
+### 3. A persistent shell layout with nested routes
+
+```jsx
+'use client';
+
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import {
+  Link,
+  Outlet,
+  RouterProvider,
+  createBrowserHistory,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from '@tanstack/react-router';
+import { createTanStackRouterRenderFunction } from 'react-on-rails-pro/tanstack-router';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+
+// The shell renders once and stays mounted across navigations.
+// Anything stateful here (sidebar state, form drafts, websocket
+// connections) survives route changes.
+const ReportDataContext = React.createContext({ reports: [] });
+
+const ShellLayout = () => {
+  const [count, setCount] = useState(0);
+  return (
+    <div>
+      <nav>
+        <Link to="/dashboard">Home</Link>
+        <Link to="/dashboard/reports">Reports</Link>
+        <button type="button" onClick={() => setCount((c) => c + 1)}>
+          Clicks: {count} {/* survives navigation — the shell never unmounts */}
+        </button>
+      </nav>
+      <Outlet />
+    </div>
+  );
+};
+
+const HomePage = () => <h2>Home</h2>;
+
+// An RSCRoute-backed route: the page's content is a React Server
+// Component, streamed from a Rails endpoint when the user navigates here.
+// componentProps are serialized into the payload request, so the server
+// component receives them when the payload is generated (see step 4).
+//
+// The mounted guard keeps RSCRoute out of the server render: with the
+// react_component entry point, RSC payloads cannot be generated during the
+// initial SSR (that needs wrapServerComponentRenderer +
+// stream_react_component), so deep links server-render the placeholder and
+// the client fetches the payload after mount — the same path used on
+// client-side navigation.
+const ReportsPage = () => {
+  const { reports } = React.useContext(ReportDataContext);
+  const [mounted, setMounted] = useState(false);
+  const componentProps = useMemo(() => ({ reports }), [reports]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <p>Loading reports...</p>;
+  }
+
+  return (
+    <Suspense fallback={<p>Loading reports...</p>}>
+      <RSCRoute componentName="Reports" componentProps={componentProps} />
+    </Suspense>
+  );
+};
+
+const rootRoute = createRootRoute({ component: ShellLayout });
+const routeTree = rootRoute.addChildren([
+  createRoute({ getParentRoute: () => rootRoute, path: '/dashboard', component: HomePage }),
+  createRoute({ getParentRoute: () => rootRoute, path: '/dashboard/reports', component: ReportsPage }),
+]);
+
+const DashboardApp = createTanStackRouterRenderFunction(
+  {
+    AppWrapper: ({ children, reports = [] }) => (
+      <ReportDataContext.Provider value={{ reports }}>{children}</ReportDataContext.Provider>
+    ),
+    createRouter: () =>
+      createRouter({
+        routeTree,
+        // The Rails catch-all forwards every /dashboard/* path to this app,
+        // so give unmatched URLs a real page instead of a blank Outlet.
+        defaultNotFoundComponent: () => <h2>Page not found</h2>,
+      }),
+  },
+  { RouterProvider, createMemoryHistory, createBrowserHistory },
+);
+
+export default DashboardApp;
+```
+
+> [!NOTE]
+> Keep `componentProps` references stable for values derived during render, and wrap production `RSCRoute` routes in an app-specific error boundary so payload fetch or render failures degrade to your chosen error UI. For constant or empty props, prefer a module-level constant over `useMemo`.
+
+With [auto-bundling](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md), placing this file in your components subdirectory registers it automatically — the generated client pack also sets up the default RSC provider that `RSCRoute` needs in the browser.
+
+### 4. The server component
+
+`Reports` is a plain React Server Component (no `'use client'` directive). Its code never ships to the browser; only its rendered payload does:
+
+```jsx
+import React from 'react';
+
+const Reports = ({ reports = [] }) => (
+  <ul>
+    {reports.map((r) => (
+      <li key={r.id}>{r.title}</li>
+    ))}
+  </ul>
+);
+
+export default Reports;
+```
+
+> [!IMPORTANT]
+> The RSC payload is generated by the Pro **Node renderer**, which has no Rails models, database connection, or user session — so a server component must not reach into Rails directly, and an in-component fetch bypasses Rails' authorization and caching.
+>
+> - Let Rails resolve request-specific data first, then pass only display-safe data as props: through `RSCRoute` `componentProps` (serialized into the payload request, as above) or via [async props](../migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently), where Rails resolves each prop and the component awaits it under `<Suspense>`.
+> - **Treat `componentProps` as untrusted client input.** Client navigation re-sends `componentProps` to the RSC payload endpoint; an attacker can forge arbitrary values, including values that control what data is fetched or rendered. Re-derive any security- or data-sensitive values (current user, permissions, record IDs, tenant) from the Rails session or database inside the controller or a Pro async prop, not from client-supplied props.
+>
+> See [RSC Data Fetching Patterns](../migrating/rsc-data-fetching.md) for the full set of options.
+
+### How navigation behaves
+
+- **Initial page load**: Rails serves SSR HTML for whatever route the URL matches; the client hydrates it. Deep links work because the Rails catch-all route renders the same component for the whole subtree.
+- **Client navigation**: TanStack Router swaps only the route outlet. The shell stays mounted, and no Rails page load happens.
+- **Navigating to an `RSCRoute` route**: the client fetches the server component's RSC payload over HTTP from the Rails `rsc_payload` endpoint and streams it into the outlet — server-driven data with no separate JSON API layer.
+- **Direct visit to the `RSCRoute` route**: the mounted guard means the server renders the placeholder and the client fetches the RSC payload after hydration. Server-rendering the RSC payload during the initial page load requires the `wrapServerComponentRenderer` + `stream_react_component` setup described in [the RSC guide](../../pro/react-server-components/inside-client-components.md), which is a different entry point than the TanStack SSR helper.
+- **Repeat visits to an `RSCRoute` route**: the default RSC provider caches payload promises by `componentName` plus serialized `componentProps` while the provider stays mounted, so returning to the same route can reuse the already-fetched payload. The local mounted guard can still briefly show the placeholder when the route outlet remounts before the cached payload is read.
+
+## How This Compares
+
+**vs. Next.js App Router.** Next gives file-system routing with nested layouts that persist across navigations, streaming, and route prefetching — but it owns the entire app. The starter gives you the same persistent-layout, instant-navigation experience for a section of a Rails app, with React Server Components streamed from your Rails app's `rsc_payload` endpoint (Rails prepares the data — no separate backend to run). There is no file-system routing convention here — routes are explicit code.
+
+**vs. Inertia (inertia-rails).** Inertia's `<Link>` gives SPA navigation with server-driven props, plus prefetch and partial reloads, but it replaces the Rails view layer for every Inertia-rendered route. The starter is scoped: the React router owns one URL subtree, and `RSCRoute` streams server components (not just JSON props) per route. Inertia currently ships link prefetching out of the box; this starter does not (see below).
+
+**Honest gaps (current state).**
+
+- **No prefetch or bounded RSC payload-cache eviction yet.** The default provider already keeps payload promises in memory while mounted, keyed by `componentName` plus serialized `componentProps`. What is still missing is hover/viewport prefetch and a bounded eviction or invalidation policy for production-sized caches, tracked in [issue #3564](https://github.com/shakacode/react_on_rails/issues/3564).
+- **Repeat-visit flash on `RSCRoute` routes.** When the user navigates away from an `RSCRoute`-backed route and returns, TanStack Router unmounts the outlet component, so the placeholder briefly reappears before the cached or fetched payload is read. You can avoid that by lifting mount state above the outlet, but the starter keeps the simpler local-state pattern.
+- **Turbo coexistence is scoped-off, not integrated.** Deeper Turbo integration is tracked in [issue #3485](https://github.com/shakacode/react_on_rails/issues/3485).
+
+## Working Example in This Repo
+
+The Pro dummy app contains the full runnable starter, exercised by a system test:
+
+- App: `react_on_rails_pro/spec/dummy/client/app/ror-auto-load-components/TanStackStarterApp.jsx`
+- Server component: `react_on_rails_pro/spec/dummy/client/app/ror-auto-load-components/StarterServerData.jsx`
+- Rails route/controller/view: `react_on_rails_pro/spec/dummy/config/routes.rb` (`tanstack_starter`), `react_on_rails_pro/spec/dummy/app/controllers/tanstack_starter_controller.rb`, `react_on_rails_pro/spec/dummy/app/views/tanstack_starter/index.html.erb`
+- System test (SSR, persistent layout, no-reload navigation, RSC streaming): `react_on_rails_pro/spec/dummy/spec/system/tanstack_starter_spec.rb`
+
+The dummy keeps the running example intentionally small: it passes `props: {}`, so it does not need the `AppWrapper`/`ReportDataContext` pattern shown in Step 3. Use that Step 3 pattern when Rails passes request-specific data into the routed island.
+
+================================================================================
 PAGE: https://reactonrails.com/docs/building-features/code-splitting
 SOURCE: docs/oss/building-features/code-splitting.md
 ================================================================================
@@ -6935,6 +7187,96 @@ case you have, React on Rails handles it.
 
 ---
 
+## Tag-Based Revalidation
+
+Cache keys answer "is this entry still current?" at read time. Tags answer a different question: "delete everything that depends on this data, right now." With `cache_tags:`, you attach declarative invalidation handles to fragment-cached components and bust them all with one call — the React on Rails Pro analog of Next.js `revalidateTag`.
+
+```erb
+<%= cached_react_component("PostShow",
+      cache_key: [@post, I18n.locale],
+      cache_tags: [@post, @post.author],
+      cache_options: { expires_in: 12.hours }) do
+      { post: @post.to_props }
+    end %>
+```
+
+```ruby
+# Anywhere in Ruby — controller, job, service object, console:
+ReactOnRailsPro.revalidate_tag(post) # => number of cache entries deleted
+ReactOnRailsPro.revalidate_tags(post, post.author)
+```
+
+`cache_tags:` is accepted by all four cached helpers — `cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, and `cached_async_react_component` — and is purely additive: `cache_key:` semantics are unchanged, and `cache_key:` is still required.
+
+### Tag forms and normalization
+
+A tag can be:
+
+- a **String** — passed through unchanged (`"post:42"`)
+- a **Symbol or Numeric** — stringified via `.to_s` (`:featured` -> `"featured"`, `42` -> `"42"`)
+- an object responding to **`#cache_key`** (any ActiveRecord model) — ActiveRecord-style records normalize to the stable identity `posts/42` (equal to the version-less `record.cache_key`, and stable even when `cache_versioning` is disabled), so the tag stays valid as the record changes; other objects pass their `#cache_key` through. Objects with both `model_name` and `id` always resolve to `collection/id`; pass an explicit String tag if you want a different key.
+- a **Proc** (arity 0) returning any accepted form
+- an **Array** of any mix of the above
+
+Tags that normalize to blank raise `ReactOnRailsPro::Error`. Tag coarsely (`post:42`, `tenant:7`, `posts:index`) — never per-user or per-request; see the index bounds below.
+
+### Revalidating from the model layer
+
+Include the `Revalidates` concern so the model that owns the data also owns cache invalidation. It runs in `after_commit`, so it never fires for a rolled-back transaction and fires only after the new data is visible to the re-rendering request:
+
+```ruby
+class Post < ApplicationRecord
+  include ReactOnRailsPro::Cache::Revalidates
+
+  revalidates_react_cache # default tag: record.cache_key, e.g. "posts/42"
+  # or custom / additional tags:
+  # revalidates_react_cache { |post| ["post:#{post.id}", "author:#{post.author_id}"] }
+end
+```
+
+This covers create/update/destroy and `touch` — so `belongs_to ..., touch: true` composes for free: touching the parent fires the parent's revalidation. The standard Rails callback caveat applies: `update_column`, `update_all`, `delete_all`, and other callback-skipping writes do not trigger revalidation; call `ReactOnRailsPro.revalidate_tags(record)` yourself after such writes.
+
+One more caveat for custom tag blocks: the block runs in `after_commit` and sees only the record's **new** values. If a custom tag derives from a mutable attribute (e.g. `"author:#{post.author_id}"` and a post moves to a different author), the old grouping's entries are not revalidated — they expire via `expires_in`. Prefer tags derived from the record's own identity, or revalidate the old grouping explicitly (`previous_changes` in `after_commit` has the prior value).
+
+### How it works, and the contract
+
+On every tagged cache write, the final cache key is appended to a per-tag index entry in `Rails.cache` (keyed by a SHA-256 digest under `rorp:tag:v1:` so long tag names and whitespace do not violate cache-store key limits). `revalidate_tag` reads the index, deletes the recorded entries with `delete_multi`, then deletes the index entry. A missing index (never-written tag, evicted entry, `:null_store`) means "nothing to revalidate" — never an error.
+
+**Tag revalidation is best-effort; correctness is bounded by `expires_in`.** `ActiveSupport::Cache` has no atomic set-append, so the index append is a read-modify-write: two processes caching different entries under the same tag at the same moment can race, and one entry can be lost _from the index_ (the cached data itself is never lost). A lost index entry simply survives `revalidate_tag` and expires via its own `expires_in`. The same applies when the index entry itself is LRU-evicted. Therefore:
+
+- **Always set `expires_in` (or `expires_at`) on tagged entries.** It is the upper bound on how long a missed invalidation can serve stale HTML. In development, React on Rails Pro logs a warning when `cache_tags:` is used without an expiry.
+- **Use a shared cache store in production** — Redis or Memcached. With `:memory_store` the index is per-process, so `revalidate_tag` in one process cannot see entries written by another; with `:null_store` tags are inert.
+- **Keep cache deletion failures bounded by expiry.** `revalidate_tag` clears the tag index before deleting the indexed entries to reduce re-registration races. If the cache store raises during deletion, any surviving entries are orphaned from that tag and only expire via their own `expires_in`.
+- **Custom cache stores must honor `namespace: nil` in `delete_multi` and `delete`.** The tag index records the fully namespaced logical keys that Rails wrote, then suppresses the store default namespace at delete time. Stores that ignore `options[:namespace]` can silently miss tag-revalidation deletes.
+
+Two config knobs bound the index (defaults shown):
+
+```ruby
+ReactOnRailsPro.configure do |config|
+  config.cache_tag_index_expires_in = 7.days # index TTL ceiling for entries without expires_in
+  config.cache_tag_index_max_keys = 5_000    # keys recorded per tag; oldest dropped beyond this
+end
+```
+
+When a tagged entry has `expires_in`, the index entry's TTL automatically covers it (plus slack). When a tag exceeds the per-tag key cap, the oldest keys are dropped with a logged warning — those entries fall back to plain TTL expiration.
+
+Note that tags solve **data**-driven invalidation only. Deploy invalidation is already handled by the server-bundle digest in the cache key (see [Cache Warming](#cache-warming)) — a deploy cold-starts prerendered fragment caches regardless of tags.
+
+### Next.js mapping
+
+| Next.js 16 (Cache Components)                       | React on Rails Pro                                                                      |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `'use cache'` on a function/component               | `cached_react_component` / `cached_react_component_hash` / streaming and async variants |
+| `cacheTag('post-42')` inside the cached scope       | `cache_tags: ["post:42"]` helper option                                                 |
+| `revalidateTag('post-42')` in a Server Action       | `ReactOnRailsPro.revalidate_tag("post:42")` — anywhere in Ruby, incl. `after_commit`    |
+| Manually wiring `revalidateTag` into every mutation | `include ReactOnRailsPro::Cache::Revalidates` — invalidation rides the AR transaction   |
+| `cacheLife` profiles                                | `cache_options: { expires_in: ... }`                                                    |
+| `revalidateTag(tag, 'max')` / SWR profiles          | Not yet supported (stale-while-revalidate is a possible future addition)                |
+
+Like Next.js's default `revalidateTag`, revalidation deletes: the next request re-renders and re-registers. There is no background refresh.
+
+---
+
 ## Cache Warming
 
 Fragment cache keys include the server bundle digest, which means every deploy creates new cache keys. This is correct — rendered output must match the current bundle — but it means every deploy starts with a cold cache. Under live traffic, this creates a synchronized storm of cache misses: every user request triggers full SSR, database queries for props assembly, and JS evaluation simultaneously.
@@ -7268,6 +7610,285 @@ class LocalBundleCacheAdapter
   end
 end
 ```
+
+================================================================================
+PAGE: https://reactonrails.com/docs/building-features/forms
+SOURCE: docs/oss/building-features/forms.md
+================================================================================
+
+# Forms and Mutations with `useRailsForm`
+
+Wiring a React form to a Rails controller by hand means reading the CSRF token,
+building a `fetch` call, serializing the body, mapping Rails model errors back
+onto fields, and tracking a `processing` flag. `useRailsForm` makes that
+turnkey while keeping Rails as the mutation layer: your form posts JSON to a
+**real Rails controller action** — the same strong parameters, ActiveModel
+validations, and authorization a server-rendered form would use. No API layer,
+no client-side validation duplication, no new protocol.
+
+There are two pieces, both opt-in:
+
+1. **`useRailsForm`** (npm package) — a React hook with `data`/`setData`,
+   `errors`, `processing`, submit verbs, and automatic CSRF attachment.
+2. **`ReactOnRails::Controller::FormResponders`** (gem) — a controller concern
+   whose `render_model_errors(record)` renders ActiveModel errors in the JSON
+   shape the hook expects.
+
+The contract between them is one blessed error shape:
+
+```json
+// HTTP 422
+{ "errors": { "name": ["can't be blank"], "email": ["is invalid"] } }
+```
+
+The hook works against **any** endpoint returning that shape; the concern is a
+convenience, not a requirement.
+
+Compatibility: `react-on-rails/useRailsForm` requires React 16.8 or newer
+because it is a hook. Apps still on React 16.0-16.7 can continue using the
+package's other React 16 APIs, but this subpath throws a clear error until React
+is upgraded to a hooks-capable version.
+
+## Quick start
+
+### Client
+
+```tsx
+import React from 'react';
+import { useRailsForm } from 'react-on-rails/useRailsForm';
+
+export default function ContactForm() {
+  const form = useRailsForm({ name: '', email: '', message: '' });
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void form
+      .post('/contact_messages', {
+        onSuccess: () => form.reset(),
+      })
+      .catch(() => {
+        form.setError('base', 'Something went wrong. Please try again.');
+      });
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} />
+      {form.errors.name?.[0] && <p className="error">{form.errors.name[0]}</p>}
+
+      <input value={form.data.email} onChange={(e) => form.setData('email', e.target.value)} />
+      {form.errors.email?.[0] && <p className="error">{form.errors.email[0]}</p>}
+
+      <textarea value={form.data.message} onChange={(e) => form.setData('message', e.target.value)} />
+      {form.errors.message?.[0] && <p className="error">{form.errors.message[0]}</p>}
+
+      <button type="submit" disabled={form.processing}>
+        {form.processing ? 'Sending…' : 'Send'}
+      </button>
+    </form>
+  );
+}
+```
+
+### Server
+
+```ruby
+class ContactMessagesController < ApplicationController
+  include ReactOnRails::Controller::FormResponders
+
+  def create
+    contact_message = ContactMessage.new(contact_message_params)
+    if contact_message.save
+      render json: { message: "Thanks!" }, status: :created
+    else
+      render_model_errors(contact_message) # 422 + { errors: { field: [messages] } }
+    end
+  end
+
+  private
+
+  def contact_message_params
+    # useRailsForm posts a flat JSON body; Rails JSON params wrapping (on by
+    # default for new apps) may also nest it under :contact_message — accept both.
+    if params.key?(:contact_message)
+      params.require(:contact_message).permit(:name, :email, :message)
+    else
+      params.permit(:name, :email, :message)
+    end
+  end
+end
+```
+
+That's the whole round trip: submitting invalid data renders per-field errors
+under each input; fixing them and resubmitting succeeds. Validations stay in
+the model — the client renders whatever the server says.
+
+A runnable example lives in the dummy app:
+`react_on_rails/spec/dummy/client/app/startup/RailsFormExample.client.tsx`
+(rendered at `/rails_form`) posting to
+`react_on_rails/spec/dummy/app/controllers/contact_messages_controller.rb`.
+
+## What the hook sends
+
+Every submit issues a `fetch` with:
+
+- the HTTP method you chose (`post`, `put`, `patch`, `delete`, or
+  `submit(method, url)`),
+- `Content-Type: application/json` and `Accept: application/json`,
+- `X-CSRF-Token` read from the standard Rails `<meta name="csrf-token">` tag
+  (via the same `authenticityToken`/`authenticityHeaders` utilities exposed on
+  the `ReactOnRails` object) plus `X-Requested-With: XMLHttpRequest`,
+- `credentials: 'same-origin'` so the Rails session cookie is included,
+- `JSON.stringify(data)` as the body — except for `delete`, which sends **no
+  body** (DELETE bodies are legal per RFC 9110 but are stripped or rejected by
+  many proxies and CDNs in practice; put the resource identifier in the URL).
+
+The CSRF token is read from the meta tag at submit time, so a token rendered
+with the page is picked up without any configuration. Your layout must render
+`<%= csrf_meta_tags %>` (the Rails default) — without the meta tag the hook
+throws before calling `fetch`, so the form cannot accidentally submit as an
+anonymous or reset session. If your app rotates tokens during long-lived
+sessions, refresh the
+meta tag (e.g., re-render it after sign-in) — the next submit reads the
+current value.
+
+Field keys are passed through untouched: if your Rails model says
+`errors: { first_name: [...] }`, the hook gives you
+`form.errors.first_name`. Use snake_case keys in `data` to match your strong
+parameters (a `transform` option for key mapping is planned — see
+[Scope and roadmap](#scope-and-roadmap)).
+
+## Hook API
+
+```ts
+const form = useRailsForm(initialData);
+```
+
+| Member                                 | Description                                                                                                                                                                                                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data`                                 | Current form data (typed from `initialData`).                                                                                                                                                                                                             |
+| `setData(key, value)`                  | Set one field. Also accepts a partial object (`setData({ a, b })`) or an updater function.                                                                                                                                                                |
+| `errors`                               | `{ field: ["message", ...] }` from the last 422 response.                                                                                                                                                                                                 |
+| `hasErrors`                            | `true` when `errors` is non-empty.                                                                                                                                                                                                                        |
+| `processing`                           | `true` while a submission is in flight.                                                                                                                                                                                                                   |
+| `wasSuccessful`                        | `true` once the most recent submission succeeded.                                                                                                                                                                                                         |
+| `post/put/patch/delete(url, options?)` | Submit `data` with that verb. Returns a promise of the submit result. `delete` sends no request body — put the resource id in the URL.                                                                                                                    |
+| `submit(method, url, options?)`        | Submit with an explicit method.                                                                                                                                                                                                                           |
+| `reset(...fields)`                     | Restore all (or the given) fields to their initial values; clears matching errors and `wasSuccessful`. Initial values are the `initialData` from the first render — later prop changes are not tracked (Inertia `useForm` semantics); remount to re-seed. |
+| `clearErrors(...fields)`               | Clear all (or the given) field errors.                                                                                                                                                                                                                    |
+| `setError(field, messages)`            | Set errors for one field manually.                                                                                                                                                                                                                        |
+| `RailsFormRequestError`                | Exported error class (import separately; it is not a `form` member) for non-2xx responses other than a mappable 422; carries the unread `Response` plus `responseBody` (parsed JSON) for an unmappable 422.                                               |
+
+Per-submit `options`: `headers` (merged in; CSRF headers always win),
+`onSuccess(result)`, and `onError(errors)`.
+
+Calling `reset()` inside `onSuccess` starts a fresh editing cycle immediately, so
+`wasSuccessful` is also reset to `false`. Keep separate success-message state if
+the UI needs to keep showing a success banner after clearing the fields.
+
+Response handling:
+
+- **2xx** — `wasSuccessful` flips on, `errors` clears, and `onSuccess` receives
+  `{ responseData, redirectTo, response }`.
+- **422 with the documented `errors` shape** — `errors` is populated per field
+  (single strings are normalized to arrays) and `onError` is called. An empty
+  `errors` object is still handled as a validation response with
+  `{ ok: false, errors: {}, response }`. The promise resolves with
+  `{ ok: false, errors, response }`.
+- **Anything else** (including a 422 whose body doesn't match) — the promise
+  rejects with `RailsFormRequestError`; network failures reject with the
+  original fetch error.
+- **Superseded submissions** — when an older in-flight submit settles after a
+  newer submit has started, it resolves with `{ ok: false, stale: true }` plus
+  the stale `response` or `error`. Stale submits do not update form state, call
+  submit callbacks, or reject into an older `.catch()` handler after the newer
+  submit has won.
+
+## Redirects and `onSuccess`
+
+The hook never navigates on its own. After a successful submit it surfaces a
+redirect target as `result.redirectTo` when the JSON body contains a
+`redirect_to` (or `redirectTo`) string hint pointing to a same-origin URL. Native
+fetch redirects are disabled for CSRF-bearing submissions (`redirect: 'error'`),
+so a Rails `redirect_to` response rejects instead of being followed in v1.
+Relative hints resolve like browser URLs against the current page URL: for
+example, `"?saved=1"` preserves the current path and changes only the query.
+Return an explicit root-relative path such as `"/posts/1?saved=1"` when the
+redirect should ignore the current page path.
+
+Pass it to whatever owns navigation in your app:
+
+```tsx
+void form.post('/posts', {
+  onSuccess: ({ redirectTo }) => {
+    if (redirectTo) window.location.assign(redirectTo);
+  },
+});
+```
+
+This design is intentionally forward-compatible with the client-routing
+integration tracked in
+[Issue 3873](https://github.com/shakacode/react_on_rails/issues/3873): when a
+client router is present, hand `redirectTo` to the router instead of
+`window.location`.
+
+## The controller concern
+
+`ReactOnRails::Controller::FormResponders` ships with the `react_on_rails` gem
+and adds one helper:
+
+```ruby
+render_model_errors(record, status: 422)
+```
+
+It renders `record.errors.messages` (any ActiveModel/ActiveRecord object) as
+`{ errors: { field: [messages] } }`. It is deliberately tiny: if your API
+already returns errors another way (JSON:API, custom serializers), keep it —
+just map your shape to the documented one at the endpoint the form posts to.
+Pass numeric HTTP status codes such as `400` or `422`; Rails status symbols are
+intentionally rejected so Rack/Rails status-symbol renames cannot change the
+wire response.
+Because those ActiveModel messages are sent to the browser verbatim, review
+custom validations for internal IDs, admin-only details, or security-sensitive
+wording before using the concern on a model.
+
+## Comparison with Inertia's `useForm`
+
+`useRailsForm` deliberately mirrors the parts of
+[Inertia.js `useForm`](https://inertia-rails.dev/guide/forms) teams use for
+CRUD, without coupling your controllers to a response protocol — the endpoint
+stays a normal Rails JSON action you can curl or reuse for mobile clients.
+
+| Inertia `useForm`                  | `useRailsForm`                           |
+| ---------------------------------- | ---------------------------------------- |
+| `data`, `setData`                  | `data`, `setData` (same overloads)       |
+| `errors` (`string` per field)      | `errors` (`string[]` per field)          |
+| `processing`                       | `processing`                             |
+| `wasSuccessful`                    | `wasSuccessful`                          |
+| `post/put/patch/delete(url)`       | `post/put/patch/delete(url)`             |
+| `reset`, `clearErrors`, `setError` | `reset`, `clearErrors`, `setError`       |
+| `transform(fn)`                    | Planned (v2)                             |
+| `recentlySuccessful`               | Planned (v2)                             |
+| `progress` (file uploads)          | Planned (v2 — requires an XHR transport) |
+| Automatic visit/redirect           | Not automatic — `redirectTo` is surfaced |
+
+Versus React 19 / Next.js `useActionState` + `useFormStatus`: those pair with
+Server Actions (`'use server'`), which introduce an RPC endpoint per action.
+React on Rails intentionally keeps mutations in Rails controllers —
+`useRailsForm` is the ergonomic path for that, and the separate
+[Server Functions RFC (Issue 3867)](https://github.com/shakacode/react_on_rails/issues/3867)
+explores the complementary RSC-side story. The two are designed to compose: if
+Server Functions land, this hook remains the plain-controller bridge.
+
+## Scope and roadmap
+
+v1 is fetch-only and covers submit verbs, `data`/`setData`, `errors`,
+`processing`, `wasSuccessful`, CSRF auto-attach, and 422 error mapping
+([Issue 3872](https://github.com/shakacode/react_on_rails/issues/3872)).
+Deferred to a follow-up release: `transform`, `recentlySuccessful`, `onFinish`,
+and file uploads with `progress` (which needs an `XMLHttpRequest`/duplex-stream
+transport). Navigation, prefetching, and router integration belong to
+[Issue 3873](https://github.com/shakacode/react_on_rails/issues/3873).
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/building-features/react-and-redux
@@ -12407,6 +13028,7 @@ available default ENV values if you wire them into your own launch script.
    Because these functions are valid client-side, they are ignored on server-side rendering without errors or warnings.
    Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
+1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
 
 Deprecated options:
 
@@ -12661,6 +13283,15 @@ example above or switch the file to `.mjs` or `"type": "module"`.
 
 ### Adding a Health Check Endpoint
 
+> **Built-in alternative:** The renderer now ships built-in `GET /health` (liveness) and `GET /ready` (readiness)
+> endpoints behind the `enableHealthEndpoints` config option — no custom Fastify code required. See
+> [Health and Readiness Endpoints](./health-checks.md). Use the recipe below only when you need custom probe logic
+> (extra warm-up gates, dependency checks, or custom payloads).
+> If your `configureFastify` callback already registers `/health` or `/ready`, remove or rename the custom route
+> before enabling `enableHealthEndpoints`; Fastify raises a duplicate-route startup error for reused paths.
+> If the duplicate route is registered by an async Fastify plugin during `app.register()` boot, Fastify reports its raw
+> `FST_ERR_DUPLICATED_ROUTE` error instead of the `enableHealthEndpoints` migration hint.
+
 A common need is a `/health` endpoint for container health checks:
 
 ```js
@@ -12776,9 +13407,10 @@ Keep the three probe types distinct:
 
 - **Startup** answers whether the renderer has finished booting. Separate it from readiness and liveness so slow startup
   does not cause premature restarts or block traffic.
-- **Readiness** answers whether the renderer should receive new render requests. Use an application-level endpoint such
-  as the `/health` route in [Adding a Health Check Endpoint](#adding-a-health-check-endpoint), or the built-in `/info`
-  endpoint for a shallow process check.
+- **Readiness** answers whether the renderer should receive new render requests. Use the built-in `/ready` endpoint
+  only when an out-of-band warm-up render can compile a bundle before probe-gated traffic begins. Without that warm-up
+  path, prefer a shallow TCP readiness check or the built-in `/info` endpoint, and use `/ready` for monitoring or
+  post-deploy verification. See [Health and Readiness Endpoints](./health-checks.md) for the full cold-start semantics.
 - **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer. Prefer
   `tcpSocket` as the default so transient CPU or GC pauses do not restart an otherwise recoverable renderer; use an
   h2c-aware `exec` check only when you intentionally need stricter hung-process detection.
@@ -13612,6 +14244,260 @@ When deploying on [ControlPlane](https://controlplane.com):
 - [JS Memory Leaks](../../../pro/js-memory-leaks.md)
 - [Profiling Server-Side Rendering Code](../../../pro/profiling-server-side-rendering-code.md)
 - [Pro Troubleshooting](../../../pro/troubleshooting.md)
+
+================================================================================
+PAGE: https://reactonrails.com/docs/building-features/node-renderer/health-checks
+SOURCE: docs/oss/building-features/node-renderer/health-checks.md
+================================================================================
+
+# Node Renderer Health and Readiness Endpoints
+
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
+> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+
+The node renderer ships built-in, opt-in probe endpoints so container orchestrators (Kubernetes, ECS, Docker Compose,
+Control Plane) can check renderer liveness and readiness without custom Fastify code:
+
+- **`GET /health`** — liveness. Returns `200` with `{ "status": "ok" }` whenever the process can answer, i.e. the
+  event loop is responsive. It intentionally checks **no** dependencies (no bundle, Rails, or license state), so a
+  transient dependency issue never restarts the container.
+- **`GET /ready`** — readiness. Returns `200` with `{ "status": "ready" }` only when the renderer can actually serve
+  render requests: the worker answering the probe is online **and** at least one server bundle has been compiled into
+  its VM pool. Until then it returns `503` with `{ "status": "waiting_for_bundle" }`, because a renderer with zero
+  bundles responds `410` to render requests until the Rails client uploads one.
+
+Both endpoints return status-only JSON bodies — no runtime versions, file paths, or license details — so leaving them
+reachable exposes nothing sensitive. Like [`/info`](./js-configuration.md#built-in-endpoints), they are plain `GET`
+routes outside the authenticated render and asset endpoints and do not require the renderer `password` (orchestrator
+probes cannot carry it). Keep the renderer on `localhost` or private networking as usual; see
+[Network Security](./basics.md#network-security).
+
+## Enabling the Endpoints
+
+The endpoints are **off by default**. Enable them with the `enableHealthEndpoints` config option or the
+`RENDERER_ENABLE_HEALTH_ENDPOINTS` environment variable (`true`, `TRUE`, `yes`, `YES`, or `1`):
+
+The `1` alias is scoped to `RENDERER_ENABLE_HEALTH_ENDPOINTS`; other node-renderer boolean environment variables keep
+their existing parsing behavior.
+
+```js
+// renderer/node-renderer.js
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+
+reactOnRailsProNodeRenderer({
+  enableHealthEndpoints: true,
+  // ... your other options
+});
+```
+
+Or, without changing the launch file:
+
+```bash
+RENDERER_ENABLE_HEALTH_ENDPOINTS=true node renderer/node-renderer.js
+```
+
+Verify locally (note `--http2-prior-knowledge` — see the next section for why):
+
+```bash
+curl -s --http2-prior-knowledge http://localhost:3800/health
+# => {"status":"ok"}
+curl -s --http2-prior-knowledge http://localhost:3800/ready
+# => 503 {"status":"waiting_for_bundle"} until the first bundle upload, then 200 {"status":"ready"}
+```
+
+## h2c: Why `httpGet` Probes Do NOT Work
+
+The renderer listens with **cleartext HTTP/2 (h2c)**. Kubernetes `httpGet` probes, ALB target-group health checks,
+Control Plane HTTP probes, and other HTTP/1.1-only checkers cannot speak h2c and **cannot reach these endpoints**
+directly. Do not configure an `httpGet` probe against the renderer port — it will always fail.
+
+Use these probe shapes instead:
+
+- **`exec` probe** with an h2c-aware client packaged in your image, e.g.
+  `curl -sf --http2-prior-knowledge http://localhost:3800/ready`. This is the only shape that checks application-level
+  readiness. Verify your image's curl has HTTP/2 support: `curl --version | grep -i http2`.
+- **`tcpSocket` probe** as a shallow fallback: it proves the port is bound, not that the renderer can serve.
+
+`exec` probes run inside the container, so the default `localhost` host binding works. `tcpSocket` probes connect to
+the pod/workload IP, so they require the renderer `host` set to `0.0.0.0`. See
+[Configuring Startup, Readiness, and Liveness Probes](./js-configuration.md#configuring-startup-readiness-and-liveness-probes)
+for the full probe-style discussion and timing guidance.
+
+## Kubernetes Probes
+
+A working probe set for a renderer container with `enableHealthEndpoints: true` and curl (with HTTP/2 support) in the
+image:
+
+```yaml
+containers:
+  - name: node-renderer
+    image: my-registry/my-app:latest
+    command: ['node', 'renderer/node-renderer.js']
+    ports:
+      - containerPort: 3800
+    env:
+      - name: RENDERER_HOST
+        value: '0.0.0.0' # required by the tcpSocket probes below
+      - name: RENDERER_PORT
+        value: '3800'
+      - name: RENDERER_ENABLE_HEALTH_ENDPOINTS
+        value: 'true'
+    # Startup: shield liveness while the renderer boots. TCP is enough here
+    # because readiness below gates traffic.
+    startupProbe:
+      tcpSocket:
+        port: 3800
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 12 # tune to your cold-start time; 10 + (5 * 12) = 70 s total
+      timeoutSeconds: 1
+    # Readiness: shallow TCP check. Do NOT gate readiness on /ready unless you
+    # also pre-warm the renderer — see "Gating traffic on /ready" below.
+    # (httpGet cannot be used in any case: the renderer listener is h2c-only.)
+    readinessProbe:
+      tcpSocket:
+        port: 3800
+      periodSeconds: 5
+      failureThreshold: 3
+      timeoutSeconds: 1
+    # Liveness: shallow by default so CPU/GC pauses don't restart the pod.
+    livenessProbe:
+      tcpSocket:
+        port: 3800
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 1
+```
+
+### Gating traffic on `/ready`
+
+`/ready` reports `503` until the answering worker has compiled at least one bundle, and each worker compiles its
+first bundle when it serves its first render request. If the readiness probe is the only thing standing between a
+fresh pod and its first render — a standalone renderer behind a Service, or a sidecar (pod readiness requires
+**all** containers to be ready, so an unready renderer container blocks traffic to the Rails container too) — then
+gating readiness on `/ready` deadlocks the rollout: no traffic → no first render → never ready.
+
+Only use `/ready` as the readiness gate when something other than probe-gated traffic delivers the first render,
+for example a deployment pipeline step or Rails initializer that POSTs a warm-up render to each new replica
+directly (bypassing the Service), or a container `postStart` hook that does the same. That warm-up must reach
+every renderer worker that can answer probes; with `workersCount > 1`, one render per replica is not enough
+unless you intentionally run a single worker or fan out warm-up renders to each worker. With a warm-up path in
+place:
+
+```yaml
+readinessProbe:
+  exec:
+    command:
+      - curl
+      - -sf
+      - --max-time
+      - '3'
+      - --http2-prior-knowledge
+      - http://localhost:3800/ready
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 5
+```
+
+Without a warm-up path, keep the shallow `tcpSocket` readiness probe and use `/ready` for monitoring, dashboards,
+and post-deploy verification instead.
+
+For stricter hung-process detection, replace the `tcpSocket` liveness probe with an `exec` probe against `/health`
+(same curl command as the `/ready` example above, with the path changed). A fully blocked event loop still accepts TCP connections, so
+only the `exec` form catches it. Use the stricter form deliberately — it restarts the container on slow event loops,
+not just dead ones.
+
+> **Cold-start note:** Each worker compiles its first bundle when it serves its first render request, so `/ready`
+> stays `503` until then — pre-seeding the bundle cache on disk does not by itself flip `/ready`. This is harmless
+> wherever the check does not gate the traffic that would deliver that first render or replace the container
+> (monitoring, dashboards, post-deploy checks). Wherever it does gate that traffic or container lifetime — a
+> Kubernetes Service routing only to ready replicas, a sidecar whose unready state blocks pod readiness, an ECS
+> container health check, an ALB target group — see "Gating traffic on `/ready`" above before using it as the gate.
+> A `503` from `/ready` during the cold-start window is correct behavior, not a failure.
+
+## ECS Health Check
+
+ECS container health checks run **inside** the container (like a Kubernetes `exec` probe), so they work against the
+h2c listener with curl and the default `localhost` binding. Use `/health` by default so a normal cold start cannot
+fail the task before the first render compiles a bundle:
+
+```json
+{
+  "containerDefinitions": [
+    {
+      "name": "node-renderer",
+      "command": ["node", "renderer/node-renderer.js"],
+      "portMappings": [{ "containerPort": 3800 }],
+      "environment": [{ "name": "RENDERER_ENABLE_HEALTH_ENDPOINTS", "value": "true" }],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/health || exit 1"
+        ],
+        "interval": 10,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      }
+    }
+  ]
+}
+```
+
+Tune `startPeriod` to match the observed image pull, boot, and first-render latency for your app. Larger bundles or
+slower registries may need 60 seconds or more.
+
+If you intentionally warm the renderer before `startPeriod` expires and want ECS to replace a task that cannot serve
+compiled bundles, change the path to `/ready`.
+
+> **ALB note:** ALB target-group health checks are HTTP/1.1 and cannot probe the renderer's h2c port. If the renderer
+> sits behind a load balancer, prefer the ECS container health check above for renderer health, or use an NLB with the
+> TCP health-check protocol for a shallow port check.
+
+## Docker Compose
+
+```yaml
+services:
+  renderer:
+    build: .
+    command: node renderer/node-renderer.js
+    environment:
+      RENDERER_ENABLE_HEALTH_ENDPOINTS: 'true'
+    healthcheck:
+      test:
+        ['CMD', 'curl', '-sf', '--max-time', '3', '--http2-prior-knowledge', 'http://localhost:3800/health']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+```
+
+## Semantics and Caveats
+
+- **Per-worker checks.** With `workersCount > 1`, the Node.js cluster module distributes incoming connections across
+  worker processes, and each worker has its own VM pool. A probe therefore checks the one worker that answers it.
+  Workers load bundles independently (each compiles the bundle on its first render request), so a freshly restarted
+  worker can briefly report `503` on `/ready` while its siblings serve traffic. This is the intended per-process
+  readiness signal for orchestrators probing one container. During a rollout or cold start, raw probe logs may show a
+  short mix of `503` and `200` responses; Kubernetes smooths that with `failureThreshold` / `successThreshold`, so a
+  single unloaded-worker `503` should not flap pod readiness.
+- **No license check.** License validation happens on the Rails side; `/ready` does not (and cannot) report license
+  state.
+- **Liveness checks nothing but the event loop.** Do not point `/health` at dependency monitoring; that is what
+  readiness and your APM are for.
+- **Custom routes still work.** If you need richer checks (warm-up gates, dependency checks, custom payloads), the
+  [`configureFastify` health-check recipe](./js-configuration.md#adding-a-health-check-endpoint) still applies and can
+  coexist with the built-in endpoints as long as your custom routes use different paths. Remove or rename any existing
+  custom `/health` or `/ready` route before enabling `enableHealthEndpoints`; Fastify raises a duplicate-route startup
+  error when built-in and custom routes share the same path. If an async Fastify plugin registers the duplicate route
+  during `app.register()` boot, you will see Fastify's raw `FST_ERR_DUPLICATED_ROUTE` error instead of the
+  `enableHealthEndpoints` migration hint.
+
+## Rails-Side Readiness
+
+To gate a Rails readiness endpoint on the renderer, keep using the TCP-check recipe in
+[Container Deployment](./container-deployment.md#same-rails-container-rails-and-renderer-co-located), or upgrade it to
+an HTTP/2 client call against `/ready` if your Ruby HTTP client supports h2c.
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/building-features/node-renderer/debugging
@@ -17266,6 +18152,15 @@ cpflow deploy-image -a myapp   # deploy the pushed image to Control Plane
 - **GVC environment variables**: Set shared environment variables at the GVC level so all workloads inherit them. See the [Control Plane Flow guide to secrets and ENV values](https://github.com/shakacode/control-plane-flow/blob/main/docs/secrets-and-env-values.md).
 - **Secrets**: Use Control Plane's built-in secrets management (`cpln://secret/...`) instead of environment variables for sensitive values.
 - **One-off tasks**: Run migrations and other one-off commands via `cpflow run -a myapp -- bundle exec rails db:migrate`.
+- **Public demo and starter staging apps**: Keep `type: standard` workloads
+  with `minScale: 1`, the autoscaling metric disabled, and `capacityAI: true`.
+  Avoid CPU Utilization autoscaling pinned to `minScale: 1` / `maxScale: 1`,
+  because that prevents Capacity AI from right-sizing the warm workload. When
+  the autoscaling metric is disabled, do not rely on `maxScale` for bursts; use
+  a compatible autoscaling metric for that separate scaling posture. Use
+  `serverless` scale-to-zero only as an explicit first-deploy choice or planned
+  delete/recreate migration. See the
+  [Control Plane Cost Posture](../getting-started/examples-and-references.md#control-plane-cost-posture).
 - **Multiple locations**: Control Plane supports multi-region deployment. Add locations to your GVC to deploy globally.
 
 ## Node Renderer in containers
@@ -27049,319 +27944,6 @@ Choose **React on Rails** if most of these are true:
 - [Installation into an Existing Rails App](./installation-into-an-existing-rails-app.md)
 
 ================================================================================
-PAGE: https://reactonrails.com/docs/misc/articles
-SOURCE: docs/oss/misc/articles.md
-================================================================================
-
-# Articles, Videos, and Podcasts
-
-## Articles
-
-- [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4) for an overview of the integration of React on Rails with Webpacker.
-- [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92)
-- [React on Rails, 2000+ 🌟 Stars](https://medium.com/shakacode/react-on-rails-2000-stars-32ff5cfacfbf#.6gmfb2gpy)
-- [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
-- [Simple Tutorial](../getting-started/tutorial.md).
-
-## Videos
-
-- [Video of running the v9 installer with Webpacker v3](https://youtu.be/M0WUM_XPaII). History, motivations, philosophy, and overview.
-
-1. [GORUCO 2017: Front-End Sadness to Happiness: The React on Rails Story by Justin Gordon](https://www.youtube.com/watch?v=SGkTvKRPYrk)
-2. [egghead.io: Creating a component with React on Rails](https://egghead.io/lessons/react-creating-a-component-with-react-on-rails)
-3. [egghead.io: Creating a redux component with React on Rails](https://egghead.io/lessons/react-add-redux-state-management-to-a-react-on-rails-project)
-4. [React On Rails Tutorial Series](https://www.youtube.com/playlist?list=PL5VAKH-U1M6dj84BApfUtvBjvF-0-JfEU)
-   1. [History and Motivation](https://youtu.be/F4oymbUHvoY)
-   2. [Basic Tutorial Walkthrough](https://youtu.be/_bjScw60FBk)
-   3. [Code Walkthrough](https://youtu.be/McQ9UM-_ocQ)
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/credits
-SOURCE: docs/oss/misc/credits.md
-================================================================================
-
-# React on Rails Credits and Authors
-
-## Authors
-
-[The Shaka Code team!](http://www.shakacode.com/about/)
-
-The origins of the project began with the need to do a rich JavaScript interface for a ShakaCode's client. The choice to use Webpack and Rails is described in [Fast Rich Client Rails Development With Webpack and the ES6 Transpiler](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/).
-
-The gem project started with [Justin Gordon](https://github.com/justin808/) pairing with [Samnang Chhun](https://github.com/samnang) to figure out how to do server rendering with Webpack plus Rails. [Alex Fedoseev](https://github.com/alex35mil) then joined in. [Rob Wise](https://github.com/robwise), [Aaron Van Bokhoven](https://github.com/aaronvb), and Andy Wang did the bulk of the generators. Many others have [contributed](https://github.com/shakacode/react_on_rails/graphs/contributors).
-
-The gem was initially inspired by the [react-rails gem](https://github.com/reactjs/react-rails).
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/doctrine
-SOURCE: docs/oss/misc/doctrine.md
-================================================================================
-
-# The React on Rails Doctrine
-
-By Justin Gordon, January 26, 2016
-
-This document is an extension and complement to [The Rails Doctrine](http://rubyonrails.org/doctrine/). If you haven't read that document, I suggest you do so first.
-
-To paraphrase the [React on Rails Introduction](../introduction.md), the project objective is to provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries.
-
-When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and with modern JavaScript? A good example is view helper integration of React components on a Rails view. If the answer is yes, then the functionality belongs right here.
-
-In other cases, we release separate npm packages or Ruby gems. For example, we needed an easy way to integrate [Twitter Bootstrap](http://getbootstrap.com/) with Webpack, and we released the [npm bootstrap-loader](https://github.com/shakacode/bootstrap-loader/).
-
-Besides the project objective, let's stick with the "Rails Doctrine" and keep the following in mind.
-
-## Optimize for Programmer Happiness
-
-The React on Rails setup provides several key components related to front-end developer happiness:
-
-1. [Hot reloading of both JavaScript and CSS](https://gaearon.github.io/react-hot-loader/), using the [webpack-dev-server](https://webpack.js.org/configuration/dev-server/) package. This works for both using an [Express server](http://expressjs.com/) to load stubs for the ajax requests, as well as using a live Rails server. **Oh yes**, your Rails server can do hot reloading!
-2. [CSS modules](https://github.com/css-modules/webpack-demo) which remove the madness of a global namespace for CSS. We organize our CSS (Sass, actually) right next to our JavaScript React component files. This means no more creating long class names to ensure that CSS picks up the right styles.
-3. [ES6 JavaScript](http://es6-features.org/#Constants) is a great language for client side coding, much more so than Ruby due to the asynchronous nature of UI programming.
-4. JavaScript libraries and tooling work better in the native node way, rather than via some aspect of Sprockets and the Rails Asset Pipeline. We find way less frustration this way, especially from being able to get the latest advances with the rest of the JavaScript community. Why complicated beautiful JavaScript tooling Rails asset pipeline complexity?
-5. We want our JavaScript from NPM. Getting JavaScript from rubygems.org is comparatively frustrating.
-6. Happiness for us is actively participating in open source, so we want to be where the action is, which is with the NPM libraries on github.com.
-7. You can get set up on React on Rails **FAST** using our application generator.
-8. By placing all client-side development inside of the `/client` directory, pure JavaScript developers can productively do development separate from Rails. Instead of Rails APIs, stub APIs on an express server can provide a simple backend, allowing for rapid iteration of UI prototypes.
-9. Just because we're not relying on the Rails asset pipeline for ES6 conversion does not mean that we're deploying Rails apps in any different way. We still use the asset pipeline to include our Webpack compiled JavaScript. This only requires a few small modifications, as explained in [our heroku deployment documentation](../deployment/heroku-deployment.md).
-
-## Convention over Configuration
-
-- React on Rails has taken the hard work out of figuring out the JavaScript tooling that works best with Rails. Not only could you spend lots of time researching different tooling, but then you'd have to figure out how to splice it all together. This is where a lot of "JavaScript fatigue" comes from. The following keep the code clean and consistent:
-- [Style Guide](./style.md)
-
-We're big believers in this quote from the Rails Doctrine:
-
-> The same goes even when you understand how all the pieces go together. When there’s an obvious next step for every change, we can scoot through the many parts of an application that is the same or very similar to all the other applications that went before it. A place for everything and everything in its place. Constraints liberate even the most able minds.
-
-## The Menu Is Omakase
-
-Here's the chef's selection from the React on Rails community:
-
-### Libraries
-
-- [Bootstrap](http://getbootstrap.com/), loaded from [bootstrap-loader](https://github.com/shakacode/bootstrap-loader/). Common UI styles.
-- [Lodash](https://lodash.com/): Swiss army knife of utilities.
-- [React](https://react.dev/): UI components.
-- [React Router](https://reactrouter.com/): Provider of deep links for client-side application.
-- [Redux](https://redux.js.org/): Flux implementation (aka "state container").
-
-### JavaScript Tooling
-
-- [Babel](https://babeljs.io/): Transpiler for ES6 into ES5 and much more.
-- [ESLint](https://eslint.org/)
-- [Webpack](https://webpack.js.org/): Generator of deployment assets and provider of hot module reloading.
-
-By having a common set of tools, we can discuss what we should or shouldn't be using. Thus, this takes out the "JavaScript Fatigue" from having too many unclear choices in the JavaScript world.
-
-By the way, we're _not_ omakase for standard Rails. That would be CoffeeScript. However, the Rails Doctrine makes it clear that non-standard menu choices are certainly welcome!
-
-## No One Paradigm
-
-React on Rails fits into the "No One Paradigm" of the Rails ecosystem from the perspective that it rocks for client-side development with Rails, even though it's a totally different language than the server code written in Ruby.
-
-## Exalt Beautiful Code
-
-ES5 was ugly. ES6 is beautiful. React is beautiful. Client side code written with React plus Redux, fully linted with the ShakaCode linters, and organized per our recommended project structure is beautiful. Don't take our word for it. Take a look at the component sample code in the [react-webpack-rails-tutorial sample code](https://github.com/shakacode/react-webpack-rails-tutorial/tree/master/client/app/bundles/comments).
-
-## Value Integrated Systems
-
-Assuming that you're building the type of app that's a good fit for Rails (document/database based with lots of business rules), the tight integration of modern JavaScript with React on top of Ruby on Rails is better than building a pure client-side app and separate microservices. Here's why:
-
-- Via React on Rails, we can seamlessly integrate React UI components with Rails.
-- Tight integration allows for trivial set up of server rendering of React on top of Rails, complete with support for fragment caching of the server rendered HTML, and integration with [Turbolinks](https://github.com/turbolinks/turbolinks).
-- Tight integration allows mixing and matching Rails pages with React-driven pages, even on the same page. Not every part of a UI requires the high fidelity achievable using React. Many existing apps may have hundreds of standard Rails forms. Support for mixing and matching React with Rails forms provides the best of both worlds.
-
-## Progress over Stability
-
-React on Rails will maintain an active pace of development, to keep up with:
-
-- Community suggestions.
-- New client side tooling, libraries, and techniques.
-- Updates to Rails.
-
-## Raise a Big Tent
-
-React on Rails is definitely a part of the big tent of Rails. Plus, React on Rails provides its own big tent. A huge benefit of the React on Rails system is simple integration with Webpack and NPM, allowing integration with almost any library available on [npm](https://www.npmjs.org/)! The integration with Webpack also allows for other Webpack supported build tools.
-
-## Thanks!
-
-Thanks for reading and being a part of the React on Rails community. Feedback on this document and _anything_ in React on Rails is welcome. Please [open an issue](https://github.com/shakacode/react_on_rails/issues/new) or a pull request. If you'd like to join our private Slack channel, please [email](mailto:contact@shakacode.com) us a request.
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/style
-SOURCE: docs/oss/misc/style.md
-================================================================================
-
-# Code Style
-
-This document describes the coding style of [ShakaCode](http://www.shakacode.com). Yes, it's opinionated, as all style guidelines should be. We shall put as little as possible into this guide and instead rely on:
-
-- Use of linters with our standard linter configuration.
-- References to existing style guidelines that support the linter configuration.
-
-## Client Side JavaScript and React
-
-- See the [Shakacode JavaScript Style Guide](https://github.com/shakacode/style-guide-javascript)
-
-## Style Guides to Follow
-
-Follow these style guidelines per the linter configuration. Basically, lint your code and if you have questions about the suggested fixes, look here:
-
-### Ruby Coding Standards
-
-- [ShakaCode Ruby Coding Standards](https://github.com/shakacode/style-guide-ruby)
-- [Ruby Documentation](http://guides.rubyonrails.org/api_documentation_guidelines.html)
-
-### JavaScript Coding Standards
-
-- [ShakaCode Javascript](https://github.com/shakacode/style-guide-javascript)
-- Use the [eslint-config-shakacode](https://github.com/shakacode/style-guide-javascript/tree/master/packages/eslint-config-shakacode) NPM package with ESLint.
-- [JSDoc](https://jsdoc.app/)
-
-### Git coding Standards
-
-- [Git Coding Standards](https://git-scm.com/docs/CodingGuidelines)
-
-### Sass Coding Standards
-
-- [Sass Guidelines](https://sass-guidelin.es/) by Kitty Giraudel
-- [Github Front End Guidelines](http://primercss.io/guidelines/)
-
-## Git Usage
-
-- Follow a [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow) model where you branch off master for features.
-- Before merging a branch to master, rebase it on top of master, by using command like `git fetch; git checkout my-branch; git rebase -i origin/master`. Clean up your commit message at this point. Be super careful to communicate with anybody else working on this branch and do not do this when others have uncommitted changes. Ideally, your merge of your feature back to master should be one nice commit.
-- Run hosted CI and code coverage.
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/tips
-SOURCE: docs/oss/misc/tips.md
-================================================================================
-
-# Tips
-
-- Make sure to run the Rails app using `bin/dev` (or `foreman start -f Procfile.dev`) and **not `rails s`** so development watchers are running. For tests, use one consistent strategy: either React on Rails TestHelper + `build_test_command` (recommended) or `compile: true` in `config/shakapacker.yml` (not both). Keep test and development `public_output_path` values separate so manifests do not collide. If you run tests frequently while developing, run `bin/dev test-watch` in a separate terminal for faster feedback (auto mode chooses full vs client-only). Advanced only: if you intentionally use `bin/dev static`, you can share dev/test output paths, but do not do that in HMR mode.
-
-- The default for rendering right now is `prerender: false`. **NOTE:** Server-side rendering does not work for some components that use an async setup for server rendering. You can configure the default for prerender in your config.
-- You can expose either a React component or a function that returns a React component. If you wish to create a React component via a function, rather than simply props, then you need to set the property "generator" on that helper invocation to true (or change the defaults). When that is done, the function is invoked with a single parameter of "props", and that function should return a React element.
-- Be sure you can first render your React component **on the client side only** before you try to debug server rendering!
-- Open up the HTML source and take a look at the generated HTML and the JavaScript to see what's going on under the covers. Note that when server rendering is turned on, then you'll see the server-rendered React components. When server rendering is turned off, then you'll only see the `div` element where the in-line JavaScript will render the component. You might also notice how the props you pass (a Ruby Hash) becomes in-line JavaScript on the HTML page.
-
-================================================================================
-PAGE: https://reactonrails.com/docs/misc/updating-dependencies
-SOURCE: docs/oss/misc/updating-dependencies.md
-================================================================================
-
-# Updating Ruby and JavaScript Dependencies
-
-If you frequently update dependencies in small batches, you will avoid large and painful updates later. Then again, if you don't have good test coverage, it's hazardous to update dependencies at any time.
-
-## Ruby
-
-Delete any unwanted version constraints from your Gemfile and run:
-
-```bash
-bundle update
-```
-
-## Node Dependencies
-
-Run the commands below from the directory that contains your `package.json`. In current React on
-Rails apps, that is usually the app root rather than a `client/` subdirectory.
-
-### Checking for Outdated Packages
-
-Check for outdated versions of packages:
-
-```bash
-pnpm outdated
-```
-
-Equivalents for other package managers:
-
-- npm: `npm outdated`
-- yarn: `yarn outdated`
-- bun: `bun outdated`
-
-Read CHANGELOGs of major updated packages before you update. You might not be ready for
-some updates.
-
-### Updating All Dependencies
-
-**Option 1: Using npm-check-updates (Recommended)**
-
-Run these commands. You may or may not need to `rm -rf` your `node_modules` directory.
-
-```bash
-pnpm dlx npm-check-updates -u -a
-pnpm install
-```
-
-To also remove old `node_modules` so you only get what corresponds to `package.json`:
-
-```bash
-pnpm dlx npm-check-updates -u -a && rm -rf node_modules && pnpm install
-```
-
-Equivalents for other package managers:
-
-- npm: `npx npm-check-updates -u -a && npm install`
-- yarn: `npx npm-check-updates -u -a && yarn install`
-- bun: `bunx npm-check-updates -u -a && bun install`
-
-**Option 2: Using your package manager's upgrade command**
-
-To update all dependencies within their existing semver ranges:
-
-```bash
-pnpm up
-```
-
-To ignore ranges and update everything to the absolute latest versions:
-
-```bash
-pnpm up --latest
-```
-
-To upgrade a specific package to its latest version:
-
-```bash
-pnpm up [package] --latest
-```
-
-Equivalents for other package managers:
-
-| Action                     | npm                        | yarn (v1)               | bun                    |
-| -------------------------- | -------------------------- | ----------------------- | ---------------------- |
-| Update within ranges       | `npm update`               | `yarn upgrade`          | `bun update`           |
-| Update to latest           | _(use ncu from Option 1)_  | `yarn upgrade --latest` | `bun update --latest`  |
-| Specific package to latest | `npm install <pkg>@latest` | `yarn add <pkg>@latest` | `bun add <pkg>@latest` |
-
-Note that `npm update` does not modify `package.json` by default (only the lockfile). Add `--save`
-if you want it to update version ranges. The other package managers update `package.json` by default.
-
-### Adding New Dependencies
-
-Typically, you can add your Node dependencies as you normally would:
-
-```bash
-pnpm add module_name@version
-# or for dev dependencies
-pnpm add -D module_name@version
-```
-
-Equivalents for other package managers:
-
-- npm: `npm install module_name@version` / `npm install -D module_name@version`
-- yarn: `yarn add module_name@version` / `yarn add --dev module_name@version`
-- bun: `bun add module_name@version` / `bun add -D module_name@version`
-
-### Verify After Updates
-
-Confirm that the hot replacement dev server and the Rails server both work after updating dependencies.
-
-================================================================================
 PAGE: https://reactonrails.com/docs/upgrading/changelog
 SOURCE: docs/oss/upgrading/changelog.md
 ================================================================================
@@ -27394,11 +27976,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro]** **Tag-based cache revalidation (a Next.js `revalidateTag` analog)**: The fragment-caching helpers (`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, `cached_async_react_component`) now accept an optional `cache_tags:` option (String, Proc, any object responding to `cache_key` such as an ActiveRecord model, or an Array of any mix), and the new `ReactOnRailsPro.revalidate_tag(tag)` / `revalidate_tags(*tags)` API deletes every cached entry registered under a tag via a `Rails.cache`-backed tag->key index. A new `ReactOnRailsPro::Cache::Revalidates` ActiveRecord concern (`revalidates_react_cache`) drives revalidation from `after_commit`, so the model that owns the data also owns cache invalidation (and composes with `touch:`). Revalidation is best-effort with correctness bounded by `expires_in` (a development-mode warning fires when `cache_tags:` is used without it); index growth is bounded by the new `config.cache_tag_index_expires_in` (default 7 days) and `config.cache_tag_index_max_keys` (default 5,000) settings. Existing `cache_key:`-only behavior is unchanged. Closes [Issue 3871](https://github.com/shakacode/react_on_rails/issues/3871). [PR 3964](https://github.com/shakacode/react_on_rails/pull/3964) by [justin808](https://github.com/justin808).
 - **React 19 root error callbacks**: `ReactOnRails.setOptions({ rootErrorHandlers: { onRecoverableError, onCaughtError, onUncaughtError } })` registers React's root error callbacks globally; React on Rails applies them to every `hydrateRoot`/`createRoot` call it makes and invokes them with an extra context argument whose `componentName` and `domNodeId` fields are optional. In development, recoverable hydration errors now log an actionable React on Rails message (component name, dom id, component stack, and a link to the new [Debugging Hydration Mismatches guide](https://reactonrails.com/docs/building-features/debugging-hydration-mismatches)) alongside React's default error reporting, which stays intact so window-'error'-based tooling keeps working. Partial `rootErrorHandlers` updates merge per key, so registering one callback later does not drop the others. On React <19 (and <18 for `onRecoverableError`), React on Rails retains registrations for future upgrades, but the current runtime cannot invoke unsupported callbacks and logs a one-time console warning. On React on Rails Pro RSC/streaming hydration paths, user callbacks chain with (never replace) Pro's internal recoverable-error handler. Addresses [Issue 3892](https://github.com/shakacode/react_on_rails/issues/3892). [PR 3933](https://github.com/shakacode/react_on_rails/pull/3933) by [justin808](https://github.com/justin808).
+- **`useRailsForm` hook + `render_model_errors` controller concern (an Inertia `useForm`-style bridge to Rails controllers)**: New React hook `useRailsForm` (importable from `react-on-rails/useRailsForm`) makes posting a React form to a plain Rails controller turnkey: `data`/`setData`, per-field `errors`, `processing`, `wasSuccessful`, submit verbs (`post`/`put`/`patch`/`delete`/`submit`), `reset`/`clearErrors`/`setError`, automatic CSRF attachment from the Rails csrf-token meta tag, JSON request/response handling, and mapping of `422` + `{ errors: { field: ["message"] } }` responses onto per-field error state. Success results surface a `redirectTo` target (followed-redirect URL or JSON `redirect_to` hint) without navigating, forward-compatible with the client-routing work in [Issue 3873](https://github.com/shakacode/react_on_rails/issues/3873). The gem side adds the opt-in `ReactOnRails::Controller::FormResponders` concern whose `render_model_errors(record)` renders ActiveModel errors in exactly that shape, so validations stay in the model with no API layer and no client-side duplication. Includes a new [Forms and Mutations](docs/oss/building-features/forms.md) docs page (with an Inertia `useForm` mapping table and a Server Functions [Issue 3867](https://github.com/shakacode/react_on_rails/issues/3867) cross-link) and a runnable dummy-app example (`/rails_form`). v1 is fetch-only; `transform`, `recentlySuccessful`, and file-upload `progress` are deferred. Closes [Issue 3872](https://github.com/shakacode/react_on_rails/issues/3872). [PR 3942](https://github.com/shakacode/react_on_rails/pull/3942) by [justin808](https://github.com/justin808).
 
 #### Changed
 
 - **[Pro]** **RSC peer compatibility accepts the coordinated React 19.2 floor**: The Pro node renderer now allows React and React DOM `19.2.x` starting at `19.2.7`, matching the floor required by the `react-on-rails-rsc` 19.2 package line while preserving the existing React `19.0.x` support window. Refs [Issue 3865](https://github.com/shakacode/react_on_rails/issues/3865).
+
+#### Added
+
+- **[Pro]** **Built-in node renderer `/health` and `/ready` probe endpoints**: The node renderer can now register first-class liveness (`GET /health` -> `200` with a status-only body) and readiness (`GET /ready` -> `503` until the answering worker is online and has at least one server bundle compiled, then `200`) endpoints, replacing the hand-rolled `configureFastify` health-check recipe for the common case. The endpoints are off by default and enabled with the new `enableHealthEndpoints` config option (or `RENDERER_ENABLE_HEALTH_ENDPOINTS=true`, `TRUE`, `yes`, `YES`, or `1`); they are unauthenticated like `/info` but expose no runtime version or path details. The `1` alias is scoped to `RENDERER_ENABLE_HEALTH_ENDPOINTS` so existing node-renderer boolean environment flags keep their previous parsing behavior. Includes a new [Health and Readiness Endpoints](docs/oss/building-features/node-renderer/health-checks.md) docs page with working Kubernetes (`tcpSocket` + `exec` with `curl --http2-prior-knowledge` -- the h2c listener cannot be probed with HTTP/1.1 `httpGet`), ECS, and Docker Compose probe examples. Closes [Issue 3880](https://github.com/shakacode/react_on_rails/issues/3880). [PR 3939](https://github.com/shakacode/react_on_rails/pull/3939) by [justin808](https://github.com/justin808).
 
 #### Fixed
 
@@ -29993,171 +30581,6 @@ Explicitly declare store dependencies for each component:
 ```
 
 This allows `ComponentWithNoStore` to hydrate immediately without waiting for `SimpleStore`, improving page performance.
-
-================================================================================
-PAGE: https://reactonrails.com/docs/upgrading/release-notes/16.1.0
-SOURCE: docs/oss/upgrading/release-notes/16.1.0.md
-================================================================================
-
-# React on Rails 16.1.x Release Notes
-
-## Upgrading from 16.0.x to 16.1.x
-
-Update your gem and npm package versions:
-
-```ruby
-# Gemfile
-gem "react_on_rails", "16.1.1"
-gem "shakapacker", "8.2.0"
-```
-
-```json
-// package.json
-{
-  "dependencies": {
-    "react-on-rails": "16.1.1",
-    "shakapacker": "8.2.0"
-  }
-}
-```
-
-Then run `bundle install` and your package manager's install command.
-
-**Important:** The shakapacker gem and npm package versions must match exactly.
-
-## Version Compatibility
-
-| Component   | Minimum | Recommended |
-| ----------- | ------- | ----------- |
-| Ruby        | 3.0     | 3.3+        |
-| Node.js     | 18      | 22+         |
-| Shakapacker | 6.0     | 8.2.0+      |
-| React       | 18      | 18+         |
-| Rails       | 5.2     | 7.0+        |
-
-**Note:** CI tests against Ruby 3.2+ and Node.js 20+, but the gem supports lower versions as shown above.
-
-## New Features in v16.1.0
-
-### Doctor Rake Task
-
-New diagnostic command for troubleshooting setup issues:
-
-```bash
-rake react_on_rails:doctor
-VERBOSE=true rake react_on_rails:doctor  # For detailed output
-```
-
-### Server Bundle Security
-
-New configuration options for enhanced server bundle security:
-
-```ruby
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
-  # Directory for server bundle output (default: "ssr-generated")
-  config.server_bundle_output_path = "ssr-generated"
-
-  # When enabled, server bundles only load from private directories
-  config.enforce_private_server_bundles = true
-end
-```
-
-### Enhanced bin/dev Script
-
-The updated `bin/dev` script provides better development server management with support for multiple modes:
-
-- `bin/dev` - Default HMR mode with webpack-dev-server
-- `bin/dev static` - Watch mode without HMR
-- `bin/dev prod` - Development with production-optimized assets
-
-### Multiple Procfile Support
-
-Three Procfile configurations for different development scenarios:
-
-1. **Procfile.dev** (HMR mode) - Rails server + webpack dev server for client + webpack watch for server bundle
-2. **Procfile.dev-static-assets** (Static watch mode) - Rails server + webpack watch mode
-3. **Procfile.dev-prod-assets** (Production assets in development) - Rails server with production-optimized assets
-
-### Webpack Configuration Updates
-
-- New `generateWebpackConfigs.js` helper for better configuration management
-- Improved babel.config.js setup
-
-### Generator Improvements
-
-**Note:** These improvements only affect newly generated code from `rails g react_on_rails:install` or component generators. Existing applications are unaffected.
-
-- Modern TypeScript patterns with better type inference
-- Optimized tsconfig.json with `"moduleResolution": "bundler"`
-- Enhanced Redux TypeScript integration
-- Smart `bin/dev` defaults that auto-navigate to `/hello_world` route
-
-## Security Enhancements
-
-v16.1.0 includes important security improvements:
-
-- **Command injection protection**: Fixed command injection vulnerabilities in generator package installation commands by replacing unsafe string interpolation with secure array-based system calls ([PR 1786](https://github.com/shakacode/react_on_rails/pull/1786)) by [justin808](https://github.com/justin808)
-- **Improved input validation**: Enhanced package manager validation and argument sanitization across all generators ([PR 1786](https://github.com/shakacode/react_on_rails/pull/1786)) by [justin808](https://github.com/justin808)
-- **Hardened DOM selectors**: Using `CSS.escape()` and proper JavaScript escaping for XSS protection ([PR 1791](https://github.com/shakacode/react_on_rails/pull/1791)) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
-
-## Bug Fixes
-
-### v16.1.1
-
-- Fixed RSC manifest file path resolution ([PR 1818](https://github.com/shakacode/react_on_rails/pull/1818)) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
-
-### v16.1.0
-
-- Fixed LoadError in `rake react_on_rails:doctor` when using packaged gem ([PR 1795](https://github.com/shakacode/react_on_rails/pull/1795)) by [justin808](https://github.com/justin808)
-- Fixed packs generator error when `server_bundle_js_file` is empty ([PR 1802](https://github.com/shakacode/react_on_rails/pull/1802)) by [justin808](https://github.com/justin808)
-- Fixed NoMethodError in environments without Shakapacker ([PR 1806](https://github.com/shakacode/react_on_rails/pull/1806)) by [justin808](https://github.com/justin808)
-- Fixed inconsistent Shakapacker version requirements ([PR 1806](https://github.com/shakacode/react_on_rails/pull/1806)) by [justin808](https://github.com/justin808)
-
-## Deprecations
-
-Remove `config.generated_assets_dirs` from your configuration - asset paths are now automatically determined from `shakapacker.yml`.
-
-## Common Upgrade Issues
-
-### Shakapacker Version Mismatch
-
-**Symptom:** Assets fail to compile or inconsistent behavior between development and production.
-
-**Solution:** Ensure your Shakapacker gem and npm package versions match exactly:
-
-```bash
-# Check gem version
-bundle show shakapacker
-
-# Check npm version
-npm list shakapacker
-# or
-yarn list shakapacker
-```
-
-Both should show the same version (e.g., 8.2.0).
-
-### Missing Server Bundle After Upgrade
-
-**Symptom:** Server-side rendering fails with "bundle not found" errors.
-
-**Solution:** If you're using `server_bundle_output_path`, ensure the directory exists and your build process outputs to that location. Run `rake react_on_rails:doctor` to diagnose configuration issues.
-
-## Pro License Features
-
-v16.1.0 introduced foundational changes for React on Rails Pro, including:
-
-- Core/Pro separation with clear licensing boundaries
-- Runtime license validation with graceful fallback
-- Enhanced immediate hydration (Pro-only feature)
-
-These changes are internal and do not affect open-source users. For information about Pro features like streaming SSR, React Server Components, and enhanced performance optimizations, see [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-
-## Related Resources
-
-- [Changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
-- [Configuration Reference](../../configuration/README.md)
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/upgrading/release-notes/16.2.0

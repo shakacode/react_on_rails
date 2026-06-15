@@ -100,6 +100,28 @@ For detailed proof criteria and migration contribution guidance, see
   legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
   source.
 
+## Control Plane Cost Posture
+
+For public demo and starter staging deployments on Control Plane, keep the app
+workload as `type: standard` with `minScale: 1`, set its autoscaling metric to
+`disabled`, and enable `capacityAI: true` so Control Plane can right-size idle
+capacity while the demo keeps one warm replica. With the autoscaling metric set
+to `disabled`, treat replica count as fixed; `maxScale` is not a burst-scaling
+lever in this posture. If a demo must absorb traffic bursts, choose a compatible
+autoscaling metric deliberately and set a tested `maxScale` ceiling for that
+separate scaling posture.
+Avoid `CPU Utilization` autoscaling with `minScale: 1` / `maxScale: 1` for
+these small staging apps because that combination prevents Capacity AI from
+right-sizing the warm workload.
+
+This is not the same as scale-to-zero: steady RAM usage and background work can
+still drive cost, and shared Postgres should usually stay manually sized. If a
+demo explicitly needs true idle scale-to-zero, create a separate `serverless`
+workload before first deploy or plan a delete/recreate migration because Control
+Plane will not change an existing `standard` workload to `serverless` in place.
+The reusable guidance lives in
+[Control Plane Flow: Enable Capacity AI for Demo and Starter Staging Apps](https://github.com/shakacode/control-plane-flow/blob/main/docs/tips.md#enable-capacity-ai-for-demo-and-starter-staging-apps).
+
 ## Legacy Repos
 
 Version-specific demos, `test-*` repos, generator snapshots, and older tutorial
