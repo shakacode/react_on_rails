@@ -277,7 +277,7 @@ class PrMergeLedger
       "pull_requests" => ledgers,
       "violations" => violations,
       "unknown_fields" => unknown_fields,
-      "complete_allowed" => violations.empty? && unknown_fields.empty?
+      "complete_allowed" => violations.empty?
     }
   end
 
@@ -393,7 +393,7 @@ class PrMergeLedger
     ledger.merge(
       "violations" => violations,
       "unknown_fields" => unknown_fields,
-      "complete_allowed" => violations.empty? && unknown_fields.empty?
+      "complete_allowed" => violations.empty?
     )
   end
   # rubocop:enable Metrics/AbcSize
@@ -1352,6 +1352,7 @@ class PrMergeLedger
       value_string = value.to_s
       raise Error, "gh api graphql variable #{key} cannot start with @" if value_string.start_with?("@")
 
+      # Arguments are passed to Open3 as argv, so values are not shell-expanded.
       flag = value.is_a?(Integer) || value == true || value == false ? "-F" : "-f"
       args.push(flag, "#{key}=#{value_string}")
     end
