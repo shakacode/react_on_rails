@@ -39,6 +39,23 @@ The bot will:
 
 If the PR branch is from a fork or the PR head repository is unavailable, the bot posts maintainer guidance and exits without dispatching workflows or adding the label.
 
+### Human, Agent, and Workflow-Token Paths
+
+`ready-for-full-ci` is both a trigger and a persistent mode label, but the actor
+that adds it matters:
+
+- A maintainer or local user token can run `bin/request-full-ci` or add
+  `ready-for-full-ci` directly. That user-token label event starts the
+  heavyweight `pull_request` workflows.
+- `+ci-run-full` and the legacy `/run-skipped-ci` command run inside GitHub
+  Actions. They must dispatch the full-CI-capable workflows for the current head
+  SHA first, then add `ready-for-full-ci` so future pushes stay in full-CI mode.
+  A label added by a workflow's `GITHUB_TOKEN` does not start new
+  `pull_request` workflow runs by itself.
+- Agents should prefer the comment command at the final readiness gate because
+  it leaves a PR-visible audit trail. During active implementation churn, use
+  `+ci-status` first and avoid starting expensive runs prematurely.
+
 ### Why This Exists
 
 By default, PRs run a fast required gate and rely on local validation during review.
@@ -134,3 +151,24 @@ Many workflows use job-level conditions to skip unnecessary heavyweight jobs:
 - Can be overridden with `workflow_dispatch` or `+ci-run-full`
 
 See `script/ci-changes-detector` for the change detection logic.
+
+## Full-CI Workflow Maintenance Checklist
+
+When adding an expensive PR workflow, update the workflow and command path
+together:
+
+1. Keep the fast required gate in `ci-required.yml`; do not make heavyweight
+   jobs the only required PR signal.
+2. Use job-level conditions instead of workflow-level `paths` filters when a
+   workflow must always be able to start for label changes, merge queue, or
+   manual dispatch.
+3. Include `pull_request` label events, `merge_group`, and `workflow_dispatch`
+   when the workflow participates in full CI.
+4. If the workflow reads `ready-for-full-ci` with
+   `.github/actions/check-full-ci-label`, give the detector job `issues: read`.
+5. Add the workflow to both comment-command dispatch lists when `+ci-run-full`
+   should run it for the current head SHA. Pass `force_run: 'true'` only when
+   that workflow defines the input.
+6. Update `internal/contributor-info/ci-optimization.md`, `CONTRIBUTING.md`,
+   `AGENTS.md`, and `.agents/workflows/pr-processing.md` when the request or
+   readiness process changes.

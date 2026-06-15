@@ -608,6 +608,12 @@ React on Rails provides PR comment commands to control CI behavior:
 
 Post one CI command per comment. If a comment contains multiple `+ci-*` commands, the command workflow handles only the first one.
 
+Maintainers and contributors with a local authenticated `gh` session can also
+run `bin/request-full-ci` from a PR branch or add `ready-for-full-ci` directly.
+That user-token label event starts the heavyweight workflows. Agents and
+maintainers who want an auditable PR-visible decision should prefer the
+`+ci-*` comment commands.
+
 #### `+ci-run-full` - Enable Full CI Mode
 
 Adds the full CI readiness label and enables full CI mode for the PR:
@@ -618,8 +624,8 @@ Adds the full CI readiness label and enables full CI mode for the PR:
 
 **What it does:**
 
-- Adds the `ready-for-full-ci` label to the PR
 - Dispatches full-CI-capable workflows for the current head SHA
+- Creates and adds the `ready-for-full-ci` label to the PR
 - **Persists across future commits** - all subsequent pushes will run the full test suite
 - Runs latest dependency tests (Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19)
 - Runs minimum dependency tests (Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18)
@@ -683,6 +689,8 @@ Legacy slash commands (`/run-skipped-ci`, `/run-skipped-tests`, and `/stop-run-s
 #### Important Notes
 
 - **Force-pushes:** The `+ci-run-full` command dispatches full CI for the current head SHA and adds the `ready-for-full-ci` label to your PR. If you force-push after commenting, the initial workflow run may test the old commit, but subsequent pushes will automatically run full CI because the label persists.
+- **Workflow-token labels:** A label added by a workflow's `GITHUB_TOKEN` does not start new `pull_request` workflow runs by itself. That is why `+ci-run-full` dispatches workflows for the current head SHA before adding `ready-for-full-ci`.
+- **Fork PRs:** Comment-command full CI does not dispatch same-repository workflows or add the persistent label for fork heads. A maintainer should push a trusted base-repository branch when full Pro or secret-backed CI is required.
 - **Waivers:** The `+ci-skip-full` command records the exact SHA in the PR conversation. If you push another commit, use `+ci-skip-full` again if you still intend to waive full CI.
 - **Branch operations:** Avoid deleting or force-pushing branches while workflows are running, as this may cause failures.
 

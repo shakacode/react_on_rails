@@ -38,31 +38,40 @@ The legacy `full-ci` label is still accepted as an alias so older comments and l
 
 ## Requesting Full CI
 
-Use the helper from a PR branch:
+There are three supported request paths. Choose the one that matches the actor
+making the request:
+
+- **Human or local user token**: run the helper from a PR branch:
 
 ```bash
 bin/request-full-ci
 ```
 
-Or add the label directly:
+- **Human or local user token**: add the label directly:
 
 ```bash
 gh pr edit <number> --add-label ready-for-full-ci
 ```
 
-Maintainers can also comment:
+- **Maintainer PR comment**: comment on the PR:
 
 ```text
 +ci-run-full
 ```
 
-Legacy slash aliases still work:
+Legacy slash aliases still work for maintainers:
 
 ```text
 /run-skipped-ci
 ```
 
-Both command paths dispatch the full-CI-capable workflows for the current head SHA, create `ready-for-full-ci` if needed, and add it so future pushes keep running full CI. This explicit dispatch is required because labels added by a workflow's `GITHUB_TOKEN` do not start new `pull_request` workflow runs.
+Human/user-token label writes start the `pull_request` label event, so direct
+labeling and `bin/request-full-ci` can wake the heavyweight workflows. Comment
+commands are different: `+ci-run-full` and `/run-skipped-ci` run from a workflow,
+so they dispatch the full-CI-capable workflows for the current head SHA, create
+`ready-for-full-ci` if needed, and add the label for future pushes. That explicit
+dispatch is required because labels added by a workflow's `GITHUB_TOKEN` do not
+start new `pull_request` workflow runs.
 
 To return a PR to fast-gate mode for future commits:
 
@@ -75,6 +84,26 @@ or:
 ```text
 /stop-run-skipped-ci
 ```
+
+For fork PRs, comment-command full CI does not dispatch same-repository
+workflows or add the persistent label. A maintainer should either push a trusted
+branch in the base repository or use the normal maintainer review path for the
+limited fork-safe checks.
+
+## Known Tradeoffs And Guardrails
+
+- Heavy workflows still start their cheap detector jobs on ordinary PR updates
+  and label changes. Expensive jobs stay behind job-level conditions, but the
+  workflow startup overhead remains so label changes, merge queue, and manual
+  dispatch can be handled consistently.
+- `ready-for-full-ci` is persistent. Once present, future commits keep running
+  full CI until `+ci-stop-full` or `/stop-run-skipped-ci` removes it.
+- Branch protection is a repository setting, not a file in this PR. After this
+  policy lands, require `ci-required / required-pr-gate` and avoid requiring
+  heavyweight PR jobs unless the repository intentionally wants every update to
+  run full CI.
+- `+ci-skip-full [reason]` is a SHA-bound waiver comment. It does not skip the
+  fast required gate and does not apply after another push.
 
 ## Local CI Contract
 
@@ -113,6 +142,32 @@ bin/ci-rerun-failures
 ```
 
 The script maps common GitHub check names to local commands, including the required PR gate. Some Pro dummy-app checks do not have exact local equivalents; use the matching GitHub workflow or `bin/ci-local --all` when a local reproduction is not precise.
+
+## Adding A Full-CI-Capable Workflow
+
+When adding or changing an expensive PR workflow, keep the workflow, command
+dispatcher, and docs in sync:
+
+1. Include `pull_request` events for normal PR updates and label changes:
+   `opened`, `synchronize`, `reopened`, `ready_for_review`, `labeled`, and
+   `unlabeled`.
+2. Include `push` to `main`, `merge_group`, and `workflow_dispatch` when the
+   workflow is part of merge or release confidence.
+3. Avoid workflow-level `paths` or `paths-ignore` when branch protection or full
+   CI policy depends on the workflow starting. Use job-level conditions after
+   checkout and change detection instead.
+4. If the workflow uses `.github/actions/check-full-ci-label`, grant the detector
+   job `issues: read` so it can list PR labels.
+5. Gate heavyweight jobs on the full-CI cases: `push` to `main`, `merge_group`,
+   `workflow_dispatch`, release-target PRs, or `ready-for-full-ci` / legacy
+   `full-ci`.
+6. If `+ci-run-full` should run the workflow for the exact current head SHA,
+   add it to the dispatch lists in `.github/workflows/ci-commands.yml` and
+   `.github/workflows/run-skipped-ci.yml`, including `force_run: 'true'` when
+   the workflow supports that input.
+7. Update `.github/read-me.md`, `CONTRIBUTING.md`, and agent-facing docs so
+   humans and agents know whether the workflow is label-driven, manually
+   dispatched, merge-queue-only, benchmark-only, or intentionally excluded.
 
 ## Related Files
 

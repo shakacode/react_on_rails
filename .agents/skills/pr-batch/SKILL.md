@@ -191,6 +191,15 @@ rule from `.agents/workflows/pr-processing.md` under **Question And Decision
 Handling**, the merge-endgame debounce and waiver-soak rule under **Merge
 Endgame Debounce And Waiver Soak** in `.agents/workflows/pr-processing.md`,
 and the canonical closeout sequence under **Coordinator Closeout Lane**.
+For full-CI requests, use the auditable `+ci-*` comment path: check with
+`+ci-status`, request with `+ci-run-full` only after local validation,
+self-review, review-thread triage, and the final push for the current batch,
+then re-fetch and wait for current-head checks. Do not rely on adding
+`ready-for-full-ci` directly from automation; a workflow `GITHUB_TOKEN` label
+write is persistence for future pushes, not a current-head trigger. Direct
+`bin/request-full-ci` or `gh pr edit --add-label ready-for-full-ci` is a
+human/local user-token path. For fork PRs, report that a trusted base-repository
+branch or maintainer-run path is needed for full Pro or secret-backed CI.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
@@ -210,7 +219,9 @@ Full-CI uncertainty at the final readiness gate after local validation and the
 final push is a non-blocking decision. Request full CI with `+ci-run-full`,
 record the reason, re-fetch and wait for the newly requested current-head checks,
 and continue the readiness flow instead of escalating it as an immediate
-maintainer question.
+maintainer question. Use `+ci-status` first when state is unclear, and do not
+substitute a direct `ready-for-full-ci` label from automation for the comment
+command; direct labels are only the human/local user-token path.
 
 Suggested PR description section:
 

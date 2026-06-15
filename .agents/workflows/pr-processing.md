@@ -431,9 +431,12 @@ update, review-thread triage, and the final push for the current head SHA,
 request full CI with `+ci-run-full` if you are unsure whether path-selected CI
 is enough. Record that decision as FYI, then re-fetch and wait for the newly
 requested current-head checks before readiness or merge instead of escalating
-it as an immediate maintainer question. Also apply the merge-endgame debounce
-and waiver-soak rule under **Merge Endgame Debounce And Waiver Soak** before
-the final merge/readiness decision.
+it as an immediate maintainer question. Use `+ci-status` first when state is
+unclear. Do not rely on adding `ready-for-full-ci` directly from automation; a
+workflow `GITHUB_TOKEN` label write does not trigger current-head
+`pull_request` workflows. Also apply the merge-endgame debounce and waiver-soak
+rule under **Merge Endgame Debounce And Waiver Soak** before the final
+merge/readiness decision.
 
 After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, run `script/pr-merge-ledger <PR> --strict` with explicit changelog classification and P0/P1/P2/Must-Fix dispositions, update stale release-mode classification, refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it, request full CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
 
@@ -778,7 +781,9 @@ Use the `+ci-*` PR comment commands from the CI command workflow for full-CI dec
 - Use `+ci-skip-full [reason]` only with explicit maintainer approval and only for low-risk/current-SHA cases where the reason is auditable.
 - Use `+ci-help` when the command syntax or current behavior is unclear.
 - Put one `+ci-*` command per PR comment; the workflow handles only the first command in a comment.
-- Do not add or remove `ready-for-full-ci` directly when a `+ci-*` command would create a clearer audit trail.
+- Agents and batch coordinators should not add or remove `ready-for-full-ci` directly when a `+ci-*` command would create a clearer audit trail.
+- A human/local user-token path such as `bin/request-full-ci` or `gh pr edit --add-label ready-for-full-ci` can start label-triggered workflows. A label added by a GitHub workflow's `GITHUB_TOKEN` cannot, so automation must use `+ci-run-full` or otherwise dispatch the full-CI-capable workflows for the exact current head SHA.
+- For fork PRs, comment-command full CI does not dispatch same-repository workflows or add the persistent label. Report that a trusted base-repository branch or maintainer-run path is needed for full Pro or secret-backed CI.
 
 ## CI Polling And Live State
 

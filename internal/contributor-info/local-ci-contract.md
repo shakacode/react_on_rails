@@ -27,3 +27,9 @@ bin/request-full-ci
 ```
 
 That adds `ready-for-full-ci`. When added with your GitHub token, the label event starts the heavyweight workflows; the label also keeps future commits on that PR in full-CI mode until it is removed.
+
+For an auditable PR-visible request, comment `+ci-run-full` after the final push
+for the current batch. The comment command dispatches full-CI-capable workflows
+for the current head SHA before adding `ready-for-full-ci`, because a label added
+by a workflow's `GITHUB_TOKEN` does not start new `pull_request` workflow runs by
+itself.

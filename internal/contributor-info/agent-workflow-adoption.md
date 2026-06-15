@@ -112,6 +112,11 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - If adopted, create the labels the workflow expects, especially `ready-for-full-ci`.
    - Keep `ci-commands.yml` aligned with the target repo's actual full-CI trigger mechanism.
    - Ensure each expensive workflow knows how to react to `ready-for-full-ci` or manual dispatch.
+   - If comment commands add labels from GitHub Actions, also dispatch the
+     target workflows explicitly for the current head SHA. A label added by a
+     workflow's `GITHUB_TOKEN` does not start new `pull_request` workflow runs.
+   - Update every full-CI-capable workflow's dispatch list and permissions
+     together; label readers that use the Issues API need `issues: read`.
    - If not adopted, remove `+ci-*` language from `AGENTS.md` and `pr-processing.md`, and replace it with the target repo's real full-CI trigger.
 
 8. Validate with a dry run.
