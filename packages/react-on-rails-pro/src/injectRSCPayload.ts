@@ -711,14 +711,17 @@ export default function injectRSCPayload(
                   hasEmittedDiagnosticScript = true;
                 }
               }
-              stylesheetTagsForRSCClientChunks(
+              const stylesheetTags = stylesheetTagsForRSCClientChunks(
                 flightData,
                 rscClientChunkStylesheetHrefsByChunkName,
                 emittedRSCClientStylesheetHrefs,
-              ).forEach((stylesheetTag) => {
+              );
+              stylesheetTags.forEach((stylesheetTag) => {
                 rscClientStylesheetBuffers.push(Buffer.from(stylesheetTag));
               });
-              resolveRSCClientStylesheetInferenceForStream();
+              if (stylesheetTags.length > 0) {
+                resolveRSCClientStylesheetInferenceForStream();
+              }
               const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
 

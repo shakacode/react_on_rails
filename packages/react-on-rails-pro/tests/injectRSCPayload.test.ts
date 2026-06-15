@@ -457,6 +457,44 @@ describe('injectRSCPayload', () => {
     expect(stylesheetIndex).toBeLessThan(revealHtmlIndex);
   });
 
+  it('keeps inferred stylesheet reveal gating active after server-only Flight chunks', async () => {
+    const serverOnlyFlightData = '0:["$","div",null,{"children":"server shell"},null]\n';
+    const styledFlightData =
+      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client3","js/client3-570df890c7aa791c.chunk.js"],"default"]\n' +
+      '0:["$","$L2",null,{},null]\n';
+    const mockRSC = createMockRSCStream({
+      0: serverOnlyFlightData,
+      25: styledFlightData,
+    });
+    const mockHTML = createMockHTMLStream({
+      0: '<p>Loading ToggleContainer</p>',
+      10:
+        '<div hidden id="RscFoucProbe-react-component-0S:0">' +
+        '<section data-testid="rsc-fouc-probe">RSC streamed FOUC probe</section>' +
+        '</div>' +
+        '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map([['client3', ['/webpack/test/css/client3-46072b81.css']]]),
+    );
+    const resultStr = await collectStreamData(result);
+
+    const stylesheetIndex = resultStr.indexOf(
+      '<link rel="stylesheet" href="/webpack/test/css/client3-46072b81.css" data-precedence="rsc-css">',
+    );
+    const revealHtmlIndex = resultStr.indexOf('<div hidden id="RscFoucProbe-react-component-0S:0">');
+
+    expect(stylesheetIndex).toBeGreaterThanOrEqual(0);
+    expect(revealHtmlIndex).toBeGreaterThanOrEqual(0);
+    expect(stylesheetIndex).toBeLessThan(revealHtmlIndex);
+  });
+
   it('preserves split UTF-8 bytes when deferring reveal HTML', async () => {
     const flightData =
       '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client1","js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +
