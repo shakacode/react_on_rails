@@ -4699,6 +4699,83 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "retries GitHub 403 secondary rate-limit responses" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      count_file="$(dirname "$0")/calls"
+      count=0
+      if [ -f "$count_file" ]; then
+        count=$(cat "$count_file")
+      fi
+      count=$((count + 1))
+      printf '%s\\n' "$count" > "$count_file"
+
+      if [ "$count" -eq 1 ]; then
+        printf '%s\\n' 'HTTP 403 API rate limit exceeded' >&2
+        exit 1
+      fi
+
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              query=*)
+                query=${1#query=}
+                ;;
+            esac
+            ;;
+          query=*)
+            query=${1#query=}
+            ;;
+          query)
+            shift
+            if [ "$#" -gt 0 ]; then
+              query=$1
+            fi
+            ;;
+        esac
+        shift
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"PR 1","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-1","headRefOid":"head-1","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+
+    with_fake_gh(fake_gh) do |env|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        chdir: repo_root
+      )
+
+      count_path = File.join(env.fetch("PATH").split(":").first, "calls")
+      expect(status).to be_success
+      expect(stderr).to be_empty
+      expect(JSON.parse(stdout).dig("pull_requests", 0, "pr", "number")).to eq(1)
+      expect(File.read(count_path).strip).to eq("5")
+    end
+  end
+
   it "fails when GraphQL pagination cursors stop advancing" do
     fake_gh = <<~SH
       #!/bin/sh
