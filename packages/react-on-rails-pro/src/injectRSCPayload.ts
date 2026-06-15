@@ -223,15 +223,17 @@ function findReactSuspenseRevealSplitIndex(htmlString: string) {
 
 function splitReactSuspenseRevealHtmlBuffer(htmlBuffer: Buffer) {
   const htmlString = htmlBuffer.toString('utf8');
-  const splitIndex = findReactSuspenseRevealSplitIndex(htmlString);
+  const splitCharacterIndex = findReactSuspenseRevealSplitIndex(htmlString);
 
-  if (splitIndex === -1) {
+  if (splitCharacterIndex === -1) {
     return { flushableHtmlBuffer: htmlBuffer, deferredRevealHtmlBuffer: undefined };
   }
 
+  const splitByteIndex = Buffer.byteLength(htmlString.slice(0, splitCharacterIndex), 'utf8');
+
   return {
-    flushableHtmlBuffer: Buffer.from(htmlString.slice(0, splitIndex)),
-    deferredRevealHtmlBuffer: Buffer.from(htmlString.slice(splitIndex)),
+    flushableHtmlBuffer: htmlBuffer.subarray(0, splitByteIndex),
+    deferredRevealHtmlBuffer: htmlBuffer.subarray(splitByteIndex),
   };
 }
 

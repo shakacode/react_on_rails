@@ -100,6 +100,24 @@ const createMockHTMLStream = (chunks: string[] | { [key: number]: string | strin
   return passThrough;
 };
 
+const createMockHTMLByteStream = (chunks: { [key: number]: Buffer | Buffer[] }) => {
+  const passThrough = new PassThrough();
+  const entries = Object.entries(chunks);
+  const keysLength = entries.length;
+  entries.forEach(([delay, value], index) => {
+    setTimeout(() => {
+      const chunksArray = Array.isArray(value) ? value : [value];
+      chunksArray.forEach((chunk) => {
+        passThrough.push(chunk);
+      });
+      if (index === keysLength - 1) {
+        passThrough.push(null);
+      }
+    }, +delay);
+  });
+  return passThrough;
+};
+
 const createFlushingHTMLStream = (html: string) =>
   ({
     pipe(destination: PassThrough & { flush?: () => void }) {
@@ -118,6 +136,14 @@ const collectStreamData = async (stream: Readable) => {
     chunks.push(new TextDecoder().decode(chunk as Buffer));
   }
   return chunks.join('');
+};
+
+const collectStreamBuffer = async (stream: Readable) => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk as Buffer));
+  }
+  return Buffer.concat(chunks);
 };
 
 const collectStreamDataByChunk = (stream: Readable) => {
@@ -429,6 +455,43 @@ describe('injectRSCPayload', () => {
     expect(stylesheetIndex).toBeGreaterThanOrEqual(0);
     expect(revealHtmlIndex).toBeGreaterThanOrEqual(0);
     expect(stylesheetIndex).toBeLessThan(revealHtmlIndex);
+  });
+
+  it('preserves split UTF-8 bytes when deferring reveal HTML', async () => {
+    const flightData =
+      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client1","js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +
+      '0:["$","$L2",null,{},null]\n';
+    const mockRSC = createMockRSCStream({ 25: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from(
+        '<p>Loading ToggleContainer</p>' +
+          '<div hidden id="RscFoucProbe-react-component-0S:0">' +
+          '<section data-testid="rsc-fouc-probe">RSC streamed FOUC probe</section>' +
+          '</div>' +
+          '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>' +
+          '<p>caf',
+      ),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</p>')]);
+    const mockHTML = createMockHTMLByteStream({
+      0: firstHtmlChunk,
+      10: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
+    );
+    const resultStr = (await collectStreamBuffer(result)).toString('utf8');
+
+    expect(resultStr).toContain('<p>café</p>');
+    expect(resultStr).not.toContain('\uFFFD');
   });
 
   it('fails open for long-lived RSC streams without initial Flight data', async () => {
