@@ -474,6 +474,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
         end
       end
     end
+  ensure
+    redis&.close
   end
 
   def calc_slow_app_props_server_render

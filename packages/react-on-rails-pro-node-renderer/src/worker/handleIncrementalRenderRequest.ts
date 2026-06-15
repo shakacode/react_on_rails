@@ -194,6 +194,10 @@ export async function handleIncrementalRenderRequest(
 
       // Set the emitter callback — AsyncPropsManager calls this from inside the VM
       sharedExecutionContext.set(PROP_REQUEST_EMITTER_KEY, (propName: string) => {
+        if (injectableStream.destroyed || injectableStream.writableEnded) {
+          log.warn({ msg: 'Skipping propRequest after stream closed', propName });
+          return;
+        }
         try {
           injectableStream.write(formatPropRequestChunk(propName));
         } catch (err) {
