@@ -796,8 +796,16 @@ export default function run(config: Partial<Config>) {
         await closeRequestPromise;
       } else {
         // Response hasn't started yet, we can send an error response
+        const closeRequestPromise = closeIncrementalRequest({
+          timeoutMs: INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS,
+        });
         const errorResponse = errorResponseResult(errorMessage, incrementalTracingContext);
-        await setResponse(errorResponse, res);
+        try {
+          await setResponse(errorResponse, res);
+        } finally {
+          markIncrementalResponseFinished();
+          await closeRequestPromise;
+        }
       }
     }
   });
