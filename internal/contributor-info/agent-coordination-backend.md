@@ -93,8 +93,8 @@ heartbeat/claim commands use the same binary.
 
 Run this block in `bash`; it relies on `pipefail`, functions, and `local`.
 If the strict preflight exits at the private `config show` step, rerun
-`$AGENT_COORD_BIN config show --json` directly in a private terminal without
-output suppression to read the backend diagnostic.
+`"$AGENT_COORD_REPO/bin/agent-coord" config show --json` directly in a private
+terminal without output suppression to read the backend diagnostic.
 
 ```bash
 if test -z "${AGENT_COORD_REPO:-}"; then
@@ -172,6 +172,7 @@ if (
       return 1
     fi
 
+    # Print the SHA so public PR evidence can record the private backend commit.
     printf '%s\n' "$head_sha"
   }
 
