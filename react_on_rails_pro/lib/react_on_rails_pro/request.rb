@@ -132,7 +132,7 @@ module ReactOnRailsPro
             output.close
           end)
 
-          [response, emitter]
+          pull_enabled ? [response, emitter] : response
         end
       end
 
