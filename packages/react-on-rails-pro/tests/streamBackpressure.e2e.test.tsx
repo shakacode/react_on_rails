@@ -38,6 +38,7 @@ import { PassThrough } from 'stream';
 import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
+import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
 
 const HIGHWATER_MARK = 16 * 1024; // Node.js default PassThrough highWaterMark: 16KB
 
@@ -50,35 +51,55 @@ const testingRailsContext = {
   },
 } as any;
 
-// Collect all JSON chunks from the result stream into parsed objects.
-// streamServerRenderedReactComponent emits JSON objects: {html, consoleReplayScript, hasErrors, isShellReady}
-const collectChunks = (
-  stream: NodeJS.ReadableStream,
-): Promise<{ html: string; hasErrors: boolean; isShellReady: boolean }[]> =>
+const toLengthPrefixedPayload = (content: string): Buffer => {
+  const contentBuffer = Buffer.from(content, 'utf8');
+  const metadata = JSON.stringify({ consoleReplayScript: '', hasErrors: false, isShellReady: true });
+  return Buffer.concat([
+    Buffer.from(`${metadata}\t${contentBuffer.length.toString(16).padStart(8, '0')}\n`, 'utf8'),
+    contentBuffer,
+  ]);
+};
+
+type StreamResultChunk = {
+  html: string;
+  hasErrors: boolean;
+  isShellReady: boolean;
+};
+
+// Collect all length-prefixed chunks from the result stream into parsed objects.
+// streamServerRenderedReactComponent emits: <metadata JSON>\t<content byte length hex>\n<raw html bytes>
+const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk[]> =>
   new Promise((resolve, reject) => {
-    const chunks: { html: string; hasErrors: boolean; isShellReady: boolean }[] = [];
+    const chunks: StreamResultChunk[] = [];
+    const parser = new LengthPrefixedStreamParser();
+    const decoder = new TextDecoder();
     stream.on('data', (chunk: Buffer) => {
-      const text = new TextDecoder().decode(chunk);
-      // A single data event may contain multiple JSON objects separated by newlines
-      for (const line of text.split('\n').filter(Boolean)) {
-        chunks.push(JSON.parse(line));
+      try {
+        parser.feed(chunk, (content, metadata) => {
+          chunks.push({
+            html: decoder.decode(content),
+            ...metadata,
+          } as StreamResultChunk);
+        });
+      } catch (error) {
+        reject(error);
       }
     });
-    stream.on('end', () => resolve(chunks));
+    stream.on('end', () => {
+      parser.flush();
+      resolve(chunks);
+    });
     stream.on('error', reject);
   });
 
 describe('streamServerRenderedReactComponent - RSC payload exceeding default highWaterMark (e2e)', () => {
   let source: PassThrough;
+  let generateRSCPayload: jest.Mock<Promise<PassThrough>, [string, unknown, unknown]>;
 
   beforeEach(() => {
     ComponentRegistry.clear();
     source = new PassThrough();
-    (globalThis as any).generateRSCPayload = jest.fn().mockResolvedValue(source);
-  });
-
-  afterEach(() => {
-    delete (globalThis as any).generateRSCPayload;
+    generateRSCPayload = jest.fn().mockResolvedValue(source);
   });
 
   const renderComponent = (name: string) =>
@@ -89,6 +110,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
       props: {},
       throwJsErrors: true,
       railsContext: testingRailsContext,
+      generateRSCPayload,
     } as any);
 
   // Helper: register a render function whose returned Promise reads ALL data from the RSC
@@ -124,7 +146,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     registerRSCRenderFunction('SmallRSCComponent');
 
     // Push a small payload — fits within stream2's buffer, no backpressure risk
-    const payload = 'x'.repeat(1024);
+    const payload = toLengthPrefixedPayload('x'.repeat(1024));
     source.push(payload);
     source.push(null);
 
@@ -135,7 +157,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
 
     // Verify the component rendered with the RSC data
     expect(allHtml).toContain('rsc-content');
-    expect(allHtml).toContain('RSC payload: 1024 bytes');
+    expect(allHtml).toContain(`RSC payload: ${payload.length} bytes`);
 
     // Verify RSC payload initialization and data scripts are embedded
     expect(allHtml).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
@@ -155,8 +177,8 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     // (16KB readable + 16KB writable).
     const chunkSize = 1024;
     const chunkCount = 128;
-    const totalBytes = chunkSize * chunkCount;
-    const chunk = Buffer.alloc(chunkSize, 0x61); // fill with 'a'
+    const chunk = toLengthPrefixedPayload('a'.repeat(chunkSize));
+    const totalBytes = chunk.length * chunkCount;
     for (let i = 0; i < chunkCount; i++) {
       source.push(chunk);
     }
@@ -185,8 +207,8 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     // with React rendering and event loop ticks.
     const chunkSize = 1024;
     const chunkCount = 128;
-    const totalBytes = chunkSize * chunkCount;
-    const chunk = Buffer.alloc(chunkSize, 0x62); // fill with 'b'
+    const chunk = toLengthPrefixedPayload('b'.repeat(chunkSize));
+    const totalBytes = chunk.length * chunkCount;
     let pushed = 0;
     const pushInterval = setInterval(() => {
       if (pushed >= chunkCount) {
@@ -204,6 +226,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     expect(allHtml).toContain('rsc-content');
     expect(allHtml).toContain(`RSC payload: ${totalBytes} bytes`);
     expect(allHtml).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
+    expect(allHtml).toContain('.push(');
   }, 10000);
 
   // Tests the boundary condition: payload just above ~32KB combined buffer capacity.
@@ -214,8 +237,8 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     // Push exactly 48KB — just above the ~32KB combined buffer capacity.
     const chunkSize = 1024;
     const chunkCount = 48;
-    const totalBytes = chunkSize * chunkCount;
-    const chunk = Buffer.alloc(chunkSize, 0x63); // fill with 'c'
+    const chunk = toLengthPrefixedPayload('c'.repeat(chunkSize));
+    const totalBytes = chunk.length * chunkCount;
     for (let i = 0; i < chunkCount; i++) {
       source.push(chunk);
     }
@@ -229,5 +252,6 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     expect(allHtml).toContain('rsc-content');
     expect(allHtml).toContain(`RSC payload: ${totalBytes} bytes`);
     expect(allHtml).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
+    expect(allHtml).toContain('.push(');
   }, 5000);
 });

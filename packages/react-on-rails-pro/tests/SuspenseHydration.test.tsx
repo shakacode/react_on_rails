@@ -15,7 +15,7 @@
 
 import * as React from 'react';
 import { Suspense } from 'react';
-import { renderToReadableStream } from 'react-dom/server';
+import { renderToReadableStream } from 'react-dom/server.browser';
 import { hydrateRoot } from 'react-dom/client';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - TypeScript error can be ignored because:
@@ -23,7 +23,7 @@ import { hydrateRoot } from 'react-dom/client';
 // 2. The package is guaranteed to be available at runtime in Node 18+ environments
 import { screen, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { getNodeVersion } from './testUtils.js';
+import { getNodeVersion } from './testUtils';
 
 /**
  * Tests React's Suspense hydration behavior for async components

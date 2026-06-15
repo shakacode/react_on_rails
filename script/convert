@@ -128,7 +128,7 @@ minimum_pro_non_rsc_ignored_tests = %w[
   wrapServerComponentRenderer[.]client[.]test
 ].join("|")
 minimum_pro_non_rsc_script = [
-  '"test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(',
+  '"test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(',
   minimum_pro_non_rsc_ignored_tests,
   ').*\"",'
 ].join

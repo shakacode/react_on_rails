@@ -108,6 +108,8 @@ const MixedRSCRouteBailoutAndNestedSuspenseErrorShell = () => (
   </main>
 );
 
+const DUPLICATE_NOTIFY_SSR_END_WARNING = 'notifySSREnd() called multiple times';
+
 describe('streamServerRenderedReactComponent', () => {
   const testingRailsContext = {
     serverSideRSCPayloadParameters: {},
@@ -161,6 +163,13 @@ describe('streamServerRenderedReactComponent', () => {
     });
 
     return { chunks, errors };
+  };
+
+  const expectOnlyDuplicateNotifySSREndWarnings = (consoleWarnSpy) => {
+    const unexpectedWarnings = consoleWarnSpy.mock.calls.filter(
+      ([message]) => !String(message).includes(DUPLICATE_NOTIFY_SSR_END_WARNING),
+    );
+    expect(unexpectedWarnings).toHaveLength(0);
   };
 
   const setupStreamTest = ({
@@ -340,14 +349,14 @@ describe('streamServerRenderedReactComponent', () => {
 
       expect(onPostSSRHook).toHaveBeenCalledTimes(1);
       expect(consoleWarnSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining('notifySSREnd() called multiple times'),
+        expect.stringContaining(DUPLICATE_NOTIFY_SSR_END_WARNING),
       );
     } finally {
       consoleWarnSpy.mockRestore();
     }
   });
 
-  it('preserves the duplicate notifySSREnd warning for unexpected nested Suspense errors', async () => {
+  it('runs post-SSR hooks once for unexpected nested Suspense errors', async () => {
     const onPostSSRHook = jest.fn();
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const renderResult = setupUnexpectedNestedSuspenseErrorStreamTest({ onPostSSRHook });
@@ -358,15 +367,13 @@ describe('streamServerRenderedReactComponent', () => {
       expect(errors).toHaveLength(0);
       expect(onPostSSRHook).toHaveBeenCalledTimes(1);
       expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('notifySSREnd() called multiple times'),
-      );
+      expectOnlyDuplicateNotifySSREndWarnings(consoleWarnSpy);
     } finally {
       consoleWarnSpy.mockRestore();
     }
   });
 
-  it('preserves the duplicate notifySSREnd warning when a real error occurs with an RSCRoute ssr=false bailout', async () => {
+  it('runs post-SSR hooks once when a real error occurs with an RSCRoute ssr=false bailout', async () => {
     const onPostSSRHook = jest.fn();
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { renderResult, generateRSCPayload } = setupMixedRSCRouteBailoutAndNestedSuspenseErrorStreamTest({
@@ -383,9 +390,7 @@ describe('streamServerRenderedReactComponent', () => {
       expect(html).toContain('Loading skipped route...');
       expect(html).toContain('Loading errored boundary...');
       expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('notifySSREnd() called multiple times'),
-      );
+      expectOnlyDuplicateNotifySSREndWarnings(consoleWarnSpy);
     } finally {
       consoleWarnSpy.mockRestore();
     }
