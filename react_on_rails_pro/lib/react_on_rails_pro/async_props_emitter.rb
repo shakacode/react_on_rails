@@ -66,9 +66,9 @@ module ReactOnRailsPro
     # The prop value is JSON-serialized and sent as an NDJSON line.
     # On the Node side, this triggers asyncPropsManager.setProp(propName, value).
     def call(prop_name, prop_value)
-      @pushed_props.add(prop_name)
       update_chunk = generate_update_chunk(prop_name, prop_value)
       @request_stream << "#{update_chunk.to_json}\n"
+      @pushed_props.add(prop_name)
     rescue StandardError => e
       Rails.logger.error do
         backtrace = e.backtrace&.first(5)&.join("\n")
