@@ -18,11 +18,13 @@ import { handleRenderRequest } from './handleRenderRequest';
 import log from '../shared/log';
 import { getRequestBundleFilePath, isErrorRenderResult } from '../shared/utils';
 import { subSpan } from '../shared/tracing.js';
+import type { ExecutionContext } from './vm';
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
   add: (chunk: unknown) => Promise<void>;
-  handleRequestClosed: () => void;
+  handleRequestClosed: () => Promise<void>;
+  executionContext: ExecutionContext;
 };
 
 export type UpdateChunk = {
@@ -141,6 +143,7 @@ export async function handleIncrementalRenderRequest(
     return {
       response,
       sink: {
+        executionContext,
         add: async (chunk: unknown) => {
           try {
             assertIsUpdateChunk(chunk);
@@ -159,21 +162,24 @@ export async function handleIncrementalRenderRequest(
             }
           }
         },
-        handleRequestClosed: () => {
+        handleRequestClosed: async () => {
           if (!onRequestClosedUpdateChunk) {
             return;
           }
 
           const bundlePath = getRequestBundleFilePath(onRequestClosedUpdateChunk.bundleTimestamp);
-          executionContext
-            .runInVM(onRequestClosedUpdateChunk.updateChunk, bundlePath)
-            .catch((err: unknown) => {
-              log.error({
-                msg: 'Error running onRequestClosedUpdateChunk',
-                err,
-                onRequestClosedUpdateChunk,
-              });
+          try {
+            const result = await executionContext.runInVM(onRequestClosedUpdateChunk.updateChunk, bundlePath);
+            if (isErrorRenderResult(result)) {
+              throw new Error(result.exceptionMessage);
+            }
+          } catch (err: unknown) {
+            log.error({
+              msg: 'Error running onRequestClosedUpdateChunk',
+              err,
+              onRequestClosedUpdateChunk,
             });
+          }
         },
       },
     };

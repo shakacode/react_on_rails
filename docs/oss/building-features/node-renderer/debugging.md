@@ -12,6 +12,15 @@ Use this page for breakpoints, renderer logs, and memory snapshots. For CPU flam
 For renderer debugging inside this repo, use the Pro dummy app at `react_on_rails_pro/spec/dummy`.
 It is a `pnpm` workspace app and already points at the local packages in this monorepo.
 
+## Source-Mapped Stack Traces
+
+When an SSR error occurs, the renderer remaps stack frames to the original TypeScript/JavaScript `file:line:column` — both in the error returned to Rails (surfaced as `ReactOnRails::PrerenderError` / renderer error messages) and in the renderer logs. This works automatically when the server bundle includes a source map:
+
+- **Inline map (simplest):** build the server bundle with `devtool: 'inline-source-map'` (webpack and Rspack). The map travels inside the bundle, so nothing else needs to be uploaded. Inline maps grow the server bundle file, but the server bundle is never served to browsers, so the cost is only disk space and upload size between Rails and the renderer.
+- **External map:** with `devtool: 'source-map'`, make the `.map` file available next to the uploaded bundle in the renderer's bundle cache directory. The renderer accepts a filename-only `//# sourceMappingURL=` reference next to the bundle, including trusted pre-staged symlink entries created by Pro cache staging, and also checks for `<uploaded-bundle>.js.map`. Never serve server-bundle source maps publicly.
+
+External source map text is captured asynchronously while the VM builds so active requests keep using the map generation they started with. The map is parsed and applied lazily on the first error and cached per bundle generation, so normal requests do not pay stack-formatting cost. If no source map is found, stack traces still name the real bundle file path and line.
+
 ## Debugging the Node Renderer
 
 ### Quick start: debugging with the full stack running

@@ -22,6 +22,7 @@ import path from 'path';
 import cluster from 'cluster';
 import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
+import { Transform } from 'stream';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
@@ -39,6 +40,7 @@ import {
   handleNewBundlesProvided,
   sumUploadedBytes,
 } from './worker/handleRenderRequest.js';
+import type { ExecutionContext } from './worker/vm.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
 import { SENSITIVE_REQUEST_BODY_KEYS } from './shared/sensitiveKeys.js';
 import { handleStartupListenError } from './worker/startupErrorHandler.js';
@@ -48,7 +50,7 @@ import {
   type IncrementalRenderSink,
 } from './worker/handleIncrementalRenderRequest.js';
 import { handleIncrementalRenderStream } from './worker/handleIncrementalRenderStream.js';
-import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT } from './shared/constants.js';
+import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT, STREAM_CHUNK_TIMEOUT_MS } from './shared/constants.js';
 import {
   badRequestResponseResult,
   errorResponseResult,
@@ -64,6 +66,13 @@ import { hasAnyVMContext } from './worker/vm.js';
 
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
+const INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS = 1_000;
+// Standard response streams use this only to release retained renderer context;
+// they are not aborted. Incremental responses may still close after request EOF.
+// These release/finish windows are intentionally equal so both stream paths
+// retain VM source-map registrations for the same idle period.
+const STREAM_CONTEXT_RELEASE_TIMEOUT_MS = STREAM_CHUNK_TIMEOUT_MS;
+const INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS = STREAM_CONTEXT_RELEASE_TIMEOUT_MS;
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
 //
@@ -94,10 +103,36 @@ function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
   Object.entries(headers).forEach(([key, header]) => res.header(key, header));
 }
 
+function hasHeader(headers: ResponseResult['headers'], headerName: string) {
+  const lowerHeaderName = headerName.toLowerCase();
+  return Object.keys(headers).some((key) => key.toLowerCase() === lowerHeaderName);
+}
+
+function setStringResponseHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
+  if (!hasHeader(headers, 'Content-Type')) {
+    res.type('text/plain; charset=utf-8');
+  }
+  if (!hasHeader(headers, 'X-Content-Type-Options')) {
+    res.header('X-Content-Type-Options', 'nosniff');
+  }
+}
+
 const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   const { status, data, headers, stream } = result;
   if (status !== 200 && status !== 410) {
     log.info({ msg: 'Sending non-200, non-410 data back', data });
+  }
+  if (!stream && typeof data === 'string' && status >= 400) {
+    setHeaders(headers, res);
+    res.header('Content-Type', 'text/plain; charset=utf-8');
+    res.header('X-Content-Type-Options', 'nosniff');
+    res.status(status);
+    res.send(data);
+    return;
+  }
+
+  if (!stream && typeof data === 'string') {
+    setStringResponseHeaders(headers, res);
   }
   setHeaders(headers, res);
   res.status(status);
@@ -106,6 +141,128 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
     await res.send(stream);
   } else {
     res.send(data);
+  }
+};
+
+function runWhenStreamFinishes(
+  stream: NonNullable<ResponseResult['stream']>,
+  res: FastifyReply,
+  onFinished: () => void,
+) {
+  let finished = false;
+  const finish = () => {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    stream.off('close', finish);
+    stream.off('end', finish);
+    stream.off('error', finish);
+    res.raw.off('close', finish);
+    onFinished();
+  };
+
+  stream.once('close', finish);
+  stream.once('end', finish);
+  stream.once('error', finish);
+  res.raw.once('close', finish);
+
+  return finish;
+}
+
+/** @internal Used in tests */
+export function releaseExecutionContextWhenStreamFinishes(
+  stream: NonNullable<ResponseResult['stream']>,
+  res: FastifyReply,
+  executionContext: ExecutionContext,
+) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let executionContextReleased = false;
+  const clearResponseFinishTimeout = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = undefined;
+    }
+  };
+  const releaseExecutionContext = () => {
+    if (executionContextReleased) {
+      return;
+    }
+
+    executionContextReleased = true;
+    clearResponseFinishTimeout();
+    executionContext.release();
+  };
+  const refreshResponseFinishTimeout = () => {
+    if (executionContextReleased) {
+      return;
+    }
+
+    const timeoutMs = STREAM_CONTEXT_RELEASE_TIMEOUT_MS;
+    clearResponseFinishTimeout();
+    timeoutId = setTimeout(() => {
+      timeoutId = undefined;
+      log.warn({
+        msg: 'Timed out waiting for render response stream to finish; releasing retained execution context',
+        timeoutMs,
+      });
+      releaseExecutionContext();
+    }, timeoutMs);
+  };
+  const progressStream = new Transform({
+    transform(chunk, encoding, callback) {
+      refreshResponseFinishTimeout();
+      callback(null, chunk);
+    },
+  });
+  const forwardSourceError = (error: Error) => progressStream.destroy(error);
+  const endProgressStream = () => {
+    if (!progressStream.writableEnded && !progressStream.destroyed) {
+      progressStream.end();
+    }
+  };
+  const release = runWhenStreamFinishes(progressStream, res, () => {
+    stream.off('close', endProgressStream);
+    stream.off('error', forwardSourceError);
+    releaseExecutionContext();
+  });
+
+  stream.once('close', endProgressStream);
+  stream.once('error', forwardSourceError);
+  stream.pipe(progressStream);
+  refreshResponseFinishTimeout();
+
+  return {
+    release,
+    stream: progressStream,
+  };
+}
+
+const setResponseAndReleaseExecutionContext = async (
+  result: ResponseResult,
+  res: FastifyReply,
+  executionContext: ExecutionContext | undefined,
+) => {
+  if (!executionContext) {
+    await setResponse(result, res);
+    return;
+  }
+
+  if (result.stream) {
+    const releaseHandle = releaseExecutionContextWhenStreamFinishes(result.stream, res, executionContext);
+    try {
+      await setResponse({ ...result, stream: releaseHandle.stream }, res);
+    } catch (error) {
+      releaseHandle.release();
+      throw error;
+    }
+    return;
+  }
+
+  try {
+    await setResponse(result, res);
+  } finally {
+    executionContext.release();
   }
 };
 
@@ -415,7 +572,7 @@ export default function run(config: Partial<Config>) {
             assetsToCopy,
             tracingContext: context,
           });
-          await setResponse(result.response, res);
+          await setResponseAndReleaseExecutionContext(result.response, res, result.executionContext);
         } catch (err) {
           const exceptionMessage = formatExceptionMessage(
             { renderingRequest },
@@ -442,7 +599,115 @@ export default function run(config: Partial<Config>) {
     // Track whether we've already started sending a response (streaming or otherwise)
     // If true, we can't send an error response on failure - headers are already sent
     let responseStarted = false;
+    let incrementalRequestClosed = false;
+    let incrementalResponseFinished = false;
+    let incrementalExecutionContextReleased = false;
+    let incrementalResponseFinishTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let incrementalTracingContext: TracingContext | undefined;
+
+    const clearIncrementalResponseFinishTimeout = () => {
+      if (!incrementalResponseFinishTimeoutId) {
+        return;
+      }
+
+      clearTimeout(incrementalResponseFinishTimeoutId);
+      incrementalResponseFinishTimeoutId = undefined;
+    };
+
+    const releaseIncrementalExecutionContextWhenDone = () => {
+      if (
+        incrementalExecutionContextReleased ||
+        !incrementalRequestClosed ||
+        !incrementalResponseFinished ||
+        !incrementalSink
+      ) {
+        return;
+      }
+
+      clearIncrementalResponseFinishTimeout();
+      incrementalExecutionContextReleased = true;
+      incrementalSink.executionContext.release();
+    };
+
+    const markIncrementalResponseFinished = () => {
+      clearIncrementalResponseFinishTimeout();
+      incrementalResponseFinished = true;
+      releaseIncrementalExecutionContextWhenDone();
+    };
+
+    const scheduleIncrementalResponseFinishTimeout = () => {
+      if (
+        incrementalResponseFinishTimeoutId ||
+        incrementalResponseFinished ||
+        incrementalExecutionContextReleased ||
+        !incrementalSink
+      ) {
+        return;
+      }
+
+      incrementalResponseFinishTimeoutId = setTimeout(() => {
+        incrementalResponseFinishTimeoutId = undefined;
+        if (incrementalResponseFinished || incrementalExecutionContextReleased) {
+          return;
+        }
+
+        log.warn({
+          msg: 'Timed out waiting for incremental render response stream to finish after request closed',
+          timeoutMs: INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS,
+        });
+
+        if (!res.raw.destroyed) {
+          res.raw.destroy();
+        }
+        markIncrementalResponseFinished();
+      }, INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS);
+    };
+
+    const waitForIncrementalRequestClose = async (closeRequestPromise: Promise<void>, timeoutMs: number) => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<'timeout'>((resolve) => {
+        timeoutId = setTimeout(() => resolve('timeout'), timeoutMs);
+      });
+
+      const result = await Promise.race([closeRequestPromise.then(() => 'closed' as const), timeoutPromise]);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      if (result === 'timeout') {
+        log.warn({
+          msg: 'Timed out waiting for incremental render close hook after response started',
+          timeoutMs,
+        });
+      }
+    };
+
+    const closeIncrementalRequest = async ({
+      timeoutMs = INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS,
+    }: { timeoutMs?: number } = {}) => {
+      if (!incrementalSink || incrementalRequestClosed) {
+        return;
+      }
+      const sink = incrementalSink;
+
+      try {
+        await waitForIncrementalRequestClose(
+          Promise.resolve()
+            .then(() => sink.handleRequestClosed())
+            .catch((closeError: unknown) => {
+              log.error({
+                msg: 'Error while closing incremental render request after response started',
+                error: closeError,
+              });
+            }),
+          timeoutMs,
+        );
+      } finally {
+        incrementalRequestClosed = true;
+        scheduleIncrementalResponseFinishTimeout();
+        releaseIncrementalExecutionContextWhenDone();
+      }
+    };
 
     try {
       await trace(
@@ -517,15 +782,30 @@ export default function run(config: Partial<Config>) {
 
             onResponseStart: async (response: ResponseResult) => {
               responseStarted = true;
-              await setResponse(response, res);
-            },
-
-            onRequestEnded: () => {
-              if (!incrementalSink) {
+              if (response.stream) {
+                const markFinished = runWhenStreamFinishes(
+                  response.stream,
+                  res,
+                  markIncrementalResponseFinished,
+                );
+                try {
+                  await setResponse(response, res);
+                } catch (error) {
+                  markFinished();
+                  throw error;
+                }
                 return;
               }
 
-              incrementalSink.handleRequestClosed();
+              try {
+                await setResponse(response, res);
+              } finally {
+                markIncrementalResponseFinished();
+              }
+            },
+
+            onRequestEnded: async () => {
+              await closeIncrementalRequest();
             },
           });
         },
@@ -552,9 +832,9 @@ export default function run(config: Partial<Config>) {
         // The React stream is waiting for async props (e.g., asyncPropsManager.getProp("researches")).
         // If we don't call endStream(), the stream will hang forever waiting for props that will never arrive.
         // This causes onResponse to never fire, leaving activeRequestsCount stuck and preventing worker shutdown.
-        if (incrementalSink) {
-          incrementalSink.handleRequestClosed();
-        }
+        const closeRequestPromise = closeIncrementalRequest({
+          timeoutMs: INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS,
+        });
 
         // CRITICAL: Destroy the response connection to immediately close it.
         // Without this, the response stream stays open waiting for the client (httpx) to timeout,
@@ -563,10 +843,20 @@ export default function run(config: Partial<Config>) {
         if (!res.raw.destroyed) {
           res.raw.destroy();
         }
+
+        await closeRequestPromise;
       } else {
         // Response hasn't started yet, we can send an error response
+        const closeRequestPromise = closeIncrementalRequest({
+          timeoutMs: INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS,
+        });
         const errorResponse = errorResponseResult(errorMessage, incrementalTracingContext);
-        await setResponse(errorResponse, res);
+        try {
+          await setResponse(errorResponse, res);
+        } finally {
+          markIncrementalResponseFinished();
+          await closeRequestPromise;
+        }
       }
     }
   });

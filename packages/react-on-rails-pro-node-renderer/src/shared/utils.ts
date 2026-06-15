@@ -25,6 +25,7 @@ import log from './log.js';
 import type { TracingContext } from './tracing.js';
 import type { RenderResult } from '../worker/vm.js';
 import fileExistsAsync from './fileExistsAsync.js';
+import { remapStackTrace } from '../worker/vmSourceMapSupport.js';
 
 export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
 
@@ -59,7 +60,12 @@ export function smartTrim(value: unknown, maxLength = getConfig().maxDebugSnippe
 }
 
 export interface ResponseResult {
-  headers: { 'Cache-Control'?: string };
+  headers: {
+    'Cache-Control'?: string;
+    'Content-Type'?: string;
+    'X-Content-Type-Options'?: string;
+    [key: string]: string | undefined;
+  };
   status: number;
   data?: unknown;
   stream?: Readable;
@@ -85,10 +91,19 @@ export type RequestInfo = { renderingRequest: string } | { label: string; conten
  * @param request Either a rendering request (auto-labeled) or a { label, content } pair
  * @param error The error that was thrown (typed as `unknown` to minimize casts in `catch`)
  * @param context Optional context to include in the error message
+ * @param stackRemapper Defaults to scanning registered source-map bundles. VM request paths pass a
+ * registration-scoped remapper to avoid rewriting unrelated bundle paths.
  */
-export function formatExceptionMessage(request: RequestInfo, error: unknown, context?: string) {
+export function formatExceptionMessage(
+  request: RequestInfo,
+  error: unknown,
+  context?: string,
+  stackRemapper = remapStackTrace,
+) {
   const label = 'renderingRequest' in request ? 'JS code for rendering request was:' : request.label;
   const content = 'renderingRequest' in request ? request.renderingRequest : request.content;
+  const rawStack = (error as Error).stack;
+  const stack = stackRemapper(rawStack) ?? rawStack;
 
   return `${context ? `\nContext:\n${context}\n` : ''}
 ${label}
@@ -98,7 +113,7 @@ EXCEPTION MESSAGE:
 ${(error as Error).message || error}
 
 STACK:
-${(error as Error).stack}`;
+${stack}`;
 }
 
 // https://github.com/fastify/fastify-multipart?tab=readme-ov-file#usage
@@ -204,14 +219,30 @@ export const delay = (milliseconds: number) =>
     setTimeout(resolve, milliseconds);
   });
 
+// Keep aligned with ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN.
+const BUNDLE_TIMESTAMP_PATH_COMPONENT_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
+
+function bundleTimestampPathComponent(bundleTimestamp: string | number) {
+  const pathComponent = String(bundleTimestamp);
+  if (!BUNDLE_TIMESTAMP_PATH_COMPONENT_PATTERN.test(pathComponent)) {
+    throw new Error(
+      `Invalid bundle timestamp path component: ${pathComponent}. ` +
+        'Expected only letters, digits, dots, underscores, and hyphens.',
+    );
+  }
+
+  return pathComponent;
+}
+
 export function getBundleDirectory(bundleTimestamp: string | number) {
   const { serverBundleCachePath } = getConfig();
-  return path.join(serverBundleCachePath, `${bundleTimestamp}`);
+  return path.resolve(serverBundleCachePath, bundleTimestampPathComponent(bundleTimestamp));
 }
 
 export function getRequestBundleFilePath(bundleTimestamp: string | number) {
-  const bundleDirectory = getBundleDirectory(bundleTimestamp);
-  return path.join(bundleDirectory, `${bundleTimestamp}.js`);
+  const pathComponent = bundleTimestampPathComponent(bundleTimestamp);
+  const bundleDirectory = getBundleDirectory(pathComponent);
+  return path.join(bundleDirectory, `${pathComponent}.js`);
 }
 
 export function getAssetPath(bundleTimestamp: string | number, filename: string) {

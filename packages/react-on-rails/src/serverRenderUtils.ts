@@ -17,6 +17,30 @@ type RenderMetadataSource = {
   isShellReady?: boolean;
 };
 
+// Must match SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY in
+// packages/react-on-rails-pro-node-renderer/src/worker/vmSourceMapSupport.ts.
+const SOURCE_MAPPED_STACK_REMAPPER_KEY = '__reactOnRailsProRemapStackTrace';
+
+type SourceMappedStackRemapper = (stack: unknown) => string | undefined;
+
+type GlobalWithSourceMappedStackRemapper = typeof globalThis & {
+  [SOURCE_MAPPED_STACK_REMAPPER_KEY]?: SourceMappedStackRemapper;
+};
+
+function remapSourceMappedStack(stack: RenderingError['stack']) {
+  const remapper = (globalThis as GlobalWithSourceMappedStackRemapper)[SOURCE_MAPPED_STACK_REMAPPER_KEY];
+  if (typeof remapper !== 'function') {
+    return stack;
+  }
+
+  try {
+    const remappedStack = remapper(stack);
+    return typeof remappedStack === 'string' ? remappedStack : stack;
+  } catch {
+    return stack;
+  }
+}
+
 export function buildRenderMetadata(
   consoleReplayScript: string,
   renderState: RenderMetadataSource,
@@ -27,13 +51,13 @@ export function buildRenderMetadata(
     hasErrors: renderState.hasErrors,
     renderingError: renderState.error && {
       message: renderState.error.message,
-      stack: renderState.error.stack,
+      stack: remapSourceMappedStack(renderState.error.stack),
     },
     isShellReady: 'isShellReady' in renderState ? renderState.isShellReady : undefined,
   };
 }
 
-function isCrossRealmError(e: unknown): e is { message?: unknown } {
+function isCrossRealmError(e: unknown): e is { message?: unknown; stack?: unknown } {
   return typeof e === 'object' && e !== null && Object.prototype.toString.call(e) === '[object Error]';
 }
 
@@ -124,6 +148,11 @@ export function convertToError(e: unknown): Error {
   // tsconfig uses es2020 libs, which do not type Error.cause even though supported runtimes provide it.
   const error = new Error(message) as Error & { cause?: unknown };
   error.cause = e;
+  if (isCrossRealmError(e) && typeof e.stack === 'string') {
+    // Prefer the cross-realm bundle stack over the host wrapping call site; the
+    // original thrown value remains available through `cause`.
+    error.stack = remapSourceMappedStack(e.stack);
+  }
   return error;
 }
 
