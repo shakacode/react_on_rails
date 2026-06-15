@@ -164,7 +164,7 @@ export async function handleIncrementalRenderRequest(
     // Set up pull mode if enabled: inject propRequest emitter into sharedExecutionContext
     // so AsyncPropsManager (inside VM) can emit propRequests to the response stream.
     let finalResponse = response;
-    const { pullEnabled, pushProps } = firstRequestChunk as FirstIncrementalRenderRequestChunk;
+    const { pullEnabled, pushProps } = firstRequestChunk;
     if (pullEnabled && response.stream) {
       const { sharedExecutionContext } = executionContext;
       sharedExecutionContext.set(PULL_ENABLED_KEY, true);

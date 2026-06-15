@@ -57,9 +57,7 @@ const NotificationsSection = async ({ items }: { items: Promise<string[]> }) => 
 
 const SettingsSection = async ({ items }: { items: Promise<Record<string, unknown>> }) => {
   const settings = await items;
-  return (
-    <pre data-testid="settings-json">{JSON.stringify(settings, null, 2)}</pre>
-  );
+  return <pre data-testid="settings-json">{JSON.stringify(settings, null, 2)}</pre>;
 };
 
 const LazyPropsComponent = ({ title, getReactOnRailsAsyncProp }: PropsType) => {

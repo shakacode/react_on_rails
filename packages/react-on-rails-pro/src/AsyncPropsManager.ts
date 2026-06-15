@@ -137,6 +137,7 @@ class AsyncPropsManager {
     this.propNameToPromiseController.forEach((promiseController, propName) => {
       if (!promiseController.resolved) {
         promiseController.reject(AsyncPropsManager.getNoPropFoundError(propName));
+        // eslint-disable-next-line no-param-reassign
         promiseController.resolved = true;
       }
     });
@@ -166,6 +167,7 @@ class AsyncPropsManager {
 
     this.propNameToPromiseController.forEach((controller, propName) => {
       if (!controller.resolved && !controller.pullRequested && !this.isPushProp(propName)) {
+        // eslint-disable-next-line no-param-reassign
         controller.pullRequested = true;
         this.emitPropRequest(propName);
       }
