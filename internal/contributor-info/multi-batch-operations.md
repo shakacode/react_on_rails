@@ -204,9 +204,11 @@ registered capacity profiles and enabled inboxes. The flow is:
 2. Read runtime capacity profiles and inbox config from the private backend or
    a gitignored local config file.
 3. Convert the registered profiles into lane slots, bound the total by enabled
-   inboxes, then subtract live, blocked, and reserved lanes. If live occupancy,
-   blocked lanes, reserved lanes, profiles, or inbox config cannot be verified,
-   stop phase 2 with a precise blocker instead of deriving a group count.
+   inboxes, then subtract the unique occupied/reserved lane-ref set. That set
+   includes live in-progress lanes, live blocked lanes, blocked lanes without a
+   live heartbeat, and reserved lanes. If lane refs, heartbeat liveness, blocked
+   state, reserved state, profiles, or inbox config cannot be verified, stop
+   phase 2 with a precise blocker instead of deriving a group count.
 4. If no lane slots remain while actionable work remains, report "all lanes
    currently occupied" and stop phase 2 instead of inventing groups.
 5. Split the current wave into up to one non-empty group per available lane slot,

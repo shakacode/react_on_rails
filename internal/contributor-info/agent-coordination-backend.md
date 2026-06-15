@@ -125,8 +125,10 @@ Capacity-aware triage derives group count from registered state:
 1. Read current capacity profiles and enabled inbox config.
 2. Convert profiles into available lane slots from `max_concurrent_batches`,
    bounded by enabled inboxes.
-3. Subtract current live, blocked, and reserved lanes from the bounded total. If
-   live occupancy, blocked lanes, reserved lanes, profiles, or inbox config
+3. Build a unique occupied/reserved lane-ref set from live in-progress lanes,
+   live blocked lanes, blocked lanes without a live heartbeat, and reserved
+   lanes, then subtract that set size from the bounded total. If lane refs,
+   heartbeat liveness, blocked state, reserved state, profiles, or inbox config
    cannot be verified, stop phase 2 with a precise blocker instead of deriving
    `N`.
 4. Let `N` be the resulting available lane-slot count.

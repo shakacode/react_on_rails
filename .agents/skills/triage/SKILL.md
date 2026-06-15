@@ -73,12 +73,15 @@ after phase 1 with a precise blocker.
 2. Set `N` to the number of available lane slots:
    - Sum `max_concurrent_batches` across registered capacity profiles.
    - Bound that sum by the count of enabled inboxes.
-   - Subtract live, blocked, and reserved lanes from the bounded total.
-     If live occupancy, blocked lanes, reserved lanes, profiles, or inbox config
-     cannot be verified, stop phase 2 with a precise blocker instead of deriving
-     `N`.
-   - If `N` is 0 after subtracting live, blocked, and reserved lanes, report
-     "all lanes currently occupied" and stop phase 2 instead of inventing groups.
+   - Build a unique occupied/reserved lane-ref set from live in-progress lanes,
+     live blocked lanes, blocked lanes without a live heartbeat, and reserved
+     lanes, then subtract that set size from the bounded total. If lane refs,
+     heartbeat liveness, blocked state, reserved state, profiles, or inbox
+     config cannot be verified, stop phase 2 with a precise blocker instead of
+     deriving `N`.
+   - If `N` is 0 after subtracting occupied/reserved lane refs, report "all
+     lanes currently occupied" and stop phase 2 instead of inventing groups.
+
 3. Split the actionable worklist into up to `N` non-empty groups for the current
    wave, honoring dependencies, file/risk disjointness, package boundaries,
    release gates, cross-repo sequencing, and the `$pr-batch` per-batch cap: 8
