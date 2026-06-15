@@ -23,6 +23,7 @@ import { getSSRCache } from '@shakacode/use-ssr-computation.runtime/lib/ssrCache
 import { RailsContext } from 'react-on-rails-pro';
 import ApolloGraphQL from '../components/LazyApolloGraphQL';
 import { preloadQuery } from '../ssr-computations/userQuery.ssr-computation';
+import { serializeForInlineScript } from '../utils/serializeForInlineScript';
 import { setApolloClient } from '../utils/lazyApollo';
 
 type Props = {
@@ -32,7 +33,7 @@ type Props = {
   };
 };
 
-export default async (props: Props, _railsContext: RailsContext) => {
+export default async (props: Props, railsContext: RailsContext) => {
   const { csrf, sessionCookie } = props.ssrOnlyProps;
   const client = new ApolloClient({
     ssrMode: true,
@@ -60,11 +61,14 @@ export default async (props: Props, _railsContext: RailsContext) => {
   // you need to return additional property `apolloStateTag`, to fulfill the state for hydration
   const apolloStateTag = renderToString(
     <script
+      // Carry the per-request CSP nonce so the strict policy
+      // (config/initializers/content_security_policy.rb) allows this inline script.
+      nonce={railsContext.cspNonce}
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{
         __html: `
-          window.__APOLLO_STATE__=${JSON.stringify(initialState).replace(/</g, '\\u003c')};
-          window.__SSR_COMPUTATION_CACHE=${JSON.stringify(getSSRCache())};
+          window.__APOLLO_STATE__=${serializeForInlineScript(initialState)};
+          window.__SSR_COMPUTATION_CACHE=${serializeForInlineScript(getSSRCache())};
         `,
       }}
     />,

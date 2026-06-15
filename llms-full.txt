@@ -717,6 +717,28 @@ For detailed proof criteria and migration contribution guidance, see
   legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
   source.
 
+## Control Plane Cost Posture
+
+For public demo and starter staging deployments on Control Plane, keep the app
+workload as `type: standard` with `minScale: 1`, set its autoscaling metric to
+`disabled`, and enable `capacityAI: true` so Control Plane can right-size idle
+capacity while the demo keeps one warm replica. With the autoscaling metric set
+to `disabled`, treat replica count as fixed; `maxScale` is not a burst-scaling
+lever in this posture. If a demo must absorb traffic bursts, choose a compatible
+autoscaling metric deliberately and set a tested `maxScale` ceiling for that
+separate scaling posture.
+Avoid `CPU Utilization` autoscaling with `minScale: 1` / `maxScale: 1` for
+these small staging apps because that combination prevents Capacity AI from
+right-sizing the warm workload.
+
+This is not the same as scale-to-zero: steady RAM usage and background work can
+still drive cost, and shared Postgres should usually stay manually sized. If a
+demo explicitly needs true idle scale-to-zero, create a separate `serverless`
+workload before first deploy or plan a delete/recreate migration because Control
+Plane will not change an existing `standard` workload to `serverless` in place.
+The reusable guidance lives in
+[Control Plane Flow: Enable Capacity AI for Demo and Starter Staging Apps](https://github.com/shakacode/control-plane-flow/blob/main/docs/tips.md#enable-capacity-ai-for-demo-and-starter-staging-apps).
+
 ## Legacy Repos
 
 Version-specific demos, `test-*` repos, generator snapshots, and older tutorial
@@ -6932,6 +6954,96 @@ using a separate webpack configuration to generate the server bundle file,
 then you **must not** include the hash in the output filename or else you will
 have a race condition overwriting your `manifest.json`. Regardless of which
 case you have, React on Rails handles it.
+
+---
+
+## Tag-Based Revalidation
+
+Cache keys answer "is this entry still current?" at read time. Tags answer a different question: "delete everything that depends on this data, right now." With `cache_tags:`, you attach declarative invalidation handles to fragment-cached components and bust them all with one call — the React on Rails Pro analog of Next.js `revalidateTag`.
+
+```erb
+<%= cached_react_component("PostShow",
+      cache_key: [@post, I18n.locale],
+      cache_tags: [@post, @post.author],
+      cache_options: { expires_in: 12.hours }) do
+      { post: @post.to_props }
+    end %>
+```
+
+```ruby
+# Anywhere in Ruby — controller, job, service object, console:
+ReactOnRailsPro.revalidate_tag(post) # => number of cache entries deleted
+ReactOnRailsPro.revalidate_tags(post, post.author)
+```
+
+`cache_tags:` is accepted by all four cached helpers — `cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, and `cached_async_react_component` — and is purely additive: `cache_key:` semantics are unchanged, and `cache_key:` is still required.
+
+### Tag forms and normalization
+
+A tag can be:
+
+- a **String** — passed through unchanged (`"post:42"`)
+- a **Symbol or Numeric** — stringified via `.to_s` (`:featured` -> `"featured"`, `42` -> `"42"`)
+- an object responding to **`#cache_key`** (any ActiveRecord model) — ActiveRecord-style records normalize to the stable identity `posts/42` (equal to the version-less `record.cache_key`, and stable even when `cache_versioning` is disabled), so the tag stays valid as the record changes; other objects pass their `#cache_key` through. Objects with both `model_name` and `id` always resolve to `collection/id`; pass an explicit String tag if you want a different key.
+- a **Proc** (arity 0) returning any accepted form
+- an **Array** of any mix of the above
+
+Tags that normalize to blank raise `ReactOnRailsPro::Error`. Tag coarsely (`post:42`, `tenant:7`, `posts:index`) — never per-user or per-request; see the index bounds below.
+
+### Revalidating from the model layer
+
+Include the `Revalidates` concern so the model that owns the data also owns cache invalidation. It runs in `after_commit`, so it never fires for a rolled-back transaction and fires only after the new data is visible to the re-rendering request:
+
+```ruby
+class Post < ApplicationRecord
+  include ReactOnRailsPro::Cache::Revalidates
+
+  revalidates_react_cache # default tag: record.cache_key, e.g. "posts/42"
+  # or custom / additional tags:
+  # revalidates_react_cache { |post| ["post:#{post.id}", "author:#{post.author_id}"] }
+end
+```
+
+This covers create/update/destroy and `touch` — so `belongs_to ..., touch: true` composes for free: touching the parent fires the parent's revalidation. The standard Rails callback caveat applies: `update_column`, `update_all`, `delete_all`, and other callback-skipping writes do not trigger revalidation; call `ReactOnRailsPro.revalidate_tags(record)` yourself after such writes.
+
+One more caveat for custom tag blocks: the block runs in `after_commit` and sees only the record's **new** values. If a custom tag derives from a mutable attribute (e.g. `"author:#{post.author_id}"` and a post moves to a different author), the old grouping's entries are not revalidated — they expire via `expires_in`. Prefer tags derived from the record's own identity, or revalidate the old grouping explicitly (`previous_changes` in `after_commit` has the prior value).
+
+### How it works, and the contract
+
+On every tagged cache write, the final cache key is appended to a per-tag index entry in `Rails.cache` (keyed by a SHA-256 digest under `rorp:tag:v1:` so long tag names and whitespace do not violate cache-store key limits). `revalidate_tag` reads the index, deletes the recorded entries with `delete_multi`, then deletes the index entry. A missing index (never-written tag, evicted entry, `:null_store`) means "nothing to revalidate" — never an error.
+
+**Tag revalidation is best-effort; correctness is bounded by `expires_in`.** `ActiveSupport::Cache` has no atomic set-append, so the index append is a read-modify-write: two processes caching different entries under the same tag at the same moment can race, and one entry can be lost _from the index_ (the cached data itself is never lost). A lost index entry simply survives `revalidate_tag` and expires via its own `expires_in`. The same applies when the index entry itself is LRU-evicted. Therefore:
+
+- **Always set `expires_in` (or `expires_at`) on tagged entries.** It is the upper bound on how long a missed invalidation can serve stale HTML. In development, React on Rails Pro logs a warning when `cache_tags:` is used without an expiry.
+- **Use a shared cache store in production** — Redis or Memcached. With `:memory_store` the index is per-process, so `revalidate_tag` in one process cannot see entries written by another; with `:null_store` tags are inert.
+- **Keep cache deletion failures bounded by expiry.** `revalidate_tag` clears the tag index before deleting the indexed entries to reduce re-registration races. If the cache store raises during deletion, any surviving entries are orphaned from that tag and only expire via their own `expires_in`.
+- **Custom cache stores must honor `namespace: nil` in `delete_multi` and `delete`.** The tag index records the fully namespaced logical keys that Rails wrote, then suppresses the store default namespace at delete time. Stores that ignore `options[:namespace]` can silently miss tag-revalidation deletes.
+
+Two config knobs bound the index (defaults shown):
+
+```ruby
+ReactOnRailsPro.configure do |config|
+  config.cache_tag_index_expires_in = 7.days # index TTL ceiling for entries without expires_in
+  config.cache_tag_index_max_keys = 5_000    # keys recorded per tag; oldest dropped beyond this
+end
+```
+
+When a tagged entry has `expires_in`, the index entry's TTL automatically covers it (plus slack). When a tag exceeds the per-tag key cap, the oldest keys are dropped with a logged warning — those entries fall back to plain TTL expiration.
+
+Note that tags solve **data**-driven invalidation only. Deploy invalidation is already handled by the server-bundle digest in the cache key (see [Cache Warming](#cache-warming)) — a deploy cold-starts prerendered fragment caches regardless of tags.
+
+### Next.js mapping
+
+| Next.js 16 (Cache Components)                       | React on Rails Pro                                                                      |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `'use cache'` on a function/component               | `cached_react_component` / `cached_react_component_hash` / streaming and async variants |
+| `cacheTag('post-42')` inside the cached scope       | `cache_tags: ["post:42"]` helper option                                                 |
+| `revalidateTag('post-42')` in a Server Action       | `ReactOnRailsPro.revalidate_tag("post:42")` — anywhere in Ruby, incl. `after_commit`    |
+| Manually wiring `revalidateTag` into every mutation | `include ReactOnRailsPro::Cache::Revalidates` — invalidation rides the AR transaction   |
+| `cacheLife` profiles                                | `cache_options: { expires_in: ... }`                                                    |
+| `revalidateTag(tag, 'max')` / SWR profiles          | Not yet supported (stale-while-revalidate is a possible future addition)                |
+
+Like Next.js's default `revalidateTag`, revalidation deletes: the next request re-renders and re-registers. There is no background refresh.
 
 ---
 
@@ -17801,6 +17913,15 @@ cpflow deploy-image -a myapp   # deploy the pushed image to Control Plane
 - **GVC environment variables**: Set shared environment variables at the GVC level so all workloads inherit them. See the [Control Plane Flow guide to secrets and ENV values](https://github.com/shakacode/control-plane-flow/blob/main/docs/secrets-and-env-values.md).
 - **Secrets**: Use Control Plane's built-in secrets management (`cpln://secret/...`) instead of environment variables for sensitive values.
 - **One-off tasks**: Run migrations and other one-off commands via `cpflow run -a myapp -- bundle exec rails db:migrate`.
+- **Public demo and starter staging apps**: Keep `type: standard` workloads
+  with `minScale: 1`, the autoscaling metric disabled, and `capacityAI: true`.
+  Avoid CPU Utilization autoscaling pinned to `minScale: 1` / `maxScale: 1`,
+  because that prevents Capacity AI from right-sizing the warm workload. When
+  the autoscaling metric is disabled, do not rely on `maxScale` for bursts; use
+  a compatible autoscaling metric for that separate scaling posture. Use
+  `serverless` scale-to-zero only as an explicit first-deploy choice or planned
+  delete/recreate migration. See the
+  [Control Plane Cost Posture](../getting-started/examples-and-references.md#control-plane-cost-posture).
 - **Multiple locations**: Control Plane supports multi-region deployment. Add locations to your GVC to deploy globally.
 
 ## Node Renderer in containers
@@ -27616,6 +27737,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro]** **Tag-based cache revalidation (a Next.js `revalidateTag` analog)**: The fragment-caching helpers (`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, `cached_async_react_component`) now accept an optional `cache_tags:` option (String, Proc, any object responding to `cache_key` such as an ActiveRecord model, or an Array of any mix), and the new `ReactOnRailsPro.revalidate_tag(tag)` / `revalidate_tags(*tags)` API deletes every cached entry registered under a tag via a `Rails.cache`-backed tag->key index. A new `ReactOnRailsPro::Cache::Revalidates` ActiveRecord concern (`revalidates_react_cache`) drives revalidation from `after_commit`, so the model that owns the data also owns cache invalidation (and composes with `touch:`). Revalidation is best-effort with correctness bounded by `expires_in` (a development-mode warning fires when `cache_tags:` is used without it); index growth is bounded by the new `config.cache_tag_index_expires_in` (default 7 days) and `config.cache_tag_index_max_keys` (default 5,000) settings. Existing `cache_key:`-only behavior is unchanged. Closes [Issue 3871](https://github.com/shakacode/react_on_rails/issues/3871). [PR 3964](https://github.com/shakacode/react_on_rails/pull/3964) by [justin808](https://github.com/justin808).
 - **React 19 root error callbacks**: `ReactOnRails.setOptions({ rootErrorHandlers: { onRecoverableError, onCaughtError, onUncaughtError } })` registers React's root error callbacks globally; React on Rails applies them to every `hydrateRoot`/`createRoot` call it makes and invokes them with an extra context argument whose `componentName` and `domNodeId` fields are optional. In development, recoverable hydration errors now log an actionable React on Rails message (component name, dom id, component stack, and a link to the new [Debugging Hydration Mismatches guide](https://reactonrails.com/docs/building-features/debugging-hydration-mismatches)) alongside React's default error reporting, which stays intact so window-'error'-based tooling keeps working. Partial `rootErrorHandlers` updates merge per key, so registering one callback later does not drop the others. On React <19 (and <18 for `onRecoverableError`), React on Rails retains registrations for future upgrades, but the current runtime cannot invoke unsupported callbacks and logs a one-time console warning. On React on Rails Pro RSC/streaming hydration paths, user callbacks chain with (never replace) Pro's internal recoverable-error handler. Addresses [Issue 3892](https://github.com/shakacode/react_on_rails/issues/3892). [PR 3933](https://github.com/shakacode/react_on_rails/pull/3933) by [justin808](https://github.com/justin808).
 - **`useRailsForm` hook + `render_model_errors` controller concern (an Inertia `useForm`-style bridge to Rails controllers)**: New React hook `useRailsForm` (importable from `react-on-rails/useRailsForm`) makes posting a React form to a plain Rails controller turnkey: `data`/`setData`, per-field `errors`, `processing`, `wasSuccessful`, submit verbs (`post`/`put`/`patch`/`delete`/`submit`), `reset`/`clearErrors`/`setError`, automatic CSRF attachment from the Rails csrf-token meta tag, JSON request/response handling, and mapping of `422` + `{ errors: { field: ["message"] } }` responses onto per-field error state. Success results surface a `redirectTo` target (followed-redirect URL or JSON `redirect_to` hint) without navigating, forward-compatible with the client-routing work in [Issue 3873](https://github.com/shakacode/react_on_rails/issues/3873). The gem side adds the opt-in `ReactOnRails::Controller::FormResponders` concern whose `render_model_errors(record)` renders ActiveModel errors in exactly that shape, so validations stay in the model with no API layer and no client-side duplication. Includes a new [Forms and Mutations](docs/oss/building-features/forms.md) docs page (with an Inertia `useForm` mapping table and a Server Functions [Issue 3867](https://github.com/shakacode/react_on_rails/issues/3867) cross-link) and a runnable dummy-app example (`/rails_form`). v1 is fetch-only; `transform`, `recentlySuccessful`, and file-upload `progress` are deferred. Closes [Issue 3872](https://github.com/shakacode/react_on_rails/issues/3872). [PR 3942](https://github.com/shakacode/react_on_rails/pull/3942) by [justin808](https://github.com/justin808).
 
@@ -30219,171 +30341,6 @@ Explicitly declare store dependencies for each component:
 ```
 
 This allows `ComponentWithNoStore` to hydrate immediately without waiting for `SimpleStore`, improving page performance.
-
-================================================================================
-PAGE: https://reactonrails.com/docs/upgrading/release-notes/16.1.0
-SOURCE: docs/oss/upgrading/release-notes/16.1.0.md
-================================================================================
-
-# React on Rails 16.1.x Release Notes
-
-## Upgrading from 16.0.x to 16.1.x
-
-Update your gem and npm package versions:
-
-```ruby
-# Gemfile
-gem "react_on_rails", "16.1.1"
-gem "shakapacker", "8.2.0"
-```
-
-```json
-// package.json
-{
-  "dependencies": {
-    "react-on-rails": "16.1.1",
-    "shakapacker": "8.2.0"
-  }
-}
-```
-
-Then run `bundle install` and your package manager's install command.
-
-**Important:** The shakapacker gem and npm package versions must match exactly.
-
-## Version Compatibility
-
-| Component   | Minimum | Recommended |
-| ----------- | ------- | ----------- |
-| Ruby        | 3.0     | 3.3+        |
-| Node.js     | 18      | 22+         |
-| Shakapacker | 6.0     | 8.2.0+      |
-| React       | 18      | 18+         |
-| Rails       | 5.2     | 7.0+        |
-
-**Note:** CI tests against Ruby 3.2+ and Node.js 20+, but the gem supports lower versions as shown above.
-
-## New Features in v16.1.0
-
-### Doctor Rake Task
-
-New diagnostic command for troubleshooting setup issues:
-
-```bash
-rake react_on_rails:doctor
-VERBOSE=true rake react_on_rails:doctor  # For detailed output
-```
-
-### Server Bundle Security
-
-New configuration options for enhanced server bundle security:
-
-```ruby
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
-  # Directory for server bundle output (default: "ssr-generated")
-  config.server_bundle_output_path = "ssr-generated"
-
-  # When enabled, server bundles only load from private directories
-  config.enforce_private_server_bundles = true
-end
-```
-
-### Enhanced bin/dev Script
-
-The updated `bin/dev` script provides better development server management with support for multiple modes:
-
-- `bin/dev` - Default HMR mode with webpack-dev-server
-- `bin/dev static` - Watch mode without HMR
-- `bin/dev prod` - Development with production-optimized assets
-
-### Multiple Procfile Support
-
-Three Procfile configurations for different development scenarios:
-
-1. **Procfile.dev** (HMR mode) - Rails server + webpack dev server for client + webpack watch for server bundle
-2. **Procfile.dev-static-assets** (Static watch mode) - Rails server + webpack watch mode
-3. **Procfile.dev-prod-assets** (Production assets in development) - Rails server with production-optimized assets
-
-### Webpack Configuration Updates
-
-- New `generateWebpackConfigs.js` helper for better configuration management
-- Improved babel.config.js setup
-
-### Generator Improvements
-
-**Note:** These improvements only affect newly generated code from `rails g react_on_rails:install` or component generators. Existing applications are unaffected.
-
-- Modern TypeScript patterns with better type inference
-- Optimized tsconfig.json with `"moduleResolution": "bundler"`
-- Enhanced Redux TypeScript integration
-- Smart `bin/dev` defaults that auto-navigate to `/hello_world` route
-
-## Security Enhancements
-
-v16.1.0 includes important security improvements:
-
-- **Command injection protection**: Fixed command injection vulnerabilities in generator package installation commands by replacing unsafe string interpolation with secure array-based system calls ([PR 1786](https://github.com/shakacode/react_on_rails/pull/1786)) by [justin808](https://github.com/justin808)
-- **Improved input validation**: Enhanced package manager validation and argument sanitization across all generators ([PR 1786](https://github.com/shakacode/react_on_rails/pull/1786)) by [justin808](https://github.com/justin808)
-- **Hardened DOM selectors**: Using `CSS.escape()` and proper JavaScript escaping for XSS protection ([PR 1791](https://github.com/shakacode/react_on_rails/pull/1791)) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
-
-## Bug Fixes
-
-### v16.1.1
-
-- Fixed RSC manifest file path resolution ([PR 1818](https://github.com/shakacode/react_on_rails/pull/1818)) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
-
-### v16.1.0
-
-- Fixed LoadError in `rake react_on_rails:doctor` when using packaged gem ([PR 1795](https://github.com/shakacode/react_on_rails/pull/1795)) by [justin808](https://github.com/justin808)
-- Fixed packs generator error when `server_bundle_js_file` is empty ([PR 1802](https://github.com/shakacode/react_on_rails/pull/1802)) by [justin808](https://github.com/justin808)
-- Fixed NoMethodError in environments without Shakapacker ([PR 1806](https://github.com/shakacode/react_on_rails/pull/1806)) by [justin808](https://github.com/justin808)
-- Fixed inconsistent Shakapacker version requirements ([PR 1806](https://github.com/shakacode/react_on_rails/pull/1806)) by [justin808](https://github.com/justin808)
-
-## Deprecations
-
-Remove `config.generated_assets_dirs` from your configuration - asset paths are now automatically determined from `shakapacker.yml`.
-
-## Common Upgrade Issues
-
-### Shakapacker Version Mismatch
-
-**Symptom:** Assets fail to compile or inconsistent behavior between development and production.
-
-**Solution:** Ensure your Shakapacker gem and npm package versions match exactly:
-
-```bash
-# Check gem version
-bundle show shakapacker
-
-# Check npm version
-npm list shakapacker
-# or
-yarn list shakapacker
-```
-
-Both should show the same version (e.g., 8.2.0).
-
-### Missing Server Bundle After Upgrade
-
-**Symptom:** Server-side rendering fails with "bundle not found" errors.
-
-**Solution:** If you're using `server_bundle_output_path`, ensure the directory exists and your build process outputs to that location. Run `rake react_on_rails:doctor` to diagnose configuration issues.
-
-## Pro License Features
-
-v16.1.0 introduced foundational changes for React on Rails Pro, including:
-
-- Core/Pro separation with clear licensing boundaries
-- Runtime license validation with graceful fallback
-- Enhanced immediate hydration (Pro-only feature)
-
-These changes are internal and do not affect open-source users. For information about Pro features like streaming SSR, React Server Components, and enhanced performance optimizations, see [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-
-## Related Resources
-
-- [Changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
-- [Configuration Reference](../../configuration/README.md)
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/upgrading/release-notes/16.2.0

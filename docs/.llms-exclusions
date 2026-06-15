@@ -22,3 +22,7 @@ misc/updating-dependencies
 misc/credits
 misc/articles
 misc/tips
+
+# Older release-note detail pages remain linked from the release-notes index.
+# Excluded until llms-full is split so current product/API docs stay under the cap.
+upgrading/release-notes/16.1.0

@@ -213,6 +213,7 @@ const sidebars: SidebarsConfig = {
         'pro/deployment/review-app-security',
         'pro/upgrading-to-pro',
         'pro/streaming-ssr',
+        'pro/strict-csp',
         'pro/async-props-database-queries',
         'pro/node-renderer',
         'pro/rolling-deploy-adapters',
