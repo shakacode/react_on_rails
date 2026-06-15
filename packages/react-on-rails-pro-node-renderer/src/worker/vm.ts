@@ -237,13 +237,13 @@ async function buildVM(filePath: string): Promise<VMContext> {
       const bundleContents = await readFileAsync(filePath, 'utf8');
       const firstLineColumnOffset =
         additionalContextIsObject || supportModules ? MODULE_WRAP_FIRST_LINE_PREFIX_LENGTH : 0;
-      const preloadedSourceMapJson = await preloadSourceMapJsonForBundle(filePath, bundleContents);
+      const preloadedSourceMap = await preloadSourceMapJsonForBundle(filePath, bundleContents);
       const currentSourceMapRegistration = registerBundleForSourceMaps(
         filePath,
         firstLineColumnOffset,
         bundleContents,
-        preloadedSourceMapJson,
-        preloadedSourceMapJson === undefined,
+        preloadedSourceMap.sourceMapJson,
+        preloadedSourceMap.retryMissingSourceMap,
       );
       sourceMapRegistration = currentSourceMapRegistration;
 

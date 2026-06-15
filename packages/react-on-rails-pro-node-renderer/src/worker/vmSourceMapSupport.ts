@@ -67,6 +67,7 @@ export interface BundleSourceMapRegistration {
    * a newer map.
    */
   sourceMapJson?: string | null;
+  realBundleDirectory: string;
   /**
    * External source maps can arrive after a bundle first becomes visible. When
    * true, a missing external map is retried briefly before caching the miss.
@@ -99,6 +100,7 @@ const sourceMapLookupAttempts = new WeakSet<SourceMapLookupAttempt>();
 let warnedMissingSourceMapConstructor = false;
 
 const MAX_MISSING_SOURCE_MAP_RETRIES = 5;
+const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
 
 function shouldRetryMissingSourceMap(registration: BundleSourceMapRegistration) {
   return registration.retryMissingSourceMap === true && !retiredMissingSourceMapRetries.has(registration);
@@ -193,14 +195,20 @@ function parseDataUrlSourceMap(url: string): string | undefined {
     return undefined;
   }
   const payload = url.slice(commaIndex + 1);
+  if (payload.length > MAX_INLINE_SOURCE_MAP_BYTES) {
+    return undefined;
+  }
+
   if (metadata.split(';').includes('base64')) {
-    return Buffer.from(payload, 'base64').toString('utf8');
+    const decoded = Buffer.from(payload, 'base64').toString('utf8');
+    return decoded.length <= MAX_INLINE_SOURCE_MAP_BYTES ? decoded : undefined;
   }
 
   try {
-    return decodeURIComponent(payload);
+    const decoded = decodeURIComponent(payload);
+    return decoded.length <= MAX_INLINE_SOURCE_MAP_BYTES ? decoded : undefined;
   } catch {
-    return payload;
+    return payload.length <= MAX_INLINE_SOURCE_MAP_BYTES ? payload : undefined;
   }
 }
 
@@ -282,7 +290,11 @@ function candidateSourceMapPaths(bundleFilePath: string, sourceMappingUrl: strin
   return Array.from(new Set(candidatePaths));
 }
 
-function resolveReadableSourceMapPath(bundleFilePath: string, candidatePath: string) {
+function resolveReadableSourceMapPath(
+  bundleFilePath: string,
+  candidatePath: string,
+  realBundleDirectory: string,
+) {
   const bundleDirectory = path.dirname(bundleFilePath);
   try {
     const resolvedPath = path.resolve(candidatePath);
@@ -290,21 +302,12 @@ function resolveReadableSourceMapPath(bundleFilePath: string, candidatePath: str
       return undefined;
     }
 
-    const realBundleDirectory = fs.realpathSync(bundleDirectory);
     const realSourceMapPath = fs.realpathSync(resolvedPath);
     if (!isPathInsideOrEqual(realSourceMapPath, realBundleDirectory)) {
-      const linkStats = fs.lstatSync(resolvedPath);
-      const targetStats = fs.statSync(resolvedPath);
-      // Pro pre-stage symlink mode creates trusted symlink entries inside the
-      // bundle directory. The sourceMappingURL still has to be a plain file name.
-      // SECURITY: that bundle directory must not be writable by untrusted
-      // parties; an attacker-controlled symlink would let the loader read any
-      // file the renderer process can access. The symlink path is returned for
-      // read-time compatibility with trusted Pro pre-stage tooling, so this does
-      // not defend against TOCTOU changes by an untrusted bundle-directory writer.
-      if (linkStats.isSymbolicLink() && targetStats.isFile()) {
-        return resolvedPath;
-      }
+      return undefined;
+    }
+
+    if (!fs.statSync(realSourceMapPath).isFile()) {
       return undefined;
     }
 
@@ -314,26 +317,30 @@ function resolveReadableSourceMapPath(bundleFilePath: string, candidatePath: str
   }
 }
 
-function readSourceMapFile(bundleFilePath: string, candidatePath: string) {
-  const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath);
+function readSourceMapFile(bundleFilePath: string, candidatePath: string, realBundleDirectory: string) {
+  const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
   if (!sourceMapPath) {
     return undefined;
   }
 
-  // `sourceMapPath` is filename-only and either realpath-checked under the bundle
-  // directory or a symlink entry staged inside that directory by trusted Pro tooling.
+  // `sourceMapPath` is filename-only and read through a final realpath that must
+  // stay inside the real bundle directory, closing symlink-swap races.
   // codeql[js/path-injection]
   return fs.readFileSync(sourceMapPath, 'utf8');
 }
 
-async function readSourceMapFileAsync(bundleFilePath: string, candidatePath: string) {
-  const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath);
+async function readSourceMapFileAsync(
+  bundleFilePath: string,
+  candidatePath: string,
+  realBundleDirectory: string,
+) {
+  const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
   if (!sourceMapPath) {
     return undefined;
   }
 
-  // `sourceMapPath` is filename-only and either realpath-checked under the bundle
-  // directory or a symlink entry staged inside that directory by trusted Pro tooling.
+  // `sourceMapPath` is filename-only and read through a final realpath that must
+  // stay inside the real bundle directory, closing symlink-swap races.
   // codeql[js/path-injection]
   return fs.promises.readFile(sourceMapPath, 'utf8');
 }
@@ -341,6 +348,7 @@ async function readSourceMapFileAsync(bundleFilePath: string, candidatePath: str
 function readSourceMapJsonForBundle(
   bundleFilePath: string,
   sourceMappingUrl: string | undefined,
+  realBundleDirectory: string,
 ): string | undefined {
   try {
     // Stack formatting is synchronous, so source-map discovery stays sync and
@@ -353,7 +361,7 @@ function readSourceMapJsonForBundle(
     // uploaded alongside it under that name is also worth checking.
     const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
     for (const candidatePath of candidatePaths) {
-      const sourceMapJson = readSourceMapFile(bundleFilePath, candidatePath);
+      const sourceMapJson = readSourceMapFile(bundleFilePath, candidatePath, realBundleDirectory);
       if (sourceMapJson) {
         return sourceMapJson;
       }
@@ -368,6 +376,7 @@ function readSourceMapJsonForBundle(
 async function readSourceMapJsonForBundleAsync(
   bundleFilePath: string,
   sourceMappingUrl: string | undefined,
+  realBundleDirectory: string,
 ): Promise<string | undefined> {
   try {
     if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
@@ -377,7 +386,7 @@ async function readSourceMapJsonForBundleAsync(
     const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
     for (const candidatePath of candidatePaths) {
       // eslint-disable-next-line no-await-in-loop
-      const sourceMapJson = await readSourceMapFileAsync(bundleFilePath, candidatePath);
+      const sourceMapJson = await readSourceMapFileAsync(bundleFilePath, candidatePath, realBundleDirectory);
       if (sourceMapJson) {
         return sourceMapJson;
       }
@@ -392,20 +401,38 @@ async function readSourceMapJsonForBundleAsync(
 /** @internal Used by VM build to avoid synchronous external-map reads. */
 export async function preloadSourceMapJsonForBundle(bundleFilePath: string, bundleContents: string) {
   const sourceMappingUrl = extractSourceMappingUrl(bundleContents);
+  const realBundleDirectory = fs.realpathSync(path.dirname(bundleFilePath));
   if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
-    return parseDataUrlSourceMap(sourceMappingUrl) ?? null;
+    return {
+      retryMissingSourceMap: false,
+      sourceMapJson: parseDataUrlSourceMap(sourceMappingUrl) ?? null,
+    };
   }
 
   // External maps can arrive just after the bundle during upload/pre-stage flows.
   // Leave misses lazy; VM registrations mark them retryable so a first error
   // before the map copy finishes does not cache a permanent miss.
-  const sourceMapJson = await readSourceMapJsonForBundleAsync(bundleFilePath, sourceMappingUrl);
+  const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
+  const existingCandidate = candidatePaths.some((candidatePath) =>
+    Boolean(resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory)),
+  );
+  const sourceMapJson = await readSourceMapJsonForBundleAsync(
+    bundleFilePath,
+    sourceMappingUrl,
+    realBundleDirectory,
+  );
   if (sourceMapJson !== undefined && !isValidJson(sourceMapJson)) {
     log.debug('Preloaded source map for bundle %s is not valid JSON yet; retrying lazily.', bundleFilePath);
-    return undefined;
+    return { retryMissingSourceMap: true, sourceMapJson: undefined };
   }
 
-  return sourceMapJson;
+  return {
+    // Without a sourceMappingURL or an observed fallback map, do not keep
+    // retrying every error-path stack lookup for bundles that have no map.
+    retryMissingSourceMap:
+      sourceMapJson === undefined && (sourceMappingUrl !== undefined || existingCandidate),
+    sourceMapJson,
+  };
 }
 
 /**
@@ -434,6 +461,7 @@ export function registerBundleForSourceMaps(
   const registration = {
     bundleFilePath,
     firstLineColumnOffset,
+    realBundleDirectory: fs.realpathSync(path.dirname(bundleFilePath)),
     sourceMappingUrl,
     sourceMapJson:
       preloadedSourceMapJson !== undefined
@@ -530,7 +558,7 @@ function loadSourceMapForBundle(
 
     const sourceMapJson =
       registration.sourceMapJson === undefined
-        ? readSourceMapJsonForBundle(bundleFilePath, sourceMappingUrl)
+        ? readSourceMapJsonForBundle(bundleFilePath, sourceMappingUrl, registration.realBundleDirectory)
         : (registration.sourceMapJson ?? undefined);
 
     if (!sourceMapJson) {
@@ -644,6 +672,7 @@ export function resolveOriginalPositionForRegistration(
   const entry = sourceMap.sourceMap.findEntry(lineNumber - 1, zeroBasedColumn) as Partial<SourceMapping>;
   if (
     entry.originalSource === undefined ||
+    entry.originalSource === '' ||
     entry.originalLine === undefined ||
     entry.generatedLine !== lineNumber - 1
   ) {
@@ -733,15 +762,7 @@ export function remapStackTrace(
     return remapStackTraceForRegistration(stack, registration, lookupAttempt);
   }
 
-  // Callers without a specific registration opt into scanning every registered
-  // bundle path in the stack text. Request paths pass a registration-specific
-  // closure so unrelated bundle registrations cannot rewrite their stacks.
-  let remappedStack = stack;
-  registeredBundles.forEach((currentRegistration) => {
-    remappedStack = remapStackTraceForRegistration(remappedStack, currentRegistration, lookupAttempt);
-  });
-
-  return remappedStack;
+  return undefined;
 }
 
 export function remapErrorStack(error: unknown, registration?: BundleSourceMapRegistration) {

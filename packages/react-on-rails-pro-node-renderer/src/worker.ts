@@ -196,10 +196,10 @@ export function releaseExecutionContextWhenStreamFinishes(
     releaseExecutionContext();
   });
 
-  refreshResponseFinishTimeout();
   stream.once('close', endProgressStream);
   stream.once('error', forwardSourceError);
   stream.pipe(progressStream);
+  refreshResponseFinishTimeout();
 
   return {
     release,

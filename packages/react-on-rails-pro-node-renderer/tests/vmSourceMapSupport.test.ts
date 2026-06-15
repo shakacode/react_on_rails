@@ -379,13 +379,23 @@ describe('source-mapped stack traces for VM errors', () => {
     });
   });
 
+  test('empty original source mappings fall back to the bundled location', async () => {
+    const bundlePath = await writeVmBundle(
+      `${buildThrowingBundleSource()}\n${inlineSourceMapComment(buildThrowingBundleMap('bundle.js', ''))}\n`,
+    );
+    const registration = registerBundleForSourceMaps(bundlePath);
+
+    expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+  });
+
   test('sourceRoot is applied to relative source entries', async () => {
     const bundlePath = await writeVmBundle(
       `${buildThrowingBundleSource()}\n${inlineSourceMapComment(buildSourceRootBundleMap('bundle.js'))}\n`,
     );
+    const registration = registerBundleForSourceMaps(bundlePath);
     const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
 
-    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).toContain(
+    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`, registration)).toContain(
       `${SOURCE_ROOTED_SOURCE}:2:3`,
     );
 
@@ -502,7 +512,7 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(remapStackTrace(bundleStack, registration)).toContain(`${ORIGINAL_SOURCE}:2:3`);
   });
 
-  test('global host stack remapping skips source-map loads for unrelated registered bundles', async () => {
+  test('scoped host stack remapping skips source-map loads for unrelated registered bundles', async () => {
     const firstBundlePath = path.join(serverBundleCachePath(testName), 'first', 'bundle.js');
     const secondBundlePath = path.join(serverBundleCachePath(testName), 'second', 'bundle.js');
     const firstMapPath = `${firstBundlePath}.map`;
@@ -523,12 +533,15 @@ describe('source-mapped stack traces for VM errors', () => {
       secondMapPath,
       JSON.stringify(buildThrowingBundleMap(path.basename(secondBundlePath), REBUILT_SOURCE)),
     );
-    registerBundleForSourceMaps(firstBundlePath);
+    const firstRegistration = registerBundleForSourceMaps(firstBundlePath);
     registerBundleForSourceMaps(secondBundlePath);
     const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
 
     try {
-      const remappedStack = remapStackTrace(`Error: host\n    at boom (${firstBundlePath}:3:17)`);
+      const remappedStack = remapStackTrace(
+        `Error: host\n    at boom (${firstBundlePath}:3:17)`,
+        firstRegistration,
+      );
 
       expect(remappedStack).toContain(`${ORIGINAL_SOURCE}:2:3`);
       const readPaths = readFileSyncSpy.mock.calls.map(([filePath]) => filePath);
@@ -536,6 +549,24 @@ describe('source-mapped stack traces for VM errors', () => {
       expect(readPaths).toContain(firstMapPath);
       expect(readPaths).not.toContain(secondBundlePath);
       expect(readPaths).not.toContain(secondMapPath);
+    } finally {
+      readFileSyncSpy.mockRestore();
+    }
+  });
+
+  test('unscoped host stack remapping does not scan registered bundles', async () => {
+    const bundlePath = vmBundlePath(testName);
+    const mapFileName = `${path.basename(bundlePath)}.map`;
+    const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+    await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+    await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+    registerBundleForSourceMaps(bundlePath);
+    const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+
+    try {
+      expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).toBeUndefined();
+      expect(readFileSyncSpy).not.toHaveBeenCalledWith(bundlePath, 'utf8');
+      expect(readFileSyncSpy).not.toHaveBeenCalledWith(mapPath, 'utf8');
     } finally {
       readFileSyncSpy.mockRestore();
     }
@@ -576,7 +607,7 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
   });
 
-  test('sourceMappingURL supports symlink-staged external source maps', async () => {
+  test('sourceMappingURL rejects symlinked maps outside the real bundle directory', async () => {
     const bundlePath = vmBundlePath(testName);
     const bundleDirectory = path.dirname(bundlePath);
     const sourceMapFileName = 'staged-source-map.js.map';
@@ -594,7 +625,8 @@ describe('source-mapped stack traces for VM errors', () => {
     if (!isErrorRenderResult(result)) {
       throw new Error('expected exceptionMessage result');
     }
-    expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+    expect(result.exceptionMessage).toContain(`at boom (${bundlePath}:3:`);
+    expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
   });
 
   test('sourceMappingURL path separators are ignored before map lookup', async () => {
@@ -691,9 +723,7 @@ describe('source-mapped stack traces for VM errors', () => {
     expect(thrown).toBeDefined();
     expect(thrown?.message).toContain("Cannot find module 'missing-host-callback-module'");
     expect(thrown?.stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
-    expect(remapStackTrace(`Error: host\n    at callback (${bundlePath}:3:1)`)).not.toContain(
-      ORIGINAL_SOURCE,
-    );
+    expect(remapStackTrace(`Error: host\n    at callback (${bundlePath}:3:1)`)).toBeUndefined();
   });
 
   test('host-realm callback stacks serialized inside the VM are remapped', async () => {
@@ -783,8 +813,15 @@ describe('source-mapped stack traces for VM errors', () => {
     const stack = await runInVM('global.heldSsrError.stack', bundlePath);
     expect(stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
 
+    const hostResult = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(hostResult)).toBe(true);
+    if (!isErrorRenderResult(hostResult)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(hostResult.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+
     executionContext.release();
-    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).not.toContain(ORIGINAL_SOURCE);
+    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).toBeUndefined();
   });
 
   test('failed parallel VM builds release source maps retained by sibling builds that settle later', async () => {
@@ -826,9 +863,7 @@ describe('source-mapped stack traces for VM errors', () => {
       });
 
       removeVM(lateBundlePath);
-      expect(remapStackTrace(`Error: host\n    at boom (${lateBundlePath}:3:17)`)).not.toContain(
-        ORIGINAL_SOURCE,
-      );
+      expect(remapStackTrace(`Error: host\n    at boom (${lateBundlePath}:3:17)`)).toBeUndefined();
     } finally {
       jest.restoreAllMocks();
     }
@@ -950,29 +985,39 @@ describe('source-mapped stack traces for VM errors', () => {
 
     removeVM(bundlePath);
     expect(hasVMContextForBundle(bundlePath)).toBe(false);
-    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).toContain(
-      `${ORIGINAL_SOURCE}:2:3`,
-    );
+    const hostResult = await runInVM('global.triggerSsrError()', bundlePath);
+    expect(isErrorRenderResult(hostResult)).toBe(true);
+    if (!isErrorRenderResult(hostResult)) {
+      throw new Error('expected exceptionMessage result');
+    }
+    expect(hostResult.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
 
     const stack = await runInVM('global.heldSsrError.stack', bundlePath);
     expect(stack).toContain(`${ORIGINAL_SOURCE}:2:3`);
 
     executionContext.release();
-    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).not.toContain(ORIGINAL_SOURCE);
+    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).toBeUndefined();
   });
 
   test('bundle without a source map keeps the real bundle path in stack frames', async () => {
     const bundlePath = await writeVmBundle(`${buildThrowingBundleSource()}\n`);
+    const fallbackMapPath = `${bundlePath}.map`;
     const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+    const realpathSyncSpy = jest.spyOn(fs, 'realpathSync');
 
-    const result = await runInVM('global.triggerSsrError()', bundlePath);
-    expect(isErrorRenderResult(result)).toBe(true);
-    if (!isErrorRenderResult(result)) {
-      throw new Error('expected exceptionMessage result');
+    try {
+      const result = await runInVM('global.triggerSsrError()', bundlePath);
+      expect(isErrorRenderResult(result)).toBe(true);
+      if (!isErrorRenderResult(result)) {
+        throw new Error('expected exceptionMessage result');
+      }
+      expect(result.exceptionMessage).toContain('SSR kaboom');
+      // The `filename` option means frames now name the bundle file, not `evalmachine.<anonymous>`.
+      expect(result.exceptionMessage).toContain(`at boom (${bundlePath}:3:`);
+      expect(realpathSyncSpy.mock.calls.some(([filePath]) => filePath === fallbackMapPath)).toBe(false);
+    } finally {
+      realpathSyncSpy.mockRestore();
     }
-    expect(result.exceptionMessage).toContain('SSR kaboom');
-    // The `filename` option means frames now name the bundle file, not `evalmachine.<anonymous>`.
-    expect(result.exceptionMessage).toContain(`at boom (${bundlePath}:3:`);
   });
 
   test('resolver exposed in the VM refuses unregistered file paths', async () => {
@@ -1021,7 +1066,7 @@ describe('source-mapped stack traces for VM errors', () => {
       line: 2,
       column: 3,
     });
-    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).toContain(
+    expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`, secondRegistration)).toContain(
       `${ORIGINAL_SOURCE}:2:3`,
     );
   });
