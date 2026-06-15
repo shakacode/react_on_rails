@@ -73,12 +73,6 @@ const INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS = 1_000;
 // retain VM source-map registrations for the same idle period.
 const STREAM_CONTEXT_RELEASE_TIMEOUT_MS = STREAM_CHUNK_TIMEOUT_MS;
 const INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS = STREAM_CONTEXT_RELEASE_TIMEOUT_MS;
-const HTML_ESCAPE_REPLACEMENTS: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-};
-
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
 //
@@ -123,10 +117,6 @@ function setStringResponseHeaders(headers: ResponseResult['headers'], res: Fasti
   }
 }
 
-function escapeHtmlText(value: string) {
-  return value.replace(/[&<>]/g, (char) => HTML_ESCAPE_REPLACEMENTS[char] ?? char);
-}
-
 function setPlainTextResponseHeaders(res: FastifyReply) {
   res.type('text/plain; charset=utf-8');
   res.header('X-Content-Type-Options', 'nosniff');
@@ -141,7 +131,7 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
     setHeaders(headers, res);
     setPlainTextResponseHeaders(res);
     res.status(status);
-    res.send(Buffer.from(escapeHtmlText(data), 'utf8'));
+    res.send(Buffer.from(data, 'utf8'));
     return;
   }
 

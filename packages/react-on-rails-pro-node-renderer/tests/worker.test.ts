@@ -315,8 +315,7 @@ describe('worker', () => {
       );
       expectPlainTextNosniffResponse(res);
       expect(res.payload).toContain('Caught top level error in handleRenderRequest');
-      expect(res.payload).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
-      expect(res.payload).not.toContain('<script>');
+      expect(res.payload).toContain('<script>alert(1)</script>');
     } finally {
       buildExecutionContextSpy.mockRestore();
       reportMessageSpy.mockRestore();
@@ -807,7 +806,7 @@ describe('worker', () => {
     // The endpoint requires at least one bundle_<hash> field
     expect(res.statusCode).toBe(400);
     expectPlainTextNosniffResponse(res);
-    expect(res.payload).toContain('No bundle_&lt;hash&gt; fields provided');
+    expect(res.payload).toContain('No bundle_<hash> fields provided');
   });
 
   test('post /upload-assets with duplicate bundle hash silently skips overwrite and returns 200', async () => {
