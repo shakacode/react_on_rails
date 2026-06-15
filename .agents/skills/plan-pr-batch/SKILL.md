@@ -8,6 +8,10 @@ argument-hint: '[issue/PR numbers, labels, milestone, or search query]'
 
 Create verified scope and a goal prompt for `$pr-batch`. Do not implement items here.
 
+If a skill picker only exposes installed/global skills, treat this skill as an
+entry point. After fetching, prefer repo-local `.agents/skills/...` and
+`.agents/workflows/...` files when they exist.
+
 Memorable invocation:
 
 ```text
@@ -247,6 +251,7 @@ Items:
   Done when: PR merged only if explicitly authorized by the current user or batch goal and allowed by release-mode gates, ready/blocked/no-PR evidence, or documented no-fix rationale.
 
 Execution rules:
+- Run `git fetch --prune origin main` first. Verify repo-local `.agents/skills/pr-batch/SKILL.md` and `.agents/workflows/pr-processing.md` exist before launching workers. If either is missing in the checkout but present on `origin/main`, update the worktree before continuing; if still missing, stop and report repo workflow state as `UNKNOWN`.
 - Follow `.agents/skills/pr-batch/SKILL.md` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
 - Dispatch one subagent per independent item; group dependent items only when shared context is required. Dispatch only the current file-disjoint wave. Hold serial and `UNKNOWN`
   discovery lanes until no active editor lane can collide with them.

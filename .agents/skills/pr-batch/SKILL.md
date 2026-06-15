@@ -8,6 +8,10 @@ argument-hint: '[exact issue/PR numbers or filters]'
 
 Turn a short batch request into a safe, explicit launch plan and, when requested, a ready-to-paste `/goal` prompt.
 
+If a skill picker only exposes installed/global skills, treat this skill as an
+entry point. After fetching, prefer repo-local `.agents/skills/...` and
+`.agents/workflows/...` files when they exist.
+
 Memorable invocation:
 
 ```text
@@ -15,7 +19,7 @@ $pr-batch
 Run a Codex batch
 ```
 
-Use `.agents/workflows/pr-processing.md` as the deeper operating model for each issue, PR, review-fix pass, or merge-readiness item.
+Run `git fetch --prune origin main`, then use `.agents/workflows/pr-processing.md` as the deeper operating model for each issue, PR, review-fix pass, or merge-readiness item. If repo-local `.agents/skills/...` or `.agents/workflows/pr-processing.md` is missing in the checkout but present on `origin/main`, update the worktree before launching workers; if it remains missing, report repo workflow state as `UNKNOWN`.
 If the target scope is not verified yet, use `.agents/skills/plan-pr-batch/SKILL.md` first.
 For release-mode coordination, auto-merge confidence, and shared release tracker updates, follow `AGENTS.md` and the release-mode sections of `.agents/workflows/pr-processing.md`; do not invent new labels or overwrite tracker issue bodies from stale reads.
 If any target's value, priority, or proposed fix scope is unclear, use `.agents/skills/evaluate-issue/SKILL.md` before assigning implementation workers.
@@ -62,7 +66,7 @@ Before implementation or worker launch, produce:
 1. A concrete goal name.
 2. A disposition summary for speculative, AI/code-analysis-only, over-scoped, or unclear candidates, or `N/A - all targets pre-approved`.
    - Include any `needs-customer-feedback` targets skipped from implementation, with that label as the reason.
-3. A repo preflight: fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
+3. A repo preflight: run `git fetch --prune origin main`, confirm the expected repository root, verify repo-local workflow files, and verify nested repo paths before assigning work.
 4. A short batch table:
    - target number and title
    - branch name
@@ -105,7 +109,7 @@ not escalate behavior-preserving optional nits, batch real questions into one
 decision block per lane, self-verify machine-checkable claims before escalation,
 and include decision-point counts plus confidence notes in handoffs.
 
-Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
+Run `git fetch --prune origin main` first, confirm the expected repo root, verify repo-local workflow files, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
