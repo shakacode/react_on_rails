@@ -127,14 +127,25 @@ function escapeHtmlText(value: string) {
   return value.replace(/[&<>]/g, (char) => HTML_ESCAPE_REPLACEMENTS[char] ?? char);
 }
 
+function setPlainTextResponseHeaders(res: FastifyReply) {
+  res.type('text/plain; charset=utf-8');
+  res.header('X-Content-Type-Options', 'nosniff');
+}
+
 const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   const { status, data, headers, stream } = result;
   if (status !== 200 && status !== 410) {
     log.info({ msg: 'Sending non-200, non-410 data back', data });
   }
-  const stringResponse = !stream && typeof data === 'string';
-  const responseData = stringResponse && status >= 400 ? escapeHtmlText(data) : data;
-  if (stringResponse) {
+  if (!stream && typeof data === 'string' && status >= 400) {
+    setHeaders(headers, res);
+    setPlainTextResponseHeaders(res);
+    res.status(status);
+    res.send(Buffer.from(escapeHtmlText(data), 'utf8'));
+    return;
+  }
+
+  if (!stream && typeof data === 'string') {
     setStringResponseHeaders(headers, res);
   }
   setHeaders(headers, res);
@@ -143,10 +154,7 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   if (stream) {
     await res.send(stream);
   } else {
-    // Non-success strings are escaped above and sent as nosniff text/plain; success
-    // strings include renderer JSON/HTML payloads for the Ruby client and stay intact.
-    // codeql[js/reflected-xss]
-    res.send(responseData);
+    res.send(data);
   }
 };
 
