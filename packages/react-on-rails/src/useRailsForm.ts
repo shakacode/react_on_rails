@@ -566,6 +566,7 @@ export function useRailsForm<TData extends object>(initialData: TData): UseRails
         options.onSuccess?.(result);
       } else {
         finishSubmission();
+        return staleSubmitResult(response);
       }
       return result;
     },

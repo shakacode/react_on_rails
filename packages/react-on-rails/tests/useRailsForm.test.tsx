@@ -920,13 +920,19 @@ describe('useRailsForm', () => {
         await result.current.post('/things', { onSuccess: secondOnSuccess });
       });
 
+      let firstResult: unknown;
       await act(async () => {
         resolveFirst(mockResponse({ status: 200, body: { redirect_to: '/first' } }));
-        await firstSubmit;
+        firstResult = await firstSubmit;
       });
 
       expect(secondOnSuccess).toHaveBeenCalledTimes(1);
       expect(firstOnSuccess).not.toHaveBeenCalled();
+      expect(firstResult).toMatchObject({
+        ok: false,
+        stale: true,
+        response: expect.objectContaining({ status: 200 }),
+      });
     });
 
     it('propagates onSuccess errors after finishing the successful submission state', async () => {
