@@ -124,9 +124,13 @@ Capacity-aware triage derives group count from registered state:
 
 1. Read current capacity profiles and enabled inbox config.
 2. Convert profiles into available lane slots from `max_concurrent_batches`,
-   bounded by enabled inboxes and current live or blocked claims.
-3. Let `N` be the resulting available lane-slot count.
-4. Split work into up to `N` non-empty groups, or stop phase 2 with a blocker
+   bounded by enabled inboxes.
+3. Subtract current live, blocked, and reserved lanes from the bounded total. If
+   live occupancy, blocked lanes, reserved lanes, profiles, or inbox config
+   cannot be verified, stop phase 2 with a precise blocker instead of deriving
+   `N`.
+4. Let `N` be the resulting available lane-slot count.
+5. Split work into up to `N` non-empty groups, or stop phase 2 with a blocker
    when `N` cannot be verified. When actionable work has fewer items than
    available slots, report the remaining idle slots instead of creating empty
    groups or prompts.
