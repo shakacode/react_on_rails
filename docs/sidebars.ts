@@ -117,6 +117,7 @@ const sidebars: SidebarsConfig = {
             'building-features/node-renderer/basics',
             'building-features/node-renderer/js-configuration',
             'building-features/node-renderer/container-deployment',
+            'building-features/node-renderer/health-checks',
             'building-features/node-renderer/debugging',
             'building-features/node-renderer/error-reporting-and-tracing',
             'building-features/node-renderer/heroku',
