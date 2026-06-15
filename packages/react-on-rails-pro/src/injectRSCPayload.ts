@@ -14,6 +14,8 @@
  */
 
 import { PassThrough } from 'stream';
+import { readFileSync } from 'fs';
+import { resolve as resolvePath } from 'path';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { createEmbeddedPayloadKey } from './utils.ts';
@@ -91,6 +93,17 @@ function createRSCDiagnosticScript(
 }
 
 const RSC_CLIENT_CHUNK_STYLESHEET_PATH = /\/css\/client\d+-[^/]+\.css$/;
+const RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET = /"((?:client)\d+)"\s*,\s*"js\/client\d+-[^"]+\.chunk\.js"/g;
+const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
+
+type LoadableStats = {
+  assetsByChunkName?: Record<string, string | string[]>;
+  publicPath?: string;
+};
+
+type RSCClientChunkStylesheetHrefsByChunkName = Map<string, string[]>;
+
+let cachedRSCClientChunkStylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName | undefined;
 
 function getQuotedAttribute(tag: string, attributeName: string) {
   const attributeMatch = tag.match(new RegExp(`\\s${attributeName}=(["'])(.*?)\\1`, 'i'));
@@ -108,6 +121,82 @@ function isRSCClientChunkStylesheetHref(href: string) {
 function shouldPromoteStylesheetPreloadTag(linkTag: string) {
   const href = getQuotedAttribute(linkTag, 'href');
   return href ? isRSCClientChunkStylesheetHref(href) : false;
+}
+
+function assetHref(assetPath: string, publicPath?: string) {
+  if (/^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(assetPath) || assetPath.startsWith('/')) {
+    return assetPath;
+  }
+
+  if (!publicPath || publicPath === 'auto') {
+    return assetPath;
+  }
+
+  return `${publicPath.replace(/\/?$/, '/')}${assetPath.replace(/^\/+/, '')}`;
+}
+
+function loadRSCClientChunkStylesheetHrefsByChunkName(): RSCClientChunkStylesheetHrefsByChunkName {
+  if (cachedRSCClientChunkStylesheetHrefsByChunkName) {
+    return cachedRSCClientChunkStylesheetHrefsByChunkName;
+  }
+
+  const stylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName = new Map();
+
+  try {
+    const loadableStats = JSON.parse(
+      readFileSync(resolvePath(__dirname, LOADABLE_STATS_FILE_NAME), 'utf8'),
+    ) as LoadableStats;
+
+    Object.entries(loadableStats.assetsByChunkName ?? {}).forEach(([chunkName, assets]) => {
+      if (!/^client\d+$/.test(chunkName)) return;
+
+      const stylesheetHrefs = (Array.isArray(assets) ? assets : [assets])
+        .filter((asset): asset is string => typeof asset === 'string' && asset.endsWith('.css'))
+        .map((asset) => assetHref(asset, loadableStats.publicPath));
+
+      if (stylesheetHrefs.length > 0) {
+        stylesheetHrefsByChunkName.set(chunkName, stylesheetHrefs);
+      }
+    });
+  } catch {
+    // RSC CSS gating is opportunistic for builds that copy loadable-stats.json to
+    // the renderer bundle directory. Other setups fall back to streamed preload tags.
+  }
+
+  cachedRSCClientChunkStylesheetHrefsByChunkName = stylesheetHrefsByChunkName;
+  return stylesheetHrefsByChunkName;
+}
+
+function escapeAttributeValue(value: string) {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function createStylesheetTag(href: string) {
+  return `<link rel="stylesheet" href="${escapeAttributeValue(href)}" data-precedence="rsc-css">`;
+}
+
+function stylesheetTagsForRSCClientChunks(
+  flightData: string,
+  stylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName,
+  emittedStylesheetHrefs: Set<string>,
+) {
+  const stylesheetTags: string[] = [];
+
+  for (const match of flightData.matchAll(RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET)) {
+    const chunkName = match[1];
+    const stylesheetHrefs = stylesheetHrefsByChunkName.get(chunkName);
+
+    if (stylesheetHrefs) {
+      stylesheetHrefs.forEach((href) => {
+        if (emittedStylesheetHrefs.has(href)) return;
+
+        emittedStylesheetHrefs.add(href);
+        stylesheetTags.push(createStylesheetTag(href));
+      });
+    }
+  }
+
+  return stylesheetTags;
 }
 
 function splitIncompleteLinkTagTail(htmlString: string) {
@@ -215,11 +304,13 @@ export default function injectRSCPayload(
   rscRequestTracker: RSCRequestTracker,
   domNodeId: string | undefined,
   cspNonce?: string,
+  rscClientChunkStylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
 ) {
   const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
   const resultStream = new PassThrough();
   let rscPromise: Promise<void> | null = null;
+  const emittedRSCClientStylesheetHrefs = new Set<string>();
 
   // ========================================
   // BUFFER ARRAYS - Three data sources
@@ -240,6 +331,13 @@ export default function injectRSCPayload(
    */
   const htmlBuffers: Buffer[] = [];
   let holdIncompleteLinkTagTail = true;
+
+  /**
+   * Buffer for stylesheet links inferred from RSC client chunk references.
+   * These must flush before HTML because React's reveal script can make the
+   * streamed fragment visible as soon as the browser parses it.
+   */
+  const rscClientStylesheetBuffers: Buffer[] = [];
 
   /**
    * Buffer for RSC payload chunk scripts.
@@ -282,8 +380,10 @@ export default function injectRSCPayload(
       htmlBuffer,
       holdIncompleteLinkTagTail,
     );
+    const rscClientStylesheetSize = rscClientStylesheetBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const rscPayloadSize = rscPayloadBuffers.reduce((sum, buf) => sum + buf.length, 0);
-    const totalSize = rscInitializationSize + gatedHtmlBuffer.length + rscPayloadSize;
+    const totalSize =
+      rscInitializationSize + rscClientStylesheetSize + gatedHtmlBuffer.length + rscPayloadSize;
 
     if (hasIncompleteLinkTagTail && holdIncompleteLinkTagTail) {
       return;
@@ -316,14 +416,22 @@ export default function injectRSCPayload(
       offset += buffer.length;
     }
 
-    // 2. HTML chunks SECOND
+    // 2. RSC client stylesheets SECOND
+    // These gate streamed reveal HTML for client components whose CSS is emitted
+    // as a separate chunk and only referenced from the Flight payload.
+    for (const buffer of rscClientStylesheetBuffers) {
+      buffer.copy(combinedBuffer, offset);
+      offset += buffer.length;
+    }
+
+    // 3. HTML chunks THIRD
     // Component markup that references the initialized arrays
     if (gatedHtmlBuffer.length > 0) {
       gatedHtmlBuffer.copy(combinedBuffer, offset);
       offset += gatedHtmlBuffer.length;
     }
 
-    // 3. RSC payload chunk scripts LAST
+    // 4. RSC payload chunk scripts LAST
     // Data pushed into the already-existing arrays
     for (const buffer of rscPayloadBuffers) {
       buffer.copy(combinedBuffer, offset);
@@ -335,6 +443,7 @@ export default function injectRSCPayload(
 
     // Clear all buffers to free memory and prepare for next flush cycle
     rscInitializationBuffers.length = 0;
+    rscClientStylesheetBuffers.length = 0;
     htmlBuffers.length = 0;
     rscPayloadBuffers.length = 0;
   };
@@ -468,6 +577,11 @@ export default function injectRSCPayload(
                   hasEmittedDiagnosticScript = true;
                 }
               }
+              stylesheetTagsForRSCClientChunks(
+                flightData,
+                rscClientChunkStylesheetHrefsByChunkName,
+                emittedRSCClientStylesheetHrefs,
+              ).forEach((stylesheetTag) => rscClientStylesheetBuffers.push(Buffer.from(stylesheetTag)));
               const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
 

@@ -313,6 +313,10 @@ test.describe('RSC and streaming FOUC acceptance coverage', () => {
       await recordProbePaints(page, [RSC_PROBE_TARGET, CLIENT_ONLY_PROBE_TARGET]);
     });
 
+    test.afterEach(async ({ page }) => {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    });
+
     test('streamed RSC content is visible and styled when its CSS is loaded, even while JS is delayed', async ({
       page,
     }) => {
