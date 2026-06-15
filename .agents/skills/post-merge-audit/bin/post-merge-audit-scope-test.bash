@@ -465,6 +465,40 @@ test_fetch_issue_markers_cleans_inner_tmpdir_on_parse_failure() {
   assert_equals "" "$leftovers" "inner tmpdir cleanup"
 }
 
+test_fetch_issue_markers_warns_when_search_hits_limit() {
+  local tmpdir fake_bin open_json closed_json markers open_markers out rc
+
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/post-merge-audit-scope-test.XXXXXX")"
+  fake_bin="$tmpdir/bin"
+  open_json="$tmpdir/open.json"
+  closed_json="$tmpdir/closed.json"
+  markers="$tmpdir/markers.tsv"
+  open_markers="$tmpdir/open-markers.tsv"
+  mkdir -p "$fake_bin"
+  cat > "$open_json" <<'JSON'
+[
+  {"number": 1, "state": "OPEN", "url": "https://example.test/issues/1", "body": ""},
+  {"number": 2, "state": "OPEN", "url": "https://example.test/issues/2", "body": ""}
+]
+JSON
+  printf '[]\n' > "$closed_json"
+  make_fake_gh "$fake_bin/gh" "$open_json" "$closed_json"
+
+  set +e
+  out="$(PATH="$fake_bin:$PATH" pma_scope_fetch_issue_markers owner/repo 2 "$markers" "$open_markers" 2>&1)"
+  rc=$?
+  set -e
+
+  rm -rf "$tmpdir"
+  assert_equals "0" "$rc" "limit warning rc"
+  case "$out" in
+    *"Warning: open issue search returned 2 results (limit=2)"*) ;;
+    *)
+      fail "limit warning missing: $out"
+      ;;
+  esac
+}
+
 test_limit_requires_positive_integer() {
   local out rc
 
@@ -633,6 +667,7 @@ run_test test_default_base_uses_nearest_rc_on_first_parent_history
 run_test test_resolver_rejects_base_outside_head_history
 run_test test_resolver_rejects_base_outside_first_parent_history
 run_test test_fetch_issue_markers_cleans_inner_tmpdir_on_parse_failure
+run_test test_fetch_issue_markers_warns_when_search_hits_limit
 run_test test_limit_requires_positive_integer
 run_test test_repo_requires_owner_repo_form
 run_test test_sourced_main_propagates_marker_fetch_failure_without_errexit

@@ -22,6 +22,10 @@ pma_scope_error() {
   printf 'Error: %s\n' "$*" >&2
 }
 
+pma_scope_warn() {
+  printf 'Warning: %s\n' "$*" >&2
+}
+
 pma_scope_require_command() {
   local command_name="$1"
 
@@ -44,19 +48,68 @@ pma_scope_default_head_ref() {
 }
 
 pma_scope_default_base_ref() {
-  local commit head_ref tag
+  local head_ref
 
   head_ref="$1"
 
-  while IFS= read -r commit; do
-    tag="$(git tag --points-at "$commit" --list '*.rc.*' --sort=-version:refname | head -n 1)"
-    if [ -n "$tag" ]; then
-      printf '%s\n' "$tag"
-      return 0
-    fi
-  done < <(git rev-list --first-parent --max-count=10000 "$head_ref" 2>/dev/null || true)
+  {
+    git log --first-parent --decorate=full --format='%D' "$head_ref" 2>/dev/null || true
+  } | ruby -e '
+def version_key(tag)
+  tag.scan(/\d+|[^\d]+/).map do |part|
+    part.match?(/\A\d+\z/) ? [1, part.to_i] : [0, part]
+  end
+end
 
-  return 0
+ARGF.each_line do |line|
+  tags = line.split(",").map do |decoration|
+    decoration.strip[/\Atag: refs\/tags\/(.+\.rc\..+)\z/, 1]
+  end.compact
+  next if tags.empty?
+
+  puts tags.sort_by { |tag| version_key(tag) }.last
+  exit
+end
+'
+}
+
+pma_scope_ref_on_first_parent() {
+  local base_sha="$1"
+  local head_sha="$2"
+  local oldest_commit parent _commit _rest
+
+  if [ "$base_sha" = "$head_sha" ]; then
+    return 0
+  fi
+
+  if ! git merge-base --is-ancestor "$base_sha" "$head_sha" 2>/dev/null; then
+    return 1
+  fi
+
+  oldest_commit="$(git rev-list --first-parent --ancestry-path --parents "${base_sha}..${head_sha}" 2>/dev/null | tail -n 1 || true)"
+  if [ -z "$oldest_commit" ]; then
+    return 1
+  fi
+
+  read -r _commit parent _rest <<< "$oldest_commit"
+  [ "$parent" = "$base_sha" ]
+}
+
+pma_scope_json_array_count() {
+  ruby -rjson -e '
+data = JSON.parse(File.read(ARGV.fetch(0)))
+puts(data.is_a?(Array) ? data.length : 0)
+' "$1"
+}
+
+pma_scope_warn_if_limit_reached() {
+  local label="$1"
+  local count="$2"
+  local limit="$3"
+
+  if [ "$count" -ge "$limit" ]; then
+    pma_scope_warn "$label issue search returned $count results (limit=$limit); some findings may be truncated -- increase --limit"
+  fi
 }
 
 pma_scope_resolve_ref_sha() {
@@ -227,7 +280,7 @@ pma_scope_fetch_issue_markers() {
   local limit="$2"
   local output_file="$3"
   local open_output_file="$4"
-  local closed_markers tmpdir open_json closed_json
+  local closed_count closed_markers open_count tmpdir open_json closed_json
 
   pma_scope_require_command gh || return 1
   if [ -n "${PMA_SCOPE_TMPDIR:-}" ]; then
@@ -266,12 +319,24 @@ pma_scope_fetch_issue_markers() {
     pma_scope_error "failed to parse open post-merge audit finding issues"
     return 1
   fi
+  open_count="$(pma_scope_json_array_count "$open_json")" || {
+    rm -rf "$tmpdir"
+    pma_scope_error "failed to count open post-merge audit finding issues"
+    return 1
+  }
+  pma_scope_warn_if_limit_reached "open" "$open_count" "$limit"
 
   if ! pma_scope_extract_issue_markers_from_json_files "$closed_json" > "$closed_markers"; then
     rm -rf "$tmpdir"
     pma_scope_error "failed to parse closed post-merge audit finding issues"
     return 1
   fi
+  closed_count="$(pma_scope_json_array_count "$closed_json")" || {
+    rm -rf "$tmpdir"
+    pma_scope_error "failed to count closed post-merge audit finding issues"
+    return 1
+  }
+  pma_scope_warn_if_limit_reached "closed" "$closed_count" "$limit"
 
   if ! cat "$open_output_file" "$closed_markers" > "$output_file"; then
     rm -rf "$tmpdir"
@@ -499,7 +564,7 @@ pma_scope_main() (
   local repo=""
   local output_format="text"
   local limit="200"
-  local repo_root base_sha head_sha first_parent_match tmpdir merged_file merged_numbers_file
+  local repo_root base_sha head_sha tmpdir merged_file merged_numbers_file
   local markers_file open_markers_file marker_numbers_file carry_file to_audit_file
 
   while [ "$#" -gt 0 ]; do
@@ -602,8 +667,7 @@ pma_scope_main() (
     return 1
   }
 
-  first_parent_match="$(git rev-list --first-parent "$head_sha" | grep -Fxm1 "$base_sha" || true)"
-  if [ "$first_parent_match" != "$base_sha" ]; then
+  if ! pma_scope_ref_on_first_parent "$base_sha" "$head_sha"; then
     pma_scope_error "base ref is not on the first-parent history of head ref: $base_ref is not a mainline boundary for $head_ref"
     return 1
   fi
