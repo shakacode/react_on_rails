@@ -9,6 +9,10 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `AGENTS.md`: canonical entry point for agent instructions and workflow discovery
 - `.agents/skills/`: agent skills; `.claude/skills` is a symlink here so Claude Code exposes the same workflows as slash commands
 - `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
+- If a tool or skill picker only exposes installed/global skills, treat those
+  skills as launchers. After fetching, prefer repo-local `.agents/skills/...`
+  and `.agents/workflows/...` files when they exist; installed/global skills do
+  not override this repo's policy.
 - `internal/contributor-info/agent-workflow-adoption.md`: guide for copying these agent workflows into other repositories
 - `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
 - `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
@@ -36,6 +40,26 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 
 Other agent-facing docs (for example `CLAUDE.md`) should contain only tool-specific workflow notes and link back here.
 If there is a conflict, `AGENTS.md` wins.
+
+## Freshness And Skill Resolution
+
+Before planning issue/PR work, creating a new branch, or creating a new
+worktree, run:
+
+```bash
+git fetch --prune origin main
+```
+
+Base new issue branches and new worktrees on the freshly fetched `origin/main`
+unless the user explicitly asks to reproduce an old SHA, continue an existing PR
+branch, bisect, or work offline. Creating a new worktree does not fetch from
+GitHub by itself.
+
+After fetching, verify repo-local workflow files before falling back to installed
+skills. If `.agents/skills/...` or `.agents/workflows/pr-processing.md` is
+missing in the checkout but present on `origin/main`, update the worktree before
+continuing; if it is still missing, report the repo workflow state as `UNKNOWN`
+instead of silently using a global skill fallback.
 
 ## Commands
 
