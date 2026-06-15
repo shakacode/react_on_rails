@@ -651,6 +651,157 @@ describe('ClientRenderer', () => {
     });
   });
 
+  describe('hydrate_on scheduling', () => {
+    const setupScheduledComponentDom = (domId: string, hydrateOn: 'visible' | 'idle'): HTMLElement => {
+      setupRailsContext();
+
+      const TestComponent: React.FC<{ message: string }> = ({ message }) =>
+        React.createElement('div', null, `Hello, ${message}!`);
+      ComponentRegistry.register({ TestComponent });
+
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', domId);
+      componentElement.setAttribute('data-hydrate-on', hydrateOn);
+      componentElement.textContent = JSON.stringify({ message: 'World' });
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = domId;
+      targetNode.innerHTML = '<div>Server rendered</div>';
+      document.body.appendChild(targetNode);
+
+      return targetNode;
+    };
+
+    beforeEach(() => {
+      runPageUnload();
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      mockHydrateOrRender.mockClear();
+    });
+
+    afterEach(() => {
+      const idleWindow = window as unknown as {
+        requestIdleCallback?: unknown;
+        cancelIdleCallback?: unknown;
+      };
+      const observerGlobal = globalThis as unknown as { IntersectionObserver?: unknown };
+      delete idleWindow.requestIdleCallback;
+      delete idleWindow.cancelIdleCallback;
+      delete observerGlobal.IntersectionObserver;
+    });
+
+    it('waits for visible components to intersect before hydrating', () => {
+      type ObserverCallback = ConstructorParameters<typeof IntersectionObserver>[0];
+      const observerInstances: Array<{
+        callback: ObserverCallback;
+        disconnect: jest.Mock;
+        observe: jest.Mock;
+      }> = [];
+
+      class MockIntersectionObserver {
+        callback: ObserverCallback;
+
+        disconnect = jest.fn();
+
+        observe = jest.fn();
+
+        constructor(callback: ObserverCallback) {
+          this.callback = callback;
+          observerInstances.push(this);
+        }
+      }
+
+      Object.defineProperty(globalThis, 'IntersectionObserver', {
+        configurable: true,
+        value: MockIntersectionObserver,
+      });
+
+      setupScheduledComponentDom('hydrate-visible-unit', 'visible');
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+
+      renderComponent('hydrate-visible-unit');
+
+      expect(mockHydrateOrRender).not.toHaveBeenCalled();
+      expect(observerInstances).toHaveLength(1);
+      expect(observerInstances[0].observe).toHaveBeenCalledWith(
+        document.getElementById('hydrate-visible-unit'),
+      );
+
+      observerInstances[0].callback(
+        [{ isIntersecting: true, intersectionRatio: 1 }] as IntersectionObserverEntry[],
+        observerInstances[0] as unknown as IntersectionObserver,
+      );
+
+      expect(observerInstances[0].disconnect).toHaveBeenCalledTimes(1);
+      expect(mockHydrateOrRender).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits for idle callbacks before hydrating idle components', () => {
+      const idleCallbacks: Array<() => void> = [];
+      Object.defineProperty(window, 'requestIdleCallback', {
+        configurable: true,
+        value: jest.fn((callback: () => void) => {
+          idleCallbacks.push(callback);
+          return idleCallbacks.length;
+        }),
+      });
+      Object.defineProperty(window, 'cancelIdleCallback', {
+        configurable: true,
+        value: jest.fn(),
+      });
+
+      setupScheduledComponentDom('hydrate-idle-unit', 'idle');
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+
+      renderComponent('hydrate-idle-unit');
+
+      expect(mockHydrateOrRender).not.toHaveBeenCalled();
+      expect(idleCallbacks).toHaveLength(1);
+
+      idleCallbacks[0]();
+
+      expect(mockHydrateOrRender).toHaveBeenCalledTimes(1);
+    });
+
+    it('cancels pending visible hydration on page unload', () => {
+      type ObserverCallback = ConstructorParameters<typeof IntersectionObserver>[0];
+      let observerCallback!: ObserverCallback;
+      const disconnectMock = jest.fn();
+
+      class MockIntersectionObserver {
+        disconnect = disconnectMock;
+
+        observe = jest.fn();
+
+        constructor(callback: ObserverCallback) {
+          observerCallback = callback;
+        }
+      }
+
+      Object.defineProperty(globalThis, 'IntersectionObserver', {
+        configurable: true,
+        value: MockIntersectionObserver,
+      });
+
+      setupScheduledComponentDom('hydrate-visible-unload', 'visible');
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+
+      renderComponent('hydrate-visible-unload');
+      runPageUnload();
+
+      expect(disconnectMock).toHaveBeenCalledTimes(1);
+
+      observerCallback(
+        [{ isIntersecting: true, intersectionRatio: 1 }] as IntersectionObserverEntry[],
+        {} as IntersectionObserver,
+      );
+
+      expect(mockHydrateOrRender).not.toHaveBeenCalled();
+    });
+  });
+
   describe('page unload cleanup (React-root cleanup)', () => {
     beforeEach(() => {
       // Isolate from roots tracked by earlier tests.

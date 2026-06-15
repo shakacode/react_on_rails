@@ -15,6 +15,8 @@ module ReactOnRails
                                                 "data-component-name" => render_options.react_component_name,
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id,
+                                                "data-hydrate-on" =>
+                                                  hydrate_on_data_attribute_value(render_options),
                                                 "data-ssr-identifier-prefix" =>
                                                   (render_options.html_streaming? ? render_options.dom_id : nil),
                                                 "data-store-dependencies" =>
@@ -37,6 +39,12 @@ module ReactOnRails
                  end
 
       spec_tag.html_safe
+    end
+
+    def hydrate_on_data_attribute_value(render_options)
+      return unless render_options.internal_option(:hydrate_on) || render_options.hydrate_on != :immediate
+
+      render_options.hydrate_on
     end
 
     def generated_stylesheet_hrefs_json(render_options)

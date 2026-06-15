@@ -4,6 +4,23 @@ require "react_on_rails/utils"
 
 module ReactOnRails
   module ReactComponent
+    HYDRATE_ON_MODES = %i[immediate visible idle].freeze
+
+    def self.normalize_hydrate_on(value)
+      normalized_value = value.is_a?(String) ? value.to_sym : value
+      unless HYDRATE_ON_MODES.include?(normalized_value)
+        raise ArgumentError,
+              "Invalid hydrate_on option: #{value.inspect}. " \
+              "Supported OSS modes are :immediate, :visible, and :idle."
+      end
+
+      return normalized_value if normalized_value == :immediate || !ReactOnRails::Utils.react_on_rails_pro?
+
+      raise ArgumentError,
+            "hydrate_on: #{value.inspect} is only supported by the open-source React on Rails client renderer. " \
+            "React on Rails Pro does not support hydrate_on scheduling yet; use :immediate."
+    end
+
     class RenderOptions
       include Utils::Required
 
@@ -54,9 +71,10 @@ module ReactOnRails
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
         @react_component_name = react_component_name.camelize
         @options = options
+        @hydrate_on = ReactComponent.normalize_hydrate_on(options.fetch(:hydrate_on, :immediate))
       end
 
-      attr_reader :react_component_name
+      attr_reader :react_component_name, :hydrate_on
 
       def throw_js_errors
         options.fetch(:throw_js_errors, false)

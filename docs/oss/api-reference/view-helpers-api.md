@@ -11,7 +11,8 @@ Once the bundled files have been generated in your `app/assets/webpack` folder, 
 ```ruby
 react_component(component_name,
                 props: {},
-                prerender: nil)
+                prerender: nil,
+                hydrate_on: :immediate,
                 html_options: {})
 ```
 
@@ -36,6 +37,7 @@ Uncommonly used options:
     - **Environment override:** set `REACT_ON_RAILS_PRERENDER_OVERRIDE=true|false` to force prerendering on or off globally.
       Precedence is: `REACT_ON_RAILS_PRERENDER_OVERRIDE` > component option (`prerender:`) > initializer default (`config.prerender`).
   - **auto_load_bundle:** will automatically load the bundle for component by calling `append_javascript_pack_tag` and `append_stylesheet_pack_tag` under the hood.
+  - **hydrate_on:** controls when React hydrates or client-renders this root. Supported OSS modes are `:immediate` (default), `:visible`, and `:idle`. See [Hydration Scheduling](../building-features/hydration-scheduling.md). `:interaction` is not supported. Deferred modes are OSS-only; React on Rails Pro currently accepts only `:immediate`.
   - **id:** Id for the div, will be used to attach the React component. This will get assigned automatically if you do not provide an id. Must be unique.
   - **html_options:** Any other HTML options get placed on the added div for the component. For example, you can set a class (or inline style) on the outer div so that it behaves like a span, with the styling of `display:inline-block`. You may also use an option of `tag: "span"` to replace the use of the default DIV tag to be a SPAN tag.
   - **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise. Only on the **client side** will you will see the `railsContext` and your props.

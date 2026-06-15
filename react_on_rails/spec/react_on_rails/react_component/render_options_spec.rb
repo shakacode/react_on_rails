@@ -151,6 +151,46 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     end
   end
 
+  describe "#hydrate_on" do
+    it "defaults to immediate and is not explicit" do
+      opts = described_class.new(**the_attrs)
+
+      expect(opts.hydrate_on).to eq(:immediate)
+    end
+
+    context "without React on Rails Pro" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "accepts supported symbol modes" do
+        %i[immediate visible idle].each do |hydrate_on|
+          opts = described_class.new(**the_attrs(options: { hydrate_on: }))
+
+          expect(opts.hydrate_on).to eq(hydrate_on)
+        end
+      end
+
+      it "normalizes supported string modes" do
+        opts = described_class.new(**the_attrs(options: { hydrate_on: "visible" }))
+
+        expect(opts.hydrate_on).to eq(:visible)
+      end
+    end
+
+    it "rejects unsupported modes" do
+      expect do
+        described_class.new(**the_attrs(options: { hydrate_on: :interaction }))
+      end.to raise_error(ArgumentError, /Supported OSS modes are :immediate, :visible, and :idle/)
+    end
+
+    it "rejects deferred modes when React on Rails Pro is installed" do
+      expect do
+        described_class.new(**the_attrs(options: { hydrate_on: :visible }))
+      end.to raise_error(ArgumentError, /React on Rails Pro does not support hydrate_on scheduling/)
+    end
+  end
+
   describe "#prerender env override" do
     around do |example|
       original_prerender_config = ReactOnRails.configuration.prerender

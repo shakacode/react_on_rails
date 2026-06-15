@@ -49,6 +49,7 @@ Rails.application.routes.draw do
   post "turbo_stream_send_hello_world" => "pages#turbo_stream_send_hello_world"
   get "manual_render_test" => "pages#manual_render_test"
   get "root_error_callbacks" => "pages#root_error_callbacks"
+  get "hydration_scheduling" => "pages#hydration_scheduling"
 
   # EXPERIMENTAL View Transitions demo (issue #3888). Inert by default: the
   # route only exists when the dummy app is booted with VIEW_TRANSITIONS_DEMO=true.

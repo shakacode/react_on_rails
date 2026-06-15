@@ -74,6 +74,7 @@ const sidebars: SidebarsConfig = {
           label: 'Rendering',
           items: [
             'building-features/code-splitting',
+            'building-features/hydration-scheduling',
             'building-features/react-helmet',
             'building-features/react-19-native-metadata',
             'building-features/react-19-activity',

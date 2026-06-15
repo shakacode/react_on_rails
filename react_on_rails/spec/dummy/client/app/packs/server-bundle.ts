@@ -4,11 +4,13 @@ import '../generated/server-bundle-generated.js'; // eslint-disable-line import/
 import ReactOnRails from 'react-on-rails';
 // Example of server rendering with no React
 import HelloString from '../non_react/HelloString';
+import HydrationSchedulingProbe from '../startup/HydrationSchedulingProbe';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 ReactOnRails.register({
   HelloString,
+  HydrationSchedulingProbe,
 });
 
 ReactOnRails.registerStoreGenerators({

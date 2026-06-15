@@ -23,6 +23,17 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
 type RendererResult = ReturnType<RendererFunction>;
 type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
+type HydrateOnMode = 'immediate' | 'visible' | 'idle';
+type IdleCallbackHandle = number;
+type WindowWithIdleCallback = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => IdleCallbackHandle;
+  cancelIdleCallback?: (handle: IdleCallbackHandle) => void;
+};
+type ScheduledRenderEntry = {
+  kind: 'scheduled';
+  cancel: () => void;
+  domNode: Element;
+};
 
 // An entry in `renderedRoots`. We track two kinds of mounts so both can be cleaned up on page
 // unload or same-id node replacement:
@@ -32,9 +43,12 @@ type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
 //   be detected before running the old teardown. `teardown` is undefined only while an async teardown
 //   has not resolved yet — `trackRendererMount` only attaches a late-resolving teardown while this
 //   entry is still the active mount for its id.
+// - `scheduled`: a framework-owned React root that has not mounted yet because `hydrate_on` deferred
+//   it. Cleanup cancels the pending observer or idle callback before Turbo/Turbolinks swaps the page.
 type RenderedEntry =
   | { kind: 'react'; root: RenderReturnType; domNode: Element }
-  | { kind: 'renderer'; teardown?: RendererTeardown; domNode: Element };
+  | { kind: 'renderer'; teardown?: RendererTeardown; domNode: Element }
+  | ScheduledRenderEntry;
 
 // Track all rendered roots for cleanup
 const renderedRoots = new Map<string, RenderedEntry>();
@@ -66,6 +80,10 @@ function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeI
  * abort cleanup of the remaining entries.
  */
 function teardownEntry(entry: RenderedEntry, domNodeId: string): void {
+  if (entry.kind === 'scheduled') {
+    entry.cancel();
+    return;
+  }
   if (entry.kind === 'renderer') {
     invokeRendererTeardown(entry.teardown, domNodeId);
     return;
@@ -96,6 +114,80 @@ function forEachStore(railsContext: RailsContext): void {
 
 function domNodeIdForEl(el: Element): string {
   return el.getAttribute('data-dom-id') || '';
+}
+
+function hydrateOnForEl(el: Element): HydrateOnMode {
+  const hydrateOn = el.getAttribute('data-hydrate-on');
+  if (!hydrateOn || hydrateOn === 'immediate' || hydrateOn === 'visible' || hydrateOn === 'idle') {
+    return (hydrateOn || 'immediate') as HydrateOnMode;
+  }
+
+  console.warn(
+    `[react-on-rails] Unsupported hydrate_on mode "${hydrateOn}". Falling back to immediate hydration.`,
+  );
+  return 'immediate';
+}
+
+function scheduleWhenVisible(domNode: Element, callback: () => void): () => void {
+  if (typeof IntersectionObserver === 'undefined') {
+    const timeoutId = window.setTimeout(callback, 0);
+    return () => window.clearTimeout(timeoutId);
+  }
+
+  let active = true;
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (!active) return;
+      const isVisible = entries.some((entry) => entry.isIntersecting || entry.intersectionRatio > 0);
+      if (!isVisible) return;
+
+      active = false;
+      observer.disconnect();
+      callback();
+    },
+    { rootMargin: '200px 0px' },
+  );
+  observer.observe(domNode);
+
+  return () => {
+    active = false;
+    observer.disconnect();
+  };
+}
+
+function scheduleWhenIdle(callback: () => void): () => void {
+  const idleWindow = window as WindowWithIdleCallback;
+  if (typeof idleWindow.requestIdleCallback === 'function') {
+    const idleCallbackId = idleWindow.requestIdleCallback(callback, { timeout: 2000 });
+    return () => {
+      if (typeof idleWindow.cancelIdleCallback === 'function') {
+        idleWindow.cancelIdleCallback(idleCallbackId);
+      }
+    };
+  }
+
+  const timeoutId = window.setTimeout(callback, 1);
+  return () => window.clearTimeout(timeoutId);
+}
+
+function scheduleHydration(hydrateOn: HydrateOnMode, domNode: Element, callback: () => void): () => void {
+  if (hydrateOn === 'visible') {
+    return scheduleWhenVisible(domNode, callback);
+  }
+
+  if (hydrateOn === 'idle') {
+    return scheduleWhenIdle(callback);
+  }
+
+  callback();
+  return () => {};
+}
+
+function raiseRenderError(componentName: string, error: unknown): never {
+  const renderError = error as Error;
+  console.error(renderError.message);
+  renderError.message = `ReactOnRails encountered an error while rendering component: ${componentName}. See above error message.`;
+  throw renderError;
 }
 
 // Result of attempting renderer delegation. Core carries the raw RendererResult (which may still be
@@ -265,25 +357,27 @@ function renderElement(el: Element, railsContext: RailsContext): void {
         return;
       }
 
-      // Hydrate if the DOM node has content (server-rendered HTML)
-      // Since we skip already-rendered components above, this check now correctly
-      // identifies only server-rendered content, not previously client-rendered content
-      const shouldHydrate = !!domNode.innerHTML;
+      const mountReactRoot = (): void => {
+        // Hydrate if the DOM node has content (server-rendered HTML)
+        // Since we skip already-rendered components above, this check now correctly
+        // identifies only server-rendered content, not previously client-rendered content
+        const shouldHydrate = !!domNode.innerHTML;
 
-      const reactElementOrRouterResult = createReactOutput({
-        componentObj,
-        props,
-        domNodeId,
-        trace,
-        railsContext,
-        shouldHydrate,
-      });
+        const reactElementOrRouterResult = createReactOutput({
+          componentObj,
+          props,
+          domNodeId,
+          trace,
+          railsContext,
+          shouldHydrate,
+        });
 
-      if (isServerRenderHash(reactElementOrRouterResult)) {
-        throw new Error(`\
+        if (isServerRenderHash(reactElementOrRouterResult)) {
+          throw new Error(`\
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
-      } else {
+        }
+
         const root = reactHydrateOrRender(
           domNode,
           reactElementOrRouterResult as ReactElement,
@@ -297,13 +391,39 @@ You should return a React.Component always for the client side entry point.`);
         );
         // Track the root for cleanup
         renderedRoots.set(domNodeId, { kind: 'react', root, domNode });
+      };
+
+      const hydrateOn = hydrateOnForEl(el);
+      if (hydrateOn === 'immediate') {
+        mountReactRoot();
+        return;
       }
+
+      let scheduledEntry: ScheduledRenderEntry;
+      const runScheduledRender = (): void => {
+        if (renderedRoots.get(domNodeId) !== scheduledEntry) return;
+        if (!domNode.isConnected) {
+          renderedRoots.delete(domNodeId);
+          return;
+        }
+
+        try {
+          mountReactRoot();
+        } catch (scheduledError) {
+          renderedRoots.delete(domNodeId);
+          raiseRenderError(name, scheduledError);
+        }
+      };
+
+      scheduledEntry = {
+        kind: 'scheduled',
+        domNode,
+        cancel: scheduleHydration(hydrateOn, domNode, runScheduledRender),
+      };
+      renderedRoots.set(domNodeId, scheduledEntry);
     }
   } catch (e: unknown) {
-    const error = e as Error;
-    console.error(error.message);
-    error.message = `ReactOnRails encountered an error while rendering component: ${name}. See above error message.`;
-    throw error;
+    raiseRenderError(name, e);
   }
 }
 
@@ -368,10 +488,12 @@ function unmountAllComponents(): void {
     } catch (error) {
       // Use the same label as the async-rejection path so renderer-teardown failures are greppable
       // whether the teardown threw synchronously (here) or rejected (invokeRendererTeardown).
-      const label =
-        entry.kind === 'renderer'
-          ? `Error in renderer teardown for dom node "${domNodeId}":`
-          : `Error unmounting component for dom node "${domNodeId}":`;
+      let label = `Error unmounting component for dom node "${domNodeId}":`;
+      if (entry.kind === 'renderer') {
+        label = `Error in renderer teardown for dom node "${domNodeId}":`;
+      } else if (entry.kind === 'scheduled') {
+        label = `Error canceling scheduled render for dom node "${domNodeId}":`;
+      }
       console.error(label, error);
     }
   });
