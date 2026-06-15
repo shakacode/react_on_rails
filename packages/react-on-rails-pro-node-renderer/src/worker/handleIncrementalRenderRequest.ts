@@ -173,11 +173,9 @@ export async function handleIncrementalRenderRequest(
       // Create injectable PassThrough — sits after the length-prefixed transform.
       // Both HTML chunks (from React) and propRequest chunks (from us) flow through it.
       const injectableStream = new PassThrough();
-      // { end: false } prevents pipe from auto-closing injectableStream when
-      // the source ends — we need to write renderComplete before closing.
-      response.stream.pipe(injectableStream, { end: false });
 
-      // When React finishes rendering, emit renderComplete so Rails closes the pull queue.
+      // Register event handlers BEFORE pipe() to guarantee we catch 'end'
+      // even if the source stream has already buffered all its data.
       response.stream.on('end', () => {
         try {
           injectableStream.write(formatRenderCompleteChunk());
@@ -190,6 +188,10 @@ export async function handleIncrementalRenderRequest(
         injectableStream.destroy(err);
       });
 
+      // { end: false } prevents pipe from auto-closing injectableStream when
+      // the source ends — we write renderComplete in the 'end' handler above.
+      response.stream.pipe(injectableStream, { end: false });
+
       // Set the emitter callback — AsyncPropsManager calls this from inside the VM
       sharedExecutionContext.set(PROP_REQUEST_EMITTER_KEY, (propName: string) => {
         try {
@@ -199,12 +201,14 @@ export async function handleIncrementalRenderRequest(
         }
       });
 
-      // Flush any propRequests that were buffered during the initial render
-      // (before the emitter was available)
+      // Flush buffered propRequests (emitted during initial render after emitter existed)
+      // AND emit propRequests for props that were requested via getProp() before pull mode
+      // was enabled on sharedExecutionContext (isPullEnabled was false during initial render).
       const manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY) as
-        | { flushPendingPullRequests?: () => void }
+        | { flushPendingPullRequests?: () => void; emitPendingPullRequests?: () => void }
         | undefined;
       manager?.flushPendingPullRequests?.();
+      manager?.emitPendingPullRequests?.();
 
       finalResponse = { ...response, stream: injectableStream };
     }

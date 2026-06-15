@@ -117,8 +117,12 @@ class AsyncPropsManager {
   }
 
   rejectProp(propName: string, reason: string) {
-    const promiseController = this.propNameToPromiseController.get(propName);
-    if (promiseController && !promiseController.resolved) {
+    const promiseController = this.getOrCreatePromiseController(propName);
+    if (!promiseController) {
+      return;
+    }
+
+    if (!promiseController.resolved) {
       promiseController.reject(new Error(`Prop "${propName}" rejected by server: ${reason}`));
       promiseController.resolved = true;
     }
@@ -150,6 +154,22 @@ class AsyncPropsManager {
       emitter(propName);
     }
     this.bufferedPropRequests = [];
+  }
+
+  /**
+   * Emits propRequests for props that were requested (via getProp) before pull mode
+   * was enabled on sharedExecutionContext. During the initial render, isPullEnabled()
+   * returns false so getProp skips emitting; this method catches up afterward.
+   */
+  emitPendingPullRequests() {
+    if (!this.isPullEnabled()) return;
+
+    this.propNameToPromiseController.forEach((controller, propName) => {
+      if (!controller.resolved && !controller.pullRequested && !this.isPushProp(propName)) {
+        controller.pullRequested = true;
+        this.emitPropRequest(propName);
+      }
+    });
   }
 
   private isPullEnabled(): boolean {
