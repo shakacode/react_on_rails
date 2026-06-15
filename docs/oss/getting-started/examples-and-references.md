@@ -109,6 +109,9 @@ capacity while the demo keeps one warm replica. Do not pin `maxScale: 1` unless
 production predictability or a specific acceptance criterion requires a fixed
 replica count; leave `maxScale` unset or set a reasonable ceiling such as
 `maxScale: 5` when the demo should still absorb traffic bursts.
+Avoid `CPU Utilization` autoscaling with `minScale: 1` / `maxScale: 1` for
+these small staging apps because that combination prevents Capacity AI from
+right-sizing the warm workload.
 
 This is not the same as scale-to-zero: steady RAM usage and background work can
 still drive cost, and shared Postgres should usually stay manually sized. If a

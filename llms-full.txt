@@ -717,6 +717,27 @@ For detailed proof criteria and migration contribution guidance, see
   legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
   source.
 
+## Control Plane Cost Posture
+
+For public demo and starter staging deployments on Control Plane, keep the app
+workload as `type: standard` with `minScale: 1`, set its autoscaling metric to
+`disabled`, and enable `capacityAI: true` so Control Plane can right-size idle
+capacity while the demo keeps one warm replica. Do not pin `maxScale: 1` unless
+production predictability or a specific acceptance criterion requires a fixed
+replica count; leave `maxScale` unset or set a reasonable ceiling such as
+`maxScale: 5` when the demo should still absorb traffic bursts.
+Avoid `CPU Utilization` autoscaling with `minScale: 1` / `maxScale: 1` for
+these small staging apps because that combination prevents Capacity AI from
+right-sizing the warm workload.
+
+This is not the same as scale-to-zero: steady RAM usage and background work can
+still drive cost, and shared Postgres should usually stay manually sized. If a
+demo explicitly needs true idle scale-to-zero, create a separate `serverless`
+workload before first deploy or plan a delete/recreate migration because Control
+Plane will not change an existing `standard` workload to `serverless` in place.
+The reusable guidance lives in
+[Control Plane Flow: Enable Capacity AI for Demo and Starter Staging Apps](https://github.com/shakacode/control-plane-flow/blob/main/docs/tips.md#enable-capacity-ai-for-demo-and-starter-staging-apps).
+
 ## Legacy Repos
 
 Version-specific demos, `test-*` repos, generator snapshots, and older tutorial
@@ -17003,6 +17024,13 @@ cpflow deploy-image -a myapp   # deploy the pushed image to Control Plane
 - **GVC environment variables**: Set shared environment variables at the GVC level so all workloads inherit them. See the [Control Plane Flow guide to secrets and ENV values](https://github.com/shakacode/control-plane-flow/blob/main/docs/secrets-and-env-values.md).
 - **Secrets**: Use Control Plane's built-in secrets management (`cpln://secret/...`) instead of environment variables for sensitive values.
 - **One-off tasks**: Run migrations and other one-off commands via `cpflow run -a myapp -- bundle exec rails db:migrate`.
+- **Public demo and starter staging apps**: Keep `type: standard` workloads
+  with `minScale: 1`, the autoscaling metric disabled, and `capacityAI: true`.
+  Avoid CPU Utilization autoscaling pinned to `minScale: 1` / `maxScale: 1`,
+  because that prevents Capacity AI from right-sizing the warm workload. Use
+  `serverless` scale-to-zero only as an explicit first-deploy choice or
+  planned delete/recreate migration. See the
+  [Control Plane Cost Posture](../getting-started/examples-and-references.md#control-plane-cost-posture).
 - **Multiple locations**: Control Plane supports multi-region deployment. Add locations to your GVC to deploy globally.
 
 ## Node Renderer in containers
@@ -27128,6 +27156,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 ## Versions
 
 ### [Unreleased]
+
+#### Changed
+
+- **[Pro]** **RSC peer compatibility accepts the coordinated React 19.2 floor**: The Pro node renderer now allows React and React DOM `19.2.x` starting at `19.2.7`, matching the floor required by the `react-on-rails-rsc` 19.2 package line while preserving the existing React `19.0.x` support window. Refs [Issue 3865](https://github.com/shakacode/react_on_rails/issues/3865).
 
 #### Fixed
 
