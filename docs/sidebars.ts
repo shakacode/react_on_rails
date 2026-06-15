@@ -63,7 +63,11 @@ const sidebars: SidebarsConfig = {
         {
           type: 'category',
           label: 'Routing',
-          items: ['building-features/react-router', 'building-features/tanstack-router'],
+          items: [
+            'building-features/react-router',
+            'building-features/tanstack-router',
+            'building-features/client-side-routing-instant-navigation',
+          ],
         },
         {
           type: 'category',
