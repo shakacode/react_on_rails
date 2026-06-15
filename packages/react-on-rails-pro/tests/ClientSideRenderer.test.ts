@@ -622,6 +622,7 @@ describe('ClientSideRenderer', () => {
     window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page1-chunk-b');
     (window.REACT_ON_RAILS_RSC_ERRORS ||= {})[rscPayloadKey] = { hasErrors: false };
 
+    // Verify same-page append: a second injection via ||= must not reset existing state.
     (window.REACT_ON_RAILS_RSC_PAYLOADS ||= {})[rscPayloadKey] ||= [];
     window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page1-chunk-c');
     expect(window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual([

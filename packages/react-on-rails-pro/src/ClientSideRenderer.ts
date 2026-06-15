@@ -615,7 +615,10 @@ function unmountAllStores(): void {
   storeRenderers.clear();
 }
 
-type RSCPreloadedPayloadGlobal = Pick<Window, 'REACT_ON_RAILS_RSC_PAYLOADS' | 'REACT_ON_RAILS_RSC_ERRORS'>;
+type RSCPreloadedPayloadGlobal = {
+  REACT_ON_RAILS_RSC_PAYLOADS?: Record<string, string[]>;
+  REACT_ON_RAILS_RSC_ERRORS?: Record<string, Record<string, unknown>>;
+};
 
 function clearRSCPreloadedPayloadGlobals(): void {
   const rscGlobal = globalThis as typeof globalThis & RSCPreloadedPayloadGlobal;
