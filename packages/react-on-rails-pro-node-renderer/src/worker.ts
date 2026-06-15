@@ -718,6 +718,7 @@ export default function run(config: Partial<Config>) {
     // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
     // this is an internal renderer service not exposed to the internet, returns
     // a static status string, and exposes no sensitive runtime data.
+    // codeql[js/missing-rate-limiting]
     // lgtm[js/missing-rate-limiting]
     app.get('/health', (_req, res) => {
       res.send({ status: 'ok' });
@@ -731,6 +732,7 @@ export default function run(config: Partial<Config>) {
     // across workers, so a probe checks one worker per request.
     // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
     // same rationale as /health; this returns only a static readiness status.
+    // codeql[js/missing-rate-limiting]
     // lgtm[js/missing-rate-limiting]
     app.get('/ready', (_req, res) => {
       if (hasAnyVMContext()) {

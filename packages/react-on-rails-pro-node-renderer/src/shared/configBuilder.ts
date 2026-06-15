@@ -216,6 +216,10 @@ function defaultReplayServerAsyncOperationLogs() {
   return env.NODE_ENV?.toLowerCase() === 'development';
 }
 
+function truthyHealthEndpointFlag(value: unknown) {
+  return value === '1' || truthy(value);
+}
+
 const defaultConfig: Config = {
   // Use env port if we run on Heroku
   port: Number(env.RENDERER_PORT) || DEFAULT_PORT,
@@ -268,7 +272,7 @@ const defaultConfig: Config = {
   maxVMPoolSize: (env.MAX_VM_POOL_SIZE && parseInt(env.MAX_VM_POOL_SIZE, 10)) || 2,
 
   // Built-in /health and /ready probe endpoints are opt-in.
-  enableHealthEndpoints: truthy(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
+  enableHealthEndpoints: truthyHealthEndpointFlag(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
 };
 
 function envValuesUsed() {
@@ -410,7 +414,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     password: env.RENDERER_PASSWORD,
     // Re-evaluate env-derived defaults at build time in case env vars are set post-import.
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
-    enableHealthEndpoints: truthy(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
+    enableHealthEndpoints: truthyHealthEndpointFlag(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
   };
   config = { ...runtimeDefaultConfig, ...userConfig };
   if (explicitUndefinedPassword) {
@@ -441,7 +445,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
 
   config.supportModules = truthy(config.supportModules);
   // Coerce in case a user config passes an env-derived string (e.g. "true").
-  config.enableHealthEndpoints = truthy(config.enableHealthEndpoints);
+  config.enableHealthEndpoints = truthyHealthEndpointFlag(config.enableHealthEndpoints);
 
   if (config.maxVMPoolSize <= 0 || !Number.isInteger(config.maxVMPoolSize)) {
     throw new Error('maxVMPoolSize must be a positive integer');
