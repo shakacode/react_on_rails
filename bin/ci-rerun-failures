@@ -131,15 +131,16 @@ if [ -z "$PR_NUMBER" ]; then
     echo "Usage: bin/ci-rerun-failures [--previous] [pr-number]"
     exit 1
   fi
-  PR_INFO=$(gh pr view --json number,commits)
+  PR_INFO=$(gh pr view --json number,commits,baseRefName)
   PR_NUMBER=$(echo "$PR_INFO" | jq -r '.number')
 else
-  if ! gh pr view "$PR_NUMBER" --json number,commits >/dev/null 2>&1; then
+  if ! gh pr view "$PR_NUMBER" --json number,commits,baseRefName >/dev/null 2>&1; then
     echo -e "${RED}Error: PR #$PR_NUMBER not found${NC}"
     exit 1
   fi
-  PR_INFO=$(gh pr view "$PR_NUMBER" --json number,commits)
+  PR_INFO=$(gh pr view "$PR_NUMBER" --json number,commits,baseRefName)
 fi
+PR_BASE_REF=$(echo "$PR_INFO" | jq -r '.baseRefName // "main"')
 
 # Determine which commit to check
 if [ "$USE_PREVIOUS" = true ]; then
@@ -238,7 +239,6 @@ JOB_MAP["examples"]="examples"
 JOB_MAP["precompile-check"]="precompile-check"
 JOB_MAP["pro-lint"]="pro-lint"
 JOB_MAP["build-dummy-app-webpack-test-bundles"]="pro-dummy-build"
-JOB_MAP["package-js-tests"]="package-js-tests"
 JOB_MAP["rspec-gem-specs"]="pro-rspec-gem-specs"
 JOB_MAP["rspec-dummy-app-node-renderer"]="pro-dummy-rspec"
 JOB_MAP["dummy-app-node-renderer-e2e-tests"]="pro-dummy-e2e"
@@ -254,11 +254,11 @@ run_command() {
         pnpm start format.listDifferent
       ;;
     "required-pr-gate")
-      ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.load_file(f); puts f }" &&
+      ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.safe_load_file(f, permitted_classes: [], aliases: false); puts f }" &&
         for script in bin/ci-local bin/ci-rerun-failures bin/request-hosted-ci script/ci-changes-detector; do
           bash -n "$script"
         done &&
-        script/ci-changes-detector origin/main
+        script/ci-changes-detector "origin/$PR_BASE_REF"
       ;;
     "rspec-package-tests")
       ensure_oss_dependencies

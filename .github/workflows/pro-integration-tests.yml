@@ -62,7 +62,6 @@ jobs:
               echo "run_pro_lint=true"
               echo "run_pro_tests=true"
               echo "run_pro_dummy_tests=true"
-              echo "run_pro_node_renderer_tests=true"
               echo "docs_only=false"
               echo "non_runtime_only=false"
             } >> "$GITHUB_OUTPUT"

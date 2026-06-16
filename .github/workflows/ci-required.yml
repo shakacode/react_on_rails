@@ -19,14 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 50
           persist-credentials: false
 
       - name: Validate workflow YAML
         run: |
-          ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.load_file(f); puts f }"
+          ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.safe_load_file(f, permitted_classes: [], aliases: false); puts f }"
 
       - name: Validate CI shell scripts
         run: |
