@@ -41,7 +41,7 @@ jobs:
 
       - name: Run changed-files detector
         run: |
-          base_ref="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          base_ref="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$base_ref"
 
       - name: Lightweight repo sanity check

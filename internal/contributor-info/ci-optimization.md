@@ -58,6 +58,14 @@ Force-full hosted CI bypasses optimized selection and marks every hosted suite
 as applicable. Use it only when a maintainer intentionally wants broad matrix
 coverage or when path selection itself is part of the risk.
 
+## Dependency Profile Matrix
+
+| Profile       | Force-full hosted | Latest local CI |
+| ------------- | ----------------- | --------------- |
+| Ruby versions | 3.3, 4.0          | 4.0 only        |
+| Node versions | 20, 22            | 22 only         |
+| Dependencies  | minimum, latest   | latest only     |
+
 ## Requesting Hosted CI
 
 Choose the request path that matches the actor making the request.

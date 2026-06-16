@@ -78,6 +78,13 @@ Fork PRs cannot use comment-command hosted CI to dispatch same-repository
 workflows or add persistent labels. A maintainer should push a trusted branch to
 this repository when Pro or secret-backed CI is required.
 
+## Dependency Profiles
+
+- Only latest dependency versions (Ruby 4.0, Node 22) are used by the latest
+  local CI profile and latest hosted Ruby-package matrix entries.
+- Minimum dependency coverage stays explicit in matrix jobs that validate the
+  supported floor.
+
 ## Why This Exists
 
 PRs should not spend hosted runner time before local checks have caught routine

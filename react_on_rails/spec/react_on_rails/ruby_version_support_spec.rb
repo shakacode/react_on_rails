@@ -113,6 +113,33 @@ RSpec.describe "Ruby version support" do
     end
   end
 
+  it "uses the merge queue base SHA for merge_group change detection" do
+    expected_base_expression = [
+      "github.event.pull_request.base.sha",
+      "github.event.merge_group.base_sha",
+      "github.event.before",
+      "'origin/main'"
+    ].join(" || ")
+
+    [
+      ".github/workflows/ci-required.yml",
+      ".github/workflows/examples.yml",
+      ".github/workflows/gem-tests.yml",
+      ".github/workflows/integration-tests.yml",
+      ".github/workflows/lint-js-and-ruby.yml",
+      ".github/workflows/package-js-tests.yml",
+      ".github/workflows/playwright.yml",
+      ".github/workflows/precompile-check.yml",
+      ".github/workflows/pro-integration-tests.yml",
+      ".github/workflows/pro-test-package-and-gem.yml"
+    ].each do |path|
+      workflow = read_repo_file(path)
+
+      expect(workflow).to include("merge_group:"), "#{path} must run on merge queue events"
+      expect(workflow).to include(expected_base_expression), "#{path} must diff merge queue runs from base_sha"
+    end
+  end
+
   # These checks intentionally make future version bumps update the committed
   # runtime files, CI matrix readers, helper scripts, and docs together.
   it "allows Ruby 4 in the gemspec" do
@@ -321,7 +348,7 @@ RSpec.describe "Ruby version support" do
     )
     # Exact table spacing is intentional: keeps the Markdown column padding in sync.
     expect(read_repo_file("internal/contributor-info/ci-optimization.md")).to include(
-      "| Ruby versions | 3.3, 4.0        | 4.0 only"
+      "| Ruby versions | 3.3, 4.0          | 4.0 only"
     )
   end
 end
