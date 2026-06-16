@@ -42,6 +42,33 @@ Be skeptical of broad changes to identity models, runtime behavior, CI/workflow 
 - **Close / not planned:** low-value, speculative, duplicate, harmful, or superseded.
 - **Product decision:** the issue needs maintainer input before implementation would be safe.
 
+## Process Gap Disposition
+
+For recurring process misses, classify the mechanism before adding or approving
+another process issue. Required fields:
+
+- `Mechanism target`: `script`, `schema`, `checklist+replay`, or `park`.
+- `Motivating miss`: the PR, review, audit, or incident the mechanism must catch.
+- `Replay evidence or park reason`: command, fixture, historical PR/issue, or
+  audit artifact used to prove the mechanism catches the miss; for `park`, why
+  no mechanism is worth building now.
+- `Non-goal`: the broad prose-only rule this should not become.
+
+### Dry Run: #4009 Process Children
+
+Live issue state checked on 2026-06-15:
+
+| Source                   | Item                                                            | Mechanism target   | Motivating miss                                 | Replay evidence or park reason                                                           | Non-goal                        |
+| ------------------------ | --------------------------------------------------------------- | ------------------ | ----------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------- |
+| #3906                    | #3908 lockfile content-diff gate (open)                         | `script`           | Lockfile review missed cross-file drift.        | Replay against #3861/#3769 lockfile diffs and sibling-lock comparison.                   | Another reviewer reminder.      |
+| #3906                    | #3910 evidence gate (open)                                      | `checklist+replay` | Review conclusions outran artifacts.            | Replay #3768/#3282 by refuting the conclusion from artifacts and caveats.                | Broad "include evidence" prose. |
+| #3906                    | #3912 deterministic orchestration (open)                        | `schema`           | Batch handoffs omitted durable state.           | Worker-result schema plus resume journal; replay omission-prone handoffs such as #3613.  | Narrative status template.      |
+| #3906                    | #3913 skill hygiene (open)                                      | `script`           | Skill docs drifted from canonical workflow.     | Sync-marker lint with an induced drift failure and word-count thresholds.                | Manual sync instruction.        |
+| #3974                    | #4000 release-train gating (open)                               | `park`             | Release branch model is still unsettled.        | Release branch model needs a maintainer/product decision before more gate prose.         | Premature gate expansion.       |
+| #3975                    | #3975 attention contract (open for observation)                 | `checklist+replay` | Attention pings and nit fixes caused churn.     | Next multi-batch closeout must replay decision-point counts and nit/CI-wait behavior.    | Another etiquette paragraph.    |
+| #4004                    | No open child; #4004 is closed                                  | `schema`           | Follow-up issue wanted outcome evidence.        | Preserve as an intent-achievement report artifact; do not file another status paragraph. | Loose progress update.          |
+| Existing prose-only rule | New-gate stale-base rollout in `AGENTS.md` / `pr-processing.md` | `checklist+replay` | New gates could strand open PRs on stale rules. | Converted to require a named stale-base sweep or rerun option plus replay evidence.      | Vague rollout warning.          |
+
 ## Labels
 
 - `P0`: merge-this-week blocker.

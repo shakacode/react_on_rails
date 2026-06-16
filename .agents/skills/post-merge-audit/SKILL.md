@@ -80,6 +80,16 @@ The audit should usually produce an issue plan for non-OK findings, but not crea
 - **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
 - **Parent issue**: create one parent issue when there are two or more related child issues from the same audit or when the audit spans a release-candidate readiness decision.
 
+For process findings, the issue plan must include a Process Gap Disposition
+before issue creation:
+
+- `Mechanism target`: `script`, `schema`, `checklist+replay`, or `park`.
+- `Motivating miss`: the PR, review, audit, or incident the mechanism must catch.
+- `Replay evidence or park reason`: the command, fixture, historical PR/issue,
+  or audit artifact used to prove the mechanism catches the miss; for `park`,
+  why no mechanism is worth building now.
+- `Non-goal`: the broad prose-only rule this finding must not become.
+
 Before creating an approved issue, search existing open issues for the affected PR number and hidden fingerprint:
 
 ```markdown

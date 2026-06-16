@@ -194,13 +194,16 @@ is the human-readable summary; CI check results for the current head SHA are the
 objective verification record.
 
 When adding or broadening a repo-wide lint, CI, release, review, or merge gate,
-include at least one stale-base race control in the PR evidence: sweep open PRs
-that touch the newly enforced surface before landing the gate, require affected
-in-flight PRs to update to current `main` and re-run the new checker/current CI
-before merge, or have the coordinator re-check stale-based PR heads for newly
-added gates immediately before merge and hold or rerun them when needed. If no
-race control is practical, get an explicit maintainer waiver before merging the
-new gate.
+include at least one stale-base race control in the PR evidence. This is a
+`checklist+replay` process-gap disposition: name the stale-base race-control
+option used and replay it against open or stale-based PR heads that touch the
+newly enforced surface, or record that the sweep found none. Race controls are:
+sweep open PRs that touch the newly enforced surface before landing the gate,
+require affected in-flight PRs to update to current `main` and re-run the new
+checker/current CI before merge, or have the coordinator re-check stale-based PR
+heads for newly added gates immediately before merge and hold or rerun them when
+needed. If no race control is practical, get an explicit maintainer waiver
+before merging the new gate.
 
 When a lockfile is added, moved, renamed, unignored, or newly committed,
 including `Gemfile.lock` and other allowed lockfiles, verify Dependabot
@@ -239,6 +242,28 @@ maintainer; do not auto-merge from that signal. For direct in-session user
 instructions, this collaborator check is not the trust source; the current
 session message is. For GitHub-originated assignments, an unverified `none`
 result blocks scope widening unless another trusted assignment source exists.
+
+## Process Gap Disposition
+
+Use this only for recurring process misses found by audits, reviews, batch
+closeout, or release-gate work. Do not add a prose-only rule by default. Every
+new process issue or PR evidence item must choose one `Mechanism target`:
+
+- `script`: deterministic command or checker for mechanically observable facts.
+- `schema`: required structured output field plus a validator.
+- `checklist+replay`: human-judgment checklist with a replay against the
+  motivating miss.
+- `park`: no mechanism now; record why the miss is not worth mechanizing.
+
+Required fields before filing or approving process follow-up issues, or before
+using a process gap as PR evidence:
+
+- `Mechanism target`: one of `script`, `schema`, `checklist+replay`, or `park`.
+- `Motivating miss`: PR, review, audit, or incident the mechanism must catch.
+- `Replay evidence or park reason`: command, fixture, historical PR/issue, or
+  audit artifact used to prove the mechanism catches the motivating miss; for
+  `park`, why no mechanism is worth building now.
+- `Non-goal`: what must not become another broad prose-only rule.
 
 ## High-Concurrency Batch Launch
 
@@ -999,6 +1024,9 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task
    - one parent issue when there are two or more related child issues from the same audit
    - hidden `post-merge-audit-finding` fingerprints so duplicate child issues can be detected
+   - for process findings, include the Process Gap Disposition fields above,
+     especially `Mechanism target` and `Replay evidence or park reason`, before
+     filing issues
 8. Return high-risk findings first, then cross-PR risks, missing changelog candidates, the issue plan, a PR-by-PR table, and exact commands/data sources.
 
 Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs until the user approves the audit report and issue plan.
