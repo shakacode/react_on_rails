@@ -1,14 +1,28 @@
 #!/usr/bin/env bash
 # Local CI Runner
 # Runs appropriate CI checks based on changes in current branch
-# Usage: bin/ci-local [--all] [--fast] [--changed] [base-ref]
+# Usage: bin/ci-local [--all] [--fast] [--changed]
 
 set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: bin/ci-local [--all] [--fast] [--changed]
+
+Runs optimized local CI for the current branch by default. The comparison base is
+auto-detected from the current GitHub PR when available, then falls back to main.
+
+Options:
+  --all       Run the broad local CI suite where practical.
+  --fast      Skip the slowest local suites after change detection.
+  --changed   Explicitly request the default optimized changed-files mode.
+  -h, --help  Show this help.
+USAGE
+}
 
 # Parse arguments
 RUN_ALL=false
 FAST_MODE=false
-BASE_REF="origin/main"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -24,9 +38,14 @@ while [[ $# -gt 0 ]]; do
       RUN_ALL=false
       shift
       ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
     *)
-      BASE_REF="$1"
-      shift
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
       ;;
   esac
 done
@@ -46,6 +65,37 @@ ROOT_GEMFILE="$ROOT_DIR/Gemfile"
 OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
 PRO_GEMFILE="$ROOT_DIR/react_on_rails_pro/Gemfile"
 cd "$ROOT_DIR"
+
+detect_base_ref() {
+  local base_branch=""
+
+  if command -v gh >/dev/null 2>&1; then
+    base_branch="$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null || true)"
+  fi
+
+  if [ -n "$base_branch" ]; then
+    for candidate in "origin/$base_branch" "$base_branch"; do
+      if git rev-parse --verify "${candidate}^{commit}" >/dev/null 2>&1; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done
+  fi
+
+  for candidate in origin/main main; do
+    if git rev-parse --verify "${candidate}^{commit}" >/dev/null 2>&1; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+if ! BASE_REF="$(detect_base_ref)"; then
+  echo -e "${RED}Could not auto-detect a base ref. Fetch origin/main or check out a PR branch.${NC}" >&2
+  exit 1
+fi
 
 # Keep this helper in sync with bin/ci-rerun-failures and bin/setup.
 bundle_command() {
@@ -113,7 +163,7 @@ run_job() {
 
 # Detect changes unless --all is specified
 if [ "$RUN_ALL" = false ]; then
-  echo "Analyzing changes since $BASE_REF..."
+  echo "Analyzing optimized local CI changes since $BASE_REF..."
 
   # Try JSON output first (if jq is available)
   if command -v jq >/dev/null 2>&1; then

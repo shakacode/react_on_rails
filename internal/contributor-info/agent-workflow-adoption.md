@@ -51,11 +51,11 @@ Keep the shared skill and `.agents/workflows/address-review.md` behavior aligned
 
 ### Optional CI command workflow
 
-Copy these only when the target repo wants PR-comment commands such as `+ci-run-full`, `+ci-stop-full`, `+ci-status`, and `+ci-skip-full`:
+Copy these only when the target repo wants PR-comment commands such as `+ci-run-hosted`, `+ci-force-full`, `+ci-stop-hosted`, `+ci-stop-full`, `+ci-status`, and `+ci-skip-hosted`:
 
 - [.github/read-me.md](../../.github/read-me.md) - maintainer-facing explanation of the CI command workflow.
 - [.github/workflows/ci-commands.yml](../../.github/workflows/ci-commands.yml) - comment-command handler.
-- [.github/actions/check-full-ci-label/action.yml](../../.github/actions/check-full-ci-label/action.yml) - helper used by workflows that react to `ready-for-full-ci` and the legacy `full-ci` label.
+- [.github/actions/hosted-ci-selectors/action.yml](../../.github/actions/hosted-ci-selectors/action.yml) - helper used by workflows that react to `ready-for-hosted-ci`, `force-full-hosted-ci`, release targets, and manual force-full dispatch.
 
 Do not copy the CI workflow files as a bundle unless the target repo has the same workflow names, labels, permissions, and matrix strategy. Treat these files as implementation examples to adapt.
 
@@ -85,7 +85,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
 4. Customize the PR processing workflow.
    - Replace `script/ci-changes-detector origin/main`, `bin/ci-local`, and the targeted command list with the target repo's real local validation commands.
    - Keep the self-review gate, reproduction/TDD gate, local-validation-first policy, batched pushes, and follow-up issue restraint.
-   - Define the repo's high-risk categories so agents know when full CI or extra review is justified.
+   - Define the repo's high-risk categories so agents know when hosted CI or extra review is justified.
    - Keep the pre-push review/simplify gate: commit locally before pushing, run `codex review --base origin/main` or the target repo's equivalent on the clean diff, add Claude Code review when requested or high-risk, run `/simplify` only after a review-clean commit, accept only behavior-preserving simplifications, rerun validation/review before pushing, and record the gates used in PR evidence or churn notes.
    - Treat high-risk categories (workflow, build-config, lockfiles, release tooling) as allowed implementation scope that requires focused diffs, appropriate validation, self-review, and clear PR evidence. Do not make them standing pre-approval categories; a per-run user instruction may narrow them for that run.
    - Keep the high-concurrency launch gates: exact target confirmation for filter-based batches, trusted-list permission preflight, untrusted GitHub content handling, and resumable coordination state.
@@ -109,15 +109,15 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - Update bot assumptions, reviewer names, and any repo-specific reply or resolution rules.
 
 7. Decide whether to adopt CI comment commands.
-   - If adopted, create the labels the workflow expects, especially `ready-for-full-ci`.
-   - Keep `ci-commands.yml` aligned with the target repo's actual full-CI trigger mechanism.
-   - Ensure each expensive workflow knows how to react to `ready-for-full-ci` or manual dispatch.
+   - If adopted, create the labels the workflow expects, especially `ready-for-hosted-ci` and `force-full-hosted-ci`.
+   - Keep `ci-commands.yml` aligned with the target repo's actual hosted-CI trigger mechanism.
+   - Ensure each expensive workflow knows how to react to `ready-for-hosted-ci`, `force-full-hosted-ci`, or manual dispatch.
    - If comment commands add labels from GitHub Actions, also dispatch the
      target workflows explicitly for the current head SHA. A label added by a
      workflow's `GITHUB_TOKEN` does not start new `pull_request` workflow runs.
-   - Update every full-CI-capable workflow's dispatch list and permissions
+   - Update every hosted-CI-capable workflow's dispatch list and permissions
      together; label readers that use the Issues API need `issues: read`.
-   - If not adopted, remove `+ci-*` language from `AGENTS.md` and `pr-processing.md`, and replace it with the target repo's real full-CI trigger.
+   - If not adopted, remove `+ci-*` language from `AGENTS.md` and `pr-processing.md`, and replace it with the target repo's real hosted-CI trigger.
 
 8. Validate with a dry run.
    - Ask an agent to process a low-risk issue and stop before opening a PR.
@@ -137,10 +137,10 @@ Update these before considering the workflow adopted:
 - Unit, integration, E2E, type-check, docs, and workflow-lint commands.
 - Local change detector or equivalent path-based CI guidance.
 - Manual developer-flow checks for app startup, generated apps, examples, or test fixtures.
-- PR labels such as `ready-for-full-ci`, `benchmark`, and `ready-to-merge`.
+- PR labels such as `ready-for-hosted-ci`, `force-full-hosted-ci`, `benchmark`, and `ready-to-merge`.
 - Batch coordination labels such as `codex-ready`, `codex-wip`, or `codex-pending-question`, if adopted; otherwise remove or replace those examples and rely on exact lane assignments plus structured claim comments.
 - Cross-repo coordination backend, agent-id format, claim/heartbeat/status lifecycle, and package-routing rules if the repo will share multi-batch operations with other repos.
-- Full-CI trigger mechanism if `+ci-*` is not installed.
+- Hosted-CI trigger mechanism if `+ci-*` is not installed.
 - Follow-up issue title convention. React on Rails uses `Follow-up:`.
 - Documentation boundaries: public docs, internal docs, generated docs, changelog policy.
 - Branch naming and merge strategy.
@@ -188,7 +188,7 @@ When changing policy:
 - add an `adversarial-pr-review` skill for stricter Codex/Claude pre-merge and post-merge review gates
 - add reusable PR processing, post-merge audit, adversarial-review, and address-review workflows under `.agents/workflows/`
 - add Claude skill/prompt support for the same review flow
-- document local validation and full-CI escalation rules for this repository
+- document local validation and hosted-CI escalation rules for this repository
 
 ## Validation
 

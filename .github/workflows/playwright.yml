@@ -15,6 +15,12 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group:
   workflow_dispatch:
+    inputs:
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   detect-changes:
@@ -26,18 +32,33 @@ jobs:
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
       non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      run_e2e_tests: ${{ steps.detect.outputs.run_e2e_tests }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check for full CI readiness label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
+            {
+              echo "run_e2e_tests=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
@@ -52,17 +73,8 @@ jobs:
     needs: detect-changes
     runs-on: ubuntu-latest
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_e2e_tests == 'true'
     steps:
       - uses: actions/checkout@v4
       - name: Read runtime versions

@@ -16,10 +16,7 @@ jobs:
         contains(github.event.comment.body, '/delete') ||
         contains(github.event.comment.body, '/deploy') ||
         contains(github.event.comment.body, '/help')
-      ) &&
-      !contains(github.event.comment.body, '/run-skipped-ci') &&
-      !contains(github.event.comment.body, '/run-skipped-tests') &&
-      !contains(github.event.comment.body, '/stop-run-skipped-ci')
+      )
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -43,8 +40,8 @@ jobs:
               return { shouldRespond: false };
             }
 
-            // Valid commands
-            const validCommands = ['/run-skipped-ci', '/run-skipped-tests', '/stop-run-skipped-ci'];
+            // Legacy slash CI commands were removed; CI commands now use +ci-*.
+            const validCommands = [];
 
             // Check if any command is invalid
             const invalidCommands = matches
@@ -83,13 +80,13 @@ jobs:
 
             ## Available GitHub Comment Commands
 
-            ### 1. \\\`+ci-run-full\\\` - Enable Full CI Mode
-            Marks the PR ready for the full GitHub CI suite.
+            ### 1. \\\`+ci-run-hosted\\\` - Request Optimized Hosted CI
+            Marks the PR ready for hosted GitHub Actions while keeping suite selection path-based.
 
             **What it does:**
-            - Runs tests across all supported versions (Ruby 3.3-4.0, Node 20-22, Shakapacker 8-10, React 18-19)
-            - Dispatches full-CI-capable workflows for the current head SHA
-            - Adds the \\\`ready-for-full-ci\\\` label to persist full testing on future commits
+            - Dispatches hosted workflows for the current head SHA
+            - Adds the \\\`ready-for-hosted-ci\\\` label to persist hosted validation on future commits
+            - Lets \\\`script/ci-changes-detector\\\` choose the applicable suites
 
             **Requirements:**
             - Must have write access to the repository
@@ -97,40 +94,54 @@ jobs:
 
             **Example:**
             \\\`\\\`\\\`
-            +ci-run-full
+            +ci-run-hosted
             \\\`\\\`\\\`
 
             ---
 
-            ### 2. \\\`+ci-stop-full\\\` - Disable Full CI Mode
-            Returns to fast required-gate behavior for future commits.
+            ### 2. \\\`+ci-force-full\\\` - Force Full Hosted CI
+            Bypasses optimized suite selection for the current head and future commits.
 
             **What it does:**
-            - Removes full CI readiness labels from the PR
-            - Future commits use the fast required gate until full CI is requested again
-            - Does NOT stop currently running workflows
+            - Dispatches hosted workflows with \\\`force_full_hosted: true\\\`
+            - Adds both \\\`ready-for-hosted-ci\\\` and \\\`force-full-hosted-ci\\\`
+
+            **Example:**
+            \\\`\\\`\\\`
+            +ci-force-full
+            \\\`\\\`\\\`
+
+            ---
+
+            ### 3. \\\`+ci-stop-hosted\\\` - Disable Hosted CI Mode
+            Removes hosted CI labels for future commits.
 
             **Requirements:**
             - Must have write access to the repository
 
             **Example:**
             \\\`\\\`\\\`
-            +ci-stop-full
+            +ci-stop-hosted
             \\\`\\\`\\\`
 
             ---
 
-            ### 3. \\\`+ci-skip-full [reason]\\\` - Record a Full CI Waiver
-            Records that a maintainer intentionally waived full CI for the current PR head SHA.
+            ### 4. \\\`+ci-stop-full\\\` - Disable Only Force-Full Mode
+            Removes \\\`force-full-hosted-ci\\\` while leaving \\\`ready-for-hosted-ci\\\` in place if present.
+
+            ---
+
+            ### 5. \\\`+ci-skip-hosted [reason]\\\` - Record a Hosted CI Waiver
+            Records that a maintainer intentionally waived hosted CI for the current PR head SHA.
 
             **Example:**
             \\\`\\\`\\\`
-            +ci-skip-full docs-only change; markdown checks are enough
+            +ci-skip-hosted docs-only change; markdown checks are enough
             \\\`\\\`\\\`
 
             ---
 
-            ### 4. \\\`@claude\\\` - Claude Code AI Review
+            ### 6. \\\`@claude\\\` - Claude Code AI Review
             Invokes Claude Code AI to perform code review or answer questions.
 
             **What it does:**
@@ -172,7 +183,7 @@ jobs:
 
             ---
 
-            Legacy slash aliases still work, but \\\`+ci-*\\\` commands are preferred because GitHub's comment editor uses \\\`/\\\` for built-in slash command autocomplete.
+            Legacy slash aliases were removed. Use \\\`+ci-*\\\` commands because GitHub's comment editor reserves \\\`/\\\` for built-in slash command autocomplete.
 
             📖 For more details, see the [Contributing Guide](https://github.com/shakacode/react_on_rails/blob/main/CONTRIBUTING.md#using-comment-commands-to-trigger-ci)\`;
 

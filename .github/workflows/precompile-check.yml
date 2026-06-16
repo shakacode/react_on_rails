@@ -13,8 +13,8 @@ on:
   merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -30,19 +30,24 @@ jobs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
       non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 50
           persist-credentials: false
-      - name: Check for full CI readiness label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
             {
               echo "run_dummy_tests=true"
               echo "docs_only=false"
@@ -63,19 +68,10 @@ jobs:
 
   precompile-check:
     needs: detect-changes
-    # Run heavyweight precompile validation only for full-CI contexts.
+    # Run hosted precompile validation only when hosted CI is allowed and dummy paths changed.
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_dummy_tests == 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

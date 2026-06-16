@@ -255,7 +255,7 @@ run_command() {
       ;;
     "required-pr-gate")
       ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.load_file(f); puts f }" &&
-        for script in bin/ci-local bin/ci-rerun-failures bin/request-full-ci script/ci-changes-detector; do
+        for script in bin/ci-local bin/ci-rerun-failures bin/request-hosted-ci script/ci-changes-detector; do
           bash -n "$script"
         done &&
         script/ci-changes-detector origin/main

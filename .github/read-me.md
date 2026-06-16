@@ -1,174 +1,190 @@
 # GitHub Actions CI/CD Configuration
 
-This directory contains GitHub Actions workflows for continuous integration and deployment.
+This directory contains GitHub Actions workflows for continuous integration and
+deployment.
 
 ## PR Comment Commands
 
-### `+ci-run-full` - Request Full CI
+Post one CI command per PR comment. If a comment contains multiple `+ci-*`
+commands, the command workflow handles only the first one.
 
-When you open or update a PR, GitHub runs the fast required gate. To run the **complete CI suite** including all dependency combinations, add a comment to your PR:
+### `+ci-run-hosted` - Request Optimized Hosted CI
 
-```
-+ci-run-full
-```
+Use this after local validation when a PR is ready for GitHub Actions
+confirmation:
 
-Post one CI command per comment. If a comment contains multiple `+ci-*` commands, the command workflow handles only the first one.
-
-This command dispatches the full-CI-capable workflows for the current head SHA, creates `ready-for-full-ci` if needed, and adds it so future pushes on the PR keep running full CI:
-
-- ✅ Main test suite with both latest and minimum supported versions
-- ✅ All example app generator tests
-- ✅ React on Rails Pro integration tests
-- ✅ React on Rails Pro package tests
-
-- **Lint JS and Ruby** (`lint-js-and-ruby.yml`)
-- **JS unit tests for Renderer package** (`package-js-tests.yml`)
-- **Rspec test for gem** (`gem-tests.yml`)
-- **Integration Tests** (`integration-tests.yml`)
-- **Assets Precompile Check** (`precompile-check.yml`)
-- **Generator tests** (`examples.yml`)
-- **Playwright E2E Tests** (`playwright.yml`)
-- **React on Rails Pro - Integration Tests** (`pro-integration-tests.yml`)
-- **React on Rails Pro - Package Tests** (`pro-test-package-and-gem.yml`)
-
-The bot will:
-
-1. React to your comment (`rocket` when at least one workflow is dispatched, `confused` when the command cannot run)
-2. Post a confirmation message for the current head SHA and any dispatch failures
-3. Keep future commits on the PR in full-CI mode until `+ci-stop-full` removes the label
-
-If the PR branch is from a fork or the PR head repository is unavailable, the bot posts maintainer guidance and exits without dispatching workflows or adding the label.
-
-### Human, Agent, and Workflow-Token Paths
-
-`ready-for-full-ci` is both a trigger and a persistent mode label, but the actor
-that adds it matters:
-
-- A maintainer or local user token can run `bin/request-full-ci` or add
-  `ready-for-full-ci` directly. That user-token label event starts the
-  heavyweight `pull_request` workflows.
-- `+ci-run-full` and the legacy `/run-skipped-ci` command run inside GitHub
-  Actions. They must dispatch the full-CI-capable workflows for the current head
-  SHA first, then add `ready-for-full-ci` so future pushes stay in full-CI mode.
-  A label added by a workflow's `GITHUB_TOKEN` does not start new
-  `pull_request` workflow runs by itself.
-- Agents should prefer the comment command at the final readiness gate because
-  it leaves a PR-visible audit trail. During active implementation churn, use
-  `+ci-status` first and avoid starting expensive runs prematurely.
-
-### Why This Exists
-
-By default, PRs run a fast required gate and rely on local validation during review.
-
-This is intentional to keep PR feedback loops fast. However, before merging high-risk changes, you should verify compatibility across all supported versions. The `+ci-run-full` command makes this easy without waiting for the PR to be merged to main.
-
-For low-risk or docs-only changes where a maintainer intentionally does not want full CI, use:
-
-```
-+ci-skip-full docs-only change; markdown checks are enough
+```text
++ci-run-hosted
 ```
 
-The reason is optional. The bot records the current PR head SHA so the waiver is auditable and does not apply after another push. It does not cancel or block workflow runs.
+The command dispatches hosted workflows for the current head SHA, creates
+`ready-for-hosted-ci` if needed, and adds it so future pushes on the PR keep
+running optimized hosted CI. Hosted CI is still path-selected by
+`script/ci-changes-detector`; it does not automatically run every hosted suite.
 
-### Security & Access Control
+### `+ci-force-full` - Request Force-Full Hosted CI
 
-**Only repository collaborators with write access can trigger full CI runs.** This prevents:
+Use this only when a maintainer intentionally wants to bypass optimized suite
+selection:
 
-- Resource abuse from external contributors
-- Unauthorized access to Pro package tests
-- Potential DoS attacks via repeated CI runs
+```text
++ci-force-full
+```
 
-The workflow first filters comment authors to `OWNER`, `MEMBER`, or `COLLABORATOR` associations to avoid allocating runners for obvious external mentions. The script still verifies repository write access before executing any command. If an unauthorized associated user attempts to use `+ci-run-full`, they'll receive a message explaining the restriction.
+The command dispatches the same hosted workflows with `force_full_hosted: true`,
+creates `ready-for-hosted-ci` and `force-full-hosted-ci`, and keeps future pushes
+in force-full mode until `+ci-stop-full` removes the override.
 
-The job-level `contains('+ci-')` prefilter is intentionally broad because GitHub Actions expressions do not support regular expressions. A prose mention such as `+ci-related` can still start the lightweight command workflow, but the script strips quoted/code blocks and only executes commands that appear at the start of a comment line.
+### Stop And Waiver Commands
 
-### Concurrency Protection
+```text
++ci-stop-hosted
+```
 
-Multiple CI command comments on the same PR run one at a time so status/help commands cannot race label changes.
+Removes both hosted labels so future commits return to the required gate only.
+
+```text
++ci-stop-full
+```
+
+Removes only `force-full-hosted-ci`. If `ready-for-hosted-ci` remains, future
+commits keep running optimized hosted CI.
+
+```text
++ci-skip-hosted docs-only change; markdown checks are enough
+```
+
+Records a SHA-bound hosted-CI waiver. The waiver does not cancel or block any
+workflow run and does not apply after another push.
+
+`+ci-status` summarizes labels, the current SHA, the docs-only heuristic, and
+whether a waiver exists for the current SHA. `+ci-help` prints the command list.
+
+## Human, Agent, And Workflow-Token Paths
+
+Actor matters because GitHub Actions ignores `pull_request` label events created
+by a workflow's `GITHUB_TOKEN`:
+
+- A maintainer or local user token can run `bin/request-hosted-ci` from a PR
+  branch or add `ready-for-hosted-ci` directly. That user-token label event can
+  start the hosted `pull_request` workflows.
+- `+ci-run-hosted` and `+ci-force-full` run inside GitHub Actions. They dispatch
+  workflows for the current head SHA first, then add labels for future pushes.
+- Agents should prefer comment commands at the final readiness gate because they
+  leave a PR-visible audit trail. During active implementation churn, use
+  `+ci-status` first and avoid starting hosted runs prematurely.
+
+Fork PRs cannot use comment-command hosted CI to dispatch same-repository
+workflows or add persistent labels. A maintainer should push a trusted branch to
+this repository when Pro or secret-backed CI is required.
+
+## Why This Exists
+
+PRs should not spend hosted runner time before local checks have caught routine
+failures. The required gate stays fast and stable for every PR update; optimized
+hosted CI confirms the ready branch; force-full hosted CI is a separate
+maintainer decision for broad matrix coverage. Draft PRs are still useful for
+early review and bots, but draft/open/ready-for-review state is not the hosted CI
+trigger.
+
+## Security And Access Control
+
+Only repository collaborators with write access can trigger hosted CI commands.
+This prevents resource abuse, unauthorized access to Pro package tests, and
+repeated runner allocation from external comments.
+
+The workflow first filters comment authors to `OWNER`, `MEMBER`, or
+`COLLABORATOR` associations, then verifies repository write access before
+executing a command. The job-level `contains('+ci-')` prefilter is intentionally
+broad because GitHub Actions expressions do not support regular expressions;
+the script strips quoted/code blocks and only executes commands at the start of
+a comment line.
 
 ## Testing Comment-Triggered Workflows
 
-**Important**: Comment-triggered workflows (`issue_comment` event) only execute from the **default branch** (main). This creates a chicken-and-egg problem when developing workflow changes.
-
-### Recommended Testing Approach
-
-1. **Develop the workflow**: Create/modify the workflow in your feature branch
-2. **Test locally**: Validate YAML syntax and logic as much as possible
-3. **Merge to main**: The workflow must be in main to be triggered by comments
-4. **Test on a PR**: Create a test PR and use the comment command to verify
-
-### Why This Limitation Exists
-
-GitHub Actions workflows triggered by `issue_comment` events always use the workflow definition from the default branch, not the PR branch. This is a security feature to prevent malicious actors from modifying workflows through PRs.
-
-For more details, see [GitHub's documentation on issue_comment events](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#issue_comment).
+Comment-triggered workflows (`issue_comment`) execute from the default branch
+(`main`), not from the PR branch. When changing `ci-commands.yml`, validate the
+YAML and script locally, merge the workflow change, then test commands on a
+follow-up PR.
 
 ## Available Workflows
 
-### CI Workflows (Triggered on Push/PR)
+### CI Workflows
 
-- **`main.yml`** - Main test suite (dummy app integration tests)
-- **`lint-js-and-ruby.yml`** - Linting for JavaScript and Ruby code
-- **`package-js-tests.yml`** - JavaScript unit tests for the package
-- **`rspec-package-specs.yml`** - RSpec tests for the Ruby package
-- **`examples.yml`** - Generator tests for example apps
-- **`playwright.yml`** - Playwright E2E tests
-- **`pro-integration-tests.yml`** - Pro package integration tests
-- **`pro-test-package-and-gem.yml`** - Pro package unit tests and Pro Ruby/RBS/TypeScript linting
+- `ci-required.yml` - Fast required PR gate
+- `lint-js-and-ruby.yml` - JavaScript and Ruby lint/type checks
+- `package-js-tests.yml` - JavaScript unit tests for packages
+- `gem-tests.yml` - RSpec tests for the Ruby package
+- `integration-tests.yml` - Dummy app integration tests
+- `precompile-check.yml` - Assets precompile validation
+- `examples.yml` - Generator tests for example apps
+- `playwright.yml` - Playwright E2E tests
+- `pro-integration-tests.yml` - Pro package integration tests
+- `pro-test-package-and-gem.yml` - Pro package tests and linting
 
 ### Utility Workflows
 
-- **`ci-required.yml`** - Fast required PR gate
-- **`ci-commands.yml`** - Triggered by `+ci-*` comments on PRs
-- **`run-skipped-ci.yml`** - Legacy workflow triggered by `/run-skipped-ci` or `/run-skipped-tests` comment on PRs
-- **`pr-welcome-comment.yml`** - Auto-comments on new PRs with helpful info
-- **`detect-changes.yml`** - Detects which parts of the codebase changed
+- `ci-commands.yml` - Handles `+ci-*` PR comments
+- `detect-invalid-ci-commands.yml` - Guides users away from old slash commands
+- `pr-welcome-comment.yml` - Auto-comments on new PRs with helpful info
+- `check-markdown-links.yml` - Validates markdown links
 
 ### Code Review Workflows
 
-- **`claude.yml`** - Claude AI code review
-- **`claude-code-review.yml`** - Additional Claude code review checks
-
-### Other Workflows
-
-- **`check-markdown-links.yml`** - Validates markdown links
+- `claude.yml` - Claude AI code review
+- `claude-code-review.yml` - Additional Claude code review checks
 
 ## Workflow Permissions
 
-Most workflows use minimal permissions. The comment-triggered workflows require:
+Most workflows use minimal permissions. Comment-triggered workflows require:
 
-- `contents: read` - To read the repository code
-- `pull-requests: read` - To inspect PR metadata and changed files
-- `issues: write` - To post comments, labels, and reactions
-- `actions: write` - To dispatch full-CI workflows for comment commands
+- `contents: read` - read repository code
+- `pull-requests: read` - inspect PR metadata and changed files
+- `issues: write` - post comments, labels, and reactions
+- `actions: write` - dispatch hosted workflows for comment commands
 
 ## Conditional Execution
 
-Many workflows use job-level conditions to skip unnecessary heavyweight jobs:
+Hosted workflows use the shared `.github/actions/hosted-ci-selectors` action and
+job-level conditions:
 
-- Runs all jobs on pushes to `main`
-- Runs full CI on merge queue, manual dispatch, release-target PRs, or PRs labeled `ready-for-full-ci`
-- Can be overridden with `workflow_dispatch` or `+ci-run-full`
+- Ordinary PR updates run the required gate only unless `ready-for-hosted-ci`,
+  `force-full-hosted-ci`, or a release-target base branch allows hosted jobs.
+- `ready-for-hosted-ci` permits hosted jobs, but the change detector still
+  selects applicable suites.
+- `force-full-hosted-ci` or `workflow_dispatch` with `force_full_hosted: true`
+  bypasses optimized selection and marks every suite as applicable.
+- Pushes to `main`, merge queue, and release-target PRs may use broad
+  version/dependency matrices, but still respect detector outputs unless
+  force-full hosted CI is active.
 
-See `script/ci-changes-detector` for the change detection logic.
+Release-target base branches are centralized in the selector action:
+`release/*`, `releases/*`, and `release-*`.
 
-## Full-CI Workflow Maintenance Checklist
+## Hosted Workflow Maintenance Checklist
 
-When adding an expensive PR workflow, update the workflow and command path
-together:
+When adding or changing an expensive PR workflow, update the workflow, command
+dispatcher, and docs together:
 
 1. Keep the fast required gate in `ci-required.yml`; do not make heavyweight
    jobs the only required PR signal.
-2. Use job-level conditions instead of workflow-level `paths` filters when a
-   workflow must always be able to start for label changes, merge queue, or
-   manual dispatch.
-3. Include `pull_request` label events, `merge_group`, and `workflow_dispatch`
-   when the workflow participates in full CI.
-4. If the workflow reads `ready-for-full-ci` with
-   `.github/actions/check-full-ci-label`, give the detector job `issues: read`.
-5. Add the workflow to both comment-command dispatch lists when `+ci-run-full`
-   should run it for the current head SHA. Pass `force_run: 'true'` only when
-   that workflow defines the input.
-6. Update `internal/contributor-info/ci-optimization.md`, `CONTRIBUTING.md`,
+2. Include `pull_request` events for normal PR updates and label changes:
+   `opened`, `synchronize`, `reopened`, `ready_for_review`, `labeled`, and
+   `unlabeled`.
+3. Include `push` to `main`, `merge_group`, and `workflow_dispatch` when the
+   workflow is part of merge or release confidence.
+4. Avoid workflow-level `paths` or `paths-ignore` when branch protection or
+   hosted CI policy depends on the workflow starting. Use job-level conditions
+   after checkout and change detection.
+5. Use `.github/actions/hosted-ci-selectors` in the detector job and grant
+   `issues: read` so it can inspect PR labels.
+6. Gate heavyweight jobs on both hosted eligibility and detector outputs, for
+   example `should_run_hosted_ci == 'true' && run_js_tests == 'true'`.
+7. Use `should_use_full_matrix` only for matrix breadth decisions; do not treat
+   `ready-for-hosted-ci` as a request to bypass optimized selection.
+8. Add the workflow to `.github/workflows/ci-commands.yml` when
+   `+ci-run-hosted` or `+ci-force-full` should dispatch it for the exact current
+   head SHA.
+9. Update `internal/contributor-info/ci-optimization.md`, `CONTRIBUTING.md`,
    `AGENTS.md`, and `.agents/workflows/pr-processing.md` when the request or
    readiness process changes.

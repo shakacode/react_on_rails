@@ -13,8 +13,8 @@ on:
   merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -39,25 +39,30 @@ jobs:
       run_pro_lint: ${{ steps.detect.outputs.run_pro_lint }}
       run_pro_tests: ${{ steps.detect.outputs.run_pro_tests }}
       run_pro_dummy_tests: ${{ steps.detect.outputs.run_pro_dummy_tests }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check for full CI readiness label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         working-directory: .
         run: |
-          # If force_run is true OR a full CI readiness label is present, run everything
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
             {
               echo "run_pro_lint=true"
               echo "run_pro_tests=true"
               echo "run_pro_dummy_tests=true"
+              echo "run_pro_node_renderer_tests=true"
               echo "docs_only=false"
               echo "non_runtime_only=false"
             } >> "$GITHUB_OUTPUT"
@@ -78,17 +83,8 @@ jobs:
   build-dummy-app-webpack-test-bundles:
     needs: detect-changes
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
@@ -188,17 +184,8 @@ jobs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
@@ -381,17 +368,8 @@ jobs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
@@ -549,17 +527,8 @@ jobs:
     needs:
       - detect-changes
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     env:

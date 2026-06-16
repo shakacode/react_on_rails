@@ -17,8 +17,8 @@ on:
   merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -38,21 +38,26 @@ jobs:
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
+      should_use_full_matrix: ${{ steps.hosted-ci.outputs.should_use_full_matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
           # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
           fetch-depth: 50
           persist-credentials: false
-      - name: Check for full CI readiness label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR a full CI readiness label is present, run everything
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
             {
               echo "run_lint=true"
               echo "run_js_tests=true"
@@ -100,11 +105,7 @@ jobs:
           LATEST_NODE_VERSION: ${{ steps.tool-versions.outputs.node-major-version }}
           MINIMUM_RUBY_VERSION: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
           MINIMUM_NODE_VERSION: ${{ steps.tool-versions.outputs.minimum-node-major-version }}
-          WORKFLOW_REF: ${{ github.ref }}
-          WORKFLOW_EVENT: ${{ github.event_name }}
-          IS_RELEASE_TARGET: ${{ startsWith(github.base_ref, 'release/') || startsWith(github.base_ref, 'releases/') || startsWith(github.base_ref, 'release-') }}
-          FORCE_RUN: ${{ inputs.force_run }}
-          HAS_FULL_CI_LABEL: ${{ needs.detect-changes.outputs.has_full_ci_label }}
+          SHOULD_USE_FULL_MATRIX: ${{ needs.detect-changes.outputs.should_use_full_matrix }}
         run: |
           # Integration matrices float Node within each supported major; single-lane
           # workflows use exact patch versions when exercising the minimum floor.
@@ -113,12 +114,9 @@ jobs:
           minimum_ruby_version="$MINIMUM_RUBY_VERSION"
           minimum_node_version="$MINIMUM_NODE_VERSION"
 
-          # Determine if we should run full matrix (main, merge queue, manual, release target, or full CI readiness label).
-          if [[ "$WORKFLOW_REF" == "refs/heads/main" ]] || \
-             [[ "$WORKFLOW_EVENT" != "pull_request" ]] || \
-             [[ "$IS_RELEASE_TARGET" == "true" ]] || \
-             [[ "$FORCE_RUN" == "true" ]] || \
-             [[ "$HAS_FULL_CI_LABEL" == "true" ]]; then
+          # Full matrices run only on main, merge queue, release targets, or
+          # explicit force-full hosted CI. Normal hosted PR CI stays optimized.
+          if [[ "$SHOULD_USE_FULL_MATRIX" == "true" ]]; then
             run_full_matrix=true
           else
             run_full_matrix=false
@@ -178,22 +176,13 @@ jobs:
   # One reusable-workflow call per independent bundler/dependency-level chain. Each call owns its
   # own build -> integration job chain (see dummy-app-bundler-tests.yml), so a build failure in one
   # chain no longer skips another chain's integration tests. Refs #3593 / #3622.
-  # The shared gating keeps regular PR updates cheap while preserving full CI on main, manual runs,
-  # merge queue, release targets, and PRs marked ready for full validation.
+  # The shared gating keeps regular PR updates cheap while allowing optimized
+  # hosted CI only after an explicit hosted request or for release/main/queue.
   webpack-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_dummy_tests == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/dummy-app-bundler-tests.yml
@@ -203,17 +192,9 @@ jobs:
   webpack-minimum-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
     if: |
-      needs.setup-integration-matrix.outputs.run_full_matrix == 'true' && !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.setup-integration-matrix.outputs.run_full_matrix == 'true' &&
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_dummy_tests == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/dummy-app-bundler-tests.yml
@@ -223,17 +204,8 @@ jobs:
   rspack-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_dummy_tests == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/dummy-app-bundler-tests.yml

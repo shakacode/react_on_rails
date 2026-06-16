@@ -13,8 +13,8 @@ on:
   merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -34,20 +34,24 @@ jobs:
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check for full CI readiness label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR a full CI readiness label is present, run everything
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
             {
               echo "run_lint=true"
               echo "run_js_tests=true"
@@ -97,20 +101,11 @@ jobs:
 
   build:
     needs: detect-changes
-    # Run heavyweight lint only for full-CI contexts. Docs-only PRs still get the
-    # focused docs-format-check above.
+    # Run heavyweight lint only when hosted CI is allowed and the detector says
+    # this PR actually needs lint. Docs-only PRs get the focused check above.
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_lint == 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

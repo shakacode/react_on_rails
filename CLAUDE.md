@@ -15,7 +15,7 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`.
 
 ## Behavioral Defaults
 
-- When confident in your changes, **commit and push without asking for permission**. Always monitor CI after pushing, and use the `+ci-*` PR comment commands from `AGENTS.md` when asking maintainers to run, stop, or waive full CI.
+- When confident in your changes, **commit and push without asking for permission**. Always monitor CI after pushing, and use the `+ci-*` PR comment commands from `AGENTS.md` when asking maintainers to run, stop, or waive hosted CI.
 - Check `main` CI status at session start (injected by `.claude/hooks/main-ci-status.sh`) and again before `gh pr create` or pushing to `main`. See `AGENTS.md` → "Main branch health" for the decision framework when `main` is red.
 
 ## Git Safety

@@ -33,7 +33,7 @@ jobs:
           for script in \
             bin/ci-local \
             bin/ci-rerun-failures \
-            bin/request-full-ci \
+            bin/request-hosted-ci \
             script/ci-changes-detector
           do
             bash -n "$script"

@@ -60,7 +60,7 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
 6. Run local validation based on changed areas.
 7. Run the pre-push AI review and simplify gate when the change is non-trivial or high-risk.
 8. Update the PR body, issue, or one concise PR comment with exact verification evidence, churn notes, and remaining gaps. Every PR body must include a self-contained why/rationale summary; link issues as supporting context, but do not require reviewers to open an issue to understand why the PR exists.
-9. Only then request review, full CI, or merge readiness.
+9. Only then request review, hosted CI, or merge readiness.
 
 ## Initial GitHub Commands
 
@@ -364,18 +364,19 @@ Fetch/prune main first, confirm the expected repo root, and verify any nested re
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
-For non-trivial, high-risk, `ready-for-full-ci`, `benchmark`, workflow/build-config,
-dependency/runtime-version, or broad refactor PRs, commit the intended
+For non-trivial, high-risk, `ready-for-hosted-ci`, `force-full-hosted-ci`,
+`benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor PRs, commit the intended
 implementation locally before pushing so there is a clean branch diff. Run
 repo-specific validation, formatter/lint/type checks as applicable, then run the
 primary local/adversarial self-review gate, normally
 `codex review --base origin/<base>` or the PR's real base, before PR creation or
 update.
 
-When requested by a maintainer or when the change is high-risk, `ready-for-full-ci`,
-`benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor
-scoped, run one additional Claude Code review pass if available, such as
-`/code-review` or `/code-review ultra`.
+When requested by a maintainer or when the change is high-risk,
+`ready-for-hosted-ci`, `force-full-hosted-ci`, `benchmark`,
+workflow/build-config, dependency/runtime-version, or broad refactor scoped, run
+one additional Claude Code review pass if available, such as `/code-review` or
+`/code-review ultra`.
 
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
@@ -407,7 +408,7 @@ CI-ready: instead treat the full `gh pr checks <PR>` list as the readiness gate
 and require each current-head check to pass or be skipped with CI selector or
 maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and
 unexplained skipped checks still block readiness. If the full check list is
-empty, report CI state as `UNKNOWN` / not ready and request full CI or maintainer
+empty, report CI state as `UNKNOWN` / not ready and request hosted CI or maintainer
 status-check configuration before merge. Avoid long-lived `gh ... --watch`. Ignore
 superseded cancelled workflow rows unless they are current required checks or
 current configured review-agent checks. If live state cannot be verified, report
@@ -428,21 +429,22 @@ unless a maintainer explicitly waives them.
 
 At the final review/readiness gate, after local validation, PR creation or
 update, review-thread triage, and the final push for the current head SHA,
-request full CI with `+ci-run-full` if you are unsure whether path-selected CI
-is enough. Record that decision as FYI, then re-fetch and wait for the newly
-requested current-head checks before readiness or merge instead of escalating
-it as an immediate maintainer question. Use `+ci-status` first when state is
-unclear. Do not rely on adding `ready-for-full-ci` directly from automation; a
-workflow `GITHUB_TOKEN` label write does not trigger current-head
-`pull_request` workflows. Also apply the merge-endgame debounce and waiver-soak
-rule under **Merge Endgame Debounce And Waiver Soak** before the final
-merge/readiness decision.
+request hosted CI only after checking `+ci-status`. Use `+ci-run-hosted` when
+the branch needs optimized hosted confirmation. Use `+ci-force-full` only when a
+maintainer intentionally wants to bypass optimized selection or the selector
+itself is part of the risk. Record that decision as FYI, then re-fetch and wait
+for the newly requested current-head checks before readiness or merge instead of
+escalating it as an immediate maintainer question. Do not rely on adding
+`ready-for-hosted-ci` directly from automation; a workflow `GITHUB_TOKEN` label
+write does not trigger current-head `pull_request` workflows. Also apply the
+merge-endgame debounce and waiver-soak rule under **Merge Endgame Debounce And
+Waiver Soak** before the final merge/readiness decision.
 
-After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, run `script/pr-merge-ledger <PR> --strict` with explicit changelog classification and P0/P1/P2/Must-Fix dispositions, update stale release-mode classification, refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it, request full CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
+After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, run `script/pr-merge-ledger <PR> --strict` with explicit changelog classification and P0/P1/P2/Must-Fix dispositions, update stale release-mode classification, refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it, request hosted CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
-Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: merged PR; open PR waiting on checks/review; blocked needing user input with the surfaced question/comment URL; or no-PR with an evidence-backed issue/PR comment URL. Do not report a target `complete` while its merge ledger has any `UNKNOWN` field or `complete_allowed: false`. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, autonomous nit outcomes, decision-point counts, confidence notes, full-CI uncertainty that was already handled by requesting full CI, and the per-PR merge-ledger summary in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, merge-ledger path or JSON artifact, blockers, no-PR comments, and next actions.
+Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: merged PR; open PR waiting on checks/review; blocked needing user input with the surfaced question/comment URL; or no-PR with an evidence-backed issue/PR comment URL. Do not report a target `complete` while its merge ledger has any `UNKNOWN` field or `complete_allowed: false`. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, autonomous nit outcomes, decision-point counts, confidence notes, hosted-CI uncertainty that was already handled by requesting hosted CI, and the per-PR merge-ledger summary in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, merge-ledger path or JSON artifact, blockers, no-PR comments, and next actions.
 ```
 
 ### Question And Decision Handling
@@ -461,13 +463,15 @@ outcomes, decision-point counts, confidence/readiness notes, and `UNKNOWN`
 facts in the PR description or handoff instead of turning them into separate
 maintainer pings.
 
-<!-- Keep this full-CI uncertainty rule in sync with `.agents/skills/pr-batch/SKILL.md`. -->
+<!-- Keep this hosted-CI uncertainty rule in sync with `.agents/skills/pr-batch/SKILL.md`. -->
 
-Full-CI uncertainty at the final readiness gate after local validation and the
-final push is a non-blocking decision. Request full CI with `+ci-run-full`,
-record the reason, re-fetch and wait for the newly requested current-head checks,
-and continue the readiness flow instead of escalating it as an immediate
-maintainer question.
+Hosted-CI uncertainty at the final readiness gate after local validation and the
+final push is a non-blocking decision. If the branch needs remote confirmation,
+request optimized hosted CI with `+ci-run-hosted`. If the remaining concern is
+that optimized suite selection may be insufficient, request force-full hosted CI
+with `+ci-force-full` and record why. Re-fetch and wait for the newly requested
+current-head checks, then continue the readiness flow instead of escalating it
+as an immediate maintainer question.
 
 Suggested PR description section:
 
@@ -491,14 +495,14 @@ Split batch handoffs into two sections:
 - **Immediate maintainer attention**: true blockers and questions only, such as
   unsafe implementation ambiguity, a failed check that needs an explicit waiver,
   unresolved `DISCUSS` feedback, or a merge/release-mode conflict.
-- **FYI / decisions made**: no-PR rationales, non-blocking decisions, full CI
+- **FYI / decisions made**: no-PR rationales, non-blocking decisions, hosted CI
   requested because the coordinator was unsure at readiness time, validation
   evidence, review churn notes, autonomous nit outcomes, confidence notes,
   decision-point counts per PR, already-answered questions, and a per-PR
   merge-ledger table or JSON artifact path.
 
-Do not put full-CI uncertainty in Immediate at final readiness after local
-validation and the final push. Request full CI and log it in FYI.
+Do not put hosted-CI uncertainty in Immediate at final readiness after local
+validation and the final push. Request hosted CI and log it in FYI.
 Do not report a PR/target as `complete` while `script/pr-merge-ledger <PR>
 --strict` reports `UNKNOWN` fields, review-thread/review-object violations, or
 `complete_allowed: false`.
@@ -593,7 +597,7 @@ When worker subagents are explicitly authorized:
 - If a worker lane declares `depends_on` but `agent-coord status` shows no
   matching batch state for that lane, treat dependency state as `UNKNOWN` and
   stop to report the missing private batch file.
-- The main agent owns final PR creation, status reporting, full-CI decisions, and merge sequencing.
+- The main agent owns final PR creation, status reporting, hosted-CI decisions, and merge sequencing.
 
 ### Coordinator Closeout Lane
 
@@ -622,11 +626,12 @@ The closeout lane is:
    PR-body `Agent Merge Confidence` block required by `AGENTS.md`; keep this
    distinct from tracker mode/classification updates.
 7. After the final push, if local validation passed and the only uncertainty is
-   whether full CI is needed, request full CI with `+ci-run-full` and record the
-   reason as FYI, then loop back to re-fetch and wait for the newly requested
-   current-head checks before readiness or merge.
+   whether hosted CI is needed, request optimized hosted CI with `+ci-run-hosted`
+   and record the reason as FYI. If the uncertainty is selector breadth, use
+   `+ci-force-full` and record why. Then loop back to re-fetch and wait for the
+   newly requested current-head checks before readiness or merge.
 8. Assemble or refresh the attention-contract closeout for each lane after any
-   full-CI waitback: autonomous nit outcomes, human decision-point count, current
+   hosted-CI waitback: autonomous nit outcomes, human decision-point count, current
    confidence or readiness note, and any remaining `UNKNOWN` facts.
 9. Under the current release mode, mark ready or merge PRs that satisfy the
    merge qualification rules, including the merge-endgame debounce and
@@ -664,8 +669,8 @@ asking GitHub reviewers or CI to spend another cycle.
 2. Apply the local/adversarial self-review gate on the committed branch diff, normally via
    `.agents/skills/autoreview/SKILL.md`. The default engine is `codex review --base origin/main` or
    the PR's real base.
-3. When the maintainer asks for Claude review, or when the change is high-risk, `ready-for-full-ci`,
-   `benchmark`, workflow/build-config, dependency/runtime-version, or broad-refactor scoped, run
+3. When the maintainer asks for Claude review, or when the change is high-risk, `ready-for-hosted-ci`,
+   `force-full-hosted-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad-refactor scoped, run
    one additional Claude Code review pass if the current environment provides it, for example
    `/code-review` or `/code-review ultra`. If Claude review tooling is unavailable, state that in
    the PR evidence instead of substituting an unrelated tool.
@@ -770,20 +775,20 @@ stop a long batch. For private channels, the Slack app or bot must be invited fi
 Notification messages should include only the exact decision or status needed, the PR/issue links,
 and the next action the agent will take after a response. Do not post routine progress noise.
 
-## Full CI Backpressure
+## Hosted CI Backpressure
 
-Use the `+ci-*` PR comment commands from the CI command workflow for full-CI decisions. These commands provide the audit trail for running, stopping, checking, or waiving full CI.
+Use the `+ci-*` PR comment commands from the CI command workflow for hosted-CI decisions. These commands provide the audit trail for running, stopping, checking, or waiving hosted CI.
 
-- During active implementation or review-fix churn, do not request full CI.
-- If a PR is still being iterated and already has `ready-for-full-ci`, ask whether to comment `+ci-stop-full` before pushing more batches.
-- Use `+ci-status` before deciding whether full CI is already enabled or waived for the current SHA.
-- Use `+ci-run-full` only after local validation, self-review, review-thread triage, and the final push for the current batch. At that point, if you are unsure whether path-selected CI is enough, request full CI and record the reason in FYI; then re-fetch and wait for the newly requested current-head checks before readiness or merge. Do not request full CI speculatively during active churn.
-- Use `+ci-skip-full [reason]` only with explicit maintainer approval and only for low-risk/current-SHA cases where the reason is auditable.
+- During active implementation or review-fix churn, do not request hosted CI.
+- If a PR is still being iterated and already has `ready-for-hosted-ci`, ask whether to comment `+ci-stop-hosted` before pushing more batches.
+- Use `+ci-status` before deciding whether hosted CI is already enabled or waived for the current SHA.
+- Use `+ci-run-hosted` only after local validation, self-review, review-thread triage, and the final push for the current batch. Use `+ci-force-full` only when a maintainer intentionally wants to bypass optimized selection or selector coverage is the specific risk. Record the reason in FYI, then re-fetch and wait for the newly requested current-head checks before readiness or merge. Do not request hosted CI speculatively during active churn.
+- Use `+ci-skip-hosted [reason]` only with explicit maintainer approval and only for low-risk/current-SHA cases where the reason is auditable.
 - Use `+ci-help` when the command syntax or current behavior is unclear.
 - Put one `+ci-*` command per PR comment; the workflow handles only the first command in a comment.
-- Agents and batch coordinators should not add or remove `ready-for-full-ci` directly when a `+ci-*` command would create a clearer audit trail.
-- A human/local user-token path such as `bin/request-full-ci` or `gh pr edit --add-label ready-for-full-ci` can start label-triggered workflows. A label added by a GitHub workflow's `GITHUB_TOKEN` cannot, so automation must use `+ci-run-full` or otherwise dispatch the full-CI-capable workflows for the exact current head SHA.
-- For fork PRs, comment-command full CI does not dispatch same-repository workflows or add the persistent label. Report that a trusted base-repository branch or maintainer-run path is needed for full Pro or secret-backed CI.
+- Agents and batch coordinators should not add or remove `ready-for-hosted-ci` directly when a `+ci-*` command would create a clearer audit trail.
+- A human/local user-token path such as `bin/request-hosted-ci` or `gh pr edit --add-label ready-for-hosted-ci` can start label-triggered workflows. A label added by a GitHub workflow's `GITHUB_TOKEN` cannot, so automation must use `+ci-run-hosted` or otherwise dispatch the hosted-CI-capable workflows for the exact current head SHA.
+- For fork PRs, comment-command hosted CI does not dispatch same-repository workflows or add the persistent label. Report that a trusted base-repository branch or maintainer-run path is needed for Pro or secret-backed CI.
 
 ## CI Polling And Live State
 
@@ -802,7 +807,7 @@ as CI-ready. Instead treat the full `gh pr checks <PR>` list as the readiness
 gate and require each current-head check to pass or be skipped with CI selector
 or maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and
 unexplained skipped checks still block readiness. If the full check list is
-empty, report CI state as `UNKNOWN` / not ready and request full CI or maintainer
+empty, report CI state as `UNKNOWN` / not ready and request hosted CI or maintainer
 status-check configuration before merge. (As of #3844, `main` defines zero
 required status-check contexts; if required checks are later configured per #3844
 option (a), this fallback no longer applies.)
@@ -835,7 +840,7 @@ Do not let follow-up issues become a substitute for finishing the PR. Follow-up 
 
 ## Merge Endgame Debounce And Waiver Soak
 
-For `ready-for-full-ci`, `benchmark`, accelerated-RC, high-risk, concurrent-batch, or repeatedly churny PRs,
+For `ready-for-hosted-ci`, `force-full-hosted-ci`, `benchmark`, accelerated-RC, high-risk, concurrent-batch, or repeatedly churny PRs,
 declare a final candidate before the final configured review pass. After that review pass completes,
 do not push nit-only, comment-only, optional wording-only, or evidence-only commits. Batch any
 remaining must-fix file changes into one final push and restart the current-head review/check gate;
@@ -943,7 +948,7 @@ Also verify:
 - No pending, stale, late, or untriaged configured review-agent feedback remains for the current head SHA.
 - No AI reviewer finding remains untriaged as a confirmed blocker; do not wait for AI approval objects or positive AI issue comments as special gates.
 - No requested adversarial review has unresolved `BLOCKING` or `DISCUSS` findings.
-- Required checks are green, or the user has explicitly accepted an auditable waiver for full CI.
+- Required checks are green, or the user has explicitly accepted an auditable waiver for hosted CI.
 - The PR body or latest agent comment includes exact local validation commands and results.
 - The merge ledger has no `UNKNOWN` fields and reports `complete_allowed: true`.
 
@@ -1005,7 +1010,7 @@ For a manual multi-PR landing plan:
 4. For each candidate PR, verify it is the right thing to work on now: approved or worth fixing, non-duplicative, scoped, and clear enough to complete.
 5. For blocked PRs, fix only the blocking cause, rerun targeted local checks, and batch one push.
 6. Do not create follow-up issues for ordinary review nits. Use one deferred bundle per PR only after explicit user approval.
-7. After local validation, if path-selected CI may be insufficient at final readiness, request full CI; otherwise use it sparingly.
+7. After local validation, if path-selected CI may be insufficient at final readiness, request hosted CI; otherwise use it sparingly.
 
 ## Post-Merge Batch Audit
 

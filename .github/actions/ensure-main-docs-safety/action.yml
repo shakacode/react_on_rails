@@ -200,6 +200,6 @@ runs:
               `Cannot skip CI for docs-only commit because previous main commit ${previousSha} still has failing workflows:`,
               details,
               '',
-              'Fix these failures before pushing docs-only changes, or push non-docs changes to trigger full CI.'
+              'Fix these failures before pushing docs-only changes, or push non-docs changes to trigger hosted CI.'
             ].join('\n')
           );

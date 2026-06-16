@@ -33,11 +33,15 @@ jobs:
             const commentId = context.payload.comment.id;
             const actor = context.actor;
             const repoFullName = `${owner}/${repo}`;
+            const hostedCiLabel = 'ready-for-hosted-ci';
+            const forceFullHostedCiLabel = 'force-full-hosted-ci';
 
             const validCommands = [
-              '+ci-run-full',
-              '+ci-skip-full',
+              '+ci-run-hosted',
+              '+ci-force-full',
+              '+ci-stop-hosted',
               '+ci-stop-full',
+              '+ci-skip-hosted',
               '+ci-status',
               '+ci-help'
             ];
@@ -123,32 +127,50 @@ jobs:
               return pr;
             }
 
-            async function addFullCiLabel() {
+            async function ensureLabel(name, description, color) {
               try {
                 await github.rest.issues.createLabel({
                   owner,
                   repo,
-                  name: 'ready-for-full-ci',
-                  description: 'Run full GitHub CI for this PR',
-                  color: '0E8A16'
+                  name,
+                  description,
+                  color
                 });
               } catch (error) {
                 if (error.status !== 422) {
                   throw error;
                 }
               }
+            }
+
+            async function addHostedCiLabels(forceFull) {
+              await ensureLabel(
+                hostedCiLabel,
+                'Run optimized hosted GitHub CI for this PR',
+                '0E8A16'
+              );
+
+              const labels = [hostedCiLabel];
+              if (forceFull) {
+                await ensureLabel(
+                  forceFullHostedCiLabel,
+                  'Bypass optimized hosted CI selection and run all hosted suites',
+                  'B60205'
+                );
+                labels.push(forceFullHostedCiLabel);
+              }
 
               await github.rest.issues.addLabels({
                 owner,
                 repo,
                 issue_number: issueNumber,
-                labels: ['ready-for-full-ci']
+                labels
               });
             }
 
-            async function removeFullCiLabel() {
+            async function removeLabels(labelNames) {
               let removed = false;
-              for (const labelName of ['ready-for-full-ci', 'full-ci']) {
+              for (const labelName of labelNames) {
                 try {
                   await github.rest.issues.removeLabel({
                     owner,
@@ -165,6 +187,14 @@ jobs:
               }
 
               return removed;
+            }
+
+            async function removeHostedCiLabels() {
+              return removeLabels([hostedCiLabel, forceFullHostedCiLabel]);
+            }
+
+            async function removeForceFullHostedCiLabel() {
+              return removeLabels([forceFullHostedCiLabel]);
             }
 
             async function listPullRequestLabels() {
@@ -210,7 +240,7 @@ jobs:
             }
 
             async function findCurrentWaiver(sha) {
-              const marker = `<!-- ci-skip-full:${sha} -->`;
+              const marker = `<!-- ci-skip-hosted:${sha} -->`;
               for await (const page of github.paginate.iterator(github.rest.issues.listComments, {
                 owner,
                 repo,
@@ -244,27 +274,29 @@ jobs:
                 'Use these commands at the start of a PR comment line:',
                 'Post one CI command per comment; if multiple commands are present, only the first is handled.',
                 '',
-                '- `+ci-run-full` - dispatch full CI and add `ready-for-full-ci` for future commits',
-                '- `+ci-stop-full` - remove full CI readiness labels so future commits return to optimized CI',
-                '- `+ci-skip-full [reason]` - record a SHA-bound waiver for the expensive full CI matrix',
+                '- `+ci-run-hosted` - dispatch optimized hosted CI and add `ready-for-hosted-ci` for future commits',
+                '- `+ci-force-full` - dispatch hosted CI with optimized selection bypassed and add `force-full-hosted-ci`',
+                '- `+ci-stop-hosted` - remove hosted CI labels so future commits return to the required gate only',
+                '- `+ci-stop-full` - remove only the force-full hosted override',
+                '- `+ci-skip-hosted [reason]` - record a SHA-bound hosted CI waiver',
                 '- `+ci-status` - summarize the PR CI policy state',
                 '- `+ci-help` - show this help',
                 '',
                 'Arguments are optional free text after the command. For example:',
                 '',
                 '```',
-                '+ci-skip-full docs-only change; markdown checks are enough',
+                '+ci-skip-hosted docs-only change; markdown checks are enough',
                 '```'
               ].join('\n');
             }
 
-            async function triggerFullCi(pr) {
+            async function triggerHostedCi(pr, { forceFull }) {
               const headRepoFullName = pr.head.repo?.full_name;
 
               if (!headRepoFullName) {
                 await addReaction('confused');
                 await postComment([
-                  'Unable to run full CI from this command because the PR head repository is unavailable.',
+                  'Unable to run hosted CI from this command because the PR head repository is unavailable.',
                   '',
                   'The repository may have been deleted or made private. A maintainer should push the branch to this repository or trigger the required workflows manually.'
                 ].join('\n'));
@@ -274,23 +306,24 @@ jobs:
               if (headRepoFullName !== repoFullName) {
                 await addReaction('confused');
                 await postComment([
-                  'Unable to run full CI from this command because the PR branch is from a fork.',
+                  'Unable to run hosted CI from this command because the PR branch is from a fork.',
                   '',
                   'A maintainer should push the branch to this repository or trigger the required workflows manually.'
                 ].join('\n'));
                 return;
               }
 
+              const inputs = forceFull ? { force_full_hosted: 'true' } : {};
               const workflows = [
-                ['Lint JS and Ruby', 'lint-js-and-ruby.yml', { force_run: 'true' }],
-                ['JS unit tests for Renderer package', 'package-js-tests.yml', { force_run: 'true' }],
-                ['Rspec test for gem', 'gem-tests.yml', { force_run: 'true' }],
-                ['Integration Tests', 'integration-tests.yml', { force_run: 'true' }],
-                ['Assets Precompile Check', 'precompile-check.yml', { force_run: 'true' }],
-                ['Generator tests', 'examples.yml', { force_run: 'true' }],
-                ['Playwright E2E Tests', 'playwright.yml', {}],
-                ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', { force_run: 'true' }],
-                ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', { force_run: 'true' }]
+                ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
+                ['JS unit tests for Renderer package', 'package-js-tests.yml', inputs],
+                ['Rspec test for gem', 'gem-tests.yml', inputs],
+                ['Integration Tests', 'integration-tests.yml', inputs],
+                ['Assets Precompile Check', 'precompile-check.yml', inputs],
+                ['Generator tests', 'examples.yml', inputs],
+                ['Playwright E2E Tests', 'playwright.yml', inputs],
+                ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
+                ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
               ];
 
               const dispatchResults = await Promise.allSettled(
@@ -322,10 +355,13 @@ jobs:
               let labelAdded = false;
               if (succeeded.length > 0) {
                 try {
-                  await addFullCiLabel();
+                  await addHostedCiLabels(forceFull);
                   labelAdded = true;
                 } catch (error) {
-                  failed.push({ workflow: 'ready-for-full-ci label', error: error.message });
+                  failed.push({
+                    workflow: forceFull ? 'force-full hosted CI labels' : 'hosted CI label',
+                    error: error.message
+                  });
                 }
               }
 
@@ -334,16 +370,21 @@ jobs:
               const failedList = failed.length > 0
                 ? `\n\nFailed:\n${failed.map((failure) => `- ${failure.workflow}: ${failure.error}`).join('\n')}`
                 : '';
-              const labelMessage = labelAdded
-                ? 'Added `ready-for-full-ci`, so future commits on this PR will keep running full CI until `+ci-stop-full` is used.'
+              const labelMessage = labelAdded && forceFull
+                ? 'Added `ready-for-hosted-ci` and `force-full-hosted-ci`, so future commits will bypass optimized hosted CI selection until `+ci-stop-full` is used.'
+                : labelAdded
+                  ? 'Added `ready-for-hosted-ci`, so future commits will keep running optimized hosted CI until `+ci-stop-hosted` is used.'
                 : succeeded.length > 0
-                  ? 'The workflows were triggered, but `ready-for-full-ci` was not added. See the failure details below.'
-                  : '`ready-for-full-ci` was not added because no workflows were triggered.';
+                  ? 'The workflows were triggered, but the hosted CI labels were not added. See the failure details below.'
+                  : 'Hosted CI labels were not added because no workflows were triggered.';
 
               await postComment([
-                '## Full CI Requested',
+                forceFull ? '## Force-Full Hosted CI Requested' : '## Hosted CI Requested',
                 '',
                 `Triggered ${succeeded.length} workflow(s) for \`${pr.head.sha.slice(0, 12)}\`.`,
+                forceFull
+                  ? 'Mode: force-full hosted CI (bypasses optimized change selection).'
+                  : 'Mode: optimized hosted CI (path-selected by `script/ci-changes-detector`).',
                 labelMessage,
                 '',
                 'View progress in the Actions tab.',
@@ -355,34 +396,47 @@ jobs:
               }
             }
 
-            async function handleSkipFull(pr, args) {
-              const removedFullCi = await removeFullCiLabel();
+            async function handleSkipHosted(pr, args) {
+              const removedHostedCi = await removeHostedCiLabels();
               const reason = oneLine(args) || 'not provided';
               const shortSha = pr.head.sha.slice(0, 12);
 
               await postComment([
-                `<!-- ci-skip-full:${pr.head.sha} -->`,
-                '## Full CI Waiver Recorded for This SHA',
+                `<!-- ci-skip-hosted:${pr.head.sha} -->`,
+                '## Hosted CI Waiver Recorded for This SHA',
                 '',
-                `@${actor} recorded a full-CI waiver for \`${shortSha}\` (audit record only - no workflow run was cancelled or blocked).`,
+                `@${actor} recorded a hosted-CI waiver for \`${shortSha}\` (audit record only - no workflow run was cancelled or blocked).`,
                 `Reason: \`${reason}\``,
                 '',
                 'This waiver is bound to the current head SHA and does not apply after another push.',
                 'The required fast gate still applies for this PR.',
-                ...(removedFullCi ? ['', 'Removed full CI readiness labels from this PR.'] : [])
+                ...(removedHostedCi ? ['', 'Removed hosted CI labels from this PR.'] : [])
+              ].join('\n'));
+            }
+
+            async function handleStopHosted() {
+              const removed = await removeHostedCiLabels();
+              await postComment([
+                '## Hosted CI Mode Disabled',
+                '',
+                removed
+                  ? 'Removed hosted CI labels. Future commits will use only the required gate until hosted CI is requested again.'
+                  : 'No hosted CI labels were present. Future commits are already using only the required gate.',
+                '',
+                'Use `+ci-run-hosted` to re-enable optimized hosted CI.'
               ].join('\n'));
             }
 
             async function handleStopFull() {
-              const removed = await removeFullCiLabel();
+              const removed = await removeForceFullHostedCiLabel();
               await postComment([
-                '## Full CI Mode Disabled',
+                '## Force-Full Hosted CI Disabled',
                 '',
                 removed
-                  ? 'Removed full CI readiness labels. Future commits will use the fast required gate until full CI is requested again.'
-                  : 'No full CI readiness labels were present. Future commits are already using the fast required gate.',
+                  ? 'Removed `force-full-hosted-ci`. If `ready-for-hosted-ci` is still present, future commits keep running optimized hosted CI.'
+                  : 'No force-full hosted CI label was present.',
                 '',
-                'Use `+ci-run-full` to re-enable full CI mode.'
+                'Use `+ci-force-full` to re-enable the force-full hosted override.'
               ].join('\n'));
             }
 
@@ -394,9 +448,8 @@ jobs:
               ]);
 
               const docsOnly = isDocsOnly(files);
-              const hasReadyForFullCi = labels.includes('ready-for-full-ci');
-              const hasLegacyFullCi = labels.includes('full-ci');
-              const hasFullCi = hasReadyForFullCi || hasLegacyFullCi;
+              const hasReadyForHostedCi = labels.includes(hostedCiLabel);
+              const hasForceFullHostedCi = labels.includes(forceFullHostedCiLabel);
 
               await postComment([
                 '## CI Status',
@@ -404,13 +457,15 @@ jobs:
                 `Head SHA: \`${pr.head.sha.slice(0, 12)}\``,
                 `Changed files: ${files.length}`,
                 `Docs-only heuristic (matches ci-changes-detector metadata paths): ${docsOnly ? 'yes' : 'no'}`,
-                `\`ready-for-full-ci\` label: ${hasReadyForFullCi ? 'present' : 'absent'}`,
-                `Legacy \`full-ci\` label: ${hasLegacyFullCi ? 'present' : 'absent'}`,
-                `Current full-CI waiver: ${waiver ? 'present for this SHA' : 'not present for this SHA'}`,
+                `\`${hostedCiLabel}\` label: ${hasReadyForHostedCi ? 'present' : 'absent'}`,
+                `\`${forceFullHostedCiLabel}\` label: ${hasForceFullHostedCi ? 'present' : 'absent'}`,
+                `Current hosted-CI waiver: ${waiver ? 'present for this SHA' : 'not present for this SHA'}`,
                 '',
-                hasFullCi
-                  ? 'Full CI mode is enabled for this PR.'
-                  : 'Fast required-gate mode is active unless full CI is requested.'
+                hasForceFullHostedCi
+                  ? 'Force-full hosted CI is enabled for this PR.'
+                  : hasReadyForHostedCi
+                    ? 'Optimized hosted CI is enabled for this PR.'
+                    : 'Only the required gate is active unless hosted CI is requested.'
               ].join('\n'));
             }
 
@@ -444,16 +499,23 @@ jobs:
             const pr = await getPullRequest();
 
             switch (parsed.command) {
-              case '+ci-run-full':
-                await triggerFullCi(pr);
+              case '+ci-run-hosted':
+                await triggerHostedCi(pr, { forceFull: false });
                 break;
-              case '+ci-skip-full':
+              case '+ci-force-full':
+                await triggerHostedCi(pr, { forceFull: true });
+                break;
+              case '+ci-stop-hosted':
                 await addReaction('eyes');
-                await handleSkipFull(pr, parsed.args);
+                await handleStopHosted();
                 break;
               case '+ci-stop-full':
                 await addReaction('eyes');
                 await handleStopFull();
+                break;
+              case '+ci-skip-hosted':
+                await addReaction('eyes');
+                await handleSkipHosted(pr, parsed.args);
                 break;
               case '+ci-status':
                 await addReaction('eyes');

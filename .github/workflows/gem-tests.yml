@@ -17,8 +17,8 @@ on:
   merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -38,7 +38,9 @@ jobs:
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
+      should_use_full_matrix: ${{ steps.hosted-ci.outputs.should_use_full_matrix }}
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
@@ -46,14 +48,17 @@ jobs:
           # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
           fetch-depth: 50
           persist-credentials: false
-      - name: Check for full CI readiness label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR a full CI readiness label is present, run everything
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
             {
               echo "run_lint=true"
               echo "run_js_tests=true"
@@ -77,24 +82,17 @@ jobs:
         env:
           LATEST_RUBY_VERSION: ${{ steps.tool-versions.outputs.ruby-minor-version }}
           MINIMUM_RUBY_VERSION: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
-          WORKFLOW_REF: ${{ github.ref }}
-          WORKFLOW_EVENT: ${{ github.event_name }}
-          IS_RELEASE_TARGET: ${{ startsWith(github.base_ref, 'release/') || startsWith(github.base_ref, 'releases/') || startsWith(github.base_ref, 'release-') }}
-          HAS_FULL_CI_LABEL: ${{ steps.check-label.outputs.result }}
-          FORCE_RUN: ${{ inputs.force_run }}
+          SHOULD_USE_FULL_MATRIX: ${{ steps.hosted-ci.outputs.should_use_full_matrix }}
         run: |
           latest_ruby_version="$LATEST_RUBY_VERSION"
           minimum_ruby_version="$MINIMUM_RUBY_VERSION"
 
-          # Determine if we should run full matrix (main, merge queue, manual, release target, or full CI readiness label)
+          # Full matrices run only on main, merge queue, release targets, or
+          # explicit force-full hosted CI. Normal hosted PR CI stays optimized.
           # Each Ruby version / dependency level is split into two shards:
           #   generators – spec/react_on_rails/generators (heavy filesystem I/O)
           #   unit       – everything else under spec/react_on_rails
-          if [[ "$WORKFLOW_REF" == "refs/heads/main" ]] || \
-             [[ "$WORKFLOW_EVENT" != "pull_request" ]] || \
-             [[ "$IS_RELEASE_TARGET" == "true" ]] || \
-             [[ "$HAS_FULL_CI_LABEL" == "true" ]] || \
-             [[ "$FORCE_RUN" == "true" ]]; then
+          if [[ "$SHOULD_USE_FULL_MATRIX" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions × 2 shards
             matrix="$(jq -nc \
               --arg latest_ruby_version "$latest_ruby_version" \
@@ -128,20 +126,10 @@ jobs:
 
   rspec-package-tests:
     needs: detect-changes
-    # Run heavyweight tests only for full-CI contexts. Regular PR updates rely on ci-required
-    # plus local CI until a maintainer marks the PR ready for full validation.
+    # Run hosted gem tests only when hosted CI is allowed and Ruby paths changed.
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.event_name != 'pull_request' ||
-        needs.detect-changes.outputs.has_full_ci_label == 'true' ||
-        startsWith(github.base_ref, 'release/') ||
-        startsWith(github.base_ref, 'releases/') ||
-        startsWith(github.base_ref, 'release-')
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_ruby_tests == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
