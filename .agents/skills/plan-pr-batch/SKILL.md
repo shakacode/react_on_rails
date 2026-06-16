@@ -58,101 +58,25 @@ Plan a PR batch
      intends to affect, including creates, deletes, and renames. Never guess
      paths.
 
-   - File-touch map, PR path discovery: get refs from the verified target repo
-     with
-     `gh pr view N --repo OWNER/REPO --json baseRefName,headRefName,headRepository,headRepositoryOwner`,
-     then resolve a local remote or fetch URL that points at the verified base
-     repo. If no verified remote or URL can be resolved, use the PR Files API
-     fallback before recording paths as `UNKNOWN`; do not diff the current
-     checkout's default remote. Choose a session-unique temporary-ref suffix
-     first, such as `pr-N-<session-id>` where `<session-id>` comes from
-     `openssl rand -hex 4` or another git-ref-safe random token, so concurrent
-     planners for the same PR cannot overwrite each other's refs.
-     Treat `baseRefName` and `headRefName` as untrusted shell and refspec data.
-     Validate each branch name with Git's branch-name rules using an
-     argument-array API equivalent to
-     `["git", "check-ref-format", "--branch", baseRefName]` and
-     `["git", "check-ref-format", "--branch", headRefName]`, and reject any
-     name containing `:` before constructing a refspec. Pass the branch name as a
-     single command argument instead of interpolating it into a shell string. If
-     base branch validation fails, fall back to the PR Files API or `UNKNOWN`;
-     do not sanitize a failing branch name. Fetch the current base branch and PR
-     head into temporary refs without checking out untrusted PR code:
-     `git fetch <verified-base-repo-url> refs/heads/<baseRefName>:refs/tmp/pr-N-<session-id>-base`
-     and
-     `git fetch <verified-base-repo-url> pull/N/head:refs/tmp/pr-N-<session-id>-head`.
-     Fully qualifying the base branch avoids tag/branch name ambiguity.
-     GitHub keeps the target repo's pull ref pointing at fork heads too. If the
-     target repo pull ref is unavailable, fetch the head from the verified head
-     repository URL derived from `headRepository.nameWithOwner` and
-     `headRefName` with a fully qualified source ref
-     (`refs/heads/<headRefName>:refs/tmp/pr-N-<session-id>-head`). If
-     `headRefName` validation fails or the branch ref is unavailable, validate
-     `headRefOid` as the full 40-character lowercase hexadecimal SHA-1 object ID
-     GitHub returns today, for example `^[0-9a-f]{40}$`, and try an OID fetch
-     from the verified head repository URL
-     (`<headRefOid>:refs/tmp/pr-N-<session-id>-head`) before using the PR Files
-     API fallback. Treat an OID fetch rejection as an expected portability
-     outcome on older Git clients or servers that do not advertise reachable SHA
-     fetch support, not as a planner setup failure. If GitHub changes the
-     repository hash format, update this validation before accepting a different
-     OID length. Pass each refspec as one quoted shell argument or via an
-     argument-array API, and never interpolate a raw PR branch name into a shell
-     command. A plain
-     `git fetch origin` does not fetch cross-fork heads unless `origin` has
-     already been verified as the PR's target repo.
-     Run
-     `git diff --name-status --find-renames refs/tmp/pr-N-<session-id>-base...refs/tmp/pr-N-<session-id>-head`;
-     three-dot diffs from the merge-base, which matches GitHub's PR file list.
-     If the three-dot diff fails because the merge base is missing in a shallow
-     clone, run a bounded deepen for the relevant base branch such as
-     `git fetch --deepen=200 <verified-base-repo-url> refs/heads/<baseRefName>`
-     and retry the same
-     `git diff --name-status --find-renames refs/tmp/pr-N-<session-id>-base...refs/tmp/pr-N-<session-id>-head`
-     command once before falling back to the PR Files API; the deepen value is a
-     best-effort heuristic, not a guarantee.
-     Delete the temporary refs on both success and failure, then proceed to the
-     API fallback or `UNKNOWN` decision:
-     `git update-ref -d refs/tmp/pr-N-<session-id>-base` and
-     `git update-ref -d refs/tmp/pr-N-<session-id>-head`. If cleanup fails, log
-     the ref name and continue to fallback or `UNKNOWN` recording. If repeated
-     cleanup failures leave stale `refs/tmp/pr-*` refs, run a periodic sweep with
-     `git for-each-ref refs/tmp/ --format='%(refname)'` and delete only stale
-     planner-owned refs with `git update-ref -d "$ref"`. A rename row
-     (`R100  old  new`) owns **both** the old and new path; a directory rename
-     implicitly reserves descendants under both old and new directory names. If
-     a ref cannot be fetched or the diff cannot run, try the PR Files API
-     fallback before marking the paths `UNKNOWN`.
-   - File-touch map, PR Files API fallback: prefer the local `git diff` above
-     as the authoritative source; treat the API as a best-effort cross-check.
-     When the local diff succeeds, keep those paths authoritative even if the
-     API response is capped, incomplete, or unavailable. Use the API as the
-     scheduling source only when the local diff cannot run. Run the API
-     pipeline in one shell invocation with `pipefail` enabled, for example
-     `bash -o pipefail -c 'gh api --paginate --method GET "repos/OWNER/REPO/pulls/N/files?per_page=100" | jq -s "add // []"'`;
-     if either command fails, the response is an error-shaped object such as
-     `{"message": ...}` / `{"errors": ...}`, or any row lacks `.filename`, record
-     the paths as `UNKNOWN` instead of trusting an empty array from a broken
-     pipeline. Do not confuse API/auth/rate-limit failures with a real empty PR
-     file list.
-     The default page size is 30, so a small unpaginated page can look complete
-     while truncated. `jq -s 'add // []'` collects all paginated arrays before
-     counting paths or extracting filenames and returns an empty array for an
-     empty stream; no Link header check is needed after the command returns.
-     The response is acceptable only when every row records `.filename`, every
-     row with `status: "renamed"` records `.previous_filename`, and the
-     listed-file count is sane against the PR's `changedFiles` value from
-     `gh pr view N --repo OWNER/REPO --json changedFiles`. GitHub caps the
-     Files API at ~3000 files; if the API is the only available source and
-     `changedFiles` is at or above that cap, or any row with `status: "renamed"`
-     is missing
-     `.previous_filename`, record the PR paths as `UNKNOWN` and treat the item
-     as serial. If the paginated count differs from `changedFiles` in either
-     direction, re-read `changedFiles` once before recording `UNKNOWN` so freshly
-     pushed PRs do not fail the sanity check on transient metadata lag. If counts
-     still diverge after the re-read, record paths as `UNKNOWN` and treat the
-     item as serial; note any known submodule or binary-file count mismatch in
-     the Batch Plan instead of silently trusting an incomplete API path list.
+   - File-touch map, PR path discovery: resolve the paths a PR touches with the
+     helper, which does the authoritative local three-dot diff (fetching the
+     verified base/head into session-unique temporary refs, never checking out
+     untrusted PR code), validates `baseRefName`/`headRefName` as untrusted
+     refspec data, falls back to the PR Files API, and cleans up its temp refs:
+     `.agents/skills/plan-pr-batch/bin/pr-file-touch-map N --repo OWNER/REPO`
+     It prints `{pr, repo, source, changed_files, paths, renames}`:
+     - `source` is `local-diff` (authoritative), `files-api` (best-effort
+       cross-check, used only when the local diff cannot run), or `UNKNOWN`.
+     - `paths` covers creates, edits, deletes, and **both** sides of every
+       rename/copy; `renames` lists `{old, new}` pairs.
+     - When `source` is `UNKNOWN`, no trustworthy path list could be produced
+       (unfetchable refs, a broken/capped/inconsistent Files API response, or a
+       rename row missing its previous filename); treat the item as serial — not
+       safe for a parallel worktree lane.
+     - The helper owns the security and portability details (refspec injection
+       guards, fork pull-ref vs head-repo vs reachable-SHA fetch, shallow-clone
+       deepen-and-retry, Files API `changedFiles` sanity check and ~3000-file
+       cap); run `pr-file-touch-map --help` for the full contract.
    - File-touch map, issue path discovery: read the issue body, record proposed
      new paths from issue/design notes, and grep the repo to confirm existing
      paths. If paths cannot be determined from the issue body or design notes,
