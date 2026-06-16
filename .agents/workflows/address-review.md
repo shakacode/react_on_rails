@@ -92,12 +92,10 @@ Execution flow when terminal access is available:
    - Legacy summary comments where the marker appears after a blank line, heading, or byte-order mark are ignored by this rule. If the cutoff appears to miss an older checkpoint, use `check all reviews`; new summary checkpoints created by this workflow always place the marker on the first line.
    - If `CHECK_ALL_REVIEWS` is true, ignore the cutoff and scan the full PR history.
    - If the input is a specific review URL or specific issue-comment URL, fetch that exact target even if it predates the latest summary comment.
-   - Fetch the latest summary comment before collecting review data:
+   - The full-PR fetch in step 4 returns `review_cutoff_at` (the latest `<!-- address-review-summary -->` comment timestamp, or empty). Read the cutoff from that field instead of a separate query:
      ```bash
-     REVIEW_CUTOFF_AT=$(
-       gh api --paginate repos/${REPO}/issues/${PR_NUMBER}/comments \
-         | jq -rs '[.[].[] | select((.body // "") | startswith("<!-- address-review-summary -->")) | {id: .id, created_at: .created_at, html_url: .html_url}] | sort_by(.created_at) | last | if . == null then "" else .created_at end'
-     )
+     # After running the step 4 fetcher into review-data.json:
+     REVIEW_CUTOFF_AT=$(jq -r '.review_cutoff_at' review-data.json)
      # Empty string means no prior summary comment; scan full PR history.
      ```
    - `REVIEW_CUTOFF_AT` is empty when no summary comment exists; treat that as "scan full PR history" and do not filter by timestamp.
@@ -128,18 +126,17 @@ Execution flow when terminal access is available:
      `gh api repos/${REPO}/pulls/${PR_NUMBER}/reviews/${REVIEW_ID} | jq '{id: .id, body: .body, state: .state, user: .user.login, created_at: .submitted_at, html_url: .html_url}'`
      `gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/reviews/${REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, created_at: .created_at, html_url: .html_url}]'`
    - If the review body contains actionable feedback, include it as an additional general comment. Review summary bodies cannot use the `/replies` endpoint; post those responses as general PR comments (see step 8).
-   - Full PR:
-     `gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/reviews | jq -s '[.[].[] | select((.body // "") != "") | {id: .id, type: "review_summary", body: .body, state: .state, user: .user.login, created_at: .submitted_at, html_url: .html_url}]'`
-     `gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "review", path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, created_at: .created_at, html_url: .html_url}]'`
-     `gh api --paginate repos/${REPO}/issues/${PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "issue", body: .body, user: .user.login, created_at: .created_at, html_url: .html_url}]'`
-   - Include actionable review summary bodies from `/pulls/{PR_NUMBER}/reviews` as additional general comments. Like specific review bodies, they cannot use the `/replies` endpoint and must be answered as general PR comments (see step 8).
+   - Full PR — fetch all review data with the helper (replaces the per-endpoint `gh api ... | jq` blocks and the `reviewThreads` GraphQL query):
+     `.agents/skills/address-review/bin/fetch-pr-review-data "${PR_NUMBER}" --repo "${REPO}" > review-data.json`
+     It emits one JSON document: `review_cutoff_at` (see step 3); `review_summaries` (`{id, type: "review_summary", body, state, user, created_at, html_url}`, non-empty bodies only); `inline_comments` (`{id, node_id, type: "review", path, body, line, start_line, user, in_reply_to_id, created_at, html_url, thread_id, is_resolved}`, with `thread_id`/`is_resolved` already joined by `node_id` — no separate GraphQL query needed); `issue_comments` (`{id, node_id, type: "issue", body, user, created_at, html_url}`, including summary/status markers for filtering); and `review_threads` (`{thread_id, is_resolved, comments: [{node_id, id}]}`).
+   - Treat actionable review summary bodies as additional general comments. Like specific review bodies, they cannot use the `/replies` endpoint and must be answered as general PR comments (see step 8).
    - When `REVIEW_CUTOFF_AT` is set for a full-PR scan:
-     - Fetch the full datasets so you keep older context for unresolved threads.
+     - The fetcher returns the full datasets so you keep older context for unresolved threads.
      - Filter issue comments and review summaries to items created after `REVIEW_CUTOFF_AT`.
      - For inline review threads, keep an unresolved thread only when at least one comment in that thread has `created_at > REVIEW_CUTOFF_AT`.
      - Use the thread's top-level comment as the triage item, and use newer replies in that thread as the latest context.
      - Do not let older comments with no new activity re-enter triage unless I said `check all reviews`.
-   - For all review-comment paths, fetch thread metadata and match `thread_id` by `node_id`:
+   - For the specific review path (single `#pullrequestreview-...` target), the helper is not used; fetch thread metadata and match `thread_id` by `node_id`:
      `OWNER=${REPO%/*}`
      `NAME=${REPO#*/}`
      `gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMBER}" -f query='query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) { repository(owner:$owner, name:$name) { pullRequest(number:$pr) { reviewThreads(first:100, after:$endCursor) { nodes { id isResolved comments(first:100) { nodes { id databaseId } } } pageInfo { hasNextPage endCursor } } } } }' | jq -s '[.[].data.repository.pullRequest.reviewThreads.nodes[] | {thread_id: .id, is_resolved: .isResolved, comments: [.comments.nodes[] | {node_id: .id, id: .databaseId}]}]'`
