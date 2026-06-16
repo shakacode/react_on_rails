@@ -1,12 +1,14 @@
+---
 name: Detect Invalid CI Commands
 
-on:
+"on":
   issue_comment:
     types: [created]
 
 jobs:
   detect-invalid-commands:
-    # Only run on PR comments that contain potential commands but don't match valid commands
+    # Only run on PR comments that contain potential commands but don't match
+    # valid commands.
     if: |
       github.event.issue.pull_request &&
       (
@@ -30,9 +32,14 @@ jobs:
           script: |
             const comment = context.payload.comment.body;
 
-            // Pattern to detect potential command attempts at the start of a line
-            // Matches: /ci*, /run*, /stop*, /delete*, /deploy*, /help* at beginning or after newline
-            const commandPattern = /(?:^|\n)\s*(\/(ci|run|stop|delete|deploy|help)[\w-]*)/gi;
+            // Detect command attempts at the start of a line.
+            // Matches /ci*, /run*, /stop*, /delete*, /deploy*, and /help*
+            // at the beginning of a comment or after a newline.
+            const commandPattern = new RegExp(
+              String.raw`(?:^|\n)\s*` +
+                String.raw`(/(ci|run|stop|delete|deploy|help)[\w-]*)`,
+              'gi',
+            );
             const matches = [...comment.matchAll(commandPattern)];
 
             if (matches.length === 0) {
@@ -57,13 +64,15 @@ jobs:
             }
 
             return { shouldRespond: false };
-          # Default result-encoding (json) JSON.stringifies the returned object so
-          # the downstream `fromJSON(...)` condition and `JSON.parse` can read it.
-          # `result-encoding: string` would coerce the object to "[object Object]",
-          # which breaks `fromJSON` and fails the job on every triggering comment.
+          # Default result-encoding (json) JSON.stringifies the returned object.
+          # That lets downstream `fromJSON(...)` and `JSON.parse` read it.
+          # `result-encoding: string` would coerce the object to
+          # "[object Object]", which breaks `fromJSON` and fails each job.
 
       - name: Post helpful comment
-        if: steps.check_command.outputs.result != '' && fromJSON(steps.check_command.outputs.result).shouldRespond == true
+        if: >-
+          steps.check_command.outputs.result != '' &&
+          fromJSON(steps.check_command.outputs.result).shouldRespond == true
         uses: actions/github-script@v7
         env:
           CHECK_RESULT: ${{ steps.check_command.outputs.result }}
@@ -73,119 +82,141 @@ jobs:
             const invalidCommands = result.invalidCommands || [];
 
             const invalidCmdsList = invalidCommands.length > 0
-              ? `\n\n**Invalid command(s) detected:** ${invalidCommands.map(cmd => \`\\\`${cmd}\\\`\`).join(', ')}`
-              : '';
+              ? [
+                  '',
+                  '**Invalid command(s) detected:** ' +
+                    invalidCommands.map((cmd) => `\`${cmd}\``).join(', '),
+                ]
+              : [];
 
-            const body = \`👋 It looks like you may have tried to use a CI command, but it doesn't match the available commands.${invalidCmdsList}
-
-            ## Available GitHub Comment Commands
-
-            ### 1. \\\`+ci-run-hosted\\\` - Request Optimized Hosted CI
-            Marks the PR ready for hosted GitHub Actions while keeping suite selection path-based.
-
-            **What it does:**
-            - Dispatches hosted workflows for the current head SHA
-            - Adds the \\\`ready-for-hosted-ci\\\` label to persist hosted validation on future commits
-            - Lets \\\`script/ci-changes-detector\\\` choose the applicable suites
-
-            **Requirements:**
-            - Must have write access to the repository
-            - Use at the start of a comment or after a newline
-
-            **Example:**
-            \\\`\\\`\\\`
-            +ci-run-hosted
-            \\\`\\\`\\\`
-
-            ---
-
-            ### 2. \\\`+ci-force-full\\\` - Force Full Hosted CI
-            Bypasses optimized suite selection for the current head and future commits.
-
-            **What it does:**
-            - Dispatches hosted workflows with \\\`force_full_hosted: true\\\`
-            - Adds both \\\`ready-for-hosted-ci\\\` and \\\`force-full-hosted-ci\\\`
-
-            **Example:**
-            \\\`\\\`\\\`
-            +ci-force-full
-            \\\`\\\`\\\`
-
-            ---
-
-            ### 3. \\\`+ci-stop-hosted\\\` - Disable Hosted CI Mode
-            Removes hosted CI labels for future commits.
-
-            **Requirements:**
-            - Must have write access to the repository
-
-            **Example:**
-            \\\`\\\`\\\`
-            +ci-stop-hosted
-            \\\`\\\`\\\`
-
-            ---
-
-            ### 4. \\\`+ci-stop-full\\\` - Disable Only Force-Full Mode
-            Removes \\\`force-full-hosted-ci\\\` while leaving \\\`ready-for-hosted-ci\\\` in place if present.
-
-            ---
-
-            ### 5. \\\`+ci-skip-hosted [reason]\\\` - Record a Hosted CI Waiver
-            Records that a maintainer intentionally waived hosted CI for the current PR head SHA.
-
-            **Example:**
-            \\\`\\\`\\\`
-            +ci-skip-hosted docs-only change; markdown checks are enough
-            \\\`\\\`\\\`
-
-            ---
-
-            ### 6. \\\`@claude\\\` - Claude Code AI Review
-            Invokes Claude Code AI to perform code review or answer questions.
-
-            **What it does:**
-            - Analyzes code changes and provides feedback
-            - Follows instructions specified in the comment
-            - Can read CI results on PRs
-
-            **Example:**
-            \\\`\\\`\\\`
-            @claude please review the error handling in this PR
-            \\\`\\\`\\\`
-
-            ---
-
-            ## Local CI Debugging
-
-            Instead of using comment commands, you can replicate CI failures locally:
-
-            **Check CI status:**
-            \\\`\\\`\\\`bash
-            gh pr view --json statusCheckRollup
-            \\\`\\\`\\\`
-
-            **Re-run only failed jobs:**
-            \\\`\\\`\\\`bash
-            bin/ci-rerun-failures
-            \\\`\\\`\\\`
-
-            **Run specific failed specs:**
-            \\\`\\\`\\\`bash
-            pbpaste | bin/ci-run-failed-specs  # macOS
-            \\\`\\\`\\\`
-
-            **Switch between CI configurations:**
-            \\\`\\\`\\\`bash
-            bin/ci-switch-config minimum  # Test with Ruby 3.3, Node 20, etc.
-            bin/ci-switch-config latest   # Return to Ruby 4.0, Node 22, etc.
-            \\\`\\\`\\\`
-
-            ---
-
-            Legacy slash aliases were removed. Use \\\`+ci-*\\\` commands because GitHub's comment editor reserves \\\`/\\\` for built-in slash command autocomplete.
-
-            📖 For more details, see the [Contributing Guide](https://github.com/shakacode/react_on_rails/blob/main/CONTRIBUTING.md#using-comment-commands-to-trigger-ci)\`;
+            const body = [
+              '👋 It looks like you may have tried to use a CI command, ' +
+                "but it doesn't match the available commands.",
+              ...invalidCmdsList,
+              '',
+              '## Available GitHub Comment Commands',
+              '',
+              '### 1. `+ci-run-hosted` - Request Optimized Hosted CI',
+              'Marks the PR ready for hosted GitHub Actions while keeping ' +
+                'suite selection path-based.',
+              '',
+              '**What it does:**',
+              '- Dispatches hosted workflows for the current head SHA',
+              '- Adds the `ready-for-hosted-ci` label to persist hosted ' +
+                'validation on future commits',
+              '- Lets `script/ci-changes-detector` choose the applicable ' +
+                'suites',
+              '',
+              '**Requirements:**',
+              '- Must have write access to the repository',
+              '- Use at the start of a comment or after a newline',
+              '',
+              '**Example:**',
+              '```',
+              '+ci-run-hosted',
+              '```',
+              '',
+              '---',
+              '',
+              '### 2. `+ci-force-full` - Force Full Hosted CI',
+              'Bypasses optimized suite selection for the current head and ' +
+                'future commits.',
+              '',
+              '**What it does:**',
+              '- Dispatches hosted workflows with `force_full_hosted: true`',
+              '- Adds both `ready-for-hosted-ci` and `force-full-hosted-ci`',
+              '',
+              '**Example:**',
+              '```',
+              '+ci-force-full',
+              '```',
+              '',
+              '---',
+              '',
+              '### 3. `+ci-stop-hosted` - Disable Hosted CI Mode',
+              'Removes hosted CI labels for future commits.',
+              '',
+              '**Requirements:**',
+              '- Must have write access to the repository',
+              '',
+              '**Example:**',
+              '```',
+              '+ci-stop-hosted',
+              '```',
+              '',
+              '---',
+              '',
+              '### 4. `+ci-stop-full` - Disable Only Force-Full Mode',
+              'Removes `force-full-hosted-ci` while leaving ' +
+                '`ready-for-hosted-ci` in place if present.',
+              '',
+              '---',
+              '',
+              '### 5. `+ci-skip-hosted [reason]` - Record a Hosted CI Waiver',
+              'Records that a maintainer intentionally waived hosted CI for ' +
+                'the current PR head SHA.',
+              '',
+              '**Example:**',
+              '```',
+              '+ci-skip-hosted docs-only change; markdown checks are enough',
+              '```',
+              '',
+              '---',
+              '',
+              '### 6. `@claude` - Claude Code AI Review',
+              'Invokes Claude Code AI to perform code review or answer ' +
+                'questions.',
+              '',
+              '**What it does:**',
+              '- Analyzes code changes and provides feedback',
+              '- Follows instructions specified in the comment',
+              '- Can read CI results on PRs',
+              '',
+              '**Example:**',
+              '```',
+              '@claude please review the error handling in this PR',
+              '```',
+              '',
+              '---',
+              '',
+              '## Local CI Debugging',
+              '',
+              'Instead of using comment commands, you can replicate CI ' +
+                'failures locally:',
+              '',
+              '**Check CI status:**',
+              '```bash',
+              'gh pr view --json statusCheckRollup',
+              '```',
+              '',
+              '**Re-run only failed jobs:**',
+              '```bash',
+              'bin/ci-rerun-failures',
+              '```',
+              '',
+              '**Run specific failed specs:**',
+              '```bash',
+              'pbpaste | bin/ci-run-failed-specs  # macOS',
+              '```',
+              '',
+              '**Switch between CI configurations:**',
+              '```bash',
+              'bin/ci-switch-config minimum  # Test with Ruby 3.3, ' +
+                'Node 20, etc.',
+              'bin/ci-switch-config latest   # Return to Ruby 4.0, ' +
+                'Node 22, etc.',
+              '```',
+              '',
+              '---',
+              '',
+              'Legacy slash aliases were removed. Use `+ci-*` commands ' +
+                "because GitHub's comment editor reserves `/` for built-in " +
+                'slash command autocomplete.',
+              '',
+              '📖 For more details, see the [Contributing Guide]' +
+                '(https://github.com/shakacode/react_on_rails/blob/main/' +
+                'CONTRIBUTING.md#using-comment-commands-to-trigger-ci)'
+            ].join('\n');
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
