@@ -167,8 +167,17 @@ if [ "$RUN_ALL" = false ]; then
 
   # Try JSON output first (if jq is available)
   if command -v jq >/dev/null 2>&1; then
-    # Get JSON output (hide from stdout)
-    DETECTOR_JSON=$(CI_JSON_OUTPUT=1 script/ci-changes-detector "$BASE_REF" 2>&1 | grep -E '^\{|^\s|^\}' | tr -d '\n')
+    # Get JSON output (hide from stdout). The detector also emits human-readable
+    # context, so extract the JSON object as a block instead of scraping by
+    # indentation.
+    DETECTOR_JSON=$(
+      CI_JSON_OUTPUT=1 script/ci-changes-detector "$BASE_REF" 2>&1 |
+        awk '
+          $0 == "{" && !seen_json { in_json = 1; seen_json = 1 }
+          in_json { print }
+          $0 == "}" && in_json { in_json = 0 }
+        '
+    )
 
     if [ -n "$DETECTOR_JSON" ] && echo "$DETECTOR_JSON" | jq -e . >/dev/null 2>&1; then
       # Show human-readable output
