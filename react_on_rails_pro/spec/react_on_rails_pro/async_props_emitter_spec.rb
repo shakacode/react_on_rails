@@ -168,91 +168,91 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       expect(chunk[:updateChunk]).to include("asyncPropsManager.endStream()")
     end
   end
-end
 
-RSpec.describe ReactOnRailsPro::PullRequestQueue do
-  let(:pushed_props) { Set.new }
-  let(:queue) { described_class.new(pushed_props) }
+  describe ReactOnRailsPro::PullRequestQueue do
+    let(:pushed_props) { Set.new }
+    let(:queue) { described_class.new(pushed_props) }
 
-  describe "#enqueue and #dequeue" do
-    it "returns props in FIFO order" do
-      Async do
-        queue.enqueue("users")
-        queue.enqueue("notifications")
-        queue.enqueue("settings")
-        queue.close
+    describe "#enqueue and #dequeue" do
+      it "returns props in FIFO order" do
+        Async do
+          queue.enqueue("users")
+          queue.enqueue("notifications")
+          queue.enqueue("settings")
+          queue.close
 
-        expect(queue.dequeue).to eq("users")
-        expect(queue.dequeue).to eq("notifications")
-        expect(queue.dequeue).to eq("settings")
-        expect(queue.dequeue).to be_nil
-      end
-    end
-  end
-
-  describe "#enqueue" do
-    it "filters out props already in the pushed_props set" do
-      pushed_props.add("stats")
-
-      Async do
-        queue.enqueue("stats")
-        queue.enqueue("users")
-        queue.close
-
-        expect(queue.dequeue).to eq("users")
-        expect(queue.dequeue).to be_nil
+          expect(queue.dequeue).to eq("users")
+          expect(queue.dequeue).to eq("notifications")
+          expect(queue.dequeue).to eq("settings")
+          expect(queue.dequeue).to be_nil
+        end
       end
     end
 
-    it "filters out props pushed after queue creation" do
-      Async do
-        queue.enqueue("users")
-        pushed_props.add("notifications")
-        queue.enqueue("notifications")
-        queue.close
+    describe "#enqueue" do
+      it "filters out props already in the pushed_props set" do
+        pushed_props.add("stats")
 
-        expect(queue.dequeue).to eq("users")
-        expect(queue.dequeue).to be_nil
+        Async do
+          queue.enqueue("stats")
+          queue.enqueue("users")
+          queue.close
+
+          expect(queue.dequeue).to eq("users")
+          expect(queue.dequeue).to be_nil
+        end
+      end
+
+      it "filters out props pushed after queue creation" do
+        Async do
+          queue.enqueue("users")
+          pushed_props.add("notifications")
+          queue.enqueue("notifications")
+          queue.close
+
+          expect(queue.dequeue).to eq("users")
+          expect(queue.dequeue).to be_nil
+        end
+      end
+
+      it "is a no-op after close" do
+        Async do
+          queue.enqueue("users")
+          queue.close
+          queue.enqueue("late_prop")
+
+          expect(queue.dequeue).to eq("users")
+          expect(queue.dequeue).to be_nil
+        end
       end
     end
 
-    it "is a no-op after close" do
-      Async do
-        queue.enqueue("users")
-        queue.close
-        queue.enqueue("late_prop")
-
-        expect(queue.dequeue).to eq("users")
-        expect(queue.dequeue).to be_nil
+    describe "#close" do
+      it "causes dequeue to return nil" do
+        Async do
+          queue.close
+          expect(queue.dequeue).to be_nil
+        end
       end
-    end
-  end
 
-  describe "#close" do
-    it "causes dequeue to return nil" do
-      Async do
-        queue.close
-        expect(queue.dequeue).to be_nil
+      it "is idempotent" do
+        Async do
+          queue.close
+          expect { queue.close }.not_to raise_error
+          expect(queue).to be_closed
+        end
       end
     end
 
-    it "is idempotent" do
-      Async do
+    describe "#closed?" do
+      it "returns false before close" do
+        expect(queue).not_to be_closed
+      end
+
+      it "returns true after close" do
         queue.close
-        expect { queue.close }.not_to raise_error
         expect(queue).to be_closed
       end
-    end
-  end
-
-  describe "#closed?" do
-    it "returns false before close" do
-      expect(queue).not_to be_closed
-    end
-
-    it "returns true after close" do
-      queue.close
-      expect(queue).to be_closed
     end
   end
 end
