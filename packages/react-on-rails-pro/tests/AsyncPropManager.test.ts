@@ -13,7 +13,12 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import AsyncPropsManager, { getOrCreateAsyncPropsManager } from '../src/AsyncPropsManager.ts';
+import AsyncPropsManager, {
+  getOrCreateAsyncPropsManager,
+  PULL_ENABLED_KEY,
+  PUSH_PROPS_KEY,
+  PROP_REQUEST_EMITTER_KEY,
+} from '../src/AsyncPropsManager.ts';
 
 describe('Access AsyncPropManager prop before setting it', () => {
   let manager: AsyncPropsManager;
@@ -285,5 +290,112 @@ describe('getOrCreateAsyncPropsManager lazy initialization', () => {
     // First prop should resolve, second should reject
     await expect(prop1Promise).resolves.toBe('received');
     await expect(prop2Promise).rejects.toThrow(/The async prop "prop2" is not received/);
+  });
+});
+
+describe('rejectProp', () => {
+  it('rejects a pending prop with server rejection error', async () => {
+    const manager = new AsyncPropsManager();
+    const getPropPromise = manager.getProp('pendingProp');
+
+    manager.rejectProp('pendingProp', 'fetch failed');
+
+    await expect(getPropPromise).rejects.toThrow(/rejected by server/);
+  });
+
+  it('returns an already-rejected promise when getProp is called after rejectProp', async () => {
+    const manager = new AsyncPropsManager();
+
+    manager.rejectProp('rejectedProp', 'fetch failed');
+
+    await expect(manager.getProp('rejectedProp')).rejects.toThrow(/rejected by server/);
+  });
+
+  it('is a no-op when the prop was already resolved via setProp', async () => {
+    const manager = new AsyncPropsManager();
+
+    manager.setProp('resolvedProp', 'Original Value');
+    manager.rejectProp('resolvedProp', 'fetch failed');
+
+    await expect(manager.getProp('resolvedProp')).resolves.toBe('Original Value');
+  });
+
+  it('is a no-op after endStream', () => {
+    const manager = new AsyncPropsManager();
+    manager.endStream();
+
+    expect(() => manager.rejectProp('endedProp', 'fetch failed')).not.toThrow();
+  });
+});
+
+describe('Pull mode propRequest emission', () => {
+  let sharedExecutionContext: Map<string, unknown>;
+  let propRequestEmitter: jest.Mock;
+  let manager: AsyncPropsManager;
+
+  beforeEach(() => {
+    propRequestEmitter = jest.fn();
+    sharedExecutionContext = new Map<string, unknown>([
+      [PULL_ENABLED_KEY, true],
+      [PUSH_PROPS_KEY, new Set(['pushProp'])],
+      [PROP_REQUEST_EMITTER_KEY, propRequestEmitter],
+    ]);
+    manager = getOrCreateAsyncPropsManager(sharedExecutionContext);
+  });
+
+  it('emits a propRequest when getProp is called for a non-push prop', () => {
+    manager.getProp('lazyProp');
+
+    expect(propRequestEmitter).toHaveBeenCalledWith('lazyProp');
+  });
+
+  it('does not emit duplicate propRequest for the same prop', () => {
+    manager.getProp('lazyProp');
+    manager.getProp('lazyProp');
+
+    expect(propRequestEmitter).toHaveBeenCalledTimes(1);
+    expect(propRequestEmitter).toHaveBeenCalledWith('lazyProp');
+  });
+
+  it('does not emit propRequest for push props', () => {
+    manager.getProp('pushProp');
+
+    expect(propRequestEmitter).not.toHaveBeenCalled();
+  });
+
+  it('does not emit propRequest for already-resolved props', async () => {
+    manager.setProp('lazyProp', 'Resolved Value');
+
+    await expect(manager.getProp('lazyProp')).resolves.toBe('Resolved Value');
+    expect(propRequestEmitter).not.toHaveBeenCalled();
+  });
+
+  it('buffers propRequests when no emitter is available', () => {
+    const bufferedContext = new Map<string, unknown>([
+      [PULL_ENABLED_KEY, true],
+      [PUSH_PROPS_KEY, new Set(['pushProp'])],
+    ]);
+    const bufferedManager = getOrCreateAsyncPropsManager(bufferedContext);
+
+    expect(() => bufferedManager.getProp('buffered')).not.toThrow();
+
+    bufferedContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
+    bufferedManager.flushPendingPullRequests();
+
+    expect(propRequestEmitter).toHaveBeenCalledWith('buffered');
+  });
+
+  it('emitPendingPullRequests emits for props requested before pull mode was enabled', () => {
+    const delayedContext = new Map<string, unknown>();
+    const delayedManager = getOrCreateAsyncPropsManager(delayedContext);
+
+    delayedManager.getProp('early');
+
+    delayedContext.set(PULL_ENABLED_KEY, true);
+    delayedContext.set(PUSH_PROPS_KEY, new Set(['pushProp']));
+    delayedContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
+    delayedManager.emitPendingPullRequests();
+
+    expect(propRequestEmitter).toHaveBeenCalledWith('early');
   });
 });

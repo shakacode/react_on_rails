@@ -203,10 +203,22 @@ const mixedPropsRedisPageTest = redisReceiverPageController.extend<PageFixture>(
   ],
 });
 
+const rejectionPropsRedisPageTest = redisReceiverPageController.extend<PageFixture>({
+  pagePath: [
+    async ({ nonBlockingNavigateWithRequestId }, use) => {
+      const pagePath = '/rejection_props_redis_for_testing';
+      await nonBlockingNavigateWithRequestId(pagePath);
+      await use(pagePath);
+    },
+    { auto: true },
+  ],
+});
+
 export {
   asyncPropsAtRouterPageTest,
   lazyPropsRedisPageTest,
   mixedPropsRedisPageTest,
+  rejectionPropsRedisPageTest,
   redisReceiverPageController,
   redisReceiverPageTest,
   redisReceiverInsideRouterPageTest,

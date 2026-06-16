@@ -81,6 +81,52 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
     end
   end
 
+  describe "control messages (messageType)" do
+    def control_message_payload(metadata)
+      metadata_with_type = metadata.merge("payloadType" => "string")
+      meta_json = metadata_with_type.to_json
+      "#{meta_json}\t0\n"
+    end
+
+    it "yields metadata with messageType but without html or payloadType keys" do
+      payload = control_message_payload("messageType" => "propRequest", "propName" => "users")
+      result = []
+      parser = described_class.new
+      parser.feed(payload) { |chunk| result << chunk }
+
+      expect(result.size).to eq(1)
+      expect(result.first).to include("messageType" => "propRequest", "propName" => "users")
+      expect(result.first).not_to have_key("html")
+      expect(result.first).not_to have_key("payloadType")
+    end
+
+    it "handles renderComplete control messages" do
+      payload = control_message_payload("messageType" => "renderComplete")
+      result = []
+      parser = described_class.new
+      parser.feed(payload) { |chunk| result << chunk }
+
+      expect(result.size).to eq(1)
+      expect(result.first).to eq("messageType" => "renderComplete")
+    end
+
+    it "correctly interleaves control messages with normal HTML chunks" do
+      html_chunk = length_prefixed_payload("<div>Hello</div>")
+      control_chunk = control_message_payload("messageType" => "propRequest", "propName" => "settings")
+      html_chunk2 = length_prefixed_payload("<p>World</p>")
+
+      parser = described_class.new
+      results = []
+      parser.feed(html_chunk + control_chunk + html_chunk2) { |chunk| results << chunk }
+
+      expect(results.size).to eq(3)
+      expect(results[0]).to include("html" => "<div>Hello</div>")
+      expect(results[1]).to include("messageType" => "propRequest", "propName" => "settings")
+      expect(results[1]).not_to have_key("html")
+      expect(results[2]).to include("html" => "<p>World</p>")
+    end
+  end
+
   describe "#feed" do
     it "parses multibyte payloads split across streaming chunks" do
       content = "\u3053\u3093\u306B\u3061\u306F"

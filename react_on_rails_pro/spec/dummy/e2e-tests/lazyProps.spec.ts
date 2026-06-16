@@ -14,7 +14,7 @@
  */
 
 import { expect } from '@playwright/test';
-import { lazyPropsRedisPageTest, mixedPropsRedisPageTest } from './fixture';
+import { lazyPropsRedisPageTest, mixedPropsRedisPageTest, rejectionPropsRedisPageTest } from './fixture';
 
 lazyPropsRedisPageTest(
   'lazy props are pulled by React and resolved incrementally',
@@ -83,6 +83,29 @@ mixedPropsRedisPageTest(
     await expect(page.getByTestId('related-posts-list')).toBeVisible();
     await expect(page.getByText('Getting Started with RSC')).toBeVisible();
     await expect(page.getByText('Streaming SSR Deep Dive')).toBeVisible();
+
+    await endRedisStream();
+  },
+);
+
+rejectionPropsRedisPageTest(
+  'rejected props show error boundary while resolved props render normally',
+  async ({ page, sendRedisValue, rejectRedisValue, endRedisStream }) => {
+    await expect(page.getByTestId('rejection-container')).toBeVisible();
+    await expect(page.getByTestId('allowed-loading')).toBeVisible();
+    await expect(page.getByTestId('forbidden-loading')).toBeVisible();
+
+    await sendRedisValue('allowedData', ['Item A', 'Item B', 'Item C']);
+    await expect(page.getByText('Item A')).toBeVisible();
+    await expect(page.getByText('Item B')).toBeVisible();
+    await expect(page.getByText('Item C')).toBeVisible();
+
+    await rejectRedisValue('forbiddenData', 'Access denied: insufficient permissions');
+    await expect(page.getByTestId('forbiddenData-error')).toBeVisible();
+    await expect(page.getByTestId('forbiddenData-error')).toContainText('rejected by server');
+    await expect(page.getByTestId('forbiddenData-error')).toContainText('Access denied');
+
+    await expect(page.getByText('Item A')).toBeVisible();
 
     await endRedisStream();
   },

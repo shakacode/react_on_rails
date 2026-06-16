@@ -64,6 +64,8 @@ Rails.application.routes.draw do
       as: :mixed_props_redis_for_testing
   get "rejection_props_for_testing" => "pages#rejection_props_for_testing",
       as: :rejection_props_for_testing
+  get "rejection_props_redis_for_testing" => "pages#rejection_props_redis_for_testing",
+      as: :rejection_props_redis_for_testing
   get "stream_async_components_for_testing_client_render" => "pages#stream_async_components_for_testing_client_render",
       as: :stream_async_components_for_testing_client_render
   get "rsc_posts_page_over_http" => "pages#rsc_posts_page_over_http", as: :rsc_posts_page_over_http

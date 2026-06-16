@@ -233,6 +233,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/rejection_props_for_testing")
   end
 
+  def rejection_props_redis_for_testing
+    stream_view_containing_react_components(template: "/pages/rejection_props_redis_for_testing")
+  end
+
   def async_on_server_sync_on_client
     @render_on_server = true
     stream_view_containing_react_components(template: "/pages/async_on_server_sync_on_client")
