@@ -193,6 +193,21 @@ new-gate rollout or Dependabot/lockfile compatibility results. The audit comment
 is the human-readable summary; CI check results for the current head SHA are the
 objective verification record.
 
+Before reporting merge readiness for a PR with `.github/workflows/**` or
+`.github/actions/**` changes, classify the diff as semantic or non-semantic.
+Semantic changes include trigger, permission, job, matrix, condition,
+concurrency, secret, reusable-action, command-parsing, workflow-dispatch, and
+CI-routing behavior changes. For semantic changes, link an existing tracking
+issue or create one bundled issue titled
+`Follow-up: Exercise GitHub Actions changes from PR #NNNN` before merge. The
+issue must include the source PR, changed workflow/action files, exact
+post-merge event or secondary verification PR to exercise, expected evidence,
+cleanup instructions for any verification-only PR, and owner if known. Treat
+comments, docs, typo fixes, formatting-only changes, and non-semantic actionlint
+cleanup as exempt only when the PR evidence states that classification and local
+validation. This is a standing exception to the default follow-up tracking
+policy because some GitHub Actions behavior can only be proven from `main`.
+
 When adding or broadening a repo-wide lint, CI, release, review, or merge gate,
 include at least one stale-base race control in the PR evidence. This is a
 `checklist+replay` process-gap disposition: name the stale-base race-control
@@ -826,7 +841,11 @@ Use `.agents/skills/address-review/SKILL.md` when skills are available; Claude C
   inline or escalate it to `DISCUSS`; autonomous defer does not apply.
 - `SKIPPED`: reply with rationale only when useful; do not create work from noise.
 
-Do not let follow-up issues become a substitute for finishing the PR. Follow-up tracking is allowed only for real, non-blocking work that remains valuable outside the PR context.
+Do not let follow-up issues become a substitute for finishing the PR. Follow-up
+tracking is allowed only for real, non-blocking work that remains valuable
+outside the PR context. The standing GitHub Actions post-merge exercise rule in
+the workflow/build-config scope section is an explicit exception because it
+verifies behavior that may not be provable before merge.
 
 ## Merge Endgame Debounce And Waiver Soak
 
