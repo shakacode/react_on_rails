@@ -217,7 +217,7 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 **Squash merges**: When completing a GitHub squash merge, include the PR number in the squash commit title using the format `<PR title> (#<PR number>)`, for example `Docs: clarify rails new JavaScript skip flag (#3666)`. For CLI merges, pass `--subject "<PR title> (#<PR number>)"` to `gh pr merge --squash` and verify the title before confirming the merge.
 
-**PR creation**: Use `gh pr create` with a clear title, summary, and test plan.
+**PR creation**: Use `gh pr create` with a clear title, self-contained why/rationale summary, implementation summary, and test plan. If an issue exists, link it, but do not make reviewers open the issue to understand why the PR exists; include at least a short rationale in the PR description itself.
 
 **PR processing**: Before pushing a review-fix batch, opening a PR, marking a PR ready, requesting full CI, or reporting merge-readiness, run the agent PR processing flow in `.agents/workflows/pr-processing.md`: verify the work is worth doing, self-review the diff, run local validation, use the pre-push AI review and simplify gate when appropriate, batch fixes, and document exact verification evidence plus churn notes. After a PR and its reviews exist, wait for configured review agents and triage actionable review feedback before marking ready, requesting merge, or merging.
 

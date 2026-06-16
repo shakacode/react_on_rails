@@ -59,7 +59,7 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
 5. Self-review before every push or PR-ready signal.
 6. Run local validation based on changed areas.
 7. Run the pre-push AI review and simplify gate when the change is non-trivial or high-risk.
-8. Update the PR body, issue, or one concise PR comment with exact verification evidence, churn notes, and remaining gaps.
+8. Update the PR body, issue, or one concise PR comment with exact verification evidence, churn notes, and remaining gaps. Every PR body must include a self-contained why/rationale summary; link issues as supporting context, but do not require reviewers to open an issue to understand why the PR exists.
 9. Only then request review, full CI, or merge readiness.
 
 ## Initial GitHub Commands
@@ -650,7 +650,7 @@ Before pushing, opening a PR, marking a PR ready, or asking for another review p
 - Tests: is there a regression test for changed behavior, not just incidental coverage?
 - Security: are shell commands, file paths, generated code, secrets, markdown links, and external input handled safely?
 - Performance: did the change add avoidable work to render, build, CI, SSR, RSC, or benchmark paths?
-- Review surface: are names, comments, PR body text, and changelog entries clear enough to avoid predictable review comments?
+- Review surface: are names, comments, PR body text, and changelog entries clear enough to avoid predictable review comments? Does the PR body explain why the change is being made, not only what changed and how it was tested?
 
 If self-review finds a real issue, fix it locally before pushing. Do not post self-review findings as new GitHub comments unless the user explicitly asks for a summary.
 

@@ -113,6 +113,11 @@ Run `git fetch --prune origin main` first, confirm the expected repo root, verif
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
+Every PR body must include a self-contained why/rationale summary. Link the
+target issue when one exists, but do not make reviewers open the issue to
+understand why the PR exists; include the motivation and user/maintainer impact
+directly in the PR description.
+
 For non-trivial, high-risk, `ready-for-full-ci`, `benchmark`, workflow/build-config,
 dependency/runtime-version, or broad refactor PRs, commit the intended
 implementation locally before pushing so there is a clean branch diff. Run
