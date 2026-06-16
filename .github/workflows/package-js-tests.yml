@@ -9,21 +9,12 @@ on:
       - 'main'
     # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'AGENTS_USER_GUIDE.md'
-      - 'docs/**'
-      - 'llms.txt'
-      - 'llms-full.txt'
-      - 'llms-full-pro.txt'
-      - '.lychee.toml'
-      - 'react_on_rails/lib/**'
-      - 'react_on_rails/spec/react_on_rails/**'
-      - 'react_on_rails_pro/**'
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -33,6 +24,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
@@ -42,21 +34,26 @@ jobs:
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
+      should_use_full_matrix: ${{ steps.hosted-ci.outputs.should_use_full_matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
           # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
           fetch-depth: 50
           persist-credentials: false
-      - name: Check for full-ci label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR full-ci label is present, run everything
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
             {
               echo "run_lint=true"
               echo "run_js_tests=true"
@@ -69,7 +66,7 @@ jobs:
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Guard docs-only main pushes
@@ -81,26 +78,21 @@ jobs:
 
   build:
     needs: detect-changes
-    # Run on main OR when JS tests needed on PR
+    # Run hosted JS tests only when hosted CI is allowed and JS paths changed.
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        needs.detect-changes.outputs.run_js_tests == 'true'
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_js_tests == 'true'
     strategy:
       matrix:
         node-version:
           # Always run: Latest Node version (fast feedback on PRs)
           - '22'
-          # Main and full-ci label: Minimum supported Node version (full coverage)
+          # Broad-matrix contexts: minimum supported Node version
           - '20'
         exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on main or with full-ci label)
-          - node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/main' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
+          # Skip the minimum Node lane unless this is a broad matrix context:
+          # main, merge queue, release target, or explicit force-full hosted CI.
+          - node-version: ${{ needs.detect-changes.outputs.should_use_full_matrix != 'true' && '20' || '' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

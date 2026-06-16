@@ -113,18 +113,24 @@ Run `git fetch --prune origin main` first, confirm the expected repo root, verif
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
-For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config,
-dependency/runtime-version, or broad refactor PRs, commit the intended
+Every PR body must include a self-contained why/rationale summary. Link the
+target issue when one exists, but do not make reviewers open the issue to
+understand why the PR exists; include the motivation and user/maintainer impact
+directly in the PR description.
+
+For non-trivial, high-risk, `ready-for-hosted-ci`, `force-full-hosted-ci`,
+`benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor PRs, commit the intended
 implementation locally before pushing so there is a clean branch diff. Run
 repo-specific validation, formatter/lint/type checks as applicable, then run the
 primary local/adversarial self-review gate, normally
 `codex review --base origin/<base>` or the PR's real base, before PR creation or
 update.
 
-When requested by a maintainer or when the change is high-risk, `full-ci`,
-`benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor
-scoped, run one additional Claude Code review pass if available, such as
-`/code-review` or `/code-review ultra`.
+When requested by a maintainer or when the change is high-risk,
+`ready-for-hosted-ci`, `force-full-hosted-ci`, `benchmark`,
+workflow/build-config, dependency/runtime-version, or broad refactor scoped, run
+one additional Claude Code review pass if available, such as `/code-review` or
+`/code-review ultra`.
 
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
@@ -183,14 +189,25 @@ as CI-ready. Instead treat the full `gh pr checks <PR>` list as the readiness
 gate and require each current-head check to pass or be skipped with CI selector
 or maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and
 unexplained skipped checks still block readiness. If the full check list is
-empty, report CI state as `UNKNOWN` / not ready and request full CI or maintainer
+empty, report CI state as `UNKNOWN` / not ready and request hosted CI or maintainer
 status-check configuration before merge.
 
-At the final review/readiness gate, apply the canonical full-CI uncertainty
+At the final review/readiness gate, apply the canonical hosted-CI uncertainty
 rule from `.agents/workflows/pr-processing.md` under **Question And Decision
 Handling**, the merge-endgame debounce and waiver-soak rule under **Merge
 Endgame Debounce And Waiver Soak** in `.agents/workflows/pr-processing.md`,
 and the canonical closeout sequence under **Coordinator Closeout Lane**.
+For hosted-CI requests, use the auditable `+ci-*` comment path after local
+validation, self-review, review-thread triage, and the final push for the
+current batch. Check with `+ci-status` first. Use `+ci-run-hosted` for optimized
+hosted CI. Use `+ci-force-full` only when a maintainer intentionally wants to
+bypass optimized selection or the selector itself is part of the risk. Then
+re-fetch and wait for current-head checks. Do not rely on adding
+`ready-for-hosted-ci` directly from automation; a workflow `GITHUB_TOKEN` label
+write is persistence for future pushes, not a current-head trigger. Direct
+`bin/request-hosted-ci` or `gh pr edit --add-label ready-for-hosted-ci` is a
+human/local user-token path. For fork PRs, report that a trusted base-repository
+branch or maintainer-run path is needed for Pro or secret-backed CI.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
@@ -204,13 +221,18 @@ Classify every unresolved question before continuing:
 - **Blocking question**: the implementation, validation, or merge decision would be unsafe without maintainer input. Stop work on that target until answered. Subagents should return the blocking question to the coordinator instead of guessing. For multi-machine batches, post a structured issue or PR comment and, if the repo uses labels for this workflow, apply `codex-pending-question`. A worker handoff should include the question/comment URL as that target's blocked final state.
 - **Non-blocking decision**: a reasonable local decision can be made without increasing merge risk. Continue work, but add a clearly formatted decision note to the PR description so later review across merged PRs can surface these items quickly.
 
-<!-- Keep this full-CI uncertainty rule in sync with `.agents/workflows/pr-processing.md`. -->
+<!-- Keep this hosted-CI uncertainty rule in sync with `.agents/workflows/pr-processing.md`. -->
 
-Full-CI uncertainty at the final readiness gate after local validation and the
-final push is a non-blocking decision. Request full CI with `+ci-run-full`,
-record the reason, re-fetch and wait for the newly requested current-head checks,
-and continue the readiness flow instead of escalating it as an immediate
-maintainer question.
+Hosted-CI uncertainty at the final readiness gate after local validation and the
+final push is a non-blocking decision. If the branch needs remote confirmation,
+request optimized hosted CI with `+ci-run-hosted`. If the remaining concern is
+that optimized suite selection may be insufficient, request force-full hosted CI
+with `+ci-force-full` and record why. Re-fetch and wait for the newly requested
+current-head checks, then continue the readiness flow instead of escalating it
+as an immediate maintainer question. Use `+ci-status` first when state is
+unclear, and do not substitute a direct `ready-for-hosted-ci` label from
+automation for the comment command; direct labels are only the human/local
+user-token path.
 
 Suggested PR description section:
 
@@ -241,7 +263,7 @@ detailed policy belongs in the canonical workflow.
 Use the canonical Batch Handoff Format in
 `.agents/workflows/pr-processing.md`. In short, split final batch handoffs into
 **Immediate maintainer attention** for true blockers and questions only, and
-**FYI / decisions made** for decisions, validations, review state, full-CI
+**FYI / decisions made** for decisions, validations, review state, hosted-CI
 requests already handled, no-PR rationales, autonomous nit outcomes,
 confidence notes, decision-point counts per PR, and per-PR merge-ledger summaries.
 Do not call a target `complete` while its ledger has `UNKNOWN` fields or
@@ -266,7 +288,7 @@ advisory fallback state.
 Follow the canonical
 [Worker Rules](../../workflows/pr-processing.md#worker-rules) and keep one target
 or one disjoint lane per worker. The main agent owns final PR creation, status
-reporting, full-CI decisions, and merge sequencing.
+reporting, hosted-CI decisions, and merge sequencing.
 
 ## Coordinator Closeout Lane
 
@@ -275,6 +297,6 @@ For the complete numbered sequence, follow the canonical closeout lane in
 coordinator owns the live re-fetch, current-head checks and review-thread triage,
 per-PR merge-ledger run, stale release-mode classification updates and the finalized PR-body
 `Agent Merge Confidence` block refresh required for accelerated-RC readiness (kept
-distinct), full-CI request and waitback when uncertainty remains, and any
+distinct), hosted-CI request and waitback when uncertainty remains, and any
 authorized ready/merge action, and the late post-merge bot-finding sweep before
 final batch handoff.

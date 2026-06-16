@@ -83,7 +83,7 @@ RSpec.describe "benchmark matrix generation" do
     end
   end
 
-  describe "the full-ci-no-benchmarks suppression label" do
+  describe "the hosted-ci-no-benchmarks suppression label" do
     it "suppresses every suite even when change detection requested them" do
       expect(suite_ids_for(
                "BENCHMARK_EVENT_NAME" => "pull_request",
@@ -92,7 +92,7 @@ RSpec.describe "benchmark matrix generation" do
                "RUN_CORE_BENCHMARKS" => "true",
                "RUN_PRO_BENCHMARKS" => "true",
                "RUN_PRO_NODE_RENDERER_BENCHMARKS" => "true",
-               "BENCHMARK_PULL_REQUEST_LABELS" => '["full-ci-no-benchmarks"]'
+               "BENCHMARK_PULL_REQUEST_LABELS" => '["hosted-ci-no-benchmarks"]'
              )).to eq(["none"])
     end
 
@@ -101,7 +101,7 @@ RSpec.describe "benchmark matrix generation" do
                "BENCHMARK_EVENT_NAME" => "pull_request",
                "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "shakacode/react_on_rails",
                "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
-               "BENCHMARK_PULL_REQUEST_LABELS" => '["benchmark","full-ci-no-benchmarks"]'
+               "BENCHMARK_PULL_REQUEST_LABELS" => '["benchmark","hosted-ci-no-benchmarks"]'
              )).to eq(["none"])
     end
 
@@ -111,7 +111,7 @@ RSpec.describe "benchmark matrix generation" do
                "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "contributor/react_on_rails",
                "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
                "RUN_CORE_BENCHMARKS" => "true",
-               "BENCHMARK_PULL_REQUEST_LABELS" => '["full-ci-no-benchmarks"]'
+               "BENCHMARK_PULL_REQUEST_LABELS" => '["hosted-ci-no-benchmarks"]'
              )).to eq(["none"])
     end
   end

@@ -69,5 +69,12 @@ The `$pr-batch` prompt must preserve the preflight/trust rules from [.agents/ski
 ## Review And Readiness
 
 - Existing PR targets with review feedback should route workers through [.agents/workflows/address-review.md](../../.agents/workflows/address-review.md) or [.agents/skills/address-review/SKILL.md](../../.agents/skills/address-review/SKILL.md).
-- Non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, and broad-refactor PRs must follow the `$pr-batch` review and `/simplify` gates before final push or readiness reporting.
+- Non-trivial, high-risk, `ready-for-hosted-ci`, `force-full-hosted-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, and broad-refactor PRs must follow the `$pr-batch` review and `/simplify` gates before final push or readiness reporting.
+- Hosted CI requests belong at the final readiness gate after local validation,
+  review-thread triage, and the final push. Agents should use `+ci-status` and
+  `+ci-run-hosted` for optimized hosted CI. Use `+ci-force-full` only when a
+  maintainer intentionally wants to bypass optimized selection or selector
+  coverage is the specific risk. Direct `ready-for-hosted-ci` labels are a
+  human/local user-token path, not a substitute for comment-command dispatch
+  from automation.
 - Final batch handoffs should include links, validation evidence, last-known CI/review state, blockers, and explicit `UNKNOWN` entries.

@@ -505,32 +505,35 @@ Users who want exact reproducibility in their generated CI can commit a `package
 
 ## CI Testing and Optimization
 
-React on Rails uses an optimized CI pipeline that runs faster on branches while maintaining full coverage on `main`. Contributors have access to local CI tools to validate changes before pushing.
+React on Rails uses a small required PR gate plus opt-in hosted validation. Contributors should validate locally before pushing, then request optimized hosted CI only when the branch is ready for remote confirmation.
 
 ### CI Behavior
 
-- **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback (~12 min vs ~45 min)
-- **On Main**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
-- **Docs-only changes**: CI skips entirely when only documentation/metadata paths change (`*.md`, `*.mdx`, `*.markdown`, `*.rst`, `*.txt`, `docs/`, `internal/`, `.github/ISSUE_TEMPLATE/`, or `.lychee.toml`)
+- **Required PR gate**: Always starts for PRs and keeps the merge signal cheap.
+- **Optimized hosted CI**: Runs path-selected hosted suites after `+ci-run-hosted`, `ready-for-hosted-ci`, release-target PRs, merge queue, `main`, or manual dispatch.
+- **Force-full hosted CI**: Runs every hosted suite only after `+ci-force-full`, `force-full-hosted-ci`, or a manual `force_full_hosted: true` dispatch.
+- **Docs-only changes**: Expensive hosted suites skip when only documentation/metadata paths change (`*.md`, `*.mdx`, `*.markdown`, `*.rst`, `*.txt`, `docs/`, `internal/`, `.github/ISSUE_TEMPLATE/`, or `.lychee.toml`)
 
 ### Local CI Tools
 
 #### `bin/ci-local` - Smart Local CI Runner
 
-Analyzes your changes and runs appropriate tests locally before pushing:
+Analyzes your changes and runs appropriate tests locally before pushing. By
+default, it auto-detects the current PR base branch and runs optimized
+changed-files CI:
 
 ```bash
 # Auto-detect what to test based on changed files
 bin/ci-local
 
-# Run all CI checks (same as main branch)
+# Same optimized mode, made explicit
+bin/ci-local --changed
+
+# Run broad local CI where practical
 bin/ci-local --all
 
 # Quick check - only fast tests, skip slow integration tests
 bin/ci-local --fast
-
-# Compare against a different branch
-bin/ci-local origin/develop
 ```
 
 **Benefits:**
@@ -580,25 +583,25 @@ If using Claude Code, run the `/run-ci` skill for interactive CI execution that:
 
 - Run `bin/ci-local` before pushing to catch issues early
 - Use `bin/ci-local --fast` during rapid iteration
-- Trust the reduced matrix on PRs - main validates everything
+- Use optimized hosted CI for final remote confirmation, and reserve force-full hosted CI for explicit broad-matrix decisions
 - Separate docs-only changes into dedicated commits/PRs when possible
 
 ❌ **DON'T:**
 
 - Push without running local tests first
 - Mix code and docs changes if you want docs to skip CI
-- Expect PR CI to catch minimum Ruby/Node version issues (use `bin/ci-local --all` for that)
+- Expect the required PR gate alone to catch minimum Ruby/Node version issues (use `bin/ci-local --all` or force-full hosted CI for that)
 
 ### Understanding CI Optimizations
 
-The CI system intelligently skips unnecessary work:
+The optimized detector intelligently skips unnecessary hosted work:
 
-| Change Type                | CI Behavior           | Time Saved |
-| -------------------------- | --------------------- | ---------- |
-| Docs only (`.md`, `docs/`) | Skips all CI          | 100%       |
-| Ruby code only             | Skips JS tests        | ~30%       |
-| JS code only               | Skips Ruby-only tests | ~30%       |
-| Workflow changes           | Runs lint only        | ~75%       |
+| Change Type                | Optimized Hosted Behavior                                                  |
+| -------------------------- | -------------------------------------------------------------------------- |
+| Docs only (`.md`, `docs/`) | Skips expensive hosted suites                                              |
+| Ruby code only             | Runs Ruby/lint coverage, skips JS-only suites                              |
+| JS code only               | Runs JS/lint coverage, skips Ruby-only suites                              |
+| Workflow changes           | Runs CI-infrastructure validation, no benchmarks unless explicitly labeled |
 
 For more details, see [`internal/contributor-info/ci-optimization.md`](./internal/contributor-info/ci-optimization.md).
 
@@ -608,32 +611,74 @@ React on Rails provides PR comment commands to control CI behavior:
 
 Post one CI command per comment. If a comment contains multiple `+ci-*` commands, the command workflow handles only the first one.
 
-#### `+ci-run-full` - Enable Full CI Mode
+Maintainers and contributors with a local authenticated `gh` session can also
+run `bin/request-hosted-ci` from a PR branch or add `ready-for-hosted-ci` directly.
+That user-token label event starts optimized hosted workflows. Agents and
+maintainers who want an auditable PR-visible decision should prefer the
+`+ci-*` comment commands.
 
-Runs all skipped CI checks and enables full CI mode for the PR:
+#### `+ci-run-hosted` - Enable Optimized Hosted CI
+
+Adds the hosted CI readiness label and dispatches hosted workflows for the current head SHA:
 
 ```
-+ci-run-full
++ci-run-hosted
 ```
 
 **What it does:**
 
-- Triggers all CI workflows that were skipped due to unchanged code
-- Adds the `full-ci` label to the PR
-- **Persists across future commits** - all subsequent pushes will run the full test suite
-- Runs latest dependency tests (Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19)
-- Runs minimum dependency tests (Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18)
+- Dispatches hosted workflows for the current head SHA
+- Creates and adds the `ready-for-hosted-ci` label to the PR
+- **Persists across future commits** - subsequent pushes run optimized hosted CI
+- Keeps `script/ci-changes-detector` in charge of which suites are applicable
 
 **When to use:**
 
-- You want comprehensive testing across all configurations
-- Testing changes that might affect minimum supported versions
-- Validating generator changes or core functionality
-- Before merging PRs that touch critical paths
+- The PR has passed local validation and is ready for remote confirmation
+- Reviewers need hosted results before merge-readiness
+- You want an auditable current-head hosted CI request
 
-#### `+ci-stop-full` - Disable Full CI Mode
+#### `+ci-force-full` - Force Full Hosted CI
 
-Removes the `full-ci` label and returns to standard CI behavior:
+Bypasses optimized suite selection and dispatches every hosted suite:
+
+```
++ci-force-full
+```
+
+**What it does:**
+
+- Dispatches hosted workflows with `force_full_hosted: true`
+- Creates and adds `ready-for-hosted-ci` and `force-full-hosted-ci`
+- **Persists across future commits** until `+ci-stop-full` removes the force-full override
+
+**When to use:**
+
+- A maintainer explicitly wants the broad hosted matrix
+- The PR changes CI detection, runtime floors, package manager behavior, release/build/publishing logic, or similarly cross-cutting infrastructure
+- You need to prove optimized selection itself is not hiding a regression path
+
+#### `+ci-stop-hosted` - Disable Hosted CI Mode
+
+Removes hosted CI labels and returns to required-gate-only behavior:
+
+```
++ci-stop-hosted
+```
+
+**What it does:**
+
+- Removes `ready-for-hosted-ci` and `force-full-hosted-ci` from the PR
+- Future commits use only the required gate until hosted CI is requested again
+- Does not stop currently running workflows
+
+**When to use:**
+
+- The PR is back in active iteration and hosted CI should not rerun on every push
+
+#### `+ci-stop-full` - Disable Only Force-Full Hosted CI
+
+Removes the force-full override while leaving optimized hosted CI enabled if present:
 
 ```
 +ci-stop-full
@@ -641,21 +686,20 @@ Removes the `full-ci` label and returns to standard CI behavior:
 
 **What it does:**
 
-- Removes the `full-ci` label from the PR
-- Future commits will use the optimized CI suite (tests only changed code)
+- Removes `force-full-hosted-ci` from the PR
+- Leaves `ready-for-hosted-ci` in place if it was present
 - Does not stop currently running workflows
 
 **When to use:**
 
-- You've validated changes with full CI and want to return to faster feedback
-- Reducing CI time during rapid iteration on a PR
+- The broad matrix is no longer needed, but optimized hosted CI should continue
 
-#### `+ci-skip-full [reason]` - Record a Full CI Waiver
+#### `+ci-skip-hosted [reason]` - Record a Hosted CI Waiver
 
-Records that a maintainer intentionally waived the expensive full matrix for the current PR head SHA:
+Records that a maintainer intentionally waived hosted CI for the current PR head SHA:
 
 ```
-+ci-skip-full docs-only change; markdown checks are enough
++ci-skip-hosted docs-only change; markdown checks are enough
 ```
 
 The reason is optional. If omitted, the bot records `not provided`.
@@ -664,26 +708,28 @@ The reason is optional. If omitted, the bot records `not provided`.
 
 - Posts an audit comment with the current head SHA
 - Does not cancel or block any workflow run
-- Removes `full-ci` if present
-- Does not skip the standard optimized CI selected for the changed files
+- Removes hosted CI labels if present
+- Does not skip the required fast gate
 - Does not apply to later pushes, because the waiver is bound to the SHA in the comment
 
-Use this when you intentionally choose not to run full CI before merge, especially when acting as an administrator.
+Use this when you intentionally choose not to run hosted CI before merge, especially when acting as an administrator.
 
 #### `+ci-status` and `+ci-help`
 
-Use `+ci-status` to summarize the current head SHA, whether the PR matches the docs-only metadata paths, whether `full-ci` is present, and whether the current SHA has a waiver comment.
+Use `+ci-status` to summarize the current head SHA, whether the PR matches the docs-only metadata paths, whether hosted CI labels are present, and whether the current SHA has a waiver comment.
 
 Use `+ci-help` to list the available CI commands.
 
-**Note:** The `full-ci` label is preserved on merged PRs as a historical record of which PRs ran with comprehensive testing.
+**Note:** `ready-for-hosted-ci` records that a PR ran optimized hosted CI. `force-full-hosted-ci` records the separate decision to bypass optimized selection.
 
-Legacy slash commands (`/run-skipped-ci`, `/run-skipped-tests`, and `/stop-run-skipped-ci`) still work, but the `+ci-*` commands are preferred because GitHub's comment editor uses `/` for built-in slash command autocomplete.
+Legacy slash commands (`/run-skipped-ci`, `/run-skipped-tests`, and `/stop-run-skipped-ci`) were removed. Use `+ci-*` commands because GitHub's comment editor uses `/` for built-in slash command autocomplete.
 
 #### Important Notes
 
-- **Force-pushes:** The `+ci-run-full` command adds the `full-ci` label to your PR. If you force-push after commenting, the initial workflow run will test the old commit, but subsequent pushes will automatically run full CI because the label persists.
-- **Waivers:** The `+ci-skip-full` command records the exact SHA in the PR conversation. If you push another commit, use `+ci-skip-full` again if you still intend to waive full CI.
+- **Force-pushes:** `+ci-run-hosted` and `+ci-force-full` dispatch workflows for the current head SHA before adding labels. If you force-push after commenting, the initial workflow run may test the old commit, but subsequent pushes follow the persistent labels.
+- **Workflow-token labels:** A label added by a workflow's `GITHUB_TOKEN` does not start new `pull_request` workflow runs by itself. That is why the comment commands dispatch workflows for the current head SHA before adding labels.
+- **Fork PRs:** Comment-command hosted CI does not dispatch same-repository workflows or add persistent labels for fork heads. A maintainer should push a trusted base-repository branch when Pro or secret-backed CI is required.
+- **Waivers:** The `+ci-skip-hosted` command records the exact SHA in the PR conversation. If you push another commit, use `+ci-skip-hosted` again if you still intend to waive hosted CI.
 - **Branch operations:** Avoid deleting or force-pushing branches while workflows are running, as this may cause failures.
 
 ### Benchmarking

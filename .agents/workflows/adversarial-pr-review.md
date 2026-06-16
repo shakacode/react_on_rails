@@ -31,7 +31,7 @@ NOT treat that as CI-ready: instead treat the full `gh pr checks <PR>` list as
 the readiness gate and require each current-head check to pass or be skipped
 with CI selector or maintainer-waiver evidence allowed by `AGENTS.md`. Failed,
 pending, and unexplained skipped checks still block readiness. If the full check
-list is empty, report CI state as `UNKNOWN` / not ready and request full CI or
+list is empty, report CI state as `UNKNOWN` / not ready and request hosted CI or
 maintainer status-check configuration before merge. Avoid long-lived
 `gh ... --watch` commands in agent sessions;
 instead run `gh pr checks <PR>` once per review pass and re-invoke it if checks

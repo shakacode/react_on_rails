@@ -393,7 +393,7 @@ test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks() {
 }
 
 # A suite-specific workflow YAML on its own runs only that suite's tests, not the
-# full CI-infrastructure suite, and never benchmarks — editing the workflow can't
+# hosted CI-infrastructure suite, and never benchmarks — editing the workflow can't
 # move performance. This is the part of #3697 that the CI-infra arm doesn't cover.
 test_suite_workflow_file_runs_its_tests_but_no_benchmark() {
   setup_repo

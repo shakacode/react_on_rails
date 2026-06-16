@@ -13,19 +13,12 @@ on:
       - 'main'
     # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'AGENTS_USER_GUIDE.md'
-      - 'docs/**'
-      - 'llms.txt'
-      - 'llms-full.txt'
-      - 'llms-full-pro.txt'
-      - '.lychee.toml'
-      - 'react_on_rails_pro/**'
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -35,6 +28,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
@@ -44,21 +38,26 @@ jobs:
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
+      should_use_full_matrix: ${{ steps.hosted-ci.outputs.should_use_full_matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
           # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
           fetch-depth: 50
           persist-credentials: false
-      - name: Check for full-ci label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR full-ci label is present, run everything
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
             {
               echo "run_lint=true"
               echo "run_js_tests=true"
@@ -69,7 +68,7 @@ jobs:
               echo "non_runtime_only=false"
             } >> "$GITHUB_OUTPUT"
           else
-            BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+            BASE_REF="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
             script/ci-changes-detector "$BASE_REF"
           fi
         shell: bash
@@ -106,10 +105,7 @@ jobs:
           LATEST_NODE_VERSION: ${{ steps.tool-versions.outputs.node-major-version }}
           MINIMUM_RUBY_VERSION: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
           MINIMUM_NODE_VERSION: ${{ steps.tool-versions.outputs.minimum-node-major-version }}
-          WORKFLOW_REF: ${{ github.ref }}
-          WORKFLOW_EVENT: ${{ github.event_name }}
-          FORCE_RUN: ${{ inputs.force_run }}
-          HAS_FULL_CI_LABEL: ${{ needs.detect-changes.outputs.has_full_ci_label }}
+          SHOULD_USE_FULL_MATRIX: ${{ needs.detect-changes.outputs.should_use_full_matrix }}
         run: |
           # Integration matrices float Node within each supported major; single-lane
           # workflows use exact patch versions when exercising the minimum floor.
@@ -118,11 +114,9 @@ jobs:
           minimum_ruby_version="$MINIMUM_RUBY_VERSION"
           minimum_node_version="$MINIMUM_NODE_VERSION"
 
-          # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label).
-          if [[ "$WORKFLOW_REF" == "refs/heads/main" ]] || \
-             [[ "$WORKFLOW_EVENT" == "workflow_dispatch" ]] || \
-             [[ "$FORCE_RUN" == "true" ]] || \
-             [[ "$HAS_FULL_CI_LABEL" == "true" ]]; then
+          # Full matrices run only on main, merge queue, release targets, or
+          # explicit force-full hosted CI. Normal hosted PR CI stays optimized.
+          if [[ "$SHOULD_USE_FULL_MATRIX" == "true" ]]; then
             run_full_matrix=true
           else
             run_full_matrix=false
@@ -182,20 +176,13 @@ jobs:
   # One reusable-workflow call per independent bundler/dependency-level chain. Each call owns its
   # own build -> integration job chain (see dummy-app-bundler-tests.yml), so a build failure in one
   # chain no longer skips another chain's integration tests. Refs #3593 / #3622.
-  # The shared gating preserves the prior skip behavior (docs/comment-only commits skip heavy jobs
-  # while main code changes always run full CI). The webpack minimum call adds the full-matrix gate.
+  # The shared gating keeps regular PR updates cheap while allowing optimized
+  # hosted CI only after an explicit hosted request or for release/main/queue.
   webpack-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_dummy_tests == 'true'
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_dummy_tests == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/dummy-app-bundler-tests.yml
@@ -205,15 +192,9 @@ jobs:
   webpack-minimum-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
     if: |
-      needs.setup-integration-matrix.outputs.run_full_matrix == 'true' && !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_dummy_tests == 'true'
-      )
+      needs.setup-integration-matrix.outputs.run_full_matrix == 'true' &&
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_dummy_tests == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/dummy-app-bundler-tests.yml
@@ -223,15 +204,8 @@ jobs:
   rspack-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.non_runtime_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_dummy_tests == 'true'
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_dummy_tests == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/dummy-app-bundler-tests.yml
