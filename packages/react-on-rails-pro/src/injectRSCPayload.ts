@@ -14,6 +14,8 @@
  */
 
 import { PassThrough } from 'stream';
+import { readFileSync } from 'fs';
+import { resolve as resolvePath } from 'path';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { createEmbeddedPayloadKey } from './utils.ts';
@@ -90,6 +92,283 @@ function createRSCDiagnosticScript(
   );
 }
 
+const RSC_CLIENT_CHUNK_STYLESHEET_PATH = /\/css\/client\d+-[^/]+\.css$/;
+const RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET = /"((?:client)\d+)"\s*,\s*"js\/client\d+-[^"]+\.chunk\.js"/g;
+const REACT_SUSPENSE_REVEAL_SCRIPT = /\$RC\(/;
+const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
+const RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS = 100;
+
+type LoadableStats = {
+  assetsByChunkName?: Record<string, string | string[]>;
+  publicPath?: string;
+};
+
+type RSCClientChunkStylesheetHrefsByChunkName = Map<string, string[]>;
+
+let cachedRSCClientChunkStylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName | undefined;
+
+function escapeRegExpLiteral(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function getQuotedAttribute(tag: string, attributeName: string) {
+  const attributeMatch = tag.match(
+    new RegExp(`\\s${escapeRegExpLiteral(attributeName)}=(["'])(.*?)\\1`, 'i'),
+  );
+  return attributeMatch?.[2];
+}
+
+function isRSCClientChunkStylesheetHref(href: string) {
+  try {
+    return RSC_CLIENT_CHUNK_STYLESHEET_PATH.test(new URL(href, 'http://react-on-rails.local').pathname);
+  } catch {
+    return RSC_CLIENT_CHUNK_STYLESHEET_PATH.test(href.split(/[?#]/, 1)[0]);
+  }
+}
+
+function shouldPromoteStylesheetPreloadTag(linkTag: string) {
+  const href = getQuotedAttribute(linkTag, 'href');
+  return href ? isRSCClientChunkStylesheetHref(href) : false;
+}
+
+function assetHref(assetPath: string, publicPath?: string) {
+  if (/^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(assetPath) || assetPath.startsWith('/')) {
+    return assetPath;
+  }
+
+  if (!publicPath || publicPath === 'auto') {
+    return assetPath;
+  }
+
+  return `${publicPath.replace(/\/?$/, '/')}${assetPath.replace(/^\/+/, '')}`;
+}
+
+function loadRSCClientChunkStylesheetHrefsByChunkName(): RSCClientChunkStylesheetHrefsByChunkName {
+  if (cachedRSCClientChunkStylesheetHrefsByChunkName) {
+    return cachedRSCClientChunkStylesheetHrefsByChunkName;
+  }
+
+  const stylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName = new Map();
+
+  try {
+    const loadableStats = JSON.parse(
+      readFileSync(resolvePath(__dirname, LOADABLE_STATS_FILE_NAME), 'utf8'),
+    ) as LoadableStats;
+
+    Object.entries(loadableStats.assetsByChunkName ?? {}).forEach(([chunkName, assets]) => {
+      if (!/^client\d+$/.test(chunkName)) return;
+
+      const stylesheetHrefs = (Array.isArray(assets) ? assets : [assets])
+        .filter((asset): asset is string => typeof asset === 'string' && asset.endsWith('.css'))
+        .map((asset) => assetHref(asset, loadableStats.publicPath));
+
+      if (stylesheetHrefs.length > 0) {
+        stylesheetHrefsByChunkName.set(chunkName, stylesheetHrefs);
+      }
+    });
+  } catch {
+    // RSC CSS gating is opportunistic for builds that copy loadable-stats.json to
+    // the renderer bundle directory. Other setups fall back to streamed preload tags.
+  }
+
+  cachedRSCClientChunkStylesheetHrefsByChunkName = stylesheetHrefsByChunkName;
+  return stylesheetHrefsByChunkName;
+}
+
+function escapeAttributeValue(value: string) {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function createStylesheetTag(href: string) {
+  return `<link rel="stylesheet" href="${escapeAttributeValue(href)}" data-precedence="rsc-css">`;
+}
+
+function includesReactSuspenseRevealScript(htmlBuffer: Buffer) {
+  return REACT_SUSPENSE_REVEAL_SCRIPT.test(htmlBuffer.toString('utf8'));
+}
+
+function findReactSuspenseRevealSplitIndex(htmlString: string) {
+  const revealCallIndex = htmlString.search(REACT_SUSPENSE_REVEAL_SCRIPT);
+  if (revealCallIndex === -1) return -1;
+
+  const scriptStartIndex = htmlString.lastIndexOf('<script', revealCallIndex);
+  const revealedContentId = htmlString
+    .slice(revealCallIndex)
+    .match(/\$RC\(\s*(["'])(?:(?!\1).)*\1\s*,\s*(["'])(.*?)\2/)?.[3];
+
+  if (revealedContentId) {
+    const hiddenBoundaryPattern = new RegExp(
+      `<div\\b(?=[^>]*\\bhidden\\b)(?=[^>]*\\bid=(?:"${escapeRegExpLiteral(
+        revealedContentId,
+      )}"|'${escapeRegExpLiteral(revealedContentId)}'))[^>]*>`,
+      'gi',
+    );
+    const searchEndIndex = scriptStartIndex === -1 ? revealCallIndex : scriptStartIndex;
+    let hiddenBoundaryStartIndex = -1;
+
+    for (
+      let hiddenBoundaryMatch = hiddenBoundaryPattern.exec(htmlString);
+      hiddenBoundaryMatch;
+      hiddenBoundaryMatch = hiddenBoundaryPattern.exec(htmlString)
+    ) {
+      if (hiddenBoundaryMatch.index >= searchEndIndex) break;
+      hiddenBoundaryStartIndex = hiddenBoundaryMatch.index;
+    }
+
+    if (hiddenBoundaryStartIndex !== -1) return hiddenBoundaryStartIndex;
+  }
+
+  return scriptStartIndex === -1 ? revealCallIndex : scriptStartIndex;
+}
+
+function splitReactSuspenseRevealHtmlBuffer(htmlBuffer: Buffer) {
+  const htmlString = htmlBuffer.toString('utf8');
+  const splitCharacterIndex = findReactSuspenseRevealSplitIndex(htmlString);
+
+  if (splitCharacterIndex === -1) {
+    return { flushableHtmlBuffer: htmlBuffer, deferredRevealHtmlBuffer: undefined };
+  }
+
+  const splitByteIndex = Buffer.byteLength(htmlString.slice(0, splitCharacterIndex), 'utf8');
+
+  return {
+    flushableHtmlBuffer: htmlBuffer.subarray(0, splitByteIndex),
+    deferredRevealHtmlBuffer: htmlBuffer.subarray(splitByteIndex),
+  };
+}
+
+function stylesheetTagsForRSCClientChunks(
+  flightData: string,
+  stylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName,
+  emittedStylesheetHrefs: Set<string>,
+) {
+  const stylesheetTags: string[] = [];
+
+  for (const match of flightData.matchAll(RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET)) {
+    const chunkName = match[1];
+    const stylesheetHrefs = stylesheetHrefsByChunkName.get(chunkName);
+
+    if (stylesheetHrefs) {
+      stylesheetHrefs.forEach((href) => {
+        if (emittedStylesheetHrefs.has(href)) return;
+
+        emittedStylesheetHrefs.add(href);
+        stylesheetTags.push(createStylesheetTag(href));
+      });
+    }
+  }
+
+  return stylesheetTags;
+}
+
+function splitIncompleteLinkTagTail(htmlString: string) {
+  const lowerHtmlString = htmlString.toLowerCase();
+  const lastCompleteTagEnd = htmlString.lastIndexOf('>');
+  const lastLinkStart = lowerHtmlString.lastIndexOf('<link');
+
+  if (lastLinkStart !== -1 && lastLinkStart > lastCompleteTagEnd) {
+    return {
+      completeHtml: htmlString.slice(0, lastLinkStart),
+      incompleteLinkTagTail: htmlString.slice(lastLinkStart),
+    };
+  }
+
+  const linkToken = '<link';
+  for (let suffixLength = linkToken.length - 1; suffixLength > 0; suffixLength -= 1) {
+    const possibleLinkTokenPrefix = lowerHtmlString.slice(-suffixLength);
+
+    if (linkToken.startsWith(possibleLinkTokenPrefix)) {
+      return {
+        completeHtml: htmlString.slice(0, -suffixLength),
+        incompleteLinkTagTail: htmlString.slice(-suffixLength),
+      };
+    }
+  }
+
+  if (lastLinkStart === -1 || lastLinkStart < lastCompleteTagEnd) {
+    return { completeHtml: htmlString, incompleteLinkTagTail: '' };
+  }
+
+  return {
+    completeHtml: htmlString.slice(0, lastLinkStart),
+    incompleteLinkTagTail: htmlString.slice(lastLinkStart),
+  };
+}
+
+function promoteStylesheetPreloadTag(linkTag: string) {
+  const promotedTag = linkTag
+    .replace(/\srel=(["'])(.*?)\1/i, (_match, quote: string, relValue: string) => {
+      const relTokens = relValue
+        .split(/\s+/)
+        .filter(Boolean)
+        .filter((token) => token.toLowerCase() !== 'preload');
+
+      return ` rel=${quote}${[
+        'stylesheet',
+        ...relTokens.filter((token) => token.toLowerCase() !== 'stylesheet'),
+      ].join(' ')}${quote}`;
+    })
+    .replace(/\sas=(["'])style\1/i, '');
+
+  if (/\sdata-precedence=/.test(promotedTag)) {
+    return promotedTag;
+  }
+
+  const closing = promotedTag.endsWith('/>') ? '/>' : '>';
+  return promotedTag.replace(/\s*\/?>$/, ` data-precedence="rsc-css"${closing}`);
+}
+
+function hasIncompleteUTF8Tail(buffer: Buffer) {
+  let continuationBytes = 0;
+  let leadByteIndex = buffer.length - 1;
+
+  while (leadByteIndex >= 0 && buffer[leadByteIndex] >= 0x80 && buffer[leadByteIndex] <= 0xbf) {
+    continuationBytes += 1;
+    leadByteIndex -= 1;
+  }
+
+  if (leadByteIndex < 0) {
+    return continuationBytes > 0;
+  }
+
+  const leadByte = buffer[leadByteIndex];
+  if (leadByte <= 0x7f) return false;
+
+  let expectedContinuationBytes = 0;
+  if (leadByte >= 0xc2 && leadByte <= 0xdf) {
+    expectedContinuationBytes = 1;
+  } else if (leadByte >= 0xe0 && leadByte <= 0xef) {
+    expectedContinuationBytes = 2;
+  } else if (leadByte >= 0xf0 && leadByte <= 0xf4) {
+    expectedContinuationBytes = 3;
+  } else {
+    return false;
+  }
+
+  return continuationBytes < expectedContinuationBytes;
+}
+
+function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteHtmlTail: boolean) {
+  if (holdIncompleteHtmlTail && hasIncompleteUTF8Tail(html)) {
+    return { gatedHtmlBuffer: html, hasIncompleteHtmlTail: true };
+  }
+
+  const htmlString = html.toString();
+  const { completeHtml, incompleteLinkTagTail: nextIncompleteLinkTagTail } = holdIncompleteHtmlTail
+    ? splitIncompleteLinkTagTail(htmlString)
+    : { completeHtml: htmlString, incompleteLinkTagTail: '' };
+  const gatedHtml = completeHtml.replace(
+    /<link\b(?=[^>]*\brel=(["'])(?:(?!\1).)*\bpreload\b(?:(?!\1).)*\1)(?=[^>]*\bas=(["'])style\2)(?=[^>]*\bhref=(["'])(?:(?!\3).)+\3)[^>]*\/?>/gi,
+    (linkTag) =>
+      shouldPromoteStylesheetPreloadTag(linkTag) ? promoteStylesheetPreloadTag(linkTag) : linkTag,
+  );
+
+  return {
+    gatedHtmlBuffer: gatedHtml === htmlString && !nextIncompleteLinkTagTail ? html : Buffer.from(gatedHtml),
+    hasIncompleteHtmlTail: Boolean(nextIncompleteLinkTagTail),
+  };
+}
+
 /**
  * Embeds RSC payloads into the HTML stream for optimal hydration.
  *
@@ -121,11 +400,15 @@ export default function injectRSCPayload(
   rscRequestTracker: RSCRequestTracker,
   domNodeId: string | undefined,
   cspNonce?: string,
+  rscClientChunkStylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
 ) {
   const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
   const resultStream = new PassThrough();
   let rscPromise: Promise<void> | null = null;
+  const emittedRSCClientStylesheetHrefs = new Set<string>();
+  const shouldInferRSCClientStylesheets = rscClientChunkStylesheetHrefsByChunkName.size > 0;
+  let pendingRSCClientStylesheetInferenceStreams = 0;
 
   // ========================================
   // BUFFER ARRAYS - Three data sources
@@ -145,6 +428,14 @@ export default function injectRSCPayload(
    * CONSTRAINT: The first output chunk must contain HTML data to begin streaming.
    */
   const htmlBuffers: Buffer[] = [];
+  let holdIncompleteHtmlTail = true;
+
+  /**
+   * Buffer for stylesheet links inferred from RSC client chunk references.
+   * These must flush before HTML because React's reveal script can make the
+   * streamed fragment visible as soon as the browser parses it.
+   */
+  const rscClientStylesheetBuffers: Buffer[] = [];
 
   /**
    * Buffer for RSC payload chunk scripts.
@@ -159,6 +450,7 @@ export default function injectRSCPayload(
 
   let flushFallbackTimeout: NodeJS.Timeout | null = null;
   let hasReceivedFirstHtmlChunk = false;
+  let hasFlushedOutputChunk = false;
 
   /**
    * Combines all buffered data into a single chunk and sends it to the result stream.
@@ -182,9 +474,31 @@ export default function injectRSCPayload(
 
     // Calculate total buffer size for efficient memory allocation
     const rscInitializationSize = rscInitializationBuffers.reduce((sum, buf) => sum + buf.length, 0);
-    const htmlSize = htmlBuffers.reduce((sum, buf) => sum + buf.length, 0);
+    const htmlBuffer = Buffer.concat(htmlBuffers);
+    const { gatedHtmlBuffer, hasIncompleteHtmlTail } = applyStreamedStylesheetPreloadGating(
+      htmlBuffer,
+      holdIncompleteHtmlTail,
+    );
+    const shouldDeferRevealHtml =
+      rscPromise &&
+      shouldInferRSCClientStylesheets &&
+      pendingRSCClientStylesheetInferenceStreams > 0 &&
+      includesReactSuspenseRevealScript(gatedHtmlBuffer);
+    const { flushableHtmlBuffer, deferredRevealHtmlBuffer } = shouldDeferRevealHtml
+      ? splitReactSuspenseRevealHtmlBuffer(gatedHtmlBuffer)
+      : { flushableHtmlBuffer: gatedHtmlBuffer, deferredRevealHtmlBuffer: undefined };
+    const rscClientStylesheetSize = rscClientStylesheetBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const rscPayloadSize = rscPayloadBuffers.reduce((sum, buf) => sum + buf.length, 0);
-    const totalSize = rscInitializationSize + htmlSize + rscPayloadSize;
+    const totalSize =
+      rscInitializationSize + rscClientStylesheetSize + flushableHtmlBuffer.length + rscPayloadSize;
+
+    if (hasIncompleteHtmlTail && holdIncompleteHtmlTail) {
+      return;
+    }
+
+    if (deferredRevealHtmlBuffer && flushableHtmlBuffer.length === 0 && !hasFlushedOutputChunk) {
+      return;
+    }
 
     // Skip flush if no data is buffered
     if (totalSize === 0) {
@@ -213,14 +527,22 @@ export default function injectRSCPayload(
       offset += buffer.length;
     }
 
-    // 2. HTML chunks SECOND
-    // Component markup that references the initialized arrays
-    for (const buffer of htmlBuffers) {
+    // 2. RSC client stylesheets SECOND
+    // These gate streamed reveal HTML for client components whose CSS is emitted
+    // as a separate chunk and only referenced from the Flight payload.
+    for (const buffer of rscClientStylesheetBuffers) {
       buffer.copy(combinedBuffer, offset);
       offset += buffer.length;
     }
 
-    // 3. RSC payload chunk scripts LAST
+    // 3. HTML chunks THIRD
+    // Component markup that references the initialized arrays
+    if (flushableHtmlBuffer.length > 0) {
+      flushableHtmlBuffer.copy(combinedBuffer, offset);
+      offset += flushableHtmlBuffer.length;
+    }
+
+    // 4. RSC payload chunk scripts LAST
     // Data pushed into the already-existing arrays
     for (const buffer of rscPayloadBuffers) {
       buffer.copy(combinedBuffer, offset);
@@ -229,14 +551,20 @@ export default function injectRSCPayload(
 
     // Send combined chunk to output stream
     resultStream.push(combinedBuffer);
+    hasFlushedOutputChunk = true;
 
     // Clear all buffers to free memory and prepare for next flush cycle
     rscInitializationBuffers.length = 0;
+    rscClientStylesheetBuffers.length = 0;
     htmlBuffers.length = 0;
+    if (deferredRevealHtmlBuffer) {
+      htmlBuffers.push(deferredRevealHtmlBuffer);
+    }
     rscPayloadBuffers.length = 0;
   };
 
   const endResultStream = () => {
+    holdIncompleteHtmlTail = false;
     // Cancel any pending fallback timer unconditionally.
     // flush() only clears the timer when it actually flushes data (past the
     // early-return guards). If we're closing with empty buffers, the timer
@@ -345,6 +673,25 @@ export default function injectRSCPayload(
         // This creates a global array that the client-side RSCProvider monitors for new chunks.
         const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
         rscInitializationBuffers.push(Buffer.from(initializationScript));
+        let inferenceTimeout: NodeJS.Timeout | undefined;
+        let hasResolvedRSCClientStylesheetInferenceForStream = !shouldInferRSCClientStylesheets;
+        const resolveRSCClientStylesheetInferenceForStream = () => {
+          if (hasResolvedRSCClientStylesheetInferenceForStream) return;
+
+          hasResolvedRSCClientStylesheetInferenceForStream = true;
+          pendingRSCClientStylesheetInferenceStreams -= 1;
+          if (inferenceTimeout) {
+            clearTimeout(inferenceTimeout);
+          }
+          scheduleFlushFallback();
+        };
+        if (shouldInferRSCClientStylesheets) {
+          pendingRSCClientStylesheetInferenceStreams += 1;
+          inferenceTimeout = setTimeout(
+            resolveRSCClientStylesheetInferenceForStream,
+            RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS,
+          );
+        }
 
         // Process RSC payload stream asynchronously.
         // The stream uses the length-prefixed protocol: metadata\tcontent_len\ncontent.
@@ -364,6 +711,17 @@ export default function injectRSCPayload(
                   hasEmittedDiagnosticScript = true;
                 }
               }
+              const stylesheetTags = stylesheetTagsForRSCClientChunks(
+                flightData,
+                rscClientChunkStylesheetHrefsByChunkName,
+                emittedRSCClientStylesheetHrefs,
+              );
+              stylesheetTags.forEach((stylesheetTag) => {
+                rscClientStylesheetBuffers.push(Buffer.from(stylesheetTag));
+              });
+              if (stylesheetTags.length > 0) {
+                resolveRSCClientStylesheetInferenceForStream();
+              }
               const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
 
@@ -376,9 +734,13 @@ export default function injectRSCPayload(
               // Schedule fallback in case flush() is never called.
               scheduleFlushFallback();
             };
-            for await (const chunk of stream ?? []) {
-              const chunkBuf = chunk instanceof Uint8Array ? chunk : new TextEncoder().encode(chunk);
-              parser.feed(chunkBuf, handleParsedChunk);
+            try {
+              for await (const chunk of stream ?? []) {
+                const chunkBuf = chunk instanceof Uint8Array ? chunk : new TextEncoder().encode(chunk);
+                parser.feed(chunkBuf, handleParsedChunk);
+              }
+            } finally {
+              resolveRSCClientStylesheetInferenceForStream();
             }
           })(),
         );

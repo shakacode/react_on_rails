@@ -18,7 +18,9 @@ module ReactOnRails
                                                 "data-ssr-identifier-prefix" =>
                                                   (render_options.html_streaming? ? render_options.dom_id : nil),
                                                 "data-store-dependencies" =>
-                                                  render_options.store_dependencies&.to_json)
+                                                  render_options.store_dependencies&.to_json,
+                                                "data-generated-stylesheet-hrefs" =>
+                                                  generated_stylesheet_hrefs_json(render_options))
 
       # Add immediate invocation script for Pro users to enable hydration during streaming
       spec_tag = if ReactOnRails::Utils.react_on_rails_pro?
@@ -35,6 +37,15 @@ module ReactOnRails
                  end
 
       spec_tag.html_safe
+    end
+
+    def generated_stylesheet_hrefs_json(render_options)
+      return unless render_options.auto_load_bundle
+
+      pack_name = "generated/#{render_options.react_component_name}"
+      sources = preload_sources_for_stylesheet_pack(pack_name)
+      hrefs = unique_preload_sources_by_href(sources).map { |source| source.fetch(:href) }
+      hrefs.to_json if hrefs.present?
     end
 
     # Generates the complete store hydration script tag.

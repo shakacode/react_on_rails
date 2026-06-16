@@ -100,6 +100,36 @@ const createMockHTMLStream = (chunks: string[] | { [key: number]: string | strin
   return passThrough;
 };
 
+const createMockHTMLByteStream = (chunks: { [key: number]: Buffer | Buffer[] }) => {
+  const passThrough = new PassThrough();
+  const entries = Object.entries(chunks);
+  const keysLength = entries.length;
+  entries.forEach(([delay, value], index) => {
+    setTimeout(() => {
+      const chunksArray = Array.isArray(value) ? value : [value];
+      chunksArray.forEach((chunk) => {
+        passThrough.push(chunk);
+      });
+      if (index === keysLength - 1) {
+        passThrough.push(null);
+      }
+    }, +delay);
+  });
+  return passThrough;
+};
+
+const createFlushingHTMLStream = (html: string) =>
+  ({
+    pipe(destination: PassThrough & { flush?: () => void }) {
+      setTimeout(() => {
+        destination.write(new TextEncoder().encode(html));
+        destination.flush?.();
+        destination.end();
+      }, 0);
+      return destination;
+    },
+  }) as Readable;
+
 const collectStreamData = async (stream: Readable) => {
   const chunks: string[] = [];
   for await (const chunk of stream) {
@@ -108,16 +138,64 @@ const collectStreamData = async (stream: Readable) => {
   return chunks.join('');
 };
 
+const collectStreamBuffer = async (stream: Readable) => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk as Buffer));
+  }
+  return Buffer.concat(chunks);
+};
+
+const collectStreamDataByChunk = (stream: Readable) => {
+  const chunks: string[] = [];
+  let resolveFirstChunk: (chunk: string) => void = () => {};
+  const firstChunk = new Promise<string>((resolve) => {
+    resolveFirstChunk = resolve;
+  });
+  const allData = new Promise<string>((resolve, reject) => {
+    stream.on('data', (chunk: Buffer) => {
+      const decodedChunk = new TextDecoder().decode(chunk);
+      chunks.push(decodedChunk);
+      if (chunks.length === 1) {
+        resolveFirstChunk(decodedChunk);
+      }
+    });
+    stream.on('end', () => {
+      if (chunks.length === 0) {
+        resolveFirstChunk('');
+      }
+      resolve(chunks.join(''));
+    });
+    stream.on('error', reject);
+  });
+
+  return { allData, chunks, firstChunk };
+};
+
+const injectWithStylesheetMap = injectRSCPayload as unknown as (
+  html: Readable,
+  tracker: RSCRequestTracker,
+  nodeId: string,
+  nonce: string | undefined,
+  stylesheetHrefsByChunkName: Map<string, string[]>,
+) => Readable;
+
 // Test setup helper
-const setupTest = (mockRSC: Readable) => {
+const setupTestWithStreams = (
+  streamInfos: Array<{ stream: Readable; componentName?: string; props?: unknown }>,
+) => {
   const railsContext = {} as RailsContextWithServerStreamingCapabilities;
   const rscRequestTracker = new RSCRequestTracker(railsContext);
   jest.spyOn(rscRequestTracker, 'onRSCPayloadGenerated').mockImplementation((callback) => {
-    callback({ stream: mockRSC, componentName: 'test', props: {} });
+    streamInfos.forEach(({ stream, componentName = 'test', props = {} }) => {
+      callback({ stream, componentName, props });
+    });
   });
 
   return { railsContext, rscRequestTracker, domNodeId: 'test-node' };
 };
+
+const setupTest = (mockRSC: Readable) => setupTestWithStreams([{ stream: mockRSC }]);
 
 describe('injectRSCPayload', () => {
   it('should inject RSC payload as script tags', async () => {
@@ -222,6 +300,333 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain(`(self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference}||=`);
     expect(resultStr).not.toContain('renderingError');
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
+  });
+
+  it('promotes streamed RSC client chunk stylesheet preloads to gate reveal', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream([
+      '<link rel="preload" as="style" href="/webpack/test/css/client1-46072b81.css?body=1" crossorigin="anonymous"/>',
+    ]);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(
+      '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css?body=1" crossorigin="anonymous" data-precedence="rsc-css"/>',
+    );
+    expect(resultStr).not.toContain('rel="preload" as="style"');
+  });
+
+  it('injects inferred RSC client chunk stylesheets before streamed reveal HTML', async () => {
+    const flightData =
+      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client1","js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +
+      '0:["$","$L2",null,{},null]\n';
+    const mockRSC = createMockRSCStream([flightData]);
+    const mockHTML = createMockHTMLStream([
+      '<div hidden id="RscFoucProbe-react-component-0S:0">' +
+        '<section data-testid="rsc-fouc-probe">RSC streamed FOUC probe</section>' +
+        '</div>' +
+        '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>',
+    ]);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
+    );
+    const resultStr = await collectStreamData(result);
+
+    const stylesheetIndex = resultStr.indexOf(
+      '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">',
+    );
+    const revealHtmlIndex = resultStr.indexOf('<div hidden id="RscFoucProbe-react-component-0S:0">');
+
+    expect(stylesheetIndex).toBeGreaterThanOrEqual(0);
+    expect(revealHtmlIndex).toBeGreaterThanOrEqual(0);
+    expect(stylesheetIndex).toBeLessThan(revealHtmlIndex);
+    expect(resultStr).toContain(expectedPayloadPushScript(flightData));
+  });
+
+  it('waits for inferred RSC client chunk stylesheets before flushing reveal HTML', async () => {
+    const flightData =
+      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client1","js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +
+      '0:["$","$L2",null,{},null]\n';
+    const mockRSC = createMockRSCStream({ 10: flightData });
+    const mockHTML = createFlushingHTMLStream(
+      '<div hidden id="RscFoucProbe-react-component-0S:0">' +
+        '<section data-testid="rsc-fouc-probe">RSC streamed FOUC probe</section>' +
+        '</div>' +
+        '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>',
+    );
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
+    );
+    const resultStr = await collectStreamData(result);
+
+    const stylesheetIndex = resultStr.indexOf(
+      '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">',
+    );
+    const revealHtmlIndex = resultStr.indexOf('<div hidden id="RscFoucProbe-react-component-0S:0">');
+
+    expect(stylesheetIndex).toBeGreaterThanOrEqual(0);
+    expect(revealHtmlIndex).toBeGreaterThanOrEqual(0);
+    expect(stylesheetIndex).toBeLessThan(revealHtmlIndex);
+  });
+
+  it('streams Suspense fallback while deferring reveal HTML for inferred RSC stylesheets', async () => {
+    const flightData =
+      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client1","js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +
+      '0:["$","$L2",null,{},null]\n';
+    const mockRSC = createMockRSCStream({ 25: flightData });
+    const mockHTML = createFlushingHTMLStream(
+      '<p>Loading ToggleContainer</p>' +
+        '<div hidden id="RscFoucProbe-react-component-0S:0">' +
+        '<section data-testid="rsc-fouc-probe">RSC streamed FOUC probe</section>' +
+        '</div>' +
+        '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>',
+    );
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
+    );
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain('Loading ToggleContainer');
+    await expect(firstChunk).resolves.not.toContain('$RC(');
+    await expect(firstChunk).resolves.not.toContain('RSC streamed FOUC probe');
+
+    const resultStr = await allData;
+    const stylesheetIndex = resultStr.indexOf(
+      '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">',
+    );
+    const revealHtmlIndex = resultStr.indexOf('<div hidden id="RscFoucProbe-react-component-0S:0">');
+
+    expect(stylesheetIndex).toBeGreaterThanOrEqual(0);
+    expect(revealHtmlIndex).toBeGreaterThanOrEqual(0);
+    expect(stylesheetIndex).toBeLessThan(revealHtmlIndex);
+  });
+
+  it('keeps inferred stylesheet reveal gating active until all RSC streams finish initial inference', async () => {
+    const flightData =
+      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client2","js/client2-570df890c7aa791c.chunk.js"],"default"]\n' +
+      '0:["$","$L2",null,{},null]\n';
+    const fastRSCWithoutClientStylesheet = createMockRSCStream({ 0: '{"fast": "done"}' });
+    const slowRSCWithClientStylesheet = createMockRSCStream({ 25: flightData });
+    const mockHTML = createFlushingHTMLStream(
+      '<div hidden id="RscFoucProbe-react-component-0S:0">' +
+        '<section data-testid="rsc-fouc-probe">RSC streamed FOUC probe</section>' +
+        '</div>' +
+        '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>',
+    );
+    const { rscRequestTracker, domNodeId } = setupTestWithStreams([
+      { stream: fastRSCWithoutClientStylesheet, componentName: 'fast' },
+      { stream: slowRSCWithClientStylesheet, componentName: 'styled' },
+    ]);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map([['client2', ['/webpack/test/css/client2-46072b81.css']]]),
+    );
+    const resultStr = await collectStreamData(result);
+
+    const stylesheetIndex = resultStr.indexOf(
+      '<link rel="stylesheet" href="/webpack/test/css/client2-46072b81.css" data-precedence="rsc-css">',
+    );
+    const revealHtmlIndex = resultStr.indexOf('<div hidden id="RscFoucProbe-react-component-0S:0">');
+
+    expect(stylesheetIndex).toBeGreaterThanOrEqual(0);
+    expect(revealHtmlIndex).toBeGreaterThanOrEqual(0);
+    expect(stylesheetIndex).toBeLessThan(revealHtmlIndex);
+  });
+
+  it('keeps inferred stylesheet reveal gating active after server-only Flight chunks', async () => {
+    const serverOnlyFlightData = '0:["$","div",null,{"children":"server shell"},null]\n';
+    const styledFlightData =
+      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client3","js/client3-570df890c7aa791c.chunk.js"],"default"]\n' +
+      '0:["$","$L2",null,{},null]\n';
+    const mockRSC = createMockRSCStream({
+      0: serverOnlyFlightData,
+      25: styledFlightData,
+    });
+    const mockHTML = createMockHTMLStream({
+      0: '<p>Loading ToggleContainer</p>',
+      10:
+        '<div hidden id="RscFoucProbe-react-component-0S:0">' +
+        '<section data-testid="rsc-fouc-probe">RSC streamed FOUC probe</section>' +
+        '</div>' +
+        '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map([['client3', ['/webpack/test/css/client3-46072b81.css']]]),
+    );
+    const resultStr = await collectStreamData(result);
+
+    const stylesheetIndex = resultStr.indexOf(
+      '<link rel="stylesheet" href="/webpack/test/css/client3-46072b81.css" data-precedence="rsc-css">',
+    );
+    const revealHtmlIndex = resultStr.indexOf('<div hidden id="RscFoucProbe-react-component-0S:0">');
+
+    expect(stylesheetIndex).toBeGreaterThanOrEqual(0);
+    expect(revealHtmlIndex).toBeGreaterThanOrEqual(0);
+    expect(stylesheetIndex).toBeLessThan(revealHtmlIndex);
+  });
+
+  it('preserves split UTF-8 bytes when deferring reveal HTML', async () => {
+    const flightData =
+      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client1","js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +
+      '0:["$","$L2",null,{},null]\n';
+    const mockRSC = createMockRSCStream({ 25: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from(
+        '<p>Loading ToggleContainer</p>' +
+          '<div hidden id="RscFoucProbe-react-component-0S:0">' +
+          '<section data-testid="rsc-fouc-probe">RSC streamed FOUC probe</section>' +
+          '</div>' +
+          '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>' +
+          '<p>caf',
+      ),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</p>')]);
+    const mockHTML = createMockHTMLByteStream({
+      0: firstHtmlChunk,
+      10: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
+    );
+    const resultStr = (await collectStreamBuffer(result)).toString('utf8');
+
+    expect(resultStr).toContain('<p>café</p>');
+    expect(resultStr).not.toContain('\uFFFD');
+  });
+
+  it('fails open for long-lived RSC streams without initial Flight data', async () => {
+    const lateFlightData = '0:["$","div",null,{"children":"late async data"},null]\n';
+    const mockRSC = createMockRSCStream({ 250: lateFlightData });
+    const mockHTML = createFlushingHTMLStream(
+      '<div hidden id="AsyncShell-react-component-0S:0">' +
+        '<section>Async shell can stream before Redis resolves</section>' +
+        '</div>' +
+        '<script>$RC("AsyncShell-react-component-0B:0","AsyncShell-react-component-0S:0")</script>',
+    );
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
+    );
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain('Async shell can stream before Redis resolves');
+    await expect(firstChunk).resolves.toContain('$RC(');
+
+    await expect(allData).resolves.toContain(expectedPayloadPushScript(lateFlightData));
+  });
+
+  it('promotes streamed RSC stylesheet preloads split across fallback flush chunks', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream({
+      0: 'before<link rel="preload" as="style" href="/webpack/test/css/client1-',
+      10: '46072b81.css">after',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(
+      'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
+    );
+    expect(resultStr).not.toContain('rel="preload" as="style"');
+  });
+
+  it('promotes streamed RSC stylesheet preloads split inside the link token', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream({
+      0: 'before<li',
+      10: 'nk rel="preload" as="style" href="/webpack/test/css/client1-46072b81.css">after',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(
+      'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
+    );
+    expect(resultStr).not.toContain('rel="preload" as="style"');
+  });
+
+  it('preserves split UTF-8 bytes when promoting streamed RSC stylesheet preloads', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<link rel="preload" as="style" href="/webpack/test/css/client1-46072b81.css">caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from(' after')]);
+    const mockHTML = createMockHTMLByteStream({
+      0: firstHtmlChunk,
+      10: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = (await collectStreamBuffer(result)).toString('utf8');
+
+    expect(resultStr).toContain(
+      'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">café after',
+    );
+    expect(resultStr).not.toContain('\uFFFD');
+  });
+
+  it('leaves app-authored style preloads as fetch hints', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const appStylePreload =
+      '<link rel="preload" as="style" href="/assets/next-route-theme.css" media="print">';
+    const mockHTML = createMockHTMLStream([appStylePreload]);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(appStylePreload);
+    expect(resultStr).not.toContain('data-precedence="rsc-css"');
   });
 
   it('should add all ready html chunks before adding RSC payloads', async () => {

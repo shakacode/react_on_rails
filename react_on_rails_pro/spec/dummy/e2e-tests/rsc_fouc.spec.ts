@@ -15,8 +15,6 @@
 
 import { expect, Page, test } from '@playwright/test';
 
-const RUN_PENDING_FOUC_TESTS = process.env.REACT_ON_RAILS_RUN_PENDING_FOUC_TESTS === 'true';
-
 interface RecordedProbePaint {
   backgroundColor: string;
   borderTopColor: string;
@@ -315,11 +313,13 @@ test.describe('RSC and streaming FOUC acceptance coverage', () => {
       await recordProbePaints(page, [RSC_PROBE_TARGET, CLIENT_ONLY_PROBE_TARGET]);
     });
 
+    test.afterEach(async ({ page }) => {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    });
+
     test('streamed RSC content is visible and styled when its CSS is loaded, even while JS is delayed', async ({
       page,
     }) => {
-      test.fixme(!RUN_PENDING_FOUC_TESTS, 'Pending #4032: streamed RSC CSS must apply before reveal');
-
       const css = await controlCssBySentinel(page, RSC_SENTINEL);
       const scripts = await delayCompiledJavaScript(page);
 
@@ -335,11 +335,6 @@ test.describe('RSC and streaming FOUC acceptance coverage', () => {
     });
 
     test('streamed RSC content does not appear before its CSS when JS is available', async ({ page }) => {
-      test.fixme(
-        !RUN_PENDING_FOUC_TESTS,
-        'Pending #4032: streamed RSC content must stay hidden until CSS is ready',
-      );
-
       const css = await controlCssBySentinel(page, RSC_SENTINEL, { holdTarget: true });
 
       await page.goto(RSC_FOUC_PATH, { waitUntil: 'commit' });
@@ -353,11 +348,6 @@ test.describe('RSC and streaming FOUC acceptance coverage', () => {
     });
 
     test('streamed RSC content still waits for CSS if JS finishes first', async ({ page }) => {
-      test.fixme(
-        !RUN_PENDING_FOUC_TESTS,
-        'Pending #4032: streamed RSC content must wait for CSS after JS loads',
-      );
-
       const css = await controlCssBySentinel(page, RSC_SENTINEL, { holdTarget: true });
       const scripts = await delayCompiledJavaScript(page);
 
@@ -365,8 +355,12 @@ test.describe('RSC and streaming FOUC acceptance coverage', () => {
         await page.goto(RSC_FOUC_PATH, { waitUntil: 'commit' });
         await css.waitForTargetRequest();
 
+        const delayedScriptResponse = page.waitForResponse(/\/webpack\/test\/.*\.js(\?.*)?$/);
         scripts.releaseScripts();
-        await page.waitForLoadState('domcontentloaded');
+        await waitWithTimeout(
+          delayedScriptResponse,
+          'Timed out waiting for a delayed JavaScript response after releasing scripts',
+        );
 
         await expectNoVisiblePaint(page, RSC_TEST_ID);
 
@@ -395,8 +389,6 @@ test.describe('RSC and streaming FOUC acceptance coverage', () => {
     });
 
     test('client-only content does not appear until CSS loads, even when JS is ready', async ({ page }) => {
-      test.fixme(!RUN_PENDING_FOUC_TESTS, 'Pending #4031: client-only content must wait for CSS and JS');
-
       const css = await controlCssBySentinel(page, CLIENT_ONLY_SENTINEL, { holdTarget: true });
 
       await page.goto(CLIENT_ONLY_FOUC_PATH, { waitUntil: 'commit' });
