@@ -225,6 +225,15 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 **GitHub follow-up issues**: Follow-up issues are the exception. Prefer fixing or declining review feedback in the PR. If deferred work remains valuable, present one bundled deferred-work summary and ask whether to track it. Prefer an existing issue; otherwise create at most one bundled issue per PR unless the user explicitly approves more. New follow-up issue titles must begin with `Follow-up:`. Build multi-line issue bodies as Markdown files and pass them with `gh issue create --body-file`; do not pass escaped newline strings through `--body`.
 
+**GitHub Actions post-merge exercise follow-ups**: Semantic changes to `.github/workflows/**` or `.github/actions/**`
+are a standing exception to the default "no follow-up issue" rule. Before merge, link an existing tracking issue or
+create one bundled issue titled `Follow-up: Exercise GitHub Actions changes from PR #NNNN`. The issue must name the
+source PR, changed workflow/action files, exact post-merge event or secondary verification PR to exercise, expected
+evidence, cleanup instructions for any verification-only PR, and owner if known. This is required for trigger,
+permission, job, matrix, condition, concurrency, secret, reusable-action, command-parsing, workflow-dispatch, or
+CI-routing behavior changes. It is not required for comments, docs, typo fixes, formatting-only changes, or
+non-semantic actionlint cleanup when local validation evidence documents that classification.
+
 **Process gap disposition**: When an audit, review, or batch closeout finds a recurring process miss, do not add a prose-only rule by default. The issue plan or PR evidence must choose one mechanism target: `script`, `schema`, `checklist+replay`, or `park`, and record the motivating miss, replay evidence or park reason, and non-goal. `park` means the miss is plausible but not worth mechanizing now.
 
 ## Maintainer Attention Contract

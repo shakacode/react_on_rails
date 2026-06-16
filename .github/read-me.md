@@ -114,6 +114,35 @@ Comment-triggered workflows (`issue_comment`) execute from the default branch
 YAML and script locally, merge the workflow change, then test commands on a
 follow-up PR.
 
+## Post-Merge Exercise Follow-Ups
+
+Semantic changes to `.github/workflows/**` or `.github/actions/**` require a
+linked `Follow-up:` issue before merge. The follow-up exists to prove behavior
+that cannot be fully exercised from the original PR branch, especially
+default-branch event handling such as `issue_comment`.
+
+Use this title:
+
+```text
+Follow-up: Exercise GitHub Actions changes from PR #NNNN
+```
+
+The issue body must include:
+
+- Source PR
+- Changed workflow/action files
+- Exact post-merge event, command, or secondary verification PR to exercise
+- Expected evidence, such as run links, PR comments, labels, artifacts, or check
+  conclusions
+- Cleanup instructions for any verification-only PR
+- Owner, if known
+
+This requirement applies to trigger, permission, job, matrix, condition,
+concurrency, secret, reusable-action, command-parsing, workflow-dispatch, and
+CI-routing behavior changes. It does not apply to comments, docs, typo fixes,
+formatting-only changes, or non-semantic actionlint cleanup when the PR evidence
+documents that classification.
+
 ## Available Workflows
 
 ### CI Workflows
