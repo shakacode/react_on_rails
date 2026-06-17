@@ -87,6 +87,10 @@ EXPOSE 3000
 CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]
 ```
 
+<p align="center">
+  <img src="images/docker-multi-stage-build.svg" alt="A three-stage Docker build for React on Rails. The base stage sets the shared Ruby image and production environment. The build stage adds Node.js and build tools, installs gems and JS dependencies, runs assets:precompile to build the client and server bundles, then deletes node_modules. The runtime stage starts fresh from base and copies in only the built artifacts — gems, compiled bundles, and app code — leaving Node.js and node_modules behind, producing a lean production image hundreds of megabytes smaller." width="840" />
+</p>
+
 ### Key points
 
 - **Node.js is only needed at build time.** The runtime stage does not include Node unless you use the Pro Node Renderer (see [Node Renderer in containers](#node-renderer-in-containers) below).

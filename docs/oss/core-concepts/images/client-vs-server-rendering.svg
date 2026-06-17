@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="csr-ssr-title csr-ssr-desc">
+  <title id="csr-ssr-title">Client-side rendering vs server-side rendering vs hydration: the HTML each produces</title>
+  <desc id="csr-ssr-desc">The same HelloWorld component rendered three ways. Client-only (prerender: false) ships an empty wrapper div plus a props script — the browser fills it in. Server-rendered (prerender: true) ships the same wrapper now containing fully-rendered HTML, so the page is visible before JavaScript runs. Hydration is the second half of server rendering: React on Rails reads the props script and attaches event handlers to the already-painted HTML, making it interactive.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .panel-head { fill: #F1F5F9; stroke: #E2E8F0; }
+      .label { fill: #334155; }
+      .sub { fill: #64748B; }
+      .code-bg { fill: #1E293B; }
+      .code { fill: #E2E8F0; }
+      .code-tag { fill: #7DD3FC; }
+      .code-attr { fill: #FCD34D; }
+      .code-comment { fill: #64748B; }
+      .empty-fill { fill: #FEF3C7; stroke: #FCD34D; }
+      .empty-text { fill: #92400E; }
+      .filled-fill { fill: #D1FAE5; stroke: #86EFAC; }
+      .filled-text { fill: #166534; }
+      .info-box { fill: #DBEAFE; stroke: #93C5FD; }
+      .info-text { fill: #1E40AF; }
+      .arrow { stroke: #94A3B8; fill: none; }
+      .arrow-head { fill: #94A3B8; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .panel-head { fill: #0F172A; stroke: #334155; }
+        .label { fill: #CBD5E1; }
+        .sub { fill: #94A3B8; }
+        .code-bg { fill: #0B1220; }
+        .empty-fill { fill: #422006; stroke: #B45309; }
+        .empty-text { fill: #FCD34D; }
+        .filled-fill { fill: #052E16; stroke: #10B981; }
+        .filled-text { fill: #6EE7B7; }
+        .info-box { fill: #172554; stroke: #3B82F6; }
+        .info-text { fill: #93C5FD; }
+        .arrow { stroke: #64748B; }
+        .arrow-head { fill: #64748B; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="560" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">One Component, Three HTML Outputs</text>
+  <text x="450" y="48" text-anchor="middle" font-size="11" class="subtitle">&lt;%= react_component("HelloWorld", props: { name: "Alice" }) %&gt; &#x2014; what reaches the browser depends on prerender</text>
+
+  <!-- =================== PANEL 1: Client-only =================== -->
+  <rect x="24" y="68" width="280" height="436" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="24" y="68" width="280" height="46" rx="12" class="panel-head" stroke-width="1"/>
+  <rect x="24" y="96" width="280" height="18" class="panel-head"/>
+  <text x="164" y="89" text-anchor="middle" font-size="13" font-weight="700" class="label">Client-Only Rendering</text>
+  <text x="164" y="106" text-anchor="middle" font-size="10" class="sub">prerender: false (default)</text>
+
+  <text x="44" y="138" font-size="10" font-weight="600" class="sub">HTML sent to browser</text>
+  <rect x="44" y="146" width="240" height="92" rx="8" class="code-bg"/>
+  <text x="58" y="166" font-size="9.5" font-family="monospace"><tspan class="code-comment">&lt;!-- props script --&gt;</tspan></text>
+  <text x="58" y="182" font-size="9.5" font-family="monospace"><tspan class="code-tag">&lt;script</tspan> <tspan class="code-attr">type=</tspan><tspan class="code">"…/json"&gt;</tspan></text>
+  <text x="58" y="196" font-size="9.5" font-family="monospace"><tspan class="code">  {"name":"Alice"}</tspan></text>
+  <text x="58" y="210" font-size="9.5" font-family="monospace"><tspan class="code-tag">&lt;/script&gt;</tspan></text>
+  <text x="58" y="228" font-size="9.5" font-family="monospace"><tspan class="code-tag">&lt;div</tspan> <tspan class="code-attr">id=</tspan><tspan class="code">"…-0"&gt;&lt;/div&gt;</tspan></text>
+
+  <text x="44" y="262" font-size="10" font-weight="600" class="sub">What the user sees first</text>
+  <rect x="44" y="270" width="240" height="58" rx="8" class="empty-fill" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="164" y="296" text-anchor="middle" font-size="11" font-weight="700" class="empty-text">(empty)</text>
+  <text x="164" y="314" text-anchor="middle" font-size="9" class="empty-text">blank until JS loads &amp; runs</text>
+
+  <rect x="44" y="344" width="240" height="146" rx="8" class="info-box" stroke-width="1"/>
+  <text x="164" y="366" text-anchor="middle" font-size="10" font-weight="700" class="info-text">Browser does all the work</text>
+  <text x="60" y="388" font-size="9" class="info-text">1. Download JS bundle</text>
+  <text x="60" y="406" font-size="9" class="info-text">2. React reads props script</text>
+  <text x="60" y="424" font-size="9" class="info-text">3. Build the DOM in the div</text>
+  <text x="60" y="442" font-size="9" class="info-text">4. Now content appears</text>
+  <text x="164" y="470" text-anchor="middle" font-size="8.5" class="sub">No HTML for crawlers; slower</text>
+  <text x="164" y="483" text-anchor="middle" font-size="8.5" class="sub">first paint on slow networks</text>
+
+  <!-- =================== PANEL 2: Server-rendered =================== -->
+  <rect x="320" y="68" width="280" height="436" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="320" y="68" width="280" height="46" rx="12" class="panel-head" stroke-width="1"/>
+  <rect x="320" y="96" width="280" height="18" class="panel-head"/>
+  <text x="460" y="89" text-anchor="middle" font-size="13" font-weight="700" class="label">Server-Side Rendering</text>
+  <text x="460" y="106" text-anchor="middle" font-size="10" class="sub">prerender: true</text>
+
+  <text x="340" y="138" font-size="10" font-weight="600" class="sub">HTML sent to browser</text>
+  <rect x="340" y="146" width="240" height="92" rx="8" class="code-bg"/>
+  <text x="354" y="166" font-size="9.5" font-family="monospace"><tspan class="code-comment">&lt;!-- same props script --&gt;</tspan></text>
+  <text x="354" y="182" font-size="9.5" font-family="monospace"><tspan class="code-tag">&lt;script</tspan> <tspan class="code-attr">type=</tspan><tspan class="code">"…/json"&gt;…&lt;/script&gt;</tspan></text>
+  <text x="354" y="200" font-size="9.5" font-family="monospace"><tspan class="code-tag">&lt;div</tspan> <tspan class="code-attr">id=</tspan><tspan class="code">"…-0"&gt;</tspan></text>
+  <text x="354" y="214" font-size="9.5" font-family="monospace"><tspan class="code">  </tspan><tspan class="code-tag">&lt;h1&gt;</tspan><tspan class="code">Hello, Alice!</tspan><tspan class="code-tag">&lt;/h1&gt;</tspan></text>
+  <text x="354" y="228" font-size="9.5" font-family="monospace"><tspan class="code-tag">&lt;/div&gt;</tspan></text>
+
+  <text x="340" y="262" font-size="10" font-weight="600" class="sub">What the user sees first</text>
+  <rect x="340" y="270" width="240" height="58" rx="8" class="filled-fill" stroke-width="1.5"/>
+  <text x="460" y="298" text-anchor="middle" font-size="14" font-weight="700" class="filled-text">Hello, Alice!</text>
+  <text x="460" y="316" text-anchor="middle" font-size="9" class="filled-text">visible before any JS runs</text>
+
+  <rect x="340" y="344" width="240" height="146" rx="8" class="info-box" stroke-width="1"/>
+  <text x="460" y="366" text-anchor="middle" font-size="10" font-weight="700" class="info-text">Server renders the HTML</text>
+  <text x="356" y="388" font-size="9" class="info-text">Rails runs your React code</text>
+  <text x="356" y="406" font-size="9" class="info-text">(ExecJS or Pro Node Renderer)</text>
+  <text x="356" y="424" font-size="9" class="info-text">and embeds the real markup.</text>
+  <text x="460" y="450" text-anchor="middle" font-size="8.5" class="sub">Great for SEO and fast first</text>
+  <text x="460" y="463" text-anchor="middle" font-size="8.5" class="sub">paint &#x2014; but not yet clickable.</text>
+  <text x="460" y="481" text-anchor="middle" font-size="9" font-weight="600" class="info-text">Needs hydration &#x2192;</text>
+
+  <!-- =================== PANEL 3: Hydration =================== -->
+  <rect x="616" y="68" width="260" height="436" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="616" y="68" width="260" height="46" rx="12" class="panel-head" stroke-width="1"/>
+  <rect x="616" y="96" width="260" height="18" class="panel-head"/>
+  <text x="746" y="89" text-anchor="middle" font-size="13" font-weight="700" class="label">Hydration</text>
+  <text x="746" y="106" text-anchor="middle" font-size="10" class="sub">second half of SSR</text>
+
+  <text x="636" y="138" font-size="10" font-weight="600" class="sub">After JS loads</text>
+  <rect x="636" y="146" width="224" height="82" rx="8" class="code-bg"/>
+  <text x="650" y="166" font-size="9.5" font-family="monospace"><tspan class="code-comment">React on Rails:</tspan></text>
+  <text x="650" y="182" font-size="9.5" font-family="monospace"><tspan class="code">read props script</tspan></text>
+  <text x="650" y="198" font-size="9.5" font-family="monospace"><tspan class="code">+ keep server HTML</tspan></text>
+  <text x="650" y="214" font-size="9.5" font-family="monospace"><tspan class="code">+ attach handlers</tspan></text>
+
+  <text x="636" y="252" font-size="10" font-weight="600" class="sub">Result</text>
+  <rect x="636" y="260" width="224" height="58" rx="8" class="filled-fill" stroke-width="1.5"/>
+  <text x="746" y="286" text-anchor="middle" font-size="14" font-weight="700" class="filled-text">Hello, Alice!</text>
+  <text x="746" y="304" text-anchor="middle" font-size="9" class="filled-text">&#x2713; now fully interactive</text>
+
+  <rect x="636" y="334" width="224" height="156" rx="8" class="info-box" stroke-width="1"/>
+  <text x="746" y="356" text-anchor="middle" font-size="10" font-weight="700" class="info-text">Reuse, don't rebuild</text>
+  <text x="652" y="378" font-size="9" class="info-text">React keeps the server-</text>
+  <text x="652" y="392" font-size="9" class="info-text">painted DOM and only wires</text>
+  <text x="652" y="406" font-size="9" class="info-text">up event listeners + state.</text>
+  <text x="652" y="430" font-size="9" class="info-text">No flash, no rebuild &#x2014; the</text>
+  <text x="652" y="444" font-size="9" class="info-text">page was already there.</text>
+  <text x="746" y="470" text-anchor="middle" font-size="8.5" class="sub">v16 starts this early, before</text>
+  <text x="746" y="483" text-anchor="middle" font-size="8.5" class="sub">full page load (see upgrading).</text>
+
+  <path d="M 600 296 L 614 296" class="arrow" stroke-width="2"/>
+  <polygon points="614,292 622,296 614,300" class="arrow-head"/>
+
+  <text x="450" y="530" text-anchor="middle" font-size="10" class="subtitle">The props script is identical in all three. Server rendering adds real HTML inside the div; hydration makes that HTML interactive.</text>
+</svg>

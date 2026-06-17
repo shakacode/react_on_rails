@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="hydration-title hydration-desc">
+  <title id="hydration-title">Early hydration in React on Rails v16 vs the serial waterfall in v14 and v15</title>
+  <desc id="hydration-desc">A timeline comparison of two hydration strategies. In v14 and v15, hydration is a serial waterfall: the browser must download the full page, then render it, and only after the full page load does hydration begin — so time-to-interactive is late. In v16, with async pack loading and immediate hydration, HTML streams from the server while each component hydrates as soon as its server-rendered markup and code arrive — hydration runs in parallel with page streaming, so components become interactive much earlier.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label { fill: #334155; }
+      .sub { fill: #64748B; }
+      .bad-head { fill: #FEE2E2; stroke: #FECACA; }
+      .bad-text { fill: #991B1B; }
+      .good-head { fill: #D1FAE5; stroke: #86EFAC; }
+      .good-text { fill: #166534; }
+      .track { fill: #F1F5F9; stroke: #E2E8F0; }
+      .seg-download { fill: #BFDBFE; }
+      .seg-render { fill: #FCD34D; }
+      .seg-hydrate { fill: #86EFAC; }
+      .seg-stream { fill: #93C5FD; }
+      .tti-line { stroke: #EF4444; }
+      .tti-line-good { stroke: #22C55E; }
+      .tti-text { fill: #991B1B; }
+      .tti-text-good { fill: #166534; }
+      .axis { stroke: #94A3B8; }
+
+      .sweep { animation: sweep 7s ease-in-out infinite; }
+      @keyframes sweep { 0% { opacity:0.25; } 40%,100% { opacity:1; } }
+      .sweep2 { animation: sweep2 7s ease-in-out infinite; }
+      @keyframes sweep2 { 0%,45% { opacity:0.25; } 80%,100% { opacity:1; } }
+      .pulseline { animation: pl 1.6s ease-in-out infinite; }
+      @keyframes pl { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } .sweep, .sweep2 { opacity:1 !important; } }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label { fill: #CBD5E1; }
+        .sub { fill: #94A3B8; }
+        .bad-head { fill: #450A0A; stroke: #F87171; }
+        .bad-text { fill: #FCA5A5; }
+        .good-head { fill: #052E16; stroke: #10B981; }
+        .good-text { fill: #6EE7B7; }
+        .track { fill: #0F172A; stroke: #334155; }
+        .tti-text { fill: #FCA5A5; }
+        .tti-text-good { fill: #6EE7B7; }
+        .axis { stroke: #64748B; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="460" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Early Hydration in v16</text>
+  <text x="450" y="48" text-anchor="middle" font-size="11" class="subtitle">Hydration no longer waits for full page load &#x2014; it runs in parallel with HTML streaming</text>
+
+  <!-- ===== BEFORE: v14/v15 ===== -->
+  <rect x="24" y="66" width="852" height="160" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="24" y="66" width="852" height="28" rx="12" class="bad-head" stroke-width="1"/>
+  <rect x="24" y="82" width="852" height="12" class="bad-head"/>
+  <text x="450" y="86" text-anchor="middle" font-size="12" font-weight="700" class="bad-text">&#x274C; v14 / v15 &#x2014; serial waterfall (defer scripts, wait for full load)</text>
+
+  <!-- track -->
+  <rect x="150" y="112" width="620" height="86" rx="8" class="track" stroke-width="1"/>
+  <text x="60" y="134" font-size="10" font-weight="600" class="label">Component</text>
+
+  <!-- download -->
+  <rect x="160" y="120" width="200" height="22" rx="4" class="seg-download sweep"/>
+  <text x="260" y="135" text-anchor="middle" font-size="9" class="label">download full page</text>
+  <!-- render -->
+  <rect x="362" y="120" width="180" height="22" rx="4" class="seg-render sweep"/>
+  <text x="452" y="135" text-anchor="middle" font-size="9" class="label">render</text>
+  <!-- full load marker -->
+  <line x1="546" y1="112" x2="546" y2="190" class="axis" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="546" y="160" text-anchor="middle" font-size="8" class="sub">full page load</text>
+  <!-- hydrate -->
+  <rect x="548" y="120" width="180" height="22" rx="4" class="seg-hydrate sweep2"/>
+  <text x="638" y="135" text-anchor="middle" font-size="9" class="label">hydrate</text>
+
+  <!-- TTI -->
+  <line x1="728" y1="112" x2="728" y2="206" class="tti-line pulseline" stroke-width="2.5"/>
+  <text x="728" y="218" text-anchor="middle" font-size="9" font-weight="700" class="tti-text">interactive (late)</text>
+  <text x="450" y="184" text-anchor="middle" font-size="9" class="sub">download &#x2192; render &#x2192; <tspan font-weight="700" class="bad-text">then</tspan> hydrate &#x2014; nothing is clickable until the very end</text>
+
+  <!-- ===== AFTER: v16 ===== -->
+  <rect x="24" y="238" width="852" height="174" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="24" y="238" width="852" height="28" rx="12" class="good-head" stroke-width="1"/>
+  <rect x="24" y="254" width="852" height="12" class="good-head"/>
+  <text x="450" y="258" text-anchor="middle" font-size="12" font-weight="700" class="good-text">&#x2705; v16 &#x2014; streaming HTML + hydration in parallel (async packs + immediate_hydration)</text>
+
+  <rect x="150" y="284" width="620" height="104" rx="8" class="track" stroke-width="1"/>
+  <text x="60" y="300" font-size="9.5" font-weight="600" class="label">HTML</text>
+  <text x="60" y="330" font-size="9.5" font-weight="600" class="label">Comp A</text>
+  <text x="60" y="360" font-size="9.5" font-weight="600" class="label">Comp B</text>
+
+  <!-- streaming HTML -->
+  <rect x="160" y="290" width="560" height="16" rx="4" class="seg-stream sweep"/>
+  <text x="440" y="302" text-anchor="middle" font-size="8.5" class="label">HTML streams progressively</text>
+
+  <!-- Comp A: hydrate as soon as available (early) -->
+  <rect x="200" y="318" width="150" height="18" rx="4" class="seg-hydrate sweep"/>
+  <text x="275" y="331" text-anchor="middle" font-size="8.5" class="label">A hydrates</text>
+  <line x1="350" y1="316" x2="350" y2="378" class="tti-line-good pulseline" stroke-width="2"/>
+  <text x="350" y="404" text-anchor="middle" font-size="8" class="good-text">A interactive</text>
+
+  <!-- Comp B: hydrate later but still during stream -->
+  <rect x="380" y="348" width="150" height="18" rx="4" class="seg-hydrate sweep2"/>
+  <text x="455" y="361" text-anchor="middle" font-size="8.5" class="label">B hydrates</text>
+  <line x1="530" y1="346" x2="530" y2="378" class="tti-line-good pulseline" stroke-width="2"/>
+  <text x="530" y="404" text-anchor="middle" font-size="8" class="good-text">B interactive</text>
+
+  <text x="660" y="345" text-anchor="middle" font-size="8.5" class="sub">each component hydrates as soon</text>
+  <text x="660" y="358" text-anchor="middle" font-size="8.5" class="sub">as its HTML + code arrive &#x2014;</text>
+  <text x="660" y="371" text-anchor="middle" font-size="8.5" class="sub">no waiting for full page load</text>
+
+  <!-- time axis -->
+  <line x1="150" y1="392" x2="770" y2="392" class="axis" stroke-width="1"/>
+  <polygon points="770,388 780,392 770,396" class="axis" fill="#94A3B8"/>
+  <text x="780" y="404" font-size="8.5" class="sub">time</text>
+</svg>

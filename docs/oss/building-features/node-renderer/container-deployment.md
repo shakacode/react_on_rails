@@ -25,20 +25,13 @@ When running Rails and the Node Renderer in containers, you have three options, 
 | **Per-process visibility** | No                     | Yes                         | Yes                                             |
 | **When to use**            | Default starting point | Need to diagnose OOM source | Need independent scaling at high replica counts |
 
+<p align="center">
+  <img src="images/deployment-topologies.svg" alt="Three container topologies for running Rails with the Pro Node Renderer. Single container: both processes run in one container sharing OS resources and talking over localhost — lowest complexity, scaled together, versions always aligned. Sidecar containers: Rails and the Node Renderer run as two containers in the same pod with their own resource limits but still talking over localhost — scaled together, versions aligned, with per-process visibility. Separate workloads: Rails and the renderer run as independent workloads communicating over service DNS — scaled independently but with a risk of version drift on rolling deploys." width="840" />
+</p>
+
 ### Option 1: Single Container (Default)
 
-Rails and the Node Renderer run together in a **single container**. This is the simplest setup and the recommended starting point.
-
-```text
-┌──────────────────────────┐
-│        Container         │
-│  ┌────────┐ ┌──────────┐ │
-│  │ Rails  │ │  Node    │ │
-│  │ process│ │ Renderer │ │
-│  └────────┘ └──────────┘ │
-│   shared OS resources    │
-└──────────────────────────┘
-```
+Rails and the Node Renderer run together in a **single container**. This is the simplest setup and the recommended starting point (the leftmost topology in the diagram above).
 
 Both processes share the container's CPU and memory limits (cgroup resources); they do not communicate via shared-memory IPC.
 
@@ -63,21 +56,7 @@ end
 
 ### Option 2: Sidecar Containers
 
-Rails and the Node Renderer run as separate containers within the **same pod/workload**, sharing the same lifecycle. Use this when you need to isolate and diagnose memory/CPU usage per process.
-
-```text
-┌─────────────────────────────────┐
-│           Pod / Workload        │
-│  ┌─────────────┐ ┌───────────┐  │
-│  │    Rails    │ │   Node    │  │
-│  │  Container  │ │ Renderer  │  │
-│  │  (2 CPU,    │ │ (2 CPU,   │  │
-│  │   4 GB RAM) │ │  4 GB RAM)│  │
-│  └──────┬──────┘ └─────┬─────┘  │
-│         │   localhost  │        │
-│         └───────┬──────┘        │
-└─────────────────┴───────────────┘
-```
+Rails and the Node Renderer run as separate containers within the **same pod/workload**, sharing the same lifecycle (the middle topology in the diagram above). Use this when you need to isolate and diagnose memory/CPU usage per process.
 
 **Advantages:**
 
