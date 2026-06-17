@@ -2762,7 +2762,7 @@ The Pro Node Renderer solves all of these by running a standalone Node.js server
 
 The contrast in one picture — the old way runs JavaScript inside Rails, while the Node Renderer runs it in a separate service:
 
-<p align="center">
+<p>
   <img src="images/execjs-vs-node-renderer.svg" alt="ExecJS runs the JavaScript runtime inside the Rails process and blocks it during rendering, while the Node Renderer runs rendering in a separate service with a pool of workers." width="840" />
 </p>
 
@@ -2787,7 +2787,7 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 
 Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Each request is rendered in its own per-request `sharedExecutionContext`, so concurrent renders never leak data into one another:
 
-<p align="center">
+<p>
   <img src="images/worker-pool-dispatch.svg" alt="Many concurrent Rails page requests send render jobs to the Node Renderer's dispatcher, which fans them out across a pool of workers that each render several pages at once." width="840" />
 </p>
 
@@ -2803,11 +2803,9 @@ By contrast, ExecJS renders one request per V8 context and blocks the Ruby threa
 
 React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The renderer cache layers sit on the server-side render path; request-scoped deduplication and browser chunk caching are separate side optimizations that do not feed into this chain, so they are left off the diagram below:
 
-<p align="center">
+<p>
   <img src="images/renderer-cache-layers.svg" alt="Stacked render caches: a Rails fragment- or prerender-cache hit returns cached HTML without running JavaScript. On a miss the Node Renderer checks whether the JS bundle is warm in memory, then on disk — those hits skip the bundle upload but still run the SSR JavaScript — and only as a last resort does Rails upload the bundle before rendering." width="840" />
 </p>
-
-(Fragment caching subsumes prerender caching: on a fragment-cache hit the prerender cache is never consulted.)
 
 ## Getting Started
 
@@ -2971,7 +2969,7 @@ When a new container starts, the Node Renderer has an empty bundle cache. The fi
 
 That round-trip is the difference between a warm and a cold render request:
 
-<p align="center">
+<p>
   <img src="images/cold-start-410.svg" alt="When the renderer already has the bundle it returns HTML immediately; when it is missing the bundle it replies 410 Gone, Rails uploads the bundle and asks again, and only then does the render succeed — an extra round-trip on the first cold request." width="840" />
 </p>
 
@@ -3152,8 +3150,8 @@ Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpIn
 
 As a trace, the spans nest under the root `ror.ssr.request`. On the warm path the spans fire in order: `ror.bundle.build_execution_context` (`cache-first`) → `ror.vm.execute` → `ror.result.prepare`. Cold-path spans (upload and `cache-miss` build) appear only between the first two; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans; and incremental (async-props) renders add their own stream/chunk spans:
 
-<p align="center">
-  <img src="images/otel-span-tree.svg" alt="OpenTelemetry span tree rooted at one server-render request: the warm path nests the cache-first build probe, run-JavaScript, and prepare-result spans; on a cache miss a cold start adds bundle-upload and cache-miss build spans after the probe; outbound fetches appear as HTTP child spans; and streaming async-props renders add their own stream and per-chunk spans." width="840" />
+<p>
+  <img src="images/otel-span-tree.svg" alt="OpenTelemetry span tree rooted at one server-render request: the cache-first build probe runs first, then (on a cache miss) a cold start adds bundle-upload and cache-miss build spans, then ror.result.prepare opens and wraps ror.vm.execute as its child; outbound fetches appear as HTTP child spans under vm.execute; and streaming async-props renders add their own stream and per-chunk spans." width="840" />
 </p>
 
 ### Production defaults
@@ -3202,7 +3200,7 @@ During a rolling deploy:
 
 Pre-seeding the current hash (`def`) eliminates the 410→retry only for the new bundle. Requests referencing `abc` still hit a cold cache on new renderers, producing 410 retries per request until the renderer has cached that bundle via upload.
 
-<p align="center">
+<p>
   <img src="images/rolling-deploy-problem.svg" alt="During a rolling deploy, draining old Rails (hash abc) and new Rails (hash def) both send SSR requests to a new renderer pool seeded only with the current hash def. The def requests hit the cache, but the abc requests miss and trigger 410 Gone, re-upload, and retry once per request." width="840" />
 </p>
 
@@ -3212,7 +3210,7 @@ The cold path is bounded and self-healing, but it is not free. On a cache miss t
 
 A **rolling-deploy adapter** makes new renderer instances start warm for **every** in-flight bundle hash — not just the current one — so draining `abc` requests hit the cache instead of triggering a 410.
 
-<p align="center">
+<p>
   <img src="images/rolling-deploy-solution.svg" alt="With a rolling_deploy_adapter the new renderer pool is pre-seeded with both the draining hash abc and the current hash def before it serves traffic, so both old draining Rails and new Rails requests hit the cache — no 410, no retry." width="840" />
 </p>
 
@@ -3224,7 +3222,7 @@ The built-in HTTP adapter is the simplest way to get there, and it's covered nex
 
 The currently-deployed Rails server already has every bundle and companion asset on disk. The HTTP adapter has the **next** deploy's build pull those files directly from the **previous** deploy over an authenticated HTTP endpoint — `upload` is a deliberate no-op because the running server _is_ the store:
 
-<p align="center">
+<p>
   <img src="images/http-adapter-flow.svg" alt="The next deploy's build CI runs the HTTP adapter, which calls the still-running previous deployment's authenticated GET /manifest and GET /bundles/:hash endpoints, receives a gzipped tarball of the bundle plus companion assets read from disk, and extracts and stages each bundle into the new renderer cache." width="840" />
 </p>
 
@@ -3397,7 +3395,7 @@ end
 
 Each deploy plays two roles. It **publishes** its own bundles so a _future_ deploy can find them, and it **pre-seeds** the bundles a _prior_ deploy published so the requests still draining against those bundles stay warm:
 
-<p align="center">
+<p>
   <img src="images/deploy-lifecycle-roles.svg" alt="A deploy's two adapter roles. In the pre-seed phase the current deploy lists recent hashes, fetches the still-draining bundle plus its companion assets from the artifact store, and stages them into the new renderer cache so it is warm. In the publish phase the deploy uploads its own bundle so a future deploy can find it." width="840" />
 </p>
 
@@ -3849,7 +3847,7 @@ The Node Renderer reuses [V8 VM contexts](https://nodejs.org/api/vm.html) across
 
 This means **module-level state persists across all requests** for the lifetime of the worker process. Code that works fine in the browser — where each page navigation creates a fresh JavaScript context — can silently leak memory on the server.
 
-<p align="center">
+<p>
   <img src="images/browser-vs-worker-memory.svg" alt="In the browser each navigation creates a fresh JavaScript context and destroys the previous one, so module-level state stays flat. In a Node Renderer worker, one context is created at startup and reused across thousands of requests, so module-level state climbs until the worker restarts." width="840" />
 </p>
 

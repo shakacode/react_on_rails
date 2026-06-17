@@ -20,7 +20,7 @@ The Pro Node Renderer solves all of these by running a standalone Node.js server
 
 The contrast in one picture — the old way runs JavaScript inside Rails, while the Node Renderer runs it in a separate service:
 
-<p align="center">
+<p>
   <img src="images/execjs-vs-node-renderer.svg" alt="ExecJS runs the JavaScript runtime inside the Rails process and blocks it during rendering, while the Node Renderer runs rendering in a separate service with a pool of workers." width="840" />
 </p>
 
@@ -45,7 +45,7 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 
 Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Each request is rendered in its own per-request `sharedExecutionContext`, so concurrent renders never leak data into one another:
 
-<p align="center">
+<p>
   <img src="images/worker-pool-dispatch.svg" alt="Many concurrent Rails page requests send render jobs to the Node Renderer's dispatcher, which fans them out across a pool of workers that each render several pages at once." width="840" />
 </p>
 
@@ -61,11 +61,9 @@ By contrast, ExecJS renders one request per V8 context and blocks the Ruby threa
 
 React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The renderer cache layers sit on the server-side render path; request-scoped deduplication and browser chunk caching are separate side optimizations that do not feed into this chain, so they are left off the diagram below:
 
-<p align="center">
+<p>
   <img src="images/renderer-cache-layers.svg" alt="Stacked render caches: a Rails fragment- or prerender-cache hit returns cached HTML without running JavaScript. On a miss the Node Renderer checks whether the JS bundle is warm in memory, then on disk — those hits skip the bundle upload but still run the SSR JavaScript — and only as a last resort does Rails upload the bundle before rendering." width="840" />
 </p>
-
-(Fragment caching subsumes prerender caching: on a fragment-cache hit the prerender cache is never consulted.)
 
 ## Getting Started
 
@@ -229,7 +227,7 @@ When a new container starts, the Node Renderer has an empty bundle cache. The fi
 
 That round-trip is the difference between a warm and a cold render request:
 
-<p align="center">
+<p>
   <img src="images/cold-start-410.svg" alt="When the renderer already has the bundle it returns HTML immediately; when it is missing the bundle it replies 410 Gone, Rails uploads the bundle and asks again, and only then does the render succeed — an extra round-trip on the first cold request." width="840" />
 </p>
 
@@ -410,8 +408,8 @@ Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpIn
 
 As a trace, the spans nest under the root `ror.ssr.request`. On the warm path the spans fire in order: `ror.bundle.build_execution_context` (`cache-first`) → `ror.vm.execute` → `ror.result.prepare`. Cold-path spans (upload and `cache-miss` build) appear only between the first two; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans; and incremental (async-props) renders add their own stream/chunk spans:
 
-<p align="center">
-  <img src="images/otel-span-tree.svg" alt="OpenTelemetry span tree rooted at one server-render request: the warm path nests the cache-first build probe, run-JavaScript, and prepare-result spans; on a cache miss a cold start adds bundle-upload and cache-miss build spans after the probe; outbound fetches appear as HTTP child spans; and streaming async-props renders add their own stream and per-chunk spans." width="840" />
+<p>
+  <img src="images/otel-span-tree.svg" alt="OpenTelemetry span tree rooted at one server-render request: the cache-first build probe runs first, then (on a cache miss) a cold start adds bundle-upload and cache-miss build spans, then ror.result.prepare opens and wraps ror.vm.execute as its child; outbound fetches appear as HTTP child spans under vm.execute; and streaming async-props renders add their own stream and per-chunk spans." width="840" />
 </p>
 
 ### Production defaults

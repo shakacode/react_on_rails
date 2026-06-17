@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 430" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
   <title>OpenTelemetry span tree for a server render</title>
-  <desc>A trace tree rooted at one server-render request. The warm path nests load-bundle, run-JavaScript, and prepare-result spans. On a cache-first miss, a cold start inserts an upload span and a cache-miss build span after that probe and before the JavaScript runs. Outbound data fetches appear as HTTP child spans, and streaming async-props renders add their own stream and per-chunk spans.</desc>
+  <desc>A trace tree rooted at one server-render request. First the cache-first build_execution_context probe loads the bundle into the VM. On a cache-first miss, a cold start then runs an upload span and a cache-miss build span. Next ror.result.prepare opens and wraps ror.vm.execute as its child, which runs the SSR JavaScript; outbound data fetches appear as HTTP child spans under vm.execute. Streaming async-props renders add their own stream and per-chunk branch off the root.</desc>
   <defs>
     <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
     <style>
@@ -77,20 +77,24 @@
   <text x="346" y="175" font-size="8.5" font-weight="700" class="cold-text mono">ror.bundle.build_execution_context</text>
   <text x="346" y="188" font-size="8.5" class="cold-text">cache-miss rebuild of the VM</text>
 
+  <!-- result.prepare is the parent span; vm.execute runs inside it -->
   <line x1="70" y1="221" x2="120" y2="221" class="connector" stroke-width="1.4"/>
-  <rect x="120" y="204" width="300" height="34" rx="8" class="warm" stroke-width="1.4"/>
-  <text x="136" y="219" font-size="10.5" font-weight="700" class="warm-text mono">ror.vm.execute</text>
-  <text x="136" y="232" font-size="9" class="warm-text">run the SSR JavaScript inside the VM</text>
+  <rect x="120" y="204" width="300" height="32" rx="8" class="warm" stroke-width="1.4"/>
+  <text x="136" y="219" font-size="10.5" font-weight="700" class="warm-text mono">ror.result.prepare</text>
+  <text x="136" y="231" font-size="9" class="warm-text">builds the response — wraps the VM execution</text>
 
-  <!-- HTTP children under vm.execute -->
-  <line x1="150" y1="238" x2="150" y2="262" class="connector-dash" stroke-width="1.3" stroke-dasharray="4 3"/>
-  <line x1="150" y1="262" x2="200" y2="262" class="connector-dash" stroke-width="1.3" stroke-dasharray="4 3"/>
-  <rect x="200" y="248" width="280" height="28" rx="7" class="http" stroke-width="1.3"/>
-  <text x="216" y="266" font-size="9.5" font-weight="600" class="http-text mono">HTTP child spans — outbound fetch() calls</text>
+  <!-- vm.execute nested under result.prepare -->
+  <line x1="135" y1="236" x2="135" y2="259" class="connector" stroke-width="1.3"/>
+  <line x1="135" y1="259" x2="150" y2="259" class="connector" stroke-width="1.3"/>
+  <rect x="150" y="242" width="270" height="32" rx="8" class="warm" stroke-width="1.4"/>
+  <text x="166" y="257" font-size="10" font-weight="700" class="warm-text mono">ror.vm.execute</text>
+  <text x="166" y="269" font-size="8.5" class="warm-text">run the SSR JavaScript inside the VM</text>
 
-  <line x1="70" y1="296" x2="120" y2="296" class="connector" stroke-width="1.4"/>
-  <rect x="120" y="282" width="300" height="30" rx="8" class="warm" stroke-width="1.4"/>
-  <text x="136" y="300" font-size="10.5" font-weight="700" class="warm-text mono">ror.result.prepare</text>
+  <!-- HTTP children nested under vm.execute -->
+  <line x1="165" y1="274" x2="165" y2="295" class="connector-dash" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <line x1="165" y1="295" x2="210" y2="295" class="connector-dash" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <rect x="210" y="282" width="270" height="26" rx="7" class="http" stroke-width="1.3"/>
+  <text x="226" y="299" font-size="9" font-weight="600" class="http-text mono">HTTP child spans — outbound fetch() calls</text>
 
   <!-- Streaming branch -->
   <line x1="70" y1="346" x2="120" y2="346" class="connector-dash" stroke-width="1.4" stroke-dasharray="4 3"/>

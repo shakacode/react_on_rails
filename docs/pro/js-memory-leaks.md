@@ -8,7 +8,7 @@ The Node Renderer reuses [V8 VM contexts](https://nodejs.org/api/vm.html) across
 
 This means **module-level state persists across all requests** for the lifetime of the worker process. Code that works fine in the browser — where each page navigation creates a fresh JavaScript context — can silently leak memory on the server.
 
-<p align="center">
+<p>
   <img src="images/browser-vs-worker-memory.svg" alt="In the browser each navigation creates a fresh JavaScript context and destroys the previous one, so module-level state stays flat. In a Node Renderer worker, one context is created at startup and reused across thousands of requests, so module-level state climbs until the worker restarts." width="840" />
 </p>
 
