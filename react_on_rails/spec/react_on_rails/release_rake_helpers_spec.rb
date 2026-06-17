@@ -1846,6 +1846,14 @@ RSpec.describe "release.rake helper methods" do
     let(:success_status) { instance_double(Process::Status, success?: true) }
     let(:failure_status) { instance_double(Process::Status, success?: false) }
 
+    # These tests focus on the fetch/parse behavior for a resolved SHA. The
+    # commit-selection walk-back is covered separately in
+    # `#main_ci_evaluation_sha`; stub it to the identity here so the gh check-runs
+    # path stays pinned to the SHA from `git rev-parse origin/main`.
+    before do
+      allow(self).to receive(:main_ci_evaluation_sha) { |**kwargs| kwargs[:head_sha] }
+    end
+
     it "aborts if `git fetch origin main` fails" do
       allow(Open3).to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet")
@@ -1978,6 +1986,187 @@ RSpec.describe "release.rake helper methods" do
       expect(result[:repo_slug]).to eq("shakacode/react_on_rails")
       expect(result[:check_runs].length).to eq(2)
       expect(result[:check_runs].first["name"]).to eq("Lint")
+    end
+  end
+
+  describe "#main_ci_evaluation_sha" do
+    let(:monorepo_root) { "/tmp/repo" }
+
+    before do
+      # Default to "no escape hatch"; the bypass test overrides this.
+      allow(self).to receive(:ci_evaluate_head_only?).and_return(false)
+    end
+
+    it "returns HEAD unchanged when HEAD already ran the full suite" do
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "head").and_return(false)
+
+      expect(self).not_to receive(:git_parent_sha)
+      expect(main_ci_evaluation_sha(monorepo_root:, head_sha: "head")).to eq("head")
+    end
+
+    it "walks back one commit past a changelog/docs-only HEAD" do
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "head").and_return(true)
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "parent").and_return(false)
+      allow(self).to receive(:git_parent_sha)
+        .with(monorepo_root:, sha: "head").and_return("parent")
+
+      result = nil
+      expect { result = main_ci_evaluation_sha(monorepo_root:, head_sha: "head") }
+        .to output(/Evaluating main CI on parent/).to_stdout
+      expect(result).to eq("parent")
+    end
+
+    it "walks back over a chain of consecutive non-runtime-only commits" do
+      runtime = { "c0" => true, "c1" => true, "c2" => true, "c3" => false }
+      parents = { "c0" => "c1", "c1" => "c2", "c2" => "c3" }
+      allow(self).to receive(:commit_non_runtime_only?) { |**kwargs| runtime.fetch(kwargs[:sha]) }
+      allow(self).to receive(:git_parent_sha) { |**kwargs| parents[kwargs[:sha]] }
+
+      result = nil
+      expect { result = main_ci_evaluation_sha(monorepo_root:, head_sha: "c0") }
+        .to output(/Skipped 3 non-runtime commit\(s\): c0, c1, c2/).to_stdout
+      expect(result).to eq("c3")
+    end
+
+    it "evaluates HEAD verbatim when RELEASE_CI_EVALUATE_HEAD is set" do
+      allow(self).to receive(:ci_evaluate_head_only?).and_return(true)
+
+      expect(self).not_to receive(:commit_non_runtime_only?)
+      expect(main_ci_evaluation_sha(monorepo_root:, head_sha: "head")).to eq("head")
+    end
+
+    it "fail-safes to evaluating HEAD when the detector is unavailable" do
+      # No stub on commit_non_runtime_only?: with no detector script under this
+      # root the real predicate returns false, so the walk never starts.
+      expect(self).not_to receive(:git_parent_sha)
+      expect(main_ci_evaluation_sha(monorepo_root: "/nonexistent/repo", head_sha: "head")).to eq("head")
+    end
+
+    it "stops at a root commit even when it is non-runtime-only" do
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "root").and_return(true)
+      allow(self).to receive(:git_parent_sha)
+        .with(monorepo_root:, sha: "root").and_return(nil)
+
+      expect(main_ci_evaluation_sha(monorepo_root:, head_sha: "root")).to eq("root")
+    end
+
+    it "stops after MAIN_CI_NONRUNTIME_WALK_LIMIT commits" do
+      allow(self).to receive(:commit_non_runtime_only?).and_return(true)
+      # Each commit reports a distinct parent, so only the cap terminates the walk.
+      allow(self).to receive(:git_parent_sha) { |**kwargs| "#{kwargs[:sha]}-p" }
+
+      result = nil
+      expect { result = main_ci_evaluation_sha(monorepo_root:, head_sha: "c") }
+        .to output(/Skipped #{MAIN_CI_NONRUNTIME_WALK_LIMIT} non-runtime/o).to_stdout
+      expect(result).to eq("c#{'-p' * MAIN_CI_NONRUNTIME_WALK_LIMIT}")
+    end
+  end
+
+  describe "#commit_non_runtime_only?" do
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
+
+    # Create a throwaway repo root with a (real, executable or not) detector
+    # script so `File.executable?` reflects reality; the detector itself is
+    # stubbed via Open3 so tests stay hermetic.
+    def with_detector(executable: true)
+      Dir.mktmpdir do |root|
+        Dir.mkdir(File.join(root, "script"))
+        detector = File.join(root, "script", "ci-changes-detector")
+        File.write(detector, "#!/bin/sh\n")
+        File.chmod(executable ? 0o755 : 0o644, detector)
+        yield root
+      end
+    end
+
+    def stub_detector_output(content)
+      allow(Open3).to receive(:capture2e) do |env, *_cmd, **_opts|
+        File.write(env["GITHUB_OUTPUT"], content)
+        ["", success_status]
+      end
+    end
+
+    it "returns false when the detector script is not executable" do
+      with_detector(executable: false) do |root|
+        expect(Open3).not_to receive(:capture2e)
+        expect(commit_non_runtime_only?(monorepo_root: root, sha: "abc")).to be false
+      end
+    end
+
+    it "returns true when the detector reports non_runtime_only=true" do
+      with_detector do |root|
+        stub_detector_output("docs_only=true\nnon_runtime_only=true\n")
+        expect(commit_non_runtime_only?(monorepo_root: root, sha: "abc")).to be true
+      end
+    end
+
+    it "returns false when the detector reports non_runtime_only=false" do
+      with_detector do |root|
+        stub_detector_output("non_runtime_only=false\n")
+        expect(commit_non_runtime_only?(monorepo_root: root, sha: "abc")).to be false
+      end
+    end
+
+    it "passes the commit range and GITHUB_OUTPUT env to the detector" do
+      with_detector do |root|
+        detector = File.join(root, "script", "ci-changes-detector")
+        expect(Open3).to receive(:capture2e) do |env, *cmd, **opts|
+          expect(env).to include("GITHUB_OUTPUT")
+          expect(cmd).to eq([detector, "abc^", "abc"])
+          expect(opts).to eq(chdir: root)
+          File.write(env["GITHUB_OUTPUT"], "non_runtime_only=true\n")
+          ["", success_status]
+        end
+        expect(commit_non_runtime_only?(monorepo_root: root, sha: "abc")).to be true
+      end
+    end
+
+    it "returns false when the detector exits non-zero" do
+      with_detector do |root|
+        allow(Open3).to receive(:capture2e).and_return(["boom", failure_status])
+        expect(commit_non_runtime_only?(monorepo_root: root, sha: "abc")).to be false
+      end
+    end
+
+    it "returns false when the detector output omits the non_runtime_only flag" do
+      with_detector do |root|
+        stub_detector_output("docs_only=true\n")
+        expect(commit_non_runtime_only?(monorepo_root: root, sha: "abc")).to be false
+      end
+    end
+  end
+
+  describe "#git_parent_sha" do
+    let(:monorepo_root) { "/tmp/repo" }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
+
+    it "returns the first parent of a commit" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "child^")
+        .and_return(["parentsha\n", success_status])
+
+      expect(git_parent_sha(monorepo_root:, sha: "child")).to eq("parentsha")
+    end
+
+    it "returns nil at a root commit (git reports failure)" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "root^")
+        .and_return(["", failure_status])
+
+      expect(git_parent_sha(monorepo_root:, sha: "root")).to be_nil
+    end
+
+    it "returns nil when git succeeds but yields empty output" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "weird^")
+        .and_return(["\n", success_status])
+
+      expect(git_parent_sha(monorepo_root:, sha: "weird")).to be_nil
     end
   end
 
