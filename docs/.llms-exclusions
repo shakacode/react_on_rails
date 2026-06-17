@@ -26,3 +26,12 @@ misc/tips
 # Older release-note detail pages remain linked from the release-notes index.
 # Excluded until llms-full is split so current product/API docs stay under the cap.
 upgrading/release-notes/16.1.0
+
+# The changelog page is a symlink to the root CHANGELOG.md, which changes on
+# nearly every PR. Inlining it made llms-full.txt drift constantly (a stale
+# snapshot reddened main, then cascaded to every later docs-only commit via the
+# detect-changes skip guard). Excluding it removes the drift source entirely:
+# changelog edits can no longer change the generated output. Release history
+# stays discoverable via the "OSS/Pro release notes" pointers in llms.txt and the
+# hosted page at reactonrails.com/docs/upgrading/changelog. See #4017.
+upgrading/changelog
