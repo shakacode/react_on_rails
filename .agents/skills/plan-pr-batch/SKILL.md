@@ -62,17 +62,23 @@ Plan a PR batch
      helper, which does the authoritative local three-dot diff (fetching the
      verified base/head into session-unique temporary refs, never checking out
      untrusted PR code), validates `baseRefName`/`headRefName` as untrusted
-     refspec data, falls back to the PR Files API, and cleans up its temp refs:
-     `.agents/skills/plan-pr-batch/bin/pr-file-touch-map N --repo OWNER/REPO`
+     refspec data, falls back to the PR Files API, and cleans up its temp refs.
+     **For parallel batch scheduling, always pass `--cross-check`** so the local
+     diff and the Files API must independently agree on the path set — a
+     fail-safe against a silent under-report scheduling two colliding items into
+     the same wave:
+     `.agents/skills/plan-pr-batch/bin/pr-file-touch-map N --repo OWNER/REPO --cross-check`
      It prints `{pr, repo, source, changed_files, paths, renames}`:
-     - `source` is `local-diff` (authoritative), `files-api` (best-effort
-       cross-check, used only when the local diff cannot run), or `UNKNOWN`.
+     - `source` is `verified` (cross-check: both sources agreed — the only value
+       safe to place in a parallel worktree lane), `local-diff` / `files-api`
+       (default mode, single source), or `UNKNOWN`.
      - `paths` covers creates, edits, deletes, and **both** sides of every
        rename/copy; `renames` lists `{old, new}` pairs.
-     - When `source` is `UNKNOWN`, no trustworthy path list could be produced
-       (unfetchable refs, a broken/capped/inconsistent Files API response, or a
-       rename row missing its previous filename); treat the item as serial — not
-       safe for a parallel worktree lane.
+     - **Treat anything other than `verified` as serial** when scheduling parallel
+       waves. `UNKNOWN` means no trustworthy path list could be produced (a
+       cross-check disagreement, an unfetchable source, a broken/capped Files API
+       response, or a rename/copy row missing its previous filename) — never put
+       it in a parallel lane.
      - The helper owns the security and portability details (refspec injection
        guards, fork pull-ref vs head-repo vs reachable-SHA fetch, shallow-clone
        deepen-and-retry, Files API `changedFiles` sanity check and ~3000-file
