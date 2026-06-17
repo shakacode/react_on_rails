@@ -117,6 +117,24 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('warns when on the dormant 19.0.4 build (now below the 19.0.5 floor)', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.0.4'),
+      }),
+    ).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not warn at the recommended stable floor (19.0.5)', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.0.5'),
+      }),
+    ).not.toThrow();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it('does not label an existing warning as downgraded when the env hatch is set', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({

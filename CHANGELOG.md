@@ -31,6 +31,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Changed
 
 - **[Pro]** **Pinned `react-on-rails-rsc` to the stable `19.0.5` release**: The generator default, the root and Pro package manifests, the lockfile, and the Pro RSC install docs now pin the stable `react-on-rails-rsc@19.0.5` (previously the `19.0.5-rc.7` prerelease). The native RSC CSS FOUC fix requires `react-on-rails-rsc >= 19.0.5`. Closes [Issue 3634](https://github.com/shakacode/react_on_rails/issues/3634). [PR 4080](https://github.com/shakacode/react_on_rails/pull/4080) by [justin808](https://github.com/justin808).
+- **[Pro]** **RSC peer-compatibility warn-tier floor raised to stable `19.0.5`**: The Pro node renderer's `recommendedMin` for `react-on-rails-rsc` is now the published stable `19.0.5` (previously the dormant `19.0.2`). Anyone still on an older 19.x build (`19.0.2`–`19.0.4`) now gets a loud startup warning that they are missing the coordinated RSC fixes shipped in `19.0.5` (FOUC stylesheet preloading, async manifest signatures); `19.0.5`+ no longer warns. Refs [Issue 3632](https://github.com/shakacode/react_on_rails/issues/3632). [PR 4078](https://github.com/shakacode/react_on_rails/pull/4078) by [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.5] - 2026-06-16
 

@@ -32,8 +32,12 @@ describe('checkRscPeerCompatibility', () => {
     expect(checkRscPeerCompatibility({ rscVersion: null, reactVersion: '19.0.4' })).toEqual({ level: 'ok' });
   });
 
-  it('returns ok for a supported stable rsc + react', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.0.4', reactVersion: '19.0.4' }).level).toBe('ok');
+  it('returns ok for a supported stable rsc + react at the recommended floor', () => {
+    expect(checkRscPeerCompatibility({ rscVersion: '19.0.5', reactVersion: '19.0.4' }).level).toBe('ok');
+  });
+
+  it('warns for a stable rsc below the recommended floor (e.g. 19.0.4)', () => {
+    expect(checkRscPeerCompatibility({ rscVersion: '19.0.4', reactVersion: '19.0.4' }).level).toBe('warn');
   });
 
   it('returns ok for the React 19.2.7 floor required by the 19.2 RSC package line', () => {
@@ -45,7 +49,7 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: 'v19.0.4', reactVersion: '19.0.4' }).level).toBe('ok');
+    expect(checkRscPeerCompatibility({ rscVersion: 'v19.0.5', reactVersion: '19.0.4' }).level).toBe('ok');
   });
 
   it('errors when rsc major is above the supported major', () => {
@@ -163,6 +167,6 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('skips the React check when React is not resolvable', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.0.4', reactVersion: null }).level).toBe('ok');
+    expect(checkRscPeerCompatibility({ rscVersion: '19.0.5', reactVersion: null }).level).toBe('ok');
   });
 });
