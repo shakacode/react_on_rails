@@ -1,0 +1,63 @@
+name: Zizmor GitHub Actions Security Audit
+
+# zizmor (https://github.com/zizmorcore/zizmor) is a static analysis tool
+# that finds security issues in GitHub Actions workflows and composite
+# actions. It runs ALONGSIDE actionlint (.github/workflows/actionlint.yml):
+# actionlint checks syntax and correctness, zizmor checks for security
+# weaknesses (unpinned actions, template injection, credential persistence).
+#
+# ROLLOUT: This gate is intentionally NON-BLOCKING for now
+# (`continue-on-error: true`). A baseline scan of `main` surfaced pre-existing
+# findings across the existing workflows. Findings are surfaced as PR
+# annotations so they can be triaged and fixed incrementally.
+# Follow-up (issue #3449): once the backlog is cleared, remove
+# `continue-on-error: true` to make this a required, blocking gate.
+# See .github/zizmor.yml for configuration.
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - '.github/zizmor.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - '.github/zizmor.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    runs-on: ubuntu-22.04
+    # Non-blocking during initial rollout; see header and .github/zizmor.yml.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # No need for history in a lint/audit job.
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Run zizmor
+        # Official action, pinned to a commit SHA (v0.5.6) per supply-chain
+        # best practice.
+        uses: zizmorcore/zizmor-action@5f14fd08f7cf1cb1609c1e344975f152c7ee938d
+        with:
+          # Audit the whole repo (workflows and composite actions).
+          inputs: .
+          # Emit findings as GitHub annotations instead of uploading SARIF.
+          # SARIF upload requires GitHub Advanced Security and
+          # `security-events: write`; annotations keep this job
+          # least-privilege (contents: read only) and work on any repo tier.
+          advanced-security: false
+          annotations: true
+          # token defaults to ${{ github.token }} for online audits.

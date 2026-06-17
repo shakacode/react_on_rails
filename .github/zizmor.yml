@@ -1,0 +1,23 @@
+# zizmor configuration — static analysis for GitHub Actions
+# https://docs.zizmor.sh/configuration/
+#
+# ROLLOUT NOTE (issue #3449):
+# zizmor is introduced as a NON-BLOCKING gate first (see
+# .github/workflows/zizmor.yml, which sets `continue-on-error: true`).
+# A baseline scan of `main` surfaced ~56 findings in the default
+# ("regular") persona across the existing workflows — primarily
+# `unpinned-uses` (third-party actions not pinned to a commit SHA) plus
+# some `template-injection`, `artipacked`, and `dependabot-cooldown`.
+#
+# These are pre-existing and out of scope for the workflow-introduction PR,
+# so the gate does not fail the build yet. The findings remain VISIBLE (as
+# PR annotations) so they can be triaged and fixed incrementally. Once the
+# backlog is cleared, the follow-up is to remove `continue-on-error: true`
+# from the workflow to make zizmor a blocking gate, and to replace any
+# blanket rule disables below with targeted per-finding `ignore` entries.
+#
+# No rules are globally disabled here on purpose: keeping all audits ON
+# while the gate is non-blocking gives maintainers the full picture without
+# masking future regressions.
+
+rules: {}
