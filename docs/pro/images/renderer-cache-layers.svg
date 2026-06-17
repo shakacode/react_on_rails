@@ -57,7 +57,7 @@
 
   <rect width="860" height="470" class="bg"/>
   <text x="430" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Stacked render caches — each skips more work</text>
-  <text x="430" y="47" text-anchor="middle" font-size="11" class="subtitle">A hit at any layer short-circuits straight to the result; only a full miss runs the JavaScript</text>
+  <text x="430" y="47" text-anchor="middle" font-size="11" class="subtitle">Rails-side hits return cached HTML; renderer bundle-cache hits still run the JavaScript but skip the bundle upload</text>
 
   <!-- entry -->
   <rect x="290" y="64" width="280" height="34" rx="9" fill="#1E293B" filter="url(#shadow)"/>
@@ -123,9 +123,10 @@
   <path d="M510,192 C560,192 580,150 608,142" fill="none" class="hit" stroke-width="2" stroke-dasharray="5 3"/>
   <text x="556" y="184" text-anchor="middle" font-size="8.5" font-weight="700" class="hit-text">hit</text>
 
-  <!-- run js feeds bundle layers -->
+  <!-- warm/disk bundle hit still runs the JS -->
   <path d="M506,274 H560" fill="none" class="hit" stroke-width="2" stroke-dasharray="5 3"/>
   <polygon points="560,270 568,274 560,278" class="hit-head"/>
+  <text x="533" y="268" text-anchor="middle" font-size="8" font-weight="700" class="hit-text">run JS</text>
   <!-- run js -> result -->
   <path d="M645,256 C645,210 700,200 700,164" fill="none" class="arrow" stroke-width="1.6"/>
   <polygon points="696,166 704,166 700,160" class="head"/>

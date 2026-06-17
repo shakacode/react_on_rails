@@ -62,7 +62,7 @@ By contrast, ExecJS renders one request per V8 context and blocks the Ruby threa
 React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The renderer cache layers sit on the server-side render path; request-scoped deduplication and browser chunk caching are separate side optimizations that do not feed into this chain, so they are left off the diagram below:
 
 <p align="center">
-  <img src="images/renderer-cache-layers.svg" alt="Stacked render caches: Rails checks for finished HTML, then a saved render result; on a miss the Node Renderer checks whether the JS bundle is warm in memory, then on disk, and only as a last resort has Rails upload the bundle before running the JavaScript. A hit at any layer short-circuits to the result." width="840" />
+  <img src="images/renderer-cache-layers.svg" alt="Stacked render caches: a Rails fragment- or prerender-cache hit returns cached HTML without running JavaScript. On a miss the Node Renderer checks whether the JS bundle is warm in memory, then on disk — those hits skip the bundle upload but still run the SSR JavaScript — and only as a last resort does Rails upload the bundle before rendering." width="840" />
 </p>
 
 (Fragment caching subsumes prerender caching: on a fragment-cache hit the prerender cache is never consulted.)
