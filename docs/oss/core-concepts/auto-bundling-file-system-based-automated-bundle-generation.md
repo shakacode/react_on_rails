@@ -173,6 +173,10 @@ Auto-bundling (described in the next section) automates both steps: it generates
 
 File-system-based automated pack generation simplifies this process with a new option for the view helpers.
 
+<p align="center">
+  <img src="images/auto-bundling.svg" alt="Manual bundle splitting versus auto-bundling. With manual splitting you hand-write a one-line pack file that imports and registers each component, and every Rails view must declare which packs it needs with append_javascript_pack_tag — easy to forget. With auto-bundling you drop components into the ror_components convention directory and React on Rails generates the per-component pack files and bundles for you, while the react_component view helper appends the right pack tags automatically, giving per-page code splitting with no boilerplate." width="840" />
+</p>
+
 > Note: In the Background examples above, we used `BarComponentTwo`. In the Solution below, we refer to the same component as `SpecialComponentNotToAutoLoadBundle` to emphasize that it is excluded from auto-loading. You do not need to rename your files.
 
 For example, if you wanted to utilize our file-system based entrypoint generation for `FooComponentOne` and `BarComponentOne`, but not `SpecialComponentNotToAutoLoadBundle` (formerly `BarComponentTwo`) (for whatever reason), then...

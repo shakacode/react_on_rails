@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="docker-build-title docker-build-desc">
+  <title id="docker-build-title">Multi-stage Docker build for a React on Rails app</title>
+  <desc id="docker-build-desc">A three-stage Docker build. The base stage sets shared Ruby image and production environment variables. The build stage adds Node.js and build tools, installs gems and JS dependencies, precompiles assets (which builds the client and server bundles), then deletes node_modules. The runtime stage starts fresh from base and copies in only the built artifacts — gems, compiled assets, and app code — leaving Node.js and node_modules behind. The result is a lean production image, hundreds of megabytes smaller than if the build tooling were shipped.</desc>
+  <defs>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CC0000"/>
+      <stop offset="100%" stop-color="#990000"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .stage-head { fill: #F1F5F9; stroke: #E2E8F0; }
+      .label { fill: #334155; }
+      .sub { fill: #64748B; }
+      .chip { fill: #EFF6FF; stroke: #BFDBFE; }
+      .chip-text { fill: #1E40AF; }
+      .build-head { fill: #FEF3C7; stroke: #FCD34D; }
+      .build-text { fill: #92400E; }
+      .runtime-head { fill: #D1FAE5; stroke: #86EFAC; }
+      .runtime-text { fill: #166534; }
+      .strip { fill: #FEE2E2; stroke: #FECACA; }
+      .strip-text { fill: #991B1B; }
+      .arrow { stroke: #94A3B8; fill: none; }
+      .arrow-head { fill: #94A3B8; }
+      .copy-line { stroke: #22C55E; }
+      .copy-head { fill: #22C55E; }
+
+      .flow { stroke-dasharray: 7 5; animation: dash 1.5s linear infinite; }
+      @keyframes dash { to { stroke-dashoffset: -24; } }
+      .pulse { animation: pulse 1.2s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+      .stripfade { animation: stripfade 4s ease-in-out infinite; }
+      @keyframes stripfade { 0%,30% { opacity:1; } 60%,100% { opacity:0.25; } }
+
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } .stripfade { opacity: 1 !important; } }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .stage-head { fill: #0F172A; stroke: #334155; }
+        .label { fill: #CBD5E1; }
+        .sub { fill: #94A3B8; }
+        .chip { fill: #172554; stroke: #3B82F6; }
+        .chip-text { fill: #93C5FD; }
+        .build-head { fill: #422006; stroke: #B45309; }
+        .build-text { fill: #FCD34D; }
+        .runtime-head { fill: #052E16; stroke: #10B981; }
+        .runtime-text { fill: #6EE7B7; }
+        .strip { fill: #450A0A; stroke: #F87171; }
+        .strip-text { fill: #FCA5A5; }
+        .arrow { stroke: #64748B; }
+        .arrow-head { fill: #64748B; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="520" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Multi-Stage Docker Build for React on Rails</text>
+  <text x="450" y="48" text-anchor="middle" font-size="11" class="subtitle">Build with Node.js and tooling &#x2014; ship a lean runtime image without them</text>
+
+  <!-- ===== BASE stage ===== -->
+  <rect x="24" y="74" width="248" height="160" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="24" y="74" width="248" height="32" rx="12" class="stage-head" stroke-width="1"/>
+  <rect x="24" y="90" width="248" height="16" class="stage-head"/>
+  <text x="148" y="95" text-anchor="middle" font-size="12" font-weight="700" class="label">1 &#x2022; base</text>
+  <text x="148" y="128" text-anchor="middle" font-size="10" class="sub">Shared foundation</text>
+  <rect x="44" y="140" width="208" height="22" rx="6" class="chip" stroke-width="1"/>
+  <text x="148" y="155" text-anchor="middle" font-size="9.5" font-family="monospace" class="chip-text">FROM ruby:3.3-slim</text>
+  <rect x="44" y="170" width="208" height="22" rx="6" class="chip" stroke-width="1"/>
+  <text x="148" y="185" text-anchor="middle" font-size="9" class="chip-text">RAILS_ENV / NODE_ENV = production</text>
+  <text x="148" y="214" text-anchor="middle" font-size="9" class="sub">Reused by both stages below</text>
+
+  <!-- ===== BUILD stage ===== -->
+  <rect x="296" y="74" width="300" height="372" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="296" y="74" width="300" height="32" rx="12" class="build-head" stroke-width="1"/>
+  <rect x="296" y="90" width="300" height="16" class="build-head"/>
+  <text x="446" y="95" text-anchor="middle" font-size="12" font-weight="700" class="build-text">2 &#x2022; build  (FROM base)</text>
+
+  <rect x="316" y="118" width="260" height="26" rx="6" class="chip" stroke-width="1"/>
+  <text x="446" y="135" text-anchor="middle" font-size="9.5" class="chip-text">+ Node.js, build-essential, git…</text>
+  <rect x="316" y="150" width="260" height="26" rx="6" class="chip" stroke-width="1"/>
+  <text x="446" y="167" text-anchor="middle" font-size="9.5" font-family="monospace" class="chip-text">bundle install</text>
+  <rect x="316" y="182" width="260" height="26" rx="6" class="chip" stroke-width="1"/>
+  <text x="446" y="199" text-anchor="middle" font-size="9.5" font-family="monospace" class="chip-text">yarn install --immutable</text>
+
+  <rect x="316" y="216" width="260" height="56" rx="6" class="chip" stroke-width="1"/>
+  <text x="446" y="236" text-anchor="middle" font-size="9.5" font-family="monospace" class="chip-text">rails assets:precompile</text>
+  <text x="446" y="252" text-anchor="middle" font-size="8.5" class="sub">builds client bundles &#x2192; public/webpack/</text>
+  <text x="446" y="264" text-anchor="middle" font-size="8.5" class="sub">+ server bundles &#x2192; ssr-generated/</text>
+
+  <!-- strip node_modules -->
+  <rect x="316" y="282" width="260" height="40" rx="6" class="strip stripfade" stroke-width="1.5"/>
+  <text x="446" y="300" text-anchor="middle" font-size="9.5" font-family="monospace" font-weight="700" class="strip-text">rm -rf node_modules</text>
+  <text x="446" y="314" text-anchor="middle" font-size="8.5" class="strip-text">not needed at runtime &#x2014; saves 100s of MB</text>
+
+  <!-- what build produces -->
+  <rect x="316" y="332" width="260" height="98" rx="8" class="build-head" stroke-width="1"/>
+  <text x="446" y="352" text-anchor="middle" font-size="10" font-weight="700" class="build-text">Artifacts to keep</text>
+  <g class="build-text" font-size="9.5">
+    <text x="336" y="372">&#x2022; installed gems (BUNDLE_PATH)</text>
+    <text x="336" y="390">&#x2022; compiled client + server bundles</text>
+    <text x="336" y="408">&#x2022; application code</text>
+  </g>
+  <text x="446" y="424" text-anchor="middle" font-size="8.5" class="sub">Node.js &amp; node_modules stay in this stage only</text>
+
+  <!-- arrow base->build -->
+  <line x1="272" y1="154" x2="290" y2="154" class="arrow flow" stroke-width="2.5"/>
+  <polygon points="290,148 302,154 290,160" class="arrow-head pulse"/>
+
+  <!-- ===== RUNTIME stage ===== -->
+  <rect x="620" y="74" width="256" height="372" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="620" y="74" width="256" height="32" rx="12" class="runtime-head" stroke-width="1"/>
+  <rect x="620" y="90" width="256" height="16" class="runtime-head"/>
+  <text x="748" y="95" text-anchor="middle" font-size="12" font-weight="700" class="runtime-text">3 &#x2022; runtime  (FROM base)</text>
+
+  <text x="748" y="128" text-anchor="middle" font-size="10" class="sub">Fresh from base &#x2014; no build tools</text>
+  <rect x="640" y="138" width="216" height="22" rx="6" class="chip" stroke-width="1"/>
+  <text x="748" y="153" text-anchor="middle" font-size="9" class="chip-text">+ runtime libs only (libpq5)</text>
+
+  <rect x="640" y="170" width="216" height="120" rx="8" class="runtime-head" stroke-width="1"/>
+  <text x="748" y="190" text-anchor="middle" font-size="10" font-weight="700" class="runtime-text">COPY --from=build</text>
+  <g class="runtime-text" font-size="9.5">
+    <text x="658" y="212">&#x2713; gems</text>
+    <text x="658" y="232">&#x2713; compiled bundles</text>
+    <text x="658" y="252">&#x2713; app code</text>
+  </g>
+  <text x="748" y="276" text-anchor="middle" font-size="9" class="sub">non-root user, EXPOSE 3000</text>
+
+  <rect x="640" y="300" width="216" height="56" rx="8" class="strip" stroke-width="1.5"/>
+  <text x="748" y="320" text-anchor="middle" font-size="10" font-weight="700" class="strip-text">Left behind &#x2715;</text>
+  <text x="748" y="338" text-anchor="middle" font-size="9" class="strip-text">Node.js  &#x2022;  node_modules</text>
+  <text x="748" y="350" text-anchor="middle" font-size="8" class="sub">(needed at build time, not runtime)</text>
+
+  <rect x="640" y="366" width="216" height="62" rx="8" class="runtime-head" stroke-width="1"/>
+  <text x="748" y="388" text-anchor="middle" font-size="11" font-weight="700" class="runtime-text">Lean production image</text>
+  <text x="748" y="406" text-anchor="middle" font-size="9.5" class="runtime-text">puma serves on :3000</text>
+  <text x="748" y="421" text-anchor="middle" font-size="8.5" class="sub">~ hundreds of MB smaller</text>
+
+  <!-- copy arrow build->runtime -->
+  <line x1="596" y1="230" x2="616" y2="230" class="copy-line flow" stroke-width="3"/>
+  <polygon points="616,223 630,230 616,237" class="copy-head pulse"/>
+  <text x="608" y="218" text-anchor="middle" font-size="8" font-weight="700" class="runtime-text">copy</text>
+
+  <text x="450" y="476" text-anchor="middle" font-size="10.5" font-weight="600" class="subtitle">Key idea: Node.js is a build-time dependency for React on Rails, not a runtime one</text>
+  <text x="450" y="496" text-anchor="middle" font-size="9.5" class="subtitle">(unless you run the Pro Node Renderer &#x2014; then Node stays in the runtime image)</text>
+</svg>

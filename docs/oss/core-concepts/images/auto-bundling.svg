@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="autobundle-title autobundle-desc">
+  <title id="autobundle-title">Manual pack files vs file-system-based auto-bundling in React on Rails</title>
+  <desc id="autobundle-desc">Two approaches to splitting bundles. Manual: for every component you hand-write a one-line pack file in app/javascript/packs that imports and registers it, and each Rails view must declare which packs to load. Auto-bundling: you place components under a ror_components convention directory and React on Rails generates the per-component pack files and bundles for you, and the react_component view helper appends the right pack tags automatically — so each page loads only the code it needs with no boilerplate.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label { fill: #334155; }
+      .sub { fill: #64748B; }
+      .code-bg { fill: #1E293B; }
+      .code { fill: #E2E8F0; }
+      .code-dim { fill: #94A3B8; }
+      .manual-head { fill: #FEF3C7; stroke: #FCD34D; }
+      .manual-text { fill: #92400E; }
+      .auto-head { fill: #D1FAE5; stroke: #86EFAC; }
+      .auto-text { fill: #166534; }
+      .gen-box { fill: #DBEAFE; stroke: #93C5FD; }
+      .gen-text { fill: #1E40AF; }
+      .arrow { stroke: #94A3B8; fill: none; }
+      .arrow-head { fill: #94A3B8; }
+      .code-attr { fill: #FCD34D; }
+
+      .pulse { animation: pulse 1.1s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
+      .flow { stroke-dasharray: 6 5; animation: dash 1.4s linear infinite; }
+      @keyframes dash { to { stroke-dashoffset: -22; } }
+      .reveal { opacity: 0; animation: reveal 6s ease infinite; }
+      .reveal-2 { opacity: 0; animation: reveal2 6s ease infinite; }
+      @keyframes reveal { 0%,20% { opacity:0; transform:translateX(8px);} 32%,100% { opacity:1; transform:translateX(0);} }
+      @keyframes reveal2 { 0%,40% { opacity:0; transform:translateX(8px);} 52%,100% { opacity:1; transform:translateX(0);} }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; }
+        .reveal, .reveal-2 { opacity: 1 !important; transform: none !important; }
+      }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label { fill: #CBD5E1; }
+        .sub { fill: #94A3B8; }
+        .code-bg { fill: #0B1220; }
+        .manual-head { fill: #422006; stroke: #B45309; }
+        .manual-text { fill: #FCD34D; }
+        .auto-head { fill: #052E16; stroke: #10B981; }
+        .auto-text { fill: #6EE7B7; }
+        .gen-box { fill: #172554; stroke: #3B82F6; }
+        .gen-text { fill: #93C5FD; }
+        .arrow { stroke: #64748B; }
+        .arrow-head { fill: #64748B; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="600" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Manual Packs vs Auto-Bundling</text>
+  <text x="450" y="48" text-anchor="middle" font-size="11" class="subtitle">File-system-based automated bundle generation: write components, skip the boilerplate</text>
+
+  <!-- ========== LEFT: Manual ========== -->
+  <rect x="24" y="66" width="412" height="510" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="24" y="66" width="412" height="34" rx="12" class="manual-head" stroke-width="1"/>
+  <rect x="24" y="84" width="412" height="16" class="manual-head"/>
+  <text x="230" y="88" text-anchor="middle" font-size="13" font-weight="700" class="manual-text">Manual bundle splitting</text>
+
+  <text x="44" y="124" font-size="10.5" font-weight="600" class="label">1. Hand-write a pack file per component</text>
+  <rect x="44" y="132" width="372" height="96" rx="8" class="code-bg"/>
+  <text x="58" y="152" font-size="9.5" font-family="monospace"><tspan class="code-dim">// app/javascript/packs/FooComponentOne.jsx</tspan></text>
+  <text x="58" y="170" font-size="9.5" font-family="monospace"><tspan class="code">import ReactOnRails from 'react-on-rails';</tspan></text>
+  <text x="58" y="186" font-size="9.5" font-family="monospace"><tspan class="code">import FooComponentOne from '../src/Foo/…';</tspan></text>
+  <text x="58" y="204" font-size="9.5" font-family="monospace"><tspan class="code">ReactOnRails.register({ FooComponentOne });</tspan></text>
+  <text x="58" y="220" font-size="9.5" font-family="monospace"><tspan class="code-dim">// …repeat for every single component</tspan></text>
+
+  <text x="44" y="252" font-size="10.5" font-weight="600" class="label">2. Each view declares the packs it needs</text>
+  <rect x="44" y="260" width="372" height="66" rx="8" class="code-bg"/>
+  <text x="58" y="280" font-size="9.5" font-family="monospace"><tspan class="code-dim">&lt;%# in the view %&gt;</tspan></text>
+  <text x="58" y="298" font-size="9.5" font-family="monospace"><tspan class="code">&lt;% append_javascript_pack_tag</tspan></text>
+  <text x="58" y="314" font-size="9.5" font-family="monospace"><tspan class="code">     'FooComponentOne' %&gt;</tspan></text>
+
+  <rect x="44" y="344" width="372" height="210" rx="8" class="manual-head" stroke-width="1"/>
+  <text x="230" y="368" text-anchor="middle" font-size="11" font-weight="700" class="manual-text">You maintain by hand:</text>
+  <g class="manual-text" font-size="10">
+    <text x="64" y="394">&#x2022; one pack file for every component</text>
+    <text x="64" y="416">&#x2022; matching register() call in each</text>
+    <text x="64" y="438">&#x2022; per-view append_javascript_pack_tag</text>
+    <text x="64" y="460">&#x2022; per-view append_stylesheet_pack_tag</text>
+  </g>
+  <text x="230" y="494" text-anchor="middle" font-size="10" font-weight="600" class="manual-text">Easy to forget a pack tag &#x2192;</text>
+  <text x="230" y="510" text-anchor="middle" font-size="10" font-weight="600" class="manual-text">component silently won't load.</text>
+  <text x="230" y="536" text-anchor="middle" font-size="9.5" class="sub">Lots of boilerplate that grows</text>
+  <text x="230" y="550" text-anchor="middle" font-size="9.5" class="sub">with every component you add.</text>
+
+  <!-- ========== center generation gear / flow ========== -->
+  <line x1="436" y1="300" x2="464" y2="300" class="arrow flow" stroke-width="2.5"/>
+  <polygon points="464,294 476,300 464,306" class="arrow-head pulse"/>
+
+  <!-- ========== RIGHT: Auto ========== -->
+  <rect x="464" y="66" width="412" height="510" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="464" y="66" width="412" height="34" rx="12" class="auto-head" stroke-width="1"/>
+  <rect x="464" y="84" width="412" height="16" class="auto-head"/>
+  <text x="670" y="88" text-anchor="middle" font-size="13" font-weight="700" class="auto-text">Auto-bundling (convention)</text>
+
+  <text x="484" y="124" font-size="10.5" font-weight="600" class="label">1. Just drop components in the convention dir</text>
+  <rect x="484" y="132" width="372" height="96" rx="8" class="code-bg"/>
+  <text x="498" y="152" font-size="9.5" font-family="monospace"><tspan class="code">app/javascript/src/</tspan></text>
+  <text x="498" y="170" font-size="9.5" font-family="monospace"><tspan class="code">  Foo/</tspan><tspan class="code-dim">ror_components/</tspan><tspan class="code">FooComponentOne.jsx</tspan></text>
+  <text x="498" y="188" font-size="9.5" font-family="monospace"><tspan class="code">  Bar/</tspan><tspan class="code-dim">ror_components/</tspan><tspan class="code">BarComponentOne.jsx</tspan></text>
+  <text x="498" y="206" font-size="9.5" font-family="monospace"><tspan class="code">  Bar/</tspan><tspan class="code-dim">ror_components/</tspan><tspan class="code">BarComponentTwo.jsx</tspan></text>
+  <text x="498" y="222" font-size="9.5" font-family="monospace"><tspan class="code-dim">// no pack files, no register() calls</tspan></text>
+
+  <text x="484" y="252" font-size="10.5" font-weight="600" class="label">2. Opt in, and the helper appends pack tags for you</text>
+  <rect x="484" y="260" width="372" height="48" rx="8" class="code-bg"/>
+  <text x="498" y="282" font-size="9.5" font-family="monospace"><tspan class="code">&lt;%= react_component("FooComponentOne",</tspan></text>
+  <text x="498" y="298" font-size="9.5" font-family="monospace"><tspan class="code">      props: …, </tspan><tspan class="code-attr">auto_load_bundle: true</tspan><tspan class="code">) %&gt;</tspan></text>
+
+  <g transform="translate(484,322)">
+    <rect x="0" y="0" width="372" height="170" rx="8" class="gen-box" stroke-width="1"/>
+    <text x="186" y="22" text-anchor="middle" font-size="11" font-weight="700" class="gen-text">React on Rails auto-generates:</text>
+    <g class="reveal gen-text" font-size="10">
+      <text x="20" y="48">&#x2192; packs/generated/FooComponentOne.js</text>
+      <text x="20" y="66">&#x2192; packs/generated/BarComponentOne.js</text>
+      <text x="20" y="84">&#x2192; packs/generated/BarComponentTwo.js</text>
+    </g>
+    <g class="reveal-2 gen-text" font-size="10">
+      <text x="20" y="110">&#x2713; webpack builds a bundle per component</text>
+      <text x="20" y="128">&#x2713; helper appends the right pack tags</text>
+      <text x="20" y="146">&#x2713; each page loads only what it renders</text>
+    </g>
+  </g>
+
+  <rect x="484" y="504" width="372" height="50" rx="8" class="auto-head" stroke-width="1"/>
+  <text x="670" y="524" text-anchor="middle" font-size="10.5" font-weight="700" class="auto-text">No boilerplate &#x2022; no forgotten pack tags</text>
+  <text x="670" y="540" text-anchor="middle" font-size="8.5" class="sub">Opt in per call (above) or set config.auto_load_bundle = true</text>
+  <text x="670" y="551" text-anchor="middle" font-size="8.5" class="sub">(default is false); add empty pack-tag placeholders to your layout</text>
+</svg>
