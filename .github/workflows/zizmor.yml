@@ -6,13 +6,21 @@ name: Zizmor GitHub Actions Security Audit
 # actionlint checks syntax and correctness, zizmor checks for security
 # weaknesses (unpinned actions, template injection, credential persistence).
 #
-# ROLLOUT: This gate is intentionally NON-BLOCKING for now. The "Run zizmor"
-# step sets `continue-on-error: true`, so a baseline scan of `main` (which
-# surfaced pre-existing findings across the existing workflows) does not fail
-# the check. Findings still surface as PR annotations for incremental triage.
-# Follow-up (issue #3449): once the backlog is cleared, remove the step's
-# `continue-on-error: true` to make this a required, blocking gate.
-# See .github/zizmor.yml for configuration.
+# ROLLOUT: This gate is intentionally NON-BLOCKING for now, but in a way that
+# still fails on real problems. The "Run zizmor" step invokes the pinned
+# zizmor CLI with `--no-exit-codes`: zizmor then exits 0 for both "clean" and
+# "findings", and non-zero ONLY for a genuine tool/config failure (bad config,
+# unknown version, Docker/image error). So pre-existing findings do not fail
+# the `zizmor` check, but a broken audit DOES — a green check always means the
+# audit actually ran. (A blanket `continue-on-error: true` was avoided because
+# it would also hide tool failures behind a green check.)
+#
+# Pre-existing findings are suppressed via a baseline in .github/zizmor.yml so
+# that NEW findings introduced by future PRs surface as annotations without
+# being pushed past GitHub's 10-annotations-per-step cap.
+#
+# Follow-up (issue #3449): once the baseline backlog in .github/zizmor.yml is
+# cleared, drop `--no-exit-codes` to make this a required, blocking gate.
 
 permissions:
   contents: read
@@ -53,32 +61,26 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Run zizmor
-        # Non-blocking during initial rollout: `continue-on-error` is set on
-        # the STEP (not the job) so zizmor's findings still surface as
-        # annotations while the job — and therefore the `zizmor` check —
-        # stays green. A job-level `continue-on-error` would leave the check
-        # run itself red even when the workflow succeeds. See the header and
-        # .github/zizmor.yml. Follow-up (#3449): remove this line to make
-        # zizmor a blocking gate once the baseline findings are triaged.
-        continue-on-error: true
-        # Official action, pinned to a commit SHA (v0.5.6) per supply-chain
-        # best practice.
-        uses: zizmorcore/zizmor-action@5f14fd08f7cf1cb1609c1e344975f152c7ee938d
-        with:
-          # Audit the whole repo (workflows and composite actions).
-          inputs: .
-          # Pin the zizmor binary version (the action otherwise installs
-          # `latest`, so the finding count would drift release-to-release and
-          # the documented baseline could go stale). Bump deliberately when
-          # re-triaging the baseline.
-          version: 1.25.2
-          # Emit findings as GitHub annotations instead of uploading SARIF.
-          # SARIF upload requires GitHub Advanced Security and
-          # `security-events: write`; annotations keep this job
-          # least-privilege (contents: read only) and work on any repo tier.
-          advanced-security: false
-          annotations: true
-          # Point at the repo config explicitly so the wiring is obvious
-          # (zizmor would otherwise discover it via the default search path).
-          config: .github/zizmor.yml
-          # token defaults to ${{ github.token }} for online audits.
+        # We invoke the pinned zizmor container directly rather than via
+        # zizmorcore/zizmor-action because that action does not expose
+        # `--no-exit-codes`, which is what lets us forgive FINDINGS while still
+        # failing on a genuine tool/config error. The image is the exact one
+        # the action would use, pinned by both tag and digest (zizmor 1.16.3).
+        # The workspace is mounted read-only and the only token exposed is the
+        # job-scoped GITHUB_TOKEN; the job has `contents: read` only.
+        env:
+          # yamllint disable-line rule:line-length
+          ZIZMOR_IMAGE: ghcr.io/zizmorcore/zizmor:1.16.3@sha256:f09cee55087d54e7a162fc255ffe82ef942f68e683f967c8a6471ffe35e7ec64
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          docker run --rm \
+            --volume "${GITHUB_WORKSPACE}:/workspace:ro" \
+            --workdir /workspace \
+            --env "GH_TOKEN=${GH_TOKEN}" \
+            "${ZIZMOR_IMAGE}" \
+            --format=github \
+            --config=.github/zizmor.yml \
+            --no-exit-codes \
+            -- \
+            .
+        shell: bash
