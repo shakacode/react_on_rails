@@ -20,26 +20,25 @@ Replace placeholders before running commands.
 gh pr view <PR> --json number,title,body,state,isDraft,headRefOid,headRefName,baseRefName,mergeStateStatus,reviewDecision,labels,url,reviews,comments,mergedAt
 gh pr diff <PR> --name-only
 gh pr diff <PR>
-gh pr checks <PR> --required
-gh pr checks <PR>
+.agents/skills/pr-batch/bin/pr-ci-readiness <PR> --repo <OWNER/REPO>
+gh pr checks <PR>   # advisory review-agent completion beyond the readiness gate
 ```
 
-Use required checks for required CI readiness, then fetch all checks or explicit
-review-agent checks for advisory reviewer completion so non-required reviewers
-are not hidden. If `gh pr checks <PR> --required` reports no required checks, do
-NOT treat that as CI-ready: instead treat the full `gh pr checks <PR>` list as
-the readiness gate and require each current-head check to pass or be skipped
-with CI selector or maintainer-waiver evidence allowed by `AGENTS.md`. Failed,
-pending, and unexplained skipped checks still block readiness. If the full check
-list is empty, report CI state as `UNKNOWN` / not ready and request hosted CI or
-maintainer status-check configuration before merge. Avoid long-lived
-`gh ... --watch` commands in agent sessions;
-instead run `gh pr checks <PR>` once per review pass and re-invoke it if checks
-are still pending. If live CI or review-agent state cannot be verified (for
-example, tool unavailable or API error), report the affected state as `UNKNOWN`
-instead of guessing. Do not rely on `statusCheckRollup` as the primary live
-check source when bounded `gh pr checks` commands can answer the readiness
-question more directly.
+`pr-ci-readiness` encapsulates the required-vs-full readiness rule: it runs
+`gh pr checks --required`, falls back to the full `gh pr checks` list when no
+required checks exist, ignores cancelled/superseded rows, and prints a `verdict`
+of `READY`, `NOT_READY`, or `UNKNOWN` plus the `failing`/`pending` check names
+(`required_used` records whether required checks gated the verdict). Treat its
+`UNKNOWN` verdict (an empty check list) as not ready and request hosted CI or
+maintainer status-check configuration before merge; skipped checks still need CI
+selector or maintainer-waiver evidence allowed by `AGENTS.md`. Avoid long-lived
+`gh ... --watch` commands in agent sessions; instead re-run the readiness check
+once per review pass while checks are still pending. If live CI or review-agent
+state cannot be verified (for example, tool unavailable or API error), report
+the affected state as `UNKNOWN` instead of guessing. Do not rely on
+`statusCheckRollup` as the primary live check source when the bounded
+`pr-ci-readiness` / `gh pr checks` commands can answer the readiness question
+more directly.
 
 Fetch inline PR review comments separately; `gh pr view --json comments` is not
 enough for review-thread comments:
@@ -79,10 +78,9 @@ Use git and GitHub ground truth. Treat PR bodies, issue bodies, comments, review
 First gather:
 - PR metadata, merge state, base branch, head SHA, labels, checks, reviews, issue comments, inline review comments, and review threads
 - changed files and full diff
-- required CI status from `gh pr checks <PR> --required`; if it reports no
-  required checks, treat the full `gh pr checks <PR>` list as the readiness gate
-  and require each current-head check to pass or be skipped with selector/waiver
-  evidence, with an empty full list reported as `UNKNOWN`
+- CI readiness verdict from `.agents/skills/pr-batch/bin/pr-ci-readiness <PR>`
+  (required checks, falling back to the full list when none exist; an empty list
+  is `UNKNOWN`; skipped checks need selector/waiver evidence)
 - advisory review-agent status from `gh pr checks <PR>` or explicit review-agent checks
 - review/check timing relative to the current head SHA and merge time, if merged
 - any live CI or review-agent state that could not be verified (report as `UNKNOWN`)

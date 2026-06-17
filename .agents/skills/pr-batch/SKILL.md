@@ -170,8 +170,9 @@ workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is
 not enough when review comments exist: fetch unresolved review threads with the
 GraphQL command in `.agents/workflows/pr-processing.md` under **Initial GitHub
 Commands**, then classify and resolve or explicitly waive actionable findings
-before merging. When no required checks are reported, apply the fallback in the
-next paragraph; an empty full check list is `UNKNOWN` / not ready. Treat untriaged
+before merging. Use `.agents/skills/pr-batch/bin/pr-ci-readiness <PR>` (described
+below) for the required-vs-full readiness verdict; an empty check list is
+`UNKNOWN` / not ready. Treat untriaged
 `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security,
 regression, compatibility, and missing-changelog findings as merge blockers
 unless a maintainer explicitly waives them.
@@ -184,13 +185,15 @@ current-head review thread, active `review_objects.changes_requested` entry, or
 `complete_allowed: false`. Include the ledger JSON artifact path or table in the
 final handoff.
 
-If `gh pr checks <PR> --required` reports no required checks, do NOT treat that
-as CI-ready. Instead treat the full `gh pr checks <PR>` list as the readiness
-gate and require each current-head check to pass or be skipped with CI selector
-or maintainer-waiver evidence allowed by `AGENTS.md`. Failed, pending, and
-unexplained skipped checks still block readiness. If the full check list is
-empty, report CI state as `UNKNOWN` / not ready and request hosted CI or maintainer
-status-check configuration before merge.
+For the required-vs-full CI readiness decision, run
+`.agents/skills/pr-batch/bin/pr-ci-readiness <PR>` (add `--repo OWNER/REPO` when
+not in the repo). It runs `gh pr checks --required`, falls back to the full list
+when no required checks exist, ignores cancelled/superseded rows, and prints a
+`verdict` of `READY`, `NOT_READY`, or `UNKNOWN` plus the `failing`/`pending`
+check names (`required_used` shows whether required checks gated the verdict).
+Treat `UNKNOWN` (an empty check list) as not ready and request hosted CI or
+maintainer status-check configuration before merge; skipped checks still need CI
+selector or maintainer-waiver evidence allowed by `AGENTS.md`.
 
 At the final review/readiness gate, apply the canonical hosted-CI uncertainty
 rule from `.agents/workflows/pr-processing.md` under **Question And Decision
