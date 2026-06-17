@@ -17,6 +17,7 @@ import { Readable } from 'stream';
 
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { renderToPipeableStream } from 'react-on-rails/ReactDOMServer';
+import captureReactOwnerStack from 'react-on-rails/captureReactOwnerStack';
 import { convertToError } from 'react-on-rails/serverRenderUtils';
 import {
   assertRailsContextWithServerStreamingCapabilities,
@@ -65,6 +66,23 @@ const streamRenderReactComponent = (
     pipeToTransform(errorHtmlStream);
   };
 
+  // Returns the suffix to append to an error's stack so React 19.1+'s owner stack (the component
+  // chain that rendered the failing one, issue #3887) travels to Rails via the renderingError
+  // metadata (message + stack) and into the shell-error HTML. MUST be called synchronously inside a
+  // React error callback (onError/onShellError), where `captureReactOwnerStack()` can still read the
+  // owner stack; returns '' on React < 19.1 and in production builds. Keyed on a marker so callers
+  // can apply it idempotently: for an Error instance both onError and onShellError receive the same
+  // object (the second call returns '' because the marker is already present), and for a non-Error
+  // throw each callback gets a fresh Error from convertToError that still gets the owner stack.
+  const OWNER_STACK_MARKER = '\n\nOwner stack (the components that rendered this one):';
+  const ownerStackAugmentedStack = (error: Error): string | undefined => {
+    if (typeof error.stack !== 'string' || error.stack.includes(OWNER_STACK_MARKER)) {
+      return undefined;
+    }
+    const ownerStack = captureReactOwnerStack();
+    return ownerStack ? `${error.stack}${OWNER_STACK_MARKER}${ownerStack}` : undefined;
+  };
+
   assertRailsContextWithServerStreamingCapabilities(railsContext);
 
   Promise.resolve(reactRenderingResult)
@@ -83,7 +101,16 @@ const streamRenderReactComponent = (
 
       const renderingStream = renderToPipeableStream(reactRenderedElement, {
         onShellError(e) {
-          sendErrorHtml(convertToError(e));
+          const error = convertToError(e);
+          // Ensure the owner stack is on this error's stack for the shell-error HTML (issue #3887).
+          // For an Error instance React already passed it to onError, which appended it, so the marker
+          // is present and the suffix is empty; for a non-Error throw onShellError gets a fresh Error
+          // and the owner stack is appended here.
+          const augmentedStack = ownerStackAugmentedStack(error);
+          if (augmentedStack) {
+            error.stack = augmentedStack;
+          }
+          sendErrorHtml(error);
         },
         onShellReady() {
           renderState.isShellReady = true;
@@ -101,6 +128,15 @@ const streamRenderReactComponent = (
           if (isRSCRouteSSRFalseBailoutError(error)) {
             sawRSCRouteSSRFalseBailout = true;
             return error.digest;
+          }
+
+          // Append the owner stack to this error's stack (issue #3887). onError fires for every
+          // render error and sets renderState.error, which is serialized into the Rails-side
+          // renderingError metadata (message + stack) — so this is what carries owner stacks to
+          // PrerenderError/SmartError for ALL streaming errors.
+          const augmentedStack = ownerStackAugmentedStack(error);
+          if (augmentedStack) {
+            error.stack = augmentedStack;
           }
 
           reportError(error);
