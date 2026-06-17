@@ -203,5 +203,64 @@ RSpec.describe "benchmark route discovery helpers" do
         end.to raise_error("Failed to get routes from #{app_dir}")
       end
     end
+
+    it "normalizes and strips optional params on explicit comma-split routes" do
+      # Explicit ROUTES= inputs are copied from `rails routes` output, so they may
+      # arrive with "(.:format)" suffixes, surrounding whitespace, missing leading
+      # slashes, and trailing empties from a dangling comma. The result must be the
+      # canonical "/path" form bench.rb uses verbatim as the BMF name (#3459).
+      expect(
+        benchmark_routes_for_app("unused", " server_side_hello_world(.:format) , /client_side_hello_world ,")
+      ).to eq(["/server_side_hello_world", "/client_side_hello_world"])
+    end
+  end
+
+  describe "#strip_optional_params" do
+    it "removes optional parameter groups" do
+      expect(strip_optional_params("/client_side_hello_world(.:format)")).to eq("/client_side_hello_world")
+    end
+
+    it "removes an optional locale prefix group" do
+      expect(strip_optional_params("(/:locale)/dashboard(.:format)")).to eq("/dashboard")
+    end
+
+    it "leaves a route with no optional groups unchanged" do
+      expect(strip_optional_params("/server_side_hello_world")).to eq("/server_side_hello_world")
+    end
+  end
+
+  describe "#normalize_route_path" do
+    it "prepends a leading slash when missing" do
+      expect(normalize_route_path("server_side_hello_world")).to eq("/server_side_hello_world")
+    end
+
+    it "leaves an already-rooted path unchanged" do
+      expect(normalize_route_path("/server_side_hello_world")).to eq("/server_side_hello_world")
+    end
+  end
+
+  describe "#sanitize_route_name" do
+    it "maps the root route to a non-empty filesystem-safe name" do
+      expect(sanitize_route_name("/")).to eq("root")
+    end
+
+    it "strips the leading slash and joins nested segments with underscores" do
+      expect(sanitize_route_name("/nested/path")).to eq("nested_path")
+    end
+
+    it "drops optional params before building the name" do
+      expect(sanitize_route_name("/client_side_hello_world(.:format)")).to eq("client_side_hello_world")
+    end
+
+    it "replaces shell metacharacters and Actions-disallowed characters with underscores" do
+      # The name becomes an artifact name and is embedded in shell/k6 commands, so
+      # the allowlist must collapse anything outside it. Adjacent unsafe runs
+      # squeeze to a single underscore and leading/trailing underscores are trimmed.
+      expect(sanitize_route_name("/a$b;c|d&e")).to eq("a_b_c_d_e")
+    end
+
+    it "trims leading and trailing underscores produced by sanitizing edge characters" do
+      expect(sanitize_route_name("/<weird>")).to eq("weird")
+    end
   end
 end
