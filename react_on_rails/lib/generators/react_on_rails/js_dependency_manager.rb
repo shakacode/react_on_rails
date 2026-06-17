@@ -160,10 +160,9 @@ module ReactOnRails
       # prerelease RSC package broadly enough to keep `npm ls` healthy, but generator behavior still
       # installs the tested React 19.0.x range and exact RSC package pin until both policies advance.
       RSC_REACT_VERSION_RANGE = "~19.0.4"
-      # Pinned to 19.0.5-rc.7 because the discovery plugin export, native Rspack plugin, and
-      # RSC manifest CSS fixes all ship in that prerelease.
-      # TODO(#3642): switch to a stable react-on-rails-rsc release after 19.0.5 stable ships.
-      RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.7"
+      # Pinned to the stable 19.0.5 release, which carries the discovery plugin export, native
+      # Rspack plugin, and RSC manifest CSS fixes.
+      RSC_PACKAGE_VERSION_PIN = "19.0.5"
 
       private
 
