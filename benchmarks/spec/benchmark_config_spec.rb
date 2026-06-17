@@ -6,10 +6,13 @@ require_relative "../lib/benchmark_config"
 # env_or_default underpins every benchmark parameter (RATE, CONNECTIONS, ...).
 # The benchmark workflow passes "" for any omitted workflow_dispatch input, so an
 # empty string must be treated as unset and fall back to the default rather than
-# overriding it with a blank value (#3459). These pin that "0 = unset" branch was
-# replaced by "empty = unset" semantics.
+# overriding it with a blank value (#3459). These specs also pin the current
+# semantics: the old "0 = unset" branch is gone, so a literal "0" now passes
+# through as a real value.
 RSpec.describe "benchmark_config env_or_default" do
   around do |example|
+    # Initialized before the begin/ensure flow so `ensure` always sees a value.
+    saved = :unset
     saved = ENV.key?("BENCHMARK_SPEC_KEY") ? ENV["BENCHMARK_SPEC_KEY"] : :unset
     example.run
   ensure
