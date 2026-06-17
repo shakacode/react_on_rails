@@ -15,23 +15,9 @@ Traditional SSR renders the full page on the server, then sends the complete HTM
 
 With traditional SSR the first paint waits for the slowest query; with streaming the shell paints first and each slow section streams in afterward:
 
-```mermaid
-flowchart LR
-    subgraph TRAD["Traditional SSR — paint waits for all data"]
-        direction LR
-        t0([Request]) --> t1["Fetch users<br/>~800 ms"]
-        t0 --> t2["Fetch posts<br/>~600 ms"]
-        t1 --> t3["Render HTML<br/>~200 ms"]
-        t2 --> t3
-        t3 --> t4(["First paint<br/>~1000 ms"])
-    end
-    subgraph STREAM["Streaming SSR + async props — paint first, data streams in"]
-        direction LR
-        s0([Request]) --> s1["Render shell<br/>~50 ms"] --> s2(["First paint<br/>~50 ms"])
-        s2 -. stream as ready .-> s3["Users fill in"]
-        s2 -. stream as ready .-> s4["Posts fill in"]
-    end
-```
+<p>
+  <img src="images/traditional-vs-streaming.svg" alt="Two side-by-side timelines on the same scale. With traditional SSR the first paint happens only after the slowest data fetch and the HTML render finish (about 1000 ms). With streaming SSR plus async props the shell paints almost immediately (about 50 ms) and each slow section streams in afterward." width="840" />
+</p>
 
 _Timings are illustrative, not benchmarks — the point is **when** the first paint happens: only after all data is ready for traditional SSR, but right after the shell for streaming._
 
@@ -42,21 +28,9 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 3. As each `<Suspense>` boundary resolves (e.g., an async data fetch completes), the rendered HTML chunk is streamed to the browser
 4. The browser replaces placeholders with real content — no full-page reload needed
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Browser
-    participant Rails
-    participant Renderer as Node Renderer
-    Browser->>Rails: Ask for a page
-    Rails->>Renderer: Start rendering the page
-    Renderer-->>Rails: First HTML piece
-    Rails-->>Browser: Browser can paint right away
-    loop more page parts become ready
-        Renderer-->>Rails: Next HTML piece
-        Rails-->>Browser: Browser adds it to the page
-    end
-```
+<p>
+  <img src="images/streaming-sequence.svg" alt="Sequence diagram across three lanes — Browser, Rails, and the Node Renderer. The browser asks Rails for a page, Rails asks the renderer to start, the renderer streams the first HTML piece back through Rails so the browser can paint right away, then a loop streams each further HTML piece as more of the page becomes ready." width="840" />
+</p>
 
 ## Prerequisites
 
@@ -77,22 +51,9 @@ This is the recommended answer to "my component needs Rails data during render":
 
 Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Browser
-    participant Rails
-    participant Renderer as Node Renderer
-    Browser->>Rails: Ask for a page
-    Rails->>Renderer: Start page with placeholders
-    Renderer-->>Rails: HTML shell + loading states
-    Rails-->>Browser: Browser shows the shell
-    loop each slow data value becomes ready
-        Rails->>Renderer: Send the data value
-        Renderer-->>Rails: HTML for that page section
-        Rails-->>Browser: Browser replaces the loading state
-    end
-```
+<p>
+  <img src="images/async-props-sequence.svg" alt="Sequence diagram across three lanes — Browser, Rails, and the Node Renderer. The browser asks for a page, Rails starts the page with placeholders, the renderer returns an HTML shell with loading states, and the browser shows the shell. Then a loop runs for each slow data value: Rails sends the value, the renderer returns the HTML for that section, and the browser replaces the loading state." width="840" />
+</p>
 
 The view helper is `stream_react_component_with_async_props`, which yields an emitter:
 
@@ -113,19 +74,9 @@ For the full data-fetching guidance — synchronous props, parallelizing indepen
 
 For contrast, a Server Component _can_ reach Rails by calling `fetch` itself. This is a plain **network round-trip** — the renderer's VM has no in-process access to Rails models, sessions, or cookies — and it gives up what async props provide for free, so prefer async props for Rails-owned data:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Renderer as Node Renderer
-    participant Rails as Rails API
-    participant Data as DB / Models
-    Note over Renderer: Discouraged — usually let Rails pass the data instead
-    Renderer->>Rails: Ask Rails API for data
-    Rails->>Data: Load and authorize data
-    Data-->>Rails: Data
-    Rails-->>Renderer: JSON data
-    Renderer->>Renderer: Continue rendering
-```
+<p>
+  <img src="images/discouraged-direct-fetch.svg" alt="Sequence diagram across three lanes — Node Renderer, Rails API, and DB / Models. A warning banner notes this is discouraged. The renderer asks the Rails API for data, Rails loads and authorizes it from the database, returns the data to Rails, Rails returns JSON to the renderer, and the renderer continues rendering. Prefer async props so Rails keeps owning auth and caching." width="840" />
+</p>
 
 Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` are **not** in the VM by default (bundle an HTTP client or inject them via [runtime globals](../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc)); cookies, auth, session, and CSRF are **not** forwarded automatically; and it bypasses Rails' authorization and caching layers.
 
@@ -356,11 +307,9 @@ To render more of the page progressively, add an async prop and a `<Suspense>` b
 
 Extending the example with a second slow section (`users`), the page fills in stage by stage from the browser's perspective — visible from the first paint and interactive as each part hydrates, with each `<Suspense>` boundary swapping its fallback for real content as its prop arrives:
 
-```mermaid
-flowchart LR
-    A["Stage 1 · shell (~50 ms)<br/><br/>Header ✓<br/>Users …loading<br/>Posts …loading<br/><br/>visible now · interactive as JS loads"] --> B["Stage 2 · users fill in<br/><br/>Header ✓<br/>Users ✓<br/>Posts …loading"]
-    B --> C["Stage 3 · complete<br/><br/>Header ✓<br/>Users ✓<br/>Posts ✓"]
-```
+<p>
+  <img src="images/progressive-stages.svg" alt="Three browser snapshots. Stage 1 is the shell at about 50 ms: the header is done while users and posts show loading states, but the page is already visible and becomes interactive as JS loads. Stage 2: the users section fills in while posts still load. Stage 3: the page is complete with header, users, and posts all done." width="840" />
+</p>
 
 ## Compression Middleware Compatibility
 
