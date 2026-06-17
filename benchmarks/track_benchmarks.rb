@@ -328,6 +328,33 @@ def report_main_push_candidate(report, report_markdown, bencher_exit_code, suite
   end
 end
 
+# A gated run (the future release-candidate / nightly benchmark on the dedicated
+# self-hosted runner, #4073) must FAIL the workflow when Bencher alerts, unlike the
+# default non-main-push run which only summarizes and exits 0. Enabled by
+# BENCHMARK_FAIL_ON_ALERT=true. There is no confirmation rerun: a dedicated runner is
+# stable enough (no shared-runner contention) that a single alert is actionable, so the
+# fresh-runner machinery that exists to filter cloud noise (#4071) is unnecessary here.
+def fail_on_alert?
+  ENV.fetch("BENCHMARK_FAIL_ON_ALERT", "false") == "true"
+end
+
+# Decide the exit code for a gated run. A regression fails the gate (exit 1); an
+# operational Bencher failure with no alert still fails (its own exit code), matching
+# report_main_push_candidate; a clean run falls through to the implicit exit 0.
+def report_gated_alert(report, bencher_exit_code, suite_name)
+  if regression?(report)
+    warn "::error::#{suite_name}: Bencher flagged a performance regression on a gated run " \
+         "(BENCHMARK_FAIL_ON_ALERT); failing the workflow. See the summary above and " \
+         "#{Github.run_url}"
+    exit 1
+  elsif bencher_exit_code != 0
+    warn "::error::Bencher exited #{bencher_exit_code} for #{suite_name} on a gated run with " \
+         "no regression alert; this indicates an operational failure (auth/API/network/CLI), " \
+         "not a performance regression. Check the logs above."
+    exit bencher_exit_code
+  end
+end
+
 # Write the non-fatal first-run candidate for the gate/confirmation jobs. Records the
 # structured alert pairs so the confirmation rerun can require the SAME pair(s) to
 # re-alert, plus the un-sharded suite name (so a suite's shards combine downstream) and
@@ -506,6 +533,11 @@ if __FILE__ == $PROGRAM_NAME
     if main_push? && bencher_exit_code != 0
       report_main_push_candidate(report, report_markdown, bencher_exit_code,
                                  SUITE_NAME)
+    elsif fail_on_alert? && !main_push?
+      # Gated run (e.g. the RC benchmark): turn a Bencher alert into a non-zero exit so it
+      # can block a release candidate. main-push keeps its non-fatal candidate/confirmation
+      # flow untouched.
+      report_gated_alert(report, bencher_exit_code, SUITE_NAME)
     end
   end
 end

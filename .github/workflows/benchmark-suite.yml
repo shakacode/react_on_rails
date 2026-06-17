@@ -24,6 +24,31 @@ on:
         required: false
         default: 'initial'
         type: string
+      runs_on:
+        description: >-
+          JSON-encoded runs-on labels for the suite job. Defaults to the GitHub-hosted
+          runner; the self-hosted runner workflow (#4073) passes its own label set so the
+          same suite runs on dedicated hardware.
+        required: false
+        default: '["ubuntu-24.04"]'
+        type: string
+      testbed:
+        description: >-
+          Bencher testbed to report under. Defaults to the shared github-actions testbed;
+          the self-hosted runner workflow (#4073) overrides it (e.g. m1-bench) so its
+          dedicated-hardware numbers build their own baseline series.
+        required: false
+        default: 'github-actions'
+        type: string
+      fail_on_alert:
+        description: >-
+          When true, a Bencher regression alert fails the job (BENCHMARK_FAIL_ON_ALERT).
+          Default false keeps the existing non-main-push behavior (summarize, exit 0). The
+          self-hosted RC/nightly workflow (#4073) sets this so a regression blocks the run;
+          main-push runs are unaffected (they use the candidate/confirmation flow).
+        required: false
+        default: false
+        type: boolean
     secrets:
       REACT_ON_RAILS_PRO_LICENSE_V2:
         required: true
@@ -49,12 +74,21 @@ env:
 
 jobs:
   run-suite:
-    runs-on: ubuntu-24.04
+    # Defaults to the GitHub-hosted runner; the self-hosted runner workflow (#4073) passes
+    # its own label set so the identical suite runs on dedicated hardware.
+    runs-on: ${{ fromJSON(inputs.runs_on) }}
     # Token permissions are set by each caller in benchmark.yml: initial mode can
     # update PR comments, while confirm mode only reads the candidate and writes checks.
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      # Bencher testbed to report under (read by benchmarks/lib/bencher_runner.rb). Default
+      # github-actions; the self-hosted workflow overrides it so its numbers build a
+      # separate baseline series that is not compared against shared-runner history.
+      BENCHER_TESTBED: ${{ inputs.testbed }}
+      # When true, track_benchmarks.rb exits non-zero on a Bencher alert so a gated
+      # (RC/nightly) run blocks on a regression. Default false preserves current behavior.
+      BENCHMARK_FAIL_ON_ALERT: ${{ inputs.fail_on_alert }}
       # Matrix row unpacked once. Names that begin with BENCHMARK_ are read by the bench
       # scripts and track_benchmarks.rb directly; the rest drive step conditions/paths.
       BENCHMARK_MODE: ${{ inputs.mode }}

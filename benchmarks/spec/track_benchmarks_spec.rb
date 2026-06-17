@@ -361,6 +361,41 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
+  # Gated runs (the future RC/nightly benchmark on the dedicated self-hosted runner) must
+  # fail on a Bencher alert, unlike the default non-main-push run which only summarizes.
+  describe "#fail_on_alert?" do
+    it "is false by default" do
+      with_env("BENCHMARK_FAIL_ON_ALERT" => nil) { expect(fail_on_alert?).to be(false) }
+    end
+
+    it "is true only for the exact string 'true'" do
+      with_env("BENCHMARK_FAIL_ON_ALERT" => "true") { expect(fail_on_alert?).to be(true) }
+      with_env("BENCHMARK_FAIL_ON_ALERT" => "1") { expect(fail_on_alert?).to be(false) }
+    end
+  end
+
+  describe "#report_gated_alert" do
+    it "fails the workflow (exit 1) on a regression" do
+      allow(Github).to receive(:run_url).and_return("https://github.test/run/1")
+
+      expect { report_gated_alert(report_with_alert, 1, "Pro") }.to(
+        output(/::error::Pro: Bencher flagged a performance regression on a gated run/).to_stderr
+          .and(raise_error(SystemExit) { |e| expect(e.status).to eq(1) })
+      )
+    end
+
+    it "fails with the Bencher exit code on an operational failure (non-zero, no alert)" do
+      expect { report_gated_alert(report_without_alert, 2, "Core") }.to(
+        output(/::error::Bencher exited 2 for Core on a gated run with no regression alert/).to_stderr
+          .and(raise_error(SystemExit) { |e| expect(e.status).to eq(2) })
+      )
+    end
+
+    it "does not exit when there is no regression and Bencher succeeded" do
+      expect { report_gated_alert(report_without_alert, 0, "Core") }.not_to raise_error
+    end
+  end
+
   describe "GitHub warning annotations" do
     it "writes warning workflow commands to stdout, not stderr" do
       expect { Github.warning("benchmark annotation") }
