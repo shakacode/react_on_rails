@@ -2386,9 +2386,7 @@ If you open the HTML source of any web page using React on Rails, you'll see the
 
 **Note**: If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="HelloWorld-react-component-0"/>`. The first specification of the React component is just the same.
 
-<p align="center">
-  <img src="images/client-vs-server-rendering.svg" alt="The same HelloWorld component rendered three ways. Client-only (prerender: false) ships an empty wrapper div plus a props script that the browser fills in. Server-rendered (prerender: true) ships the same wrapper now containing fully-rendered HTML, visible before any JavaScript runs. Hydration, the second half of server rendering, reads the props script and attaches event handlers to the already-painted HTML to make it interactive." width="840" />
-</p>
+[Diagram: The same HelloWorld component rendered three ways. Client-only (prerender: false) ships an empty wrapper div plus a props script that the browser fills in. Server-rendered (prerender: true) ships the same wrapper now containing fully-rendered HTML, visible before any JavaScript runs. Hydration, the second half of server rendering, reads the props script and attaches event handlers to the already-painted HTML to make it interactive.]
 
 ## Different Server-Side Rendering Code (and a Server-Specific Bundle)
 
@@ -3345,9 +3343,7 @@ Auto-bundling (described in the next section) automates both steps: it generates
 
 File-system-based automated pack generation simplifies this process with a new option for the view helpers.
 
-<p align="center">
-  <img src="images/auto-bundling.svg" alt="Manual bundle splitting versus auto-bundling. With manual splitting you hand-write a one-line pack file that imports and registers each component, and every Rails view must declare which packs it needs with append_javascript_pack_tag — easy to forget. With auto-bundling you drop components into the ror_components convention directory and React on Rails generates the per-component pack files and bundles for you, while the react_component view helper appends the right pack tags automatically, giving per-page code splitting with no boilerplate." width="840" />
-</p>
+[Diagram: Manual bundle splitting versus auto-bundling. With manual splitting you hand-write a one-line pack file that imports and registers each component, and every Rails view must declare which packs it needs with append_javascript_pack_tag — easy to forget. With auto-bundling you drop components into the ror_components convention directory and React on Rails generates the per-component pack files and bundles for you, while the react_component view helper appends the right pack tags automatically, giving per-page code splitting with no boilerplate.]
 
 > Note: In the Background examples above, we used `BarComponentTwo`. In the Solution below, we refer to the same component as `SpecialComponentNotToAutoLoadBundle` to emphasize that it is excluded from auto-loading. You do not need to rename your files.
 
@@ -14475,9 +14471,7 @@ When running Rails and the Node Renderer in containers, you have three options, 
 | **Per-process visibility** | No                     | Yes                         | Yes                                             |
 | **When to use**            | Default starting point | Need to diagnose OOM source | Need independent scaling at high replica counts |
 
-<p align="center">
-  <img src="images/deployment-topologies.svg" alt="Three container topologies for running Rails with the Pro Node Renderer. Single container: both processes run in one container sharing OS resources and talking over localhost — lowest complexity, scaled together, versions always aligned. Sidecar containers: Rails and the Node Renderer run as two containers in the same pod with their own resource limits but still talking over localhost — scaled together, versions aligned, with per-process visibility. Separate workloads: Rails and the renderer run as independent workloads communicating over service DNS — scaled independently but with a risk of version drift on rolling deploys." width="840" />
-</p>
+[Diagram: Three container topologies for running Rails with the Pro Node Renderer. Single container: both processes run in one container sharing OS resources and talking over localhost — lowest complexity, scaled together, versions always aligned. Sidecar containers: Rails and the Node Renderer run as two containers in the same pod with their own resource limits but still talking over localhost — scaled together, versions aligned, with per-process visibility. Separate workloads: Rails and the renderer run as independent workloads communicating over service DNS — scaled independently but with a risk of version drift on rolling deploys.]
 
 ### Option 1: Single Container (Default)
 
@@ -18769,9 +18763,7 @@ EXPOSE 3000
 CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]
 ```
 
-<p align="center">
-  <img src="images/docker-multi-stage-build.svg" alt="A three-stage Docker build for React on Rails. The base stage sets the shared Ruby image and production environment. The build stage adds Node.js and build tools, installs gems and JS dependencies, runs assets:precompile to build the client and server bundles, then deletes node_modules. The runtime stage starts fresh from base and copies in only the built artifacts — gems, compiled bundles, and app code — leaving Node.js and node_modules behind, producing a lean production image hundreds of megabytes smaller." width="840" />
-</p>
+[Diagram: A three-stage Docker build for React on Rails. The base stage sets the shared Ruby image and production environment. The build stage adds Node.js and build tools, installs gems and JS dependencies, runs assets:precompile to build the client and server bundles, then deletes node_modules. The runtime stage starts fresh from base and copies in only the built artifacts — gems, compiled bundles, and app code — leaving Node.js and node_modules behind, producing a lean production image hundreds of megabytes smaller.]
 
 ### Key points
 
@@ -23753,9 +23745,7 @@ module.exports = webpackConfig;
 
 Add the RSC bundle watcher to your `Procfile.dev`:
 
-<p align="center">
-  <img src="images/build-pipeline-bundles.svg" alt="Static diagram showing the RSC build pipeline with three parallel webpack bundle processes (client, server, RSC) plus the Node renderer, as defined in Procfile.dev. Each bundle targets different environments and entry points." width="840" />
-</p>
+[Diagram: Static diagram showing the RSC build pipeline with three parallel webpack bundle processes (client, server, RSC) plus the Node renderer, as defined in Procfile.dev. Each bundle targets different environments and entry points.]
 
 > **For full webpack configuration details**, including the technical background on how the RSC loader, plugin, and manifests work together, see [How React Server Components Work](../../pro/react-server-components/how-react-server-components-work.md).
 
@@ -24085,9 +24075,7 @@ This means the placement of `'use client'` directly determines your bundle size.
 
 A common misconception is that every component using hooks or browser APIs needs `'use client'`. It doesn't. You only need the directive at the **boundary** — the file where code transitions from server to client. Everything imported below that boundary is automatically client code:
 
-<p align="center">
-  <img src="images/use-client-module-boundary.svg" alt="Static diagram showing how the 'use client' directive works at the module (file) level. Once a file has the directive, all its imports automatically become client code — no additional directive needed in child modules." width="840" />
-</p>
+[Diagram: Static diagram showing how the 'use client' directive works at the module (file) level. Once a file has the directive, all its imports automatically become client code — no additional directive needed in child modules.]
 
 `SearchInput` and `SearchResults` use hooks and event handlers, but they don't need `'use client'` because `SearchBar` already established the boundary. Adding it would be redundant.
 
@@ -24095,9 +24083,7 @@ A common misconception is that every component using hooks or browser APIs needs
 
 Start from the top of each component tree and work downward:
 
-<p align="center">
-  <img src="images/top-down-migration.svg" alt="Animated three-phase diagram showing RSC migration strategy: Phase 1 marks the root as 'use client' (100% client bundle), Phase 2 pushes the boundary down to child components (~40% client), Phase 3 splits mixed components into server+client leaves (~15% client). Each phase reveals progressively with staggered animation." width="840" />
-</p>
+[Diagram: Animated three-phase diagram showing RSC migration strategy: Phase 1 marks the root as 'use client' (100% client bundle), Phase 2 pushes the boundary down to child components (~40% client), Phase 3 splits mixed components into server+client leaves (~15% client). Each phase reveals progressively with staggered animation.]
 
 > **React on Rails multi-root note:** Unlike single-page apps with one root component, React on Rails renders multiple independent component trees on a page -- each `stream_react_component` call in your view is a separate root. This is actually an advantage for migration: you can migrate **one registered component at a time**, leaving the rest untouched.
 
@@ -24168,9 +24154,7 @@ Choose one registered component to migrate. The ideal first candidate is a compo
 
 **Step 3: Push `'use client'` down to interactive children.** Identify child components that don't use hooks or browser APIs. Those can stay as server-rendered. Add `'use client'` only to the children that need interactivity.
 
-<p align="center">
-  <img src="images/push-boundary-down.svg" alt="Static before-and-after diagram showing how to migrate a React component tree by pushing the 'use client' directive from the root down to only the leaf components that truly need interactivity. Before: the entire tree is client code. After: only interactive leaves are client components." width="840" />
-</p>
+[Diagram: Static before-and-after diagram showing how to migrate a React component tree by pushing the 'use client' directive from the root down to only the leaf components that truly need interactivity. Before: the entire tree is client code. After: only interactive leaves are client components.]
 
 Repeat for each registered component you want to migrate.
 
@@ -25260,9 +25244,7 @@ Rails streams the data through async props using `stream_react_component_with_as
 - `<Suspense>` replaces manual loading/error checks
 - No JavaScript ships to the client for this component
 
-<p align="center">
-  <img src="images/waterfall-vs-parallel.svg" alt="Side-by-side comparison showing client-side fetching requiring an extra API round trip after mount versus Server Component pattern where Rails streams data via async props — no extra round trips, no client state management, Suspense handles loading." width="840" />
-</p>
+[Diagram: Side-by-side comparison showing client-side fetching requiring an extra API round trip after mount versus Server Component pattern where Rails streams data via async props — no extra round trips, no client state management, Suspense handles loading.]
 
 For pages with multiple data sources, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro) to
 stream the rendered HTML to the browser as React renders the component tree. When slower data sources should resolve
@@ -25436,7 +25418,7 @@ With async props, `stream_react_component_with_async_props` starts rendering wit
 
 The synchronous example above loads every prop in the controller before React starts rendering. When one data source is slow (a recommendations service, an expensive aggregate), it holds up the whole render. **Async props** let Rails send the fast props immediately and stream each slow prop to the browser as it resolves, so React shows the shell and fills in each `<Suspense>` boundary independently.
 
-![How async props work in React on Rails](../../pro/react-server-components/async-props-execution.svg)
+[Diagram: How async props work in React on Rails]
 
 Use `stream_react_component_with_async_props` and emit each slow prop from the block. The fast props go in `props:`; each `emit.call(name, value)` streams one more prop as soon as Rails has it:
 
@@ -27069,9 +27051,7 @@ For third-party packages, check if the library provides direct import paths (mos
 
 Avoid creating barrel files that mix server and client components. If you must use a barrel file, keep separate barrels for server and client exports:
 
-<p align="center">
-  <img src="images/barrel-file-contamination.svg" alt="Static diagram showing how a single barrel file (index.js) with 'use client' contaminates all re-exports, and the fix using separate server/client barrels to keep imports isolated." width="840" />
-</p>
+[Diagram: Static diagram showing how a single barrel file (index.js) with 'use client' contaminates all re-exports, and the fix using separate server/client barrels to keep imports isolated.]
 
 ## The `server-only` and `client-only` Packages
 
@@ -27340,9 +27320,7 @@ The `'use client'` directive operates at the **module level**. Once a file is ma
 
 ### The Problem
 
-<p align="center">
-  <img src="images/import-chain-contamination.svg" alt="Static diagram showing how a small 'use client' component can inherit large chunk groups from heavier import paths, and the fix using a thin wrapper file to isolate the dependency tree." width="840" />
-</p>
+[Diagram: Static diagram showing how a small 'use client' component can inherit large chunk groups from heavier import paths, and the fix using a thin wrapper file to isolate the dependency tree.]
 
 ### How to Detect It
 
@@ -27369,9 +27347,7 @@ If someone imports `db-utils.js` from a Client Component (directly or transitive
 
 When a component with `'use client'` is statically imported by both a small RSC path and a heavier client path, the RSC page can inherit chunks from both paths. The impact can be severe (for example, 382 KB instead of 8 KB).
 
-<p align="center">
-  <img src="images/chunk-contamination-fix.svg" alt="Animated before/after showing how a shared import between a heavy page and a small component drags vendor chunks into the RSC page bundle, and the fix that shrinks it by isolating the import." width="840" />
-</p>
+[Diagram: Animated before/after showing how a shared import between a heavy page and a small component drags vendor chunks into the RSC page bundle, and the fix that shrinks it by isolating the import.]
 
 ### How to Detect It
 
@@ -28412,9 +28388,7 @@ The savings were dominated by className strings. In the Tailwind-heavy benchmark
 | **Structural JSON**   | ~25%              | The `["$","div",null,{...}]` wrappers around every element            |
 | **Content data**      | ~27%              | Actual text, numbers, and data values                                 |
 
-<p align="center">
-  <img src="images/flight-payload-breakdown.svg" alt="Diagram showing what makes up the RSC Flight payload: className strings (~48%), structural JSON (~25%), and content data (~27%). Includes expansion ratio benchmarks for real components like StarRating (16:1) and ReviewSnippets (9.3:1)." width="840" />
-</p>
+[Diagram: Diagram showing what makes up the RSC Flight payload: className strings (~48%), structural JSON (~25%), and content data (~27%). Includes expansion ratio benchmarks for real components like StarRating (16:1) and ReviewSnippets (9.3:1).]
 
 ### How to Apply It
 
@@ -28554,9 +28528,7 @@ The Flight payload optimization patterns in this guide (expansion ratios, presen
 
 Use this flowchart when deciding whether a presentational component should be a Server or Client Component:
 
-<p align="center">
-  <img src="images/server-client-decision-flowchart.svg" alt="Static flowchart guiding developers through the decision of whether a component should be a Server Component or Client Component, based on interactivity, server-only resources, repetition ratio, expansion ratio, and bundle cost." width="840" />
-</p>
+[Diagram: Static flowchart guiding developers through the decision of whether a component should be a Server Component or Client Component, based on interactivity, server-only resources, repetition ratio, expansion ratio, and bundle cost.]
 
 ## Summary
 
@@ -28918,9 +28890,7 @@ This optimization is particularly impactful for:
 
 _How early hydration changes the timeline:_
 
-<p align="center">
-  <img src="images/early-hydration.svg" alt="A timeline comparison of two hydration strategies. In v14 and v15, hydration is a serial waterfall: the browser downloads the full page, renders it, and only after full page load does hydration begin, so time-to-interactive is late. In v16, with async pack loading and immediate hydration, HTML streams from the server while each component hydrates as soon as its server-rendered markup and code arrive — hydration runs in parallel with page streaming, so components become interactive much earlier." width="840" />
-</p>
+[Diagram: A timeline comparison of two hydration strategies. In v14 and v15, hydration is a serial waterfall: the browser downloads the full page, renders it, and only after full page load does hydration begin, so time-to-interactive is late. In v16, with async pack loading and immediate hydration, HTML streams from the server while each component hydrates as soon as its server-rendered markup and code arrive — hydration runs in parallel with page streaming, so components become interactive much earlier.]
 
 _Performance improvement visualization:_
 
