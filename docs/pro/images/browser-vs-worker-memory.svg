@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 380" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Browser memory resets per navigation; the Node worker context persists</title>
+  <desc>Two timelines. In the browser, each page navigation creates a fresh JavaScript context and the previous one is destroyed, so module-level state never accumulates. In a Node Renderer worker, one context is created at startup and reused across thousands of requests, so module-level state keeps growing until the worker restarts.</desc>
+  <defs>
+    <linearGradient id="browserGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A90D9"/><stop offset="100%" stop-color="#2E5A8A"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .axis { stroke: #CBD5E1; }
+      .tick { fill: #94A3B8; }
+      .ctx-ok { fill: #DBEAFE; stroke: #3B82F6; }
+      .ctx-ok-text { fill: #1E40AF; }
+      .ctx-bad { fill: #FEF3C7; stroke: #F59E0B; }
+      .ctx-bad-text { fill: #92400E; }
+      .mem-ok { fill: #22C55E; }
+      .mem-bad { fill: #F59E0B; }
+      .reset { fill: #16A34A; }
+      .reset-text { fill: #166534; }
+      .grow-text { fill: #92400E; }
+      .caption { fill: #475569; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .axis { stroke: #475569; }
+        .ctx-ok { fill: #172554; stroke: #3B82F6; }
+        .ctx-ok-text { fill: #93C5FD; }
+        .ctx-bad { fill: #422006; stroke: #F59E0B; }
+        .ctx-bad-text { fill: #FDE68A; }
+        .reset-text { fill: #6EE7B7; }
+        .grow-text { fill: #FDE68A; }
+        .caption { fill: #94A3B8; }
+      }
+      .nav { animation: navloop 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      @keyframes navloop { 0%,70% { opacity: 1; transform: scale(1); } 80% { opacity: 0; transform: scale(0.85); } 81%,100% { opacity: 1; transform: scale(1); } }
+      .climb { stroke-dasharray: 360; stroke-dashoffset: 360; animation: climb 7s linear infinite; }
+      @keyframes climb { 0% { stroke-dashoffset: 360; } 70%,100% { stroke-dashoffset: 0; } }
+      .pulse { animation: pulse 2s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; stroke-dashoffset: 0 !important; } }
+    </style>
+  </defs>
+
+  <rect width="900" height="380" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Why server code leaks when browser code doesn't</text>
+  <text x="450" y="47" text-anchor="middle" font-size="11" class="subtitle">Same module-level state — reset per navigation in the browser, persisted across requests on the server</text>
+
+  <!-- ===== Browser card ===== -->
+  <g>
+    <rect x="20" y="64" width="410" height="290" rx="11" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="20" y="64" width="410" height="30" rx="11" fill="url(#browserGrad)"/>
+    <rect x="20" y="84" width="410" height="10" fill="url(#browserGrad)"/>
+    <text x="225" y="84" text-anchor="middle" font-size="12" font-weight="700" fill="white">Browser — fresh context per navigation</text>
+
+    <!-- contexts -->
+    <g class="nav">
+      <rect x="44" y="118" width="100" height="48" rx="8" class="ctx-ok" stroke-width="1.3"/>
+      <text x="94" y="138" text-anchor="middle" font-size="9.5" font-weight="600" class="ctx-ok-text">Page A</text>
+      <text x="94" y="152" text-anchor="middle" font-size="8.5" class="ctx-ok-text">JS context</text>
+    </g>
+    <text x="166" y="146" text-anchor="middle" font-size="14" class="reset-text">→</text>
+    <g class="nav" style="animation-delay: 0.4s">
+      <rect x="188" y="118" width="100" height="48" rx="8" class="ctx-ok" stroke-width="1.3"/>
+      <text x="238" y="138" text-anchor="middle" font-size="9.5" font-weight="600" class="ctx-ok-text">Page B</text>
+      <text x="238" y="152" text-anchor="middle" font-size="8.5" class="ctx-ok-text">new context</text>
+    </g>
+    <text x="310" y="146" text-anchor="middle" font-size="14" class="reset-text">→</text>
+    <g class="nav" style="animation-delay: 0.8s">
+      <rect x="332" y="118" width="76" height="48" rx="8" class="ctx-ok" stroke-width="1.3"/>
+      <text x="370" y="138" text-anchor="middle" font-size="9.5" font-weight="600" class="ctx-ok-text">Page C</text>
+      <text x="370" y="152" text-anchor="middle" font-size="8.5" class="ctx-ok-text">new context</text>
+    </g>
+
+    <text x="225" y="190" text-anchor="middle" font-size="9.5" class="reset-text" font-weight="600">Navigate → old context destroyed → module state cleared</text>
+
+    <!-- flat memory graph -->
+    <line x1="60" y1="320" x2="390" y2="320" class="axis" stroke-width="1.4"/>
+    <line x1="60" y1="220" x2="60" y2="320" class="axis" stroke-width="1.4"/>
+    <text x="48" y="224" text-anchor="end" font-size="8" class="tick">mem</text>
+    <text x="225" y="336" text-anchor="middle" font-size="8.5" class="tick">requests / navigations →</text>
+    <!-- sawtooth: resets to baseline -->
+    <polyline points="60,310 130,290 130,312 200,292 200,312 270,290 270,312 340,292 390,308" fill="none" class="mem-ok" stroke-width="2.5"/>
+    <text x="225" y="248" text-anchor="middle" font-size="10" font-weight="700" class="reset-text">Memory stays flat ✓</text>
+  </g>
+
+  <!-- ===== Node Renderer card ===== -->
+  <g>
+    <rect x="470" y="64" width="410" height="290" rx="11" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="470" y="64" width="410" height="30" rx="11" fill="url(#nodeGrad)"/>
+    <rect x="470" y="84" width="410" height="10" fill="url(#nodeGrad)"/>
+    <text x="675" y="84" text-anchor="middle" font-size="12" font-weight="700" fill="white">Node worker — one context, reused</text>
+
+    <rect x="560" y="118" width="230" height="48" rx="8" class="ctx-bad pulse" stroke-width="1.4"/>
+    <text x="675" y="138" text-anchor="middle" font-size="9.5" font-weight="600" class="ctx-bad-text">One JS context — created at worker startup</text>
+    <text x="675" y="152" text-anchor="middle" font-size="8.5" class="ctx-bad-text">request 1, 2, 3, ... 10,000 → same context</text>
+
+    <text x="675" y="190" text-anchor="middle" font-size="9.5" class="grow-text" font-weight="600">Module-level state is never cleared between requests</text>
+
+    <!-- rising memory graph -->
+    <line x1="510" y1="320" x2="840" y2="320" class="axis" stroke-width="1.4"/>
+    <line x1="510" y1="214" x2="510" y2="320" class="axis" stroke-width="1.4"/>
+    <text x="498" y="218" text-anchor="end" font-size="8" class="tick">mem</text>
+    <text x="675" y="336" text-anchor="middle" font-size="8.5" class="tick">requests over the worker's lifetime →</text>
+    <polyline points="510,316 580,300 650,280 720,255 790,228 840,214" fill="none" class="mem-bad climb" stroke-width="2.5"/>
+    <text x="675" y="240" text-anchor="middle" font-size="10" font-weight="700" class="grow-text">Memory climbs until restart ✗</text>
+  </g>
+
+  <text x="450" y="372" text-anchor="middle" font-size="10" class="caption">Rule of thumb: module-level mutable state is the danger zone. Rolling worker restarts reclaim it; bounded caches prevent it.</text>
+</svg>

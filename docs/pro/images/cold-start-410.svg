@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 470" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Warm render versus the cold-start 410 round-trip</title>
+  <desc>Sequence diagram between Rails and the Node Renderer. When the renderer already has the bundle it returns HTML immediately. When it is missing the bundle it replies that it needs the bundle first, Rails uploads it and asks again, and only then does the render succeed — an extra round-trip on every cold request.</desc>
+  <defs>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CC0000"/><stop offset="100%" stop-color="#990000"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .lane-line { stroke: #E2E8F0; }
+      .alt-box { fill: none; stroke: #CBD5E1; }
+      .alt-label-bg { fill: #F1F5F9; stroke: #CBD5E1; }
+      .alt-label { fill: #475569; }
+      .warm-tint { fill: #ECFDF5; }
+      .cold-tint { fill: #FEF7ED; }
+      .msg-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .msg-text { fill: #1E40AF; }
+      .ret-box { fill: #ECFDF5; stroke: #86EFAC; }
+      .ret-text { fill: #166534; }
+      .err-box { fill: #FEE2E2; stroke: #FCA5A5; }
+      .err-text { fill: #991B1B; }
+      .arrow-fwd { stroke: #94A3B8; }
+      .arrow-ret { stroke: #22C55E; }
+      .arrow-err { stroke: #DC2626; }
+      .head-fwd { fill: #94A3B8; }
+      .head-ret { fill: #22C55E; }
+      .head-err { fill: #DC2626; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .lane-line { stroke: #334155; }
+        .alt-box { stroke: #475569; }
+        .alt-label-bg { fill: #1E293B; stroke: #475569; }
+        .alt-label { fill: #94A3B8; }
+        .warm-tint { fill: #052E16; }
+        .cold-tint { fill: #422006; }
+        .msg-box { fill: #172554; stroke: #3B82F6; }
+        .msg-text { fill: #93C5FD; }
+        .ret-box { fill: #052E16; stroke: #10B981; }
+        .ret-text { fill: #6EE7B7; }
+        .err-box { fill: #450A0A; stroke: #EF4444; }
+        .err-text { fill: #FCA5A5; }
+        .arrow-fwd { stroke: #CBD5E1; }
+        .head-fwd { fill: #CBD5E1; }
+        .arrow-ret { stroke: #4ADE80; }
+        .head-ret { fill: #4ADE80; }
+        .arrow-err { stroke: #F87171; }
+        .head-err { fill: #F87171; }
+      }
+      .s1 { opacity:0; animation: reveal 11s ease 0.3s infinite; }
+      .s2 { opacity:0; animation: reveal 11s ease 1.3s infinite; }
+      .s3 { opacity:0; animation: reveal 11s ease 2.6s infinite; }
+      .s4 { opacity:0; animation: reveal 11s ease 3.6s infinite; }
+      .s5 { opacity:0; animation: reveal 11s ease 4.6s infinite; }
+      .s6 { opacity:0; animation: reveal 11s ease 5.6s infinite; }
+      @keyframes reveal { 0% { opacity:0; } 4% { opacity:1; } 92% { opacity:1; } 97% { opacity:0; } 100% { opacity:0; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; } }
+    </style>
+  </defs>
+
+  <rect width="840" height="470" class="bg"/>
+  <text x="420" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Cold start: the 410 round-trip</text>
+  <text x="420" y="47" text-anchor="middle" font-size="11" class="subtitle">A missing bundle costs an extra Rails ↔ renderer round-trip on the first request</text>
+
+  <rect x="150" y="62" width="120" height="30" rx="8" fill="url(#railsGrad)" filter="url(#shadow)"/>
+  <text x="210" y="82" text-anchor="middle" font-size="11" font-weight="600" fill="white">Rails</text>
+  <rect x="560" y="62" width="140" height="30" rx="8" fill="url(#nodeGrad)" filter="url(#shadow)"/>
+  <text x="630" y="82" text-anchor="middle" font-size="11" font-weight="600" fill="white">Node Renderer</text>
+
+  <line x1="210" y1="98" x2="210" y2="440" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="630" y1="98" x2="630" y2="440" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+  <!-- WARM branch -->
+  <rect x="40" y="110" width="760" height="78" rx="8" class="warm-tint" opacity="0.6"/>
+  <rect x="40" y="110" width="760" height="78" rx="8" class="alt-box" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+  <rect x="40" y="110" width="280" height="20" rx="6" class="alt-label-bg" stroke-width="1"/>
+  <text x="52" y="124" font-size="10" font-weight="600" class="alt-label">warm — renderer already has the bundle</text>
+
+  <g class="s1">
+    <line x1="216" y1="150" x2="622" y2="150" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="622,147 629,150 622,153" class="head-fwd"/>
+    <rect x="350" y="140" width="150" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="425" y="152" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Please render this page</text>
+  </g>
+  <g class="s2">
+    <line x1="624" y1="178" x2="218" y2="178" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="218,175 211,178 218,181" class="head-ret"/>
+    <rect x="385" y="168" width="80" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="425" y="180" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">HTML — fast</text>
+  </g>
+
+  <!-- COLD branch -->
+  <rect x="40" y="204" width="760" height="218" rx="8" class="cold-tint" opacity="0.55"/>
+  <rect x="40" y="204" width="760" height="218" rx="8" class="alt-box" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+  <rect x="40" y="204" width="300" height="20" rx="6" class="alt-label-bg" stroke-width="1"/>
+  <text x="52" y="218" font-size="10" font-weight="600" class="alt-label">cold — renderer is missing the bundle</text>
+
+  <g class="s3">
+    <line x1="216" y1="248" x2="622" y2="248" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="622,245 629,248 622,251" class="head-fwd"/>
+    <rect x="350" y="238" width="150" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="425" y="250" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Please render this page</text>
+  </g>
+  <g class="s4">
+    <line x1="624" y1="288" x2="218" y2="288" class="arrow-err" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="218,285 211,288 218,291" class="head-err"/>
+    <rect x="350" y="278" width="200" height="18" rx="4" class="err-box" stroke-width="1"/>
+    <text x="450" y="290" text-anchor="middle" font-size="9" font-weight="600" class="err-text">410 Gone — I need that bundle first</text>
+  </g>
+  <g class="s5">
+    <line x1="216" y1="328" x2="622" y2="328" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="622,325 629,328 622,331" class="head-fwd"/>
+    <rect x="360" y="318" width="130" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="425" y="330" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Upload the bundle</text>
+    <line x1="216" y1="360" x2="622" y2="360" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="622,357 629,360 622,363" class="head-fwd"/>
+    <rect x="355" y="350" width="140" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="425" y="362" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Please render again</text>
+  </g>
+  <g class="s6">
+    <line x1="624" y1="398" x2="218" y2="398" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="218,395 211,398 218,401" class="head-ret"/>
+    <rect x="385" y="388" width="80" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="425" y="400" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">HTML — finally</text>
+  </g>
+
+  <text x="420" y="450" text-anchor="middle" font-size="10" class="alt-label">Pre-seeding the cache makes every fresh renderer take the warm path on its very first request.</text>
+</svg>

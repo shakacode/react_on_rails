@@ -16,21 +16,9 @@ During a rolling deploy:
 
 Pre-seeding the current hash (`def`) eliminates the 410→retry only for the new bundle. Requests referencing `abc` still hit a cold cache on new renderers, producing 410 retries per request until the renderer has cached that bundle via upload.
 
-```mermaid
-flowchart TB
-    Traffic(["Incoming traffic"]) --> LB["Load Balancer"]
-    LB --> Old["Old Rails — draining<br/>bundle hash <b>abc</b>"]
-    LB --> New["New Rails<br/>bundle hash <b>def</b>"]
-    Old -- "SSR request · hash = abc" --> R
-    New -- "SSR request · hash = def" --> R
-    R["New Node Renderer pool<br/>(cold start: cache seeded with<br/>current hash <b>def</b> only)"]
-    R -- "def" --> Hit["✅ Cache HIT<br/>fast SSR"]
-    R -- "abc" --> Miss["❌ Cache MISS → <b>410 Gone</b><br/>Rails re-uploads abc, then retries<br/>— once per request, until warm"]
-    style Old fill:#fff4e5,stroke:#e0a000,color:#000
-    style New fill:#e6ffed,stroke:#2da44e,color:#000
-    style Hit fill:#e6ffed,stroke:#2da44e,color:#000
-    style Miss fill:#ffe5e5,stroke:#d1242f,color:#000
-```
+<p align="center">
+  <img src="images/rolling-deploy-problem.svg" alt="During a rolling deploy, draining old Rails (hash abc) and new Rails (hash def) both send SSR requests to a new renderer pool seeded only with the current hash def. The def requests hit the cache, but the abc requests miss and trigger 410 Gone, re-upload, and retry once per request." width="840" />
+</p>
 
 The cold path is bounded and self-healing, but it is not free. On a cache miss the renderer can't serve the request on its own: it returns `410 Gone`, Rails ships the bundle over to the renderer, and only then does the request render. That extra renderer ↔ Rails round-trip — a network hop plus the bundle transfer — adds latency to **every** request that touches a cold bundle, and it repeats per request until that bundle is cached, so a deploy shows up as a latency and error-rate spike. The whole point of a rolling-deploy adapter is to **avoid these cache misses entirely** so no request ever pays that cost during a deploy.
 
@@ -38,22 +26,9 @@ The cold path is bounded and self-healing, but it is not free. On a cache miss t
 
 A **rolling-deploy adapter** makes new renderer instances start warm for **every** in-flight bundle hash — not just the current one — so draining `abc` requests hit the cache instead of triggering a 410.
 
-```mermaid
-flowchart TB
-    Traffic(["Incoming traffic"]) --> LB["Load Balancer"]
-    LB --> Old["Old Rails — draining<br/>bundle hash <b>abc</b>"]
-    LB --> New["New Rails<br/>bundle hash <b>def</b>"]
-    Old -- "SSR request · hash = abc" --> R
-    New -- "SSR request · hash = def" --> R
-    R["New Node Renderer pool<br/>pre-seeded with <b>abc</b> AND <b>def</b><br/>via rolling_deploy_adapter"]
-    R -- "def" --> H1["✅ Cache HIT"]
-    R -- "abc" --> H2["✅ Cache HIT — no 410, no retry"]
-    style Old fill:#fff4e5,stroke:#e0a000,color:#000
-    style New fill:#e6ffed,stroke:#2da44e,color:#000
-    style R fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style H1 fill:#e6ffed,stroke:#2da44e,color:#000
-    style H2 fill:#e6ffed,stroke:#2da44e,color:#000
-```
+<p align="center">
+  <img src="images/rolling-deploy-solution.svg" alt="With a rolling_deploy_adapter the new renderer pool is pre-seeded with both the draining hash abc and the current hash def before it serves traffic, so both old draining Rails and new Rails requests hit the cache — no 410, no retry." width="840" />
+</p>
 
 The built-in HTTP adapter is the simplest way to get there, and it's covered next. If your build can't reach the previous deployment, or you'd rather keep bundles in your own store, you can [write a custom adapter](./rolling-deploy-custom-adapters.md) instead.
 
@@ -63,24 +38,9 @@ The built-in HTTP adapter is the simplest way to get there, and it's covered nex
 
 The currently-deployed Rails server already has every bundle and companion asset on disk. The HTTP adapter has the **next** deploy's build pull those files directly from the **previous** deploy over an authenticated HTTP endpoint — `upload` is a deliberate no-op because the running server _is_ the store:
 
-```mermaid
-flowchart LR
-    subgraph Build["Next deploy · build CI"]
-        Http["RollingDeployAdapters::Http<br/>previous_bundle_hashes + fetch"]
-    end
-    subgraph Server["Previous deploy · still-running Rails"]
-        Ctrl["BundlesController<br/>GET /manifest<br/>GET /bundles/:hash"]
-        Disk[("Bundles + companion assets<br/>already on local disk")]
-    end
-    Http -- "GET /manifest · Bearer TOKEN" --> Ctrl
-    Http -- "GET /bundles/abc · Bearer TOKEN" --> Ctrl
-    Disk -- "reads from disk" --> Ctrl
-    Ctrl -- "gzipped tarball:<br/>bundle.js + companion assets" --> Http
-    Http -- "extract + stage" --> Cache["New renderer cache<br/>{cache}/abc/abc.js"]
-    style Server fill:#fff4e5,stroke:#e0a000,color:#000
-    style Build fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Cache fill:#e6ffed,stroke:#2da44e,color:#000
-```
+<p align="center">
+  <img src="images/http-adapter-flow.svg" alt="The next deploy's build CI runs the HTTP adapter, which calls the still-running previous deployment's authenticated GET /manifest and GET /bundles/:hash endpoints, receives a gzipped tarball of the bundle plus companion assets read from disk, and extracts and stages each bundle into the new renderer cache." width="840" />
+</p>
 
 ### 1. Configure the adapter
 

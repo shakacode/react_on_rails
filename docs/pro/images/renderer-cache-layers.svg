@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 470" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>React on Rails Pro render cache layers</title>
+  <desc>A request for a component's HTML falls through stacked caches, each skipping more work than the one below. Rails checks for finished HTML, then a saved render result. On a miss the Node Renderer checks whether the JS bundle is warm in memory, then on disk, and only as a last resort has Rails upload the bundle before running the JavaScript. Earlier layers short-circuit to the result.</desc>
+  <defs>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .group { fill: none; stroke: #CBD5E1; }
+      .group-label { fill: #475569; }
+      .rails { fill: #DBEAFE; stroke: #3B82F6; }
+      .rails-text { fill: #1E40AF; }
+      .node { fill: #FEF3C7; stroke: #F59E0B; }
+      .node-text { fill: #92400E; }
+      .upload { fill: #FEE2E2; stroke: #DC2626; }
+      .upload-text { fill: #991B1B; }
+      .done { fill: #D1FAE5; stroke: #22C55E; }
+      .done-text { fill: #166534; }
+      .arrow { stroke: #94A3B8; }
+      .head { fill: #94A3B8; }
+      .hit { stroke: #22C55E; }
+      .hit-head { fill: #22C55E; }
+      .hit-text { fill: #166534; }
+      .label { fill: #64748B; }
+      .caption { fill: #475569; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .group { stroke: #475569; }
+        .group-label { fill: #94A3B8; }
+        .rails { fill: #172554; stroke: #3B82F6; }
+        .rails-text { fill: #93C5FD; }
+        .node { fill: #422006; stroke: #F59E0B; }
+        .node-text { fill: #FDE68A; }
+        .upload { fill: #450A0A; stroke: #EF4444; }
+        .upload-text { fill: #FCA5A5; }
+        .done { fill: #052E16; stroke: #10B981; }
+        .done-text { fill: #6EE7B7; }
+        .arrow { stroke: #CBD5E1; }
+        .head { fill: #CBD5E1; }
+        .hit { stroke: #4ADE80; }
+        .hit-head { fill: #4ADE80; }
+        .hit-text { fill: #6EE7B7; }
+        .label { fill: #94A3B8; }
+        .caption { fill: #94A3B8; }
+      }
+      .probe1 { animation: glow 8s ease 0.2s infinite; }
+      .probe2 { animation: glow 8s ease 1.8s infinite; }
+      .probe3 { animation: glow 8s ease 3.4s infinite; }
+      .probe4 { animation: glow 8s ease 5.0s infinite; }
+      @keyframes glow { 0%,4% { filter: none; } 10% { filter: drop-shadow(0 0 6px #22C55E); } 22%,100% { filter: none; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+    </style>
+  </defs>
+
+  <rect width="860" height="470" class="bg"/>
+  <text x="430" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Stacked render caches — each skips more work</text>
+  <text x="430" y="47" text-anchor="middle" font-size="11" class="subtitle">A hit at any layer short-circuits straight to the result; only a full miss runs the JavaScript</text>
+
+  <!-- entry -->
+  <rect x="290" y="64" width="280" height="34" rx="9" fill="#1E293B" filter="url(#shadow)"/>
+  <text x="430" y="86" text-anchor="middle" font-size="11" font-weight="600" fill="#E2E8F0">Need HTML for a component</text>
+
+  <!-- Layer 1: Rails final HTML -->
+  <g class="probe1">
+    <rect x="130" y="116" width="380" height="40" rx="9" class="rails" stroke-width="1.4"/>
+    <text x="146" y="134" font-size="11" font-weight="700" class="rails-text">1 · Fragment cache (Rails)</text>
+    <text x="146" y="149" font-size="9.5" class="rails-text">Final HTML already cached? Skips props assembly too.</text>
+  </g>
+  <line x1="320" y1="98" x2="320" y2="116" class="arrow" stroke-width="1.4"/>
+  <polygon points="316,116 324,116 320,122" class="head"/>
+
+  <!-- Layer 2: Rails render result -->
+  <g class="probe2">
+    <rect x="130" y="172" width="380" height="40" rx="9" class="rails" stroke-width="1.4"/>
+    <text x="146" y="190" font-size="11" font-weight="700" class="rails-text">2 · Prerender cache (Rails)</text>
+    <text x="146" y="205" font-size="9.5" class="rails-text">Saved render result? Assembles props but skips JS eval.</text>
+  </g>
+  <line x1="320" y1="156" x2="320" y2="172" class="arrow" stroke-width="1.4"/>
+  <polygon points="316,172 324,172 320,178" class="head"/>
+
+  <!-- Node Renderer group -->
+  <rect x="118" y="226" width="404" height="118" rx="11" class="group" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text x="320" y="244" text-anchor="middle" font-size="10.5" font-weight="600" class="group-label">Node Renderer</text>
+  <line x1="320" y1="212" x2="320" y2="252" class="arrow" stroke-width="1.4"/>
+  <polygon points="316,252 324,252 320,258" class="head"/>
+
+  <g class="probe3">
+    <rect x="134" y="256" width="372" height="36" rx="9" class="node" stroke-width="1.4"/>
+    <text x="150" y="273" font-size="11" font-weight="700" class="node-text">3 · Bundle warm in memory?</text>
+    <text x="150" y="287" font-size="9.5" class="node-text">VM already loaded — run the JavaScript right away.</text>
+  </g>
+  <line x1="320" y1="292" x2="320" y2="304" class="arrow" stroke-width="1.4"/>
+  <polygon points="316,304 324,304 320,310" class="head"/>
+  <g class="probe4">
+    <rect x="134" y="304" width="372" height="34" rx="9" class="node" stroke-width="1.4"/>
+    <text x="150" y="320" font-size="11" font-weight="700" class="node-text">4 · Bundle on disk?</text>
+    <text x="150" y="333" font-size="9" class="node-text">Load it into the VM, then run the JavaScript.</text>
+  </g>
+
+  <!-- Upload fallback -->
+  <rect x="130" y="360" width="380" height="36" rx="9" class="upload" stroke-width="1.4"/>
+  <text x="320" y="378" text-anchor="middle" font-size="11" font-weight="700" class="upload-text">Miss everywhere → Rails uploads the bundle</text>
+  <text x="320" y="390" text-anchor="middle" font-size="9" class="upload-text">slow cold path — pre-seed the cache to avoid it</text>
+  <line x1="320" y1="344" x2="320" y2="360" class="arrow" stroke-width="1.4"/>
+  <polygon points="316,360 324,360 320,366" class="head"/>
+
+  <!-- Run JS -->
+  <rect x="560" y="256" width="170" height="40" rx="9" class="node" stroke-width="1.4"/>
+  <text x="645" y="280" text-anchor="middle" font-size="11" font-weight="700" class="node-text">Run JavaScript → HTML</text>
+
+  <!-- Result -->
+  <rect x="610" y="116" width="180" height="44" rx="10" class="done" stroke-width="1.6" filter="url(#shadow)"/>
+  <text x="700" y="143" text-anchor="middle" font-size="12" font-weight="700" class="done-text">Return HTML</text>
+
+  <!-- hit arrows to result -->
+  <path d="M510,136 H600" fill="none" class="hit" stroke-width="2" stroke-dasharray="5 3"/>
+  <polygon points="600,132 608,136 600,140" class="hit-head"/>
+  <text x="556" y="128" text-anchor="middle" font-size="8.5" font-weight="700" class="hit-text">hit</text>
+
+  <path d="M510,192 C560,192 580,150 608,142" fill="none" class="hit" stroke-width="2" stroke-dasharray="5 3"/>
+  <text x="556" y="184" text-anchor="middle" font-size="8.5" font-weight="700" class="hit-text">hit</text>
+
+  <!-- run js feeds bundle layers -->
+  <path d="M506,274 H560" fill="none" class="hit" stroke-width="2" stroke-dasharray="5 3"/>
+  <polygon points="560,270 568,274 560,278" class="hit-head"/>
+  <!-- run js -> result -->
+  <path d="M645,256 C645,210 700,200 700,164" fill="none" class="arrow" stroke-width="1.6"/>
+  <polygon points="696,166 704,166 700,160" class="head"/>
+  <!-- upload -> run js -->
+  <path d="M510,378 C660,378 645,330 645,300" fill="none" class="arrow" stroke-width="1.6"/>
+  <polygon points="641,300 649,300 645,294" class="head"/>
+
+  <text x="430" y="430" text-anchor="middle" font-size="10.5" class="caption">Fragment caching subsumes prerender caching — a fragment-cache hit never consults the prerender cache.</text>
+  <text x="430" y="450" text-anchor="middle" font-size="9.5" class="label">Side optimizations (request-scoped dedupe, browser chunk caching) sit off this path and are omitted here.</text>
+</svg>

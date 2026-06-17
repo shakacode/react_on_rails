@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 380" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Node Renderer worker-pool dispatch</title>
+  <desc>Many concurrent Rails page requests send render jobs to the Node Renderer's dispatcher, which hands each job to an available worker. Each worker renders several pages at once, so requests are spread across the pool instead of blocking a single thread.</desc>
+  <defs>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CC0000"/><stop offset="100%" stop-color="#990000"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+    <linearGradient id="dispGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A90D9"/><stop offset="100%" stop-color="#2E5A8A"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .group { fill: none; stroke: #CBD5E1; }
+      .group-label { fill: #475569; }
+      .req-text { fill: white; }
+      .worker { fill: #D1FAE5; stroke: #22C55E; }
+      .worker-text { fill: #166534; }
+      .arrow { stroke: #94A3B8; }
+      .head { fill: #94A3B8; }
+      .caption { fill: #475569; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .group { stroke: #475569; }
+        .group-label { fill: #94A3B8; }
+        .worker { fill: #052E16; stroke: #10B981; }
+        .worker-text { fill: #6EE7B7; }
+        .arrow { stroke: #CBD5E1; }
+        .head { fill: #CBD5E1; }
+        .caption { fill: #94A3B8; }
+      }
+      .flow { animation: flow 1.2s linear infinite; }
+      @keyframes flow { to { stroke-dashoffset: -16; } }
+      .busy { animation: busy 2.4s ease-in-out infinite; }
+      .busy2 { animation: busy 2.4s ease-in-out 0.8s infinite; }
+      .busy3 { animation: busy 2.4s ease-in-out 1.6s infinite; }
+      @keyframes busy { 0%,100% { opacity: 0.35; } 50% { opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; } }
+    </style>
+  </defs>
+
+  <rect width="880" height="380" class="bg"/>
+  <text x="440" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Worker-pool dispatch</text>
+  <text x="440" y="47" text-anchor="middle" font-size="11" class="subtitle">The dispatcher spreads many concurrent render jobs across available workers</text>
+
+  <!-- Rails requests group -->
+  <rect x="24" y="70" width="190" height="276" rx="11" class="group" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text x="119" y="90" text-anchor="middle" font-size="11" font-weight="600" class="group-label">Rails — many page requests</text>
+  <g>
+    <rect x="44" y="108" width="150" height="40" rx="8" fill="url(#railsGrad)" filter="url(#shadow)"/>
+    <text x="119" y="132" text-anchor="middle" font-size="10.5" font-weight="600" class="req-text">page request 1</text>
+    <rect x="44" y="188" width="150" height="40" rx="8" fill="url(#railsGrad)" filter="url(#shadow)"/>
+    <text x="119" y="212" text-anchor="middle" font-size="10.5" font-weight="600" class="req-text">page request 2</text>
+    <rect x="44" y="268" width="150" height="40" rx="8" fill="url(#railsGrad)" filter="url(#shadow)"/>
+    <text x="119" y="292" text-anchor="middle" font-size="10.5" font-weight="600" class="req-text">page request N</text>
+  </g>
+
+  <!-- Dispatcher -->
+  <rect x="350" y="160" width="150" height="96" rx="11" fill="url(#dispGrad)" filter="url(#shadow)"/>
+  <text x="425" y="200" text-anchor="middle" font-size="13" font-weight="700" fill="white">Dispatcher</text>
+  <text x="425" y="220" text-anchor="middle" font-size="9.5" fill="white" opacity="0.9">hands jobs to</text>
+  <text x="425" y="234" text-anchor="middle" font-size="9.5" fill="white" opacity="0.9">available workers</text>
+
+  <!-- request -> dispatcher arrows -->
+  <line x1="194" y1="128" x2="344" y2="186" class="arrow" stroke-width="1.4"/>
+  <polygon points="344,186 336,182 338,190" class="head"/>
+  <line x1="194" y1="208" x2="344" y2="208" class="arrow" stroke-width="1.4"/>
+  <polygon points="344,208 336,204 336,212" class="head"/>
+  <line x1="194" y1="288" x2="344" y2="230" class="arrow" stroke-width="1.4"/>
+  <polygon points="344,230 338,226 336,234" class="head"/>
+
+  <!-- Renderer group -->
+  <rect x="560" y="70" width="296" height="276" rx="11" class="group" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text x="708" y="90" text-anchor="middle" font-size="11" font-weight="600" class="group-label">Node Renderer — worker pool</text>
+
+  <!-- dispatch paths -->
+  <path d="M500,196 C540,150 560,128 596,128" fill="none" class="arrow flow" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <polygon points="596,124 604,128 596,132" class="head"/>
+  <path d="M500,208 C540,208 560,208 596,208" fill="none" class="arrow flow" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <polygon points="596,204 604,208 596,212" class="head"/>
+  <path d="M500,220 C540,266 560,288 596,288" fill="none" class="arrow flow" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <polygon points="596,284 604,288 596,292" class="head"/>
+
+  <!-- workers -->
+  <g class="busy">
+    <rect x="600" y="108" width="236" height="40" rx="9" class="worker" stroke-width="1.4"/>
+    <text x="718" y="126" text-anchor="middle" font-size="10.5" font-weight="700" class="worker-text">Worker A</text>
+    <text x="718" y="140" text-anchor="middle" font-size="9" class="worker-text">renders several pages at once</text>
+  </g>
+  <g class="busy2">
+    <rect x="600" y="188" width="236" height="40" rx="9" class="worker" stroke-width="1.4"/>
+    <text x="718" y="206" text-anchor="middle" font-size="10.5" font-weight="700" class="worker-text">Worker B</text>
+    <text x="718" y="220" text-anchor="middle" font-size="9" class="worker-text">renders several pages at once</text>
+  </g>
+  <g class="busy3">
+    <rect x="600" y="268" width="236" height="40" rx="9" class="worker" stroke-width="1.4"/>
+    <text x="718" y="286" text-anchor="middle" font-size="10.5" font-weight="700" class="worker-text">Worker C</text>
+    <text x="718" y="300" text-anchor="middle" font-size="9" class="worker-text">renders several pages at once</text>
+  </g>
+
+  <text x="440" y="368" text-anchor="middle" font-size="10" class="caption">Default worker count is CPU cores − 1; crashed workers auto-restart and the pool does scheduled rolling restarts.</text>
+</svg>

@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>ExecJS versus the Node Renderer</title>
+  <desc>Side-by-side comparison. With ExecJS the JavaScript runtime runs inside the same Rails process, so Rails blocks while it renders HTML. With the Node Renderer, Rails sends render requests over HTTP to a separate service that fans the work out across a pool of workers.</desc>
+  <defs>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CC0000"/><stop offset="100%" stop-color="#990000"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .box-warn { fill: #FEF3C7; stroke: #F59E0B; }
+      .box-warn-text { fill: #92400E; }
+      .box-bad { fill: #FEE2E2; stroke: #DC2626; }
+      .box-bad-text { fill: #991B1B; }
+      .box-info { fill: #DBEAFE; stroke: #93C5FD; }
+      .box-info-text { fill: #1E40AF; }
+      .box-ok { fill: #D1FAE5; stroke: #22C55E; }
+      .box-ok-text { fill: #166534; }
+      .arrow { stroke: #94A3B8; }
+      .head { fill: #94A3B8; }
+      .caption { fill: #475569; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .box-warn { fill: #422006; stroke: #F59E0B; }
+        .box-warn-text { fill: #FDE68A; }
+        .box-bad { fill: #450A0A; stroke: #EF4444; }
+        .box-bad-text { fill: #FCA5A5; }
+        .box-info { fill: #172554; stroke: #3B82F6; }
+        .box-info-text { fill: #93C5FD; }
+        .box-ok { fill: #052E16; stroke: #10B981; }
+        .box-ok-text { fill: #6EE7B7; }
+        .arrow { stroke: #CBD5E1; }
+        .head { fill: #CBD5E1; }
+        .caption { fill: #94A3B8; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="360" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">ExecJS vs the Node Renderer</text>
+  <text x="450" y="47" text-anchor="middle" font-size="11" class="subtitle">Where server-side JavaScript runs, and what it does to Rails throughput</text>
+
+  <!-- ===== ExecJS card ===== -->
+  <g>
+    <rect x="20" y="64" width="410" height="276" rx="11" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="225" y="90" text-anchor="middle" font-size="13" font-weight="700" class="box-warn-text">ExecJS — JavaScript inside Rails</text>
+
+    <rect x="60" y="106" width="330" height="200" rx="9" fill="url(#railsGrad)" opacity="0.10" stroke="#CC0000" stroke-width="1.3" stroke-dasharray="5 3"/>
+    <text x="225" y="126" text-anchor="middle" font-size="10" font-weight="700" fill="#CC0000">One Rails process</text>
+
+    <rect x="92" y="138" width="266" height="40" rx="8" fill="url(#railsGrad)" filter="url(#shadow)"/>
+    <text x="225" y="162" text-anchor="middle" font-size="11" font-weight="600" fill="white">Rails request thread</text>
+
+    <line x1="225" y1="178" x2="225" y2="206" class="arrow" stroke-width="1.5"/>
+    <polygon points="221,206 229,206 225,213" class="head"/>
+
+    <rect x="92" y="214" width="266" height="40" rx="8" class="box-warn" stroke-width="1.3"/>
+    <text x="225" y="232" text-anchor="middle" font-size="10.5" font-weight="600" class="box-warn-text">JavaScript runtime (V8 / mini_racer)</text>
+    <text x="225" y="247" text-anchor="middle" font-size="9.5" class="box-warn-text">renders HTML in the same process</text>
+
+    <rect x="92" y="266" width="266" height="30" rx="8" class="box-bad" stroke-width="1.3"/>
+    <text x="225" y="285" text-anchor="middle" font-size="10" font-weight="600" class="box-bad-text">Rails blocks until the render finishes</text>
+  </g>
+
+  <!-- ===== Node Renderer card ===== -->
+  <g>
+    <rect x="470" y="64" width="410" height="276" rx="11" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="675" y="90" text-anchor="middle" font-size="13" font-weight="700" class="box-ok-text">Node Renderer — a separate service</text>
+
+    <rect x="494" y="120" width="120" height="42" rx="8" fill="url(#railsGrad)" filter="url(#shadow)"/>
+    <text x="554" y="139" text-anchor="middle" font-size="10.5" font-weight="600" fill="white">Rails process</text>
+    <text x="554" y="153" text-anchor="middle" font-size="9" fill="white" opacity="0.85">handles more requests</text>
+
+    <line x1="614" y1="141" x2="700" y2="141" class="arrow" stroke-width="1.6"/>
+    <polygon points="700,137 707,141 700,145" class="head"/>
+    <rect x="618" y="122" width="80" height="16" rx="4" class="box-info" stroke-width="1"/>
+    <text x="658" y="134" text-anchor="middle" font-size="8.5" font-weight="600" class="box-info-text">render · HTTP</text>
+
+    <rect x="700" y="112" width="156" height="184" rx="9" fill="url(#nodeGrad)" opacity="0.10" stroke="#3C873A" stroke-width="1.3" stroke-dasharray="5 3"/>
+    <rect x="716" y="124" width="124" height="34" rx="8" fill="url(#nodeGrad)" filter="url(#shadow)"/>
+    <text x="778" y="145" text-anchor="middle" font-size="10.5" font-weight="600" fill="white">Node Renderer</text>
+
+    <line x1="778" y1="158" x2="778" y2="176" class="arrow" stroke-width="1.4"/>
+    <polygon points="774,176 782,176 778,182" class="head"/>
+
+    <rect x="716" y="184" width="124" height="28" rx="7" class="box-ok" stroke-width="1.2"/>
+    <text x="778" y="202" text-anchor="middle" font-size="9.5" font-weight="600" class="box-ok-text">Worker 1 — renders</text>
+    <rect x="716" y="218" width="124" height="28" rx="7" class="box-ok" stroke-width="1.2"/>
+    <text x="778" y="236" text-anchor="middle" font-size="9.5" font-weight="600" class="box-ok-text">Worker 2 — renders</text>
+    <rect x="716" y="252" width="124" height="28" rx="7" class="box-ok" stroke-width="1.2"/>
+    <text x="778" y="270" text-anchor="middle" font-size="9.5" font-weight="600" class="box-ok-text">Worker N — renders</text>
+  </g>
+
+  <text x="225" y="328" text-anchor="middle" font-size="10" class="caption">A leak or crash here can take Rails down with it.</text>
+  <text x="675" y="328" text-anchor="middle" font-size="10" class="caption">Isolated process, pooled workers, rolling restarts.</text>
+</svg>
