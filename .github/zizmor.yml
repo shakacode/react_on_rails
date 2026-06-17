@@ -4,12 +4,12 @@
 # ROLLOUT NOTE (issue #3449):
 # zizmor is introduced as a NON-BLOCKING gate first (see
 # .github/workflows/zizmor.yml, which sets `continue-on-error: true`).
-# A baseline scan of `main` surfaced ~56 surfaced findings in the default
-# ("regular") persona across the existing workflows — primarily
-# `unpinned-uses` (third-party actions not pinned to a commit SHA) plus
-# some `template-injection`, `artipacked`, and `dependabot-cooldown`. The
-# zizmor binary version is pinned in the workflow (see the `version:` input)
-# so this count stays reproducible across runs.
+# A baseline scan of `main` with the pinned zizmor version surfaced ~56
+# findings in the default ("regular") persona across the existing workflows
+# — primarily `unpinned-uses` (third-party actions not pinned to a commit
+# SHA) plus some `template-injection`, `artipacked`, and `dependabot-cooldown`.
+# The zizmor binary version is pinned in the workflow (see the `version:`
+# input) so this count stays reproducible across runs.
 #
 # These are pre-existing and out of scope for the workflow-introduction PR,
 # so the gate does not fail the build yet. The findings remain VISIBLE (as
