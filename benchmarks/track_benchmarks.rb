@@ -536,7 +536,9 @@ if __FILE__ == $PROGRAM_NAME
     elsif fail_on_alert? && !main_push?
       # Gated run (e.g. the RC benchmark): turn a Bencher alert into a non-zero exit so it
       # can block a release candidate. main-push keeps its non-fatal candidate/confirmation
-      # flow untouched.
+      # flow untouched. Called regardless of bencher_exit_code (unlike the main-push branch
+      # above) on purpose: report_gated_alert inspects the report's alerts itself, so a
+      # regression must still fail even on a 0 exit — do not add a bencher_exit_code guard.
       report_gated_alert(report, bencher_exit_code, SUITE_NAME)
     end
   end

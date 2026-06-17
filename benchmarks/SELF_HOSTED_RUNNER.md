@@ -63,11 +63,13 @@ your machine. The planned workflow avoids that:
 2. **Register the runner**: repo → Settings → Actions → Runners → New self-hosted runner.
    Follow the macOS/arm64 instructions and add the labels the workflow will target, e.g.:
 
-   ```
-   self-hosted, macOS, ARM64, rork-bench
+   ```text
+   self-hosted, macOS, ARM64, m1-bench
    ```
 
-   Install it as a service (`./svc.sh install && ./svc.sh start`) so it is always listening.
+   The `m1-bench` label is what the future workflow's `runs_on` input targets; keep it in
+   sync with that input. Install it as a service (`./svc.sh install && ./svc.sh start`) so
+   it is always listening.
 
 3. **Confirm secrets** (already set for CI, used by the reusable suite): repo →
    Settings → Secrets → Actions has `REACT_ON_RAILS_PRO_LICENSE_V2` and `BENCHER_API_TOKEN`.

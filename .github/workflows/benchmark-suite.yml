@@ -26,9 +26,11 @@ on:
         type: string
       runs_on:
         description: >-
-          JSON-encoded runs-on labels for the suite job. Defaults to the GitHub-hosted
-          runner; the self-hosted runner workflow (#4073) passes its own label set so the
-          same suite runs on dedicated hardware.
+          JSON-encoded runs-on label array for the suite job (must be valid JSON — a bare
+          string like m1-bench fails fromJSON). Defaults to the GitHub-hosted runner; the
+          self-hosted runner workflow (#4073) passes its own label set, e.g.
+          '["self-hosted", "macOS", "ARM64", "m1-bench"]', so the same suite runs on
+          dedicated hardware.
         required: false
         default: '["ubuntu-24.04"]'
         type: string
