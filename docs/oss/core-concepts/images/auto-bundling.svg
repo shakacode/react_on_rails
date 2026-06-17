@@ -27,12 +27,10 @@
       .gen-text { fill: #1E40AF; }
       .arrow { stroke: #94A3B8; fill: none; }
       .arrow-head { fill: #94A3B8; }
-      .gear { fill: #22C55E; }
+      .code-attr { fill: #FCD34D; }
 
       .pulse { animation: pulse 1.1s ease-in-out infinite; }
       @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
-      .spin { transform-origin: 754px 300px; animation: spin 5s linear infinite; }
-      @keyframes spin { to { transform: rotate(360deg); } }
       .flow { stroke-dasharray: 6 5; animation: dash 1.4s linear infinite; }
       @keyframes dash { to { stroke-dashoffset: -22; } }
       .reveal { opacity: 0; animation: reveal 6s ease infinite; }
@@ -124,10 +122,6 @@
   <text x="498" y="282" font-size="9.5" font-family="monospace"><tspan class="code">&lt;%= react_component("FooComponentOne",</tspan></text>
   <text x="498" y="298" font-size="9.5" font-family="monospace"><tspan class="code">      props: …, </tspan><tspan class="code-attr">auto_load_bundle: true</tspan><tspan class="code">) %&gt;</tspan></text>
 
-  <!-- generation gear -->
-  <g class="spin">
-    <circle cx="754" cy="300" r="0" />
-  </g>
   <g transform="translate(484,322)">
     <rect x="0" y="0" width="372" height="170" rx="8" class="gen-box" stroke-width="1"/>
     <text x="186" y="22" text-anchor="middle" font-size="11" font-weight="700" class="gen-text">React on Rails auto-generates:</text>
