@@ -15,33 +15,9 @@ end
 
 Each deploy plays two roles. It **publishes** its own bundles so a _future_ deploy can find them, and it **pre-seeds** the bundles a _prior_ deploy published so the requests still draining against those bundles stay warm:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Build as Current deploy (hash def)
-    participant Adapter as rolling_deploy_adapter
-    participant Store as Artifact store (S3 / image / volume)
-    participant Cache as New renderer cache
-
-    rect rgb(230, 240, 255)
-    Note over Build,Cache: Pre-seed — warm THIS deploy before it serves traffic
-    Build->>Adapter: previous_bundle_hashes()
-    Adapter->>Store: list recent hashes
-    Store-->>Adapter: ["abc"]  (still draining)
-    Build->>Adapter: fetch("abc")
-    Adapter->>Store: download bundle + companion assets
-    Store-->>Adapter: bundle abc + loadable-stats / RSC manifests
-    Adapter-->>Build: { bundle:, assets: }
-    Build->>Cache: stage at {cache}/abc/abc.js
-    Note over Cache: Warm for abc + def → zero 410 retries
-    end
-
-    rect rgb(232, 255, 237)
-    Note over Build,Store: Publish — leave def behind for the NEXT deploy
-    Build->>Adapter: upload("def", bundle:, assets:)
-    Adapter->>Store: store bundle def + companion assets
-    end
-```
+<p>
+  <img src="images/deploy-lifecycle-roles.svg" alt="A deploy's two adapter roles. In the pre-seed phase the current deploy lists recent hashes, fetches the still-draining bundle plus its companion assets from the artifact store, and stages them into the new renderer cache so it is warm. In the publish phase the deploy uploads its own bundle so a future deploy can find it." width="840" />
+</p>
 
 ## Companion assets
 

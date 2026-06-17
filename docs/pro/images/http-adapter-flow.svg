@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 380" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Built-in HTTP rolling-deploy adapter at build time</title>
+  <desc>The next deploy's build CI runs the HTTP adapter, which calls the still-running previous deployment's authenticated endpoints — GET /manifest to list bundle hashes and GET /bundles/:hash to download a gzipped tarball of the bundle and its companion assets read straight from disk. The adapter extracts and stages each bundle into the new renderer cache.</desc>
+  <defs>
+    <linearGradient id="buildGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A90D9"/><stop offset="100%" stop-color="#2E5A8A"/>
+    </linearGradient>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CC0000"/><stop offset="100%" stop-color="#990000"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .group { fill: none; stroke: #CBD5E1; }
+      .group-label { fill: #475569; }
+      .panel { fill: white; stroke: #E2E8F0; }
+      .panel-text { fill: #0F172A; }
+      .disk { fill: #F1F5F9; stroke: #CBD5E1; }
+      .disk-text { fill: #475569; }
+      .cache { fill: #D1FAE5; stroke: #22C55E; }
+      .cache-text { fill: #166534; }
+      .req { fill: #EFF6FF; stroke: #93C5FD; }
+      .req-text { fill: #1E40AF; }
+      .ret { fill: #ECFDF5; stroke: #86EFAC; }
+      .ret-text { fill: #166534; }
+      .arrow-fwd { stroke: #94A3B8; }
+      .arrow-ret { stroke: #22C55E; }
+      .head-fwd { fill: #94A3B8; }
+      .head-ret { fill: #22C55E; }
+      .mono { font-family: monospace; }
+      .caption { fill: #475569; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .group { stroke: #475569; }
+        .group-label { fill: #94A3B8; }
+        .panel { fill: #1E293B; stroke: #334155; }
+        .panel-text { fill: #F1F5F9; }
+        .disk { fill: #0F172A; stroke: #475569; }
+        .disk-text { fill: #94A3B8; }
+        .cache { fill: #052E16; stroke: #10B981; }
+        .cache-text { fill: #6EE7B7; }
+        .req { fill: #172554; stroke: #3B82F6; }
+        .req-text { fill: #93C5FD; }
+        .ret { fill: #052E16; stroke: #10B981; }
+        .ret-text { fill: #6EE7B7; }
+        .arrow-fwd { stroke: #CBD5E1; }
+        .head-fwd { fill: #CBD5E1; }
+        .arrow-ret { stroke: #4ADE80; }
+        .head-ret { fill: #4ADE80; }
+        .caption { fill: #94A3B8; }
+      }
+    </style>
+  </defs>
+
+  <rect width="880" height="380" class="bg"/>
+  <text x="440" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">HTTP adapter: pull bundles from the previous deploy</text>
+  <text x="440" y="47" text-anchor="middle" font-size="11" class="subtitle">The still-running server is the store — no S3, no extra infrastructure</text>
+
+  <!-- Build CI group -->
+  <rect x="24" y="72" width="290" height="216" rx="11" class="group" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text x="169" y="92" text-anchor="middle" font-size="11" font-weight="600" class="group-label">Next deploy · build CI</text>
+  <rect x="48" y="120" width="242" height="60" rx="9" fill="url(#buildGrad)" filter="url(#shadow)"/>
+  <text x="169" y="144" text-anchor="middle" font-size="11" font-weight="700" fill="white">RollingDeployAdapters::Http</text>
+  <text x="169" y="162" text-anchor="middle" font-size="9" fill="white" opacity="0.92" class="mono">previous_bundle_hashes + fetch</text>
+
+  <!-- new renderer cache -->
+  <rect x="48" y="210" width="242" height="58" rx="9" class="cache" stroke-width="1.5"/>
+  <text x="169" y="232" text-anchor="middle" font-size="10.5" font-weight="700" class="cache-text">New renderer cache</text>
+  <text x="169" y="250" text-anchor="middle" font-size="10" class="cache-text mono">{cache}/abc/abc.js</text>
+
+  <!-- Previous deploy group -->
+  <rect x="566" y="72" width="290" height="262" rx="11" class="group" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text x="711" y="92" text-anchor="middle" font-size="11" font-weight="600" class="group-label">Previous deploy · still-running Rails</text>
+  <rect x="590" y="112" width="242" height="64" rx="9" fill="url(#railsGrad)" filter="url(#shadow)"/>
+  <text x="711" y="136" text-anchor="middle" font-size="11" font-weight="700" fill="white">BundlesController</text>
+  <text x="711" y="153" text-anchor="middle" font-size="9" fill="white" opacity="0.92" class="mono">GET /manifest</text>
+  <text x="711" y="166" text-anchor="middle" font-size="9" fill="white" opacity="0.92" class="mono">GET /bundles/:hash</text>
+
+  <rect x="590" y="252" width="242" height="58" rx="9" class="disk" stroke-width="1.4"/>
+  <text x="711" y="274" text-anchor="middle" font-size="10" font-weight="700" class="disk-text">Bundles + companion assets</text>
+  <text x="711" y="291" text-anchor="middle" font-size="9.5" class="disk-text">already on local disk</text>
+
+  <line x1="711" y1="176" x2="711" y2="252" class="arrow-fwd" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <polygon points="707,252 715,252 711,258" class="head-fwd"/>
+  <text x="724" y="216" font-size="8.5" class="disk-text">reads from disk</text>
+
+  <!-- adapter -> controller requests -->
+  <line x1="290" y1="138" x2="586" y2="132" class="arrow-fwd" stroke-width="1.6"/>
+  <polygon points="586,132 578,131 579,138" class="head-fwd"/>
+  <rect x="350" y="106" width="180" height="18" rx="4" class="req" stroke-width="1"/>
+  <text x="440" y="118" text-anchor="middle" font-size="8.5" font-weight="600" class="req-text mono">GET /manifest · Bearer TOKEN</text>
+
+  <line x1="290" y1="158" x2="586" y2="158" class="arrow-fwd" stroke-width="1.6"/>
+  <polygon points="586,158 578,154 578,162" class="head-fwd"/>
+  <rect x="338" y="166" width="204" height="18" rx="4" class="req" stroke-width="1"/>
+  <text x="440" y="178" text-anchor="middle" font-size="8.5" font-weight="600" class="req-text mono">GET /bundles/abc · Bearer TOKEN</text>
+
+  <!-- controller -> adapter return -->
+  <line x1="586" y1="196" x2="294" y2="220" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+  <polygon points="294,220 302,217 302,225" class="head-ret"/>
+  <rect x="332" y="196" width="216" height="18" rx="4" class="ret" stroke-width="1"/>
+  <text x="440" y="208" text-anchor="middle" font-size="8.5" font-weight="600" class="ret-text">gzipped tarball: bundle.js + companions</text>
+
+  <text x="440" y="244" text-anchor="middle" font-size="9" class="caption">adapter extracts</text>
+  <text x="440" y="256" text-anchor="middle" font-size="9" class="caption">+ stages</text>
+  <line x1="380" y1="230" x2="300" y2="230" class="arrow-fwd" stroke-width="1.4"/>
+  <polygon points="300,226 293,230 300,234" class="head-fwd"/>
+
+  <text x="440" y="360" text-anchor="middle" font-size="10.5" class="caption">upload is a no-op — the running server already has every bundle on disk, so the next deploy just pulls them.</text>
+</svg>
