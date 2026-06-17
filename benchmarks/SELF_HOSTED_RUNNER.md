@@ -23,19 +23,21 @@ with its own baseline and act as a gate — no duplicated benchmark logic:
 
 All three default to current behavior, so the existing cloud workflow is unchanged.
 
-## Prerequisites before a self-hosted workflow can run
+The suite's OS-specific steps are also portable: Vegeta installs the right OS/arch build via
+`curl`, CPU count comes from `sysctl` on macOS (`nproc` on Linux), CPU pinning (`taskset`) is
+skipped where it's unavailable, and the `/etc/issue` diagnostic falls back to `uname`. The
+Linux path is byte-for-byte unchanged. Validated on an Apple Silicon machine: the Vegeta
+`darwin_arm64` build installs and runs, `sysctl` core detection and the no-`taskset` fallback
+work, and the Bencher CLI installer supports `aarch64-apple-darwin`.
 
-The workflow itself (RC-tag + nightly triggers calling the suite on the dedicated runner)
-is intentionally **not** added yet, because it would not work on Apple Silicon as-is:
+## Remaining before a self-hosted workflow runs
 
-1. **Make the suite OS-portable.** `benchmark-suite.yml` currently hard-depends on Linux:
-   it downloads the Linux Vegeta tarball, and uses `dpkg --print-architecture`, `nproc`,
-   `taskset -c` (CPU pinning), and `cat /etc/issue`. macOS needs: a macOS Vegeta install,
-   `sysctl -n hw.ncpu` for core count, an alternative to `taskset` (macOS has no direct
-   CPU-pinning equivalent), and guards around the Linux-only diagnostics. This must be
-   validated on the actual machine.
-2. **Register the runner** (below), then add the workflow with `workflow_dispatch` first so
-   a maintainer can validate one real run end to end before enabling automatic triggers.
+The workflow itself (RC-tag + nightly triggers calling the suite on the dedicated runner) is
+intentionally **not** added yet:
+
+1. **Register the runner** (below).
+2. Add the workflow targeting it with `workflow_dispatch` first, so a maintainer can validate
+   one real end-to-end run on the live machine before enabling the automatic triggers.
 
 ## Security: this is a public repository
 

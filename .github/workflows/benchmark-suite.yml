@@ -159,10 +159,21 @@ jobs:
       - name: Install Vegeta
         if: env.BENCHMARK_TOOL == 'vegeta' && steps.cache-vegeta.outputs.cache-hit != 'true'
         run: |
-          ARCH=$(dpkg --print-architecture)
-          echo "Installing Vegeta v${VEGETA_VERSION} (${ARCH})"
-          wget -q "https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_linux_${ARCH}.tar.gz"
-          tar -xzf "vegeta_${VEGETA_VERSION}_linux_${ARCH}.tar.gz"
+          # OS/arch-aware so the suite installs the right Vegeta build on both GitHub-hosted
+          # Linux runners and a self-hosted macOS runner (#4073). curl is present on both
+          # (macOS has no wget by default; dpkg is Linux-only).
+          case "$(uname -s)" in
+            Darwin) OS=darwin ;;
+            *) OS=linux ;;
+          esac
+          case "$(uname -m)" in
+            x86_64 | amd64) ARCH=amd64 ;;
+            arm64 | aarch64) ARCH=arm64 ;;
+            *) echo "::error::Unsupported architecture $(uname -m) for Vegeta install"; exit 1 ;;
+          esac
+          echo "Installing Vegeta v${VEGETA_VERSION} (${OS}_${ARCH})"
+          curl -fsSL "https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_${OS}_${ARCH}.tar.gz" -o vegeta.tar.gz
+          tar -xzf vegeta.tar.gz
           mv vegeta ~/bin/
 
       - name: Setup Ruby
@@ -203,8 +214,9 @@ jobs:
 
       - name: Print system information
         run: |
-          echo "Linux release: "
-          cat /etc/issue
+          echo "OS release: "
+          # /etc/issue is Linux-only; fall back to uname on macOS (#4073).
+          if [ -f /etc/issue ]; then cat /etc/issue; else uname -a; fi
           echo "Current user: "
           whoami
           echo "Current directory: "
@@ -220,10 +232,16 @@ jobs:
 
       - name: Configure benchmark commands
         run: |
-          NPROC=$(nproc)
+          # nproc is Linux-only; sysctl is the macOS equivalent (#4073).
+          case "$(uname -s)" in
+            Darwin) NPROC=$(sysctl -n hw.ncpu) ;;
+            *) NPROC=$(nproc) ;;
+          esac
           echo "Available CPUs: $NPROC"
 
-          if [ "$NPROC" -le 1 ]; then
+          # taskset (CPU pinning) is Linux-only and absent on macOS — fall back to no
+          # pinning there. On Linux with >1 CPU this keeps the exact previous commands.
+          if [ "$NPROC" -le 1 ] || ! command -v taskset >/dev/null 2>&1; then
             SERVER_CMD="bin/prod"
             BENCH_CMD="ruby"
           else
