@@ -135,8 +135,8 @@
   <text x="652" y="406" font-size="9" class="info-text">up event listeners + state.</text>
   <text x="652" y="430" font-size="9" class="info-text">No flash, no rebuild &#x2014; the</text>
   <text x="652" y="444" font-size="9" class="info-text">page was already there.</text>
-  <text x="746" y="470" text-anchor="middle" font-size="8.5" class="sub">v16 starts this early, before</text>
-  <text x="746" y="483" text-anchor="middle" font-size="8.5" class="sub">full page load (see upgrading).</text>
+  <text x="746" y="470" text-anchor="middle" font-size="8.5" class="sub">Pro can start this early, before</text>
+  <text x="746" y="483" text-anchor="middle" font-size="8.5" class="sub">full page load (immediate_hydration).</text>
 
   <path d="M 600 296 L 614 296" class="arrow" stroke-width="2"/>
   <polygon points="614,292 622,296 614,300" class="arrow-head"/>

@@ -119,10 +119,10 @@
   <text x="498" y="206" font-size="9.5" font-family="monospace"><tspan class="code">  Bar/</tspan><tspan class="code-dim">ror_components/</tspan><tspan class="code">BarComponentTwo.jsx</tspan></text>
   <text x="498" y="222" font-size="9.5" font-family="monospace"><tspan class="code-dim">// no pack files, no register() calls</tspan></text>
 
-  <text x="484" y="252" font-size="10.5" font-weight="600" class="label">2. The view helper appends pack tags for you</text>
+  <text x="484" y="252" font-size="10.5" font-weight="600" class="label">2. Opt in, and the helper appends pack tags for you</text>
   <rect x="484" y="260" width="372" height="48" rx="8" class="code-bg"/>
   <text x="498" y="282" font-size="9.5" font-family="monospace"><tspan class="code">&lt;%= react_component("FooComponentOne",</tspan></text>
-  <text x="498" y="298" font-size="9.5" font-family="monospace"><tspan class="code">      props: …) %&gt;</tspan></text>
+  <text x="498" y="298" font-size="9.5" font-family="monospace"><tspan class="code">      props: …, </tspan><tspan class="code-attr">auto_load_bundle: true</tspan><tspan class="code">) %&gt;</tspan></text>
 
   <!-- generation gear -->
   <g class="spin">
@@ -144,6 +144,7 @@
   </g>
 
   <rect x="484" y="504" width="372" height="50" rx="8" class="auto-head" stroke-width="1"/>
-  <text x="670" y="526" text-anchor="middle" font-size="10.5" font-weight="700" class="auto-text">No boilerplate &#x2022; no forgotten pack tags</text>
-  <text x="670" y="544" text-anchor="middle" font-size="9.5" class="sub">Automatic per-page code splitting, out of the box</text>
+  <text x="670" y="524" text-anchor="middle" font-size="10.5" font-weight="700" class="auto-text">No boilerplate &#x2022; no forgotten pack tags</text>
+  <text x="670" y="540" text-anchor="middle" font-size="8.5" class="sub">Opt in per call (above) or set config.auto_load_bundle = true</text>
+  <text x="670" y="551" text-anchor="middle" font-size="8.5" class="sub">(default is false); add empty pack-tag placeholders to your layout</text>
 </svg>
