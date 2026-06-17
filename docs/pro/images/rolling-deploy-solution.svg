@@ -86,18 +86,18 @@
   <rect x="404" y="232" width="74" height="15" rx="4" class="new" stroke-width="1"/>
   <text x="441" y="244" text-anchor="middle" font-size="8" font-weight="600" class="new-text mono">req · def</text>
 
-  <!-- outcomes: both hits -->
+  <!-- outcomes: both hits — top label aligns with abc (draining) lane, bottom with def (current) lane -->
   <line x1="672" y1="170" x2="724" y2="138" class="arrow" stroke-width="1.6"/>
   <polygon points="724,138 716,139 719,146" class="head"/>
   <rect x="724" y="108" width="130" height="50" rx="10" class="hit" stroke-width="1.5"/>
-  <text x="789" y="130" text-anchor="middle" font-size="11" font-weight="700" class="hit-text">def → HIT</text>
-  <text x="789" y="147" text-anchor="middle" font-size="9" class="hit-text">fast SSR</text>
+  <text x="789" y="130" text-anchor="middle" font-size="11" font-weight="700" class="hit-text">abc → HIT</text>
+  <text x="789" y="147" text-anchor="middle" font-size="9" class="hit-text">no 410, no retry</text>
 
   <line x1="672" y1="206" x2="724" y2="238" class="arrow" stroke-width="1.6"/>
   <polygon points="724,238 719,232 716,239" class="head"/>
   <rect x="724" y="218" width="130" height="56" rx="10" class="hit" stroke-width="1.5"/>
-  <text x="789" y="240" text-anchor="middle" font-size="11" font-weight="700" class="hit-text">abc → HIT</text>
-  <text x="789" y="257" text-anchor="middle" font-size="9" class="hit-text">no 410, no retry</text>
+  <text x="789" y="240" text-anchor="middle" font-size="11" font-weight="700" class="hit-text">def → HIT</text>
+  <text x="789" y="257" text-anchor="middle" font-size="9" class="hit-text">fast SSR</text>
 
   <text x="440" y="324" text-anchor="middle" font-size="11" font-weight="600" class="hit-text">Every in-flight bundle hash is warm — the deploy causes no latency or error-rate spike.</text>
 </svg>

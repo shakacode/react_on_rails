@@ -120,7 +120,8 @@
   <polygon points="600,132 608,136 600,140" class="hit-head"/>
   <text x="556" y="128" text-anchor="middle" font-size="8.5" font-weight="700" class="hit-text">hit</text>
 
-  <path d="M510,192 C560,192 580,150 608,142" fill="none" class="hit" stroke-width="2" stroke-dasharray="5 3"/>
+  <path d="M510,192 C560,192 580,150 600,142" fill="none" class="hit" stroke-width="2" stroke-dasharray="5 3"/>
+  <polygon points="600,138 608,142 600,146" class="hit-head"/>
   <text x="556" y="184" text-anchor="middle" font-size="8.5" font-weight="700" class="hit-text">hit</text>
 
   <!-- warm/disk bundle hit still runs the JS -->
