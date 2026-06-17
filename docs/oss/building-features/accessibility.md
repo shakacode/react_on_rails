@@ -28,8 +28,8 @@ both). Where a practice is RSC-specific, it is called out in the
 Every text and interactive surface must meet WCAG AA contrast ratios:
 
 - **4.5:1** for normal text
-- **3:1** for large text (≥ 24px, or ≥ 19px bold) and for UI component
-  boundaries / focus indicators
+- **3:1** for large text (≥ 24px / 18pt, or ≥ 18.66px / 14pt bold) and for UI
+  component boundaries / focus indicators
 
 Contrast is a design-token concern, not a per-component one. If you use
 [Tailwind](./styling-with-tailwind.md), pin accessible color pairs in your theme
@@ -406,7 +406,24 @@ test('main nav is reachable by keyboard', async ({ page }) => {
 ```
 
 If your app has no skip link, the first `Tab` lands on the first nav item — but
-add the skip link: it is a Level A requirement.
+add one (it is a Level A requirement). A minimal skip link is a normal anchor to
+the main landmark, visually hidden until focused:
+
+```erb
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<%# ... %>
+<main id="main-content" tabindex="-1"><%= yield %></main>
+```
+
+```css
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+.skip-link:focus {
+  left: 0;
+}
+```
 
 For an example of asserting React runtime behavior from a Playwright spec in this
 project, see
