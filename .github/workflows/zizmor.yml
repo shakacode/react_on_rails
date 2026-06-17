@@ -1,0 +1,101 @@
+name: Zizmor GitHub Actions Security Audit
+
+# zizmor (https://github.com/zizmorcore/zizmor) is a static analysis tool
+# that finds security issues in GitHub Actions workflows and composite
+# actions. It runs ALONGSIDE actionlint (.github/workflows/actionlint.yml):
+# actionlint checks syntax and correctness, zizmor checks for security
+# weaknesses (unpinned actions, template injection, credential persistence).
+#
+# ROLLOUT: This gate is intentionally NON-BLOCKING for now, but in a way that
+# still fails on real problems. The "Run zizmor" step invokes the pinned
+# zizmor CLI with `--no-exit-codes`: zizmor then exits 0 for both "clean" and
+# "findings", and non-zero ONLY for a genuine tool/config failure (bad config,
+# unknown version, Docker/image error). So pre-existing findings do not fail
+# the `zizmor` check, but a broken audit DOES — a green check always means the
+# audit actually ran. (A blanket `continue-on-error: true` was avoided because
+# it would also hide tool failures behind a green check.)
+#
+# Pre-existing workflow-file findings are suppressed via a baseline in
+# .github/zizmor.yml so that NEW findings introduced by future PRs surface as
+# annotations without being pushed past GitHub's 10-annotations-per-step cap.
+# Composite-action (action.yml) findings cannot be suppressed via config (a
+# documented zizmor limitation) and, like online-audit findings, still surface
+# as advisory annotations — acceptable while the gate is non-blocking.
+#
+# Follow-up (issue #3449): once the baseline backlog in .github/zizmor.yml is
+# cleared, drop `--no-exit-codes` to make this a required, blocking gate.
+
+permissions:
+  contents: read
+
+# Single source of truth for the pinned zizmor image (tag + digest). Defined at
+# workflow level so the version-print and audit steps can't drift apart on a
+# version bump.
+env:
+  # yamllint disable-line rule:line-length
+  ZIZMOR_IMAGE: ghcr.io/zizmorcore/zizmor:1.16.3@sha256:f09cee55087d54e7a162fc255ffe82ef942f68e683f967c8a6471ffe35e7ec64
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - '.github/dependabot.yml'
+      - '.github/zizmor.yml'
+  # No `branches:` filter on purpose: auditing PRs that target any branch
+  # (not just main) catches security issues early. Mirrors actionlint.yml.
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - '.github/dependabot.yml'
+      - '.github/zizmor.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    runs-on: ubuntu-22.04
+    steps:
+      # Pinned to a commit SHA (v4.2.2) to model the target state for the
+      # rest of the repo, since this workflow introduces zizmor's
+      # `unpinned-uses` rule.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          # No need for history in a lint/audit job.
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Print zizmor version
+        # Logs the exact pinned version and confirms the image pulled
+        # successfully before the audit runs. ZIZMOR_IMAGE comes from the
+        # workflow-level env above.
+        run: docker run --rm "${ZIZMOR_IMAGE}" --version
+        shell: bash
+      - name: Run zizmor
+        # We invoke the pinned zizmor container directly rather than via
+        # zizmorcore/zizmor-action because that action does not expose
+        # `--no-exit-codes`, which is what lets us forgive FINDINGS while still
+        # failing on a genuine tool/config error. The image is the exact one
+        # the action would use, pinned by both tag and digest (zizmor 1.16.3).
+        # The workspace is mounted read-only and the only token exposed is the
+        # job-scoped GITHUB_TOKEN; the job has `contents: read` only.
+        # ZIZMOR_IMAGE comes from the workflow-level env above.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          docker run --rm \
+            --volume "${GITHUB_WORKSPACE}:/workspace:ro" \
+            --workdir /workspace \
+            --env "GH_TOKEN=${GH_TOKEN}" \
+            "${ZIZMOR_IMAGE}" \
+            --format=github \
+            --config=.github/zizmor.yml \
+            --no-exit-codes \
+            -- \
+            .
+        shell: bash

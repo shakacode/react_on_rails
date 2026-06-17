@@ -1,0 +1,130 @@
+# zizmor configuration — static analysis for GitHub Actions
+# https://docs.zizmor.sh/configuration/
+#
+# ROLLOUT (issue #3449): zizmor runs as a NON-BLOCKING gate during phase 1.
+# The workflow (.github/workflows/zizmor.yml) invokes the pinned zizmor CLI
+# with `--no-exit-codes`, so pre-existing FINDINGS do not fail the `zizmor`
+# check — but genuine TOOL/CONFIG failures (bad config, unknown version,
+# Docker/image error) still fail it, so a broken audit never masquerades as a
+# green check. See the workflow for the exit-code handling.
+#
+# BASELINE SUPPRESSION (why the `ignore` list below):
+# A scan of `main` with the pinned zizmor version (1.16.3 — see the workflow's
+# `--version`) surfaces ~56 pre-existing findings across the existing
+# workflows/actions. GitHub caps annotations at 10 per step, so with an
+# un-suppressed baseline a NEW finding introduced by a future PR could be
+# pushed past the cap and never render — defeating the point of a non-blocking
+# "surface new issues" gate. To keep the signal useful, every KNOWN baseline
+# finding is suppressed below with a precise `filename:line` `ignore` entry.
+# Net effect: a brand-new finding in a PR is NOT in this list, so it surfaces
+# as an annotation (and stays well under the cap).
+#
+# These suppressions are the phase-1 triage backlog, NOT permanent waivers.
+# As each underlying issue is fixed (e.g. pinning an action to a SHA, adding
+# an explicit `permissions:` block), remove its `ignore` entry. When the list
+# is empty, drop `--no-exit-codes` from the workflow to flip zizmor to a
+# blocking gate. If a baseline line shifts due to an unrelated edit, the stale
+# finding simply re-surfaces as an annotation (safe failure mode — more
+# visibility, not less).
+#
+# SCOPE LIMITATION: zizmor's `ignore` matches by workflow filename, and per its
+# documentation composite-action findings (in .github/actions/*/action.yml)
+# CANNOT be suppressed via this config — so no `action.yml` entries are listed
+# below (they were no-ops). Those composite-action findings, and any
+# online-audit findings, therefore still surface as annotations. That is
+# acceptable under the non-blocking phase-1 gate (more visibility, never a false
+# green); only the higher-volume workflow-file findings are baselined here so a
+# genuinely NEW workflow finding stays under GitHub's 10-annotation cap.
+# Regenerate the workflow-file baseline after a binary version bump with the
+# pinned version, EXCLUDING any action.yml locations (not suppressible):
+#   zizmor --no-online-audits --color=never --format=json . \
+#     | jq -r '.[] | .ident as $r | .locations[]
+#              | "\($r) \(.symbolic.key.Local.given_path | split("/") | last):"
+#                + "\(.concrete.location.start_point.row + 1)"' \
+#     | grep -v ' action.yml:'
+# then group by rule.
+# See https://docs.zizmor.sh/configuration/#ignoring-findings
+
+rules:
+  artipacked:
+    ignore:
+      - bundle-size.yml:23
+      - check-markdown-links.yml:34
+      - check-markdown-links.yml:70
+      - claude-code-review.yml:17
+      - claude.yml:25
+      - codeql.yml:24
+      - playwright.yml:79
+  dependabot-cooldown:
+    ignore:
+      - dependabot.yml:36
+      - dependabot.yml:55
+      - dependabot.yml:81
+      - dependabot.yml:100
+      - dependabot.yml:121
+  template-injection:
+    ignore:
+      - dummy-app-bundler-tests.yml:240
+      - dummy-app-bundler-tests.yml:241
+      - dummy-app-bundler-tests.yml:242
+      - examples.yml:54
+      - examples.yml:56
+      - examples.yml:59
+      - examples.yml:208
+      - examples.yml:209
+      - examples.yml:210
+      - gem-tests.yml:56
+      - gem-tests.yml:58
+      - gem-tests.yml:61
+      - gem-tests.yml:171
+      - gem-tests.yml:172
+      - gem-tests.yml:173
+      - integration-tests.yml:55
+      - integration-tests.yml:57
+      - integration-tests.yml:60
+      - lint-js-and-ruby.yml:49
+      - lint-js-and-ruby.yml:51
+      - lint-js-and-ruby.yml:54
+      - package-js-tests.yml:51
+      - package-js-tests.yml:53
+      - package-js-tests.yml:56
+      - playwright.yml:48
+      - playwright.yml:50
+      - playwright.yml:53
+      - precompile-check.yml:45
+      - precompile-check.yml:47
+      - precompile-check.yml:50
+      - pro-integration-tests.yml:54
+      - pro-integration-tests.yml:57
+      - pro-integration-tests.yml:60
+      - pro-test-package-and-gem.yml:53
+      - pro-test-package-and-gem.yml:56
+      - pro-test-package-and-gem.yml:59
+  unpinned-uses:
+    ignore:
+      - benchmark-suite.yml:104
+      - benchmark-suite.yml:113
+      - benchmark-suite.yml:155
+      - bundle-size.yml:70
+      - bundle-size.yml:129
+      - check-markdown-links.yml:37
+      - check-markdown-links.yml:80
+      - claude-code-review.yml:24
+      - claude.yml:32
+      - dummy-app-bundler-tests.yml:46
+      - dummy-app-bundler-tests.yml:160
+      - examples.yml:154
+      - lint-js-and-ruby.yml:96
+      - lint-js-and-ruby.yml:130
+      - package-js-tests.yml:106
+      - playwright.yml:96
+      - precompile-check.yml:92
+      - pro-integration-tests.yml:116
+      - pro-integration-tests.yml:224
+      - pro-integration-tests.yml:408
+      - pro-integration-tests.yml:572
+      - pro-test-package-and-gem.yml:119
+      - pro-test-package-and-gem.yml:225
+      - pro-test-package-and-gem.yml:324
+      - shakaperf-release-gates.yml:56
+      - trigger-docs-site.yml:23
