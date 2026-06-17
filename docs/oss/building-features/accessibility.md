@@ -416,12 +416,21 @@ the main landmark, visually hidden until focused:
 ```
 
 ```css
+/* Hidden until focused, using the direction-independent clip pattern so it
+   also works in RTL layouts. */
 .skip-link {
   position: absolute;
-  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
 }
 .skip-link:focus {
-  left: 0;
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
 }
 ```
 
