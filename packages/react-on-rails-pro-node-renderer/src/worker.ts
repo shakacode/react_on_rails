@@ -227,6 +227,31 @@ export function releaseExecutionContextWhenStreamFinishes(
     releaseExecutionContext();
   });
 
+  // If the HTTP client disconnects before the render stream finishes, destroy the source render
+  // stream so the in-flight React render is aborted upstream (issue #3885) instead of running to
+  // completion for a client that is gone. Destroying the source triggers its own teardown, which the
+  // Pro streaming layer propagates into ReactDOM's `PipeableStream.abort()`. The
+  // `!progressStream.writableEnded` guard means this is a no-op on normal completion (the source ends
+  // first, so by the time the response closes there is nothing left to abort).
+  const abortRenderOnClientDisconnect = () => {
+    if (!stream.destroyed && !progressStream.writableEnded) {
+      stream.destroy();
+    }
+    // End the response progress stream explicitly. `runWhenStreamFinishes`'s own `res.raw` close
+    // listener runs before this one and removes the `stream` 'close' → `endProgressStream` forwarding,
+    // so destroying the source above would otherwise leave `progressStream` open. Ending it here is
+    // order-independent (issue #3885).
+    endProgressStream();
+  };
+  res.raw.once('close', abortRenderOnClientDisconnect);
+  // Remove the disconnect listener once the render stream terminates for any reason — normal end,
+  // error, or destroy all emit 'close' — so its closure over `stream`/`progressStream` does not linger
+  // on `res.raw` until the connection closes, which can be much later on HTTP/2 or keep-alive
+  // connections, delaying GC of the finished render (review feedback on #3885).
+  stream.once('close', () => {
+    res.raw.off('close', abortRenderOnClientDisconnect);
+  });
+
   stream.once('close', endProgressStream);
   stream.once('error', forwardSourceError);
   stream.pipe(progressStream);

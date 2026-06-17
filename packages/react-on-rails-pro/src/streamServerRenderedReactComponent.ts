@@ -46,8 +46,15 @@ const streamRenderReactComponent = (
     isShellReady: false,
   };
 
-  const { readableStream, pipeToTransform, writeChunk, emitError, endStream } =
-    transformRenderStreamChunksToResultObject(renderState);
+  const {
+    readableStream,
+    pipeToTransform,
+    writeChunk,
+    emitError,
+    endStream,
+    onConsumerAbort,
+    isConsumerAborted,
+  } = transformRenderStreamChunksToResultObject(renderState);
   let sawRSCRouteSSRFalseBailout = false;
   let sawUnexpectedRenderError = false;
 
@@ -130,6 +137,13 @@ const streamRenderReactComponent = (
             return error.digest;
           }
 
+          // The render was aborted because the consumer disconnected (issue #3885): React's resulting
+          // abort error is expected teardown, not an app failure. Swallow it so it is neither reported
+          // nor emitted into the already-closed output stream as a rendering error.
+          if (isConsumerAborted()) {
+            return undefined;
+          }
+
           // Append the owner stack to this error's stack (issue #3887). onError fires for every
           // render error and sets renderState.error, which is serialized into the Rails-side
           // renderingError metadata (message + stack) — so this is what carries owner stacks to
@@ -152,6 +166,23 @@ const streamRenderReactComponent = (
         },
         identifierPrefix: domNodeId,
         nonce: sanitizeNonce(railsContext.cspNonce),
+      });
+
+      // If the consumer disconnects before the render finishes, abort the in-flight React render and
+      // release the request's RSC payload streams so we stop doing work for a client that is gone
+      // (issue #3885). `renderingStream` (a ReactDOM PipeableStream) is the actual aborter; the piped
+      // source the transform sees is injectRSCPayload's wrapper, which has no abort() of its own.
+      // Aborting an already-completed render is a no-op.
+      onConsumerAbort(() => {
+        // `isConsumerAborted()` is already true here (set centrally before abort handlers run), so the
+        // onError above will swallow React's resulting abort error.
+        renderingStream.abort();
+        streamingTrackers.rscRequestTracker.clear();
+        // Run post-SSR cleanup hooks (e.g. releasing request-scoped resources like a Redis receiver)
+        // that onAllReady would normally run. An early disconnect aborts before onAllReady, so without
+        // this those hooks would leak (issue #3885). Idempotent; suppress the duplicate warning for the
+        // post-shell case where onAllReady already fired.
+        streamingTrackers.postSSRHookTracker.notifySSREnd({ suppressDuplicateWarning: true });
       });
     })
     .catch((e: unknown) => {
