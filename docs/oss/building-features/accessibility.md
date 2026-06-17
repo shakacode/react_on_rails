@@ -83,6 +83,8 @@ associate each message with its field via `aria-describedby` so the error is
 announced when focus reaches the input:
 
 ```tsx
+import { useRailsForm } from 'react-on-rails/useRailsForm';
+
 function EmailField() {
   const form = useRailsForm({ email: '' });
 
@@ -146,7 +148,9 @@ server-rendered pages. Both transitions need explicit focus handling:
 - **Client-side route changes:** unlike a full page load, an SPA navigation does
   not reset focus. On each route change, move focus to a logical landmark (the
   new page's `<h1>` or main heading) and announce the new page title in a live
-  region, so screen-reader users know the view changed.
+  region, so screen-reader users know the view changed. Headings are not natively
+  focusable — add `tabIndex={-1}` to the target so `element.focus()` works
+  (`<h1 tabIndex={-1} ref={headingRef}>`), then focus it after the route renders.
 
 ### `prefers-reduced-motion`
 
@@ -181,7 +185,9 @@ boundary caveat.
 
 ### Touch targets
 
-The WCAG **AA** floor is **24×24 CSS pixels** (WCAG 2.2 SC 2.5.8). Aim higher:
+The WCAG 2.2 **AA** criterion (SC 2.5.8) effectively asks for **24×24 CSS
+pixels** — though a smaller target can still pass if it has enough spacing, since
+the rule is really about the target plus the gap to adjacent targets. Aim higher:
 **44×44 CSS pixels** (WCAG 2.1/2.2 AAA, SC 2.5.5) is widely treated as the
 practical minimum on touch devices. Apply minimum sizes with padding rather than
 shrinking the visible label, and keep adequate spacing between adjacent targets.
@@ -374,8 +380,10 @@ test('dialog is keyboard accessible', async ({ page }) => {
   const dialog = page.getByRole('dialog', { name: 'Settings' });
   await expect(dialog).toBeVisible();
 
-  // Focus should have moved into the dialog on open — assert the focused element
-  // is inside it, not merely that the dialog rendered.
+  // Focus should have moved into the dialog on open — assert a focused element
+  // is inside it, not merely that the dialog rendered. For a sharper failure,
+  // assert the specific control you expect, e.g.
+  // dialog.getByRole('button', { name: 'Close' }).
   await expect(dialog.locator(':focus')).toBeVisible();
 
   // Escape closes and returns focus to the trigger.
