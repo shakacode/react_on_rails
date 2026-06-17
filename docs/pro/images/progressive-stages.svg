@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>How a streaming page fills in stage by stage in the browser</title>
+  <desc>Three browser snapshots. Stage 1 is the shell at about 50 ms: the header is done while users and posts show loading states, but the page is already visible and becomes interactive as JS loads. Stage 2: the users section fills in while posts still load. Stage 3: the page is complete with header, users, and posts all done. Each Suspense boundary swaps its fallback for real content as its prop arrives.</desc>
+  <defs>
+    <linearGradient id="browserGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A90D9"/><stop offset="100%" stop-color="#2E5A8A"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.12"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .stage-label { fill: #334155; }
+      .stage-sub { fill: #64748B; }
+      .done-box { fill: #D1FAE5; stroke: #22C55E; }
+      .done-text { fill: #166534; }
+      .load-box { fill: #FEF3C7; stroke: #F59E0B; }
+      .load-text { fill: #92400E; }
+      .flow-arrow { stroke: #94A3B8; }
+      .flow-head { fill: #94A3B8; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .stage-label { fill: #E2E8F0; }
+        .stage-sub { fill: #94A3B8; }
+        .done-box { fill: #052E16; stroke: #10B981; }
+        .done-text { fill: #6EE7B7; }
+        .load-box { fill: #422006; stroke: #F59E0B; }
+        .load-text { fill: #FDE68A; }
+      }
+      .spinner { animation: spin 1s linear infinite; transform-box: fill-box; transform-origin: center; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+    </style>
+  </defs>
+
+  <rect width="900" height="300" class="bg"/>
+  <text x="450" y="26" text-anchor="middle" font-size="18" font-weight="700" class="title">Progressive streaming: the page fills in stage by stage</text>
+  <text x="450" y="44" text-anchor="middle" font-size="11" class="subtitle">Each Suspense boundary swaps its fallback for real content as its prop arrives</text>
+
+  <g>
+    <rect x="20" y="60" width="250" height="196" rx="10" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="20" y="60" width="250" height="26" rx="10" fill="url(#browserGrad)"/>
+    <rect x="20" y="76" width="250" height="10" fill="url(#browserGrad)"/>
+    <circle cx="34" cy="73" r="4" fill="#EF4444"/><circle cx="48" cy="73" r="4" fill="#F59E0B"/><circle cx="62" cy="73" r="4" fill="#22C55E"/>
+    <text x="160" y="77" text-anchor="middle" font-size="10" font-weight="600" fill="white">Stage 1 · shell (~50 ms)</text>
+
+    <rect x="32" y="98" width="226" height="30" rx="5" class="done-box" stroke-width="1.5"/>
+    <text x="44" y="117" font-size="11" font-weight="600" class="done-text">Header</text>
+    <text x="246" y="117" text-anchor="end" font-size="11" class="done-text">✓</text>
+
+    <rect x="32" y="134" width="226" height="30" rx="5" class="load-box" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="44" y="153" font-size="11" font-weight="500" class="load-text">Users</text>
+    <circle cx="240" cy="149" r="6" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="12 6" class="spinner"/>
+
+    <rect x="32" y="170" width="226" height="30" rx="5" class="load-box" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="44" y="189" font-size="11" font-weight="500" class="load-text">Posts</text>
+    <circle cx="240" cy="185" r="6" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="12 6" class="spinner"/>
+
+    <text x="145" y="222" text-anchor="middle" font-size="9" class="stage-sub">visible now · interactive as JS loads</text>
+  </g>
+
+  <line x1="278" y1="155" x2="318" y2="155" class="flow-arrow" stroke-width="2"/>
+  <polygon points="318,150 326,155 318,160" class="flow-head"/>
+
+  <g>
+    <rect x="328" y="60" width="250" height="196" rx="10" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="328" y="60" width="250" height="26" rx="10" fill="url(#browserGrad)"/>
+    <rect x="328" y="76" width="250" height="10" fill="url(#browserGrad)"/>
+    <circle cx="342" cy="73" r="4" fill="#EF4444"/><circle cx="356" cy="73" r="4" fill="#F59E0B"/><circle cx="370" cy="73" r="4" fill="#22C55E"/>
+    <text x="468" y="77" text-anchor="middle" font-size="10" font-weight="600" fill="white">Stage 2 · users fill in</text>
+
+    <rect x="340" y="98" width="226" height="30" rx="5" class="done-box" stroke-width="1.5"/>
+    <text x="352" y="117" font-size="11" font-weight="600" class="done-text">Header</text>
+    <text x="554" y="117" text-anchor="end" font-size="11" class="done-text">✓</text>
+
+    <rect x="340" y="134" width="226" height="30" rx="5" class="done-box" stroke-width="1.5"/>
+    <text x="352" y="153" font-size="11" font-weight="600" class="done-text">Users</text>
+    <text x="554" y="153" text-anchor="end" font-size="11" class="done-text">✓</text>
+
+    <rect x="340" y="170" width="226" height="30" rx="5" class="load-box" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="352" y="189" font-size="11" font-weight="500" class="load-text">Posts</text>
+    <circle cx="548" cy="185" r="6" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="12 6" class="spinner"/>
+
+    <text x="453" y="222" text-anchor="middle" font-size="9" class="stage-sub">users streamed in independently</text>
+  </g>
+
+  <line x1="586" y1="155" x2="626" y2="155" class="flow-arrow" stroke-width="2"/>
+  <polygon points="626,150 634,155 626,160" class="flow-head"/>
+
+  <g>
+    <rect x="636" y="60" width="250" height="196" rx="10" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="636" y="60" width="250" height="26" rx="10" fill="url(#browserGrad)"/>
+    <rect x="636" y="76" width="250" height="10" fill="url(#browserGrad)"/>
+    <circle cx="650" cy="73" r="4" fill="#EF4444"/><circle cx="664" cy="73" r="4" fill="#F59E0B"/><circle cx="678" cy="73" r="4" fill="#22C55E"/>
+    <text x="776" y="77" text-anchor="middle" font-size="10" font-weight="600" fill="white">Stage 3 · complete</text>
+
+    <rect x="648" y="98" width="226" height="30" rx="5" class="done-box" stroke-width="1.5"/>
+    <text x="660" y="117" font-size="11" font-weight="600" class="done-text">Header</text>
+    <text x="862" y="117" text-anchor="end" font-size="11" class="done-text">✓</text>
+
+    <rect x="648" y="134" width="226" height="30" rx="5" class="done-box" stroke-width="1.5"/>
+    <text x="660" y="153" font-size="11" font-weight="600" class="done-text">Users</text>
+    <text x="862" y="153" text-anchor="end" font-size="11" class="done-text">✓</text>
+
+    <rect x="648" y="170" width="226" height="30" rx="5" class="done-box" stroke-width="1.5"/>
+    <text x="660" y="189" font-size="11" font-weight="600" class="done-text">Posts</text>
+    <text x="862" y="189" text-anchor="end" font-size="11" class="done-text">✓</text>
+
+    <text x="761" y="222" text-anchor="middle" font-size="9" class="stage-sub">all sections hydrated</text>
+  </g>
+</svg>

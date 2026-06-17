@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 400" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Discouraged pattern: a Server Component fetching Rails directly</title>
+  <desc>Sequence diagram across three lanes — Node Renderer, Rails API, and DB / Models. A warning banner notes this is discouraged. The renderer asks the Rails API for data, Rails loads and authorizes it from the database, returns the data to Rails, Rails returns JSON to the renderer, and the renderer continues rendering. Prefer async props so Rails keeps owning auth and caching.</desc>
+  <defs>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CC0000"/><stop offset="100%" stop-color="#990000"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+    <linearGradient id="dataGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7C8DA6"/><stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .lane-line { stroke: #E2E8F0; }
+      .callout-box { fill: #FFFBEB; stroke: #FCD34D; }
+      .callout-title { fill: #92400E; }
+      .msg-box { fill: #FEF3C7; stroke: #F59E0B; }
+      .msg-text { fill: #92400E; }
+      .ret-box { fill: #F1F5F9; stroke: #CBD5E1; }
+      .ret-text { fill: #475569; }
+      .arrow-warn { stroke: #F59E0B; }
+      .head-warn { fill: #F59E0B; }
+      .arrow-ret { stroke: #94A3B8; }
+      .head-ret { fill: #94A3B8; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .lane-line { stroke: #334155; }
+        .callout-box { fill: #422006; stroke: #F59E0B; }
+        .callout-title { fill: #FCD34D; }
+        .msg-box { fill: #422006; stroke: #F59E0B; }
+        .msg-text { fill: #FDE68A; }
+        .ret-box { fill: #1E293B; stroke: #475569; }
+        .ret-text { fill: #CBD5E1; }
+      }
+      .st1 { opacity:0; animation: reveal 9s ease 0.6s infinite; }
+      .st2 { opacity:0; animation: reveal 9s ease 1.4s infinite; }
+      .st3 { opacity:0; animation: reveal 9s ease 2.2s infinite; }
+      .st4 { opacity:0; animation: reveal 9s ease 3.0s infinite; }
+      .st5 { opacity:0; animation: reveal 9s ease 3.8s infinite; }
+      @keyframes reveal { 0% { opacity:0; } 4% { opacity:1; } 90% { opacity:1; } 96% { opacity:0; } 100% { opacity:0; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; } }
+    </style>
+  </defs>
+
+  <rect width="840" height="400" class="bg"/>
+  <text x="420" y="26" text-anchor="middle" font-size="18" font-weight="700" class="title">Discouraged: fetching Rails directly from the renderer</text>
+  <text x="420" y="44" text-anchor="middle" font-size="11" class="subtitle">A plain network round-trip that bypasses Rails auth and caching — prefer async props</text>
+
+  <rect x="85" y="58" width="130" height="30" rx="8" fill="url(#nodeGrad)" filter="url(#shadow)"/>
+  <text x="150" y="78" text-anchor="middle" font-size="11" font-weight="600" fill="white">Node Renderer</text>
+  <rect x="365" y="58" width="110" height="30" rx="8" fill="url(#railsGrad)" filter="url(#shadow)"/>
+  <text x="420" y="78" text-anchor="middle" font-size="11" font-weight="600" fill="white">Rails API</text>
+  <rect x="630" y="58" width="120" height="30" rx="8" fill="url(#dataGrad)" filter="url(#shadow)"/>
+  <text x="690" y="78" text-anchor="middle" font-size="11" font-weight="600" fill="white">DB / Models</text>
+
+  <line x1="150" y1="94" x2="150" y2="372" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="420" y1="94" x2="420" y2="372" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="690" y1="94" x2="690" y2="372" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+  <g>
+    <rect x="40" y="102" width="760" height="34" rx="8" class="callout-box" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="420" y="123" text-anchor="middle" font-size="11" font-weight="600" class="callout-title">⚠ Discouraged — usually let Rails pass the data in via async props so auth, session, and caching stay on the Rails side</text>
+  </g>
+
+  <g class="st1">
+    <line x1="156" y1="172" x2="414" y2="172" class="arrow-warn" stroke-width="1.5"/>
+    <polygon points="414,169 421,172 414,175" class="head-warn"/>
+    <rect x="210" y="162" width="120" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="270" y="174" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Ask Rails API for data</text>
+  </g>
+
+  <g class="st2">
+    <line x1="426" y1="210" x2="684" y2="210" class="arrow-warn" stroke-width="1.5"/>
+    <polygon points="684,207 691,210 684,213" class="head-warn"/>
+    <rect x="486" y="200" width="138" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="555" y="212" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Load and authorize data</text>
+  </g>
+
+  <g class="st3">
+    <line x1="684" y1="248" x2="426" y2="248" class="arrow-ret" stroke-width="1.5" stroke-dasharray="6 3"/>
+    <polygon points="426,245 419,248 426,251" class="head-ret"/>
+    <rect x="520" y="238" width="70" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="555" y="250" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">Data</text>
+  </g>
+
+  <g class="st4">
+    <line x1="414" y1="286" x2="156" y2="286" class="arrow-ret" stroke-width="1.5" stroke-dasharray="6 3"/>
+    <polygon points="156,283 149,286 156,289" class="head-ret"/>
+    <rect x="220" y="276" width="100" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="270" y="288" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">JSON data</text>
+  </g>
+
+  <g class="st5">
+    <path d="M 156 318 h 44 v 26 h -44" fill="none" class="arrow-ret" stroke-width="1.5"/>
+    <polygon points="159,341 152,344 159,347" class="head-ret"/>
+    <rect x="206" y="322" width="124" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="268" y="334" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">Continue rendering</text>
+  </g>
+</svg>
