@@ -24,11 +24,13 @@ on:
     paths:
       - '.github/workflows/**'
       - '.github/actions/**'
+      - '.github/dependabot.yml'
       - '.github/zizmor.yml'
   pull_request:
     paths:
       - '.github/workflows/**'
       - '.github/actions/**'
+      - '.github/dependabot.yml'
       - '.github/zizmor.yml'
   workflow_dispatch:
 
@@ -40,7 +42,10 @@ jobs:
   zizmor:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to a commit SHA (v4.2.2) to model the target state for the
+      # rest of the repo, since this workflow introduces zizmor's
+      # `unpinned-uses` rule.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           # No need for history in a lint/audit job.
           fetch-depth: 1
@@ -66,4 +71,7 @@ jobs:
           # least-privilege (contents: read only) and work on any repo tier.
           advanced-security: false
           annotations: true
+          # Point at the repo config explicitly so the wiring is obvious
+          # (zizmor would otherwise discover it via the default search path).
+          config: .github/zizmor.yml
           # token defaults to ${{ github.token }} for online audits.

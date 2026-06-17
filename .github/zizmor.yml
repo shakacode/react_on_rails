@@ -19,5 +19,15 @@
 # No rules are globally disabled here on purpose: keeping all audits ON
 # while the gate is non-blocking gives maintainers the full picture without
 # masking future regressions.
+#
+# `rules: {}` below is effectively a no-op today (same as having no config),
+# but it gives the file a valid, ready-to-extend structure. To suppress a
+# specific finding while triaging the baseline, add a per-finding `ignore`
+# entry rather than disabling a rule globally. Example (commented out):
+#   rules:
+#     unpinned-uses:
+#       ignore:
+#         - some-workflow.yml:42:9   # reason for the suppression
+# See https://docs.zizmor.sh/configuration/#ignoring-findings
 
 rules: {}
