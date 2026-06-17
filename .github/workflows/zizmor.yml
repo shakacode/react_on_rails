@@ -26,6 +26,8 @@ on:
       - '.github/actions/**'
       - '.github/dependabot.yml'
       - '.github/zizmor.yml'
+  # No `branches:` filter on purpose: auditing PRs that target any branch
+  # (not just main) catches security issues early. Mirrors actionlint.yml.
   pull_request:
     paths:
       - '.github/workflows/**'
@@ -65,6 +67,11 @@ jobs:
         with:
           # Audit the whole repo (workflows and composite actions).
           inputs: .
+          # Pin the zizmor binary version (the action otherwise installs
+          # `latest`, so the finding count would drift release-to-release and
+          # the documented baseline could go stale). Bump deliberately when
+          # re-triaging the baseline.
+          version: 1.25.2
           # Emit findings as GitHub annotations instead of uploading SARIF.
           # SARIF upload requires GitHub Advanced Security and
           # `security-events: write`; annotations keep this job
