@@ -39,6 +39,24 @@ class PrFileTouchMapTest < Minitest::Test
     assert_equal "files-api", out["source"]
   end
 
+  def test_files_api_copied_owns_both_paths
+    out = PrFileTouchMap.parse_files_api(
+      '[[{"filename":"lib/copy.rb","status":"copied","previous_filename":"lib/src.rb"}]]',
+      repo: "owner/repo", pr_number: 7, changed_files: 1
+    )
+    assert_equal ["lib/copy.rb", "lib/src.rb"], out["paths"]
+    assert_equal [{ "old" => "lib/src.rb", "new" => "lib/copy.rb" }], out["renames"]
+  end
+
+  def test_files_api_rejects_copied_without_previous
+    assert_raises(PrFileTouchMap::Error) do
+      PrFileTouchMap.parse_files_api(
+        '[[{"filename":"lib/copy.rb","status":"copied"}]]',
+        repo: "o/r", pr_number: 7, changed_files: 1
+      )
+    end
+  end
+
   def test_files_api_rejects_renamed_without_previous
     assert_raises(PrFileTouchMap::Error) do
       PrFileTouchMap.parse_files_api(
@@ -70,6 +88,33 @@ class PrFileTouchMapTest < Minitest::Test
     assert_raises(PrFileTouchMap::Error) do
       PrFileTouchMap.parse_files_api("", repo: "o/r", pr_number: 7, changed_files: 1)
     end
+  end
+
+  def test_reconcile_agreeing_sources_are_verified
+    local = PrFileTouchMap.parse_name_status("M\tlib/a.rb\nA\tlib/b.rb\n", repo: "o/r", pr_number: 7, changed_files: 2)
+    api = PrFileTouchMap.parse_files_api(
+      '[[{"filename":"lib/a.rb","status":"modified"},{"filename":"lib/b.rb","status":"added"}]]',
+      repo: "o/r", pr_number: 7, changed_files: 2
+    )
+    out = PrFileTouchMap.reconcile(local, api, repo: "o/r", pr_number: 7, changed_files: 2)
+    assert_equal "verified", out["source"]
+    assert_equal ["lib/a.rb", "lib/b.rb"], out["paths"]
+  end
+
+  def test_reconcile_disagreement_is_unknown
+    local = PrFileTouchMap.parse_name_status("M\tlib/a.rb\nA\tlib/b.rb\n", repo: "o/r", pr_number: 7, changed_files: 2)
+    api = PrFileTouchMap.parse_files_api(
+      '[[{"filename":"lib/a.rb","status":"modified"}]]', repo: "o/r", pr_number: 7, changed_files: 1
+    )
+    out = PrFileTouchMap.reconcile(local, api, repo: "o/r", pr_number: 7, changed_files: 2)
+    assert_equal "UNKNOWN", out["source"]
+    assert_empty out["paths"]
+  end
+
+  def test_reconcile_missing_source_is_unknown
+    local = PrFileTouchMap.parse_name_status("M\tlib/a.rb\n", repo: "o/r", pr_number: 7, changed_files: 1)
+    assert_equal "UNKNOWN", PrFileTouchMap.reconcile(local, nil, repo: "o/r", pr_number: 7, changed_files: 1)["source"]
+    assert_equal "UNKNOWN", PrFileTouchMap.reconcile(nil, local, repo: "o/r", pr_number: 7, changed_files: 1)["source"]
   end
 
   def test_unknown_result_shape
