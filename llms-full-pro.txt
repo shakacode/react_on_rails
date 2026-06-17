@@ -2170,7 +2170,7 @@ To render more of the page progressively, add an async prop and a `<Suspense>` b
 Extending the example with a second slow section (`users`), the page fills in stage by stage from the browser's perspective — visible from the first paint and interactive as each part hydrates, with each `<Suspense>` boundary swapping its fallback for real content as its prop arrives:
 
 <p>
-  <img src="images/progressive-stages.svg" alt="Three browser snapshots. Stage 1 is the shell at about 50 ms: the header is done while users and posts show loading states, but the page is already visible and becomes interactive as JS loads. Stage 2: the users section fills in while posts still load. Stage 3: the page is complete with header, users, and posts all done." width="840" />
+  <img src="images/progressive-stages.svg" alt="Three browser snapshots. Stage 1 is the shell at about 50 ms: the header is done while users and posts show loading states, but the page is already visible and becomes interactive as JS loads. Stage 2: the users section fills in while posts still load. Stage 3: the page is complete with header, users, and posts all done. Each Suspense boundary swaps its fallback for real content as its prop arrives." width="840" />
 </p>
 
 ## Compression Middleware Compatibility

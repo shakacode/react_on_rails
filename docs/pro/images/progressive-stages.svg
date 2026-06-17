@@ -33,7 +33,7 @@
       }
       .spinner { animation: spin 1s linear infinite; transform-box: fill-box; transform-origin: center; }
       @keyframes spin { to { transform: rotate(360deg); } }
-      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; } }
     </style>
   </defs>
 

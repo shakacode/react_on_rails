@@ -40,6 +40,8 @@
         .msg-text { fill: #93C5FD; }
         .ret-box { fill: #052E16; stroke: #10B981; }
         .ret-text { fill: #6EE7B7; }
+        .arrow-fwd { stroke: #CBD5E1; }
+        .head-fwd { fill: #CBD5E1; }
         .arrow-ret { stroke: #4ADE80; }
         .head-ret { fill: #4ADE80; }
       }
