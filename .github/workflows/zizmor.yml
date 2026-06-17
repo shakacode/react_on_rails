@@ -6,11 +6,11 @@ name: Zizmor GitHub Actions Security Audit
 # actionlint checks syntax and correctness, zizmor checks for security
 # weaknesses (unpinned actions, template injection, credential persistence).
 #
-# ROLLOUT: This gate is intentionally NON-BLOCKING for now
-# (`continue-on-error: true`). A baseline scan of `main` surfaced pre-existing
-# findings across the existing workflows. Findings are surfaced as PR
-# annotations so they can be triaged and fixed incrementally.
-# Follow-up (issue #3449): once the backlog is cleared, remove
+# ROLLOUT: This gate is intentionally NON-BLOCKING for now. The "Run zizmor"
+# step sets `continue-on-error: true`, so a baseline scan of `main` (which
+# surfaced pre-existing findings across the existing workflows) does not fail
+# the check. Findings still surface as PR annotations for incremental triage.
+# Follow-up (issue #3449): once the backlog is cleared, remove the step's
 # `continue-on-error: true` to make this a required, blocking gate.
 # See .github/zizmor.yml for configuration.
 
@@ -39,8 +39,6 @@ concurrency:
 jobs:
   zizmor:
     runs-on: ubuntu-22.04
-    # Non-blocking during initial rollout; see header and .github/zizmor.yml.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,6 +46,14 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Run zizmor
+        # Non-blocking during initial rollout: `continue-on-error` is set on
+        # the STEP (not the job) so zizmor's findings still surface as
+        # annotations while the job — and therefore the `zizmor` check —
+        # stays green. A job-level `continue-on-error` would leave the check
+        # run itself red even when the workflow succeeds. See the header and
+        # .github/zizmor.yml. Follow-up (#3449): remove this line to make
+        # zizmor a blocking gate once the baseline findings are triaged.
+        continue-on-error: true
         # Official action, pinned to a commit SHA (v0.5.6) per supply-chain
         # best practice.
         uses: zizmorcore/zizmor-action@5f14fd08f7cf1cb1609c1e344975f152c7ee938d
