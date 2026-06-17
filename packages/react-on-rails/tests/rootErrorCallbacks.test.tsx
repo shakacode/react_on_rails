@@ -12,7 +12,11 @@
 import * as React from 'react';
 import { renderComponent } from '../src/ClientRenderer.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
-import { setRootErrorHandlers, resetRootErrorHandlers } from '../src/rootErrorHandlers.ts';
+import {
+  buildRootErrorCallbackOptions,
+  setRootErrorHandlers,
+  resetRootErrorHandlers,
+} from '../src/rootErrorHandlers.ts';
 import { resetRailsContext } from '../src/context.ts';
 import { supportsReact19RootErrorCallbacks } from '../src/reactApis.cts';
 
@@ -137,6 +141,25 @@ describe('root error callbacks with real react-dom (React 19)', () => {
       'https://reactonrails.com/docs/building-features/debugging-hydration-mismatches',
     );
   });
+
+  react19It(
+    'never auto-attaches a caught/uncaught wrapper for owner stacks when the app registered no handler, preserving React defaults (issue #3887)',
+    () => {
+      // React on Rails must not displace React's built-in caught/uncaught dev diagnostics (component
+      // stack, error-boundary hints) just to add an owner-stack line. With no app-registered handler,
+      // both callbacks stay unset so React's own defaults run untouched — regardless of React version.
+      // Owner stacks still reach users automatically on the SSR and hydration-mismatch paths. The
+      // positive client path (app handler + owner stacks available) is covered with a mocked
+      // owner-stack module in rootErrorCallbacksOwnerStack.test.tsx.
+      setupRailsContext('development');
+      const context = { componentName: 'ThrowingDevComponent', domNodeId: 'dev-uncaught-dom-id' };
+
+      const options = buildRootErrorCallbackOptions(context, false);
+
+      expect(options.onUncaughtError).toBeUndefined();
+      expect(options.onCaughtError).toBeUndefined();
+    },
+  );
 
   react19It(
     'invokes the user onUncaughtError with enriched context on the client-render (createRoot) path',

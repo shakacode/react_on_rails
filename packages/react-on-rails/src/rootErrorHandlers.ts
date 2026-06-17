@@ -3,6 +3,7 @@ import type { ReactHydrateOptions } from './reactApis.cts';
 import { supportsRootApi, supportsReact19RootErrorCallbacks } from './reactApis.cts';
 import { getRailsContext } from './context.ts';
 import { isThenable } from './isThenable.ts';
+import captureReactOwnerStack, { isOwnerStackSupported } from './captureReactOwnerStack.ts';
 
 /**
  * Guide linked from the development-mode hydration-mismatch message.
@@ -188,10 +189,40 @@ function extractComponentStack(errorInfo: unknown): string | undefined {
 }
 
 /**
+ * React 19.2+ includes the owner stack on the `errorInfo` passed to `onCaughtError`/`onUncaughtError`
+ * (and to `onRecoverableError` for hydration mismatches) via `errorInfo.ownerStack`. Prefer it when
+ * present; callers fall back to a live `captureReactOwnerStack()` call for React 19.1, which exposes
+ * the API but not the `errorInfo` field.
+ */
+function extractOwnerStack(errorInfo: unknown): string | undefined {
+  const ownerStack = (errorInfo as { ownerStack?: unknown } | null | undefined)?.ownerStack;
+  return typeof ownerStack === 'string' && ownerStack.trim().length > 0 ? ownerStack : undefined;
+}
+
+/**
+ * Builds the supplemental "Owner stack" suffix for dev-mode error logs (issue #3887).
+ *
+ * MUST be called synchronously from inside React's error callback. `precomputedOwnerStack` is the
+ * owner stack React already captured for this error (e.g. `errorInfo.ownerStack` on React 19.2+),
+ * when available; otherwise we fall back to a live `captureReactOwnerStack()` call, which only
+ * returns a value while React is still handling the error. Returns an empty string when no owner
+ * stack is available — in particular on React < 19.1 and in production builds, where
+ * `captureReactOwnerStack` is a strict no-op.
+ */
+function ownerStackSuffix(precomputedOwnerStack?: string): string {
+  const ownerStack =
+    (typeof precomputedOwnerStack === 'string' && precomputedOwnerStack.trim().length > 0
+      ? precomputedOwnerStack
+      : undefined) ?? captureReactOwnerStack();
+  return ownerStack ? `\nOwner stack (the components that rendered this one):${ownerStack}` : '';
+}
+
+/**
  * Branded, supplemental development-mode line: component name, dom id, component stack (when
- * React provides one), and the debugging-guide link. Deliberately does NOT dump the error object
- * itself — the error is default-reported exactly once elsewhere (by `defaultReportRecoverableError`
- * on core paths, or by Pro's internal recoverable-error handler on chained paths).
+ * React provides one), the owner stack (React >= 19.1 dev builds, issue #3887), and the
+ * debugging-guide link. Deliberately does NOT dump the error object itself — the error is
+ * default-reported exactly once elsewhere (by `defaultReportRecoverableError` on core paths, or by
+ * Pro's internal recoverable-error handler on chained paths).
  */
 function logDevHydrationError(context: RootErrorContext, errorInfo: unknown): void {
   const componentName = context.componentName ?? 'unknown';
@@ -199,7 +230,30 @@ function logDevHydrationError(context: RootErrorContext, errorInfo: unknown): vo
   const componentStack = extractComponentStack(errorInfo);
   const componentStackSuffix = componentStack ? `\nComponent stack:${componentStack}` : '';
   console.error(
-    `[ReactOnRails] Recoverable hydration error in component "${componentName}" (dom id: "${domNodeId}"). The server-rendered HTML did not match what React rendered on the client, so React threw away the server HTML and re-rendered on the client. Common Rails-specific causes and fixes: ${HYDRATION_MISMATCH_GUIDE_URL}${componentStackSuffix}`,
+    `[ReactOnRails] Recoverable hydration error in component "${componentName}" (dom id: "${domNodeId}"). The server-rendered HTML did not match what React rendered on the client, so React threw away the server HTML and re-rendered on the client. Common Rails-specific causes and fixes: ${HYDRATION_MISMATCH_GUIDE_URL}${componentStackSuffix}${ownerStackSuffix(extractOwnerStack(errorInfo))}`,
+  );
+}
+
+/**
+ * Development-only supplemental line for render-path errors React reports through an app-registered
+ * `onCaughtError`/`onUncaughtError` handler (issue #3887). Names the failing component/dom id and
+ * appends the owner stack when React provides one. The error itself is reported by the app's own
+ * handler (which we forward to), so this line is purely additive context.
+ */
+function logDevRenderError(
+  kind: 'onCaughtError' | 'onUncaughtError',
+  context: RootErrorContext,
+  errorInfo: unknown,
+): void {
+  const suffix = ownerStackSuffix(extractOwnerStack(errorInfo));
+  if (!suffix) {
+    return;
+  }
+  const componentName = context.componentName ?? 'unknown';
+  const domNodeId = context.domNodeId ?? 'unknown';
+  const caughtNote = kind === 'onCaughtError' ? ' (caught by an error boundary)' : '';
+  console.error(
+    `[ReactOnRails] Render error in component "${componentName}" (dom id: "${domNodeId}")${caughtNote}.${suffix}`,
   );
 }
 
@@ -272,13 +326,34 @@ export function buildRootErrorCallbackOptions(
   }
 
   if (supportsReact19RootErrorCallbacks) {
+    // Owner-stack enrichment for client render errors (issue #3887). We only enrich when the app has
+    // registered its own onCaughtError/onUncaughtError handler: providing one already replaces
+    // React's default reporting for that callback, so prepending our supplemental dev owner-stack
+    // line is purely additive. We deliberately do NOT auto-attach a wrapper when the app registered
+    // no handler — that would displace React's built-in dev diagnostics (component stack,
+    // error-boundary hints) that we cannot faithfully reproduce, a net loss. Owner stacks still reach
+    // users automatically on the two paths React on Rails already owns: SSR errors (the Pro streaming
+    // onError path) and hydration mismatches (the onRecoverableError path above).
+    //
+    // The owner-stack line is only emitted on React >= 19.1 dev builds (`isOwnerStackSupported()`);
+    // otherwise the wrapper just forwards to the app handler unchanged.
+    const enrichDevOwnerStack = inDevelopmentEnv() && isOwnerStackSupported();
+
     if (onCaughtError) {
-      options.onCaughtError = (error, errorInfo) =>
+      options.onCaughtError = (error, errorInfo) => {
+        if (enrichDevOwnerStack) {
+          logDevRenderError('onCaughtError', context, errorInfo);
+        }
         safeInvoke(onCaughtError, 'onCaughtError', error, errorInfo, context);
+      };
     }
     if (onUncaughtError) {
-      options.onUncaughtError = (error, errorInfo) =>
+      options.onUncaughtError = (error, errorInfo) => {
+        if (enrichDevOwnerStack) {
+          logDevRenderError('onUncaughtError', context, errorInfo);
+        }
         safeInvoke(onUncaughtError, 'onUncaughtError', error, errorInfo, context);
+      };
     }
   }
 

@@ -48,6 +48,7 @@
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
     "./handleError": "./lib/handleError.js",
     "./generateRenderingErrorMessage": "./lib/generateRenderingErrorMessage.js",
+    "./captureReactOwnerStack": "./lib/captureReactOwnerStack.js",
     "./serverRenderUtils": "./lib/serverRenderUtils.js",
     "./buildConsoleReplay": "./lib/buildConsoleReplay.js",
     "./ReactDOMServer": "./lib/ReactDOMServer.cjs",
