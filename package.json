@@ -24,7 +24,7 @@
   ],
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.3",
-    "@babel/core": "^7.20.12",
+    "@babel/core": "^7.29.6",
     "@babel/eslint-parser": "^7.27.0",
     "@babel/preset-env": "^7.20.2",
     "@babel/preset-react": "^7.26.3",
