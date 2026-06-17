@@ -21,6 +21,9 @@
       .seg-render { fill: #FCD34D; }
       .seg-hydrate { fill: #86EFAC; }
       .seg-stream { fill: #93C5FD; }
+      /* Text that sits on the pastel timeline segments stays dark in both themes
+         (the segment fills are light in light and dark mode alike). */
+      .seg-label { fill: #0F172A; }
       .tti-line { stroke: #EF4444; }
       .tti-line-good { stroke: #22C55E; }
       .tti-text { fill: #991B1B; }
@@ -69,16 +72,16 @@
 
   <!-- download -->
   <rect x="160" y="120" width="200" height="22" rx="4" class="seg-download sweep"/>
-  <text x="260" y="135" text-anchor="middle" font-size="9" class="label">download full page</text>
+  <text x="260" y="135" text-anchor="middle" font-size="9" class="seg-label">download full page</text>
   <!-- render -->
   <rect x="362" y="120" width="180" height="22" rx="4" class="seg-render sweep"/>
-  <text x="452" y="135" text-anchor="middle" font-size="9" class="label">render</text>
+  <text x="452" y="135" text-anchor="middle" font-size="9" class="seg-label">render</text>
   <!-- full load marker -->
   <line x1="546" y1="112" x2="546" y2="190" class="axis" stroke-width="1.5" stroke-dasharray="4 3"/>
   <text x="546" y="160" text-anchor="middle" font-size="8" class="sub">full page load</text>
   <!-- hydrate -->
   <rect x="548" y="120" width="180" height="22" rx="4" class="seg-hydrate sweep2"/>
-  <text x="638" y="135" text-anchor="middle" font-size="9" class="label">hydrate</text>
+  <text x="638" y="135" text-anchor="middle" font-size="9" class="seg-label">hydrate</text>
 
   <!-- TTI -->
   <line x1="728" y1="112" x2="728" y2="206" class="tti-line pulseline" stroke-width="2.5"/>
@@ -98,17 +101,17 @@
 
   <!-- streaming HTML -->
   <rect x="160" y="290" width="560" height="16" rx="4" class="seg-stream sweep"/>
-  <text x="440" y="302" text-anchor="middle" font-size="8.5" class="label">HTML streams progressively</text>
+  <text x="440" y="302" text-anchor="middle" font-size="8.5" class="seg-label">HTML streams progressively</text>
 
   <!-- Comp A: hydrate as soon as available (early) -->
   <rect x="200" y="318" width="150" height="18" rx="4" class="seg-hydrate sweep"/>
-  <text x="275" y="331" text-anchor="middle" font-size="8.5" class="label">A hydrates</text>
+  <text x="275" y="331" text-anchor="middle" font-size="8.5" class="seg-label">A hydrates</text>
   <line x1="350" y1="316" x2="350" y2="378" class="tti-line-good pulseline" stroke-width="2"/>
   <text x="350" y="404" text-anchor="middle" font-size="8" class="good-text">A interactive</text>
 
   <!-- Comp B: hydrate later but still during stream -->
   <rect x="380" y="348" width="150" height="18" rx="4" class="seg-hydrate sweep2"/>
-  <text x="455" y="361" text-anchor="middle" font-size="8.5" class="label">B hydrates</text>
+  <text x="455" y="361" text-anchor="middle" font-size="8.5" class="seg-label">B hydrates</text>
   <line x1="530" y1="346" x2="530" y2="378" class="tti-line-good pulseline" stroke-width="2"/>
   <text x="530" y="404" text-anchor="middle" font-size="8" class="good-text">B interactive</text>
 

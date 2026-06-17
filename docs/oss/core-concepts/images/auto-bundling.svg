@@ -2,10 +2,6 @@
   <title id="autobundle-title">Manual pack files vs file-system-based auto-bundling in React on Rails</title>
   <desc id="autobundle-desc">Two approaches to splitting bundles. Manual: for every component you hand-write a one-line pack file in app/javascript/packs that imports and registers it, and each Rails view must declare which packs to load. Auto-bundling: you place components under a ror_components convention directory and React on Rails generates the per-component pack files and bundles for you, and the react_component view helper appends the right pack tags automatically — so each page loads only the code it needs with no boilerplate.</desc>
   <defs>
-    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#CC0000"/>
-      <stop offset="100%" stop-color="#990000"/>
-    </linearGradient>
     <filter id="shadow">
       <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.12"/>
     </filter>
