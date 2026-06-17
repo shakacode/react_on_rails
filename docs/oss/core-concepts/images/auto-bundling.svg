@@ -121,12 +121,12 @@
   <g transform="translate(484,322)">
     <rect x="0" y="0" width="372" height="170" rx="8" class="gen-box" stroke-width="1"/>
     <text x="186" y="22" text-anchor="middle" font-size="11" font-weight="700" class="gen-text">React on Rails auto-generates:</text>
-    <g class="reveal" font-size="10" fill="#1E40AF">
+    <g class="reveal gen-text" font-size="10">
       <text x="20" y="48">&#x2192; packs/generated/FooComponentOne.js</text>
       <text x="20" y="66">&#x2192; packs/generated/BarComponentOne.js</text>
       <text x="20" y="84">&#x2192; packs/generated/BarComponentTwo.js</text>
     </g>
-    <g class="reveal-2" font-size="10" fill="#1E40AF">
+    <g class="reveal-2 gen-text" font-size="10">
       <text x="20" y="110">&#x2713; webpack builds a bundle per component</text>
       <text x="20" y="128">&#x2713; helper appends the right pack tags</text>
       <text x="20" y="146">&#x2713; each page loads only what it renders</text>

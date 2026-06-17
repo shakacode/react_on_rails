@@ -98,11 +98,11 @@
   <rect x="352" y="152" width="96" height="58" rx="8" class="container-d" stroke-width="1.5"/>
   <rect x="358" y="158" width="84" height="30" rx="6" class="rails-fill"/>
   <text x="400" y="178" text-anchor="middle" font-size="9.5" font-weight="700" class="proc-text">Rails</text>
-  <text x="400" y="202" text-anchor="middle" font-size="7" class="sub">2 CPU / 4 GB</text>
+  <text x="400" y="202" text-anchor="middle" font-size="8.5" class="sub">2 CPU / 4 GB</text>
   <rect x="452" y="152" width="96" height="58" rx="8" class="container-d" stroke-width="1.5"/>
   <rect x="458" y="158" width="84" height="30" rx="6" class="node-fill"/>
   <text x="500" y="178" text-anchor="middle" font-size="9.5" font-weight="700" class="node-text">Node Rndr</text>
-  <text x="500" y="202" text-anchor="middle" font-size="7" class="sub">2 CPU / 4 GB</text>
+  <text x="500" y="202" text-anchor="middle" font-size="8.5" class="sub">2 CPU / 4 GB</text>
   <line x1="448" y1="224" x2="452" y2="224" class="link" stroke-width="2"/>
   <path d="M 400 210 L 400 224 L 500 224 L 500 210" class="link" fill="none" stroke-width="1.5"/>
   <text x="450" y="237" text-anchor="middle" font-size="8" class="link-text">localhost (shared netns)</text>
@@ -128,18 +128,18 @@
   <text x="676" y="142" text-anchor="middle" font-size="8.5" font-weight="600" class="sub">Workload A</text>
   <rect x="638" y="152" width="76" height="48" rx="8" class="rails-fill"/>
   <text x="676" y="173" text-anchor="middle" font-size="9.5" font-weight="700" class="proc-text">Rails</text>
-  <text x="676" y="187" text-anchor="middle" font-size="7" class="proc-text">replicas</text>
-  <text x="676" y="220" text-anchor="middle" font-size="7.5" class="sub">scale on its own</text>
+  <text x="676" y="187" text-anchor="middle" font-size="8.5" class="proc-text">replicas</text>
+  <text x="676" y="220" text-anchor="middle" font-size="8.5" class="sub">scale on its own</text>
 
   <rect x="772" y="124" width="104" height="116" rx="10" class="container" stroke-width="1.5"/>
   <text x="824" y="142" text-anchor="middle" font-size="8.5" font-weight="600" class="sub">Workload B</text>
   <rect x="786" y="152" width="76" height="48" rx="8" class="node-fill"/>
   <text x="824" y="171" text-anchor="middle" font-size="9" font-weight="700" class="node-text">Node</text>
   <text x="824" y="184" text-anchor="middle" font-size="8" class="node-text">Renderer</text>
-  <text x="824" y="220" text-anchor="middle" font-size="7.5" class="sub">scale on its own</text>
+  <text x="824" y="220" text-anchor="middle" font-size="8.5" class="sub">scale on its own</text>
 
   <line x1="728" y1="176" x2="772" y2="176" class="link" stroke-width="2" stroke-dasharray="4 3"/>
-  <text x="750" y="170" text-anchor="middle" font-size="7.5" class="link-text">service DNS</text>
+  <text x="750" y="170" text-anchor="middle" font-size="8.5" class="link-text">service DNS</text>
 
   <rect x="624" y="252" width="252" height="22" rx="6" class="chip" stroke-width="1"/>
   <text x="750" y="267" text-anchor="middle" font-size="8" font-family="monospace" class="chip-text">renderer_url: node-renderer-service:3800</text>
