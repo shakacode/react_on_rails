@@ -40,6 +40,8 @@
         .ret-text { fill: #CBD5E1; }
         .arrow-ret { stroke: #CBD5E1; }
         .head-ret { fill: #CBD5E1; }
+        .arrow-warn { stroke: #FCD34D; }
+        .head-warn { fill: #FCD34D; }
       }
       .st1 { opacity:0; animation: reveal 9s ease 0.6s infinite; }
       .st2 { opacity:0; animation: reveal 9s ease 1.4s infinite; }
@@ -67,8 +69,8 @@
   <line x1="690" y1="94" x2="690" y2="372" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
 
   <g>
-    <rect x="40" y="102" width="760" height="34" rx="8" class="callout-box" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="420" y="123" text-anchor="middle" font-size="11" font-weight="600" class="callout-title">Discouraged — usually let Rails pass the data in via async props so auth, session, and caching stay on the Rails side</text>
+    <rect x="40" y="100" width="760" height="46" rx="8" class="callout-box" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="420" y="118" text-anchor="middle" font-size="11" font-weight="600" class="callout-title">Discouraged — usually let Rails pass the data in via async props,<tspan x="420" dy="16" font-weight="500">so auth, session, and caching stay on the Rails side</tspan></text>
   </g>
 
   <g class="st1">
