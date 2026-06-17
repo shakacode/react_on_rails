@@ -34,7 +34,7 @@ pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
 > The RSC generator intentionally stays on React 19.0.x and does not widen generated apps to React 19.1 or 19.2 yet. React's RSC runtime and bundler APIs can change between minor releases, so advance the React range only when the generator, docs, and package metadata policy are reviewed together.
 
 > [!NOTE]
-> `react-on-rails-rsc@19.0.5` is the exact stable pin used by the generator. This is separate from the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609): metadata can allow RSC packages broadly enough for `npm ls`, while the generator still installs the tested exact RSC package pin.
+> The generator pins `react-on-rails-rsc` to exactly `19.0.5` (no `^` or `~`). Because the RSC bundler APIs are version-coupled, record `react-on-rails-rsc` as exactly `19.0.5` in `package.json` rather than the default caret range so a later `19.1.x`/`19.2.x` is not picked up; `react` and `react-dom` stay on `~19.0.4`. This is separate from the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609): metadata can allow RSC packages broadly enough for `npm ls`, while the generator still installs the tested exact RSC package pin.
 
 ## Pre-Migration: Audit Components for Client API Usage
 

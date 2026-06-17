@@ -738,6 +738,22 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(warning).to include("stable 19.1.0")
       expect(warning).not_to include("stable 19.0.5")
     end
+
+    it "uses accurate messaging without prerelease wording for a stable package pin" do
+      expect(ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN).to eq("19.0.5")
+
+      info = instance.send(:rsc_dependency_pin_info)
+      warning = instance.send(:rsc_dependency_pin_failed_warning)
+
+      [info, warning].each do |message|
+        expect(message).to include("react-on-rails-rsc@19.0.5")
+        expect(message).to include("react-on-rails-rsc/WebpackPlugin")
+        expect(message).to include("react-on-rails-rsc/RspackPlugin")
+        expect(message).not_to include("prerelease")
+        expect(message).not_to include("temporarily")
+        expect(message).not_to include("until stable")
+      end
+    end
   end
 
   describe "#add_rsc_dependencies" do

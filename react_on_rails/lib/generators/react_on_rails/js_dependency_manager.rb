@@ -488,23 +488,42 @@ module ReactOnRails
         RSC_PACKAGE_VERSION_PIN.split("-", 2).first
       end
 
+      def rsc_package_version_prerelease?
+        RSC_PACKAGE_VERSION_PIN.include?("-")
+      end
+
       def rsc_dependency_pin_info
-        "React Server Components package pin: all --rsc installs temporarily use " \
-          "react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, including Webpack projects. " \
-          "This prerelease keeps react-on-rails-rsc/WebpackPlugin compatible while adding " \
-          "react-on-rails-rsc/RspackPlugin. Keep the pin until stable " \
-          "react-on-rails-rsc@#{rsc_stable_package_version_target} " \
-          "is published and tagged latest."
+        if rsc_package_version_prerelease?
+          "React Server Components package pin: all --rsc installs temporarily use " \
+            "react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, including Webpack projects. " \
+            "This prerelease keeps react-on-rails-rsc/WebpackPlugin compatible while adding " \
+            "react-on-rails-rsc/RspackPlugin. Keep the pin until stable " \
+            "react-on-rails-rsc@#{rsc_stable_package_version_target} " \
+            "is published and tagged latest."
+        else
+          "React Server Components package pin: all --rsc installs use " \
+            "react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, including Webpack projects. " \
+            "This pin keeps react-on-rails-rsc/WebpackPlugin compatible while adding " \
+            "react-on-rails-rsc/RspackPlugin."
+        end
       end
 
       def rsc_dependency_pin_failed_warning
-        "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
-          "All RSC projects are temporarily pinned to that version: the prerelease keeps " \
-          "react-on-rails-rsc/WebpackPlugin compatible while adding react-on-rails-rsc/RspackPlugin, " \
-          "and the unversioned `latest` tag may not include both until stable " \
-          "#{rsc_stable_package_version_target} " \
-          "is published, so the generator left the version pin in package.json rather than " \
-          "install a potentially incompatible version."
+        if rsc_package_version_prerelease?
+          "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
+            "All RSC projects are temporarily pinned to that version: the prerelease keeps " \
+            "react-on-rails-rsc/WebpackPlugin compatible while adding react-on-rails-rsc/RspackPlugin, " \
+            "and the unversioned `latest` tag may not include both until stable " \
+            "#{rsc_stable_package_version_target} " \
+            "is published, so the generator left the version pin in package.json rather than " \
+            "install a potentially incompatible version."
+        else
+          "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
+            "All RSC projects are pinned to that version: this pin keeps " \
+            "react-on-rails-rsc/WebpackPlugin compatible while adding react-on-rails-rsc/RspackPlugin, " \
+            "so the generator left the version pin in package.json rather than " \
+            "install a potentially incompatible version."
+        end
       end
 
       def rsc_dependency_pin_failure_details(used_version_pins)

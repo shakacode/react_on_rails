@@ -35,7 +35,7 @@ yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
 > [!NOTE]
 > React on Rails Pro RSC currently supports React 19.0.x with patch >= 19.0.4. Do not upgrade generated RSC apps to React 19.1 or 19.2 just because those versions are newer on npm; the RSC bundler APIs used internally can change between React minor versions. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
 >
-> The example above pins the stable `react-on-rails-rsc@19.0.5` release exactly, matching the generator default.
+> The generator pins `react-on-rails-rsc` to exactly `19.0.5` (no `^` or `~`), matching the generator default. Because the RSC bundler APIs are version-coupled, manual installers should record `react-on-rails-rsc` as exactly `19.0.5` in `package.json` rather than the default caret range; `react` and `react-dom` stay on `~19.0.4`.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
 
