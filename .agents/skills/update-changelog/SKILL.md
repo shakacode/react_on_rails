@@ -103,51 +103,30 @@ Use `classification-sweep` before every RC/release changelog edit, and whenever 
 
 ### Exact PR-Listing Command
 
-Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to the release tag, `origin/main`, or upper bound being audited. Then run this exact command to list merged PRs in first-parent order. It extracts PR numbers from squash titles, falls back to GitHub's commit-to-PR API for commits that lack `(#NNNN)` in the title, and emits an explicit `UNKNOWN` row for any commit that still cannot be mapped.
+Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to the release tag, `origin/main`, or upper bound being audited. Then run the committed `changelog-merged-prs` helper to list merged PRs in first-parent order. It extracts PR numbers from squash titles (the `(#NNNN)` suffix) and `Merge pull request #NNNN` subjects, falls back to GitHub's commit-to-PR API for commits that lack an inline PR number, dedups by PR number, and emits an explicit `UNKNOWN` row for any commit that still cannot be mapped.
 
 ```bash
 BASE_REF="${BASE_REF:?set BASE_REF, e.g. v17.0.0.rc.1}"
 TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/main}"
-REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)" || {
-  printf 'error: gh repo view failed; run: gh auth status\n' >&2
-  exit 1
-}
-DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)" || {
-  printf 'error: gh repo view failed; run: gh auth status\n' >&2
-  exit 1
-}
 
-git log --first-parent --reverse --format='%H%x09%s' "${BASE_REF}..${TARGET_REF}" |
-while IFS=$'\t' read -r sha subject; do
-  pr_number=$(printf '%s\n' "$subject" | sed -nE 's/.*\(#([0-9]+)\)[[:space:]]*$/\1/p')
-  if [ -n "$pr_number" ]; then
-    printf '%s\t%s\t%s\n' "$pr_number" "$sha" "$subject"
-  else
-    mapped_rows=$(SHA="$sha" DEFAULT_BRANCH="$DEFAULT_BRANCH" gh api -H "Accept: application/vnd.github+json" \
-      "repos/${REPO}/commits/${sha}/pulls" \
-      --jq '.[] | select(.merged_at != null and .base.ref == env.DEFAULT_BRANCH) | [.number, env.SHA, .title] | @tsv' 2>&1)
-    api_status=$?
-    if [ "$api_status" -ne 0 ]; then
-      printf 'warning: commit-to-PR API lookup failed for %s: %s\n' "$sha" "$mapped_rows" >&2
-      printf 'UNKNOWN\t%s\t%s\n' "$sha" "$subject"
-    elif [ -n "$mapped_rows" ]; then
-      printf '%s\n' "$mapped_rows"
-    else
-      printf 'UNKNOWN\t%s\t%s\n' "$sha" "$subject"
-    fi
-  fi
-done | awk -F '\t' '{ key = ($1 == "UNKNOWN" ? $1 FS $2 : $1); if (!seen[key]++) print }'
+# JSON array of {pr, sha, subject}; pr is an integer, or the string "UNKNOWN".
+.agents/skills/update-changelog/bin/changelog-merged-prs "${BASE_REF}..${TARGET_REF}"
+
+# Or --text for pr<TAB>sha<TAB>subject rows (UNKNOWN in the pr column):
+.agents/skills/update-changelog/bin/changelog-merged-prs "${BASE_REF}..${TARGET_REF}" --text
 ```
 
-If any commit in the range cannot be mapped to a PR, the command prints an explicit `UNKNOWN` row for that commit. Carry that row into the full table with `Result` set to `UNKNOWN`, investigate it, and do not finish the sweep until the row is resolved to a merged PR classification or explicitly reported as a blocker. Do not silently drop it.
+The helper defaults the repo to `gh repo view`; pass `--repo OWNER/REPO` to override. Run `changelog-merged-prs --help` for the full output contract and `--self-check` to validate the parser and a read-only `gh` smoke test. Each row is a merged PR for the range; rows with `"pr": "UNKNOWN"` are commits that could not be mapped to a merged PR on the default branch.
 
-A sudden spike of `UNKNOWN` rows can indicate stale GitHub authentication, API rate limits, or a temporary API failure rather than genuinely unmapped commits. Run `gh auth status` and retry the PR-listing command when the UNKNOWN count looks suspicious.
+If any commit in the range cannot be mapped to a PR, the helper prints an explicit `UNKNOWN` row for that commit. Carry that row into the full table with `Result` set to `UNKNOWN`, investigate it, and do not finish the sweep until the row is resolved to a merged PR classification or explicitly reported as a blocker. Do not silently drop it.
+
+A sudden spike of `UNKNOWN` rows can indicate stale GitHub authentication, API rate limits, or a temporary API failure rather than genuinely unmapped commits. Run `gh auth status` and rerun the helper when the UNKNOWN count looks suspicious.
 
 The fallback makes one GitHub API call per commit whose subject lacks `(#NNNN)`. Typical RC ranges complete quickly, but large ranges with many direct commits can hit rate limits. Direct version-bump commits, bot commits, and release-automation commits may be expected `UNKNOWN` rows; keep them in the table with `Result` set to `UNKNOWN`, choose `internal` or `release-process`, and explain that no PR-backed changelog entry exists.
 
 ### Required Sweep Output
 
-Print the full Markdown table. No silent caps, no "top N", and no filtering to only likely changelog entries. Every row from the PR-listing command must appear, including `no-entry` rows.
+Print the full Markdown table. No silent caps, no "top N", and no filtering to only likely changelog entries. Every row from the helper must appear, including `no-entry` rows.
 
 ```markdown
 | PR    | Title                                     | Result       | Category         | Reason                                                                                             |
@@ -161,7 +140,7 @@ Allowed `Result` values for mapped PRs are exactly:
 - `entry-needed`
 - `no-entry`
 
-Use `UNKNOWN` only for unmapped commit rows emitted by the PR-listing command; resolve or report those rows before finishing.
+Use `UNKNOWN` only for unmapped commit rows emitted by the helper; resolve or report those rows before finishing.
 
 Allowed `Category` values are exactly:
 
