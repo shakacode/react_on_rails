@@ -61,7 +61,10 @@ markup and update its contents — do not create the region at the moment the
 message appears, or the announcement may be missed.
 
 ```erb
-<%# app/views/layouts/application.html.erb %>
+<%# app/views/layouts/application.html.erb
+    This element is plain server-rendered ERB — it is not React-managed, so it
+    won't re-mount on hydration and won't trigger the double-announcement
+    described later for hydrated React live regions. %>
 <div aria-live="polite" aria-atomic="true" id="flash">
   <% flash.each do |type, message| %>
     <div class="flash flash--<%= type %>"><%= message %></div>
@@ -111,6 +114,19 @@ function EmailField() {
 After a submit that returns a 422, move focus to a summary of errors (or to the
 first invalid field) so keyboard and screen-reader users are taken to the
 problem rather than left at the submit button.
+
+The example above conditionally mounts the `role="alert"` element, which is the
+simplest pattern and works in most modern screen readers (a newly-inserted
+`role="alert"` is announced). If you need to support older AT pairings that only
+announce **mutations** of an already-present live region, render a persistent
+empty container in the initial markup and update its text instead:
+
+```tsx
+// Always rendered; only its contents change.
+<p id="email-error" role="alert" className="error">
+  {form.errors.email?.[0] ?? ''}
+</p>
+```
 
 ### Focus management on dialogs and route changes
 
@@ -274,6 +290,12 @@ their state to assistive tech:
   spinner.
 - Purely decorative skeleton shapes should be hidden from assistive tech with
   `aria-hidden="true"`.
+
+> The `sr-only` class used below visually hides text while keeping it available
+> to screen readers. It ships with [Tailwind](./styling-with-tailwind.md); without
+> Tailwind, define it yourself (see the
+> [WebAIM recipe](https://webaim.org/techniques/css/invisiblecontent/)):
+> `position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;`
 
 Drive `aria-busy` from the loading state rather than hard-coding it, so it
 clears once the content resolves. Put the busy flag and the status message on the
