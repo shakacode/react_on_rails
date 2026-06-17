@@ -411,7 +411,7 @@ Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpIn
 As a trace, the spans nest under the root `ror.ssr.request`. On the warm path the spans fire in order: `ror.bundle.build_execution_context` (`cache-first`) → `ror.vm.execute` → `ror.result.prepare`. Cold-path spans (upload and `cache-miss` build) appear only between the first two; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans; and incremental (async-props) renders add their own stream/chunk spans:
 
 <p align="center">
-  <img src="images/otel-span-tree.svg" alt="OpenTelemetry span tree rooted at one server-render request: the warm path nests load-bundle, run-JavaScript, and prepare-result spans; a cold start adds bundle-upload and cache-miss build spans up front; outbound fetches appear as HTTP child spans; and streaming async-props renders add their own stream and per-chunk spans." width="840" />
+  <img src="images/otel-span-tree.svg" alt="OpenTelemetry span tree rooted at one server-render request: the warm path nests the cache-first build probe, run-JavaScript, and prepare-result spans; on a cache miss a cold start adds bundle-upload and cache-miss build spans after the probe; outbound fetches appear as HTTP child spans; and streaming async-props renders add their own stream and per-chunk spans." width="840" />
 </p>
 
 ### Production defaults

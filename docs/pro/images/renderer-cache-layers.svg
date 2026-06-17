@@ -51,7 +51,7 @@
       .probe3 { animation: glow 8s ease 3.4s infinite; }
       .probe4 { animation: glow 8s ease 5.0s infinite; }
       @keyframes glow { 0%,4% { filter: none; } 10% { filter: drop-shadow(0 0 6px #22C55E); } 22%,100% { filter: none; } }
-      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; } }
     </style>
   </defs>
 
