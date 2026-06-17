@@ -2762,31 +2762,9 @@ The Pro Node Renderer solves all of these by running a standalone Node.js server
 
 The contrast in one picture — the old way runs JavaScript inside Rails, while the Node Renderer runs it in a separate service:
 
-```mermaid
-flowchart LR
-    subgraph Exec["ExecJS — JavaScript inside Rails"]
-        direction TB
-        E1["Rails process"] --> E2["JavaScript runtime<br/>inside the same process"]
-        E2 --> E3["Rails waits while<br/>JavaScript renders HTML"]
-    end
-    subgraph Node["Node Renderer — JavaScript in a separate service"]
-        direction TB
-        N1["Rails process"] -- "render request" --> N2["Node Renderer"]
-        N2 --> N3["Worker 1<br/>renders HTML"]
-        N2 --> N4["Worker 2<br/>renders HTML"]
-        N2 --> N5["Worker N<br/>renders HTML"]
-    end
-    style Exec fill:#fff4e5,stroke:#e0a000,color:#000
-    style E1 fill:#fff4e5,stroke:#e0a000,color:#000
-    style E2 fill:#fff4e5,stroke:#e0a000,color:#000
-    style E3 fill:#ffe5e5,stroke:#d1242f,color:#000
-    style Node fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style N1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style N2 fill:#e6ffed,stroke:#2da44e,color:#000
-    style N3 fill:#e6ffed,stroke:#2da44e,color:#000
-    style N4 fill:#e6ffed,stroke:#2da44e,color:#000
-    style N5 fill:#e6ffed,stroke:#2da44e,color:#000
-```
+<p align="center">
+  <img src="images/execjs-vs-node-renderer.svg" alt="ExecJS runs the JavaScript runtime inside the Rails process and blocks it during rendering, while the Node Renderer runs rendering in a separate service with a pool of workers." width="840" />
+</p>
 
 ## Performance Benefits
 
@@ -2809,28 +2787,9 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 
 Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Each request is rendered in its own per-request `sharedExecutionContext`, so concurrent renders never leak data into one another:
 
-```mermaid
-flowchart TB
-    subgraph Rails["Rails receives many page requests"]
-        direction LR
-        Req1["page request 1"]
-        Req2["page request 2"]
-        Req3["page request N"]
-    end
-    Req1 -- "send render job" --> Master
-    Req2 -- "send render job" --> Master
-    Req3 -- "send render job" --> Master
-    subgraph Renderer["Node Renderer"]
-        Master["Dispatcher<br/>hands jobs to workers"]
-        Master --> WA["Worker A<br/>renders several pages at once"]
-        Master --> WB["Worker B<br/>renders several pages at once"]
-    end
-    style Rails fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
-    style Master fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style WA fill:#e6ffed,stroke:#2da44e,color:#000
-    style WB fill:#e6ffed,stroke:#2da44e,color:#000
-```
+<p align="center">
+  <img src="images/worker-pool-dispatch.svg" alt="Many concurrent Rails page requests send render jobs to the Node Renderer's dispatcher, which fans them out across a pool of workers that each render several pages at once." width="840" />
+</p>
 
 By contrast, ExecJS renders one request per V8 context and blocks the Ruby thread for the duration. For concurrent _streaming_ specifically, see [Streaming SSR](./streaming-ssr.md).
 
@@ -2842,37 +2801,11 @@ By contrast, ExecJS renders one request per V8 context and blocks the Ruby threa
 - **Shared secret authentication** — Secure communication between Rails and Node
 - **Prerender caching** — Combined with [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching), rendering results are cached across requests
 
-React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The renderer cache layers sit on the server-side render path; request-scoped deduplication and browser chunk caching are shown as side optimizations because they do not feed into each other:
+React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The renderer cache layers sit on the server-side render path; request-scoped deduplication and browser chunk caching are separate side optimizations that do not feed into this chain, so they are left off the diagram below:
 
-```mermaid
-flowchart TB
-    Req["Need HTML for a component"] --> L1{"Does Rails already<br/>have the final HTML?"}
-    L1 -- "yes" --> Done["Return HTML"]
-    L1 -- "no" --> L2{"Does Rails have<br/>a saved render result?"}
-    L2 -- "yes" --> Done
-    L2 -- "no" --> L3
-    subgraph Renderer["Node Renderer"]
-        L3{"Is the JS bundle<br/>already warm in memory?"}
-        L3 -- "yes" --> Exec["Run JavaScript<br/>to make HTML"]
-        L3 -- "no" --> L4{"Is the JS bundle<br/>saved on disk?"}
-        L4 -- "yes" --> Exec
-    end
-    L4 -- "no" --> Upload["Rails uploads<br/>the bundle"]
-    Upload --> Exec
-    Exec --> Done
-    Exec -. "during one render" .-> L5["Repeated data reads<br/>share one result"]
-    Browser["Browser starts the page"] -. "later" .-> L6["Browser code chunks<br/>cached by the browser"]
-    style L1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style L2 fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Done fill:#e6ffed,stroke:#2da44e,color:#000
-    style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
-    style L3 fill:#e6ffed,stroke:#2da44e,color:#000
-    style L4 fill:#fff4e5,stroke:#e0a000,color:#000
-    style Upload fill:#ffe5e5,stroke:#d1242f,color:#000
-    style Browser fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style L5 fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style L6 fill:#e6f0ff,stroke:#2c6ecb,color:#000
-```
+<p align="center">
+  <img src="images/renderer-cache-layers.svg" alt="Stacked render caches: a Rails fragment- or prerender-cache hit returns cached HTML without running JavaScript. On a miss the Node Renderer checks whether the JS bundle is warm in memory, then on disk — those hits skip the bundle upload but still run the SSR JavaScript — and only as a last resort does Rails upload the bundle before rendering." width="840" />
+</p>
 
 (Fragment caching subsumes prerender caching: on a fragment-cache hit the prerender cache is never consulted.)
 
@@ -3038,21 +2971,9 @@ When a new container starts, the Node Renderer has an empty bundle cache. The fi
 
 That round-trip is the difference between a warm and a cold render request:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Rails
-    participant Renderer as Node Renderer
-    Rails->>Renderer: Please render this page
-    alt renderer already has the bundle
-        Renderer-->>Rails: HTML
-    else renderer is missing the bundle
-        Renderer-->>Rails: I need that bundle first
-        Rails->>Renderer: Upload the bundle
-        Rails->>Renderer: Please render again
-        Renderer-->>Rails: HTML
-    end
-```
+<p align="center">
+  <img src="images/cold-start-410.svg" alt="When the renderer already has the bundle it returns HTML immediately; when it is missing the bundle it replies 410 Gone, Rails uploads the bundle and asks again, and only then does the render succeed — an extra round-trip on the first cold request." width="840" />
+</p>
 
 Pre-seeding the cache (below) makes every fresh renderer take the warm path on its very first request.
 
@@ -3231,22 +3152,9 @@ Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpIn
 
 As a trace, the spans nest under the root `ror.ssr.request`. On the warm path the spans fire in order: `ror.bundle.build_execution_context` (`cache-first`) → `ror.vm.execute` → `ror.result.prepare`. Cold-path spans (upload and `cache-miss` build) appear only between the first two; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans; and incremental (async-props) renders add their own stream/chunk spans:
 
-```mermaid
-flowchart TB
-    Root["One server-render trace"]
-    Root --> Warm["Load bundle -> run JavaScript -> prepare result"]
-    Root -. "cold start" .-> Cold["Upload bundle<br/>and build cache-miss VM"]
-    Cold -- "then continue" --> Warm
-    Warm -. "if JavaScript fetches data" .-> Http["Data-fetch spans"]
-    Root -. "if slow data is streamed" .-> Inc["Streaming-data spans"]
-    Inc --> Chunk["One span for each<br/>incoming data chunk"]
-    style Root fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Warm fill:#e6ffed,stroke:#2da44e,color:#000
-    style Cold fill:#fff4e5,stroke:#e0a000,color:#000
-    style Http fill:#fff4e5,stroke:#e0a000,color:#000
-    style Inc fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Chunk fill:#e6ffed,stroke:#2da44e,color:#000
-```
+<p align="center">
+  <img src="images/otel-span-tree.svg" alt="OpenTelemetry span tree rooted at one server-render request: the warm path nests load-bundle, run-JavaScript, and prepare-result spans; a cold start adds an upload-and-build span up front; outbound fetches appear as HTTP child spans; and streaming async-props renders add their own stream and per-chunk spans." width="840" />
+</p>
 
 ### Production defaults
 
@@ -3294,21 +3202,9 @@ During a rolling deploy:
 
 Pre-seeding the current hash (`def`) eliminates the 410→retry only for the new bundle. Requests referencing `abc` still hit a cold cache on new renderers, producing 410 retries per request until the renderer has cached that bundle via upload.
 
-```mermaid
-flowchart TB
-    Traffic(["Incoming traffic"]) --> LB["Load Balancer"]
-    LB --> Old["Old Rails — draining<br/>bundle hash <b>abc</b>"]
-    LB --> New["New Rails<br/>bundle hash <b>def</b>"]
-    Old -- "SSR request · hash = abc" --> R
-    New -- "SSR request · hash = def" --> R
-    R["New Node Renderer pool<br/>(cold start: cache seeded with<br/>current hash <b>def</b> only)"]
-    R -- "def" --> Hit["✅ Cache HIT<br/>fast SSR"]
-    R -- "abc" --> Miss["❌ Cache MISS → <b>410 Gone</b><br/>Rails re-uploads abc, then retries<br/>— once per request, until warm"]
-    style Old fill:#fff4e5,stroke:#e0a000,color:#000
-    style New fill:#e6ffed,stroke:#2da44e,color:#000
-    style Hit fill:#e6ffed,stroke:#2da44e,color:#000
-    style Miss fill:#ffe5e5,stroke:#d1242f,color:#000
-```
+<p align="center">
+  <img src="images/rolling-deploy-problem.svg" alt="During a rolling deploy, draining old Rails (hash abc) and new Rails (hash def) both send SSR requests to a new renderer pool seeded only with the current hash def. The def requests hit the cache, but the abc requests miss and trigger 410 Gone, re-upload, and retry once per request." width="840" />
+</p>
 
 The cold path is bounded and self-healing, but it is not free. On a cache miss the renderer can't serve the request on its own: it returns `410 Gone`, Rails ships the bundle over to the renderer, and only then does the request render. That extra renderer ↔ Rails round-trip — a network hop plus the bundle transfer — adds latency to **every** request that touches a cold bundle, and it repeats per request until that bundle is cached, so a deploy shows up as a latency and error-rate spike. The whole point of a rolling-deploy adapter is to **avoid these cache misses entirely** so no request ever pays that cost during a deploy.
 
@@ -3316,22 +3212,9 @@ The cold path is bounded and self-healing, but it is not free. On a cache miss t
 
 A **rolling-deploy adapter** makes new renderer instances start warm for **every** in-flight bundle hash — not just the current one — so draining `abc` requests hit the cache instead of triggering a 410.
 
-```mermaid
-flowchart TB
-    Traffic(["Incoming traffic"]) --> LB["Load Balancer"]
-    LB --> Old["Old Rails — draining<br/>bundle hash <b>abc</b>"]
-    LB --> New["New Rails<br/>bundle hash <b>def</b>"]
-    Old -- "SSR request · hash = abc" --> R
-    New -- "SSR request · hash = def" --> R
-    R["New Node Renderer pool<br/>pre-seeded with <b>abc</b> AND <b>def</b><br/>via rolling_deploy_adapter"]
-    R -- "def" --> H1["✅ Cache HIT"]
-    R -- "abc" --> H2["✅ Cache HIT — no 410, no retry"]
-    style Old fill:#fff4e5,stroke:#e0a000,color:#000
-    style New fill:#e6ffed,stroke:#2da44e,color:#000
-    style R fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style H1 fill:#e6ffed,stroke:#2da44e,color:#000
-    style H2 fill:#e6ffed,stroke:#2da44e,color:#000
-```
+<p align="center">
+  <img src="images/rolling-deploy-solution.svg" alt="With a rolling_deploy_adapter the new renderer pool is pre-seeded with both the draining hash abc and the current hash def before it serves traffic, so both old draining Rails and new Rails requests hit the cache — no 410, no retry." width="840" />
+</p>
 
 The built-in HTTP adapter is the simplest way to get there, and it's covered next. If your build can't reach the previous deployment, or you'd rather keep bundles in your own store, you can [write a custom adapter](./rolling-deploy-custom-adapters.md) instead.
 
@@ -3341,24 +3224,9 @@ The built-in HTTP adapter is the simplest way to get there, and it's covered nex
 
 The currently-deployed Rails server already has every bundle and companion asset on disk. The HTTP adapter has the **next** deploy's build pull those files directly from the **previous** deploy over an authenticated HTTP endpoint — `upload` is a deliberate no-op because the running server _is_ the store:
 
-```mermaid
-flowchart LR
-    subgraph Build["Next deploy · build CI"]
-        Http["RollingDeployAdapters::Http<br/>previous_bundle_hashes + fetch"]
-    end
-    subgraph Server["Previous deploy · still-running Rails"]
-        Ctrl["BundlesController<br/>GET /manifest<br/>GET /bundles/:hash"]
-        Disk[("Bundles + companion assets<br/>already on local disk")]
-    end
-    Http -- "GET /manifest · Bearer TOKEN" --> Ctrl
-    Http -- "GET /bundles/abc · Bearer TOKEN" --> Ctrl
-    Disk -- "reads from disk" --> Ctrl
-    Ctrl -- "gzipped tarball:<br/>bundle.js + companion assets" --> Http
-    Http -- "extract + stage" --> Cache["New renderer cache<br/>{cache}/abc/abc.js"]
-    style Server fill:#fff4e5,stroke:#e0a000,color:#000
-    style Build fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Cache fill:#e6ffed,stroke:#2da44e,color:#000
-```
+<p align="center">
+  <img src="images/http-adapter-flow.svg" alt="The next deploy's build CI runs the HTTP adapter, which calls the still-running previous deployment's authenticated GET /manifest and GET /bundles/:hash endpoints, receives a gzipped tarball of the bundle plus companion assets read from disk, and extracts and stages each bundle into the new renderer cache." width="840" />
+</p>
 
 ### 1. Configure the adapter
 
@@ -3529,33 +3397,9 @@ end
 
 Each deploy plays two roles. It **publishes** its own bundles so a _future_ deploy can find them, and it **pre-seeds** the bundles a _prior_ deploy published so the requests still draining against those bundles stay warm:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Build as Current deploy (hash def)
-    participant Adapter as rolling_deploy_adapter
-    participant Store as Artifact store (S3 / image / volume)
-    participant Cache as New renderer cache
-
-    rect rgb(230, 240, 255)
-    Note over Build,Cache: Pre-seed — warm THIS deploy before it serves traffic
-    Build->>Adapter: previous_bundle_hashes()
-    Adapter->>Store: list recent hashes
-    Store-->>Adapter: ["abc"]  (still draining)
-    Build->>Adapter: fetch("abc")
-    Adapter->>Store: download bundle + companion assets
-    Store-->>Adapter: bundle abc + loadable-stats / RSC manifests
-    Adapter-->>Build: { bundle:, assets: }
-    Build->>Cache: stage at {cache}/abc/abc.js
-    Note over Cache: Warm for abc + def → zero 410 retries
-    end
-
-    rect rgb(232, 255, 237)
-    Note over Build,Store: Publish — leave def behind for the NEXT deploy
-    Build->>Adapter: upload("def", bundle:, assets:)
-    Adapter->>Store: store bundle def + companion assets
-    end
-```
+<p align="center">
+  <img src="images/deploy-lifecycle-roles.svg" alt="A deploy's two adapter roles. In the pre-seed phase the current deploy lists recent hashes, fetches the still-draining bundle plus its companion assets from the artifact store, and stages them into the new renderer cache so it is warm. In the publish phase the deploy uploads its own bundle so a future deploy can find it." width="840" />
+</p>
 
 ## Companion assets
 
@@ -4005,10 +3849,9 @@ The Node Renderer reuses [V8 VM contexts](https://nodejs.org/api/vm.html) across
 
 This means **module-level state persists across all requests** for the lifetime of the worker process. Code that works fine in the browser — where each page navigation creates a fresh JavaScript context — can silently leak memory on the server.
 
-```text
-Browser:  page load → JS context created → user navigates → context destroyed ✓
-Node SSR: worker starts → JS context created → request 1, 2, 3, ... 10,000 → same context ✗
-```
+<p align="center">
+  <img src="images/browser-vs-worker-memory.svg" alt="In the browser each navigation creates a fresh JavaScript context and destroys the previous one, so module-level state stays flat. In a Node Renderer worker, one context is created at startup and reused across thousands of requests, so module-level state climbs until the worker restarts." width="840" />
+</p>
 
 > **Migrating from ExecJS?** ExecJS creates a fresh JavaScript context per render, so module-level state is automatically cleared. When you switch to the Node Renderer, code that "worked fine" before may start leaking because the same context is now reused across requests.
 
