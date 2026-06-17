@@ -827,9 +827,10 @@ For most React on Rails applications, you won't need `React.cache()` for data fe
 This is a deliberate, settled design decision, not a temporary gap (see the decision record in
 [#3867](https://github.com/shakacode/react_on_rails/issues/3867)): Rails controllers are the mutation
 layer, and the ergonomics gap with Next.js Server Actions is being closed by a first-class Rails-native
-bridge -- a `useRailsForm` hook paired with controller conveniences -- tracked in
-[#3872](https://github.com/shakacode/react_on_rails/issues/3872) and **in development, not yet shipped**.
-Until it ships, the `fetch` + CSRF pattern below is the supported approach. An optional
+bridge -- the [`useRailsForm`](../building-features/forms.md) hook paired with the
+`ReactOnRails::Controller::FormResponders` controller concern, **shipped** via
+[#3872](https://github.com/shakacode/react_on_rails/issues/3872) (see [Forms and Mutations](../building-features/forms.md)).
+The `fetch` + CSRF pattern below remains fully supported and is exactly what `useRailsForm` automates. An optional
 `'use server'`-shaped authoring syntax that compiles down to the Rails bridge (for Next.js-migration
 familiarity only) is a deferred follow-up RFC, tracked in
 [#3956](https://github.com/shakacode/react_on_rails/issues/3956).
