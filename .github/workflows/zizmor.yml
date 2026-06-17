@@ -28,6 +28,13 @@ name: Zizmor GitHub Actions Security Audit
 permissions:
   contents: read
 
+# Single source of truth for the pinned zizmor image (tag + digest). Defined at
+# workflow level so the version-print and audit steps can't drift apart on a
+# version bump.
+env:
+  # yamllint disable-line rule:line-length
+  ZIZMOR_IMAGE: ghcr.io/zizmorcore/zizmor:1.16.3@sha256:f09cee55087d54e7a162fc255ffe82ef942f68e683f967c8a6471ffe35e7ec64
+
 on:
   push:
     branches:
@@ -65,10 +72,8 @@ jobs:
           persist-credentials: false
       - name: Print zizmor version
         # Logs the exact pinned version and confirms the image pulled
-        # successfully before the audit runs.
-        env:
-          # yamllint disable-line rule:line-length
-          ZIZMOR_IMAGE: ghcr.io/zizmorcore/zizmor:1.16.3@sha256:f09cee55087d54e7a162fc255ffe82ef942f68e683f967c8a6471ffe35e7ec64
+        # successfully before the audit runs. ZIZMOR_IMAGE comes from the
+        # workflow-level env above.
         run: docker run --rm "${ZIZMOR_IMAGE}" --version
         shell: bash
       - name: Run zizmor
@@ -79,9 +84,8 @@ jobs:
         # the action would use, pinned by both tag and digest (zizmor 1.16.3).
         # The workspace is mounted read-only and the only token exposed is the
         # job-scoped GITHUB_TOKEN; the job has `contents: read` only.
+        # ZIZMOR_IMAGE comes from the workflow-level env above.
         env:
-          # yamllint disable-line rule:line-length
-          ZIZMOR_IMAGE: ghcr.io/zizmorcore/zizmor:1.16.3@sha256:f09cee55087d54e7a162fc255ffe82ef942f68e683f967c8a6471ffe35e7ec64
           GH_TOKEN: ${{ github.token }}
         run: |
           docker run --rm \
