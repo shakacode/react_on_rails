@@ -11406,24 +11406,32 @@ associate each message with its field via `aria-describedby` so the error is
 announced when focus reaches the input:
 
 ```tsx
-const form = useRailsForm({ email: '' });
+function EmailField() {
+  const form = useRailsForm({ email: '' });
 
-<div>
-  <label htmlFor="email">Email</label>
-  <input
-    id="email"
-    name="email"
-    aria-invalid={Boolean(form.errors.email)}
-    aria-describedby={form.errors.email ? 'email-error' : undefined}
-    value={form.data.email}
-    onChange={(e) => form.setData('email', e.target.value)}
-  />
-  {form.errors.email?.[0] && (
-    <p id="email-error" role="alert" className="error">
-      {form.errors.email[0]}
-    </p>
-  )}
-</div>;
+  // Use the same guard (`?.[0]`) for the attribute and the element it points to,
+  // so `aria-describedby` never references a `<p>` that isn't in the DOM.
+  const emailError = form.errors.email?.[0];
+
+  return (
+    <div>
+      <label htmlFor="email">Email</label>
+      <input
+        id="email"
+        name="email"
+        aria-invalid={Boolean(emailError)}
+        aria-describedby={emailError ? 'email-error' : undefined}
+        value={form.data.email}
+        onChange={(e) => form.setData('email', e.target.value)}
+      />
+      {emailError && (
+        <p id="email-error" role="alert" className="error">
+          {emailError}
+        </p>
+      )}
+    </div>
+  );
+}
 ```
 
 After a submit that returns a 422, move focus to a summary of errors (or to the
@@ -11440,9 +11448,11 @@ server-rendered pages. Both transitions need explicit focus handling:
 
 - **Dialogs / modals:** on open, move focus into the dialog; trap focus while it
   is open; on close, return focus to the element that opened it. Prefer the
-  native `<dialog>` element or a well-tested library — focus trapping is easy to
-  get wrong. Give the dialog `role="dialog"` and `aria-modal="true"` with an
-  accessible name via `aria-labelledby`.
+  native `<dialog>` element (opened with `showModal()`, which handles focus
+  trapping and the implicit `role="dialog"` for you) or a well-tested library —
+  hand-rolled focus trapping is easy to get wrong. Always give the dialog an
+  accessible name via `aria-labelledby`. On a custom (non-`<dialog>`) container,
+  add `role="dialog"` and `aria-modal="true"` yourself.
 - **Client-side route changes:** unlike a full page load, an SPA navigation does
   not reset focus. On each route change, move focus to a logical landmark (the
   new page's `<h1>` or main heading) and announce the new page title in a live
@@ -11602,7 +11612,12 @@ function ReviewsFallback() {
       <span role="status" className="sr-only">
         Loading reviews
       </span>
-      <ReviewsSkeleton aria-hidden="true" />
+      {/* Wrap in a real DOM element: a custom component only honors aria-hidden
+          if it forwards the prop to its root, so the wrapper is the reliable way
+          to hide decorative skeleton shapes from assistive tech. */}
+      <div aria-hidden="true">
+        <ReviewsSkeleton />
+      </div>
     </div>
   );
 }
