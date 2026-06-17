@@ -43,3 +43,49 @@ jobs:
 
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+
+      # The action exits 0 even when the review never ran: an invalid or expired
+      # CLAUDE_CODE_OAUTH_TOKEN makes the first API call fail in <1s at $0 cost,
+      # yet the result still reports a green "pass" and posts no review. Inspect
+      # the execution output and fail only that silent-success case.
+      #
+      # Scoped to outcome == 'success' on purpose. When the action itself fails
+      # (missing token on Dependabot PRs, the "workflow validation failed" safety
+      # skip on PRs that edit this file, a real action error) the job is already
+      # red and the action prints its own message — re-failing here would only
+      # add a misleading one. And a successful run that legitimately skips Claude
+      # (so emits no execution_file/result) is treated as a pass, not a failure.
+      - name: Verify review completed (fail on invalid/expired token)
+        if: steps.claude-review.outcome == 'success'
+        env:
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+        run: |
+          set -euo pipefail
+          TOKEN_HINT="Rotate CLAUDE_CODE_OAUTH_TOKEN with 'claude setup-token' and update the repo secret."
+
+          # No execution output: the action skipped Claude (e.g. the workflow-
+          # validation safety skip). Nothing was claimed to run — let it pass.
+          if [ -z "${EXECUTION_FILE:-}" ] || [ ! -f "$EXECUTION_FILE" ]; then
+            echo "No execution output found; the action skipped Claude. Nothing to verify."
+            exit 0
+          fi
+
+          # The execution file may be a JSON array or newline-delimited JSON;
+          # slurp + flatten handles both, then grab the final result record.
+          result=$(jq -s 'flatten | map(select(type == "object" and .type == "result")) | last' "$EXECUTION_FILE" 2>/dev/null || echo null)
+          if [ "$result" = "null" ] || [ -z "$result" ]; then
+            echo "No result record in execution output; nothing to verify."
+            exit 0
+          fi
+
+          is_error=$(echo "$result" | jq -r '.is_error // false')
+          cost=$(echo "$result" | jq -r '.total_cost_usd // 0')
+          turns=$(echo "$result" | jq -r '.num_turns // 0')
+          echo "Claude review result: is_error=$is_error total_cost_usd=$cost num_turns=$turns"
+
+          # is_error=true with $0 cost and a single turn is the signature of an
+          # invalid/expired token, but any is_error means the review failed.
+          if [ "$is_error" = "true" ]; then
+            echo "::error::Claude review failed (is_error=true, cost=$cost, turns=$turns). This usually means the token is invalid or expired. $TOKEN_HINT"
+            exit 1
+          fi
