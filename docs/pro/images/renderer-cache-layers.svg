@@ -124,10 +124,14 @@
   <polygon points="600,138 608,142 600,146" class="hit-head"/>
   <text x="556" y="184" text-anchor="middle" font-size="8.5" font-weight="700" class="hit-text">hit</text>
 
-  <!-- warm/disk bundle hit still runs the JS -->
+  <!-- warm bundle hit (layer 3) still runs the JS -->
   <path d="M506,274 H560" fill="none" class="hit" stroke-width="2" stroke-dasharray="5 3"/>
   <polygon points="560,270 568,274 560,278" class="hit-head"/>
   <text x="533" y="268" text-anchor="middle" font-size="8" font-weight="700" class="hit-text">run JS</text>
+  <!-- disk bundle hit (layer 4) loads into VM, then runs the JS -->
+  <path d="M506,321 C534,321 540,292 560,289" fill="none" class="hit" stroke-width="2" stroke-dasharray="5 3"/>
+  <polygon points="560,285 568,289 559,293" class="hit-head"/>
+  <text x="533" y="312" text-anchor="middle" font-size="8" font-weight="700" class="hit-text">run JS</text>
   <!-- run js -> result -->
   <path d="M645,256 C645,210 700,200 700,164" fill="none" class="arrow" stroke-width="1.6"/>
   <polygon points="696,166 704,166 700,160" class="head"/>

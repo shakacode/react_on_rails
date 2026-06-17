@@ -60,11 +60,16 @@
   <!-- vertical trunk -->
   <line x1="70" y1="108" x2="70" y2="392" class="connector" stroke-width="1.5"/>
 
-  <!-- Cold-start branch (dashed, optional) -->
+  <!-- Cold-start branch (dashed, fires only on a cache miss) -->
   <line x1="70" y1="135" x2="120" y2="135" class="connector-dash" stroke-width="1.4" stroke-dasharray="4 3"/>
-  <rect x="120" y="118" width="320" height="34" rx="8" class="cold" stroke-width="1.4"/>
-  <text x="136" y="133" font-size="10.5" font-weight="700" class="cold-text mono">ror.bundle.build_execution_context</text>
-  <text x="136" y="146" font-size="9" class="cold-text">cold start only · cache-first miss + cache-miss rebuild</text>
+  <rect x="120" y="118" width="200" height="34" rx="8" class="cold" stroke-width="1.4"/>
+  <text x="130" y="133" font-size="10" font-weight="700" class="cold-text mono">ror.bundle.upload</text>
+  <text x="130" y="146" font-size="8.5" class="cold-text">Rails posts the missing bundle</text>
+  <line x1="320" y1="135" x2="330" y2="135" class="connector-dash" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <polygon points="330,131 338,135 330,139" class="cold-text" fill="#92400E"/>
+  <rect x="338" y="118" width="194" height="34" rx="8" class="cold" stroke-width="1.4"/>
+  <text x="346" y="132" font-size="8.5" font-weight="700" class="cold-text mono">ror.bundle.build_execution_context</text>
+  <text x="346" y="145" font-size="8.5" class="cold-text">cache-miss rebuild of the VM</text>
 
   <!-- Warm sequence -->
   <line x1="70" y1="178" x2="120" y2="178" class="connector" stroke-width="1.4"/>
@@ -104,12 +109,13 @@
   <rect x="560" y="152" width="16" height="12" rx="3" class="warm" stroke-width="1.2"/>
   <text x="584" y="162" font-size="9.5" class="legend">Warm path — always fires, in order</text>
   <rect x="560" y="174" width="16" height="12" rx="3" class="cold" stroke-width="1.2"/>
-  <text x="584" y="184" font-size="9.5" class="legend">Cold start — extra build span up front</text>
+  <text x="584" y="184" font-size="9.5" class="legend">Cold start — upload + rebuild spans up front</text>
   <rect x="560" y="196" width="16" height="12" rx="3" class="http" stroke-width="1.2"/>
   <text x="584" y="206" font-size="9.5" class="legend">HTTP children — captured automatically</text>
   <rect x="560" y="218" width="16" height="12" rx="3" class="stream" stroke-width="1.2"/>
   <text x="584" y="228" font-size="9.5" class="legend">Streaming — only for async-props renders</text>
-  <text x="560" y="256" font-size="9" class="note">On a miss, build_execution_context appears</text>
-  <text x="560" y="270" font-size="9" class="note">twice: cache-first (may end ERROR — expected)</text>
-  <text x="560" y="284" font-size="9" class="note">then cache-miss for the real VM build.</text>
+  <text x="560" y="252" font-size="9" class="note">On a miss, build_execution_context appears</text>
+  <text x="560" y="264" font-size="9" class="note">twice: the warm cache-first probe (may end</text>
+  <text x="560" y="276" font-size="9" class="note">ERROR — expected), then, after ror.bundle.upload,</text>
+  <text x="560" y="288" font-size="9" class="note">the cache-miss rebuild of the VM.</text>
 </svg>
