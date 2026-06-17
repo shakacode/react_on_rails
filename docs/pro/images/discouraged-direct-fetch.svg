@@ -68,7 +68,7 @@
 
   <g>
     <rect x="40" y="102" width="760" height="34" rx="8" class="callout-box" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="420" y="123" text-anchor="middle" font-size="11" font-weight="600" class="callout-title">⚠ Discouraged — usually let Rails pass the data in via async props so auth, session, and caching stay on the Rails side</text>
+    <text x="420" y="123" text-anchor="middle" font-size="11" font-weight="600" class="callout-title">Discouraged — usually let Rails pass the data in via async props so auth, session, and caching stay on the Rails side</text>
   </g>
 
   <g class="st1">
