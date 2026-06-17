@@ -27,15 +27,21 @@
 # finding simply re-surfaces as an annotation (safe failure mode — more
 # visibility, not less).
 #
-# NOTE: zizmor matches `ignore` entries by filename basename only (its own
-# documented limitation), so the composite actions all named `action.yml` are
-# matched by basename + line. Multiple lines per finding are listed because a
-# finding is ignored if ANY of its locations matches. Regenerate after a
-# binary version bump with the pinned version:
+# SCOPE LIMITATION: zizmor's `ignore` matches by workflow filename, and per its
+# documentation composite-action findings (in .github/actions/*/action.yml)
+# CANNOT be suppressed via this config — so no `action.yml` entries are listed
+# below (they were no-ops). Those composite-action findings, and any
+# online-audit findings, therefore still surface as annotations. That is
+# acceptable under the non-blocking phase-1 gate (more visibility, never a false
+# green); only the higher-volume workflow-file findings are baselined here so a
+# genuinely NEW workflow finding stays under GitHub's 10-annotation cap.
+# Regenerate the workflow-file baseline after a binary version bump with the
+# pinned version, EXCLUDING any action.yml locations (not suppressible):
 #   zizmor --no-online-audits --color=never --format=json . \
 #     | jq -r '.[] | .ident as $r | .locations[]
 #              | "\($r) \(.symbolic.key.Local.given_path | split("/") | last):"
-#                + "\(.concrete.location.start_point.row + 1)"'
+#                + "\(.concrete.location.start_point.row + 1)"' \
+#     | grep -v ' action.yml:'
 # then group by rule.
 # See https://docs.zizmor.sh/configuration/#ignoring-findings
 
@@ -58,12 +64,6 @@ rules:
       - dependabot.yml:121
   template-injection:
     ignore:
-      - action.yml:30
-      - action.yml:32
-      - action.yml:34
-      - action.yml:35
-      - action.yml:37
-      - action.yml:38
       - dummy-app-bundler-tests.yml:240
       - dummy-app-bundler-tests.yml:241
       - dummy-app-bundler-tests.yml:242
@@ -102,8 +102,6 @@ rules:
       - pro-test-package-and-gem.yml:59
   unpinned-uses:
     ignore:
-      - action.yml:51
-      - action.yml:60
       - benchmark-suite.yml:104
       - benchmark-suite.yml:113
       - benchmark-suite.yml:155

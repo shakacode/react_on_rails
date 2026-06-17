@@ -15,9 +15,12 @@ name: Zizmor GitHub Actions Security Audit
 # audit actually ran. (A blanket `continue-on-error: true` was avoided because
 # it would also hide tool failures behind a green check.)
 #
-# Pre-existing findings are suppressed via a baseline in .github/zizmor.yml so
-# that NEW findings introduced by future PRs surface as annotations without
-# being pushed past GitHub's 10-annotations-per-step cap.
+# Pre-existing workflow-file findings are suppressed via a baseline in
+# .github/zizmor.yml so that NEW findings introduced by future PRs surface as
+# annotations without being pushed past GitHub's 10-annotations-per-step cap.
+# Composite-action (action.yml) findings cannot be suppressed via config (a
+# documented zizmor limitation) and, like online-audit findings, still surface
+# as advisory annotations — acceptable while the gate is non-blocking.
 #
 # Follow-up (issue #3449): once the baseline backlog in .github/zizmor.yml is
 # cleared, drop `--no-exit-codes` to make this a required, blocking gate.
@@ -60,6 +63,14 @@ jobs:
           # No need for history in a lint/audit job.
           fetch-depth: 1
           persist-credentials: false
+      - name: Print zizmor version
+        # Logs the exact pinned version and confirms the image pulled
+        # successfully before the audit runs.
+        env:
+          # yamllint disable-line rule:line-length
+          ZIZMOR_IMAGE: ghcr.io/zizmorcore/zizmor:1.16.3@sha256:f09cee55087d54e7a162fc255ffe82ef942f68e683f967c8a6471ffe35e7ec64
+        run: docker run --rm "${ZIZMOR_IMAGE}" --version
+        shell: bash
       - name: Run zizmor
         # We invoke the pinned zizmor container directly rather than via
         # zizmorcore/zizmor-action because that action does not expose
