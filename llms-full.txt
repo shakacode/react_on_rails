@@ -11337,9 +11337,10 @@ streamed over the wire. Each path has its own failure modes for focus, live
 regions, and progressive enhancement.
 
 This guide collects the accessibility practices that matter for React on Rails
-specifically. The baseline target is **WCAG 2.1 Level AA**. Where a practice is
-RSC-specific, it is called out in the [Server Components](#server-components)
-section.
+specifically. The baseline target is **WCAG 2.1 Level AA** (WCAG 2.2, the current
+W3C Recommendation, is a backwards-compatible superset — the guidance here meets
+both). Where a practice is RSC-specific, it is called out in the
+[Server Components](#server-components) section.
 
 > **Scope note:** Most of the general guidance below is plain web a11y that
 > applies to any React on Rails app. The Server Components section assumes the
@@ -11480,7 +11481,10 @@ If you use [View Transitions](./view-transitions.md) or other JS-driven motion,
 read the same preference in JS and skip the animation:
 
 ```ts
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Browser-only — `window` is undefined during SSR / in a Server Component, so
+// guard it and prefer the CSS media query above, which applies before JS runs.
+const reduceMotion =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 ```
 
 See [SSR and reduced motion](#ssr-reduced-motion-and-fouc) for the server/client
@@ -11488,10 +11492,10 @@ boundary caveat.
 
 ### Touch targets
 
-Interactive targets should be at least **44×44 CSS pixels** (WCAG 2.1 AAA
-guidance, widely treated as a practical floor on touch devices). Apply minimum
-sizes with padding rather than shrinking the visible label, and keep adequate
-spacing between adjacent targets.
+The WCAG **AA** floor is **24×24 CSS pixels** (WCAG 2.2 SC 2.5.8). Aim higher:
+**44×44 CSS pixels** (WCAG 2.1/2.2 AAA, SC 2.5.5) is widely treated as the
+practical minimum on touch devices. Apply minimum sizes with padding rather than
+shrinking the visible label, and keep adequate spacing between adjacent targets.
 
 ### `eslint-plugin-jsx-a11y`
 
@@ -11622,9 +11626,13 @@ function ReviewsFallback() {
   );
 }
 
-<Suspense fallback={<ReviewsFallback />}>
-  <Reviews />
-</Suspense>;
+function ReviewsSection() {
+  return (
+    <Suspense fallback={<ReviewsFallback />}>
+      <Reviews />
+    </Suspense>
+  );
+}
 ```
 
 When the boundary resolves, React unmounts the fallback — so `aria-busy="true"`
@@ -11683,10 +11691,19 @@ test('dialog is keyboard accessible', async ({ page }) => {
 
 test('main nav is reachable by keyboard', async ({ page }) => {
   await page.goto('/');
+
+  // A skip-navigation link is a WCAG 2.4.1 (Level A) requirement and the correct
+  // first tab stop, so assert it first, then the first nav item.
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: /skip to main content/i })).toBeFocused();
+
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Home' })).toBeFocused();
 });
 ```
+
+If your app has no skip link, the first `Tab` lands on the first nav item — but
+add the skip link: it is a Level A requirement.
 
 For an example of asserting React runtime behavior from a Playwright spec in this
 project, see
