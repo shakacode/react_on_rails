@@ -36,6 +36,9 @@ pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
 > [!NOTE]
 > The generator pins `react-on-rails-rsc` to exactly `19.0.5` (no `^` or `~`). Because the RSC bundler APIs are version-coupled, record `react-on-rails-rsc` as exactly `19.0.5` in `package.json` rather than the default caret range so a later `19.1.x`/`19.2.x` is not picked up; `react` and `react-dom` stay on `~19.0.4`. This is separate from the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609): metadata can allow RSC packages broadly enough for `npm ls`, while the generator still installs the tested exact RSC package pin.
 
+> [!NOTE]
+> The Pro package's optional `react-on-rails-rsc` peer range is `^19.0.5` — the FOUC floor (`>= 19.0.5`, see [issue #3965](https://github.com/shakacode/react_on_rails/issues/3965)). It tracks the React 19.0.x runtime line. Bumping it to the React 19.2.x `react-on-rails-rsc` line is a deliberate, reviewed change made alongside the generator and React range, not an automatic adoption of any future stable release.
+
 ## Pre-Migration: Audit Components for Client API Usage
 
 Before running the generator, audit your existing components to identify which ones use client-side APIs. When RSC is enabled, any component **without** `'use client'` is automatically classified as a React Server Component. Components that use client APIs will break if misclassified.
