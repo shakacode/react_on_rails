@@ -8,6 +8,7 @@ require "minitest/autorun"
 require "open3"
 require "tmpdir"
 require "fileutils"
+require "shellwords"
 
 SCRIPT = File.expand_path("pr-file-touch-map", __dir__)
 load SCRIPT
@@ -51,7 +52,7 @@ class PrFileTouchMapTest < Minitest::Test # rubocop:disable Metrics/ClassLength
       File.write(git, <<~SH)
         #!/usr/bin/env bash
         if [ "$1" = "check-ref-format" ]; then exit 0; fi
-        if [ "$1" = "fetch" ]; then echo "$@" >> #{log_path.inspect}; exit 1; fi
+        if [ "$1" = "fetch" ]; then echo "$@" >> #{Shellwords.shellescape(log_path)}; exit 1; fi
         exit 0
       SH
       FileUtils.chmod(0o755, git)

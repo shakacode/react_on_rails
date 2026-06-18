@@ -303,7 +303,8 @@ module PrCiReadiness
 
     def check_parse_helpers
       errors = []
-      errors << "usable_checks? missed an active array" unless PrCiReadiness.usable_checks?('[{"name":"a"}]')
+      active = PrCiReadiness.usable_checks?('[{"name":"a","bucket":"pass"}]')
+      errors << "usable_checks? missed an active array" unless active
       errors << "usable_checks? treated [] as usable" if PrCiReadiness.usable_checks?("[]")
       errors << "usable_checks? treated blank as usable" if PrCiReadiness.usable_checks?("")
       errors << "usable_checks? treated non-JSON as usable" if PrCiReadiness.usable_checks?("no required checks")
