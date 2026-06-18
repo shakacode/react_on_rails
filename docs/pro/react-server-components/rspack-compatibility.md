@@ -12,7 +12,7 @@ The generator supports Rspack — when `assets_bundler: rspack` is detected in `
 The RSC implementation depends on the `react-on-rails-rsc` npm package, which provides bundler-specific manifest plugins plus a shared loader:
 
 - **WebpackPlugin** (`react-on-rails-rsc/WebpackPlugin`) — generates client/server component manifest files under webpack.
-- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by the exact `react-on-rails-rsc@19.0.5-rc.7` pin (switch to 19.0.5 stable once published).
+- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by the stable `react-on-rails-rsc@19.0.5` pin.
 - **WebpackLoader** (`react-on-rails-rsc/WebpackLoader`) — transforms `'use client'` files into client reference proxies in the RSC bundle. Works under both webpack and rspack.
 
 ## React and Package Version Policy
@@ -24,8 +24,8 @@ integration can change between React minor releases, so the generator range shou
 advance only after the Webpack and Rspack paths are verified against the new React
 minor.
 
-The generator separately pins `react-on-rails-rsc@19.0.5-rc.7` exactly until a
-stable `react-on-rails-rsc@19.0.5` is published. That package pin is separate from
+The generator separately pins the stable `react-on-rails-rsc@19.0.5` release
+exactly. That package pin is separate from
 the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609):
 metadata can allow prerelease RSC packages broadly enough for `npm ls`, while the
 generator still installs the tested React range and exact RSC package pin.
