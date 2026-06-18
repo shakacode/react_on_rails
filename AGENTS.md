@@ -334,6 +334,45 @@ contract unless a maintainer explicitly narrows the run.
   - Residual risk: <one-line risk summary, or "none">
   ```
 
+## Tracking Issues And Handoffs
+
+Keep the issue tracker for durable work — product features, real bugs, release
+gates — not for transient agent-process state. Process state accretes into
+clutter because "open a tracker" has no matching "close it" step.
+
+- **Do not open a new issue for a session handoff or a point-in-time audit.** A
+  handoff is transient coordination and an audit is a snapshot; neither is
+  durable backlog. Record a handoff as a comment on the relevant parent tracking
+  issue (for example the roadmap umbrella), or — if a dedicated agent-coordination
+  repo is in use — there. If the work has no parent umbrella (a standalone PR or a
+  one-off batch), put the handoff in the PR's final comment or description rather
+  than creating an issue to hold it. Append a point-in-time audit to the standing
+  release audit ledger in place. Never spawn a standalone `Handoff: ...` or
+  `Post-rc.N audit` issue.
+- **One durable ledger per recurring concern, updated in place.** Release audits
+  append to the standing release audit ledger; cross-agent coordination state —
+  the heartbeats and leases that signal which agent is live on which lane — lives
+  in the coordination-layer tracker. Do not create a sibling issue each cycle.
+  (At time of writing these are #4010 and #3974, but treat any such number as a
+  movable pointer: confirm it is still the live ledger before relying on it, and
+  update the pointer if it has been superseded — the same staleness this policy
+  guards against applies to the ledgers themselves.)
+- **Closure follows the work, not the opener.** A tracking issue closes when its
+  underlying PR/work lands, done by whoever finishes the work — not by whoever
+  opened the tracker. "I opened it" does not mean "I must close it": WIP can
+  outlive a session (lost chat, unanswered question, disconnect). The heartbeat —
+  the coordination layer's liveness signal that flags when no agent is active on a
+  lane — detects abandonment, and an unfinished PR is the real signal of remaining
+  work; act on the PR, not on a stale tracker.
+- **The 30-day test.** Before opening any tracking or meta issue, ask whether it
+  will still matter in 30 days. If not, it is a comment or a ledger entry, not an
+  issue.
+- **Sweep on sight.** When a handoff/audit/process-snapshot issue's underlying
+  work has landed or its snapshot is obsolete, close it — first consolidating any
+  still-live finding into the durable ledger or a real backlog issue. Verify it is
+  actually resolved or superseded before closing; never close a tracker that still
+  fronts unfinished work.
+
 ## Release Mode And Auto-Merge Coordination
 
 Use the current release tracker to decide whether PRs are in normal development, accelerated RC, strict RC, or final-release mode. The tracker is the live source of truth for the mode; committed docs define how to interpret it.
