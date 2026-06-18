@@ -107,9 +107,12 @@ export default function createReactOutput({
       throw new Error(`Registered render function "${name}" must be a function.`);
     }
 
+    // The cast only narrows the broad RegisteredComponentValue union (which isn't structurally
+    // callable) to a concrete render-function role; it does not widen what may be returned.
     const renderFunctionResult = (component as ServerRenderFunction)(props, railsContext);
-    // Defense-in-depth: a 2-argument render function isn't expected to return a teardown wrapper, but
-    // the public RenderFunction return type can't structurally exclude it, so reject that at runtime too.
+    // Defense-in-depth: RenderFunction (= ServerRenderFunction) returns RenderFunctionResult, which
+    // already excludes RendererTeardownResult at the type level, so a teardown can't arrive here from
+    // a typed caller. Reject it at runtime anyway for untyped JS callers that ignore the contract.
     if (isRendererTeardownResult(renderFunctionResult)) {
       throw new Error(unsupportedManualRendererMessage(name));
     }

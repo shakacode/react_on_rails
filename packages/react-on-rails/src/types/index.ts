@@ -294,6 +294,7 @@ export type {
   RendererTeardownResult,
   RendererFunction,
   RenderFunctionResult,
+  RendererFunctionResult,
   Store,
   StoreGenerator,
   CreateReactOutputResult,

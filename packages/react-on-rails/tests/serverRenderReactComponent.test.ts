@@ -7,7 +7,7 @@ import type {
   RailsContext,
   RenderFunction,
   RendererFunction,
-  RenderFunctionResult,
+  RendererFunctionResult,
 } from '../src/types/index.ts';
 // eslint-disable-next-line import/no-relative-packages
 import LengthPrefixedStreamParser from '../../react-on-rails-pro/src/parseLengthPrefixedStream.ts';
@@ -367,7 +367,7 @@ describe('serverRenderReactComponent', () => {
       _railsContext?: RailsContext,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _domNodeId?: string,
-    ): RenderFunctionResult => ({ renderedHtml: '' });
+    ): RendererFunctionResult => ({ renderedHtml: '' });
 
     ComponentRegistry.register({ X4 });
 
