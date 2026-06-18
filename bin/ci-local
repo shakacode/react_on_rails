@@ -173,9 +173,10 @@ if [ "$RUN_ALL" = false ]; then
     DETECTOR_JSON=$(
       CI_JSON_OUTPUT=1 script/ci-changes-detector "$BASE_REF" 2>&1 |
         awk '
-          $0 == "{" && !seen_json { in_json = 1; seen_json = 1 }
-          in_json { print }
-          $0 == "}" && in_json { in_json = 0 }
+          { line = $0; sub(/\r$/, "", line) }
+          line == "{" && !seen_json { in_json = 1; seen_json = 1 }
+          in_json { print line }
+          line == "}" && in_json { in_json = 0 }
         '
     )
 
