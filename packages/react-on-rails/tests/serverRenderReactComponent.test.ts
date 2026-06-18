@@ -2,7 +2,13 @@ import * as React from 'react';
 import { Script } from 'node:vm';
 import serverRenderReactComponent from '../src/serverRenderReactComponent.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
-import type { RenderParams, RailsContext, RenderFunction, RenderFunctionResult } from '../src/types/index.ts';
+import type {
+  RenderParams,
+  RailsContext,
+  RenderFunction,
+  RendererFunction,
+  RenderFunctionResult,
+} from '../src/types/index.ts';
 // eslint-disable-next-line import/no-relative-packages
 import LengthPrefixedStreamParser from '../../react-on-rails-pro/src/parseLengthPrefixedStream.ts';
 
@@ -354,7 +360,7 @@ describe('serverRenderReactComponent', () => {
   });
 
   it('serverRenderReactComponent renders an error if attempting to render a renderer', () => {
-    const X4: RenderFunction = (
+    const X4: RendererFunction = (
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _props: unknown,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
