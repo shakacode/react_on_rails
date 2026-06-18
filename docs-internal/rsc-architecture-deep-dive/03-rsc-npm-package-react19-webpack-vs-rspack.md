@@ -199,8 +199,7 @@ plugins, and loaders; you just tell Shakapacker to use the rspack engine.
 
 ### 6.1 rspack can reuse the webpack runtime — and `react-on-rails-rsc` now _also_ ships a native Rspack path
 
-> ⚠️ **Updated.** Earlier drafts of these docs asserted "there is **no** `RSCRspackPlugin` and **no**
-> `react-server-dom-rspack` anywhere." That is no longer accurate for `react-on-rails-rsc` itself.
+> ⚠️ **Updated.** Earlier drafts of these docs asserted "there is **no** `RSCRspackPlugin` and **no** > `react-server-dom-rspack` anywhere." That is no longer accurate for `react-on-rails-rsc` itself.
 > The narrowly‑scoped claims remain true (React's monorepo publishes no `-rspack` build, and
 > **Next.js** has none — it reuses `react-server-dom-webpack` under rspack), but ShakaCode has since
 > added a native Rspack path to its own package.
