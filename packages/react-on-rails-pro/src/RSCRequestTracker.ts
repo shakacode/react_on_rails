@@ -38,10 +38,10 @@ import { extractErrorMessage } from './utils.ts';
  * failure through `renderToPipeableStream`'s `onError` rather than rejecting the stream parse)
  * recover the original diagnostic — see #3475.
  */
-export type CapturedRSCDiagnostic = {
+export interface CapturedRSCDiagnostic {
   componentName: string;
   diagnosticError: Error;
-};
+}
 
 class RSCRequestTracker {
   private streams: RSCPayloadStreamInfo[] = [];
