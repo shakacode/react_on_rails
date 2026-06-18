@@ -63,6 +63,7 @@ const toLengthPrefixedPayload = (content: string): Buffer => {
 
 type StreamResultChunk = {
   html: string;
+  consoleReplayScript: string;
   hasErrors: boolean;
   isShellReady: boolean;
 };
