@@ -153,8 +153,9 @@ Worker path:
    phase from `agent-coord` status for that branch (available only when
    `agent-coord doctor` and `agent-coord status` exit 0). If the backend is
    `UNKNOWN`, derive it: `main` -> `beta`; `release/*` -> `rc`, or `final` when
-   the applicable tracker is in `final-release` mode or the branch is in the
-   promotion freeze.
+   the applicable tracker is in `final-release` mode (the only machine-readable
+   signal in the fallback path; the promotion freeze is normally published via
+   `agent-coord`, which is the tool that is unavailable here).
 2. Apply that phase's gate: `beta` (target `main`) is lowest — confidence note +
    green required checks. `rc` (target `release/*`) adds adversarial-pr-review and
    requires zero open MUST-FIX, and only stabilizing fixes belong on `release/*`.
@@ -993,9 +994,9 @@ Use `address-review` for actionable GitHub review comments instead of skimming t
 
 ### Adversarial Review Gate
 
-Use `.agents/skills/adversarial-pr-review/SKILL.md` for high-risk PRs, concurrent batch PRs, suspected bad merges, release-candidate risk, or when the user asks for a Claude/Codex red-team pass.
+Use `.agents/skills/adversarial-pr-review/SKILL.md` for high-risk PRs, concurrent batch PRs, suspected bad merges, release-candidate risk, or when the user asks for a Claude/Codex red-team pass. **It is also required (not optional) at the `rc` and `final` phases** — i.e. any PR targeting `release/*` — per the phase-gate table in `AGENTS.md` -> **Release-Train Branching And Phase Gating** and the worker path above. The high-risk triggers in this paragraph are the _additional_ cases where it applies at the `beta` phase (target `main`).
 
-The adversarial review is report-only by default. It must check inline review comments, review timing, missing changelog entries, changed agent instructions, validation gaps, untrusted PR content, and cross-PR interactions. All `BLOCKING` and `DISCUSS` findings must be fixed, explicitly decided, or waived before final readiness.
+The adversarial review is report-only by default (it produces findings; it is not itself a merge approval). It must check inline review comments, review timing, missing changelog entries, changed agent instructions, validation gaps, untrusted PR content, and cross-PR interactions. All `BLOCKING` and `DISCUSS` findings must be fixed, explicitly decided, or waived before final readiness.
 
 ### Coordinating Claude Review
 

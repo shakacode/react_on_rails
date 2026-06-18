@@ -230,14 +230,16 @@ public pointer carries only the contract:
 
 - The backend exposes a phase value (`beta` | `rc` | `final`) keyed by release
   line / target branch. Read it from the machine-readable `agent-coord` status
-  output for the PR's target branch. The private backend README,
+  output for the PR's target branch. A missing entry (no published phase for the
+  line) is equivalent to `beta` — there is no separate `none` value. The private backend README,
   `agent-coord --help`, and `agent-coord config show --json` are authoritative
   for the exact field and subcommand if they differ from this pointer.
 - Treat the published phase as available only when `agent-coord doctor` and
   `agent-coord status` exit 0, exactly as for claim and heartbeat state.
   Otherwise report the phase as `UNKNOWN` and use the `AGENTS.md` fallback:
   derive it from the target branch (`main` -> `beta`; `release/*` -> `rc`, or
-  `final` during the promotion freeze / `final-release` mode).
+  `final` when the applicable tracker is in `final-release` mode — the only
+  machine-readable signal in the fallback path).
 - The release tracker remains the human source of truth for mode and go/no-go.
   The published phase is the fast machine path. If the published phase and the
   tracker disagree, treat it as a `release-mode-conflict` per `AGENTS.md`, report
@@ -245,7 +247,8 @@ public pointer carries only the contract:
 - Phase is read-mostly coordination state, not a claim. Only a maintainer (or the
   release coordinator they designate) publishes or changes a release line's
   phase, at the transitions in the runbook: `beta` -> `rc` at RC cut, `rc` ->
-  `final` at the promotion freeze, and back to `beta`/none at release close-out.
+  `final` at the promotion freeze, and cleared at release close-out (the entry is
+  removed when the release branch is deleted; absence falls back to `beta`).
 
 Do not store secrets, `.env` files, credentials, patches, customer data, or Pro
 source code in the coordination backend. It is only for minimal JSON state files.

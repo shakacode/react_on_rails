@@ -192,13 +192,22 @@ and publish phase `final` for the release line during the promotion freeze.
 
 ```bash
 # After v17.0.0 is published and the GitHub release exists:
-# Reconcile the final CHANGELOG/version state back to main (forward-port the collapse + next-dev bump).
-# Then delete the ephemeral branch — the tags are the durable record.
+# 1. Forward-port the final CHANGELOG collapse and next-dev version bump to main:
+git fetch origin
+git checkout main && git pull --rebase
+git cherry-pick -x <changelog-collapse-and-release-bump-sha>  # the step-4 commit(s) that collapsed
+                                                              # the rc sections and bumped to 17.0.0
+# Then bump main to the next dev version per releasing.md (e.g. bundle exec rake bump), if applicable.
+git push   # or open a PR if main is protected
+# 2. Delete the ephemeral branch — the tags are the durable record.
 git push origin --delete release/17.0.0
 ```
 
-Mark the release tracker released per [`rc-testing-plan.md`](rc-testing-plan.md), and publish the phase
-for this line back to `beta`/none so agents stop applying the RC/final gate.
+See [`releasing.md`](releasing.md) for the next-dev version bump details.
+
+Mark the release tracker released per [`rc-testing-plan.md`](rc-testing-plan.md), and clear the
+published phase for this line (the entry is removed when the branch is deleted; absence falls back to
+`beta` per the deterministic fallback) so agents stop applying the RC/final gate.
 
 ## Phase-tiered merge gating
 
@@ -229,9 +238,10 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
 **Contract (public pointer):**
 
 - The backend exposes a **phase** value (`beta` | `rc` | `final`) per release line / target branch.
-  Read it from the machine-readable `agent-coord` status output for the PR's target branch. The private
-  backend README, `agent-coord --help`, and `agent-coord config show --json` are authoritative for the
-  exact field and subcommand if they differ from this pointer.
+  Read it from the machine-readable `agent-coord` status output for the PR's target branch. A missing
+  entry (no published phase for the line) is equivalent to `beta` — there is no separate `none` value.
+  The private backend README, `agent-coord --help`, and `agent-coord config show --json` are
+  authoritative for the exact field and subcommand if they differ from this pointer.
 - Treat the published phase as available only when `agent-coord doctor` and `agent-coord status` exit 0,
   exactly as for claim/heartbeat state. Otherwise report the phase as `UNKNOWN` and use the fallback.
 - The **release tracker remains the human source of truth** for mode and go/no-go; the published phase
@@ -243,7 +253,9 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
 
 1. Target is `main` → **beta**.
 2. Target matches `release/*` → **rc**, unless the applicable release tracker is in `final-release`
-   mode or the branch is in the promotion freeze, in which case **final**.
+   mode, in which case **final**. (`final-release` mode is the only machine-readable signal in the
+   fallback path; the promotion freeze is normally published via `agent-coord`, which is the tool that
+   is unavailable here.)
 3. Cannot determine the target or applicable tracker → report `UNKNOWN` and do not auto-merge; fall
    back to standard `AGENTS.md` merge qualification with a maintainer decision.
 
@@ -292,8 +304,8 @@ Asserted invariants (all passed):
 
 - `git diff --name-only v1.0.0.rc.1 v1.0.0` lists only `version.rb` + `CHANGELOG.md` — the final's code
   tree equals the last good RC's.
-- The post-cut `main` features are **absent** from the `v1.0.0` tree (`git merge-base --is-ancestor main
-v1.0.0` is false).
+- The post-cut `main` features are **absent** from the `v1.0.0` tree
+  (`git merge-base --is-ancestor main v1.0.0` is false).
 - `main` has the fix (via cherry-pick) but **not** the RC version bump.
 
 To re-validate after changing this runbook, repeat the sequence in a `mktemp -d` git repo; do not run it
