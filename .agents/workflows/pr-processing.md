@@ -423,7 +423,7 @@ plus confidence notes in handoffs.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
-For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
+For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main and target `main` by default. **Release-phase override:** when the work is a stabilizing fix for an active RC (the applicable release line is in the `rc`/`final` phase and the fix belongs on the release branch), branch from and open the PR against `origin/release/X.Y.Z` instead of `main`, then forward-port to `main` with `git cherry-pick -x <sha>` per the runbook — do not open the fix against `main` and rely on someone noticing it needs cherry-picking onto the RC. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
 For non-trivial, high-risk, `ready-for-hosted-ci`, `force-full-hosted-ci`,
 `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor PRs, commit the intended
@@ -1078,8 +1078,12 @@ real uncertainty, failed checks, or unresolved findings lower the score.
 
 Final-release mode is stricter than accelerated RC. Do not use confidence-only
 auto-merge for final release work; run the post-merge audit, update changelog or
-release notes as needed, confirm required checks on `main`, and get an explicit
-maintainer release decision before publishing.
+release notes as needed, and get an explicit maintainer release decision before
+publishing. Confirm required checks on the **SHA being promoted**: for a final
+promotion off `release/X.Y.Z` that is the release-branch / promoted-RC tip, not
+`origin/main` — once post-RC commits have landed on `main`, `main`'s checks are
+green or red independently of the RC being promoted, so validating `main` would
+prove the wrong SHA.
 
 Auto-merge requires all of the following:
 
