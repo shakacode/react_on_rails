@@ -217,7 +217,10 @@ server_env = {
   "RAILS_MAX_THREADS" => "3",
   "RAILS_MIN_THREADS" => "3",
   "PORT" => SERVER_PORT.to_s,
-  "RAILS_PORT" => SERVER_PORT.to_s
+  "RAILS_PORT" => SERVER_PORT.to_s,
+  # The benchmarked app (Rails + Pro node renderer) is checked-out code; keep the Bencher
+  # upload token out of it — only the final in-process upload needs the token.
+  "BENCHER_API_TOKEN" => nil
 }
 if pro
   server_env["REACT_ON_RAILS_PRO_LICENSE"] = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", "")
