@@ -286,7 +286,7 @@ function rewriteDiagramEmbeds(text) {
       return rewritten === img ? whole : rewritten;
     })
     .replace(/<img\b[^>]*>/gi, (img) => rewriteImgTag(img))
-    .replace(/!\[([^\]]*)\]\([^)\s]*\.svg\)/gi, (whole, alt) => diagramMarker(alt));
+    .replace(/!\[([^\]]*)\]\([^)\s]*\.svg\)/gi, (_whole, alt) => diagramMarker(alt));
 }
 
 // Apply rewriteDiagramEmbeds to a doc body while leaving fenced code blocks
