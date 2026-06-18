@@ -367,7 +367,7 @@ describe('serverRenderReactComponent', () => {
       _railsContext?: RailsContext,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _domNodeId?: string,
-    ): RendererFunctionResult => ({ renderedHtml: '' });
+    ): RendererFunctionResult => undefined;
 
     ComponentRegistry.register({ X4 });
 

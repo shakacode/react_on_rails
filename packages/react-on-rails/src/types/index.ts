@@ -266,9 +266,10 @@ type AsyncPropsManager = {
  * `RenderFunction` is exactly this 2-argument server/client render-function form. The 3-argument
  * "renderer" form `(props, railsContext, domNodeId)` owns its own DOM rendering/hydration and is a
  * distinct role: type those functions {@link RendererFunction} (they return nothing or an optional
- * `{ teardown }` wrapper for cleanup). Keeping the two roles as separate types makes illegal
- * combinations — a server render-function "returning" a teardown, or a renderer "returning" a
- * server-render hash — unrepresentable instead of merely discouraged.
+ * `{ teardown }` wrapper for cleanup). For `RenderFunction`, this makes the illegal combination —
+ * a server render-function "returning" a teardown — unrepresentable instead of merely discouraged.
+ * (`RendererFunction` still accepts legacy {@link RenderFunctionResult} return shapes for backward
+ * compatibility with old 3-argument renderers; those values are ignored at runtime.)
  */
 interface ServerRenderFunction extends RenderFunctionMarker {
   (props?: any, railsContext?: RailsContext): RenderFunctionResult;
