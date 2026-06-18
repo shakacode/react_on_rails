@@ -129,6 +129,50 @@ describe('BoundedLRU', () => {
     lru.set('c', 'C'); // cap 2 -> evicts LRU; 'a' is no longer pinned
     expect(lru.has('a')).toBe(false);
   });
+
+  it('setPinned: a new key inserted into an all-pinned full cache is not self-evicted', () => {
+    // Regression guard for the pin-before-evict race: with a plain `set` then
+    // `pin`, inserting a key into a cache whose every entry is already pinned
+    // would run eviction first and delete the just-inserted (still-unpinned)
+    // key — the only evictable candidate — before the pin landed. `setPinned`
+    // pins before eviction, so the new key survives.
+    const cap = 3;
+    const { lru, evicted } = makeLRU(cap);
+
+    // Fill to cap and pin every entry (simulating `cap` in-flight initial loads).
+    for (let i = 0; i < cap; i += 1) {
+      lru.setPinned(`p${i}`, `P${i}`);
+    }
+    expect(lru.has('p0')).toBe(true);
+    expect(lru.has('p1')).toBe(true);
+    expect(lru.has('p2')).toBe(true);
+
+    // Insert a (cap+1)-th in-flight key. With the old set+pin order this key
+    // would be evicted immediately; with setPinned it must survive and the
+    // map is allowed to temporarily exceed the cap.
+    lru.setPinned('p3', 'P3');
+    expect(lru.has('p3')).toBe(true);
+    expect(evicted).not.toContain('p3');
+
+    // Releasing one earlier pin lets the cache reconcile back toward the cap by
+    // evicting that now-unpinned, least-recently-used key — never the still-
+    // pinned newest key.
+    lru.unpin('p0');
+    expect(lru.has('p0')).toBe(false);
+    expect(evicted).toContain('p0');
+    expect(lru.has('p3')).toBe(true);
+  });
+
+  it('setPinned keeps pin and map in sync: no orphan pin when the key is absent', () => {
+    // setPinned only pins once the key is live in the map, so a later unpin
+    // fully clears the pin and the key becomes evictable as normal.
+    const { lru, evicted } = makeLRU(1);
+    lru.setPinned('a', 'A');
+    lru.unpin('a'); // count -> 0, 'a' no longer protected
+    lru.set('b', 'B'); // cap 1 -> 'a' is evictable now
+    expect(lru.has('a')).toBe(false);
+    expect(evicted).toContain('a');
+  });
 });
 
 (getNodeVersion() >= 18 ? describe : describe.skip)('RSCProvider bounded LRU cache (#3564)', () => {
@@ -563,5 +607,91 @@ describe('BoundedLRU', () => {
 
     // The UI must keep showing the initial successful payload (v1), not blank.
     await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('id 0 v1'));
+  });
+
+  it('h. 51+ concurrent in-flight initial loads: the newest is not self-evicted before it settles', async () => {
+    // Regression guard for the pin-before-evict race (chatgpt-codex P2): when
+    // more initial loads are in flight than the cap, every cached key is
+    // pinned. Inserting the (cap+1)-th still-in-flight key must not let
+    // `set()`'s eviction choose that just-inserted (still-unpinned) key as the
+    // only evictable candidate. `setPinned` pins before eviction, so the newest
+    // key survives the burst.
+    //
+    // The survival invariant is asserted via FETCH COUNT: if the newest key
+    // were self-evicted on insertion, a later render would miss and re-fetch
+    // it (count 2). It stays at exactly 1 fetch, proving it was never evicted.
+    // (The deterministic data-structure proof lives in the `setPinned` unit
+    // test above; this exercises the same path end-to-end through RSCProvider.)
+    process.env.NODE_ENV = 'production';
+
+    type Deferred = {
+      promise: Promise<React.ReactNode>;
+      resolve: (v: React.ReactNode) => void;
+      reject: (err: unknown) => void;
+    };
+    const makeDeferred = (): Deferred => {
+      let resolve!: (v: React.ReactNode) => void;
+      let reject!: (err: unknown) => void;
+      const promise = new Promise<React.ReactNode>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+
+    type PendingEntry = Deferred & { args: GetServerComponentArgs };
+    const pending: PendingEntry[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      pending.push({ ...d, args: _args[0] });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    // `lastId` is the (cap+1)-th distinct key — started LAST while every
+    // earlier in-flight key is still pinned, so it is the key the old
+    // set-then-pin order would have self-evicted.
+    const lastId = CACHE_CAP;
+
+    // Mount CACHE_CAP "early" routes (ids 0..CACHE_CAP-1) plus the tracked
+    // `lastId` route, all under one provider but each in its OWN Suspense
+    // boundary. Resolve NONE yet, so all CACHE_CAP+1 loads are simultaneously
+    // in-flight (and pinned).
+    const Root: React.FC = () => (
+      <RSCProvider>
+        {Array.from({ length: CACHE_CAP + 1 }, (_, id) => (
+          <Suspense key={id} fallback={<div>loading…</div>}>
+            <RSCRoute componentName="Card" componentProps={{ id }} />
+          </Suspense>
+        ))}
+      </RSCProvider>
+    );
+
+    await renderInAct(<Root />);
+    // All CACHE_CAP+1 distinct initial loads fired, all still in-flight and
+    // pinned — the cache temporarily holds CACHE_CAP+1 entries.
+    expect(getServerComponent).toHaveBeenCalledTimes(CACHE_CAP + 1);
+
+    // KEY ASSERTION: the (cap+1)-th key (lastId) was fetched exactly once and
+    // was NOT self-evicted at insertion time. With the old set-then-pin order,
+    // inserting lastId into a cache whose other CACHE_CAP entries are all
+    // pinned would run eviction first and drop lastId (the only unpinned
+    // candidate) immediately; the next render that reads it would then re-fetch
+    // (count 2). `setPinned` pins lastId before eviction, so it survives.
+    expect(fetchCount(lastId)).toBe(1);
+    // Its in-flight promise is still the single live entry for that key — no
+    // eviction-driven re-fetch occurred.
+    const lastPending = pending.filter(
+      (d) => !d.args.enforceRefetch && (d.args.componentProps as { id: number }).id === lastId,
+    );
+    expect(lastPending).toHaveLength(1);
+
+    // Now drain every in-flight load so the cache reconciles back toward cap
+    // and no unsettled promises leak into later tests.
+    await act(async () => {
+      pending
+        .filter((d) => !d.args.enforceRefetch)
+        .forEach((d, i) => d.resolve(<span>{`payload ${i}`}</span>));
+    });
   });
 });

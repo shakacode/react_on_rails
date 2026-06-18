@@ -81,6 +81,13 @@ export const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
  *    payload is recorded in `lastSuccessfulRSCPromisesRef` (which is used to
  *    restore the last-good view in `recoverOnError` refetch paths).
  *
+ * Inserting an in-flight promise uses `setPinned`, which pins BEFORE running
+ * eviction so the just-inserted key can never be chosen as the eviction victim
+ * even when every other key is already pinned (a pure `set` then `pin` would
+ * let `evictIfNeeded` drop the new unpinned key first). When every key is
+ * pinned the map is allowed to temporarily exceed `maxEntries`; the matching
+ * `unpin` reconciles it.
+ *
  * No external LRU dependency exists for this synchronous provider cache (the
  * repo's `InMemoryLRUCacheHandler` is an async `CacheHandler` tied to
  * `CacheEntry`), so this minimal helper mirrors that same Map-based pattern.
@@ -121,6 +128,27 @@ export class BoundedLRU<V> {
     // Re-insert so an existing key moves to most-recently-used.
     this.map.delete(key);
     this.map.set(key, value);
+    this.evictIfNeeded();
+  }
+
+  /**
+   * Insert (or refresh) `key` and pin it atomically — the pin is registered
+   * BEFORE eviction runs. This is required when inserting an in-flight promise
+   * into an already-full cache whose every other key is pinned: a plain `set`
+   * would run `evictIfNeeded` with the just-inserted (still-unpinned) key as
+   * the ONLY evictable candidate and delete it immediately, leaving an orphan
+   * pin and breaking last-successful tracking for that mounted route. Pinning
+   * first makes the new key un-evictable, so the map is allowed to temporarily
+   * exceed `maxEntries` (reconciled by the matching `unpin`). The pin is still
+   * registered only after the key is live in the map, so no orphan pin can
+   * outlive an absent map entry.
+   */
+  setPinned(key: string, value: V): void {
+    // Re-insert so an existing key moves to most-recently-used.
+    this.map.delete(key);
+    this.map.set(key, value);
+    // Pin before eviction so the new key cannot be the eviction victim.
+    this.pin(key);
     this.evictIfNeeded();
   }
 
@@ -218,6 +246,15 @@ export const createRSCProvider = ({
     // reads as a hit. When a least-recently-used key is evicted, its companion
     // entries are removed too so nothing leaks. Eviction only affects cold keys
     // beyond the cap; the common bounded case is byte-for-byte unchanged.
+    //
+    // The LRU (and its `onEvict` closure) is created once, on the first render
+    // where `fetchRSCPromisesRef.current` is null, and never recreated. That is
+    // safe even though `onEvict` closes over `lastSuccessfulRSCPromisesRef`,
+    // `refetchVersionsRef`, `startTransition`, `setVersions`, and
+    // `setSuccessfulVersions`: refs are accessed via `.current` at call time
+    // (always current), and the state setters / `startTransition` are
+    // guaranteed stable by React across renders. So there is no stale-closure
+    // risk from not recreating `onEvict` on re-renders.
     const fetchRSCPromisesRef = useRef<BoundedLRU<Promise<ReactNode>> | null>(null);
     if (!fetchRSCPromisesRef.current) {
       fetchRSCPromisesRef.current = new BoundedLRU<Promise<ReactNode>>(
@@ -300,27 +337,31 @@ export const createRSCProvider = ({
         // would see a stale (evicted) entry and skip recording last-successful,
         // leaving `recoverOnError` with nothing to restore after a failed
         // refetch. Unpinned in `.finally()` once the initial fetch settles.
-        // Pin is placed after `set` (same invariant as refetchComponent): the
-        // key is live in the map before the pin is registered, so there is no
-        // window where a phantom pin could permanently block eviction.
         //
-        // `let` + deferred assignment is required: the closure inside `.then`
-        // captures `promise` to call `markSuccessfulPromise(key, promise)` for
-        // the identity check — a self-referential pattern that needs `let`.
-        let promise: Promise<ReactNode>;
-        // eslint-disable-next-line prefer-const
+        // `setPinned` inserts and pins atomically (pin registered before
+        // eviction): when 51+ initial loads start before any settle, a plain
+        // `set` would run eviction with this just-inserted, still-unpinned key
+        // as the only evictable candidate (every other key is pinned) and drop
+        // it immediately. Pinning before eviction prevents that.
+        //
+        // `let promise!` + deferred assignment is required: the marker closure
+        // below references `promise` to call `markSuccessfulPromise(key,
+        // promise)` for the identity check — a self-referential pattern that
+        // needs `let` (mirrors `refetchComponent`, which defines its
+        // `restoreLastSuccessfulPromise` closure before assigning `promise`).
+        let promise!: Promise<ReactNode>;
+        const markPayloadIfSuccessful = (payload: ReactNode) => {
+          if (!(payload instanceof Error)) {
+            markSuccessfulPromise(key, promise);
+          }
+          return payload;
+        };
         promise = getServerComponent({ componentName, componentProps })
-          .then((payload: ReactNode) => {
-            if (!(payload instanceof Error)) {
-              markSuccessfulPromise(key, promise);
-            }
-            return payload;
-          })
+          .then(markPayloadIfSuccessful)
           .finally(() => {
             fetchRSCPromises.unpin(key);
           });
-        fetchRSCPromises.set(key, promise);
-        fetchRSCPromises.pin(key);
+        fetchRSCPromises.setPinned(key, promise);
         return promise;
       },
       [fetchRSCPromises, markSuccessfulPromise],
@@ -376,13 +417,12 @@ export const createRSCProvider = ({
           .finally(() => {
             fetchRSCPromises.unpin(key);
           });
-        // Set the promise in the cache before pinning so that `pin` and the
-        // LRU map entry are always in sync. If the code between here and `set`
-        // were to throw, an orphan pin count would permanently block eviction
-        // of that key. Moving `pin` after `set` eliminates that risk: the pin
-        // is only registered once the key is live in the map.
-        fetchRSCPromises.set(key, promise);
-        fetchRSCPromises.pin(key);
+        // `setPinned` inserts and pins atomically (pin registered before
+        // eviction, but only once the key is live in the map). This both keeps
+        // `pin` and the map entry in sync — no orphan pin if a future throw
+        // path were added — and prevents the refetch's new promise from being
+        // the eviction victim when the cache is already full of pinned keys.
+        fetchRSCPromises.setPinned(key, promise);
         startTransition(() => {
           setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
         });
