@@ -923,10 +923,10 @@ module ReactOnRails
         # Resolve the bundler via using_rspack?. shakapacker.yml doesn't exist yet at this point,
         # so the fresh-install default applies: an unset --rspack flag resolves to Rspack when
         # Shakapacker supports it (shakapacker_version_9_or_higher? is optimistically true on a
-        # brand-new install where Shakapacker isn't loaded yet). An explicit --no-rspack still
-        # selects Webpack. using_rspack? memoizes, so the rest of the run (e.g.
-        # configure_rspack_in_shakapacker) stays consistent with this decision.
-        shakapacker_install_env = using_rspack? ? { "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" } : {}
+        # brand-new install where Shakapacker isn't loaded yet). Pass the resolved choice explicitly
+        # so Shakapacker installs dependencies for the same bundler that React on Rails configures.
+        assets_bundler = using_rspack? ? "rspack" : "webpack"
+        shakapacker_install_env = { "SHAKAPACKER_ASSETS_BUNDLER" => assets_bundler }
         success = Bundler.with_unbundled_env do
           system(shakapacker_install_env, "bundle exec rails shakapacker:install")
         end
