@@ -226,7 +226,6 @@ the server.
 3. **Turbopack is not a competitor you can adopt** — it's welded to Next's framework (the
    `crates/next-core`/`next-api` layer _is_ the RSC implementation). The transferable idea is
    **turbo‑tasks‑style function‑level incrementality**; the transferable _reality_ for RoR is \*\*rspack
-
    - SWC\*\*, which gets most of the speed without leaving the webpack‑compatible world Shakapacker
      depends on.
 
