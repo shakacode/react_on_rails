@@ -873,13 +873,12 @@ describe('ClientRenderer', () => {
           {} as IntersectionObserver,
         );
       }).not.toThrow();
-      // prepareRenderError mutates renderError.message after the first console.error call; both
-      // recorded argument references point to the same (now-mutated) object. Verify the spy was
-      // called twice with the error object, and that the mutation happened as expected.
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
-      expect(consoleErrorSpy).toHaveBeenNthCalledWith(1, renderError);
-      expect(consoleErrorSpy).toHaveBeenNthCalledWith(2, renderError);
-      // originalMessage was recorded before the callback mutated it; verify the mutation did occur.
+      // The deferred render error is logged exactly once (inside prepareRenderError) with the original
+      // error object; reportRenderError no longer logs a second, redundant entry.
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(renderError);
+      // originalMessage was captured before the message was mutated; verify the mutation did occur so
+      // the ReactOnRails-prefixed message (pointing at the logged original) is applied.
       expect(originalMessage).toBe('scheduled render boom');
       expect(renderError.message).toBe(
         'ReactOnRails encountered an error while rendering component: TestComponent. See above error message.',
@@ -953,6 +952,63 @@ describe('ClientRenderer', () => {
       );
 
       consoleErrorSpy.mockRestore();
+    });
+
+    it('re-observes a visible root that is detached and later reattached', () => {
+      type ObserverCallback = ConstructorParameters<typeof IntersectionObserver>[0];
+      const observerInstances: Array<{
+        callback: ObserverCallback;
+        disconnect: jest.Mock;
+        observe: jest.Mock;
+      }> = [];
+
+      class MockIntersectionObserver {
+        callback: ObserverCallback;
+
+        disconnect = jest.fn();
+
+        observe = jest.fn();
+
+        constructor(callback: ObserverCallback) {
+          this.callback = callback;
+          observerInstances.push(this);
+        }
+      }
+
+      Object.defineProperty(globalThis, 'IntersectionObserver', {
+        configurable: true,
+        value: MockIntersectionObserver,
+      });
+
+      const targetNode = setupScheduledComponentDom('hydrate-visible-reattach', 'visible');
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+
+      // First schedule: observer #1 observes the node, nothing hydrates yet.
+      renderComponent('hydrate-visible-reattach');
+      expect(observerInstances).toHaveLength(1);
+      expect(mockHydrateOrRender).not.toHaveBeenCalled();
+
+      // Detach the SAME node (e.g. Turbo cache restore / DOM move), then reattach it unchanged.
+      targetNode.remove();
+      document.body.appendChild(targetNode);
+
+      // Re-running renderComponent on the reattached node must NOT hit the "already rendered" skip
+      // path (the scheduled entry never mounted); it must cancel the stale schedule and re-observe.
+      expect(() => renderComponent('hydrate-visible-reattach')).not.toThrow();
+      expect(observerInstances).toHaveLength(2);
+      // The stale observer from the first schedule was cancelled.
+      expect(observerInstances[0].disconnect).toHaveBeenCalledTimes(1);
+      expect(observerInstances[1].observe).toHaveBeenCalledWith(targetNode);
+      expect(mockHydrateOrRender).not.toHaveBeenCalled();
+
+      // The fresh observer now drives hydration when the node becomes visible.
+      observerInstances[1].callback(
+        [
+          { isIntersecting: true, intersectionRatio: 1, target: targetNode },
+        ] as unknown as IntersectionObserverEntry[],
+        observerInstances[1] as unknown as IntersectionObserver,
+      );
+      expect(mockHydrateOrRender).toHaveBeenCalledTimes(1);
     });
   });
 

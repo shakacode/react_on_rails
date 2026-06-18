@@ -221,6 +221,12 @@ function scheduleHydration(hydrateOn: HydrateOnMode, domNode: Element, callback:
   return () => {};
 }
 
+// Logs the original error (preserving its untouched message and stack), then mutates and returns it
+// with a ReactOnRails-prefixed message that points readers at the just-logged original. The original
+// error is logged exactly once here so callers must NOT log the returned error again — doing so would
+// emit a second, redundant entry holding the same (now-mutated) reference. `raiseRenderError` throws
+// the returned error (its message references the logged original); `reportRenderError` only relies on
+// this single log.
 function prepareRenderError(componentName: string, error: unknown): Error {
   const renderError = error as Error;
   console.error(renderError);
@@ -233,7 +239,8 @@ function raiseRenderError(componentName: string, error: unknown): never {
 }
 
 function reportRenderError(componentName: string, error: unknown): void {
-  console.error(prepareRenderError(componentName, error));
+  // prepareRenderError already logged the original error; do not log again (avoids the double-log).
+  prepareRenderError(componentName, error);
 }
 
 // Result of attempting renderer delegation. Core carries the raw RendererResult (which may still be
@@ -367,10 +374,15 @@ function renderElement(el: Element, railsContext: RailsContext): void {
       // (e.g., for asynchronously loaded content)
       const existing = renderedRoots.get(domNodeId);
       if (existing) {
-        // Only skip if it's the exact same DOM node and it's still connected to the document.
-        // If the node was replaced (e.g., via innerHTML or Turbo), we need to unmount the old
-        // root and re-render to the new node to prevent memory leaks and ensure rendering works.
-        const sameNode = existing.domNode === domNode && existing.domNode.isConnected;
+        // Only skip if it's the exact same DOM node, it's still connected to the document, AND it has
+        // actually mounted. A `scheduled` entry has not mounted yet: if its node was detached and later
+        // reattached (e.g. Turbo cache restore or a DOM move), its IntersectionObserver was disconnected
+        // and will never re-observe, so we must fall through to cancel the stale schedule and re-schedule
+        // fresh rather than skip (which would leave the island permanently non-interactive).
+        // If the node was replaced (e.g., via innerHTML or Turbo), we likewise need to unmount/cancel the
+        // old entry and re-render to the new node to prevent memory leaks and ensure rendering works.
+        const sameNode =
+          existing.kind !== 'scheduled' && existing.domNode === domNode && existing.domNode.isConnected;
         if (sameNode) {
           if (trace) {
             console.log(`Skipping already rendered component: ${name} (dom id: ${domNodeId})`);

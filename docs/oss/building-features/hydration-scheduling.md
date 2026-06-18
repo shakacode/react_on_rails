@@ -53,7 +53,7 @@ Because the HTML is already present, this works well for content that should be 
 
 For `prerender: false`, the container stays empty until React renders. Prefer server rendering when users should see meaningful content before hydration.
 
-For `hydrate_on: :visible`, an empty zero-size client-only container cannot be reliably observed by `IntersectionObserver`. React on Rails renders that root on the next tick instead of leaving it permanently unmounted. If you need true viewport-based deferral for a client-only root, reserve layout space for the container or use `hydrate_on: :idle`.
+For `hydrate_on: :visible`, an empty zero-size client-only container cannot be reliably observed by `IntersectionObserver`. React on Rails renders that root in a macrotask via `setTimeout(fn, 0)` instead of leaving it permanently unmounted. If you need true viewport-based deferral for a client-only root, reserve layout space for the container or use `hydrate_on: :idle`.
 
 ## Turbo and Turbolinks Cleanup
 
