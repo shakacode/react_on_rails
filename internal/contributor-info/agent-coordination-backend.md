@@ -230,10 +230,14 @@ public pointer carries only the contract:
 
 - The backend exposes a phase value (`beta` | `rc` | `final`) keyed by release
   line / target branch. Read it from the machine-readable `agent-coord` status
-  output for the PR's target branch. A missing entry (no published phase for the
-  line) is equivalent to `beta` — there is no separate `none` value. The private backend README,
-  `agent-coord --help`, and `agent-coord config show --json` are authoritative
-  for the exact field and subcommand if they differ from this pointer.
+  output for the PR's target branch. There is no separate `none` value; a missing
+  entry (no published phase for that line) means "no explicit override is
+  published", so derive the phase from the target branch exactly as in the
+  backend-UNKNOWN fallback below (`main` -> `beta`; `release/*` -> `rc`, or
+  `final` in `final-release` mode). A missing entry must never down-gate a
+  `release/*` target to `beta`. The private backend README, `agent-coord --help`,
+  and `agent-coord config show --json` are authoritative for the exact field and
+  subcommand if they differ from this pointer.
 - Treat the published phase as available only when `agent-coord doctor` and
   `agent-coord status` exit 0, exactly as for claim and heartbeat state.
   Otherwise report the phase as `UNKNOWN` and use the `AGENTS.md` fallback:

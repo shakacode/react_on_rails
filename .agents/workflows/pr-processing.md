@@ -151,11 +151,14 @@ Worker path:
 
 1. Determine the PR's target branch and resolve its phase. Prefer the published
    phase from `agent-coord` status for that branch (available only when
-   `agent-coord doctor` and `agent-coord status` exit 0). If the backend is
-   `UNKNOWN`, derive it: `main` -> `beta`; `release/*` -> `rc`, or `final` when
-   the applicable tracker is in `final-release` mode (the only machine-readable
-   signal in the fallback path; the promotion freeze is normally published via
-   `agent-coord`, which is the tool that is unavailable here).
+   `agent-coord doctor` and `agent-coord status` exit 0). If the backend is up
+   but has no published phase entry for that line, derive the phase from the
+   target branch (the same rule below); never treat a missing entry as `beta` for
+   a `release/*` target. If the backend is `UNKNOWN`, derive it: `main` ->
+   `beta`; `release/*` -> `rc`, or `final` when the applicable tracker is in
+   `final-release` mode (the only machine-readable signal in the fallback path;
+   the promotion freeze is normally published via `agent-coord`, which is the
+   tool that is unavailable here).
 2. Apply that phase's gate: `beta` (target `main`) is lowest — confidence note +
    green required checks. `rc` (target `release/*`) adds adversarial-pr-review and
    requires zero open MUST-FIX, and only stabilizing fixes belong on `release/*`.

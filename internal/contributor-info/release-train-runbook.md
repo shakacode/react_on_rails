@@ -80,8 +80,12 @@ the auto-merge automation _within_ a phase. See
 ## Runbook
 
 The git mechanics below were validated end-to-end with a local dry-run (see
-[Dry-run](#dry-run-validate-the-mechanics)). Worked examples use `17.0.0` because the repo is on
-`v17.0.0.rc.3` as this runbook lands; substitute the real target.
+[Dry-run](#dry-run-validate-the-mechanics)).
+
+> **Note:** Worked examples use the concrete version `17.0.0` (and branch `release/17.0.0`, tags
+> `v17.0.0.rc.N` / `v17.0.0`) for clarity, because the repo is on `v17.0.0.rc.3` as this runbook lands.
+> Substitute your actual target version everywhere you see `17.0.0` / `release/17.0.0` / `v17.0.0*`; the
+> generic form is `X.Y.Z`.
 
 ### 1. Cut the RC onto `release/X.Y.Z`
 
@@ -174,12 +178,25 @@ this is the only code change between the good RC and the final:
 bundle exec rake "release[17.0.0]"   # version.rb rc.3 -> 17.0.0, tags v17.0.0, publishes
 ```
 
-The invariant that makes this safe (verified by the dry-run): the **final's code tree equals the last
-good RC's code tree** — only `version.rb` and `CHANGELOG.md` differ. Untested commits that landed on
-`main` after the cut are **not** in the final.
+> **Blocker — release task is `main`-only for stable versions.** As of this writing
+> `rakelib/release.rake` aborts a stable (non-prerelease) `release[X.Y.Z]` unless the current branch is
+> `main` (the `is_prerelease || current_branch == "main"` guard), and it exposes no branch override.
+> Running the command above from `release/X.Y.Z` will therefore abort. Promoting an RC to its stable
+> tag from the ephemeral release branch requires a follow-up change to `release.rake` to allow stable
+> releases from `release/*` (or an equivalent supported final-promotion path). Until that lands, the
+> final stable `release[...]` must be cut from `main` at the promoted commit, which conflicts with the
+> "promote that RC, do not re-cut from `main`" invariant — treat this as a maintainer decision before
+> running a real final promotion.
+
+The invariant that makes this safe (verified by the dry-run): the **final's runtime code tree equals
+the last good RC's** — only version/changelog **metadata** differs, never runtime source. Under unified
+versioning the release task bumps several version artifacts in one commit (the gem `version.rb`, the Pro
+gem version, every workspace `package.json`, and any lockfiles it updates) plus `CHANGELOG.md`. Untested
+commits that landed on `main` after the cut are **not** in the final.
 
 ```bash
-# Should show only version.rb + CHANGELOG.md:
+# Expect only version/changelog metadata — version.rb, the Pro version file, package.json files,
+# lockfiles, and CHANGELOG.md — and no runtime source (.rb/.ts/.tsx/.js under lib or src) changes:
 git diff --name-only v17.0.0.rc.3 v17.0.0
 ```
 
@@ -192,12 +209,16 @@ and publish phase `final` for the release line during the promotion freeze.
 
 ```bash
 # After v17.0.0 is published and the GitHub release exists:
-# 1. Forward-port the final CHANGELOG collapse and next-dev version bump to main:
+# 1. Forward-port the final CHANGELOG collapse to main:
 git fetch origin
 git checkout main && git pull --rebase
-git cherry-pick -x <changelog-collapse-and-release-bump-sha>  # the step-4 commit(s) that collapsed
-                                                              # the rc sections and bumped to 17.0.0
-# Then bump main to the next dev version per releasing.md (e.g. bundle exec rake bump), if applicable.
+git cherry-pick -x <changelog-collapse-sha>  # the step-4 commit that collapsed the rc sections
+                                             # into ### [17.0.0]
+# NOTE: do NOT blindly cherry-pick the version-bump commit. If main has already advanced past the
+# release version (e.g. to 17.1.0.dev), cherry-picking the bump-to-17.0.0 commit will conflict on the
+# version artifacts and would regress main's version. Only forward-port the version bump if main has
+# NOT yet been bumped past 17.0.0; otherwise resolve to keep main's newer version and take only the
+# CHANGELOG changes. Then bump main to the next dev version per releasing.md if it is not already.
 git push   # or open a PR if main is protected
 # 2. Delete the ephemeral branch — the tags are the durable record.
 git push origin --delete release/17.0.0
@@ -238,10 +259,13 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
 **Contract (public pointer):**
 
 - The backend exposes a **phase** value (`beta` | `rc` | `final`) per release line / target branch.
-  Read it from the machine-readable `agent-coord` status output for the PR's target branch. A missing
-  entry (no published phase for the line) is equivalent to `beta` — there is no separate `none` value.
-  The private backend README, `agent-coord --help`, and `agent-coord config show --json` are
-  authoritative for the exact field and subcommand if they differ from this pointer.
+  Read it from the machine-readable `agent-coord` status output for the PR's target branch. There is no
+  separate `none` value; a missing entry (no published phase for that line) means "no explicit override
+  is published" — derive the phase from the target branch exactly as in the backend-UNKNOWN fallback
+  below (`main` → `beta`; `release/*` → `rc`, or `final` in `final-release` mode). A missing entry must
+  never down-gate a `release/*` target to `beta`. The private backend README, `agent-coord --help`, and
+  `agent-coord config show --json` are authoritative for the exact field and subcommand if they differ
+  from this pointer.
 - Treat the published phase as available only when `agent-coord doctor` and `agent-coord status` exit 0,
   exactly as for claim/heartbeat state. Otherwise report the phase as `UNKNOWN` and use the fallback.
 - The **release tracker remains the human source of truth** for mode and go/no-go; the published phase
@@ -260,8 +284,9 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
    back to standard `AGENTS.md` merge qualification with a maintainer decision.
 
 Agents that act on the gate: `pr-batch`, `address-review` (nit-autonomy + MUST-FIX handling),
-`adversarial-pr-review` (required at `rc`/`final`), and `pr-processing` (the worker path). Each points
-back here and to `AGENTS.md` rather than re-deriving the table.
+`adversarial-pr-review` (required at `rc`/`final`), and `pr-processing` (the worker path). These skills
+inherit the gate indirectly from `AGENTS.md` and this runbook — they require no skill-level phase table
+of their own; each points back here and to `AGENTS.md` rather than re-deriving it.
 
 ### Phase vs. release mode
 
