@@ -12,6 +12,13 @@ retry_wait_time = 20
 # Timeout for each request
 timeout = 20
 
+# Send a browser-like User-Agent so anti-bot defenses don't return false 403s.
+# Some hosts (e.g. webaim.org) block lychee's default crawler UA via anti-bot
+# rules even though the link is live. Presenting a current Chrome UA stops these
+# false positives across all docs without per-host excludes. A genuine 403
+# (real access failure) still fails the run, so this does not hide dead links.
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
 # Exclude patterns (migrated from markdown-link-check-config.json)
 exclude = [
   # ============================================================================
