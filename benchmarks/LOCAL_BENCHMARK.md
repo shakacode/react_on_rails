@@ -31,8 +31,13 @@ schedule you control (below).
 
 On the dedicated machine:
 
-- Ruby (per [`.tool-versions`](../.tool-versions)), Node, `pnpm`, and
-  [`k6`](https://grafana.com/docs/k6/latest/set-up/install-k6/).
+- Node, `pnpm`, and [`k6`](https://grafana.com/docs/k6/latest/set-up/install-k6/).
+- Ruby: the script benchmarks under the **minimum** supported Ruby (from
+  [`.minimum.tool-versions`](../.minimum.tool-versions)), matching CI — not the repo's
+  default. (The default `.tool-versions` Ruby can be too new to boot the dummy app: Ruby 4.0
+  trips `net-imap`'s `Ractor.make_shareable` and the server exits on startup.) On a `mise`
+  machine this is automatic (the script sets `MISE_RUBY_VERSION`); otherwise make that Ruby
+  the active one before running.
 - The [`bencher`](https://bencher.dev/docs/explanation/bencher-run/) CLI on `PATH`.
 - `BENCHER_API_TOKEN` exported (for uploads). For the `pro` suite, also
   `REACT_ON_RAILS_PRO_LICENSE`.

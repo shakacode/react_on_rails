@@ -31,6 +31,15 @@ require_relative "lib/bencher_runner"
 REPO_ROOT = File.expand_path("..", __dir__)
 SERVER_PORT = 3001
 
+# Match CI, which runs benchmarks on the MINIMUM supported Ruby ("Ruby stays on minimum to
+# exercise gem compatibility"), not the repo's default. The default .tool-versions Ruby can
+# be newer than the dummy app can boot — e.g. Ruby 4.0 trips net-imap's Ractor.make_shareable
+# restriction and the server exits on startup. Setting MISE_RUBY_VERSION makes every
+# `bash -lc` subcommand below resolve Ruby to the minimum via mise. Harmless if the machine
+# doesn't use mise (see LOCAL_BENCHMARK.md for the manual fallback).
+MIN_RUBY = File.read(File.join(REPO_ROOT, ".minimum.tool-versions"))[/^ruby\s+(\S+)/, 1]
+ENV["MISE_RUBY_VERSION"] = MIN_RUBY if MIN_RUBY
+
 options = {
   testbed: "m1-bench",
   upload: true,
@@ -125,6 +134,9 @@ end
 
 web_concurrency = [cpu_count - 1, 1].max
 pro = suite.fetch(:pro_env)
+
+puts "Suite: #{suite[:suite_name]} | Ruby (app): #{MIN_RUBY || 'ambient'} | " \
+     "testbed: #{options[:testbed]} | upload: #{options[:upload]}"
 
 if options[:setup]
   log "Install JS deps + build workspace packages"
