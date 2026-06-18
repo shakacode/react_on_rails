@@ -261,11 +261,12 @@ detailed policy belongs in the canonical workflow.
 
 ## Batch Handoff Format
 
-> **Do not file a standalone handoff or audit issue.** Per `AGENTS.md` →
-> _Tracking Issues And Handoffs_: record a handoff as a comment on the relevant
-> parent tracking issue (or the agent-coordination repo if one is in use), and
-> append audits to the release audit ledger in place — never spawn a
-> `Handoff: ...` / `Post-rc.N audit` issue. Close superseded process issues on
+> **A handoff is a comment, not a new issue.** Per `AGENTS.md` → _Tracking Issues
+> And Handoffs_: record a handoff on the relevant parent tracking issue (or the
+> agent-coordination repo if one is in use), or — when there is no parent umbrella
+> — in the batch's own PR comment/description; and append point-in-time audits to
+> the standing release audit ledger in place. Never spawn a standalone
+> `Handoff: ...` or `Post-rc.N audit` issue. Close superseded process issues on
 > sight; closure follows the work, not whoever opened the tracker.
 
 <!-- Keep this handoff summary in sync with `.agents/workflows/pr-processing.md` -> `### Batch Handoff Format`. -->

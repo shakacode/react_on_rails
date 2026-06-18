@@ -504,7 +504,8 @@ Before merge or final readiness, scan the PR description for the decision log an
 > **A handoff is a comment, not a new issue.** Per `AGENTS.md` → _Tracking Issues
 > And Handoffs_: record the handoff below on the relevant parent tracking issue
 > (or the agent-coordination repo if one is in use), or in the batch's own PR
-> comment/description when there is no parent umbrella — never spawn a standalone
+> comment/description when there is no parent umbrella; and append point-in-time
+> audits to the standing release audit ledger in place. Never spawn a standalone
 > `Handoff: ...` or `Post-rc.N audit` issue. Close superseded process issues on
 > sight; closure follows the work, not whoever opened the tracker.
 
