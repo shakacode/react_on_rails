@@ -123,7 +123,7 @@ export function createTanStackRouterRenderFunction(
         clientProps: {
           __tanstackRouterDehydratedState: dehydratedState,
         },
-      })) as RenderFunctionResult;
+      }));
     }
 
     // Client-side: return a React component so React on Rails can instantiate it with props.
