@@ -27,26 +27,26 @@ Rails Pro.
 
 Same concepts, different names. Keep this handy when reading either codebase.
 
-| Concept                                 | React on Rails Pro                                                                      | Next.js (App Router)                                                     |
-| --------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| What renders the page                   | a Rails controller calling `stream_react_component`                                     | file‑system route (`page.tsx`/`layout.tsx`) → **loader tree**            |
-| RSC payload (the "order ticket")        | "RSC payload" / Flight                                                                  | "Flight" / RSC payload                                                   |
-| Inlined‑payload global                  | `window.REACT_ON_RAILS_RSC_PAYLOADS[key]`                                               | `self.__next_f`                                                          |
-| Inliner                                 | `injectRSCPayload.ts` (3 ordered buffers)                                               | `createInlinedDataReadableStream` + `continueFizzStream`                 |
-| Wire framing                            | length‑prefixed `metadata\thexlen\ncontent` NDJSON                                      | tuple pushes `push([0 \| 1 \| 2 \| 3, …])`                               |
-| Make payload (server)                   | `serverRenderRSCReactComponent` → `buildServerRenderer`                                 | `renderToNodeFlightStream` → `react-server-dom-*/server`                 |
-| Payload → HTML (SSR)                    | server bundle `createFromNodeStream`                                                    | `App` → `getFlightStream` → `createFromNodeStream`                       |
-| Hydrate from inlined payload            | `createFromPreloadedPayloads` → `createFromReadableStream`                              | drain `__next_f` → `createFromReadableStream`                            |
-| Refetch on navigation                   | `fetchRSC` → `GET /rsc_payload/:name?props=`                                            | `fetchServerResponse` → `GET ?_rsc` + `Next-Router-State-Tree`           |
-| Client‑reference manifest               | `react-client-manifest.json`                                                            | `…_client-reference-manifest.js` (`globalThis.__RSC_MANIFEST`)           |
-| SSR consumer manifest                   | `react-server-client-manifest.json`                                                     | `ssrModuleMapping` (in `__RSC_MANIFEST`)                                 |
-| The RSC bundle/graph                    | `rsc-bundle.js` (3rd webpack config)                                                    | the `rsc` **layer** (`WEBPACK_LAYERS.reactServerComponents`)             |
-| `react-server` condition                | `conditionNames: ['react-server','...']` in `rscWebpackConfig.js`                       | `should_use_react_server_condition()` / per‑layer in `webpack-config.ts` |
-| Strip `'use client'` in server graph    | `react-on-rails-rsc/WebpackLoader`                                                      | `next-flight-loader` / Rust `EcmascriptClientReferenceModule`            |
-| Discover `'use client'` + emit manifest | `react-on-rails-rsc/WebpackPlugin`                                                      | `FlightClientEntryPlugin` + `ClientReferenceManifestPlugin` (or Rust)    |
-| SSR/RSC execution host                  | the **node‑renderer** (Fastify worker pool)                                             | the Next server process (Node or Edge runtime)                           |
-| RSC runtime package                     | `react-on-rails-rsc` (vendors `react-server-dom-webpack`; +`-rspack` since 19.0.5‑rc.x) | `react-server-dom-webpack` (webpack/rspack) or `-turbopack`              |
-| Incremental dev rebuild                 | webpack/rspack HMR + `--watch` to disk                                                  | Turbopack turbo‑tasks invalidation + Node‑side HMR                       |
+| Concept                                 | React on Rails Pro                                                                 | Next.js (App Router)                                                     |
+| --------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| What renders the page                   | a Rails controller calling `stream_react_component`                                | file‑system route (`page.tsx`/`layout.tsx`) → **loader tree**            |
+| RSC payload (the "order ticket")        | "RSC payload" / Flight                                                             | "Flight" / RSC payload                                                   |
+| Inlined‑payload global                  | `window.REACT_ON_RAILS_RSC_PAYLOADS[key]`                                          | `self.__next_f`                                                          |
+| Inliner                                 | `injectRSCPayload.ts` (4 ordered buffers)                                          | `createInlinedDataReadableStream` + `continueFizzStream`                 |
+| Wire framing                            | length‑prefixed `metadata\thexlen\ncontent` NDJSON                                 | tuple pushes `push([0 \| 1 \| 2 \| 3, …])`                               |
+| Make payload (server)                   | `serverRenderRSCReactComponent` → `buildServerRenderer`                            | `renderToNodeFlightStream` → `react-server-dom-*/server`                 |
+| Payload → HTML (SSR)                    | server bundle `createFromNodeStream`                                               | `App` → `getFlightStream` → `createFromNodeStream`                       |
+| Hydrate from inlined payload            | `createFromPreloadedPayloads` → `createFromReadableStream`                         | drain `__next_f` → `createFromReadableStream`                            |
+| Refetch on navigation                   | `fetchRSC` → `GET /rsc_payload/:name?props=`                                       | `fetchServerResponse` → `GET ?_rsc` + `Next-Router-State-Tree`           |
+| Client‑reference manifest               | `react-client-manifest.json`                                                       | `…_client-reference-manifest.js` (`globalThis.__RSC_MANIFEST`)           |
+| SSR consumer manifest                   | `react-server-client-manifest.json`                                                | `ssrModuleMapping` (in `__RSC_MANIFEST`)                                 |
+| The RSC bundle/graph                    | `rsc-bundle.js` (3rd webpack config)                                               | the `rsc` **layer** (`WEBPACK_LAYERS.reactServerComponents`)             |
+| `react-server` condition                | `conditionNames: ['react-server','...']` in `rscWebpackConfig.js`                  | `should_use_react_server_condition()` / per‑layer in `webpack-config.ts` |
+| Strip `'use client'` in server graph    | `react-on-rails-rsc/WebpackLoader`                                                 | `next-flight-loader` / Rust `EcmascriptClientReferenceModule`            |
+| Discover `'use client'` + emit manifest | `react-on-rails-rsc/WebpackPlugin`                                                 | `FlightClientEntryPlugin` + `ClientReferenceManifestPlugin` (or Rust)    |
+| SSR/RSC execution host                  | the **node‑renderer** (Fastify worker pool)                                        | the Next server process (Node or Edge runtime)                           |
+| RSC runtime package                     | `react-on-rails-rsc` (vendors `react-server-dom-webpack`; +`-rspack` since 19.0.5) | `react-server-dom-webpack` (webpack/rspack) or `-turbopack`              |
+| Incremental dev rebuild                 | webpack/rspack HMR + `--watch` to disk                                             | Turbopack turbo‑tasks invalidation + Node‑side HMR                       |
 
 ---
 
@@ -64,13 +64,13 @@ Same concepts, different names. Keep this handy when reading either codebase.
         │                                             │
    ── PASS 1: RSC bundle ──                       ── PASS 1: rsc layer ──
    serverRenderRSCReactComponent                 getRSCPayload → renderToNodeFlightStream
-   react-server-dom-webpack renderToReadableStream  react-server-dom-(webpack|turbopack)
+   react-server-dom-webpack renderToPipeableStream  react-server-dom-(webpack|turbopack)
         │  Flight payload                             │  Flight payload
    ── PASS 2: server bundle ──                    ── PASS 2: ssr layer ──
    streamServerRenderedReactComponent            <App> use(getFlightStream)→createFromNodeStream
    createFromNodeStream → react-dom/server HTML  → react-dom/server HTML
         │                                             │
-   injectRSCPayload (3 buffers, ordered)         createInlinedDataReadableStream + continueFizzStream
+   injectRSCPayload (4 buffers, ordered)         createInlinedDataReadableStream + continueFizzStream
    REACT_ON_RAILS_RSC_PAYLOADS[key].push(...)    self.__next_f.push([1,"..."])
         │                                             │
    response.stream (via Async fibers, stream.rb) HTML document stream
@@ -119,29 +119,32 @@ speed; RoR's loose coupling buys "it's your Rails app, RSC is just a capability 
 
 ## 5. Bundlers head‑to‑head (the part you specifically asked about)
 
-|                                      | **webpack**                                        | **Rspack**                                                                                                                                               | **Turbopack**                                                                                 |
-| ------------------------------------ | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Language                             | JavaScript/Node                                    | Rust (SWC inside)                                                                                                                                        | Rust, on **turbo‑tasks** (SWC inside)                                                         |
-| webpack‑API compatible               | yes (the reference)                                | **yes** — near drop‑in (same loaders/plugins)                                                                                                            | **no** — own config (`turbopack.rules`), loaders only via a Node IPC shim                     |
-| Incremental granularity              | module‑level (recompile affected modules, re‑seal) | same model, Rust‑fast                                                                                                                                    | **function/task‑level** memoization (`Vc` cells), bottom‑up invalidation, cross‑session cache |
-| Plugin model                         | tapable hooks (JS)                                 | tapable + native Rust plugins                                                                                                                            | Rust crates / transitions; **webpack plugins don't port**                                     |
-| RSC integration                      | JS plugin/loader + `react-server-dom-webpack`      | reuse the Webpack plugin/loader + `react-server-dom-webpack`, **or** native `RspackPlugin`/`RspackLoader` + `react-server-dom-rspack` (RoR, 19.0.5‑rc.x) | **native Rust** + `react-server-dom-turbopack`                                                |
-| Used by React on Rails (Shakapacker) | ✅                                                 | ✅ (preferred for speed; SWC)                                                                                                                            | ❌ (Turbopack is Next‑internal)                                                               |
-| Used by Next.js                      | `--webpack` (legacy/fallback)                      | `next-rspack` (experimental)                                                                                                                             | default (`--turbopack`)                                                                       |
+|                                      | **webpack**                                        | **Rspack**                                                                                                                                          | **Turbopack**                                                                                 |
+| ------------------------------------ | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Language                             | JavaScript/Node                                    | Rust (SWC inside)                                                                                                                                   | Rust, on **turbo‑tasks** (SWC inside)                                                         |
+| webpack‑API compatible               | yes (the reference)                                | **yes** — near drop‑in (same loaders/plugins)                                                                                                       | **no** — own config (`turbopack.rules`), loaders only via a Node IPC shim                     |
+| Incremental granularity              | module‑level (recompile affected modules, re‑seal) | same model, Rust‑fast                                                                                                                               | **function/task‑level** memoization (`Vc` cells), bottom‑up invalidation, cross‑session cache |
+| Plugin model                         | tapable hooks (JS)                                 | tapable + native Rust plugins                                                                                                                       | Rust crates / transitions; **webpack plugins don't port**                                     |
+| RSC integration                      | JS plugin/loader + `react-server-dom-webpack`      | reuse the Webpack plugin/loader + `react-server-dom-webpack`, **or** native `RspackPlugin`/`RspackLoader` + `react-server-dom-rspack` (RoR, 19.0.5) | **native Rust** + `react-server-dom-turbopack`                                                |
+| Used by React on Rails (Shakapacker) | ✅                                                 | ✅ (preferred for speed; SWC)                                                                                                                       | ❌ (Turbopack is Next‑internal)                                                               |
+| Used by Next.js                      | `--webpack` (legacy/fallback)                      | `next-rspack` (experimental)                                                                                                                        | default (`--turbopack`)                                                                       |
 
 🔑 **Two findings that matter most for you:**
 
 1. **Rspack is "webpack in Rust."** In Next's own repo, enabling Rspack literally **swaps `@rspack/core`
    in where webpack is required and runs the _same_ webpack config + plugin tree** (`get-webpack-bundler.ts`,
-   gated on `NEXT_RSPACK`). This is exactly how Shakapacker treats it: same `rscWebpackConfig.js`, same
-   `react-on-rails-rsc/WebpackPlugin`/`WebpackLoader`.
+   gated on `NEXT_RSPACK`). Shakapacker treats it the same way at the config layer — same
+   `rscWebpackConfig.js` and the same `react-on-rails-rsc/WebpackLoader` under both bundlers — but the
+   Pro dummy now **selects the native `RSCRspackPlugin` (from `react-on-rails-rsc/RspackPlugin`) when
+   `assets_bundler === 'rspack'`** instead of the webpack `RSCWebpackPlugin` (see doc 03 §6.5). So the
+   _loader_ is shared; the _manifest plugin_ is bundler‑specific.
 
 2. **Rspack can reuse `react-server-dom-webpack`** — and there's no `-rspack` build in **React's
    monorepo** or **Next.js**. Because Rspack is webpack‑API‑compatible, RSC under Rspack can reuse
    **`react-server-dom-webpack`** (webpack‑shaped chunk loading via
    `__webpack_require__`/`__webpack_chunk_load__`). **Next.js independently proves this path is sound:**
    Next runs RSC under Rspack on `react-server-dom-webpack` too. _Caveat (updated):_ React on Rails
-   has gone a step further — `react-on-rails-rsc@19.0.5‑rc.x` now **also** ships a native
+   has gone a step further — `react-on-rails-rsc@19.0.5` now **also** ships a native
    `RspackPlugin`/`RspackLoader` backed by its own vendored `react-server-dom-rspack` build (the GA
    direction). So a `react-server-dom-rspack` does exist — in `react-on-rails-rsc`, not upstream.
    Turbopack still needs `react-server-dom-turbopack` because it isn't webpack‑compatible (different
@@ -217,7 +220,7 @@ the server.
    rspack with the single `react-server-dom-webpack` runtime and **no `-rspack` package** in its tree
    — validating the "rspack reuses the webpack runtime" path. React on Rails has now gone further: the
    native Rspack path (`RspackPlugin`/`RspackLoader` + vendored `react-server-dom-rspack`) **ships** in
-   `react-on-rails-rsc@19.0.5‑rc.x` as the GA direction, while the webpack‑compatible path keeps
+   `react-on-rails-rsc@19.0.5` as the GA direction, while the webpack‑compatible path keeps
    working as a fallback.
 
 3. **Turbopack is not a competitor you can adopt** — it's welded to Next's framework (the
@@ -252,6 +255,6 @@ server actions, and PPR; React on Rails Pro **bolts** RSC onto a general‑purpo
 runtime, which buys it the ability to add world‑class RSC to **any real Rails app** without giving up
 Rails. Bundler‑wise, **rspack is "webpack in Rust"** and can run RSC on the **webpack** runtime (proven by
 Next running RSC under rspack on `react-server-dom-webpack`); React on Rails additionally ships a
-native rspack path (`react-server-dom-rspack`) since `react-on-rails-rsc@19.0.5‑rc.x`. **Turbopack**
+native rspack path (`react-server-dom-rspack`) since `react-on-rails-rsc@19.0.5`. **Turbopack**
 is the one bundler that _requires_ a distinct runtime (`react-server-dom-turbopack`), purely because
 its runtime chunk‑loading primitives differ from webpack's.

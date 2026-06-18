@@ -68,7 +68,7 @@ names and file paths.
 
 | #   | Document                                              | What it answers                                                                                           | Read if you want…                                                                                              |
 | --- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 01  | **`01-ror-pro-rsc-request-flow.md`**                  | The complete browser↔Rails↔Node↔browser RSC flow in React on Rails Pro, with every real function name  | the precise call chain: helpers, node‑renderer, `injectRSCPayload`, hydration, navigation refetch, async props |
+| 01  | **`01-ror-pro-rsc-request-flow.md`**                  | The complete browser↔Rails↔Node↔browser RSC flow in React on Rails Pro, with every real function name     | the precise call chain: helpers, node‑renderer, `injectRSCPayload`, hydration, navigation refetch, async props |
 | 02  | **`02-shakapacker-dev-and-prod-builds.md`**           | Shakapacker in **dev (HMR)** vs **production**, and how the 3 RSC bundles are built/watched               | to understand the dev process set, React Refresh, the node‑renderer, and the prod precompile                   |
 | 03  | **`03-rsc-npm-package-react19-webpack-vs-rspack.md`** | **Why `react-on-rails-rsc` exists**, how it maps to **React 19 versions**, and **webpack vs rspack**      | the version‑coupling story and why rspack needs no special RSC runtime                                         |
 | 04  | **`04-nextjs-and-turbopack-deep-dive.md`**            | Next.js App Router RSC flow + the **Turbopack** (Rust) architecture, dev/HMR, and build                   | a deep, source‑grounded tour of how Next does all of this                                                      |
@@ -100,7 +100,7 @@ Suggested path:
    `-turbopack` differ only in the runtime "load chunk #47" primitive; both are pinned to an exact
    React version's private internals. That's why `react-on-rails-rsc` vendors a specific build.
    rspack can **reuse the webpack runtime** (React core and Next.js ship no `-rspack` build), but as
-   of `react-on-rails-rsc@19.0.5‑rc.x` the package **also** ships a native Rspack plugin/loader
+   of `react-on-rails-rsc@19.0.5` the package **also** ships a native Rspack plugin/loader
    backed by its own vendored `react-server-dom-rspack` (the GA direction). (doc 03 §1–2, §6.1, doc 05 §5)
 
 5. **The deep difference is ownership.** Next builds RSC **into** a Rust bundler + framework (buying
@@ -162,3 +162,10 @@ These reference repos are **not committed** to this repository. To browse the ex
 docs 03–05, clone `vercel/next.js` and `facebook/react` yourself (a shallow clone is enough). The
 original research used local checkouts under `.context/next-research/repos/`, but that path only
 exists in the author's workspace.
+
+> **Provenance / drift note.** This research was done against `vercel/next.js` at **v16.3.0‑canary
+> (June 2026)** and a contemporaneous `facebook/react` checkout. `v16.3.0‑canary` is an _unreleased_
+> snapshot and the canary train moves fast, so specific Next.js file paths and function names cited in
+> docs 04–05 may drift over time. When verifying a claim, pin your own clone to the same approximate
+> date (or a tagged release ≥ 16.3) before assuming a path has "moved"; treat the names as accurate
+> _as of_ that snapshot, not as a stable API.

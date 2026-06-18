@@ -49,7 +49,8 @@ interactive pieces aren't re‑described, they're **referenced**, because the br
 downloaded those pieces in the client bundle.
 
 🛠️ **The real thing.** The "order ticket" is React's **Flight** wire format produced by
-`react-server-dom-webpack`'s `renderToReadableStream`/`renderToPipeableStream`. Server Components are
+`react-server-dom-webpack`'s `renderToPipeableStream` (the Node‑renderer path; `renderToReadableStream`
+is the Web‑streams variant). Server Components are
 serialized as a tree of plain data; Client Components are serialized as **client references**
 (`{ id, chunks, name }`) that point into the client manifest. See
 `packages/react-on-rails-pro/src/ReactOnRailsRSC.ts` and the vendored runtime in
@@ -178,7 +179,7 @@ Inside the template, you call a helper:
   React 18.3+ `renderToPipeableStream(<MyPage/>)` runs the SSR pass. When it hits a Server Component
   boundary (`<RSCRoute>`), it calls `generateRSCPayload()` → `runOnOtherBundle(rscBundleHash, …)` →
   the **RSC bundle** runs `serverRenderRSCReactComponent(...)` →
-  `react-server-dom-webpack`'s `renderToReadableStream(<ServerComponent/>)` → **Flight payload**.
+  `react-server-dom-webpack`'s `renderToPipeableStream(<ServerComponent/>)` → **Flight payload**.
 
 ```
    server-bundle VM                         rsc-bundle VM
@@ -187,7 +188,7 @@ Inside the template, you call a helper:
         │ hits <RSCRoute>
         │ generateRSCPayload(name, props) ─runOnOtherBundle──▶ serverRenderRSCReactComponent()
         │                                                          │
-        │                                          renderToReadableStream(<ServerComp/>)
+        │                                          renderToPipeableStream(<ServerComp/>)
         │  ◀──────────── Flight payload stream ─────────────────────┘
         ▼
    HTML chunks  +  inlined Flight payload  ──▶ back to Rails ──▶ response.stream ──▶ Browser
@@ -216,7 +217,7 @@ e.g.
 `injectRSCPayload` maintains **four ordered buffers** and flushes them in a strict order so the
 browser never tries to use a payload that hasn't arrived:
 
-```
+```text
    1) rscInitializationBuffers   →  <script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})[key]||=[]</script>
    2) rscClientStylesheetBuffers →  <link rel="stylesheet" href="…" data-precedence="rsc-css">
    3) htmlBuffers                →  <div id="MyPage-react-component-0">…SSR HTML…</div>
@@ -269,9 +270,11 @@ page. You fetch **just a new payload**:
 - Rails side of that endpoint:
   `react_on_rails_pro/lib/react_on_rails_pro/concerns/rsc_payload_renderer.rb` →
   **`rsc_payload`** action → `stream_view_containing_react_components(template: 'rsc_payload.text.erb')`,
-  `content_type: "application/x-ndjson"`. (The HTTP `Content-Type` header is `application/x-ndjson`, but
-  the body itself uses the length‑prefixed framing described in §4.E — the client always parses it with
-  `LengthPrefixedStreamParser`, not as line‑delimited JSON.)
+  `content_type: "application/x-ndjson"`. ⚠️ The HTTP `Content-Type` header value
+  `application/x-ndjson` is a **legacy MIME label and does not describe the actual wire format**: the
+  body is **not** newline‑delimited JSON. It uses the length‑prefixed framing described in §4.E, and
+  the client always decodes it with `LengthPrefixedStreamParser` — never as line‑delimited JSON. Treat
+  the header purely as a streaming‑content hint; the framing in §4.E is authoritative.
   Route defined in `react_on_rails_pro/lib/react_on_rails_pro/routes.rb` → **`rsc_payload_route`**
   (`GET /rsc_payload_generation_url/:component_name`). Template:
   `react_on_rails_pro/app/views/react_on_rails_pro/rsc_payload.text.erb`.
@@ -279,7 +282,7 @@ page. You fetch **just a new payload**:
 ```
 User clicks ──▶ RSCRoute.refetch() ──▶ fetch(/rsc_payload/MyPage?props=…)
                                               │
-                                Rails rsc_payload action ──▶ rsc-bundle ──▶ renderToReadableStream
+                                Rails rsc_payload action ──▶ rsc-bundle ──▶ renderToPipeableStream
                                               │
                   length-prefixed Flight ◀────┘
                                               │

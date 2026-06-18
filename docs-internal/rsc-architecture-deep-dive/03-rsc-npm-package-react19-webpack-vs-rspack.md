@@ -293,8 +293,15 @@ RSC bundle able to render Server Components — and why a missing condition thro
   `RspackPlugin`/`RspackLoader` + vendored `react-server-dom-rspack` — now **ships** in the
   `19.0.5` line (the GA direction), while the webpack‑compatible path keeps working. The Pro dummy
   selects the native `RSCRspackPlugin` when `assets_bundler === 'rspack'` (webpack `RSCWebpackPlugin`
-  otherwise), and keeps the Webpack\* **loader** under both. Treat rspack‑RSC as "supported and
-  stabilizing; native plugin shipped."
+  otherwise), and keeps the Webpack\* **loader** under both. **Status caveat:** the native Rspack RSC
+  path is **not yet fully working** on the version the Pro dummy currently rides
+  (`react-on-rails-rsc@19.2.0-rc.1`): the Pro dummy's `rsc_fouc.spec.ts` and
+  `rsc_route_ssr_false.spec.ts` e2e tests **skip their Rspack RSC assertions** under
+  `SHAKAPACKER_ASSETS_BUNDLER=rspack` because the RSC content does not render (the Rspack build cannot
+  locate the client runtime, so the RSC module map is not created — tracked in `react_on_rails_rsc#105`,
+  to be unskipped at `19.2.0-rc.2`). The webpack RSC path runs those same tests. So treat native
+  rspack‑RSC as "shipping/stabilizing, but a known blocker is gated in e2e for the `19.2.0-rc.1` lane";
+  validate against the webpack path for now.
 
 ---
 
