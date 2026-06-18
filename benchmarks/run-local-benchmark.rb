@@ -178,32 +178,39 @@ if options[:setup]
   run!("bin/prod-assets", chdir: app_dir)
 
   if pro
+    prod = { "RAILS_ENV" => "production" }
     log "Prepare + seed benchmark database"
-    run!("bundle exec rails db:prepare", chdir: app_dir, env: { "RAILS_ENV" => "production" })
-    # db:prepare only seeds when it CREATES the database. On a persistent host the DB may
-    # already exist but be empty/stale, in which case /posts_page serves a healthy-looking
-    # 200 ("No posts found") and the benchmark would upload bogus metrics. Verify the tables
-    # the DB-backed routes read, the same guard CI runs after db:prepare.
+    run!("bundle exec rails db:prepare", chdir: app_dir, env: prod)
+    # db:prepare only seeds when it CREATES the database, so on a persistent host the DB can
+    # carry stale/old rows from a previous seed version or manual experimentation — which the
+    # benchmark would then measure. Reseed every run: db/seeds.rb clears and recreates
+    # deterministic, faker-free data and is designed to be re-run under production, so this is
+    # idempotent and keeps /posts_page benchmarking the current dataset.
+    run!("bundle exec rails db:seed", chdir: app_dir, env: prod)
+    # Confirm the reseed populated the tables the DB-backed routes read (same shape as the CI
+    # guard) — a fail-loud backstop so an empty DB can't pass as a healthy "No posts found" 200.
     db_guard = <<~'RUBY'
       counts = { posts: Post.count, users: User.count, comments: Comment.count }
       empty = counts.select { |_, count| count.zero? }.keys
-      abort("Benchmark DB is empty (#{empty.join(', ')}); reseed it before benchmarking " \
-            "(cd #{Dir.pwd}; RAILS_ENV=production bundle exec rails db:seed)") if empty.any?
+      abort("Benchmark DB still empty after db:seed (#{empty.join(', ')})") if empty.any?
       puts "DB seeded (#{counts.map { |table, count| "#{count} #{table}" }.join(', ')})"
     RUBY
-    run!("bundle exec rails runner #{Shellwords.escape(db_guard)}", chdir: app_dir,
-                                                                    env: { "RAILS_ENV" => "production" })
+    run!("bundle exec rails runner #{Shellwords.escape(db_guard)}", chdir: app_dir, env: prod)
   end
 else
   log "Skipping setup (--no-setup); reusing the existing build"
 end
 
 # Server env mirrors the CI suite. No taskset: it's Linux-only and absent on macOS, so the
-# server runs unpinned (the dedicated machine has no competing load anyway).
+# server runs unpinned (the dedicated machine has no competing load anyway). PORT is pinned to
+# SERVER_PORT (bin/prod honors an ambient PORT/RAILS_PORT) so the server can't land on a
+# different port than the one this runner probes and benchmarks.
 server_env = {
   "WEB_CONCURRENCY" => web_concurrency.to_s,
   "RAILS_MAX_THREADS" => "3",
-  "RAILS_MIN_THREADS" => "3"
+  "RAILS_MIN_THREADS" => "3",
+  "PORT" => SERVER_PORT.to_s,
+  "RAILS_PORT" => SERVER_PORT.to_s
 }
 server_env["REACT_ON_RAILS_PRO_LICENSE"] = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", "") if pro
 
@@ -224,6 +231,9 @@ begin
 
   log "Run #{suite[:suite_name]} benchmark"
   FileUtils.mkdir_p(results_dir)
+  # Drop any prior payload so the post-run existence check can't pass on a stale file if this
+  # run exits 0 without writing fresh metrics (e.g. k6 metrics MISSING -> no BMF written).
+  FileUtils.rm_f(benchmark_json)
   bench_env = {
     "PRO" => pro.to_s,
     "BASE_URL" => "localhost:#{SERVER_PORT}",
