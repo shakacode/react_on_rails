@@ -780,7 +780,7 @@ Use the 15-minute rule from `AGENTS.md`: if another short local check would like
 
 ### Local-vs-CI parity (blind spots)
 
-"Lint/tests pass locally" is not the same as "CI is green." Two classes of gap recur and are worth an
+"Lint/tests pass locally" is not the same as "CI is green." Three classes of gap recur and are worth an
 explicit check before claiming readiness:
 
 - **Repo-wide gates are invisible to changed-files-only checks.** Linting just your diff (e.g.
