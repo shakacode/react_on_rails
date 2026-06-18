@@ -106,6 +106,14 @@ Then tag and publish the first RC from the release branch, following the mechani
 bundle exec rake "release[17.0.0.rc.0]"   # bumps version.rb, tags v17.0.0.rc.0, publishes
 ```
 
+> **Caveat — the release task's CI gate evaluates `origin/main`, not the release branch.**
+> `rakelib/release.rake` runs `validate_main_ci_status!`, which fetches and evaluates `origin/main`
+> HEAD's CI status, regardless of the branch you release from. Cutting an RC from `release/X.Y.Z`
+> therefore only proves `main` is green, not the release-branch tip. Until the release task gains an
+> explicit release-branch CI gate, manually confirm the `release/X.Y.Z` tip's CI is green (e.g. via
+> `gh pr checks` / `gh run list --branch release/X.Y.Z`) before publishing the RC. Track this as a
+> release-task follow-up alongside the stable-promotion `main`-only guard noted in step 4.
+
 A maintainer opens (or updates) the release tracker per [`rc-testing-plan.md`](rc-testing-plan.md) and
 sets the mode to `accelerated-rc` or `strict-rc`. Publish the phase as `rc` for this release line so
 agents pick up the RC gate automatically (see [Phase-tiered merge gating](#phase-tiered-merge-gating)).
