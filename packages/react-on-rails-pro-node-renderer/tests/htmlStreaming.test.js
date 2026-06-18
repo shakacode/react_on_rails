@@ -273,8 +273,10 @@ describe('html streaming', () => {
       const chunksWithError = jsonChunks.filter((chunk) => chunk.hasErrors);
       expect(chunksWithError).toHaveLength(1);
       expect(chunksWithError[0].isShellReady).toBeTruthy();
+      // The error message is enriched by the RSC bundle diagnostic: it includes the original
+      // error message plus context (component name, module path, etc.) from rscDiagnostics.ts.
       expect(chunksWithError[0].renderingError).toMatchObject({
-        message: 'Async error from AsyncHelloWorldHooks',
+        message: expect.stringContaining('Async error from AsyncHelloWorldHooks'),
         stack: expect.stringMatching(
           /Error: Async error from AsyncHelloWorldHooks\s*at AsyncHelloWorldHooks/,
         ),
