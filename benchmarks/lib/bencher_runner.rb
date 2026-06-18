@@ -19,10 +19,11 @@ class BencherRunner
   PROJECT_SLUG = "react-on-rails-t8a9ncxo"
   private_constant :PROJECT_SLUG
   # Bencher testbed: the runner/hardware identity that segments a benchmark's baseline
-  # series. GitHub-hosted shared runners are the default. The self-hosted runner workflow
-  # (#4073) overrides this via BENCHER_TESTBED so its dedicated-hardware (arm64) numbers
-  # build their own baseline instead of being compared against — and polluting — the
-  # shared-runner series, whose values are not comparable across different hardware.
+  # series. GitHub-hosted shared runners are the default. The local benchmark runner
+  # (benchmarks/run-local-benchmark.rb, #4073) overrides this via BENCHER_TESTBED so its
+  # dedicated-hardware (arm64) numbers build their own baseline instead of being compared
+  # against — and polluting — the shared-runner series, whose values are not comparable
+  # across different hardware.
   DEFAULT_TESTBED = "github-actions"
   private_constant :DEFAULT_TESTBED
   MAX_SAMPLE = "64" # String because it is passed verbatim as a CLI argument.
@@ -77,9 +78,9 @@ class BencherRunner
     warn stderr
   end
 
-  # The Bencher testbed to report under. BENCHER_TESTBED lets the self-hosted runner
-  # workflow (#4073) build its own baseline series; unset everywhere else, so the
-  # GitHub-hosted runs keep reporting to the shared default testbed.
+  # The Bencher testbed to report under. BENCHER_TESTBED lets the local benchmark runner
+  # (benchmarks/run-local-benchmark.rb, #4073) build its own baseline series; unset everywhere
+  # else, so the GitHub-hosted runs keep reporting to the shared default testbed.
   def testbed
     ENV.fetch("BENCHER_TESTBED", DEFAULT_TESTBED)
   end

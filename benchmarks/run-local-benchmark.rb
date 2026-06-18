@@ -86,9 +86,10 @@ if suite[:server_kind] != "rails"
 end
 
 # Fail fast on upload prerequisites BEFORE the long build + benchmark, so a missing token or
-# CLI doesn't waste a full dedicated-hardware run that can't be recorded.
+# CLI doesn't waste a full dedicated-hardware run that can't be recorded. Treat an empty string
+# as unset (BENCHER_API_TOKEN= would otherwise pass and only fail at upload).
 if options[:upload]
-  abort "BENCHER_API_TOKEN is not set; export it or pass --no-upload." unless ENV["BENCHER_API_TOKEN"]
+  abort "BENCHER_API_TOKEN is not set; export it or pass --no-upload." if ENV["BENCHER_API_TOKEN"].to_s.empty?
   abort "bencher CLI not found on PATH; install it or pass --no-upload." if `command -v bencher`.strip.empty?
 end
 
@@ -135,17 +136,17 @@ def run!(command, chdir: REPO_ROOT, env: {})
   raise "command failed (#{$CHILD_STATUS.exitstatus}): #{command}" unless success
 end
 
-def wait_for_server(pid)
+def wait_for_port(pid, port, label)
   attempt = 0
   while attempt < 30
-    raise "server (pid #{pid}) exited during startup" unless process_alive?(pid)
-    return if port_open?(SERVER_PORT)
+    raise "#{label} (pid #{pid}) exited during startup" unless process_alive?(pid)
+    return if port_open?(port)
 
     attempt += 1
-    puts "  attempt #{attempt}/30: server not ready yet..."
+    puts "  attempt #{attempt}/30: #{label} (port #{port}) not ready yet..."
     sleep 1
   end
-  raise "server failed to start within 30s"
+  raise "#{label} failed to start within 30s"
 end
 
 def port_open?(port)
@@ -164,6 +165,12 @@ end
 
 web_concurrency = [cpu_count - 1, 1].max
 pro = suite.fetch(:pro_env)
+
+# Fail fast (before the long build) if the pro suite is missing its license: the server would
+# otherwise boot with an empty license and die mid-startup with a cryptic error.
+if pro && ENV["REACT_ON_RAILS_PRO_LICENSE"].to_s.empty?
+  abort "REACT_ON_RAILS_PRO_LICENSE is required for the pro suite; export it first."
+end
 
 puts "Suite: #{suite[:suite_name]} | Ruby (app): #{MIN_RUBY || 'ambient'} | " \
      "testbed: #{options[:testbed]} | upload: #{options[:upload]}"
@@ -231,7 +238,7 @@ if pro
   server_env["REACT_RENDERER_URL"] = "http://localhost:#{RENDERER_PORT}"
 end
 
-# Reject a pre-existing listener BEFORE spawning: otherwise wait_for_server's port check
+# Reject a pre-existing listener BEFORE spawning: otherwise wait_for_port's check
 # could pass against a stale server/dev process and the benchmark would measure (and upload)
 # the wrong app. On a persistent host this is a real hazard. Pro also needs the renderer port.
 abort "Port #{SERVER_PORT} is already in use — stop the other server/dev process first." if port_open?(SERVER_PORT)
@@ -246,7 +253,10 @@ begin
   # `rails server` as a child (core) or starts overmind/foreman managing rails + node-renderer
   # (pro), so a TERM to the leader alone would orphan those children or block.
   server_pid = Process.spawn(server_env, "bin/prod", chdir: app_dir, pgroup: true)
-  wait_for_server(server_pid)
+  wait_for_port(server_pid, SERVER_PORT, "Rails server")
+  # Pro starts the node renderer concurrently; wait for it too so the benchmark doesn't hit a
+  # not-yet-ready renderer and record skewed (cold/erroring) numbers.
+  wait_for_port(server_pid, RENDERER_PORT, "node renderer") if pro
   puts "✅ server ready (pid #{server_pid})"
 
   log "Run #{suite[:suite_name]} benchmark"
@@ -307,14 +317,15 @@ start_point_args = if branch == "main"
                      ["--start-point", "main", "--start-point-clone-thresholds", "--start-point-reset"]
                    end
 ENV["BENCHER_TESTBED"] = options[:testbed]
+# BencherRunner#run already echoes the CLI's stderr, so don't print it again here.
 result = BencherRunner.new(benchmark_json:, report_json:).run(branch:, start_point_args:)
-warn result.stderr unless result.stderr.empty?
 
 if result.report&.regression?
   # A regression means the measurement worked, not that the run failed. BencherRunner passes
   # --err, so result.exit_code is non-zero on any alert — but the default (trend) mode should
   # still succeed and just record the point. Only the explicit --fail-on-alert gate fails.
-  warn "::warning:: Bencher flagged a performance regression for #{suite[:suite_name]}."
+  # (Plain message, not a ::warning:: workflow command — this is a local script.)
+  warn "⚠️  Bencher flagged a performance regression for #{suite[:suite_name]}."
   exit(options[:fail_on_alert] ? 1 : 0)
 end
 
