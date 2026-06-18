@@ -46,7 +46,7 @@ RSpec.describe BencherRunner do
       expect(args.each_cons(2)).to include(["--testbed", "github-actions"])
     end
 
-    it "reports to BENCHER_TESTBED when set (self-hosted runner override)" do
+    it "reports to BENCHER_TESTBED when set (local benchmark runner override)" do
       allow(ENV).to receive(:fetch).and_call_original
       allow(ENV).to receive(:fetch).with("BENCHER_TESTBED", "github-actions").and_return("m1-bench")
 

@@ -291,10 +291,32 @@ ensure
     rescue Errno::ESRCH
       nil
     end
-    begin
-      Process.wait(server_pid)
-    rescue Errno::ECHILD
-      nil
+    # Bound the reap: a server that ignores TERM (or a wedged child holding the group open)
+    # would otherwise hang Process.wait forever and leave the runner stuck after the
+    # benchmark. Poll for the child against a deadline, then escalate to KILL and reap so no
+    # zombie is left behind.
+    reaped = false
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
+    until reaped || Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+      begin
+        reaped = !Process.wait(server_pid, Process::WNOHANG).nil?
+      rescue Errno::ECHILD
+        reaped = true # Already reaped (or never a child) — nothing left to wait on.
+      end
+      sleep 0.2 unless reaped
+    end
+    unless reaped
+      warn "Server (pid #{server_pid}) did not exit within 10s of TERM; sending KILL."
+      begin
+        Process.kill("KILL", -server_pid)
+      rescue Errno::ESRCH
+        nil
+      end
+      begin
+        Process.wait(server_pid)
+      rescue Errno::ECHILD
+        nil
+      end
     end
   end
 end
@@ -335,6 +357,9 @@ end
 
 # Bencher also exits non-zero on a stale/filtered alert (one it still lists but that is not a
 # current regression). That is not a failure — match track_benchmarks.rb and treat it as
-# success. A non-zero exit with NO alert at all is a genuine operational failure (auth/CLI).
-exit 0 if result.exit_code != 0 && result.report&.filtered_alert?
+# success. The `!regression?` guard mirrors track_benchmarks.rb's normalized_bencher_exit_code
+# and keeps the --fail-on-alert gate above authoritative: a real regression already exited
+# (honoring --fail-on-alert), so this branch can never swallow one. A non-zero exit with NO
+# alert at all is a genuine operational failure (auth/CLI) and propagates unchanged.
+exit 0 if result.exit_code != 0 && result.report&.filtered_alert? && !result.report.regression?
 exit result.exit_code
