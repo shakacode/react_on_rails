@@ -191,6 +191,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
 
     // Verify the component rendered with the RSC data
     expect(allHtml).toContain('rsc-content');
+    // payload.length includes the length-prefix framing overhead (header + hex + newline + content)
     expect(allHtml).toContain(`RSC payload: ${payload.length} bytes`);
 
     // Verify RSC payload initialization and data scripts are embedded
