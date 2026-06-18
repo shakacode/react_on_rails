@@ -46,6 +46,106 @@ type RSCContextType = {
 const RSCContext = createContext<RSCContextType | undefined>(undefined);
 
 /**
+ * Maximum number of distinct RSC payload keys the provider-scoped promise cache
+ * retains. High-cardinality `componentProps` (e.g. per-row or per-search-query
+ * routes) would otherwise grow the cache unbounded for the provider's whole
+ * lifetime. When the cap is exceeded the least-recently-used key is evicted
+ * along with all of its companion bookkeeping (last-successful promise and
+ * refetch version). The common case — a small, stable set of routes — never
+ * hits the cap, so cache hits, refetch, and recoverOnError restore are
+ * unaffected. See https://github.com/shakacode/react_on_rails/issues/3564.
+ *
+ * NOTE: the per-key `useSyncExternalStore` subscription/fan-out optimization
+ * from #3564 is intentionally deferred pending profiling; only eviction is
+ * implemented here.
+ */
+const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
+
+/**
+ * A tiny insertion-ordered LRU over a `Map`. `get`/`has` and `set` move the key
+ * to the most-recently-used position (end of the Map). When `set` pushes the
+ * size past `maxEntries`, the least-recently-used key (front of the Map) is
+ * evicted and passed to `onEvict` so callers can drop companion state keyed by
+ * the same payload key. A key can be temporarily `pin`-ned so an in-flight
+ * refetch is never evicted out from under its own `restoreLastSuccessfulPromise`.
+ *
+ * No external LRU dependency exists for this synchronous provider cache (the
+ * repo's `InMemoryLRUCacheHandler` is an async `CacheHandler` tied to
+ * `CacheEntry`), so this minimal helper mirrors that same Map-based pattern.
+ */
+class BoundedLRU<V> {
+  private map = new Map<string, V>();
+
+  private pinned = new Set<string>();
+
+  constructor(
+    private readonly maxEntries: number,
+    private readonly onEvict: (key: string) => void,
+  ) {}
+
+  has(key: string): boolean {
+    return this.map.has(key);
+  }
+
+  /** Read without affecting recency — for identity checks on in-flight promises. */
+  peek(key: string): V | undefined {
+    return this.map.get(key);
+  }
+
+  get(key: string): V | undefined {
+    const value = this.map.get(key);
+    if (value === undefined || !this.map.has(key)) {
+      return undefined;
+    }
+    // Re-insert to mark most-recently-used.
+    this.map.delete(key);
+    this.map.set(key, value);
+    return value;
+  }
+
+  set(key: string, value: V): void {
+    // Re-insert so an existing key moves to most-recently-used.
+    this.map.delete(key);
+    this.map.set(key, value);
+    this.evictIfNeeded();
+  }
+
+  delete(key: string): void {
+    this.map.delete(key);
+    this.pinned.delete(key);
+  }
+
+  /** Prevent `key` from being evicted until `unpin` is called (in-flight refetch). */
+  pin(key: string): void {
+    this.pinned.add(key);
+  }
+
+  unpin(key: string): void {
+    this.pinned.delete(key);
+    // A key may have been kept past the cap while pinned; reconcile now.
+    this.evictIfNeeded();
+  }
+
+  private evictIfNeeded(): void {
+    while (this.map.size > this.maxEntries) {
+      let evicted: string | undefined;
+      for (const candidate of this.map.keys()) {
+        if (!this.pinned.has(candidate)) {
+          evicted = candidate;
+          break;
+        }
+      }
+      // Every remaining key is pinned (in-flight); stop and let unpin reconcile.
+      if (evicted === undefined) {
+        return;
+      }
+      this.map.delete(evicted);
+      this.onEvict(evicted);
+    }
+  }
+}
+
+/**
  * Creates a provider context for React Server Components.
  *
  * RSCProvider is a foundational component that:
@@ -70,8 +170,11 @@ export const createRSCProvider = ({
   getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<ReactNode>;
 }) => {
   return ({ children }: { children: ReactNode }) => {
-    const fetchRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
-    // TODO(#3564): add LRU/TTL eviction for high-cardinality provider caches.
+    // Companion bookkeeping keyed by the same RSC payload key as the promise
+    // cache. These are dropped in lockstep when a key is evicted from the LRU so
+    // eviction cannot orphan/leak a key's last-successful promise or refetch
+    // version. (`versions`/`successfulVersions` state is cleaned via the same
+    // `onEvict` path below.)
     const lastSuccessfulRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
     const refetchVersionsRef = useRef<Record<string, number>>({});
     // `versions` is a per-cache-key counter held in React state. Bumping it on
@@ -82,6 +185,42 @@ export const createRSCProvider = ({
     const [successfulVersions, setSuccessfulVersions] = useState<Record<string, number>>({});
     const [, startTransition] = useTransition();
 
+    // Bounded promise cache (#3564): the authoritative cache `getComponent`
+    // reads as a hit. When a least-recently-used key is evicted, its companion
+    // entries are removed too so nothing leaks. Eviction only affects cold keys
+    // beyond the cap; the common bounded case is byte-for-byte unchanged.
+    const fetchRSCPromisesRef = useRef<BoundedLRU<Promise<ReactNode>> | null>(null);
+    if (!fetchRSCPromisesRef.current) {
+      fetchRSCPromisesRef.current = new BoundedLRU<Promise<ReactNode>>(
+        RSC_PAYLOAD_CACHE_MAX_ENTRIES,
+        (evictedKey) => {
+          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+          delete lastSuccessfulRSCPromisesRef.current[evictedKey];
+          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+          delete refetchVersionsRef.current[evictedKey];
+          // Drop the version-state companions for the evicted key. Done outside
+          // React's render via a microtask so eviction (which happens during a
+          // render-phase cache write) never triggers a state update mid-render.
+          const dropVersionState = (prev: Record<string, number>) => {
+            if (!(evictedKey in prev)) {
+              return prev;
+            }
+            const next = { ...prev };
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+            delete next[evictedKey];
+            return next;
+          };
+          queueMicrotask(() => {
+            startTransition(() => {
+              setVersions(dropVersionState);
+              setSuccessfulVersions(dropVersionState);
+            });
+          });
+        },
+      );
+    }
+    const fetchRSCPromises = fetchRSCPromisesRef.current;
+
     const getRefetchVersion = useCallback((componentName: string, componentProps: unknown) => {
       const key = createRSCPayloadKey(componentName, componentProps);
       return refetchVersionsRef.current[key] ?? 0;
@@ -89,7 +228,7 @@ export const createRSCProvider = ({
 
     const markSuccessfulPromise = useCallback(
       (key: string, promise: Promise<ReactNode>, notifyRoutes = false) => {
-        if (fetchRSCPromisesRef.current[key] !== promise) {
+        if (fetchRSCPromises.peek(key) !== promise) {
           return;
         }
 
@@ -102,14 +241,15 @@ export const createRSCProvider = ({
           setSuccessfulVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
         });
       },
-      [startTransition],
+      [fetchRSCPromises, startTransition],
     );
 
     const getComponent = useCallback(
       (componentName: string, componentProps: unknown) => {
         const key = createRSCPayloadKey(componentName, componentProps);
-        if (key in fetchRSCPromisesRef.current) {
-          return fetchRSCPromisesRef.current[key];
+        const cached = fetchRSCPromises.get(key);
+        if (cached !== undefined) {
+          return cached;
         }
 
         let promise!: Promise<ReactNode>;
@@ -120,27 +260,31 @@ export const createRSCProvider = ({
           return payload;
         };
         promise = getServerComponent({ componentName, componentProps }).then(markPayloadIfSuccessful);
-        fetchRSCPromisesRef.current[key] = promise;
+        fetchRSCPromises.set(key, promise);
         return promise;
       },
-      [markSuccessfulPromise],
+      [fetchRSCPromises, markSuccessfulPromise],
     );
 
     const refetchComponent = useCallback(
       (componentName: string, componentProps: unknown, recoverOnError?: boolean) => {
         const key = createRSCPayloadKey(componentName, componentProps);
         refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
+        // Pin the key for the duration of the in-flight refetch so a burst of
+        // intervening cold fetches cannot evict it (and its last-successful
+        // companion) out from under restoreLastSuccessfulPromise. Unpinned in a
+        // `finally` once the refetch settles.
+        fetchRSCPromises.pin(key);
         let promise!: Promise<ReactNode>;
         const restoreLastSuccessfulPromise = () => {
-          if (fetchRSCPromisesRef.current[key] !== promise) {
+          if (fetchRSCPromises.peek(key) !== promise) {
             return;
           }
 
           if (key in lastSuccessfulRSCPromisesRef.current) {
-            fetchRSCPromisesRef.current[key] = lastSuccessfulRSCPromisesRef.current[key];
+            fetchRSCPromises.set(key, lastSuccessfulRSCPromisesRef.current[key]);
           } else {
-            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-            delete fetchRSCPromisesRef.current[key];
+            fetchRSCPromises.delete(key);
           }
 
           startTransition(() => {
@@ -173,14 +317,17 @@ export const createRSCProvider = ({
               }
               throw error;
             },
-          );
-        fetchRSCPromisesRef.current[key] = promise;
+          )
+          .finally(() => {
+            fetchRSCPromises.unpin(key);
+          });
+        fetchRSCPromises.set(key, promise);
         startTransition(() => {
           setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
         });
         return promise;
       },
-      [markSuccessfulPromise, startTransition],
+      [fetchRSCPromises, markSuccessfulPromise, startTransition],
     );
 
     // `versions` and `successfulVersions` intentionally refresh this context.
