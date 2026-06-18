@@ -55,7 +55,46 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-          fetch-depth: 1
+          # fetch-depth: 0 is required so the merge commit's parents are real
+          # (a shallow checkout grafts the tip and hides its parents, which would
+          # break base-SHA derivation below).
+          fetch-depth: 0
+
+      - name: Determine base SHA from the PR merge commit
+        id: base-sha
+        env:
+          MERGE_SHA: ${{ github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # For pull_request events github.sha is the ephemeral merge commit
+          # (refs/pull/N/merge): the PR head merged into the base-branch tip. The
+          # PR-head sizes are built from this merge commit, so the base sizes must be
+          # built from its FIRST PARENT to share the exact same base-branch baseline.
+          #
+          # Using the live base tip (github.event.pull_request.base.sha) instead lets
+          # the two builds drift apart whenever the PR branch is behind the base
+          # branch: unrelated growth that landed on the base branch gets mis-attributed
+          # to the PR, producing uniform false-positive size increases across every
+          # tracked bundle (including OSS bundles the PR never touched).
+          if [ "$MERGE_SHA" = "$HEAD_SHA" ]; then
+            echo "::error::Bundle size check needs a mergeable PR: github.sha equals the PR head, so no merge commit exists (the branch likely conflicts with the base branch). Rebase / resolve conflicts and re-run."
+            exit 1
+          fi
+          read -ra parents <<< "$(git rev-list --parents -n 1 "$MERGE_SHA")"
+          # parents[0] = merge commit, [1] = first parent (base), [2] = second parent (head)
+          if [ "${#parents[@]}" -ne 3 ]; then
+            echo "::error::Expected github.sha ($MERGE_SHA) to be a 2-parent merge commit, found $(( ${#parents[@]} - 1 )) parent(s); cannot determine a matching base baseline. Ensure this job checks out with fetch-depth: 0."
+            exit 1
+          fi
+          base_sha="${parents[1]}"
+          head_parent="${parents[2]}"
+          if [ "$head_parent" != "$HEAD_SHA" ]; then
+            echo "::error::Merge commit second parent ($head_parent) does not match the PR head ($HEAD_SHA); unexpected merge structure."
+            exit 1
+          fi
+          echo "base-sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "Base baseline (merge commit first parent): $base_sha"
+          echo "PR head        (merge commit second parent): $head_parent"
 
       - name: Read runtime versions
         id: tool-versions
@@ -72,12 +111,15 @@ jobs:
       - name: Save size-limit config
         run: cp .size-limit.json /tmp/size-limit-config.json
 
-      # 2. Get base branch sizes.
+      # 2. Get base branch sizes from the merge commit's first parent so the base
+      #    and PR-head builds share the same base-branch baseline (see base-sha step).
       - name: Checkout base branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ steps.base-sha.outputs.base-sha }}
           persist-credentials: false
+          # fetch-depth: 0 so the (possibly older) base parent commit is fetchable.
+          fetch-depth: 0
 
       - name: Copy size-limit config to base branch
         run: cp /tmp/size-limit-config.json .size-limit.json
