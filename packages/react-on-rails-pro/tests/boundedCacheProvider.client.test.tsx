@@ -32,6 +32,24 @@ type GetServerComponentArgs = {
   enforceRefetch?: boolean;
 };
 
+// A hand-resolvable promise, shared by the integration tests that need to drive
+// fetch resolution order deterministically.
+type Deferred = {
+  promise: Promise<React.ReactNode>;
+  resolve: (v: React.ReactNode) => void;
+  reject: (err: unknown) => void;
+};
+
+const makeDeferred = (): Deferred => {
+  let resolve!: (v: React.ReactNode) => void;
+  let reject!: (err: unknown) => void;
+  const promise = new Promise<React.ReactNode>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
 // Focused unit tests for the eviction primitive. These pin down the
 // ref-counted-pin fix deterministically, independent of React render timing.
 describe('BoundedLRU', () => {
@@ -154,13 +172,52 @@ describe('BoundedLRU', () => {
     expect(lru.has('p3')).toBe(true);
     expect(evicted).not.toContain('p3');
 
-    // Releasing one earlier pin lets the cache reconcile back toward the cap by
-    // evicting that now-unpinned, least-recently-used key — never the still-
-    // pinned newest key.
+    // Releasing the FIRST pin while every other entry is still pinned does NOT
+    // evict that just-unpinned key (it just settled — see the dedicated P2 test
+    // below). The cache stays temporarily over cap.
     lru.unpin('p0');
+    expect(lru.has('p0')).toBe(true);
+    expect(evicted).not.toContain('p0');
+
+    // Releasing a SECOND pin now exposes a genuinely colder unpinned key, so
+    // reconciliation evicts the least-recently-used unpinned entry (p0) and
+    // the still-pinned newest key (p3) is never the victim.
+    lru.unpin('p1');
     expect(lru.has('p0')).toBe(false);
     expect(evicted).toContain('p0');
     expect(lru.has('p3')).toBe(true);
+  });
+
+  it('unpin does not evict the just-settled key when it is the only unpinned entry (over-cap reconciliation)', () => {
+    // Regression guard for the over-cap reconciliation bug: a burst of
+    // concurrent in-flight loads pushes the cache past the cap with every key
+    // pinned. When the OLDEST in-flight key settles first and unpins, naive
+    // reconciliation would evict that just-settled key (the only unpinned, and
+    // the LRU by insertion order) — immediately discarding the payload that
+    // just loaded. `unpin` promotes the just-settled key to MRU and protects it
+    // for that reconciliation, so the cache stays temporarily over cap until a
+    // genuinely colder key becomes evictable.
+    const cap = 2;
+    const { lru, evicted } = makeLRU(cap);
+    lru.setPinned('a', 'A'); // oldest in-flight
+    lru.setPinned('b', 'B');
+    lru.setPinned('c', 'C'); // size 3 > cap 2, all pinned -> no eviction yet
+    expect(evicted).toEqual([]);
+
+    // 'a' settles first and unpins. It must NOT evict itself even though it is
+    // the only unpinned key and the LRU by insertion order.
+    lru.unpin('a');
+    expect(lru.has('a')).toBe(true);
+    expect(evicted).not.toContain('a');
+
+    // When 'b' later settles, there are now two unpinned keys (a, b). The
+    // genuinely colder one — 'a' (LRU among unpinned) — is evicted, 'c'
+    // (still pinned) survives, and the cache reconciles back to the cap.
+    lru.unpin('b');
+    expect(lru.has('a')).toBe(false);
+    expect(evicted).toContain('a');
+    expect(lru.has('b')).toBe(true);
+    expect(lru.has('c')).toBe(true);
   });
 
   it('setPinned keeps pin and map in sync: no orphan pin when the key is absent', () => {
@@ -392,21 +449,6 @@ describe('BoundedLRU', () => {
     // eviction victim here. The unit test exercises the raw eviction race.)
     process.env.NODE_ENV = 'production';
 
-    type Deferred = {
-      promise: Promise<React.ReactNode>;
-      resolve: (v: React.ReactNode) => void;
-      reject: (err: unknown) => void;
-    };
-    const makeDeferred = (): Deferred => {
-      let resolve!: (v: React.ReactNode) => void;
-      let reject!: (err: unknown) => void;
-      const promise = new Promise<React.ReactNode>((res, rej) => {
-        resolve = res;
-        reject = rej;
-      });
-      return { promise, resolve, reject };
-    };
-
     // One deferred per call so the test drives resolution order. Each deferred
     // is tagged with the call args so we can address refetches by identity
     // rather than fragile array indices (refetch fetches are queued on a
@@ -529,21 +571,6 @@ describe('BoundedLRU', () => {
     // `recoverOnError` refetch failure would find no companion to restore.
     process.env.NODE_ENV = 'production';
 
-    type Deferred = {
-      promise: Promise<React.ReactNode>;
-      resolve: (v: React.ReactNode) => void;
-      reject: (err: unknown) => void;
-    };
-    const makeDeferred = (): Deferred => {
-      let resolve!: (v: React.ReactNode) => void;
-      let reject!: (err: unknown) => void;
-      const promise = new Promise<React.ReactNode>((res, rej) => {
-        resolve = res;
-        reject = rej;
-      });
-      return { promise, resolve, reject };
-    };
-
     type PendingEntry = Deferred & { args: GetServerComponentArgs };
     const pending: PendingEntry[] = [];
     getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
@@ -623,21 +650,6 @@ describe('BoundedLRU', () => {
     // (The deterministic data-structure proof lives in the `setPinned` unit
     // test above; this exercises the same path end-to-end through RSCProvider.)
     process.env.NODE_ENV = 'production';
-
-    type Deferred = {
-      promise: Promise<React.ReactNode>;
-      resolve: (v: React.ReactNode) => void;
-      reject: (err: unknown) => void;
-    };
-    const makeDeferred = (): Deferred => {
-      let resolve!: (v: React.ReactNode) => void;
-      let reject!: (err: unknown) => void;
-      const promise = new Promise<React.ReactNode>((res, rej) => {
-        resolve = res;
-        reject = rej;
-      });
-      return { promise, resolve, reject };
-    };
 
     type PendingEntry = Deferred & { args: GetServerComponentArgs };
     const pending: PendingEntry[] = [];

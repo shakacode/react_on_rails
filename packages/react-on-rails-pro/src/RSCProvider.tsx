@@ -93,6 +93,8 @@ export const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
  * `CacheEntry`), so this minimal helper mirrors that same Map-based pattern.
  *
  * Exported for unit testing; not part of the public package surface.
+ *
+ * @internal
  */
 export class BoundedLRU<V> {
   private map = new Map<string, V>();
@@ -170,29 +172,57 @@ export class BoundedLRU<V> {
     if (count === undefined) {
       return;
     }
-    if (count <= 1) {
-      this.pinCounts.delete(key);
-    } else {
+    if (count > 1) {
       this.pinCounts.set(key, count - 1);
+      this.evictIfNeeded();
+      return;
     }
-    // A key may have been kept past the cap while pinned; reconcile now.
-    this.evictIfNeeded();
+
+    this.pinCounts.delete(key);
+    // The in-flight operation that held this pin just settled, so the key is
+    // now the most-recently-used. Promote it to the MRU position (only when
+    // still present; a key already deleted, e.g. by
+    // `restoreLastSuccessfulPromise`, stays absent).
+    if (this.map.has(key)) {
+      const value = this.map.get(key) as V;
+      this.map.delete(key);
+      this.map.set(key, value);
+    }
+    // Reconcile any pin-induced over-cap overflow, but protect the just-settled
+    // key from being evicted by its own `unpin`. Without this, when a burst of
+    // concurrent in-flight initial loads pushed the cache past `maxEntries` and
+    // this key (often the OLDEST insertion) is the only currently-unpinned
+    // entry, the reconciliation would evict the payload that just successfully
+    // loaded — forcing the mounted route to immediately re-fetch it. Skipping
+    // it leaves the cache temporarily over cap (bounded by the count of still
+    // in-flight pins); the next `set`/`unpin` reconciles once a genuinely
+    // colder key becomes evictable.
+    this.evictIfNeeded(key);
   }
 
   private isPinned(key: string): boolean {
     return (this.pinCounts.get(key) ?? 0) > 0;
   }
 
-  private evictIfNeeded(): void {
+  /**
+   * Evict least-recently-used unpinned keys until the map is back within
+   * `maxEntries`. `protectKey`, when given, is treated as un-evictable for this
+   * reconciliation (in addition to pinned keys) so a key that was JUST unpinned
+   * after its in-flight load settled is not evicted by its own `unpin`. If
+   * every evictable candidate is pinned or protected, the loop stops and the
+   * map is allowed to stay temporarily over cap until the next reconciliation.
+   */
+  private evictIfNeeded(protectKey?: string): void {
     while (this.map.size > this.maxEntries) {
       let evicted: string | undefined;
       for (const candidate of this.map.keys()) {
-        if (!this.isPinned(candidate)) {
+        if (candidate !== protectKey && !this.isPinned(candidate)) {
           evicted = candidate;
           break;
         }
       }
-      // Every remaining key is pinned (in-flight); stop and let unpin reconcile.
+      // Every remaining key is pinned (in-flight) or protected; stop and let a
+      // later set/unpin reconcile once a colder key becomes evictable.
       if (evicted === undefined) {
         return;
       }
