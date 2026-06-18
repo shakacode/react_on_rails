@@ -76,11 +76,17 @@ const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk
     const decoder = new TextDecoder();
 
     const flushParserOrThrow = () => {
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      // Collect warnings locally rather than reading consoleWarnSpy.mock.calls so the spy
+      // is never left active if parser.flush() throws, and so we never depend on spy
+      // bookkeeping that could shadow an unrelated outer console.warn spy.
+      const warnings: unknown[][] = [];
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation((...args) => {
+        warnings.push(args);
+      });
 
       try {
         parser.flush();
-        const incompleteStreamWarning = consoleWarnSpy.mock.calls.find(([message]) =>
+        const incompleteStreamWarning = warnings.find(([message]) =>
           String(message).includes(INCOMPLETE_LENGTH_PREFIXED_STREAM_WARNING),
         );
 
