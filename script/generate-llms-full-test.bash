@@ -141,6 +141,18 @@ Architecture overview.
 
 Also referenced inline: ![Data flow diagram](images/data-flow.svg)
 
+A PNG screenshot is not a diagram and must pass through verbatim:
+
+<p>
+  <img src="images/screenshot.png" alt="App screenshot" width="840" />
+</p>
+
+An SVG diagram with empty alt degrades to a bare marker:
+
+<p>
+  <img src="images/no-alt.svg" alt="" width="840" />
+</p>
+
 A JSX example must not be rewritten:
 
 ```jsx
@@ -301,6 +313,17 @@ test_svg_diagram_embeds_become_text_descriptions() {
   # A JSX <img> inside a fenced code block stays verbatim — it is a code
   # example, not a diagram embed.
   assert_contains "$oss" '<img src={thumbnail} alt="thumbnail" />'
+
+  # A non-SVG image (PNG screenshot) is not a diagram and passes through
+  # verbatim — only .svg embeds are rewritten.
+  assert_contains "$oss" '<img src="images/screenshot.png" alt="App screenshot" width="840" />'
+
+  # An SVG embed with empty alt degrades to a bare [Diagram] marker rather
+  # than emitting an empty description or leaving the dead <img> path behind.
+  assert_contains "$oss" "[Diagram]"
+  if printf '%s' "$oss" | grep -q "images/no-alt.svg"; then
+    fail "expected the empty-alt SVG <img> embed to collapse to a [Diagram] marker"
+  fi
 }
 
 run_test test_complete_sidebar_top_level_sections_pass_check
