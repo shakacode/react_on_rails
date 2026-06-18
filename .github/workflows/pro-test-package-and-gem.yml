@@ -286,6 +286,123 @@ jobs:
             react_on_rails_pro/spec/dummy/ssr-generated
           key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
 
+  # Additive Rspack coverage for the ExecJS-compatible Pro dummy (#4091).
+  #
+  # This fixture already carries Rspack peer deps (@rspack/cli, @rspack/core,
+  # shakapacker-rspack) and a config/rspack/rspack.config.js, but nothing in CI
+  # ever compiled it with Rspack — config/shakapacker.yml hardcodes
+  # `assets_bundler: webpack`, so Rspack regressions in this fixture went
+  # undetected. This job compiles the fixture's test bundles with Rspack by
+  # overriding SHAKAPACKER_ASSETS_BUNDLER=rspack (no shakapacker.yml edit needed:
+  # the env var wins over the YAML default, exactly as the OSS bundler matrix and
+  # the Pro rspack-rsc runtime gate already do). It is a new, additive leg and is
+  # not a required-status gate, so it does not affect the existing webpack path.
+  build-execjs-dummy-rspack-bundles:
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_pro_tests == 'true'
+    runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      SHAKAPACKER_ASSETS_BUNDLER: rspack
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          bundler-version: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
+          # https://github.com/nodejs/node/issues/56010
+          node-version-file: .tool-versions
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "pnpm version: "; pnpm --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
+
+      - name: Verify React 18 resolution for ExecJS-compatible dummy
+        working-directory: .
+        run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
+
+      - name: Install Ruby Gems for ExecJS-compatible dummy app
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/execjs-compatible-dummy
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          install-libyaml: 'false'
+
+      - name: Build ExecJS-compatible dummy test bundles with Rspack
+        # shell: bash gives `bash -eo pipefail`; set -o pipefail is explicit belt-and-suspenders so a
+        # nonzero bin/shakapacker exit is not masked by the `tee` pipe. SHAKAPACKER_ASSETS_BUNDLER=rspack
+        # (job env) overrides config/shakapacker.yml's webpack default and selects config/rspack/rspack.config.js.
+        shell: bash
+        run: |
+          set -o pipefail
+          cd spec/execjs-compatible-dummy
+          rm -rf public/packs-test
+          RAILS_ENV="test" NODE_ENV="test" ./bin/shakapacker 2>&1 | tee "$RUNNER_TEMP/execjs-rspack-build.log"
+
+      - name: Verify ExecJS-compatible dummy bundles were built with Rspack
+        # Guard against a silent bundler fallback. Shakapacker logs
+        # "[Shakapacker] Completed <bundler> build" based on the resolved bundler, which is driven by
+        # SHAKAPACKER_ASSETS_BUNDLER. Matching the rspack log line confirms the leg actually compiled with
+        # Rspack rather than silently falling back to webpack and still going green. Mirrors the OSS
+        # dummy-app-bundler-tests.yml guard. (The build step's set -o pipefail handles compile failure.)
+        run: |
+          log="$RUNNER_TEMP/execjs-rspack-build.log"
+          if [ ! -s "$log" ]; then
+            echo "::error::Build log $log is missing or empty - the build step did not produce a log."
+            exit 1
+          fi
+          if ! grep -qF "[Shakapacker] Completed rspack build" "$log"; then
+            echo "::error::Expected an 'rspack' build, but Shakapacker did not report completing one. The leg may have silently used a different bundler."
+            exit 1
+          fi
+          echo "Confirmed: ExecJS-compatible dummy test bundles built with rspack."
+
+      - name: Verify Rspack test bundles were emitted
+        run: test -s spec/execjs-compatible-dummy/public/packs-test/manifest.json
+
   # Jest unit tests for Pro package
   package-js-tests:
     needs:
