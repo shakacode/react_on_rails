@@ -111,6 +111,7 @@ When you consume an unreleased build, bump the related packages **together** so
 versions stay compatible:
 
 - `react_on_rails` (gem)
+- `react-on-rails` (npm)
 - `react_on_rails_pro` (gem)
 - `react-on-rails-pro-node-renderer` (npm)
 - `react-on-rails-rsc` (npm), if you use React Server Components — see
