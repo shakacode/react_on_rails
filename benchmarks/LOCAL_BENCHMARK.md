@@ -64,14 +64,16 @@ BENCHER_API_TOKEN=… REACT_ON_RAILS_PRO_LICENSE=… \
 ruby benchmarks/run-local-benchmark.rb core --no-setup --no-upload
 ```
 
-Options: `--testbed NAME` (default `m1-bench`), `--[no-]upload`, `--fail-on-alert`,
-`--[no-]setup`, `--duration`, `--rate`, `--connections`. See `--help`.
+Options: `--testbed NAME` (default `m1-bench`), `--branch NAME`, `--[no-]upload`,
+`--fail-on-alert`, `--[no-]setup`, `--duration`, `--rate`, `--connections`. See `--help`.
 
 The script reuses the CI building blocks (no duplicated benchmark logic): per-suite config
 from `generate_matrix.rb`, the dummy app's `bin/prod*` for the build + server, `bench.rb` for
 the measurement, and `lib/bencher_runner.rb` for the upload (same tuned thresholds, with the
-testbed overridden via `BENCHER_TESTBED`). It always reports to the testbed's `main` series —
-this machine benchmarks merged `main`, so its history is one clean dedicated-hardware trend.
+testbed overridden via `BENCHER_TESTBED`). It reports under the **checked-out git ref** (branch
+name, or tag/SHA when detached) unless `--branch` overrides it: a nightly `main` run feeds the
+dedicated main trend, while an RC tag or feature branch forms its own series instead of
+polluting that baseline.
 
 **Supported suites:** `core`, `pro` (rails + k6). The `pro-node-renderer` suite needs extra
 steps (renderer cache pre-seed, a separate server + vegeta target) and is deferred — run it

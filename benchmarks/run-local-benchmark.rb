@@ -54,6 +54,7 @@ parser = OptionParser.new do |opts|
   opts.banner = "Usage: ruby benchmarks/run-local-benchmark.rb SUITE [options]\n  " \
                 "SUITE: core | pro   (node-renderer is deferred; run it in CI)"
   opts.on("--testbed NAME", "Bencher testbed to report to (default: m1-bench)") { |v| options[:testbed] = v }
+  opts.on("--branch NAME", "Bencher branch/series (default: the checked-out git ref)") { |v| options[:branch] = v }
   opts.on("--[no-]upload", "Upload results to Bencher (default: on; needs BENCHER_API_TOKEN)") do |v|
     options[:upload] = v
   end
@@ -80,6 +81,13 @@ if suite[:server_kind] != "rails"
   abort "Suite #{suite_id.inspect} (#{suite[:server_kind]}) is not supported by the local runner yet; run it in CI."
 end
 
+# Fail fast on upload prerequisites BEFORE the long build + benchmark, so a missing token or
+# CLI doesn't waste a full dedicated-hardware run that can't be recorded.
+if options[:upload]
+  abort "BENCHER_API_TOKEN is not set; export it or pass --no-upload." unless ENV["BENCHER_API_TOKEN"]
+  abort "bencher CLI not found on PATH; install it or pass --no-upload." if `command -v bencher`.strip.empty?
+end
+
 app_dir = File.join(REPO_ROOT, suite.fetch(:app_directory))
 bench_script = File.join(REPO_ROOT, suite.fetch(:benchmark_script))
 # bench.rb hardcodes OUTDIR="bench_results" relative to its CWD, and runs from the repo
@@ -98,6 +106,19 @@ end
 
 def log(message)
   puts "\n=== #{message} ==="
+end
+
+# The git ref being benchmarked, used as the Bencher branch/series so a non-main checkout
+# (an RC tag, a feature branch) never lands in — and pollutes — the dedicated main baseline.
+# Branch name when on a branch; tag name for a detached tag checkout; short SHA otherwise.
+def git_ref
+  branch = `git -C #{Shellwords.escape(REPO_ROOT)} symbolic-ref --short -q HEAD`.strip
+  return branch unless branch.empty?
+
+  tag = `git -C #{Shellwords.escape(REPO_ROOT)} describe --tags --exact-match 2>/dev/null`.strip
+  return tag unless tag.empty?
+
+  `git -C #{Shellwords.escape(REPO_ROOT)} rev-parse --short HEAD`.strip
 end
 
 # Run a command, streaming output, raising on failure. Returns nothing.
@@ -235,14 +256,13 @@ unless options[:upload]
   exit 0
 end
 
-log "Upload to Bencher (testbed #{options[:testbed]})"
-ENV.fetch("BENCHER_API_TOKEN") do
-  abort "BENCHER_API_TOKEN is not set; export it or pass --no-upload."
-end
-# The local runner always reports to the testbed's own `main` series (no PR/branch logic):
-# this machine benchmarks merged main, so its history is a single dedicated-hardware trend.
+branch = options[:branch] || git_ref
+log "Upload to Bencher (testbed #{options[:testbed]}, branch #{branch})"
+# Report under the checked-out ref so a nightly main run feeds the dedicated main trend while
+# an RC/feature run forms its own series instead of polluting that baseline. (Token + CLI were
+# already verified up front.)
 ENV["BENCHER_TESTBED"] = options[:testbed]
-result = BencherRunner.new(benchmark_json:, report_json:).run(branch: "main", start_point_args: [])
+result = BencherRunner.new(benchmark_json:, report_json:).run(branch:, start_point_args: [])
 warn result.stderr unless result.stderr.empty?
 
 if result.report&.regression?
