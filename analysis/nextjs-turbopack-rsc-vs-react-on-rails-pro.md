@@ -6,11 +6,10 @@ This is a deep architecture note for understanding how Next.js App Router, React
 
 Source snapshot:
 
-- Next.js source clone: `/private/tmp/nextjs-rsc-analysis/next.js`
-- Next.js commit: `f4828c13e778dbe04c4a1e308ff29941536f091f`
-- Next.js canary context from sub-agent clone: `v16.3.0-canary.42`
-- React on Rails source: current worktree rebased onto `origin/main` at
-  `bad061fbd693356009317b4b153cc48f20393ffe`
+- Next.js source: [vercel/next.js @ f4828c1](https://github.com/vercel/next.js/tree/f4828c13e778dbe04c4a1e308ff29941536f091f)
+- Next.js canary version analyzed: `v16.3.0-canary.42`
+- React on Rails source: `main` at
+  [`bad061fbd693356009317b4b153cc48f20393ffe`](https://github.com/shakacode/react_on_rails/commit/bad061fbd693356009317b4b153cc48f20393ffe)
 - React on Rails version context: `17.0.0-rc.5`, with the default RSC generator still on the stable
   React `~19.0.4` plus `react-on-rails-rsc@19.0.5` path, and the Pro dummy/CI path soaking React
   `19.2.7` with `react-on-rails-rsc@19.2.0-rc.1`
