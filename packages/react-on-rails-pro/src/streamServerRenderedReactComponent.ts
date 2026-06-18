@@ -230,6 +230,10 @@ const streamRenderReactComponent = (
       // failure (or downstream fallout), so enriching it would risk re-attaching an unrelated RSC
       // diagnostic. Consumption in enrichWithCapturedRSCDiagnostics already prevents reuse, but this
       // gate also avoids double-reporting the same render's failure.
+      //
+      // Ordering invariant: `reportError` sets `renderState.hasErrors = true` synchronously, and
+      // `onError` runs synchronously inside React's render before this `.catch` rejection settles in a
+      // later microtask — so if `onError` reported an error, `hasErrors` is already true when read here.
       const convertedError = convertToError(e);
       const error = renderState.hasErrors ? convertedError : enrichWithCapturedRSCDiagnostics(convertedError);
       reportError(error);

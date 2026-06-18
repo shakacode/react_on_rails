@@ -239,18 +239,36 @@ describe('RSCRequestTracker', () => {
       expect(tracker.getCapturedRSCDiagnostics()).toEqual([]);
     });
 
-    it('deduplicates a diagnostic recorded twice for the same component', () => {
+    it('suppresses a true duplicate (same component name AND same message) recorded twice', () => {
       const tracker = createTracker();
-      const firstError = new Error('first');
-      const duplicateError = new Error('duplicate');
+      const firstError = new Error('boom in CommentsToggle');
+      const duplicateError = new Error('boom in CommentsToggle');
 
-      // Same component fetched in two Suspense trees fires onDiagnosticError twice.
+      // Same component fetched in two Suspense trees fires onDiagnosticError twice for the SAME
+      // failure (identical message). Only the first record is kept, so the 2+ enrichment path never
+      // lists the same component twice with the same text.
       tracker.recordRSCDiagnostic('CommentsToggle', firstError);
       tracker.recordRSCDiagnostic('CommentsToggle', duplicateError);
 
-      // Only the first record is kept, so the 2+ enrichment path never lists the same component twice.
       expect(tracker.getCapturedRSCDiagnostics()).toEqual([
         { componentName: 'CommentsToggle', diagnosticError: firstError },
+      ]);
+    });
+
+    it('retains distinct diagnostics for the same component name when the errors differ (codex P2)', () => {
+      const tracker = createTracker();
+      const firstError = new Error('boom in CommentsToggle instance A');
+      const secondError = new Error('boom in CommentsToggle instance B');
+
+      // Two instances of the same component can each fail with a DIFFERENT error. These are genuinely
+      // distinct diagnostics — deduping on component name alone would drop the second and lose error
+      // information. Both must be retained.
+      tracker.recordRSCDiagnostic('CommentsToggle', firstError);
+      tracker.recordRSCDiagnostic('CommentsToggle', secondError);
+
+      expect(tracker.getCapturedRSCDiagnostics()).toEqual([
+        { componentName: 'CommentsToggle', diagnosticError: firstError },
+        { componentName: 'CommentsToggle', diagnosticError: secondError },
       ]);
     });
 

@@ -132,12 +132,20 @@ class RSCRequestTracker {
    * @param diagnosticError - The diagnostic built by `buildRSCStreamDiagnosticError`
    */
   recordRSCDiagnostic(componentName: string, diagnosticError: Error): void {
-    // Dedup by component name: the same server component can be fetched in two Suspense trees within
-    // one render, firing `onDiagnosticError` twice for the same failure. Without this guard the 2+
-    // enrichment path would list "one of these 2 RSC components failed" naming the same component
-    // twice. `transformRSCStream` is already first-wins per stream parse, so a single payload never
-    // double-records; this guards the cross-Suspense-tree case only.
-    if (this.capturedRSCDiagnostics.some((entry) => entry.componentName === componentName)) {
+    // Suppress only *true* duplicates — same component name AND same diagnostic message. The same
+    // server component fetched in two Suspense trees within one render can fire `onDiagnosticError`
+    // twice for the identical failure; without a guard the 2+ enrichment path would list "one of
+    // these 2 RSC components failed" naming the same component twice with the same text. But two
+    // instances of the same component can also fail with *different* errors, and those are genuinely
+    // distinct diagnostics that must both be retained (codex P2) — deduping on name alone would drop
+    // the second and lose error information. Keying on name + message keeps distinct failures while
+    // collapsing exact repeats. (`transformRSCStream` is already first-wins per stream parse, so a
+    // single payload never double-records; this guards the cross-instance case only.)
+    const isDuplicate = this.capturedRSCDiagnostics.some(
+      (entry) =>
+        entry.componentName === componentName && entry.diagnosticError.message === diagnosticError.message,
+    );
+    if (isDuplicate) {
       return;
     }
     this.capturedRSCDiagnostics.push({ componentName, diagnosticError });

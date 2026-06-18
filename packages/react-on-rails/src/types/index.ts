@@ -124,7 +124,9 @@ export const assertRailsContextWithServerStreamingCapabilities: (
   // Hard-throwing on its absence would be a compat regression for those consumers even though their
   // type-check passes (the field is optional). Callers degrade gracefully when it is missing, so the
   // assertion only guards the two pre-existing required capabilities.
-  const capabilities = context as Record<string, unknown>;
+  // Cast to a Partial of the target type (rather than Record<string, unknown>) so the known
+  // capability keys stay typed while we runtime-check that each is actually a function.
+  const capabilities = context as Partial<RailsContextWithServerStreamingCapabilities>;
   if (
     typeof capabilities.getRSCPayloadStream !== 'function' ||
     typeof capabilities.addPostSSRHook !== 'function'

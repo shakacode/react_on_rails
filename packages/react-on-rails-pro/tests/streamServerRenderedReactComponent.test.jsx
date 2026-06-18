@@ -388,15 +388,31 @@ describe('streamServerRenderedReactComponent', () => {
 
   // Collects every emitted `error` event into an array so a render that surfaces multiple errors
   // (e.g. two failing Suspense boundaries) does not silently drop all but the last.
-  const collectEmittedErrors = async (renderResult) => {
+  //
+  // Guarded with a Promise.race timeout: if the stream never emits `end` (a regression that stalls
+  // the render), the helper rejects with a clear message instead of hanging until Jest's global
+  // timeout, which would surface as an opaque suite-level timeout.
+  const collectEmittedErrors = async (renderResult, timeoutMs = 5000) => {
     const emittedErrors = [];
     renderResult.on('data', () => {});
     renderResult.on('error', (error) => {
       emittedErrors.push(error);
     });
-    await new Promise((resolve) => {
+    let timeoutId;
+    const ended = new Promise((resolve) => {
       renderResult.once('end', resolve);
     });
+    const timedOut = new Promise((_resolve, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error(`collectEmittedErrors: stream did not end within ${timeoutMs}ms`)),
+        timeoutMs,
+      );
+    });
+    try {
+      await Promise.race([ended, timedOut]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
     return emittedErrors;
   };
 
