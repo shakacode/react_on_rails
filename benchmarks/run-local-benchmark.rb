@@ -126,9 +126,12 @@ def git_ref
 end
 
 # Run a command, streaming output, raising on failure. Returns nothing.
+# Clears BENCHER_API_TOKEN for the child: only the final in-process Bencher upload needs it,
+# so setup/build/benchmark subprocesses (pnpm, Rails, the app) shouldn't see the upload token.
+# (`nil` in the env hash unsets the key for the child.)
 def run!(command, chdir: REPO_ROOT, env: {})
   puts "+ (#{chdir}) #{command}"
-  success = system(env, "bash", "-lc", command, chdir:)
+  success = system({ "BENCHER_API_TOKEN" => nil }.merge(env), "bash", "-lc", command, chdir:)
   raise "command failed (#{$CHILD_STATUS.exitstatus}): #{command}" unless success
 end
 
