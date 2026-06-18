@@ -54,3 +54,29 @@ special merge gate; require only that advisory findings are complete, current,
 and triaged.
 If the PR already merged before this gate ran, include the finding in the next
 post-merge audit issue plan instead of editing GitHub state without approval.
+
+## High-Risk Mode
+
+Apply this stricter mode when a PR touches release-sensitive surfaces:
+release-candidate or version-bump changes, SSR/RSC/hydration behavior, streaming
+or asset-timing, CI/workflow/build-config, generated output, benchmark-sensitive
+code, Pro/core boundaries, or concurrent batch work. It adds three demands on top
+of the steps above; see `.agents/workflows/adversarial-pr-review.md` under
+**High-Risk Mode** for the full checklist, adversarial-question seed, the
+`pending_maintainer_action` dashboard block, and the #4047 retrospective fixture.
+
+1. **Prove the bug, then prove the fix.** When feasible, reproduce the reported
+   failure on the base (without the fix) and confirm it disappears on the current
+   head. Then check the fix waits for the _minimum_ required condition and is the
+   simplest plausible location for the invariant — not an over-broad wait or a
+   policy duplicated across layers.
+2. **Separate implementation confidence from merge-gate readiness.** Strong test
+   evidence does not mean the merge gate is satisfied.
+3. **Report merge-gate state without conflating the three approval concepts.** A
+   maintainer approval _comment_, a formal GitHub _review object_ (`reviewDecision`),
+   and the local `script/pr-merge-ledger --strict` result (`complete_allowed`) are
+   distinct. Report each separately and classify every remaining blocker by type:
+   policy gate, GitHub API state, CI/check failure, or real code concern. If a
+   plain maintainer comment is intended to suffice for a lane, that waiver must be
+   stated explicitly in the handoff — never silently treat an "approved" comment
+   as a formal review object.
