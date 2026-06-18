@@ -452,6 +452,8 @@ If the user selects skipped/declined items for rationale replies, post those rep
 
 Before committing or asking for push confirmation, run the self-review gate: review the combined fix diff for correctness bugs, style violations, and inconsistencies introduced by the fixes themselves. Fix critical issues immediately.
 
+Converge the review loop, don't chase it: every push re-triggers the configured review bots on the new head and produces a fresh batch of comments. Batch all code fixes into a single push; resolve purely advisory threads (style, dead-code, "consider…", informational, positive) in-thread with a reply — **without a new commit**, since resolving a thread does not re-trigger reviews while a push does. Never resolve a confirmed blocker by reply alone. See [Review-Loop Convergence](../../workflows/pr-processing.md#review-loop-convergence-push-amplification).
+
 When 2+ selected fixes touch different files with no logical dependency, process them in parallel if the environment supports it. Instruct parallel helpers not to commit; keep all changes unstaged until the combined diff passes the self-review gate.
 After parallel fixes complete, verify no conflicts exist between the changes by checking whether any helpers touched the same files (`git diff --name-only`).
 
