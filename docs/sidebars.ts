@@ -31,6 +31,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/create-react-on-rails-app',
         'getting-started/tutorial',
         'getting-started/installation-into-an-existing-rails-app',
+        'getting-started/consuming-an-unreleased-build',
         'getting-started/project-structure',
         'getting-started/using-react-on-rails',
         'getting-started/oss-vs-pro',
