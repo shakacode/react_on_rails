@@ -222,21 +222,26 @@ git fetch origin
 git checkout main && git pull --rebase
 git cherry-pick -x <changelog-collapse-sha>  # the step-4 commit that collapsed the rc sections
                                              # into ### [17.0.0]
-# NOTE: do NOT blindly cherry-pick the version-bump commit. If main has already advanced past the
-# release version (e.g. to 17.1.0.dev), cherry-picking the bump-to-17.0.0 commit will conflict on the
-# version artifacts and would regress main's version. Only forward-port the version bump if main has
-# NOT yet been bumped past 17.0.0; otherwise resolve to keep main's newer version and take only the
-# CHANGELOG changes. Then bump main to the next dev version per releasing.md if it is not already.
 git push   # or open a PR if main is protected
 # 2. Delete the ephemeral branch — the tags are the durable record.
 git push origin --delete release/17.0.0
 ```
 
+> **Caveat — do not blindly cherry-pick the version-bump commit.** If `main` has already advanced past the
+> release version (e.g. to `17.1.0.dev`), cherry-picking the bump-to-`17.0.0` commit will conflict on the
+> version artifacts and would regress `main`'s version. Only forward-port the version bump if `main` has
+> **not** yet been bumped past `17.0.0`; otherwise resolve to keep `main`'s newer version and take only the
+> CHANGELOG changes. Then bump `main` to the next dev version per [`releasing.md`](releasing.md) if it is
+> not already.
+
 See [`releasing.md`](releasing.md) for the next-dev version bump details.
 
 Mark the release tracker released per [`rc-testing-plan.md`](rc-testing-plan.md), and clear the
-published phase for this line (the entry is removed when the branch is deleted; absence falls back to
-`beta` per the deterministic fallback) so agents stop applying the RC/final gate.
+published phase for this line (the entry is removed when the branch is deleted) so agents stop applying
+the RC/final gate. This is consistent with the "never down-gate `release/*` to `beta`" rule: phase always
+derives from the **target branch**, and once `release/X.Y.Z` is deleted the only remaining target for this
+line is `main`, which derives to `beta` — not because the entry is absent, but because no `release/*`
+target exists anymore.
 
 ## Phase-tiered merge gating
 
@@ -244,11 +249,11 @@ The merge-gate strictness for an agent-merged PR is a **function of the target b
 This formalizes the attention-contract gating levels (#3975): maintainer attention is spent only on
 judgment; everything machine-checkable is handled autonomously with evidence.
 
-| Phase     | Target            | Agent merge gate (lowest → highest)                                                                                                                       |
-| --------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **beta**  | `main`            | **Lowest.** Confidence note + green required checks. Fast iteration; `main` may be unstable.                                                              |
-| **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`; features still allowed on `main`. |
-| **final** | `release/*` → tag | **Highest.** Only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion itself**. No confidence-only auto-merge.    |
+| Phase     | Target            | Agent merge gate (lowest → highest)                                                                                                                                                                                                        |
+| --------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **beta**  | `main`            | **Lowest.** Confidence note + green required checks. Fast iteration; `main` may be unstable.                                                                                                                                               |
+| **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`; features still allowed on `main`.                                                                                  |
+| **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial-pr-review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion itself**. No confidence-only auto-merge. |
 
 Reading the gate is mechanical:
 
@@ -293,8 +298,11 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
 
 Agents that act on the gate: `pr-batch`, `address-review` (nit-autonomy + MUST-FIX handling),
 `adversarial-pr-review` (required at `rc`/`final`), and `pr-processing` (the worker path). These skills
-inherit the gate indirectly from `AGENTS.md` and this runbook — they require no skill-level phase table
-of their own; each points back here and to `AGENTS.md` rather than re-deriving it.
+inherit the gate indirectly from `AGENTS.md` and this runbook — none carries a skill-level phase table of
+its own. `pr-batch` and `adversarial-pr-review` add a one-line pointer back here and to `AGENTS.md`;
+`address-review` and `pr-processing` inherit the same gate through the `AGENTS.md` Maintainer Attention
+Contract they already follow, so they need no additional edit. If the gate tiers ever change, update
+`AGENTS.md` and this runbook (the canonical source) rather than adding per-skill phase tables.
 
 ### Phase vs. release mode
 
