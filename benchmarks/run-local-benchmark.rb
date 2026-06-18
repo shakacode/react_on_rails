@@ -133,7 +133,9 @@ end
 def run!(command, chdir: REPO_ROOT, env: {})
   puts "+ (#{chdir}) #{command}"
   success = system({ "BENCHER_API_TOKEN" => nil }.merge(env), "bash", "-lc", command, chdir:)
-  raise "command failed (#{$CHILD_STATUS.exitstatus}): #{command}" unless success
+  # system returns nil (not false) when the command can't be exec'd at all; $CHILD_STATUS is
+  # then nil too, so guard the exitstatus lookup to keep the real failure visible.
+  raise "command failed (exit #{$CHILD_STATUS&.exitstatus || 'exec error'}): #{command}" unless success
 end
 
 def wait_for_port(pid, port, label)
@@ -161,6 +163,8 @@ def process_alive?(pid)
   true
 rescue Errno::ESRCH
   false
+rescue Errno::EPERM
+  true # Process exists but is owned by another user — still alive, just unsignalable.
 end
 
 web_concurrency = [cpu_count - 1, 1].max
