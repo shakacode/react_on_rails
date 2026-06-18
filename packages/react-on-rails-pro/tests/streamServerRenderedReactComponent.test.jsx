@@ -127,6 +127,31 @@ const DeferredThrowShell = () => (
   </main>
 );
 
+// Throws a labeled error during the deferred phase. Used to drive two independent Suspense
+// boundaries that fail in one render so we can prove the misattribution guard: the captured RSC
+// diagnostic must enrich only the first (correlated) error, not a second unrelated failure.
+const makeDeferredThrower = (message, delayMs) => async () => {
+  await new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+  throw new Error(message);
+};
+
+const FirstDeferredThrow = makeDeferredThrower('First deferred failure (correlated)', 10);
+const SecondDeferredThrow = makeDeferredThrower('Second deferred failure (unrelated)', 30);
+
+const TwoDeferredThrowShell = () => (
+  <main>
+    <h1>Header In The Shell</h1>
+    <React.Suspense fallback={<div>Loading first...</div>}>
+      <FirstDeferredThrow />
+    </React.Suspense>
+    <React.Suspense fallback={<div>Loading second...</div>}>
+      <SecondDeferredThrow />
+    </React.Suspense>
+  </main>
+);
+
 describe('streamServerRenderedReactComponent', () => {
   const testingRailsContext = {
     serverSideRSCPayloadParameters: {},
@@ -361,16 +386,24 @@ describe('streamServerRenderedReactComponent', () => {
     return renderResult;
   };
 
-  const collectEmittedError = async (renderResult) => {
-    let emittedError;
+  // Collects every emitted `error` event into an array so a render that surfaces multiple errors
+  // (e.g. two failing Suspense boundaries) does not silently drop all but the last.
+  const collectEmittedErrors = async (renderResult) => {
+    const emittedErrors = [];
     renderResult.on('data', () => {});
     renderResult.on('error', (error) => {
-      emittedError = error;
+      emittedErrors.push(error);
     });
     await new Promise((resolve) => {
       renderResult.once('end', resolve);
     });
-    return emittedError;
+    return emittedErrors;
+  };
+
+  // Convenience for the common single-error case.
+  const collectEmittedError = async (renderResult) => {
+    const errors = await collectEmittedErrors(renderResult);
+    return errors[errors.length - 1];
   };
 
   it('leaves a deferred-render error unenriched when no RSC diagnostics were captured (#3475)', async () => {
@@ -411,6 +444,61 @@ describe('streamServerRenderedReactComponent', () => {
     expect(emittedError.message).toContain('Component: CommentsToggle');
     expect(emittedError.message).toContain('Component: PostsPage');
     expect(emittedError.message).toContain('React stream error: Deferred render failure');
+  });
+
+  // Misattribution guard (codex P2 #3475): with exactly one captured RSC diagnostic and TWO
+  // independent failing Suspense boundaries, the single captured diagnostic must enrich only the
+  // first (correlated) error. The second, unrelated failure must be reported as itself — the stale
+  // diagnostic must not be reattached to it.
+  const setupSingleCaptureTwoErrorsTest = () => {
+    const renderFunction = (_props, railsContext) => {
+      const diagnosticError = new Error(
+        `[ReactOnRails] RSC bundle rendering failed.\n` +
+          `Component: CommentsToggle\n` +
+          `Module: /app/components/CommentsToggle.jsx\n` +
+          `Original error: boom in CommentsToggle`,
+      );
+      diagnosticError.name = 'ReactOnRailsRSCStreamError';
+      railsContext.recordRSCDiagnostic('CommentsToggle', diagnosticError);
+      return TwoDeferredThrowShell;
+    };
+
+    ReactOnRails.register({
+      TwoDeferredThrowShell: wrapServerComponentRenderer(renderFunction, 'TwoDeferredThrowShell'),
+    });
+
+    return streamServerRenderedReactComponent({
+      name: 'TwoDeferredThrowShell',
+      domNodeId: 'twoDeferredThrowDomId',
+      trace: false,
+      throwJsErrors: true,
+      railsContext: testingRailsContext,
+      generateRSCPayload: jest.fn(),
+    });
+  };
+
+  it('merges a single captured RSC diagnostic into only one error, never a later unrelated one (#3475)', async () => {
+    const renderResult = setupSingleCaptureTwoErrorsTest();
+    const emittedErrors = await collectEmittedErrors(renderResult);
+
+    // Both Suspense boundaries fail, so two errors surface.
+    expect(emittedErrors.length).toBeGreaterThanOrEqual(2);
+
+    const enrichedErrors = emittedErrors.filter((error) =>
+      error.message.includes('RSC bundle rendering failed'),
+    );
+    // Exactly one error carries the RSC diagnostic — the captured diagnostic is consumed on first
+    // use and cannot be reattached to the second, unrelated failure.
+    expect(enrichedErrors).toHaveLength(1);
+    expect(enrichedErrors[0].message).toContain('Component: CommentsToggle');
+
+    // At least one emitted error is the unrelated second failure with no RSC diagnostic attached.
+    const unattributedErrors = emittedErrors.filter(
+      (error) => !error.message.includes('RSC bundle rendering failed'),
+    );
+    expect(unattributedErrors.length).toBeGreaterThanOrEqual(1);
+    // The unrelated failure is reported as itself, not mislabeled as the RSC component.
+    expect(unattributedErrors.some((error) => !error.message.includes('CommentsToggle'))).toBe(true);
   });
 
   it('renders the nearest Suspense fallback for RSCRoute ssr=false without generating an RSC payload', async () => {

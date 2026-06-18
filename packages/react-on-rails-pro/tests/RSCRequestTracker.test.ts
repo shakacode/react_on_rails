@@ -238,6 +238,35 @@ describe('RSCRequestTracker', () => {
       tracker.clear();
       expect(tracker.getCapturedRSCDiagnostics()).toEqual([]);
     });
+
+    it('deduplicates a diagnostic recorded twice for the same component', () => {
+      const tracker = createTracker();
+      const firstError = new Error('first');
+      const duplicateError = new Error('duplicate');
+
+      // Same component fetched in two Suspense trees fires onDiagnosticError twice.
+      tracker.recordRSCDiagnostic('CommentsToggle', firstError);
+      tracker.recordRSCDiagnostic('CommentsToggle', duplicateError);
+
+      // Only the first record is kept, so the 2+ enrichment path never lists the same component twice.
+      expect(tracker.getCapturedRSCDiagnostics()).toEqual([
+        { componentName: 'CommentsToggle', diagnosticError: firstError },
+      ]);
+    });
+
+    it('consumeCapturedRSCDiagnostics returns the captures and clears them (misattribution guard)', () => {
+      const tracker = createTracker();
+      const diagnosticError = new Error('boom');
+      tracker.recordRSCDiagnostic('CommentsToggle', diagnosticError);
+
+      const consumed = tracker.consumeCapturedRSCDiagnostics();
+      expect(consumed).toEqual([{ componentName: 'CommentsToggle', diagnosticError }]);
+
+      // After consumption a second consumer (e.g. an unrelated later error) finds nothing to merge,
+      // so the stale diagnostic cannot be reattached — this is the codex P2 fix (#3475).
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([]);
+      expect(tracker.getCapturedRSCDiagnostics()).toEqual([]);
+    });
   });
 
   // Integration tests: RSCRequestTracker + injectRSCPayload wired together.

@@ -115,7 +115,10 @@ const getReactServerComponent =
       railsContext.reactServerClientManifestFileName,
       railsContext.reactClientManifestFileName,
       componentName,
-      (diagnosticError) => railsContext.recordRSCDiagnostic(componentName, diagnosticError),
+      // Optional chaining: `recordRSCDiagnostic` is an additive capability (#3475). When an older or
+      // custom railsContext doesn't supply it, diagnostic recording degrades to a no-op rather than
+      // crashing — the synchronous-reject enrichment in `createFromReactOnRailsNodeStream` still works.
+      (diagnosticError) => railsContext.recordRSCDiagnostic?.(componentName, diagnosticError),
     );
   };
 

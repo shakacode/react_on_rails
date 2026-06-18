@@ -81,10 +81,19 @@ const streamRenderReactComponent = (
   //   - exactly 1 captured     -> merge it exactly (the common single-server-component failure).
   //   - 2+ captured            -> merge a COMBINED diagnostic listing all candidates, never a single
   //                               false pinpoint.
+  //
+  // Misattribution guard (codex P2): the diagnostics are *consumed* (cleared) here, not just read, so
+  // each captured diagnostic is merged into at most one surfaced error. An unrelated failure that
+  // surfaces later in the same render — a different Suspense boundary throwing, a serialization error,
+  // an addPostSSRHook throw — no longer finds a stale RSC diagnostic to attach, so it is reported as
+  // itself. The first error after an RSC payload reports a renderingError is the correlated one (React
+  // awaiting the failed lazy element), so first-use consumption attributes correctly in the common
+  // case while preventing confident-but-wrong attribution of subsequent errors.
+  //
   // mergeRSCStreamDiagnosticError is idempotent, so an error already enriched on the synchronous
   // reject path in getReactServerComponent.server.ts is returned untouched.
   const enrichWithCapturedRSCDiagnostics = (error: Error): Error => {
-    const captured = streamingTrackers.rscRequestTracker.getCapturedRSCDiagnostics();
+    const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
     if (captured.length === 0) {
       return error;
     }
@@ -213,9 +222,16 @@ const streamRenderReactComponent = (
     })
     .catch((e: unknown) => {
       // Enrich here too so a deferred RSC failure that surfaces as a rejection (rather than through
-      // renderToPipeableStream's onError) still recovers its bundle diagnostic (#3475). No-op when
-      // no diagnostics were captured this render.
-      const error = enrichWithCapturedRSCDiagnostics(convertToError(e));
+      // renderToPipeableStream's onError) still recovers its bundle diagnostic (#3475).
+      //
+      // Only enrich when onError has not already reported an error (`renderState.hasErrors` is still
+      // false). If onError fired, it already consumed the captured diagnostics and attributed them to
+      // the correlated error; reaching the .catch afterwards means this rejection is a *different*
+      // failure (or downstream fallout), so enriching it would risk re-attaching an unrelated RSC
+      // diagnostic. Consumption in enrichWithCapturedRSCDiagnostics already prevents reuse, but this
+      // gate also avoids double-reporting the same render's failure.
+      const convertedError = convertToError(e);
+      const error = renderState.hasErrors ? convertedError : enrichWithCapturedRSCDiagnostics(convertedError);
       reportError(error);
       sendErrorHtml(error);
     });

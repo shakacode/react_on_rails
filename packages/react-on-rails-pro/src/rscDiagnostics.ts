@@ -129,7 +129,17 @@ export const buildRSCStreamDiagnosticError = (
  * a candidate. The returned error mirrors the shape of `buildRSCStreamDiagnosticError` so the
  * existing `mergeRSCStreamDiagnosticError` flow can consume it.
  *
- * @param diagnosticErrors - Two or more diagnostics built by `buildRSCStreamDiagnosticError`
+ * Handles 0/1/2+ defensively: returns `undefined` for an empty list and the single entry unchanged
+ * for one, so callers don't need to pre-check length. The combined error is deliberately a *fresh*
+ * diagnostic — it does NOT carry `MERGED_DIAGNOSTIC_FLAG` — so it is meant to be passed as the
+ * `diagnosticError` (second) argument to `mergeRSCStreamDiagnosticError`, never as the stream error
+ * (first) argument.
+ *
+ * Precondition: every entry must be a raw diagnostic from `buildRSCStreamDiagnosticError`, never an
+ * already-merged error. Passing a merged error would embed its full prior-merged text into a
+ * candidate block, producing garbled output with no runtime warning.
+ *
+ * @param diagnosticErrors - Diagnostics built by `buildRSCStreamDiagnosticError` (0, 1, or more)
  */
 export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Error | undefined => {
   if (diagnosticErrors.length === 0) return undefined;
@@ -150,12 +160,10 @@ export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Err
   // diagnostics module and mislead error monitors (same reasoning as buildRSCStreamDiagnosticError).
   // Each candidate's own stack is preserved below (labeled), so the real failing frames survive
   // without the synthetic combiner frames.
-  combinedError.stack = [
-    `${combinedError.name}: ${message}`,
-    ...diagnosticErrors.map((error, index) => error.stack && `Candidate ${index + 1} stack:\n${error.stack}`),
-  ]
-    .filter((line): line is string => Boolean(line))
-    .join('\n\n');
+  const candidateStacks = diagnosticErrors
+    .map((error, index) => error.stack && `Candidate ${index + 1} stack:\n${error.stack}`)
+    .filter((line): line is string => Boolean(line));
+  combinedError.stack = [`${combinedError.name}: ${message}`, ...candidateStacks].join('\n\n');
   return combinedError;
 };
 

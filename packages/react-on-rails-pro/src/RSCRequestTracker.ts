@@ -23,14 +23,6 @@ import {
 import { extractErrorMessage } from './utils.ts';
 
 /**
- * RSC Request Tracker - manages RSC payload generation and tracking for a single request.
- *
- * This class provides a local alternative to the global RSC payload management,
- * allowing each request to have its own isolated tracker without sharing state.
- * It includes both tracking functionality for the server renderer and fetching
- * functionality for components.
- */
-/**
  * A captured RSC bundle diagnostic for a single component, recorded during stream parse.
  *
  * Kept render-scoped on the tracker so it survives past the `getReactServerComponentOnServer`
@@ -43,6 +35,14 @@ export interface CapturedRSCDiagnostic {
   diagnosticError: Error;
 }
 
+/**
+ * RSC Request Tracker — manages RSC payload generation and stream tracking per request.
+ *
+ * This class provides a local alternative to the global RSC payload management,
+ * allowing each request to have its own isolated tracker without sharing state.
+ * It includes both tracking functionality for the server renderer and fetching
+ * functionality for components.
+ */
 class RSCRequestTracker {
   private streams: RSCPayloadStreamInfo[] = [];
 
@@ -132,6 +132,14 @@ class RSCRequestTracker {
    * @param diagnosticError - The diagnostic built by `buildRSCStreamDiagnosticError`
    */
   recordRSCDiagnostic(componentName: string, diagnosticError: Error): void {
+    // Dedup by component name: the same server component can be fetched in two Suspense trees within
+    // one render, firing `onDiagnosticError` twice for the same failure. Without this guard the 2+
+    // enrichment path would list "one of these 2 RSC components failed" naming the same component
+    // twice. `transformRSCStream` is already first-wins per stream parse, so a single payload never
+    // double-records; this guards the cross-Suspense-tree case only.
+    if (this.capturedRSCDiagnostics.some((entry) => entry.componentName === componentName)) {
+      return;
+    }
     this.capturedRSCDiagnostics.push({ componentName, diagnosticError });
   }
 
@@ -142,6 +150,27 @@ class RSCRequestTracker {
    */
   getCapturedRSCDiagnostics(): CapturedRSCDiagnostic[] {
     return [...this.capturedRSCDiagnostics];
+  }
+
+  /**
+   * Returns all RSC bundle diagnostics captured this render **and clears them**, so a single
+   * captured diagnostic is merged into at most one surfaced error.
+   *
+   * This is the misattribution guard for the deferred-render enrichment (#3475). React's `onError`
+   * carries no component key, so the enrichment site cannot prove a given error came from the
+   * captured RSC component. By *consuming* the diagnostics on first use, an unrelated error that
+   * surfaces later in the same render (e.g. a different Suspense boundary throwing, a serialization
+   * error) no longer finds a stale diagnostic to merge — it is reported as-is. The first error that
+   * surfaces after an RSC payload reported a `renderingError` is the correlated one (React awaiting
+   * the failed lazy element from that payload), so consuming on first use attributes correctly in
+   * the common case while preventing confident-but-wrong attribution of later failures.
+   *
+   * @returns The captured diagnostics (empty if none were captured or they were already consumed)
+   */
+  consumeCapturedRSCDiagnostics(): CapturedRSCDiagnostic[] {
+    const captured = this.capturedRSCDiagnostics;
+    this.capturedRSCDiagnostics = [];
+    return captured;
   }
 
   /**

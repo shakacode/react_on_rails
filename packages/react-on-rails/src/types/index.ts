@@ -72,7 +72,14 @@ export type RailsContextWithServerStreamingCapabilities = RailsContextWithServer
   // Records an RSC bundle diagnostic captured while parsing a component's payload stream so the
   // render-scoped error-surfacing site can recover it even when the failure propagates through
   // React's deferred render phase rather than rejecting the stream parse synchronously (#3475).
-  recordRSCDiagnostic: (componentName: string, diagnosticError: Error) => void;
+  //
+  // Optional for backward compatibility: this field was added in the deferred-render diagnostic work
+  // (#3475) and is additive over the pre-existing streaming contract. An external consumer that
+  // constructs this context against an older Pro version (or a custom integration) may not supply it.
+  // Callers must treat a missing `recordRSCDiagnostic` as "diagnostic recording unavailable" and skip
+  // recording rather than crashing — see `getReactServerComponent.server.ts`. The Pro renderer always
+  // supplies it (`streamingUtils.ts`), so the common path is unaffected.
+  recordRSCDiagnostic?: (componentName: string, diagnosticError: Error) => void;
 };
 
 const throwRailsContextMissingEntries = (missingEntries: string) => {
@@ -111,13 +118,18 @@ export const assertRailsContextWithServerStreamingCapabilities: (
 
   // Verify the capabilities are callable, not merely present, so a misconfigured context fails here
   // with the intended diagnostic instead of crashing later at a call site.
+  //
+  // `recordRSCDiagnostic` is intentionally NOT required here. It is an additive field (#3475); an
+  // external consumer constructing this context against an older Pro version may not supply it.
+  // Hard-throwing on its absence would be a compat regression for those consumers even though their
+  // type-check passes (the field is optional). Callers degrade gracefully when it is missing, so the
+  // assertion only guards the two pre-existing required capabilities.
   const capabilities = context as Record<string, unknown>;
   if (
     typeof capabilities.getRSCPayloadStream !== 'function' ||
-    typeof capabilities.addPostSSRHook !== 'function' ||
-    typeof capabilities.recordRSCDiagnostic !== 'function'
+    typeof capabilities.addPostSSRHook !== 'function'
   ) {
-    throwRailsContextMissingEntries('getRSCPayloadStream, addPostSSRHook, and recordRSCDiagnostic functions');
+    throwRailsContextMissingEntries('getRSCPayloadStream and addPostSSRHook functions');
   }
 };
 
