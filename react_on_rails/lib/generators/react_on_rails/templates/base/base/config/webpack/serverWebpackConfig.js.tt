@@ -224,11 +224,14 @@ const configureServer = () => {
   // The Pro Node renderer can remap bundled stack frames back to your original
   // source files (see docs/oss/building-features/node-renderer/debugging.md). This
   // needs source maps in the *production* server bundle, which the default above
-  // disables (`devtool: false`). To opt in, set a production devtool, e.g.:
-  //   serverWebpackConfig.devtool = 'source-map';        // external .map (smaller bundle; stage the .map next to the uploaded bundle)
-  //   serverWebpackConfig.devtool = 'inline-source-map'; // simplest; map travels inside the bundle
-  // The server bundle is never served to browsers, but never serve server-bundle
-  // source maps publicly.
+  // disables (`devtool: false`). To opt in, replace the devtool line above with a
+  // production-aware variant (keep the dev setting so development is unaffected), e.g.:
+  //   serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? 'source-map' : 'cheap-module-source-map';
+  //     // 'source-map' — external .map (smaller bundle; stage the .map next to the uploaded bundle)
+  //   serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? 'inline-source-map' : 'cheap-module-source-map';
+  //     // 'inline-source-map' — simplest; map travels inside the bundle (larger file)
+  // The server bundle is never served to browsers; still, never expose
+  // server-bundle source maps publicly.
 <% else -%>
   // If using the default 'web', then libraries like Emotion and loadable-components
   // break with SSR. The fix is to use a node renderer and change the target.
