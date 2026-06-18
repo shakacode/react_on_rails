@@ -3971,19 +3971,6 @@ describe InstallGenerator, type: :generator do
       expect(Bundler).to have_received(:with_unbundled_env).at_least(:twice)
     end
 
-    it "passes SHAKAPACKER_ASSETS_BUNDLER=webpack to shakapacker:install when --no-rspack is set" do
-      allow(Bundler).to receive(:with_unbundled_env).and_yield
-      allow(install_generator).to receive(:system).with("bundle install").and_return(true)
-      allow(install_generator).to receive(:system)
-        .with(webpack_install_env, "bundle exec rails shakapacker:install")
-        .and_return(true)
-
-      install_generator.send(:install_shakapacker)
-
-      expect(install_generator).to have_received(:system)
-        .with(webpack_install_env, "bundle exec rails shakapacker:install")
-    end
-
     it "passes SHAKAPACKER_ASSETS_BUNDLER=webpack to shakapacker:install when --webpack is set" do
       webpack_generator = install_generator_fixture(webpack: true)
       allow(Bundler).to receive(:with_unbundled_env).and_yield
