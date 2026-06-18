@@ -269,6 +269,7 @@ spec:
             - http://localhost:3800/health
         periodSeconds: 5
         failureThreshold: 3
+        timeoutSeconds: 5 # exceed curl --max-time 3 so the probe, not the orchestrator, owns the timeout
       livenessProbe:
         exec:
           command:
@@ -280,6 +281,7 @@ spec:
             - http://localhost:3800/health
         periodSeconds: 10
         failureThreshold: 3
+        timeoutSeconds: 5 # exceed curl --max-time 3 so the probe, not the orchestrator, owns the timeout
 ```
 
 Do **not** point a `--fail` Command probe at `/ready` unless something pre-warms the renderer, or the probe will fail
