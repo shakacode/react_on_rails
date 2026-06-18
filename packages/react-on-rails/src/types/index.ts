@@ -270,11 +270,21 @@ type AsyncPropsManager = {
  * a server render-function "returning" a teardown — unrepresentable instead of merely discouraged.
  * (`RendererFunction` still accepts legacy {@link RenderFunctionResult} return shapes for backward
  * compatibility with old 3-argument renderers; those values are ignored at runtime.)
+ *
+ * The doc block above describes {@link RenderFunction}, the public alias for this interface. Prefer
+ * `RenderFunction` in public-facing annotations; `ServerRenderFunction` is the concrete interface
+ * behind it (exported mainly so call sites can narrow to the precise role after runtime guards).
  */
 interface ServerRenderFunction extends RenderFunctionMarker {
   (props?: any, railsContext?: RailsContext): RenderFunctionResult;
 }
 
+/**
+ * The public name for the 2-argument server/client render-function form
+ * `(props, railsContext) => RenderFunctionResult`. Alias of {@link ServerRenderFunction}; prefer
+ * `RenderFunction` in public-facing annotations. See {@link ServerRenderFunction} for the full
+ * render-function vs. renderer role explanation.
+ */
 type RenderFunction = ServerRenderFunction;
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction | RendererFunction;
