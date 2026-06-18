@@ -59,24 +59,33 @@ const RSCContext = createContext<RSCContextType | undefined>(undefined);
  * from #3564 is intentionally deferred pending profiling; only eviction is
  * implemented here.
  */
-const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
+export const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
 
 /**
- * A tiny insertion-ordered LRU over a `Map`. `get`/`has` and `set` move the key
- * to the most-recently-used position (end of the Map). When `set` pushes the
- * size past `maxEntries`, the least-recently-used key (front of the Map) is
- * evicted and passed to `onEvict` so callers can drop companion state keyed by
- * the same payload key. A key can be temporarily `pin`-ned so an in-flight
- * refetch is never evicted out from under its own `restoreLastSuccessfulPromise`.
+ * A tiny insertion-ordered LRU over a `Map`. `get` and `set` move the key to
+ * the most-recently-used position (end of the Map); `has` and `peek` are
+ * recency-neutral reads. When `set` pushes the size past `maxEntries`, the
+ * least-recently-used key (front of the Map) is evicted and passed to
+ * `onEvict` so callers can drop companion state keyed by the same payload key.
+ *
+ * A key can be `pin`-ned so an in-flight refetch is never evicted out from
+ * under its own `restoreLastSuccessfulPromise`. Pins are REF-COUNTED: each
+ * `pin` increments and each `unpin` decrements a per-key counter, and the key
+ * is only evictable once the count returns to zero. This is required because
+ * overlapping same-key `refetch()` calls each take their own pin/unpin pair —
+ * a plain set would let the first call's `unpin` drop the pin while a second
+ * refetch is still in flight.
  *
  * No external LRU dependency exists for this synchronous provider cache (the
  * repo's `InMemoryLRUCacheHandler` is an async `CacheHandler` tied to
  * `CacheEntry`), so this minimal helper mirrors that same Map-based pattern.
+ *
+ * Exported for unit testing; not part of the public package surface.
  */
-class BoundedLRU<V> {
+export class BoundedLRU<V> {
   private map = new Map<string, V>();
 
-  private pinned = new Set<string>();
+  private pinCounts = new Map<string, number>();
 
   constructor(
     private readonly maxEntries: number,
@@ -93,10 +102,10 @@ class BoundedLRU<V> {
   }
 
   get(key: string): V | undefined {
-    const value = this.map.get(key);
-    if (value === undefined || !this.map.has(key)) {
+    if (!this.map.has(key)) {
       return undefined;
     }
+    const value = this.map.get(key) as V;
     // Re-insert to mark most-recently-used.
     this.map.delete(key);
     this.map.set(key, value);
@@ -112,25 +121,40 @@ class BoundedLRU<V> {
 
   delete(key: string): void {
     this.map.delete(key);
-    this.pinned.delete(key);
+    this.pinCounts.delete(key);
   }
 
-  /** Prevent `key` from being evicted until `unpin` is called (in-flight refetch). */
+  /**
+   * Prevent `key` from being evicted until a matching `unpin` runs. Ref-counted:
+   * overlapping in-flight refetches for the same key each add a pin.
+   */
   pin(key: string): void {
-    this.pinned.add(key);
+    this.pinCounts.set(key, (this.pinCounts.get(key) ?? 0) + 1);
   }
 
   unpin(key: string): void {
-    this.pinned.delete(key);
+    const count = this.pinCounts.get(key);
+    if (count === undefined) {
+      return;
+    }
+    if (count <= 1) {
+      this.pinCounts.delete(key);
+    } else {
+      this.pinCounts.set(key, count - 1);
+    }
     // A key may have been kept past the cap while pinned; reconcile now.
     this.evictIfNeeded();
+  }
+
+  private isPinned(key: string): boolean {
+    return (this.pinCounts.get(key) ?? 0) > 0;
   }
 
   private evictIfNeeded(): void {
     while (this.map.size > this.maxEntries) {
       let evicted: string | undefined;
       for (const candidate of this.map.keys()) {
-        if (!this.pinned.has(candidate)) {
+        if (!this.isPinned(candidate)) {
           evicted = candidate;
           break;
         }

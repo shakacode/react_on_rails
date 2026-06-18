@@ -19,18 +19,117 @@ import { Suspense } from 'react';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-import { createRSCProvider } from '../src/RSCProvider.tsx';
+import { BoundedLRU, createRSCProvider, RSC_PAYLOAD_CACHE_MAX_ENTRIES } from '../src/RSCProvider.tsx';
 import RSCRoute, { type RSCRouteHandle } from '../src/RSCRoute.tsx';
 import { getNodeVersion } from './testUtils';
 
-// Keep in sync with RSC_PAYLOAD_CACHE_MAX_ENTRIES in src/RSCProvider.tsx.
-const CACHE_CAP = 50;
+// Imported from the source so the test cap cannot drift from the real cap.
+const CACHE_CAP = RSC_PAYLOAD_CACHE_MAX_ENTRIES;
 
 type GetServerComponentArgs = {
   componentName: string;
   componentProps: unknown;
   enforceRefetch?: boolean;
 };
+
+// Focused unit tests for the eviction primitive. These pin down the
+// ref-counted-pin fix deterministically, independent of React render timing.
+describe('BoundedLRU', () => {
+  const makeLRU = (cap: number) => {
+    const evicted: string[] = [];
+    const lru = new BoundedLRU<string>(cap, (key) => evicted.push(key));
+    return { lru, evicted };
+  };
+
+  it('evicts the least-recently-used key past the cap', () => {
+    const { lru, evicted } = makeLRU(2);
+    lru.set('a', 'A');
+    lru.set('b', 'B');
+    lru.set('c', 'C'); // pushes past cap -> evicts 'a'
+    expect(evicted).toEqual(['a']);
+    expect(lru.has('a')).toBe(false);
+    expect(lru.has('b')).toBe(true);
+    expect(lru.has('c')).toBe(true);
+  });
+
+  it('get() promotes a key to most-recently-used; has()/peek() do not', () => {
+    const { lru, evicted } = makeLRU(2);
+    lru.set('a', 'A');
+    lru.set('b', 'B');
+    // Recency-neutral reads leave 'a' as the LRU.
+    expect(lru.has('a')).toBe(true);
+    expect(lru.peek('a')).toBe('A');
+    // Promote 'a' so 'b' becomes the LRU victim.
+    expect(lru.get('a')).toBe('A');
+    lru.set('c', 'C');
+    expect(evicted).toEqual(['b']);
+    expect(lru.has('a')).toBe(true);
+  });
+
+  it('get()/peek() return undefined for a missing key but handle a stored undefined value', () => {
+    const { lru } = makeLRU(2);
+    const undefinedLru = new BoundedLRU<string | undefined>(2, () => {});
+    expect(lru.get('missing')).toBeUndefined();
+    expect(lru.peek('missing')).toBeUndefined();
+    undefinedLru.set('u', undefined);
+    expect(undefinedLru.has('u')).toBe(true);
+    // A stored `undefined` is a real hit, not treated as absent.
+    expect(undefinedLru.get('u')).toBeUndefined();
+    expect(undefinedLru.peek('u')).toBeUndefined();
+  });
+
+  it('REF-COUNTED pins: a key survives until every pin is released', () => {
+    const { lru, evicted } = makeLRU(1);
+    lru.set('keep', 'KEEP');
+    // Two overlapping holders pin the same key.
+    lru.pin('keep');
+    lru.pin('keep');
+
+    // Cold traffic that would normally evict 'keep' (cap is 1) cannot, because
+    // it is pinned.
+    lru.set('cold1', 'C1');
+    lru.set('cold2', 'C2');
+    expect(lru.has('keep')).toBe(true);
+    expect(evicted).not.toContain('keep');
+
+    // First release: with a plain Set this would clear the pin and 'keep' would
+    // become evictable. Ref-counting keeps it protected (count 2 -> 1).
+    lru.unpin('keep');
+    lru.set('cold3', 'C3');
+    expect(lru.has('keep')).toBe(true);
+    expect(evicted).not.toContain('keep');
+
+    // Final release: count -> 0, now 'keep' is evictable.
+    lru.unpin('keep');
+    lru.set('cold4', 'C4');
+    expect(lru.has('keep')).toBe(false);
+    expect(evicted).toContain('keep');
+  });
+
+  it('unpin past zero is a no-op and does not underflow into a permanent pin', () => {
+    const { lru } = makeLRU(1);
+    lru.set('x', 'X');
+    lru.pin('x');
+    lru.unpin('x');
+    lru.unpin('x'); // extra unpin must not make the count negative
+    lru.unpin('missing'); // unpinning an unknown key is harmless
+    lru.set('y', 'Y'); // 'x' is unpinned -> evictable
+    expect(lru.has('x')).toBe(false);
+  });
+
+  it('delete() drops the value and its pin state together', () => {
+    const { lru } = makeLRU(2);
+    lru.set('a', 'A');
+    lru.pin('a');
+    lru.delete('a');
+    expect(lru.has('a')).toBe(false);
+    // Re-adding 'a' must not be protected by a stale pin from before delete.
+    lru.set('a', 'A2');
+    lru.set('b', 'B');
+    lru.set('c', 'C'); // cap 2 -> evicts LRU; 'a' is no longer pinned
+    expect(lru.has('a')).toBe(false);
+  });
+});
 
 (getNodeVersion() >= 18 ? describe : describe.skip)('RSCProvider bounded LRU cache (#3564)', () => {
   let getServerComponent: jest.Mock<Promise<React.ReactNode>, [GetServerComponentArgs]>;
@@ -233,5 +332,147 @@ type GetServerComponentArgs = {
 
     await waitFor(() => expect(ref.current!.refetchError?.message).toBe('refetch boom'));
     expect(screen.getByTestId('payload')).toHaveTextContent('Card v1');
+  });
+
+  it('f. overlapping same-key refetches both recover and keep the key cached with the LRU in place', async () => {
+    // Integration coverage for the ref-counted-pin fix: TWO overlapping
+    // recoverOnError refetches for the same key (id 0) run while the cache is
+    // flooded far past the cap. We then fail both refetches one at a time and
+    // assert the route recovers to its last-successful payload and id 0 is never
+    // re-fetched (it stays cached and its companion restore entry survives). The
+    // deterministic ref-counting guarantee is locked down by the `BoundedLRU`
+    // unit tests above; this verifies the wiring end-to-end through RSCRoute.
+    //
+    // (Note: because the id-0 route stays mounted, each render re-reads it via
+    // getComponent and promotes it to most-recently-used, so it is not the LRU
+    // eviction victim here. The unit test exercises the raw eviction race.)
+    process.env.NODE_ENV = 'production';
+
+    type Deferred = {
+      promise: Promise<React.ReactNode>;
+      resolve: (v: React.ReactNode) => void;
+      reject: (err: unknown) => void;
+    };
+    const makeDeferred = (): Deferred => {
+      let resolve!: (v: React.ReactNode) => void;
+      let reject!: (err: unknown) => void;
+      const promise = new Promise<React.ReactNode>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+
+    // One deferred per call so the test drives resolution order. Each deferred
+    // is tagged with the call args so we can address refetches by identity
+    // rather than fragile array indices (refetch fetches are queued on a
+    // microtask, so their position in `pending` is not statically obvious). The
+    // pinned key is `Card-{"id":0}`; everything else is a cold filler key.
+    const pending: Array<Deferred & { args: GetServerComponentArgs }> = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      pending.push({ ...d, args: _args[0] });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    const refetchDeferreds = () =>
+      pending.filter((d) => d.args.enforceRefetch && (d.args.componentProps as { id: number }).id === 0);
+
+    // A SINGLE stable provider holds the cache across the whole test. The pinned
+    // route (id 0) is always mounted; `fillerId` cycles through cold keys via a
+    // second always-mounted slot, so the provider instance (and its LRU) is
+    // never torn down. (Swapping root component types would remount the
+    // provider and wipe the cache, masking the eviction behavior under test.)
+    const ref = React.createRef<RSCRouteHandle>();
+    const Root: React.FC<{ fillerId: number | null }> = ({ fillerId }) => (
+      <TestHarness>
+        <RSCRoute ref={ref} componentName="Card" componentProps={{ id: 0 }} />
+        {fillerId === null ? null : <RSCRoute componentName="Card" componentProps={{ id: fillerId }} />}
+      </TestHarness>
+    );
+
+    // Mount the pinned route and resolve its initial payload so id 0 has a
+    // last-successful companion entry to restore to.
+    const result = await renderInAct(<Root fillerId={null} />);
+    await act(async () => {
+      pending[0].resolve(<span data-testid="payload">id 0 v1</span>);
+    });
+    await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('id 0 v1'));
+    expect(pending[0].args).toEqual({ componentName: 'Card', componentProps: { id: 0 } });
+
+    // Start TWO overlapping recoverOnError refetches for the SAME key (id 0).
+    // refetch() uses recoverOnError in production; each takes its own pin → the
+    // pin ref-count is 2. pending[1] = refetch A, pending[2] = refetch B.
+    let refetchA!: Promise<React.ReactNode>;
+    let refetchB!: Promise<React.ReactNode>;
+    await act(async () => {
+      refetchA = ref.current!.refetch();
+      refetchB = ref.current!.refetch();
+      // Swallow the eventual rejections here so an unhandled-rejection warning
+      // doesn't fire before the assertions below await them.
+      void refetchA.catch(() => undefined);
+      void refetchB.catch(() => undefined);
+    });
+    expect(getServerComponent).toHaveBeenCalledTimes(3);
+    // Two enforceRefetch fetches for id 0 are now pending (A then B).
+    expect(refetchDeferreds()).toHaveLength(2);
+    const [deferredA, deferredB] = refetchDeferreds();
+
+    // Flood the SAME provider's cache with cold keys far past the cap. id 0 is
+    // retained throughout only because it is pinned (count 2).
+    for (let id = 1; id <= CACHE_CAP + 5; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await rerenderInAct(result, <Root fillerId={id} />);
+      // Resolve THIS filler by identity (matching its call args), never
+      // `pending[length-1]` — the in-flight refetch chains also push entries.
+      const fillerDeferred = pending.find(
+        (d) => !d.args.enforceRefetch && (d.args.componentProps as { id: number }).id === id,
+      );
+      if (fillerDeferred) {
+        // eslint-disable-next-line no-await-in-loop
+        await act(async () => {
+          fillerDeferred.resolve(<span>{`filler ${id}`}</span>);
+        });
+      }
+    }
+
+    // Confirm id 0 was never evicted during the flood (still only its 1 initial
+    // + 2 refetch fetches; no re-fetch from a cache miss).
+    expect(fetchCount(0)).toBe(3);
+
+    // Fail refetch A first. The cache points at refetch B's (still pending)
+    // promise, so A's failure is stale and its restore is a no-op — but its
+    // `.finally` runs ONE unpin, dropping id 0's pin ref-count 2 → 1. id 0 stays
+    // pinned because refetch B is still in flight.
+    await act(async () => {
+      deferredA.reject(new Error('refetch A failed'));
+      await expect(refetchA).rejects.toThrow('refetch A failed');
+    });
+
+    // More cold traffic after the first unpin, to keep the cache churning over
+    // the cap while refetch B is still pending.
+    const extraColdId = CACHE_CAP + 100;
+    await rerenderInAct(result, <Root fillerId={extraColdId} />);
+    const extraColdDeferred = pending.find(
+      (d) => !d.args.enforceRefetch && (d.args.componentProps as { id: number }).id === extraColdId,
+    );
+    if (extraColdDeferred) {
+      await act(async () => {
+        extraColdDeferred.resolve(<span>{`filler ${extraColdId}`}</span>);
+      });
+    }
+
+    // Fail refetch B — the live cache entry. recoverOnError restores id 0 to its
+    // last-successful v1, which requires id 0's companion entry to still exist.
+    await act(async () => {
+      deferredB.reject(new Error('refetch B failed'));
+      await expect(refetchB).rejects.toThrow('refetch B failed');
+    });
+
+    await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('id 0 v1'));
+    // id 0 was never re-fetched: it stayed cached and was restored from its
+    // surviving companion, not re-requested.
+    expect(fetchCount(0)).toBe(3);
   });
 });
