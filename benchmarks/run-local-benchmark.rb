@@ -82,7 +82,9 @@ end
 
 app_dir = File.join(REPO_ROOT, suite.fetch(:app_directory))
 bench_script = File.join(REPO_ROOT, suite.fetch(:benchmark_script))
-results_dir = File.join(app_dir, "bench_results")
+# bench.rb hardcodes OUTDIR="bench_results" relative to its CWD, and runs from the repo
+# root (same as CI), so results land at REPO_ROOT/bench_results — not under the app dir.
+results_dir = File.join(REPO_ROOT, "bench_results")
 benchmark_json = File.join(results_dir, "benchmark.json")
 report_json = File.join(results_dir, "bencher_report.json")
 
@@ -183,7 +185,6 @@ begin
   bench_env = {
     "PRO" => pro.to_s,
     "BASE_URL" => "localhost:#{SERVER_PORT}",
-    "OUTDIR" => results_dir,
     "BENCHMARK_TOOL" => suite.fetch(:benchmark_tool),
     "RATE" => options[:rate],
     "DURATION" => options[:duration],
