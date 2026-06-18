@@ -213,19 +213,21 @@ e.g.
 `{"consoleReplayScript":"…","clientProps":{…},"hasErrors":false,"renderingError":null,"isShellReady":true,"payloadType":"string"}`
 (`payloadType` is appended in `streamingUtils.ts`). Note there is **no `html` field**.
 
-`injectRSCPayload` maintains **three ordered buffers** and flushes them in a strict order so the
+`injectRSCPayload` maintains **four ordered buffers** and flushes them in a strict order so the
 browser never tries to use a payload that hasn't arrived:
 
 ```
    1) rscInitializationBuffers   →  <script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})[key]||=[]</script>
-   2) htmlBuffers                →  <div id="MyPage-react-component-0">…SSR HTML…</div>
-   3) rscPayloadBuffers          →  <script>(self.REACT_ON_RAILS_RSC_PAYLOADS[key]).push("<flight chunk>")</script>
+   2) rscClientStylesheetBuffers →  <link rel="stylesheet" href="…" data-precedence="rsc-css">
+   3) htmlBuffers                →  <div id="MyPage-react-component-0">…SSR HTML…</div>
+   4) rscPayloadBuffers          →  <script>(self.REACT_ON_RAILS_RSC_PAYLOADS[key]).push("<flight chunk>")</script>
 ```
 
 - Flush is driven by React calling `destination.flush()` at the end of each render cycle (React 18.3+
   convention), with a `setTimeout(flush, 0)` fallback if it never fires.
-- Order guarantee: **init array → HTML → payload pushes**, so the global array exists before any
-  `.push`, and the HTML exists before the client tries to hydrate it.
+- Order guarantee: **init array → RSC client stylesheets → HTML → payload pushes**, so the global
+  array exists before any `.push`, the stylesheets for RSC client chunks land before the HTML that
+  React's reveal script can make visible, and the HTML exists before the client tries to hydrate it.
 
 🧒 **Why the weird format?** It's a single pipe carrying two kinds of stuff (the photo of the plate,
 and the order ticket), chopped into labeled pieces so the browser can tell them apart and reassemble

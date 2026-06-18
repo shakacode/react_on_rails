@@ -203,9 +203,10 @@ production:
 | RSC manifests         | `react-client-manifest.json`, `react-server-client-manifest.json` | client/server reference maps (see doc 03 + 01)                              |
 
 - The **server/RSC bundles deliberately aren't content‑hashed or minified** — they run in a Node VM,
-  load once, and readable stack traces matter more than bytes. The `WebpackAssetsManifest`,
-  `MiniCssExtractPlugin`, and `ForkTsCheckerWebpackPlugin` plugins are filtered **out** of the server
-  config (`serverWebpackConfig.js`).
+  load once, and readable stack traces matter more than bytes. The filter block in
+  `serverWebpackConfig.js` strips **five** plugins by constructor name: `WebpackAssetsManifest`,
+  `RspackManifestPlugin`, `MiniCssExtractPlugin`, `CssExtractRspackPlugin`, and
+  `ForkTsCheckerWebpackPlugin` (the manifest/CSS pairs cover both the webpack and Rspack bundlers).
 - The **client bundle** is where minification, code‑splitting (`@loadable/component`), and content
   hashing all live — that's the code shipped to thousands of browsers.
 
