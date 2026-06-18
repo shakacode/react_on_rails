@@ -82,7 +82,7 @@ authoritative list and the exact CVE references.
 
 ## 3. 🛠️ What the package exposes (exports map)
 
-From `node_modules/react-on-rails-rsc/package.json` (**v19.0.5‑rc.6** in the tree today;
+From `node_modules/react-on-rails-rsc/package.json` (**v19.0.5** in the tree today;
 simplified — the real targets also carry `types`/`default` sub‑keys):
 
 ```jsonc
@@ -94,7 +94,7 @@ simplified — the real targets also carry `types`/`default` sub‑keys):
   "./WebpackPlugin": "./dist/WebpackPlugin.js",
   "./WebpackLoader": "./dist/WebpackLoader.js",
   "./RSCReferenceDiscoveryPlugin": "./dist/RSCReferenceDiscoveryPlugin.js",
-  // NEW in 19.0.5‑rc.x: a native Rspack plugin/loader backed by a vendored
+  // Added in the 19.0.5 line: a native Rspack plugin/loader backed by a vendored
   // react-server-dom-rspack build (see §6.1) — additive; the Webpack* paths still work.
   "./RspackPlugin": "./dist/react-server-dom-rspack/plugin.js",
   "./RspackLoader": "./dist/react-server-dom-rspack/loader.js",
@@ -127,7 +127,7 @@ Who imports what in the Pro runtime (`packages/react-on-rails-pro/src/`):
 
 Note: `dist/react-server-dom-webpack/…` is the **vendored React runtime** with node/browser/edge
 variants — i.e. exactly the per‑environment builds React produces, repackaged here. As of
-19.0.5‑rc.x the package **also** vendors a `dist/react-server-dom-rspack/` build (consumed by
+the 19.0.5 line the package **also** vendors a `dist/react-server-dom-rspack/` build (consumed by
 the new `RspackPlugin`/`RspackLoader`); see §6.1 — this is a recent change that the older
 "there is no `react-server-dom-rspack`" framing predates.
 
@@ -140,14 +140,15 @@ major.minor is the same family as `react`/`react-dom`. But they are **not requir
 exact same string**: during a release‑candidate window the RSC package can ride ahead on a
 patch/RC while `react`/`react-dom` stay on the matching stable line.
 
-Concrete pins found in the repo **today** (note the RC drift — these change as the RC train moves):
+Concrete pins found in the repo **today** (these change as the RC train moves — the Pro dummy
+in particular rides ahead on a `react@19.2` line while the root/generator sit on stable `19.0.5`):
 
-| Location                                                                      | react / react-dom                     | react-on-rails-rsc                        |
-| ----------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------- |
-| root `package.json` (dev)                                                     | `~19.0.4`                             | `19.0.5-rc.6`                             |
-| `packages/react-on-rails-pro/package.json` (peer, optional)                   | `>= 16`                               | `*` (optional peer)                       |
-| `react_on_rails_pro/spec/dummy/package.json`                                  | `~19.0.4`                             | `19.0.5-rc.6`                             |
-| generator pins (`react_on_rails/lib/generators/.../js_dependency_manager.rb`) | `RSC_REACT_VERSION_RANGE = "~19.0.4"` | `RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.6"` |
+| Location                                                                      | react / react-dom                     | react-on-rails-rsc                   |
+| ----------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ |
+| root `package.json` (dev)                                                     | `~19.0.4`                             | `19.0.5`                             |
+| `packages/react-on-rails-pro/package.json` (peer, optional)                   | `>= 16`                               | `^19.0.5` (optional peer)            |
+| `react_on_rails_pro/spec/dummy/package.json`                                  | `^19.2.7`                             | `19.2.0-rc.1`                        |
+| generator pins (`react_on_rails/lib/generators/.../js_dependency_manager.rb`) | `RSC_REACT_VERSION_RANGE = "~19.0.4"` | `RSC_PACKAGE_VERSION_PIN = "19.0.5"` |
 
 The package's own `peerDependencies`: `react ^19.0.4`, `react-dom ^19.0.4`, `webpack ^5.59.0`.
 
@@ -155,13 +156,15 @@ Important nuances:
 
 - **The gem version and the RSC package version are decoupled.** The RSC package tracks **React**,
   not the gem.
-- **react/react-dom and react-on-rails-rsc are also decoupled during the RC window.** The generator
-  comment (`js_dependency_manager.rb`) is explicit: react/react-dom stay on stable `~19.0.4` while
-  `react-on-rails-rsc` rides an RC (`19.0.5-rc.6`). `RSC_REACT_VERSION_RANGE` is intentionally
-  distinct from `RSC_PACKAGE_VERSION_PIN`. There's a TODO (#3642) to re‑converge on a stable
-  `react-on-rails-rsc` after 19.0.5 stable ships.
-- The Pro package declares `react-on-rails-rsc` as an **optional peer with range `*`** (it doesn't
-  pin a window); the **generator** is what pins the one known‑good version for an install.
+- **react/react-dom and react-on-rails-rsc are decoupled.** The generator comment
+  (`js_dependency_manager.rb`) is explicit: react/react-dom stay on the stable `~19.0.4` line, while
+  `react-on-rails-rsc` is pinned separately to stable `19.0.5` (which carries the discovery-plugin
+  export, the native Rspack plugin, and the RSC-manifest CSS fixes). `RSC_REACT_VERSION_RANGE` is
+  intentionally distinct from `RSC_PACKAGE_VERSION_PIN`; the comment warns against widening the React
+  range to 19.1/19.2 just because those are current on npm.
+- The Pro package declares `react-on-rails-rsc` as an **optional peer with range `^19.0.5`** (a
+  caret range, not the old open `*`); the **generator** is what pins the one known‑good exact version
+  for an install.
 - Per the migration docs, **19.0.0–19.0.3 are effectively buggy** (stale vendored
   `react-server-dom-webpack`); **use the generator's pinned version or newer**. Symptoms of a
   wrong/old version: "cryptic rendering errors or RSC payloads that fail to deserialize on the
@@ -169,7 +172,7 @@ Important nuances:
 
 How to manage it in practice:
 
-- Install the generator‑pinned set, e.g. `yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.6`
+- Install the generator‑pinned set, e.g. `yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5`
   (let `js_dependency_manager.rb` be the source of truth for the exact pins, since they move with the RC train).
 - Verify a single resolved copy: `yarn why react-on-rails-rsc` / `npm ls react-on-rails-rsc`.
 - The `rails generate react_on_rails:rsc` generator adds the dep and wires the webpack
@@ -208,15 +211,21 @@ Two facts, both true today:
    **`react-on-rails-rsc/WebpackPlugin`** (`RSCWebpackPlugin`) and **`WebpackLoader`** run under
    rspack too, because rspack implements enough of webpack's plugin API (`thisCompilation` /
    `processAssets` / `make`) and the `react-server-dom-webpack` runtime's `__webpack_require__` /
-   `__webpack_chunk_load__` calls + webpack‑shaped chunk metadata work as‑is. This is the path the
-   **Pro dummy app uses today** (it wires `WebpackPlugin` + `WebpackLoader` + `RSCReferenceDiscoveryPlugin`,
-   with `javascript_transpiler: babel`). It's also what Next.js does under rspack.
+   `__webpack_chunk_load__` calls + webpack‑shaped chunk metadata work as‑is. This is also what
+   Next.js does under rspack.
 
-2. **`react-on-rails-rsc@19.0.5-rc.x` _additionally_ ships a native Rspack path** — exports
+2. **`react-on-rails-rsc@19.0.5` _additionally_ ships a native Rspack path** — exports
    **`./RspackPlugin`** and **`./RspackLoader`**, backed by a vendored **`dist/react-server-dom-rspack/`**
    build. This is the GA direction for rspack RSC (tracked in the project's rspack‑RSC issues); the
-   RC "keeps `WebpackPlugin` compatible while adding `RspackPlugin`" (per the generator's own install
+   release "keeps `WebpackPlugin` compatible while adding `RspackPlugin`" (per the generator's own install
    messaging). So a `react-server-dom-rspack` build now **does** exist — inside `react-on-rails-rsc`.
+   **The Pro dummy actually selects between the two by bundler:** `serverWebpackConfig.js` /
+   `clientWebpackConfig.js` set `isRspack = config.assets_bundler === 'rspack'` and require
+   `react-on-rails-rsc/RspackPlugin` (`RSCRspackPlugin`) when that is true, falling back to
+   `WebpackPlugin` (`RSCWebpackPlugin`) only under webpack. The **loader** stays
+   `react-on-rails-rsc/WebpackLoader` even under rspack (per the comment in `rscWebpackConfig.js`:
+   `RspackLoader` only reports client modules to `RSCRspackPlugin`, so the Webpack loader is kept),
+   alongside `RSCReferenceDiscoveryPlugin`.
 
 > Cross‑check from Next.js's own repo (see doc 04/05): Next supports webpack, rspack, AND Turbopack,
 > and under rspack **Next reuses `react-server-dom-webpack`** (no `react-server-dom-rspack` in the
@@ -281,10 +290,11 @@ RSC bundle able to render Server Components — and why a missing condition thro
 - **Minor plugin filtering quirks** can differ (e.g. CSS‑module SSR handling under rspack had its own
   fixes — see CHANGELOG). But the RSC plugin/loader/runtime are shared.
 - **Maturity:** rspack‑RSC has two paths (see §6.1). The **native** path — `react-on-rails-rsc`'s
-  `RspackPlugin`/`RspackLoader` + vendored `react-server-dom-rspack` — now **ships** in
-  `19.0.5-rc.x` (the GA direction), while the webpack‑compatible path keeps working. The Pro dummy
-  still wires the Webpack\* plugins. Treat rspack‑RSC as "supported and stabilizing; native plugin
-  landing via the RC train."
+  `RspackPlugin`/`RspackLoader` + vendored `react-server-dom-rspack` — now **ships** in the
+  `19.0.5` line (the GA direction), while the webpack‑compatible path keeps working. The Pro dummy
+  selects the native `RSCRspackPlugin` when `assets_bundler === 'rspack'` (webpack `RSCWebpackPlugin`
+  otherwise), and keeps the Webpack\* **loader** under both. Treat rspack‑RSC as "supported and
+  stabilizing; native plugin shipped."
 
 ---
 
@@ -298,18 +308,20 @@ WHY A SEPARATE PACKAGE
     and ships on React's cadence (fast security patches), independent of the gem version.
 
 REACT 19 CORRELATION
-  package tracks React's major.minor, but the strings can differ during an RC window:
-  react/react-dom on ~19.0.4 while react-on-rails-rsc rides 19.0.5-rc.6 (intentional;
-  TODO #3642 re-converges on stable). Use ≥ the generator's pin (19.0.0–19.0.3 are buggy).
+  package tracks React's major.minor, but the strings can differ: the generator/root pin
+  react-on-rails-rsc to stable 19.0.5 with react/react-dom on ~19.0.4 (intentionally distinct
+  ranges), while the Pro dummy rides ahead on react ^19.2.7 + react-on-rails-rsc 19.2.0-rc.1.
+  Use ≥ the generator's pin (19.0.0–19.0.3 are buggy).
   Let js_dependency_manager.rb be the source of truth for pins. Gem version is decoupled.
 
 WEBPACK vs RSPACK
   rspack = "webpack in Rust," webpack-API-compatible.
-  PATH 1 (what the Pro dummy uses): SAME react-on-rails-rsc/WebpackPlugin + WebpackLoader +
+  PATH 1 (webpack-compatible): SAME react-on-rails-rsc/WebpackPlugin + WebpackLoader +
     react-server-dom-webpack runtime + manifests + rscWebpackConfig (react-server condition),
     because rspack speaks the webpack plugin API. Next.js does this too.
-  PATH 2 (new, GA direction): react-on-rails-rsc@19.0.5-rc.x ALSO ships native RspackPlugin +
-    RspackLoader backed by a vendored react-server-dom-rspack build.
+  PATH 2 (new, GA direction): react-on-rails-rsc@19.0.5 ALSO ships native RspackPlugin +
+    RspackLoader backed by a vendored react-server-dom-rspack build. The Pro dummy SELECTS
+    RSCRspackPlugin vs RSCWebpackPlugin by assets_bundler, keeping the WebpackLoader under both.
   So "no react-server-dom-rspack exists anywhere" is now FALSE — it exists inside
     react-on-rails-rsc (just not in React's monorepo or Next.js, which reuse the webpack runtime).
   Differences: speed (SWC vs babel), a few plugin quirks, maturity.
@@ -324,7 +336,7 @@ WEBPACK vs RSPACK
 - `node_modules/react-on-rails-rsc/dist/react-server-dom-webpack/…` — vendored React runtime
 - `packages/react-on-rails-pro/src/ReactOnRailsRSC.ts`, `getReactServerComponent.server.ts` — consumers
 - `config/webpack/rscWebpackConfig.js` — the `react-server` condition + loader
-- `react_on_rails/spec/dummy/config/rspack/rspack.config.js` — delegates to webpack config (OSS dummy only; the Pro dummy has no `config/rspack/`)
+- `react_on_rails/spec/dummy/config/rspack/rspack.config.js` and `react_on_rails_pro/spec/dummy/config/rspack/rspack.config.js` — each delegates to its webpack config (both the OSS and Pro dummy apps ship a `config/rspack/`)
 - `config/shakapacker.yml` — `assets_bundler`, `javascript_transpiler`
 - `react_on_rails/lib/generators/react_on_rails/js_dependency_manager.rb` — `RSC_*` version pins
 - `react_on_rails/lib/generators/react_on_rails/rsc_setup.rb` — generator wiring
