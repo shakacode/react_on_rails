@@ -140,6 +140,35 @@ path so release rules do not drift.
 4. Do not auto-create release trackers. A maintainer creates one when entering
    accelerated RC, strict RC, or final-release coordination.
 
+### Release Phase Gate
+
+The merge-gate strictness is a function of the **target branch's release phase**,
+which composes with the mode above. The canonical phase->gate table is in
+`AGENTS.md` -> **Release-Train Branching And Phase Gating**; the full branching
+runbook is
+[release-train-runbook.md](../../internal/contributor-info/release-train-runbook.md).
+Worker path:
+
+1. Determine the PR's target branch and resolve its phase. Prefer the published
+   phase from `agent-coord` status for that branch (available only when
+   `agent-coord doctor` and `agent-coord status` exit 0). If the backend is up
+   but has no published phase entry for that line, derive the phase from the
+   target branch (the same rule below); never treat a missing entry as `beta` for
+   a `release/*` target. If the backend is `UNKNOWN`, derive it: `main` ->
+   `beta`; `release/*` -> `rc`, or `final` when the applicable tracker is in
+   `final-release` mode (the only machine-readable signal in the fallback path;
+   the promotion freeze is normally published via `agent-coord`, which is the
+   tool that is unavailable here).
+2. Apply that phase's gate: `beta` (target `main`) is lowest — confidence note +
+   green required checks. `rc` (target `release/*`) adds adversarial-pr-review and
+   requires zero open MUST-FIX, and only stabilizing fixes belong on `release/*`.
+   `final` is highest — only cherry-picked fully-verified fixes, no new features,
+   and explicit human sign-off on the promotion; no confidence-only auto-merge.
+3. Stabilizing fixes that land on `release/*` must be forward-ported to `main`
+   with `git cherry-pick -x <sha>`; never `git merge release/X.Y.Z` into `main`.
+4. If the published phase and the tracker disagree, treat it as a
+   `release-mode-conflict` per `AGENTS.md`, report it, and do not auto-merge.
+
 ### Tracker Update Safety
 
 Tracker issue bodies are shared mutable state. Avoid clobbering another agent's update:
@@ -394,7 +423,7 @@ plus confidence notes in handoffs.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
-For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
+For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main and target `main` by default. **Release-phase override:** when the work is a stabilizing fix for an active RC (the applicable release line is in the `rc`/`final` phase and the fix belongs on the release branch), branch from and open the PR against `origin/release/X.Y.Z` instead of `main`, then forward-port to `main` with `git cherry-pick -x <sha>` per the runbook — do not open the fix against `main` and rely on someone noticing it needs cherry-picking onto the RC. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
 For non-trivial, high-risk, `ready-for-hosted-ci`, `force-full-hosted-ci`,
 `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor PRs, commit the intended
@@ -968,9 +997,9 @@ Use `address-review` for actionable GitHub review comments instead of skimming t
 
 ### Adversarial Review Gate
 
-Use `.agents/skills/adversarial-pr-review/SKILL.md` for high-risk PRs, concurrent batch PRs, suspected bad merges, release-candidate risk, or when the user asks for a Claude/Codex red-team pass.
+Use `.agents/skills/adversarial-pr-review/SKILL.md` for high-risk PRs, concurrent batch PRs, suspected bad merges, release-candidate risk, or when the user asks for a Claude/Codex red-team pass. **It is also required (not optional) at the `rc` and `final` phases** — i.e. any PR targeting `release/*` — per the phase-gate table in `AGENTS.md` -> **Release-Train Branching And Phase Gating** and the worker path above. The high-risk triggers in this paragraph are the _additional_ cases where it applies at the `beta` phase (target `main`).
 
-The adversarial review is report-only by default. It must check inline review comments, review timing, missing changelog entries, changed agent instructions, validation gaps, untrusted PR content, and cross-PR interactions. All `BLOCKING` and `DISCUSS` findings must be fixed, explicitly decided, or waived before final readiness.
+The adversarial review is report-only by default (it produces findings; it is not itself a merge approval). It must check inline review comments, review timing, missing changelog entries, changed agent instructions, validation gaps, untrusted PR content, and cross-PR interactions. All `BLOCKING` and `DISCUSS` findings must be fixed, explicitly decided, or waived before final readiness.
 
 ### Coordinating Claude Review
 
@@ -1049,8 +1078,12 @@ real uncertainty, failed checks, or unresolved findings lower the score.
 
 Final-release mode is stricter than accelerated RC. Do not use confidence-only
 auto-merge for final release work; run the post-merge audit, update changelog or
-release notes as needed, confirm required checks on `main`, and get an explicit
-maintainer release decision before publishing.
+release notes as needed, and get an explicit maintainer release decision before
+publishing. Confirm required checks on the **SHA being promoted**: for a final
+promotion off `release/X.Y.Z` that is the release-branch / promoted-RC tip, not
+`origin/main` — once post-RC commits have landed on `main`, `main`'s checks are
+green or red independently of the RC being promoted, so validating `main` would
+prove the wrong SHA.
 
 Auto-merge requires all of the following:
 
