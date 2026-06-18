@@ -501,6 +501,13 @@ Before merge or final readiness, scan the PR description for the decision log an
 
 <!-- Canonical batch handoff copy. `.agents/skills/pr-batch/SKILL.md` should point here instead of duplicating this section. -->
 
+> **A handoff is a comment, not a new issue.** Per `AGENTS.md` → _Tracking Issues
+> And Handoffs_: record the handoff below on the relevant parent tracking issue
+> (or the agent-coordination repo if one is in use), or in the batch's own PR
+> comment/description when there is no parent umbrella — never spawn a standalone
+> `Handoff: ...` or `Post-rc.N audit` issue. Close superseded process issues on
+> sight; closure follows the work, not whoever opened the tracker.
+
 Split batch handoffs into two sections:
 
 - **Immediate maintainer attention**: true blockers and questions only, such as
