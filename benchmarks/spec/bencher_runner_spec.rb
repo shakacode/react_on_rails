@@ -36,6 +36,11 @@ RSpec.describe BencherRunner do
     end
 
     it "reports to the github-actions testbed by default" do
+      # Force the default path so the example is independent of any BENCHER_TESTBED exported in
+      # the developer/CI shell (which the runner intentionally honors).
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("BENCHER_TESTBED", "github-actions").and_return("github-actions")
+
       args = capture_run_command
 
       expect(args.each_cons(2)).to include(["--testbed", "github-actions"])

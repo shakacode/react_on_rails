@@ -30,6 +30,10 @@ require_relative "lib/bencher_runner"
 
 REPO_ROOT = File.expand_path("..", __dir__)
 SERVER_PORT = 3001
+# Pro renders via a node renderer; bin/prod (Procfile.prod) starts it on RENDERER_PORT and
+# Rails reaches it at REACT_RENDERER_URL. Pin both so a local override/stale renderer can't
+# desync them (see the pro server env + preflight below).
+RENDERER_PORT = 3800
 
 # Match CI, which runs benchmarks on the MINIMUM supported Ruby ("Ruby stays on minimum to
 # exercise gem compatibility"), not the repo's default. The default .tool-versions Ruby can
@@ -212,12 +216,22 @@ server_env = {
   "PORT" => SERVER_PORT.to_s,
   "RAILS_PORT" => SERVER_PORT.to_s
 }
-server_env["REACT_ON_RAILS_PRO_LICENSE"] = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", "") if pro
+if pro
+  server_env["REACT_ON_RAILS_PRO_LICENSE"] = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", "")
+  # Pin the renderer port AND the URL Rails uses to reach it to the same value, so an ambient
+  # RENDERER_PORT override (or a default-vs-override split) can't make Rails talk to the wrong
+  # renderer.
+  server_env["RENDERER_PORT"] = RENDERER_PORT.to_s
+  server_env["REACT_RENDERER_URL"] = "http://localhost:#{RENDERER_PORT}"
+end
 
 # Reject a pre-existing listener BEFORE spawning: otherwise wait_for_server's port check
 # could pass against a stale server/dev process and the benchmark would measure (and upload)
-# the wrong app. On a persistent host this is a real hazard.
+# the wrong app. On a persistent host this is a real hazard. Pro also needs the renderer port.
 abort "Port #{SERVER_PORT} is already in use — stop the other server/dev process first." if port_open?(SERVER_PORT)
+if pro && port_open?(RENDERER_PORT)
+  abort "Renderer port #{RENDERER_PORT} is already in use — stop the other process first."
+end
 
 server_pid = nil
 begin
