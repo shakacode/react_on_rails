@@ -204,8 +204,21 @@ export const safePipe = <T extends Writable>(
   return destination;
 };
 
-export const handleStreamError = (stream: Readable, onError: (error: Error) => void) =>
-  safePipe(stream, new PassThrough(), onError);
+export const handleStreamError = (stream: Readable, onError: (error: Error) => void) => {
+  const wrapper = new PassThrough();
+  // `safePipe` propagates source → destination teardown, but not the reverse. The worker hands this
+  // wrapper to Fastify and destroys it when the HTTP client disconnects (issue #3885); plain pipe()
+  // would leave the source (and the in-flight render upstream of it) running. Propagate a premature
+  // wrapper teardown back to the source so the render is aborted. `writableEnded` is true only after a
+  // normal end (source finished → safePipe ended the wrapper), so this is a no-op on normal
+  // completion and fires only when the wrapper is destroyed before it ends.
+  wrapper.once('close', () => {
+    if (!wrapper.writableEnded && !stream.destroyed) {
+      stream.destroy();
+    }
+  });
+  return safePipe(stream, wrapper, onError);
+};
 
 export const isErrorRenderResult = (result: RenderResult): result is { exceptionMessage: string } =>
   typeof result === 'object' && !isReadableStream(result) && 'exceptionMessage' in result;

@@ -33,6 +33,17 @@ import { extractErrorMessage } from './utils.ts';
 class RSCRequestTracker {
   private streams: RSCPayloadStreamInfo[] = [];
 
+  // The original `generateRSCPayload` source streams (the work hitting Rails/APIs), tracked so that
+  // aborting the request (issue #3885) can destroy them. Destroying a source stops its `data`
+  // subscription — and therefore the upstream Rails/API work — and cascades to the tee'd
+  // stream1/stream2 via the source's own 'close' handler. The tee destinations alone are not enough.
+  private sourceStreams: Readable[] = [];
+
+  // Set once the request has been torn down (normal completion or abort). A `generateRSCPayload`
+  // promise that resolves *after* this point (issue #3885) must not start flowing — its source is
+  // destroyed immediately instead of being wired up and tracked.
+  private cleared = false;
+
   private callbacks: RSCPayloadCallback[] = [];
 
   private railsContext: RailsContextWithServerComponentMetadata;
@@ -55,21 +66,40 @@ class RSCRequestTracker {
    * This method is safe to call multiple times and will handle any errors during cleanup gracefully.
    */
   clear(): void {
-    // Close any active streams before clearing
+    this.cleared = true;
+    // Destroy the original source streams first: this stops the upstream Rails/API work driving each
+    // RSC payload (issue #3885) and cascades to the tee'd destinations via the source's 'close'
+    // handler. Then destroy the tracked tee outputs defensively in case a source already ended.
+    this.sourceStreams.forEach((source, index) => {
+      try {
+        if (!source.destroyed) {
+          source.destroy();
+        }
+      } catch (error) {
+        console.warn(`Warning: Error while destroying RSC source stream at index ${index}:`, error);
+      }
+    });
+
     this.streams.forEach(({ stream, componentName }, index) => {
       try {
-        if (stream && typeof (stream as Readable).destroy === 'function') {
-          (stream as Readable).destroy();
+        // End (not destroy) the tee output. A consumer may still be `for await`-ing it (e.g.
+        // injectRSCPayload); destroying mid-iteration rejects the iterator with "Premature close",
+        // which would surface an expected disconnect as a render error (issue #3885). Ending lets the
+        // iterator finish cleanly — the source destroy above has already halted upstream production.
+        const teeStream = stream as PassThrough;
+        if (!teeStream.writableEnded && !teeStream.destroyed) {
+          teeStream.end();
         }
       } catch (error) {
         // Log the error but don't throw to avoid disrupting cleanup of other streams
         console.warn(
-          `Warning: Error while destroying RSC stream for component "${componentName}" at index ${index}:`,
+          `Warning: Error while ending RSC stream for component "${componentName}" at index ${index}:`,
           error,
         );
       }
     });
 
+    this.sourceStreams = [];
     this.streams = [];
     this.callbacks = [];
   }
@@ -123,6 +153,25 @@ class RSCRequestTracker {
     try {
       const stream = await this.generateRSCPayload(componentName, props, this.railsContext);
 
+      // The request may have been aborted/cleared while we awaited the payload (issue #3885). Don't
+      // start consuming the source — destroy it to stop the upstream work — and hand back an already
+      // ended stream so any awaiting consumer unblocks instead of hanging.
+      //
+      // Known gap (tracked for the cacheSignal follow-up): this only stops a payload that resolves
+      // AFTER teardown. A `generateRSCPayload` call still *pending* (its Rails/API request in flight)
+      // at disconnect cannot be cancelled here because `GenerateRSCPayloadFunction` takes no
+      // `AbortSignal`; cancelling that requires threading a signal through the JS → node-renderer →
+      // Rails boundary.
+      if (this.cleared) {
+        const source = stream as Readable;
+        if (!source.destroyed) {
+          source.destroy();
+        }
+        const endedStream = new PassThrough();
+        endedStream.end();
+        return endedStream;
+      }
+
       // Tee stream to allow for multiple consumers:
       //   1. stream1 - Used by React's runtime to perform server-side rendering
       //   2. stream2 - Used by react-on-rails to embed the RSC payloads
@@ -159,6 +208,9 @@ class RSCRequestTracker {
         if (!stream1.writableEnded && !stream1.destroyed) stream1.end();
         if (!stream2.writableEnded && !stream2.destroyed) stream2.end();
       });
+
+      // Track the original source so an aborted request (issue #3885) can stop the upstream work.
+      this.sourceStreams.push(stream as Readable);
 
       const streamInfo: RSCPayloadStreamInfo = {
         componentName,
