@@ -173,6 +173,10 @@ if [ "$RUN_ALL" = false ]; then
     DETECTOR_JSON=$(
       CI_JSON_OUTPUT=1 script/ci-changes-detector "$BASE_REF" 2>&1 |
         awk '
+          # Relies on the detector emitting "{" and "}" as exact standalone
+          # lines (its current bare-echo/heredoc JSON format). A trailing
+          # carriage return is stripped first so CRLF checkouts still match.
+          # A nested or indented "{" would need brace counting instead.
           { line = $0; sub(/\r$/, "", line) }
           line == "{" && !seen_json { in_json = 1; seen_json = 1 }
           in_json { print line }
