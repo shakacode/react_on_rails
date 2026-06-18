@@ -318,8 +318,9 @@ final batch handoff.
 When the batch goal delegates merge authority, definition of done for a target is merged +
 closed out (or a true blocker / no-PR with evidence), not "stopped at a recommendation." When
 merge authority is NOT delegated, done is a complete merge-readiness handoff per `AGENTS.md` —
-all current-head checks and review threads satisfied, with evidence and the `Agent Merge
-Confidence` note recorded — for the maintainer to merge; do not merge without authorization.
+all current-head checks and review threads satisfied, with evidence and the generic `Confidence
+note:` recorded (the `Agent Merge Confidence` block is the accelerated-RC auto-merge block, not the
+normal-handoff note) — for the maintainer to merge; do not merge without authorization.
 Either way, do not surface merge readiness while review threads are still unresolved.
 
 Converge the review loop instead of chasing it: each push re-triggers every configured
