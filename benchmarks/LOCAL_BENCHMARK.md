@@ -99,7 +99,7 @@ running core nightly at 03:00:
     <key>ProgramArguments</key>
     <array>
       <string>/bin/bash</string><string>-lc</string>
-      <string>git fetch origin &amp;&amp; git checkout origin/main &amp;&amp; ruby benchmarks/run-local-benchmark.rb core</string>
+      <string>git fetch origin &amp;&amp; git checkout origin/main &amp;&amp; ruby benchmarks/run-local-benchmark.rb core --branch main</string>
     </array>
     <key>StandardOutPath</key><string>/tmp/ror-benchmark.log</string>
     <key>StandardErrorPath</key><string>/tmp/ror-benchmark.err</string>

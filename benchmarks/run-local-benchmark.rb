@@ -215,7 +215,10 @@ abort "Port #{SERVER_PORT} is already in use — stop the other server/dev proce
 server_pid = nil
 begin
   log "Start #{suite[:suite_name]} production server (WEB_CONCURRENCY=#{web_concurrency})"
-  server_pid = Process.spawn(server_env, "bin/prod", chdir: app_dir)
+  # Own process group (pgroup: true) so cleanup can terminate the whole tree: bin/prod runs
+  # `rails server` as a child (core) or starts overmind/foreman managing rails + node-renderer
+  # (pro), so a TERM to the leader alone would orphan those children or block.
+  server_pid = Process.spawn(server_env, "bin/prod", chdir: app_dir, pgroup: true)
   wait_for_server(server_pid)
   puts "✅ server ready (pid #{server_pid})"
 
@@ -236,9 +239,14 @@ begin
   }
   run!("ruby #{Shellwords.escape(bench_script)}", chdir: REPO_ROOT, env: bench_env)
 ensure
-  if server_pid && process_alive?(server_pid)
+  if server_pid
     log "Stop server (pid #{server_pid})"
-    Process.kill("TERM", server_pid)
+    # Negative pid = the whole process group, so rails/overmind/foreman children all stop.
+    begin
+      Process.kill("TERM", -server_pid)
+    rescue Errno::ESRCH
+      nil
+    end
     begin
       Process.wait(server_pid)
     rescue Errno::ECHILD
@@ -260,9 +268,16 @@ branch = options[:branch] || git_ref
 log "Upload to Bencher (testbed #{options[:testbed]}, branch #{branch})"
 # Report under the checked-out ref so a nightly main run feeds the dedicated main trend while
 # an RC/feature run forms its own series instead of polluting that baseline. (Token + CLI were
-# already verified up front.)
+# already verified up front.) A non-main branch clones main's thresholds (same args as the CI
+# tracker's PR path) so --fail-on-alert actually compares against the baseline instead of
+# starting an empty series that can never alert.
+start_point_args = if branch == "main"
+                     []
+                   else
+                     ["--start-point", "main", "--start-point-clone-thresholds", "--start-point-reset"]
+                   end
 ENV["BENCHER_TESTBED"] = options[:testbed]
-result = BencherRunner.new(benchmark_json:, report_json:).run(branch:, start_point_args: [])
+result = BencherRunner.new(benchmark_json:, report_json:).run(branch:, start_point_args:)
 warn result.stderr unless result.stderr.empty?
 
 if result.report&.regression?
