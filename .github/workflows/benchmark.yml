@@ -191,11 +191,19 @@ jobs:
     needs: [detect-changes, benchmark]
     # always() so it still runs after a suite reports a candidate; gated to main pushes
     # that actually ran benchmark suites so it doesn't spin up on PRs or benchmark-less pushes.
+    # Also gated OFF by default (#4071): on shared GitHub-hosted runners the regression alerts
+    # are dominated by ±50-125% noise and filed a stream of false-positive issues (#4038-#4044).
+    # The trustworthy signal now comes from the dedicated local runner (benchmarks/run-local-
+    # benchmark.rb, #4073). The main-push benchmark job still runs and uploads to Bencher (so the
+    # dashboard and PR-comparison baseline keep updating); only the confirmation + issue-filing
+    # pipeline is disabled. Set the repo variable BENCHMARK_REGRESSION_ISSUES_ENABLED=true to
+    # restore automatic issue filing (e.g. once CI benchmarking moves to a dedicated runner).
     if: >-
       always()
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && needs.detect-changes.outputs.run_benchmark_suites == 'true'
+      && vars.BENCHMARK_REGRESSION_ISSUES_ENABLED == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -255,11 +263,14 @@ jobs:
   # alert was cleared as noise or short-circuited as ignored.
   report-regressions:
     needs: [detect-changes, benchmark, plan-confirmation, confirm-regressions]
+    # Disabled by default with the confirmation pipeline above (#4071): set the repo variable
+    # BENCHMARK_REGRESSION_ISSUES_ENABLED=true to restore automatic issue filing.
     if: >-
       always()
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && needs.detect-changes.outputs.run_benchmark_suites == 'true'
+      && vars.BENCHMARK_REGRESSION_ISSUES_ENABLED == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
