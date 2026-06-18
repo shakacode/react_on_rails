@@ -159,6 +159,19 @@ if options[:setup]
   if pro
     log "Prepare + seed benchmark database"
     run!("bundle exec rails db:prepare", chdir: app_dir, env: { "RAILS_ENV" => "production" })
+    # db:prepare only seeds when it CREATES the database. On a persistent host the DB may
+    # already exist but be empty/stale, in which case /posts_page serves a healthy-looking
+    # 200 ("No posts found") and the benchmark would upload bogus metrics. Verify the tables
+    # the DB-backed routes read, the same guard CI runs after db:prepare.
+    db_guard = <<~'RUBY'
+      counts = { posts: Post.count, users: User.count, comments: Comment.count }
+      empty = counts.select { |_, count| count.zero? }.keys
+      abort("Benchmark DB is empty (#{empty.join(', ')}); reseed it before benchmarking " \
+            "(cd #{Dir.pwd}; RAILS_ENV=production bundle exec rails db:seed)") if empty.any?
+      puts "DB seeded (#{counts.map { |table, count| "#{count} #{table}" }.join(', ')})"
+    RUBY
+    run!("bundle exec rails runner #{Shellwords.escape(db_guard)}", chdir: app_dir,
+                                                                    env: { "RAILS_ENV" => "production" })
   end
 else
   log "Skipping setup (--no-setup); reusing the existing build"
@@ -172,6 +185,11 @@ server_env = {
   "RAILS_MIN_THREADS" => "3"
 }
 server_env["REACT_ON_RAILS_PRO_LICENSE"] = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", "") if pro
+
+# Reject a pre-existing listener BEFORE spawning: otherwise wait_for_server's port check
+# could pass against a stale server/dev process and the benchmark would measure (and upload)
+# the wrong app. On a persistent host this is a real hazard.
+abort "Port #{SERVER_PORT} is already in use — stop the other server/dev process first." if port_open?(SERVER_PORT)
 
 server_pid = nil
 begin
@@ -225,8 +243,12 @@ result = BencherRunner.new(benchmark_json:, report_json:).run(branch: "main", st
 warn result.stderr unless result.stderr.empty?
 
 if result.report&.regression?
+  # A regression means the measurement worked, not that the run failed. BencherRunner passes
+  # --err, so result.exit_code is non-zero on any alert — but the default (trend) mode should
+  # still succeed and just record the point. Only the explicit --fail-on-alert gate fails.
   warn "::warning:: Bencher flagged a performance regression for #{suite[:suite_name]}."
-  exit 1 if options[:fail_on_alert]
+  exit(options[:fail_on_alert] ? 1 : 0)
 end
 
+# No regression: a non-zero exit here is a genuine operational failure (auth/network/CLI).
 exit result.exit_code
