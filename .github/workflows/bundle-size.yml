@@ -82,6 +82,10 @@ jobs:
           fi
           read -ra parents <<< "$(git rev-list --parents -n 1 "$MERGE_SHA")"
           # parents[0] = merge commit, [1] = first parent (base), [2] = second parent (head)
+          if [ "${#parents[@]}" -eq 0 ]; then
+            echo "::error::Could not read parents of github.sha ($MERGE_SHA); the commit is not reachable in this checkout. Ensure this job checks out with fetch-depth: 0."
+            exit 1
+          fi
           if [ "${#parents[@]}" -ne 3 ]; then
             echo "::error::Expected github.sha ($MERGE_SHA) to be a 2-parent merge commit, found $(( ${#parents[@]} - 1 )) parent(s); cannot determine a matching base baseline. Ensure this job checks out with fetch-depth: 0."
             exit 1
@@ -116,10 +120,11 @@ jobs:
       - name: Checkout base branch
         uses: actions/checkout@v4
         with:
+          # Only the working tree at the base parent is needed (not its history), so
+          # the default shallow fetch-depth is enough; checkout@v4 fetches this SHA
+          # directly since it is reachable from the base branch.
           ref: ${{ steps.base-sha.outputs.base-sha }}
           persist-credentials: false
-          # fetch-depth: 0 so the (possibly older) base parent commit is fetchable.
-          fetch-depth: 0
 
       - name: Copy size-limit config to base branch
         run: cp /tmp/size-limit-config.json .size-limit.json
