@@ -314,3 +314,15 @@ per-PR merge-ledger run, stale release-mode classification updates and the final
 distinct), hosted-CI request and waitback when uncertainty remains, and any
 authorized ready/merge action, and the late post-merge bot-finding sweep before
 final batch handoff.
+
+When the batch goal delegates merge authority, definition of done for a target is merged +
+closed out (or a true blocker / no-PR with evidence), not "stopped at a recommendation." When
+merge authority is NOT delegated, done is a complete merge-readiness handoff per `AGENTS.md` —
+all current-head checks and review threads satisfied, with evidence and the `Agent Merge
+Confidence` note recorded — for the maintainer to merge; do not merge without authorization.
+Either way, do not surface merge readiness while review threads are still unresolved.
+
+Converge the review loop instead of chasing it: each push re-triggers every configured
+review bot on the new head, so resolve advisory threads in-thread (reply + resolve)
+**without a commit**, and reserve pushes for batched confirmed blockers. See
+[Review-Loop Convergence](../../workflows/pr-processing.md#review-loop-convergence-push-amplification).

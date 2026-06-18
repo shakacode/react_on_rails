@@ -778,6 +778,23 @@ Use targeted checks when a full local run is too expensive, but explain the subs
 
 Use the 15-minute rule from `AGENTS.md`: if another short local check would likely catch the failure before CI, run it locally.
 
+### Local-vs-CI parity (blind spots)
+
+"Lint/tests pass locally" is not the same as "CI is green." Two classes of gap recur and are worth an
+explicit check before claiming readiness:
+
+- **Repo-wide gates are invisible to changed-files-only checks.** Linting just your diff (e.g.
+  `eslint <changed files>`) can pass while a separate CI step that scans the whole tree fails — for
+  example the Pro license-header check (`script/check-pro-license-headers --check`). Run the package's
+  actual CI lint target, not only your diff, especially when adding new files.
+- **A new test can be silently excluded from the test command.** A test that passes when invoked
+  directly may never run in CI because the package's `test` script filters paths (e.g. a
+  `testPathIgnorePatterns` that ignores `stream`, or an `*.rsc.test.*`-only target). After adding a
+  test, confirm the package's real `test` command actually executes it; otherwise the coverage is
+  illusory.
+- **Some suites cannot run locally** (heavy RSC/streaming E2E, hosted-only secrets). Lean on hosted
+  CI as the gate for those and say so explicitly rather than implying full local validation.
+
 ## Review Churn Measurement
 
 For each non-trivial or high-risk batch, add lightweight churn notes to the PR body or latest
@@ -891,6 +908,29 @@ from the latest fix, waiver, or triage reply.
 The batch coordinator or merge finalizer owns the closeout sweep for late post-merge bot findings
 before final batch handoff. Findings that arrive after closeout route into the next post-merge audit
 intake by default.
+
+### Review-Loop Convergence (push amplification)
+
+Every push re-triggers all configured review agents on the new head SHA, and each may emit a fresh
+batch of comments — including re-raises of already-addressed points, dead-code observations, optional
+nits, and positive confirmations. Responding to each comment with a commit therefore never
+terminates: every fix manufactures another full review round (and another CI cycle and reviewer-quota
+spend). Converge deliberately:
+
+- Use the local pre-push adversarial review (e.g. `codex review --base origin/<base>`) as the
+  authoritative gate to find real bugs cheaply, before any push. Treat the post-push GitHub review
+  bots (Claude, CodeRabbit, Greptile, Cursor Bugbot, Codex GitHub review) as advisory input to
+  triage per `AGENTS.md`, not as a gate to satisfy comment-by-comment.
+- Batch all confirmed blockers into a single push; do not push one fix per comment.
+- Resolve every remaining advisory thread in-thread (reply with rationale, then resolve) **without a
+  commit**. Resolving a thread does not re-trigger the review workflows, so the loop converges; a new
+  push restarts it. Never resolve a confirmed blocker by reply alone.
+- When the same class of finding recurs across rounds at different code sites, stop patching per-site
+  and apply one root-cause fix — recurrence across entry points is the signal to centralize.
+- Terminating state: authoritative/local review clean + the CI-readiness verdict is `READY`
+  (`.agents/skills/pr-batch/bin/pr-ci-readiness <PR>` — required checks, falling back to the full
+  current-head check list when no required checks are configured; an empty list is `UNKNOWN`/not
+  ready) + `mergeStateStatus` CLEAN + zero unresolved review threads reached via replies, not pushes.
 
 ## Review Completion Gate
 
