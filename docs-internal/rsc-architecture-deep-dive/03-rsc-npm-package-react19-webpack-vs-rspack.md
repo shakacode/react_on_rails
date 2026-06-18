@@ -325,7 +325,7 @@ WEBPACK vs RSPACK
 - `node_modules/react-on-rails-rsc/dist/react-server-dom-webpack/…` — vendored React runtime
 - `packages/react-on-rails-pro/src/ReactOnRailsRSC.ts`, `getReactServerComponent.server.ts` — consumers
 - `config/webpack/rscWebpackConfig.js` — the `react-server` condition + loader
-- `config/rspack/rspack.config.js` — delegates to webpack config
+- `react_on_rails/spec/dummy/config/rspack/rspack.config.js` — delegates to webpack config (OSS dummy only; the Pro dummy has no `config/rspack/`)
 - `config/shakapacker.yml` — `assets_bundler`, `javascript_transpiler`
 - `react_on_rails/lib/generators/react_on_rails/js_dependency_manager.rb` — `RSC_*` version pins
 - `react_on_rails/lib/generators/react_on_rails/rsc_setup.rb` — generator wiring

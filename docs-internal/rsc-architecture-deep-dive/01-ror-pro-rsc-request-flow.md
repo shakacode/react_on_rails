@@ -267,7 +267,9 @@ page. You fetch **just a new payload**:
 - Rails side of that endpoint:
   `react_on_rails_pro/lib/react_on_rails_pro/concerns/rsc_payload_renderer.rb` →
   **`rsc_payload`** action → `stream_view_containing_react_components(template: 'rsc_payload.text.erb')`,
-  `content_type: "application/x-ndjson"`.
+  `content_type: "application/x-ndjson"`. (The HTTP `Content-Type` header is `application/x-ndjson`, but
+  the body itself uses the length‑prefixed framing described in §4.E — the client always parses it with
+  `LengthPrefixedStreamParser`, not as line‑delimited JSON.)
   Route defined in `react_on_rails_pro/lib/react_on_rails_pro/routes.rb` → **`rsc_payload_route`**
   (`GET /rsc_payload_generation_url/:component_name`). Template:
   `react_on_rails_pro/app/views/react_on_rails_pro/rsc_payload.text.erb`.

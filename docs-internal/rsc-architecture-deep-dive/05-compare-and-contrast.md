@@ -28,12 +28,12 @@ Rails Pro.
 Same concepts, different names. Keep this handy when reading either codebase.
 
 | Concept                                 | React on Rails Pro                                                                      | Next.js (App Router)                                                     |
-| --------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | --- | --- | ------- |
+| --------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | What renders the page                   | a Rails controller calling `stream_react_component`                                     | file‑system route (`page.tsx`/`layout.tsx`) → **loader tree**            |
 | RSC payload (the "order ticket")        | "RSC payload" / Flight                                                                  | "Flight" / RSC payload                                                   |
 | Inlined‑payload global                  | `window.REACT_ON_RAILS_RSC_PAYLOADS[key]`                                               | `self.__next_f`                                                          |
 | Inliner                                 | `injectRSCPayload.ts` (3 ordered buffers)                                               | `createInlinedDataReadableStream` + `continueFizzStream`                 |
-| Wire framing                            | length‑prefixed `metadata\thexlen\ncontent` NDJSON                                      | tuple pushes `push([0                                                    | 1   | 2   | 3, …])` |
+| Wire framing                            | length‑prefixed `metadata\thexlen\ncontent` NDJSON                                      | tuple pushes `push([0 \| 1 \| 2 \| 3, …])`                               |
 | Make payload (server)                   | `serverRenderRSCReactComponent` → `buildServerRenderer`                                 | `renderToNodeFlightStream` → `react-server-dom-*/server`                 |
 | Payload → HTML (SSR)                    | server bundle `createFromNodeStream`                                                    | `App` → `getFlightStream` → `createFromNodeStream`                       |
 | Hydrate from inlined payload            | `createFromPreloadedPayloads` → `createFromReadableStream`                              | drain `__next_f` → `createFromReadableStream`                            |
@@ -159,8 +159,8 @@ The Flight **algorithm** is identical everywhere (it lives once in React's priva
 | Parcel           | `parcelRequire(id)`         | `parcelRequire.load(url)`             | refs resolved at build time                         |
 
 That's the _entire_ reason there's a `react-server-dom-<bundler>` family. webpack and rspack share one
-because they share the `__webpack_*` primitives. (Detail: doc 05's sibling research — React monorepo
-`ReactFlightClientConfigBundler*.js`.)
+because they share the `__webpack_*` primitives. (Detail: see the React monorepo's
+`ReactFlightClientConfigBundler*.js` files.)
 
 ---
 

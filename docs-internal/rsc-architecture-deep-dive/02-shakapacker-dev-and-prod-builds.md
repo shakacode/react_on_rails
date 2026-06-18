@@ -235,7 +235,7 @@ exact bundle matching the running Rails code (version skew protection).
 
 ---
 
-## 6. File index (relative to repo root, Pro dummy app)
+## 6. File index (paths relative to `react_on_rails_pro/spec/dummy/`, the Pro dummy app)
 
 - `config/shakapacker.yml` — all the knobs (dev_server, hmr, extract_css, assets_bundler)
 - `Procfile.dev` / `Procfile.static` / `Procfile.prod` — process sets
