@@ -723,6 +723,7 @@ describe ReactOnRailsHelper do
 
     context "with hydrate_on and React on Rails Pro installed" do
       it "rejects deferred scheduling modes" do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
         expect do
           react_component("App", hydrate_on: :visible)
         end.to raise_error(ArgumentError, /React on Rails Pro does not support hydrate_on scheduling/)

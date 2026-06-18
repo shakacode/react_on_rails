@@ -185,6 +185,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     end
 
     it "rejects deferred modes when React on Rails Pro is installed" do
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
       expect do
         described_class.new(**the_attrs(options: { hydrate_on: :visible }))
       end.to raise_error(ArgumentError, /React on Rails Pro does not support hydrate_on scheduling/)

@@ -842,6 +842,7 @@ describe('ClientRenderer', () => {
       type ObserverCallback = ConstructorParameters<typeof IntersectionObserver>[0];
       let observerCallback!: ObserverCallback;
       const renderError = new Error('scheduled render boom');
+      const originalMessage = renderError.message;
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
       mockHydrateOrRender.mockImplementationOnce(() => {
@@ -872,8 +873,14 @@ describe('ClientRenderer', () => {
           {} as IntersectionObserver,
         );
       }).not.toThrow();
+      // prepareRenderError mutates renderError.message after the first console.error call; both
+      // recorded argument references point to the same (now-mutated) object. Verify the spy was
+      // called twice with the error object, and that the mutation happened as expected.
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
       expect(consoleErrorSpy).toHaveBeenNthCalledWith(1, renderError);
       expect(consoleErrorSpy).toHaveBeenNthCalledWith(2, renderError);
+      // originalMessage was recorded before the callback mutated it; verify the mutation did occur.
+      expect(originalMessage).toBe('scheduled render boom');
       expect(renderError.message).toBe(
         'ReactOnRails encountered an error while rendering component: TestComponent. See above error message.',
       );

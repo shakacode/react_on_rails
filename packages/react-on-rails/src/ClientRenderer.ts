@@ -32,6 +32,8 @@ type WindowWithIdleCallback = Window & {
 type ScheduledRenderEntry = {
   kind: 'scheduled';
   cancel: () => void;
+  // Retained for same-node replacement detection: renderElement reads `entry.domNode` when an
+  // existing scheduled entry occupies the same `domNodeId` to decide whether to skip or evict it.
   domNode: Element;
 };
 
@@ -166,6 +168,13 @@ function scheduleWhenVisible(domNode: Element, callback: () => void): () => void
 
   const observer = new IntersectionObserver(
     (entries) => {
+      // Disconnect early if the target was removed outside Turbo navigation to avoid a
+      // leaked observer holding a live reference to a detached node.
+      const target = entries[0]?.target;
+      if (target && !target.isConnected) {
+        observer.disconnect();
+        return;
+      }
       const isVisible = entries.some((entry) => entry.isIntersecting || entry.intersectionRatio > 0);
       if (!isVisible) return;
 
@@ -192,6 +201,8 @@ function scheduleWhenIdle(callback: () => void): () => void {
     };
   }
 
+  // Safari lacks requestIdleCallback; 50 ms defers past the current frame without a layout-blocking
+  // setTimeout(0) but still far enough before most long-idle periods (matching common polyfill defaults).
   return scheduleTimeout(callback, 50);
 }
 
@@ -204,6 +215,8 @@ function scheduleHydration(hydrateOn: HydrateOnMode, domNode: Element, callback:
     return scheduleWhenIdle(callback);
   }
 
+  // Defensive: `renderElement` short-circuits for `immediate` before calling `scheduleHydration`, so
+  // this branch is normally unreachable; it acts as a safe fallback guard for future callers.
   callback();
   return () => {};
 }
