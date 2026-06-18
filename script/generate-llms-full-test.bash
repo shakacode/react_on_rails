@@ -134,6 +134,30 @@ MD
 # How React on Rails Works
 
 Architecture overview.
+
+<p>
+  <img src="images/architecture.svg" alt="Rails sends render requests to the Node Renderer." width="840" />
+</p>
+
+Also referenced inline: ![Data flow diagram](images/data-flow.svg)
+
+A PNG screenshot is not a diagram and must pass through verbatim:
+
+<p>
+  <img src="images/screenshot.png" alt="App screenshot" width="840" />
+</p>
+
+An SVG diagram with empty alt degrades to a bare marker:
+
+<p>
+  <img src="images/no-alt.svg" alt="" width="840" />
+</p>
+
+A JSX example must not be rewritten:
+
+```jsx
+<img src={thumbnail} alt="thumbnail" />
+```
 MD
 
   cat > docs/pro/react-on-rails-pro.md <<'MD'
@@ -267,7 +291,43 @@ test_split_threshold_exceeded_fails_check() {
   assert_contains "$out" "above the 2048 KiB split threshold"
 }
 
+test_svg_diagram_embeds_become_text_descriptions() {
+  write_fixture
+
+  local oss
+  oss="$(cat llms-full.txt)"
+
+  # The <p><img .svg/></p> embed is replaced by its alt text, and the raw <img>
+  # tag (a dead relative path in the text reference) is gone.
+  assert_contains "$oss" "[Diagram: Rails sends render requests to the Node Renderer.]"
+  if printf '%s' "$oss" | grep -q "images/architecture.svg"; then
+    fail "expected the SVG <img> embed to be replaced by its alt text"
+  fi
+
+  # The markdown ![alt](.svg) form is handled too.
+  assert_contains "$oss" "[Diagram: Data flow diagram]"
+  if printf '%s' "$oss" | grep -q "images/data-flow.svg"; then
+    fail "expected the markdown .svg image to be replaced by its alt text"
+  fi
+
+  # A JSX <img> inside a fenced code block stays verbatim — it is a code
+  # example, not a diagram embed.
+  assert_contains "$oss" '<img src={thumbnail} alt="thumbnail" />'
+
+  # A non-SVG image (PNG screenshot) is not a diagram and passes through
+  # verbatim — only .svg embeds are rewritten.
+  assert_contains "$oss" '<img src="images/screenshot.png" alt="App screenshot" width="840" />'
+
+  # An SVG embed with empty alt degrades to a bare [Diagram] marker rather
+  # than emitting an empty description or leaving the dead <img> path behind.
+  assert_contains "$oss" "[Diagram]"
+  if printf '%s' "$oss" | grep -q "images/no-alt.svg"; then
+    fail "expected the empty-alt SVG <img> embed to collapse to a [Diagram] marker"
+  fi
+}
+
 run_test test_complete_sidebar_top_level_sections_pass_check
+run_test test_svg_diagram_embeds_become_text_descriptions
 run_test test_split_produces_oss_and_pro_files
 run_test test_missing_sidebar_top_level_section_fails_check
 run_test test_unresolvable_sidebar_top_level_entry_fails_check
