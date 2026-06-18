@@ -109,10 +109,13 @@ export const assertRailsContextWithServerStreamingCapabilities: (
 ): asserts context is RailsContextWithServerStreamingCapabilities => {
   assertRailsContextWithServerComponentMetadata(context);
 
+  // Verify the capabilities are callable, not merely present, so a misconfigured context fails here
+  // with the intended diagnostic instead of crashing later at a call site.
+  const capabilities = context as Record<string, unknown>;
   if (
-    !('getRSCPayloadStream' in context) ||
-    !('addPostSSRHook' in context) ||
-    !('recordRSCDiagnostic' in context)
+    typeof capabilities.getRSCPayloadStream !== 'function' ||
+    typeof capabilities.addPostSSRHook !== 'function' ||
+    typeof capabilities.recordRSCDiagnostic !== 'function'
   ) {
     throwRailsContextMissingEntries('getRSCPayloadStream, addPostSSRHook, and recordRSCDiagnostic functions');
   }

@@ -146,9 +146,10 @@ export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Err
 
   const combinedError = new Error(message);
   combinedError.name = RSC_STREAM_DIAGNOSTIC_ERROR_NAME;
-  // Reduce the stack to the header line for the same reason as buildRSCStreamDiagnosticError: a
-  // V8-generated stack would point at this diagnostics module and mislead error monitors. The
-  // candidate diagnostics' own stacks are preserved on the combined message body.
+  // Build the stack manually rather than keeping the V8-generated one, which would point at this
+  // diagnostics module and mislead error monitors (same reasoning as buildRSCStreamDiagnosticError).
+  // Each candidate's own stack is preserved below (labeled), so the real failing frames survive
+  // without the synthetic combiner frames.
   combinedError.stack = [
     `${combinedError.name}: ${message}`,
     ...diagnosticErrors.map((error, index) => error.stack && `Candidate ${index + 1} stack:\n${error.stack}`),
