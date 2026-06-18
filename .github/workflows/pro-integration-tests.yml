@@ -898,14 +898,6 @@ jobs:
           rm -rf public/packs-test
           RAILS_ENV="test" NODE_ENV="test" ./bin/shakapacker 2>&1 | tee "$RUNNER_TEMP/execjs-rspack-build.log"
 
-      - name: Upload Rspack build log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: execjs-rspack-build-log
-          path: ${{ runner.temp }}/execjs-rspack-build.log
-          if-no-files-found: ignore
-
       - name: Verify ExecJS-compatible dummy bundles were built with Rspack
         # Guard against a silent bundler fallback. Shakapacker logs
         # "[Shakapacker] Completed <bundler> build" based on the resolved bundler, which is driven by
@@ -926,3 +918,13 @@ jobs:
 
       - name: Verify Rspack test bundles were emitted
         run: test -s spec/execjs-compatible-dummy/public/packs-test/manifest.json
+
+      - name: Upload Rspack build log on failure
+        # Placed after the verification steps so `if: failure()` captures a failure from any prior step
+        # in this job -- not only the build step, but also the bundler/manifest verification steps below.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: execjs-rspack-build-log
+          path: ${{ runner.temp }}/execjs-rspack-build.log
+          if-no-files-found: ignore
