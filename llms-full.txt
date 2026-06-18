@@ -1451,6 +1451,7 @@ versions stay compatible:
 - `react_on_rails` (gem)
 - `react-on-rails` (npm)
 - `react_on_rails_pro` (gem)
+- `react-on-rails-pro` (npm)
 - `react-on-rails-pro-node-renderer` (npm)
 - `react-on-rails-rsc` (npm), if you use React Server Components — see
   [shakacode/react_on_rails_rsc#109](https://github.com/shakacode/react_on_rails_rsc/issues/109)
