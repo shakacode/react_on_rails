@@ -347,8 +347,8 @@ language in an implementation PR, combined investigation PR, or no-PR evidence
 comment. Concrete corrective implementation PRs are not blocked merely because
 the target involves investigation or benchmark evidence.
 
-See the gate criteria in `.agents/skills/evaluate-issue/SKILL.md` (step 4d --
-"Evaluate the fix plan separately"). When the gate cannot be satisfied, carry
+See the gate criteria in `.agents/skills/evaluate-issue/SKILL.md` under the
+"Evaluate the fix plan separately" step. When the gate cannot be satisfied, carry
 only a caveated no-PR `park` disposition or a product-decision blocker.
 
 Workers should not turn product-decision blockers into speculative PRs. They should post or draft the evidence-backed question and stop that target.
