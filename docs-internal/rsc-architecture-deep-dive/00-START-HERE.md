@@ -158,5 +158,7 @@ Suggested path:
 - **React RSC runtimes:** a fresh shallow clone of `facebook/react` —
   `packages/react-server-dom-{webpack,turbopack,parcel,esm,unbundled}`, `react-server`, `react-client`.
 
-The clones live under `.context/next-research/repos/` (gitignored) in this workspace if you want to
-browse the exact files referenced.
+These reference repos are **not committed** to this repository. To browse the exact files cited in
+docs 03–05, clone `vercel/next.js` and `facebook/react` yourself (a shallow clone is enough). The
+original research used local checkouts under `.context/next-research/repos/`, but that path only
+exists in the author's workspace.

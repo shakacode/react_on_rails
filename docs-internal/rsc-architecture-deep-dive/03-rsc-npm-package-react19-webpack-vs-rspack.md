@@ -73,8 +73,7 @@ package lets ShakaCode cut RSC‑runtime releases on React's cadence, decoupled 
 project's docs explicitly call out that **early builds (19.0.0–19.0.3) vendored older
 `react-server-dom-webpack` builds** that were fixed in **19.0.4**, and that several security fixes
 landed across that range — see `CHANGELOG.md` and `docs/oss/migrating/rsc-preparing-app.md` for the
-authoritative list and the exact CVE references (don't quote CVE numbers from memory; read the
-CHANGELOG).
+authoritative list and the exact CVE references.
 
 > Repo of record: **`shakacode/react_on_rails_rsc`** (separate from the main monorepo). npm name
 > `react-on-rails-rsc` (the published `name` field is unscoped — `react-on-rails-rsc`).

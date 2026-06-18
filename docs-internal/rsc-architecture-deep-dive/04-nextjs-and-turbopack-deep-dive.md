@@ -1,6 +1,6 @@
 # 04 — Next.js (App Router) + Turbopack: A Deep Dive
 
-> Researched against a fresh clone of **`vercel/next.js`** (v16.3.0‑canary) including the full
+> Researched against a fresh clone of **`vercel/next.js`** (v16.3.0‑canary, June 2026) including the full
 > `turbopack/` + `crates/` Rust source, and **`facebook/react`** (the `react-server-dom-*` runtimes).
 > 🧒 ELI5 boxes explain the ideas; 🛠️ sections give exact files/symbols (paths relative to the
 > next.js repo root). Read alongside docs 01–03 — the concepts map almost one‑to‑one onto React on
