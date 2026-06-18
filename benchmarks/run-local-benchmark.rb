@@ -203,6 +203,9 @@ begin
   bench_env = {
     "PRO" => pro.to_s,
     "BASE_URL" => "localhost:#{SERVER_PORT}",
+    # Lets bench.rb's BenchmarkTargetMonitor discard metrics if the server dies mid-run
+    # instead of uploading numbers from a dead/restarting target (same as the CI suite).
+    "TARGET_PID" => server_pid.to_s,
     "BENCHMARK_TOOL" => suite.fetch(:benchmark_tool),
     "RATE" => options[:rate],
     "DURATION" => options[:duration],
@@ -250,5 +253,8 @@ if result.report&.regression?
   exit(options[:fail_on_alert] ? 1 : 0)
 end
 
-# No regression: a non-zero exit here is a genuine operational failure (auth/network/CLI).
+# Bencher also exits non-zero on a stale/filtered alert (one it still lists but that is not a
+# current regression). That is not a failure — match track_benchmarks.rb and treat it as
+# success. A non-zero exit with NO alert at all is a genuine operational failure (auth/CLI).
+exit 0 if result.exit_code != 0 && result.report&.filtered_alert?
 exit result.exit_code
