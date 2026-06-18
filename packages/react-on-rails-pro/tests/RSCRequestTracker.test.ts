@@ -205,6 +205,41 @@ describe('RSCRequestTracker', () => {
     }, 5000);
   });
 
+  describe('captured RSC diagnostics (#3475)', () => {
+    it('starts with no captured diagnostics', () => {
+      const tracker = createTracker();
+      expect(tracker.getCapturedRSCDiagnostics()).toEqual([]);
+    });
+
+    it('records diagnostics keyed by component name and returns a copy', () => {
+      const tracker = createTracker();
+      const firstError = new Error('first');
+      const secondError = new Error('second');
+
+      tracker.recordRSCDiagnostic('CommentsToggle', firstError);
+      tracker.recordRSCDiagnostic('PostsPage', secondError);
+
+      const captured = tracker.getCapturedRSCDiagnostics();
+      expect(captured).toEqual([
+        { componentName: 'CommentsToggle', diagnosticError: firstError },
+        { componentName: 'PostsPage', diagnosticError: secondError },
+      ]);
+
+      // Returned array is a copy — mutating it must not affect the tracker.
+      captured.push({ componentName: 'Injected', diagnosticError: new Error('nope') });
+      expect(tracker.getCapturedRSCDiagnostics()).toHaveLength(2);
+    });
+
+    it('clears captured diagnostics on clear()', () => {
+      const tracker = createTracker();
+      tracker.recordRSCDiagnostic('CommentsToggle', new Error('boom'));
+      expect(tracker.getCapturedRSCDiagnostics()).toHaveLength(1);
+
+      tracker.clear();
+      expect(tracker.getCapturedRSCDiagnostics()).toEqual([]);
+    });
+  });
+
   // Integration tests: RSCRequestTracker + injectRSCPayload wired together.
   //
   // These test the rendering pipeline when the RSC payload exceeds the default

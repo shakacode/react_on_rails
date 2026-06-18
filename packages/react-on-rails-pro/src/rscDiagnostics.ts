@@ -121,6 +121,44 @@ export const buildRSCStreamDiagnosticError = (
 };
 
 /**
+ * Builds a single combined diagnostic from multiple captured RSC bundle diagnostics.
+ *
+ * Used for the deferred-render path when more than one RSC component diagnostic was captured this
+ * render (#3475). React's `onError` carries no component key, so the failing component is ambiguous;
+ * rather than pinpoint one (which could be wrong), this lists every captured component diagnostic as
+ * a candidate. The returned error mirrors the shape of `buildRSCStreamDiagnosticError` so the
+ * existing `mergeRSCStreamDiagnosticError` flow can consume it.
+ *
+ * @param diagnosticErrors - Two or more diagnostics built by `buildRSCStreamDiagnosticError`
+ */
+export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Error | undefined => {
+  if (diagnosticErrors.length === 0) return undefined;
+  if (diagnosticErrors.length === 1) return diagnosticErrors[0];
+
+  const candidateBlocks = diagnosticErrors
+    .map((error, index) => `Candidate ${index + 1}:\n${error.message}`)
+    .join('\n\n');
+  const message = [
+    '[ReactOnRails] RSC bundle rendering failed during the deferred render phase.',
+    `React surfaced the failure without a component key, so one of these ${diagnosticErrors.length} RSC components failed (exact component unknown):`,
+    candidateBlocks,
+  ].join('\n\n');
+
+  const combinedError = new Error(message);
+  combinedError.name = RSC_STREAM_DIAGNOSTIC_ERROR_NAME;
+  // Reduce the stack to the header line for the same reason as buildRSCStreamDiagnosticError: a
+  // V8-generated stack would point at this diagnostics module and mislead error monitors. The
+  // candidate diagnostics' own stacks are preserved on the combined message body.
+  combinedError.stack = [
+    `${combinedError.name}: ${message}`,
+    ...diagnosticErrors.map((error, index) => error.stack && `Candidate ${index + 1} stack:\n${error.stack}`),
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join('\n\n');
+  return combinedError;
+};
+
+/**
  * Merges a generic React stream error with the original RSC bundle diagnostic.
  *
  * Idempotent on `error`: if `error` is already a merged result (carries `MERGED_DIAGNOSTIC_FLAG`)

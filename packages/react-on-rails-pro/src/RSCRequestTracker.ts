@@ -30,6 +30,19 @@ import { extractErrorMessage } from './utils.ts';
  * It includes both tracking functionality for the server renderer and fetching
  * functionality for components.
  */
+/**
+ * A captured RSC bundle diagnostic for a single component, recorded during stream parse.
+ *
+ * Kept render-scoped on the tracker so it survives past the `getReactServerComponentOnServer`
+ * call that captured it. This is what lets the deferred-render path (where React surfaces the
+ * failure through `renderToPipeableStream`'s `onError` rather than rejecting the stream parse)
+ * recover the original diagnostic — see #3475.
+ */
+export type CapturedRSCDiagnostic = {
+  componentName: string;
+  diagnosticError: Error;
+};
+
 class RSCRequestTracker {
   private streams: RSCPayloadStreamInfo[] = [];
 
@@ -45,6 +58,8 @@ class RSCRequestTracker {
   private cleared = false;
 
   private callbacks: RSCPayloadCallback[] = [];
+
+  private capturedRSCDiagnostics: CapturedRSCDiagnostic[] = [];
 
   private railsContext: RailsContextWithServerComponentMetadata;
 
@@ -102,6 +117,31 @@ class RSCRequestTracker {
     this.sourceStreams = [];
     this.streams = [];
     this.callbacks = [];
+    this.capturedRSCDiagnostics = [];
+  }
+
+  /**
+   * Records an RSC bundle diagnostic captured while parsing a component's payload stream.
+   *
+   * Called from `getReactServerComponentOnServer` when `transformRSCStream` surfaces a
+   * `renderingError` via `onDiagnosticError`. Storing it here (render-scoped) lets the surfacing
+   * site recover it even when the failure propagates through React's deferred render phase rather
+   * than rejecting the stream parse synchronously (#3475).
+   *
+   * @param componentName - Name of the server component the diagnostic belongs to
+   * @param diagnosticError - The diagnostic built by `buildRSCStreamDiagnosticError`
+   */
+  recordRSCDiagnostic(componentName: string, diagnosticError: Error): void {
+    this.capturedRSCDiagnostics.push({ componentName, diagnosticError });
+  }
+
+  /**
+   * Returns all RSC bundle diagnostics captured during this render.
+   *
+   * @returns A copy of the captured diagnostics to prevent external mutation
+   */
+  getCapturedRSCDiagnostics(): CapturedRSCDiagnostic[] {
+    return [...this.capturedRSCDiagnostics];
   }
 
   /**

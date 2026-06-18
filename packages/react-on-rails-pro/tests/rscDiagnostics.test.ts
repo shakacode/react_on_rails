@@ -23,9 +23,11 @@ import { Readable } from 'stream';
 import transformRSCStream from '../src/transformRSCNodeStream.ts';
 import {
   buildRSCStreamDiagnosticError,
+  combineRSCStreamDiagnosticErrors,
   extractModulePathFromStack,
   mergeRSCStreamDiagnosticError,
   MERGED_DIAGNOSTIC_FLAG,
+  RSC_STREAM_DIAGNOSTIC_ERROR_NAME,
 } from '../src/rscDiagnostics.ts';
 
 const encodeLengthPrefixedChunk = (metadata: Record<string, unknown>, content: string) => {
@@ -238,6 +240,74 @@ describe('RSC diagnostics', () => {
 
     expect(Object.keys(mergedError)).not.toContain(MERGED_DIAGNOSTIC_FLAG);
     expect(Object.prototype.hasOwnProperty.call(mergedError, MERGED_DIAGNOSTIC_FLAG)).toBe(true);
+  });
+
+  describe('combineRSCStreamDiagnosticErrors', () => {
+    const makeDiagnostic = (componentName: string) =>
+      buildRSCStreamDiagnosticError(
+        {
+          hasErrors: true,
+          renderingError: {
+            message: `boom in ${componentName}`,
+            stack: `Error: boom\n    at ${componentName} (/app/components/${componentName}.jsx:3:5)`,
+          },
+        },
+        { componentName },
+      ) as Error;
+
+    it('returns undefined when no diagnostics are provided', () => {
+      expect(combineRSCStreamDiagnosticErrors([])).toBeUndefined();
+    });
+
+    it('returns the single diagnostic unchanged when exactly one is provided', () => {
+      const diagnostic = makeDiagnostic('CommentsToggle');
+      expect(combineRSCStreamDiagnosticErrors([diagnostic])).toBe(diagnostic);
+    });
+
+    it('lists every captured component as a candidate when two or more are provided', () => {
+      const combined = combineRSCStreamDiagnosticErrors([
+        makeDiagnostic('CommentsToggle'),
+        makeDiagnostic('PostsPage'),
+      ]) as Error;
+
+      expect(combined.name).toBe(RSC_STREAM_DIAGNOSTIC_ERROR_NAME);
+      expect(combined.message).toContain('one of these 2 RSC components failed');
+      // Never a single false pinpoint — both candidates are named.
+      expect(combined.message).toContain('Candidate 1:');
+      expect(combined.message).toContain('Component: CommentsToggle');
+      expect(combined.message).toContain('Module: /app/components/CommentsToggle.jsx');
+      expect(combined.message).toContain('Candidate 2:');
+      expect(combined.message).toContain('Component: PostsPage');
+      expect(combined.message).toContain('Module: /app/components/PostsPage.jsx');
+    });
+
+    it('reduces the combined stack to the header line so monitors do not misattribute the origin', () => {
+      const combined = combineRSCStreamDiagnosticErrors([
+        makeDiagnostic('CommentsToggle'),
+        makeDiagnostic('PostsPage'),
+      ]) as Error;
+
+      expect(combined.stack?.split('\n')[0]).toBe(`${combined.name}: ${combined.message.split('\n')[0]}`);
+      expect(combined.stack).not.toContain('rscDiagnostics');
+      // Candidate stacks are preserved for debugging.
+      expect(combined.stack).toContain('Candidate 1 stack:');
+      expect(combined.stack).toContain('Candidate 2 stack:');
+    });
+
+    it('merges cleanly into a generic React stream error via mergeRSCStreamDiagnosticError', () => {
+      const combined = combineRSCStreamDiagnosticErrors([
+        makeDiagnostic('CommentsToggle'),
+        makeDiagnostic('PostsPage'),
+      ]);
+      const reactStreamError = new Error('An error occurred in the Server Components render.');
+
+      const merged = mergeRSCStreamDiagnosticError(reactStreamError, combined);
+
+      expect(merged.message).toContain('one of these 2 RSC components failed');
+      expect(merged.message).toContain(
+        'React stream error: An error occurred in the Server Components render.',
+      );
+    });
   });
 
   it('treats a merged diagnostic as idempotent even when the message format changes', () => {

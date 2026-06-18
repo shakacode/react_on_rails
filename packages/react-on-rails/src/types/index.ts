@@ -69,6 +69,10 @@ export type RailsContextWithServerComponentMetadata = RailsContext & {
 export type RailsContextWithServerStreamingCapabilities = RailsContextWithServerComponentMetadata & {
   getRSCPayloadStream: (componentName: string, props: unknown) => Promise<NodeJS.ReadableStream>;
   addPostSSRHook: (hook: () => void) => void;
+  // Records an RSC bundle diagnostic captured while parsing a component's payload stream so the
+  // render-scoped error-surfacing site can recover it even when the failure propagates through
+  // React's deferred render phase rather than rejecting the stream parse synchronously (#3475).
+  recordRSCDiagnostic: (componentName: string, diagnosticError: Error) => void;
 };
 
 const throwRailsContextMissingEntries = (missingEntries: string) => {
@@ -105,8 +109,12 @@ export const assertRailsContextWithServerStreamingCapabilities: (
 ): asserts context is RailsContextWithServerStreamingCapabilities => {
   assertRailsContextWithServerComponentMetadata(context);
 
-  if (!('getRSCPayloadStream' in context) || !('addPostSSRHook' in context)) {
-    throwRailsContextMissingEntries('getRSCPayloadStream and addPostSSRHook functions');
+  if (
+    !('getRSCPayloadStream' in context) ||
+    !('addPostSSRHook' in context) ||
+    !('recordRSCDiagnostic' in context)
+  ) {
+    throwRailsContextMissingEntries('getRSCPayloadStream, addPostSSRHook, and recordRSCDiagnostic functions');
   }
 };
 

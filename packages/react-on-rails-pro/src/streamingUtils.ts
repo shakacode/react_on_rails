@@ -335,6 +335,7 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
     ...railsContext,
     addPostSSRHook: postSSRHookTracker.addPostSSRHook.bind(postSSRHookTracker),
     getRSCPayloadStream: rscRequestTracker.getRSCPayloadStream.bind(rscRequestTracker),
+    recordRSCDiagnostic: rscRequestTracker.recordRSCDiagnostic.bind(rscRequestTracker),
   };
 
   const optionsWithStreamingCapabilities = {
