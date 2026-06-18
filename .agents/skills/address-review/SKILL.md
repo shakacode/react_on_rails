@@ -221,6 +221,8 @@ Triage rules:
 - Deduplicate overlapping comments before classifying them. Keep one representative item for the underlying issue.
 - Verify factual claims locally before classifying a comment as `MUST-FIX`.
 - If a claim appears wrong, classify it as `SKIPPED` and note briefly why.
+- When a reviewer identifies an unexplained sibling-lock version split, platform-precompiled/source-build transition, or new build-time dependency, treat the lockfile dependency drift item as `MUST-FIX`.
+  - Verify the lockfile diff and require either alignment or an explicit rationale in PR evidence before classifying the item as resolved.
 - Preserve the original review comment ID and thread ID when available so the command can reply to the correct place and resolve the correct thread later.
 - Treat actionable review summary bodies as normal feedback to classify (`MUST-FIX`/`DISCUSS` as appropriate); skip only boilerplate or status-only summaries.
 

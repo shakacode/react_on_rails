@@ -81,6 +81,21 @@ Before implementation or worker launch, produce:
 
 If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/goal` prompt. Do not begin implementation from plan approval unless the user explicitly says to launch now.
 
+## Handoff Contract
+
+For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
+`.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
+controls. For lockfile changes, include Dependabot ecosystem and
+directory/directories compatibility plus the lockfile content-diff note:
+
+- changed dependencies
+- rationale
+- sibling-lock comparison
+- any platform-precompiled / source-build or build-time dependency change
+
+This per-PR requirement also applies to each individual target PR in the batch
+whose committed lockfiles change.
+
 ## Goal Prompt Template
 
 Keep this template aligned with the matching plan-to-goal prompt in
@@ -135,7 +150,8 @@ one additional Claude Code review pass if available, such as `/code-review` or
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
 controls. For lockfile changes, include Dependabot ecosystem and
-directory/directories compatibility.
+directory/directories compatibility and the lockfile content-diff evidence
+required by the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 

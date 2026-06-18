@@ -228,6 +228,11 @@ compatibility before merge. Check that `.github/dependabot.yml` has matching
 form, and that npm/pnpm workspace layout matches the configured Dependabot
 directory or directories.
 
+When a committed lockfile's contents change, the PR evidence must satisfy the
+lockfile content-diff requirement from the Handoff Contract in
+`.agents/skills/pr-batch/SKILL.md`. Unexplained lockfile drift blocks
+merge-readiness until aligned or justified.
+
 Typical checks include `actionlint`, `yamllint .github/`,
 `script/ci-changes-detector origin/main`, package-script smoke checks, dependency
 consistency checks, Pro-specific lint/tests, and targeted runtime or dummy-app
@@ -334,6 +339,18 @@ Classify each target before assigning a worker:
 - **No-PR evidence comment**: the issue is duplicate, low-value, already fixed, or better closed with evidence. The posted comment is the deliverable; include live evidence, the no-PR rationale, and whether the issue should stay open, close, or wait.
 - **Product-decision blocker**: the issue needs a maintainer/product decision before code would be safe. The deliverable is a surfaced question or decision request, not a speculative branch.
 
+For investigation or benchmark conclusions, apply the closing-evidence gate from
+the "Evaluate the fix plan separately" step in
+`.agents/skills/evaluate-issue/SKILL.md` before carrying a target as `close` or
+`document/work around`, or before using that conclusion to justify close/workaround
+language in an implementation PR, combined investigation PR, or no-PR evidence
+comment. Concrete corrective implementation PRs are not blocked merely because
+the target involves investigation or benchmark evidence.
+
+See the gate criteria in `.agents/skills/evaluate-issue/SKILL.md` (step 4d --
+"Evaluate the fix plan separately"). When the gate cannot be satisfied, carry
+only a caveated no-PR `park` disposition or a product-decision blocker.
+
 Workers should not turn product-decision blockers into speculative PRs. They should post or draft the evidence-backed question and stop that target.
 
 ### Plan To Goal Handoff
@@ -396,7 +413,8 @@ one additional Claude Code review pass if available, such as `/code-review` or
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
 controls. For lockfile changes, include Dependabot ecosystem and
-directory/directories compatibility.
+directory/directories compatibility, then apply the lockfile content-diff
+evidence requirement from the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 
