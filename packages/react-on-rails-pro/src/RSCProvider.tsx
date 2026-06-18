@@ -68,13 +68,18 @@ export const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
  * least-recently-used key (front of the Map) is evicted and passed to
  * `onEvict` so callers can drop companion state keyed by the same payload key.
  *
- * A key can be `pin`-ned so an in-flight refetch is never evicted out from
- * under its own `restoreLastSuccessfulPromise`. Pins are REF-COUNTED: each
- * `pin` increments and each `unpin` decrements a per-key counter, and the key
- * is only evictable once the count returns to zero. This is required because
- * overlapping same-key `refetch()` calls each take their own pin/unpin pair —
- * a plain set would let the first call's `unpin` drop the pin while a second
- * refetch is still in flight.
+ * A key can be `pin`-ned to prevent eviction while it is in-flight. Pins are
+ * REF-COUNTED: each `pin` increments and each `unpin` decrements a per-key
+ * counter, and the key is only evictable once the count returns to zero. This
+ * is required for two reasons:
+ *
+ * 1. Overlapping same-key `refetch()` calls each take their own pin/unpin pair
+ *    — a plain set would let the first call's `unpin` drop the pin while a
+ *    second refetch is still in flight.
+ * 2. Initial `getComponent()` loads are also pinned until they settle so that
+ *    a burst of 50+ other keys cannot evict the key before its successful
+ *    payload is recorded in `lastSuccessfulRSCPromisesRef` (which is used to
+ *    restore the last-good view in `recoverOnError` refetch paths).
  *
  * No external LRU dependency exists for this synchronous provider cache (the
  * repo's `InMemoryLRUCacheHandler` is an async `CacheHandler` tied to
@@ -225,17 +230,30 @@ export const createRSCProvider = ({
           // Drop the version-state companions for the evicted key. Done outside
           // React's render via a microtask so eviction (which happens during a
           // render-phase cache write) never triggers a state update mid-render.
-          const dropVersionState = (prev: Record<string, number>) => {
-            if (!(evictedKey in prev)) {
-              return prev;
-            }
-            const next = { ...prev };
-            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-            delete next[evictedKey];
-            return next;
-          };
           queueMicrotask(() => {
+            // Guard: if the key was re-entered between eviction and the microtask
+            // firing (e.g. a refetch that incremented refetchVersionsRef before
+            // this microtask ran), skip the version-state delete so we don't
+            // clobber fresh state for the re-entered key.
+            if (refetchVersionsRef.current[evictedKey] !== undefined) {
+              return;
+            }
             startTransition(() => {
+              const dropVersionState = (prev: Record<string, number>) => {
+                if (!(evictedKey in prev)) {
+                  return prev;
+                }
+                // Second guard inside the reducer: bail if a concurrent refetch
+                // repopulated the ref between the outer check and this setState
+                // commit.
+                if (refetchVersionsRef.current[evictedKey] !== undefined) {
+                  return prev;
+                }
+                const next = { ...prev };
+                // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+                delete next[evictedKey];
+                return next;
+              };
               setVersions(dropVersionState);
               setSuccessfulVersions(dropVersionState);
             });
@@ -276,15 +294,33 @@ export const createRSCProvider = ({
           return cached;
         }
 
-        let promise!: Promise<ReactNode>;
-        const markPayloadIfSuccessful = (payload: ReactNode) => {
-          if (!(payload instanceof Error)) {
-            markSuccessfulPromise(key, promise);
-          }
-          return payload;
-        };
-        promise = getServerComponent({ componentName, componentProps }).then(markPayloadIfSuccessful);
+        // Pin the key for the duration of the initial in-flight load so that
+        // a burst of 50+ other keys loading before this one settles cannot
+        // evict it. Without this pin, `markSuccessfulPromise`'s `peek` guard
+        // would see a stale (evicted) entry and skip recording last-successful,
+        // leaving `recoverOnError` with nothing to restore after a failed
+        // refetch. Unpinned in `.finally()` once the initial fetch settles.
+        // Pin is placed after `set` (same invariant as refetchComponent): the
+        // key is live in the map before the pin is registered, so there is no
+        // window where a phantom pin could permanently block eviction.
+        //
+        // `let` + deferred assignment is required: the closure inside `.then`
+        // captures `promise` to call `markSuccessfulPromise(key, promise)` for
+        // the identity check — a self-referential pattern that needs `let`.
+        let promise: Promise<ReactNode>;
+        // eslint-disable-next-line prefer-const
+        promise = getServerComponent({ componentName, componentProps })
+          .then((payload: ReactNode) => {
+            if (!(payload instanceof Error)) {
+              markSuccessfulPromise(key, promise);
+            }
+            return payload;
+          })
+          .finally(() => {
+            fetchRSCPromises.unpin(key);
+          });
         fetchRSCPromises.set(key, promise);
+        fetchRSCPromises.pin(key);
         return promise;
       },
       [fetchRSCPromises, markSuccessfulPromise],
@@ -294,11 +330,6 @@ export const createRSCProvider = ({
       (componentName: string, componentProps: unknown, recoverOnError?: boolean) => {
         const key = createRSCPayloadKey(componentName, componentProps);
         refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
-        // Pin the key for the duration of the in-flight refetch so a burst of
-        // intervening cold fetches cannot evict it (and its last-successful
-        // companion) out from under restoreLastSuccessfulPromise. Unpinned in a
-        // `finally` once the refetch settles.
-        fetchRSCPromises.pin(key);
         let promise!: Promise<ReactNode>;
         const restoreLastSuccessfulPromise = () => {
           if (fetchRSCPromises.peek(key) !== promise) {
@@ -345,7 +376,13 @@ export const createRSCProvider = ({
           .finally(() => {
             fetchRSCPromises.unpin(key);
           });
+        // Set the promise in the cache before pinning so that `pin` and the
+        // LRU map entry are always in sync. If the code between here and `set`
+        // were to throw, an orphan pin count would permanently block eviction
+        // of that key. Moving `pin` after `set` eliminates that risk: the pin
+        // is only registered once the key is live in the map.
         fetchRSCPromises.set(key, promise);
+        fetchRSCPromises.pin(key);
         startTransition(() => {
           setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
         });

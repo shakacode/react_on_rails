@@ -475,4 +475,93 @@ describe('BoundedLRU', () => {
     // surviving companion, not re-requested.
     expect(fetchCount(0)).toBe(3);
   });
+
+  it('g. initial in-flight load is pinned: eviction before it settles cannot break recoverOnError restore', async () => {
+    // Regression guard for the initial-load pin fix: a slow initial fetch for
+    // id 0 is in-flight while 50+ other keys are inserted into the same
+    // provider's cache. Without pinning the initial load, those insertions would
+    // evict id 0 before its payload resolves; `markSuccessfulPromise`'s `peek`
+    // guard would then skip recording last-successful, and a subsequent
+    // `recoverOnError` refetch failure would find no companion to restore.
+    process.env.NODE_ENV = 'production';
+
+    type Deferred = {
+      promise: Promise<React.ReactNode>;
+      resolve: (v: React.ReactNode) => void;
+      reject: (err: unknown) => void;
+    };
+    const makeDeferred = (): Deferred => {
+      let resolve!: (v: React.ReactNode) => void;
+      let reject!: (err: unknown) => void;
+      const promise = new Promise<React.ReactNode>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+
+    type PendingEntry = Deferred & { args: GetServerComponentArgs };
+    const pending: PendingEntry[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      pending.push({ ...d, args: _args[0] });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    const ref = React.createRef<RSCRouteHandle>();
+    const Root: React.FC<{ fillerId: number | null }> = ({ fillerId }) => (
+      <TestHarness>
+        <RSCRoute ref={ref} componentName="Card" componentProps={{ id: 0 }} />
+        {fillerId === null ? null : <RSCRoute componentName="Card" componentProps={{ id: fillerId }} />}
+      </TestHarness>
+    );
+
+    // Start id 0's initial load — but do NOT resolve it yet.
+    const result = await renderInAct(<Root fillerId={null} />);
+    expect(getServerComponent).toHaveBeenCalledTimes(1);
+    const initialDeferred = pending[0];
+    expect(initialDeferred.args).toEqual({ componentName: 'Card', componentProps: { id: 0 } });
+
+    // Flood the cache with CACHE_CAP + 5 other keys while id 0 is still
+    // in-flight. Without the initial-load pin, id 0 would be evicted here.
+    for (let id = 1; id <= CACHE_CAP + 5; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await rerenderInAct(result, <Root fillerId={id} />);
+      const fillerDeferred = pending.find(
+        (d) => !d.args.enforceRefetch && (d.args.componentProps as { id: number }).id === id,
+      );
+      if (fillerDeferred) {
+        // eslint-disable-next-line no-await-in-loop
+        await act(async () => {
+          fillerDeferred.resolve(<span>{`filler ${id}`}</span>);
+        });
+      }
+    }
+
+    // Now resolve id 0's initial payload. Because it was pinned, the LRU
+    // entry is still live and markSuccessfulPromise records it.
+    await act(async () => {
+      initialDeferred.resolve(<span data-testid="payload">id 0 v1</span>);
+    });
+    await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('id 0 v1'));
+
+    // A recoverOnError refetch that fails must restore id 0 from its
+    // last-successful companion — which was recorded only because of the pin.
+    let refetchPromise!: Promise<React.ReactNode>;
+    await act(async () => {
+      refetchPromise = ref.current!.refetch();
+      void refetchPromise.catch(() => undefined);
+    });
+
+    const refetchDeferred = pending.find((d) => d.args.enforceRefetch);
+    expect(refetchDeferred).toBeDefined();
+    await act(async () => {
+      refetchDeferred!.reject(new Error('refetch boom'));
+      await expect(refetchPromise).rejects.toThrow('refetch boom');
+    });
+
+    // The UI must keep showing the initial successful payload (v1), not blank.
+    await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('id 0 v1'));
+  });
 });
