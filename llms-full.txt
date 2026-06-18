@@ -15258,6 +15258,24 @@ routes outside the authenticated render and asset endpoints and do not require t
 probes cannot carry it). Keep the renderer on `localhost` or private networking as usual; see
 [Network Security](./basics.md#network-security).
 
+## Status-Code Contract
+
+Probe tooling that uses `curl --fail` / `-f` (which `-sf` and `-fsS` both include) exits non-zero on any HTTP status
+`>= 400`. Whether `--fail` is safe therefore depends on which endpoint you probe:
+
+| Endpoint  | Status codes                                                           | Safe with `curl --fail` / `-f`?                                                                 |
+| --------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `/health` | Always `200` (process can answer)                                      | **Yes** — never non-2xx.                                                                        |
+| `/info`   | Always `200` (returns Node and renderer versions)                      | **Yes** — never non-2xx.                                                                        |
+| `/ready`  | `200` once a bundle is compiled; `503` `waiting_for_bundle` until then | **Only with a warm-up path.** Without one, `-f` turns the cold-start `503` into a failed probe. |
+
+> **Why `curl -fsS .../ready` can break container startup:** during the cold-start window `/ready` returns `503`
+> (`{"status":"waiting_for_bundle"}`) until the answering worker compiles its first bundle, and `-f`/`--fail` turns
+> that `503` into a non-zero exit. If that command gates startup/readiness and nothing pre-warms the renderer, the
+> probe never passes and the container never becomes ready. This is the `503` working as designed, not a bug — see
+> [Gating traffic on `/ready`](#gating-traffic-on-ready). For a probe that must always pass once the process is up,
+> point `--fail` at `/health` (or `/info`); reserve `--fail` against `/ready` for setups with a warm-up path.
+
 ## Enabling the Endpoints
 
 The endpoints are **off by default**. Enable them with the `enableHealthEndpoints` config option or the
@@ -15457,6 +15475,55 @@ services:
       retries: 5
       start_period: 10s
 ```
+
+## Control Plane (CPLN)
+
+Control Plane exposes two relevant probe shapes: an **HTTP** probe and a **Command** (exec) probe. The HTTP probe is
+HTTP/1.1 and **cannot speak the renderer's h2c listener** (see [h2c](#h2c-why-httpget-probes-do-not-work)), so it
+always fails against these endpoints — use a **Command** probe with an h2c-aware curl instead. Command probes run
+inside the container, so the default `localhost` binding works and no `0.0.0.0` host is required.
+
+Use `/health` (always `200`) for liveness and readiness by default so a normal cold start cannot fail the workload
+before the first render compiles a bundle. Control Plane uses the Kubernetes-style `readinessProbe` / `livenessProbe`
+fields on the workload container (the same shape as the [Kubernetes example above](#kubernetes-probes) and the
+existing [Control Plane deployment docs](../../deployment/docker-deployment.md#deploying-with-control-plane)), with a Command
+probe expressed as `exec.command`:
+
+```yaml
+kind: workload
+spec:
+  containers:
+    - name: node-renderer
+      # ... image, ports, env (RENDERER_ENABLE_HEALTH_ENDPOINTS: 'true') ...
+      # Command probe — h2c-aware curl against /health (always 200).
+      readinessProbe:
+        exec:
+          command:
+            - curl
+            - -sf
+            - --max-time
+            - '3'
+            - --http2-prior-knowledge
+            - http://localhost:3800/health
+        periodSeconds: 5
+        failureThreshold: 3
+      livenessProbe:
+        exec:
+          command:
+            - curl
+            - -sf
+            - --max-time
+            - '3'
+            - --http2-prior-knowledge
+            - http://localhost:3800/health
+        periodSeconds: 10
+        failureThreshold: 3
+```
+
+Do **not** point a `--fail` Command probe at `/ready` unless something pre-warms the renderer, or the probe will fail
+on the cold-start `503` and the workload never becomes ready (the exact failure in
+[Status-Code Contract](#status-code-contract)). Only switch the path to `/ready` once a warm-up path delivers the
+first render to every worker that answers probes — see [Gating traffic on `/ready`](#gating-traffic-on-ready).
 
 ## Semantics and Caveats
 

@@ -246,19 +246,40 @@ always fails against these endpoints — use a **Command** probe with an h2c-awa
 inside the container, so the default `localhost` binding works and no `0.0.0.0` host is required.
 
 Use `/health` (always `200`) for liveness and readiness by default so a normal cold start cannot fail the workload
-before the first render compiles a bundle:
+before the first render compiles a bundle. Control Plane uses the Kubernetes-style `readinessProbe` / `livenessProbe`
+fields on the workload container (the same shape as the [Kubernetes example above](#kubernetes-probes) and the
+existing [Control Plane deployment docs](../../deployment/docker-deployment.md#deploying-with-control-plane)), with a Command
+probe expressed as `exec.command`:
 
 ```yaml
-# Control Plane workload — readiness / liveness as a Command probe
-readiness:
-  exec:
-    command:
-      - curl
-      - -sf
-      - --max-time
-      - '3'
-      - --http2-prior-knowledge
-      - http://localhost:3800/health
+kind: workload
+spec:
+  containers:
+    - name: node-renderer
+      # ... image, ports, env (RENDERER_ENABLE_HEALTH_ENDPOINTS: 'true') ...
+      # Command probe — h2c-aware curl against /health (always 200).
+      readinessProbe:
+        exec:
+          command:
+            - curl
+            - -sf
+            - --max-time
+            - '3'
+            - --http2-prior-knowledge
+            - http://localhost:3800/health
+        periodSeconds: 5
+        failureThreshold: 3
+      livenessProbe:
+        exec:
+          command:
+            - curl
+            - -sf
+            - --max-time
+            - '3'
+            - --http2-prior-knowledge
+            - http://localhost:3800/health
+        periodSeconds: 10
+        failureThreshold: 3
 ```
 
 Do **not** point a `--fail` Command probe at `/ready` unless something pre-warms the renderer, or the probe will fail
