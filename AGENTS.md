@@ -334,6 +334,36 @@ contract unless a maintainer explicitly narrows the run.
   - Residual risk: <one-line risk summary, or "none">
   ```
 
+## Tracking Issues And Handoffs
+
+Keep the issue tracker for durable work — product features, real bugs, release
+gates — not for transient agent-process state. Process state accretes into
+clutter because "open a tracker" has no matching "close it" step.
+
+- **Do not open a new issue for a session handoff or a point-in-time audit.** A
+  handoff is transient coordination and an audit is a snapshot; neither is
+  durable backlog. Record a handoff as a comment on the relevant parent tracking
+  issue (for example the roadmap umbrella), and append an audit to the standing
+  release audit ledger (#4010) in place. If a dedicated agent-coordination repo
+  is in use, route handoffs there instead. Never spawn a standalone
+  `Handoff: ...` or `Post-rc.N audit` issue.
+- **One durable ledger per recurring concern, updated in place.** Release audits
+  append to the ledger (#4010); cross-agent coordination state lives in the
+  coordination layer (#3974). Do not create a sibling issue each cycle.
+- **Closure follows the work, not the opener.** A tracking issue closes when its
+  underlying PR/work lands, done by whoever finishes the work — not by whoever
+  opened the tracker. "I opened it" does not mean "I must close it": WIP can
+  outlive a session (lost chat, unanswered question, disconnect). The heartbeat
+  detects abandonment, and an unfinished PR is the real signal of remaining work
+  — act on the PR, not on a stale tracker.
+- **The 30-day test.** Before opening any tracking or meta issue, ask whether it
+  will still matter in 30 days. If not, it is a comment or a ledger entry, not an
+  issue.
+- **Sweep on sight.** When you encounter a resolved or superseded
+  handoff/audit/process-snapshot issue, close it — consolidating any still-live
+  finding into the durable ledger or a real backlog issue — rather than leaving
+  it open.
+
 ## Release Mode And Auto-Merge Coordination
 
 Use the current release tracker to decide whether PRs are in normal development, accelerated RC, strict RC, or final-release mode. The tracker is the live source of truth for the mode; committed docs define how to interpret it.
