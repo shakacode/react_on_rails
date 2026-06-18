@@ -3945,6 +3945,7 @@ describe InstallGenerator, type: :generator do
     # Pin to Webpack (--no-rspack) so this shared fixture covers the explicit Webpack install path.
     let(:install_generator) { install_generator_fixture(rspack: false) }
     let(:webpack_install_env) { { "SHAKAPACKER_ASSETS_BUNDLER" => "webpack" } }
+    let(:rspack_install_env) { { "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" } }
 
     it "clears BUNDLE_GEMFILE when running bundle add" do
       allow(install_generator).to receive(:shakapacker_in_gemfile?).and_return(false)
@@ -3985,18 +3986,34 @@ describe InstallGenerator, type: :generator do
         .with(webpack_install_env, "bundle exec rails shakapacker:install")
     end
 
+    it "passes the resolved SHAKAPACKER_ASSETS_BUNDLER to shakapacker:install when no bundler flag is set" do
+      default_generator = install_generator_fixture
+      allow(default_generator).to receive_messages(project_declares_assets_bundler?: false,
+                                                   shakapacker_version_9_or_higher?: true)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(default_generator).to receive(:system).with("bundle install").and_return(true)
+      allow(default_generator).to receive(:system)
+        .with(rspack_install_env, "bundle exec rails shakapacker:install")
+        .and_return(true)
+
+      default_generator.send(:install_shakapacker)
+
+      expect(default_generator).to have_received(:system)
+        .with(rspack_install_env, "bundle exec rails shakapacker:install")
+    end
+
     it "passes SHAKAPACKER_ASSETS_BUNDLER=rspack to shakapacker:install when --rspack is set" do
       rspack_generator = install_generator_fixture(rspack: true)
       allow(Bundler).to receive(:with_unbundled_env).and_yield
       allow(rspack_generator).to receive(:system).with("bundle install").and_return(true)
       allow(rspack_generator).to receive(:system)
-        .with({ "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" }, "bundle exec rails shakapacker:install")
+        .with(rspack_install_env, "bundle exec rails shakapacker:install")
         .and_return(true)
 
       rspack_generator.send(:install_shakapacker)
 
       expect(rspack_generator).to have_received(:system)
-        .with({ "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" }, "bundle exec rails shakapacker:install")
+        .with(rspack_install_env, "bundle exec rails shakapacker:install")
     end
 
     context "with fake BUNDLE_GEMFILE set" do
