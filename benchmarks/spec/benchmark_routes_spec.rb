@@ -204,6 +204,16 @@ RSpec.describe "benchmark route discovery helpers" do
       end
     end
 
+    it "collapses the double slash from a leading-slash locale-prefixed route" do
+      # "/(/:locale)/dashboard(.:format)" -> stripping the optional "(/:locale)"
+      # group leaves the leading slash adjacent to "/dashboard". Without collapsing
+      # runs of "/", the result is "//dashboard". Swapping the strip/normalize order
+      # does NOT help (both orders produce "//dashboard"); the fix collapses "/+".
+      expect(
+        benchmark_routes_for_app("unused", "/(/:locale)/dashboard(.:format)")
+      ).to eq(["/dashboard"])
+    end
+
     it "normalizes and strips optional params on explicit comma-split routes" do
       # Explicit ROUTES= inputs are copied from `rails routes` output, so they may
       # arrive with "(.:format)" suffixes, surrounding whitespace, missing leading
@@ -222,6 +232,10 @@ RSpec.describe "benchmark route discovery helpers" do
 
     it "removes an optional locale prefix group" do
       expect(strip_optional_params("(/:locale)/dashboard(.:format)")).to eq("/dashboard")
+    end
+
+    it "collapses the double slash left by a leading-slash locale prefix group" do
+      expect(strip_optional_params("/(/:locale)/dashboard(.:format)")).to eq("/dashboard")
     end
 
     it "leaves a route with no optional groups unchanged" do
