@@ -87,7 +87,7 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": "*",
+    "react-on-rails-rsc": "^19.0.5",
     "@tanstack/react-router": ">=1.139.0 <2.0.0",
     "ioredis": ">= 5"
   },

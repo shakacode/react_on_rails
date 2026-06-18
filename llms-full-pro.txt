@@ -7953,6 +7953,11 @@ pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
 > [!NOTE]
 > The generator pins `react-on-rails-rsc` to exactly `19.0.5` (no `^` or `~`). Because the RSC bundler APIs are version-coupled, record `react-on-rails-rsc` as exactly `19.0.5` in `package.json` rather than the default caret range so a later `19.1.x`/`19.2.x` is not picked up; `react` and `react-dom` stay on `~19.0.4`. This is separate from the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609): metadata can allow RSC packages broadly enough for `npm ls`, while the generator still installs the tested exact RSC package pin.
 
+That exact pin is what goes in your app's `package.json`. Separately, the Pro package itself declares an optional peer range, which is broader on purpose:
+
+> [!NOTE]
+> The Pro package's optional `react-on-rails-rsc` peer range is `^19.0.5` (i.e. `>= 19.0.5 < 20.0.0`, see [issue #3965](https://github.com/shakacode/react_on_rails/issues/3965)). This is an advisory range: it sets the **floor** at `19.0.5` (the RSC CSS FOUC fix) and a **ceiling** below the next major `20.0.0` (a new `react-on-rails-rsc` major is a deliberate, reviewed bump). Within the `19.x` line it admits any `>= 19.0.5` release, including `19.1.x` and `19.2.x`; per-version compatibility is enforced not by this range but by the Pro node renderer's runtime version check (`rscPeerSupport.ts`), which tiers `react-on-rails-rsc` `19.0.x` against React `19.0.4+` and `19.2.x` against React `19.2.7+`. Compared to the old `"*"`, this range simply excludes pre-`19.0.5` builds (which lack the FOUC fix) and the unknown next major.
+
 ## Pre-Migration: Audit Components for Client API Usage
 
 Before running the generator, audit your existing components to identify which ones use client-side APIs. When RSC is enabled, any component **without** `'use client'` is automatically classified as a React Server Component. Components that use client APIs will break if misclassified.
