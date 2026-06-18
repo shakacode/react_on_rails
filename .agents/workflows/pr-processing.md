@@ -593,7 +593,11 @@ When worker subagents are explicitly authorized:
 - Acquire the lane's `agent-coord claim` before creating the worker worktree or
   branch when the backend is available. If the claim is refused, the worker
   reports the holder and heartbeat liveness, then stops that lane.
-- Give each worker a separate worktree and branch.
+- Give each worker a separate worktree and branch. For in-process subagents
+  (Claude Code `Agent`/`Workflow` tools), "separate worktree" means passing
+  `isolation: 'worktree'`. Never run two file-editing workers in the same working
+  directory at the same time; sharing one checkout corrupts the git index,
+  branch, and working tree as workers overwrite each other.
 - Tell workers they are not alone in the codebase and must not revert others' edits.
 - Keep write scopes disjoint unless the main agent serializes integration.
 - Refresh that worker's heartbeat whenever it starts an item, pushes or updates a

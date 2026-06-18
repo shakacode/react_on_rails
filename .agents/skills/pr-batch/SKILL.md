@@ -290,8 +290,11 @@ advisory fallback state.
 
 Follow the canonical
 [Worker Rules](../../workflows/pr-processing.md#worker-rules) and keep one target
-or one disjoint lane per worker. The main agent owns final PR creation, status
-reporting, hosted-CI decisions, and merge sequencing.
+or one disjoint lane per worker. Every file-editing worker runs in its own
+worktree so two workers never share one working directory — Codex or
+multi-machine workers use `git worktree add`; in-process Claude Code
+`Agent`/`Workflow` subagents pass `isolation: 'worktree'`. The main agent owns
+final PR creation, status reporting, hosted-CI decisions, and merge sequencing.
 
 ## Coordinator Closeout Lane
 
