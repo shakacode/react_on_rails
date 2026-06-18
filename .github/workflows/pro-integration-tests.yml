@@ -816,6 +816,7 @@ jobs:
       needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
       needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     steps:
@@ -896,6 +897,14 @@ jobs:
           cd spec/execjs-compatible-dummy
           rm -rf public/packs-test
           RAILS_ENV="test" NODE_ENV="test" ./bin/shakapacker 2>&1 | tee "$RUNNER_TEMP/execjs-rspack-build.log"
+
+      - name: Upload Rspack build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: execjs-rspack-build-log
+          path: ${{ runner.temp }}/execjs-rspack-build.log
+          if-no-files-found: ignore
 
       - name: Verify ExecJS-compatible dummy bundles were built with Rspack
         # Guard against a silent bundler fallback. Shakapacker logs
