@@ -69,41 +69,48 @@ Use git, GitHub, and agent-coord ground truth. Do not rely on prior chat memory.
 Scope:
 - Repository: <OWNER>/<REPO>
 - Batch id: <BATCH_ID, or UNKNOWN if not applicable>
-  (if UNKNOWN or not applicable, skip the agent-coord lookup below)
 - Base: resolve the most recent release candidate tag/commit unless I provide one explicitly
 - Head: current main
 - Focus: PRs that appear to be from recent high-concurrency agent/Codex/Claude batch work
 - Audit id: <AUDIT_ID>
 
 First, produce the exact worked-issue scope and merged-PR range:
-- run `agent-coord doctor`, then `agent-coord status` when a batch id is known,
+- when a batch id is `UNKNOWN` or not applicable, skip `agent-coord` and record
+  `worked_issue_scope: not applicable`
+- when a batch id is known, run `agent-coord doctor`, then `agent-coord status`,
   then inspect `<BATCH_ID>` in the status output
 - list every worked issue/lane from claims, heartbeats, branches, and dependency
   metadata
 - for each worked issue, include the lane owner, branch, heartbeat/final state,
   linked PR if known, and whether the final state is merged, open, blocked,
   parked, no-PR, done-unmerged, or UNKNOWN
-- if agent-coord is missing, unavailable, or either command fails, record
-  `worked_issue_scope: UNKNOWN` with the exact command/error and continue with
-  GitHub/git evidence for the merged-PR range only
+- if `agent-coord` is missing or `agent-coord doctor` fails, record
+  `worked_issue_scope: UNKNOWN (setup)` with the exact command/error and
+  continue with GitHub/git evidence for the merged-PR range only
+- if `agent-coord doctor` passes but `agent-coord status` fails, record
+  `worked_issue_scope: UNKNOWN (access)` with the exact command/error and
+  continue with GitHub/git evidence for the merged-PR range only
 
-Then produce the exact merged-PR range and batch-subset list:
+Then produce the exact merged-PR range and, only when `worked_issue_scope` is
+known, the batch-subset list:
 - merged PR number and URL
 - merge commit
 - branch name
 - author
 - linked issue
-- included or excluded from the batch subset
-- why you think it is or is not part of the batch
+- included or excluded from the batch subset, only when `worked_issue_scope` is
+  known
+- why it is or is not part of the batch, only when `worked_issue_scope` is known
 
 List every PR merged between base and head, not only the PRs that look like
 batch work. Ask me to confirm the included/excluded worked issues and PRs before
 deep audit.
 
 If `worked_issue_scope` is `UNKNOWN`, do not invent a worked-issue list from the
-merged PR range. After confirmation, audit the merged PR range only and include
-a `worked_issue_scope: UNKNOWN` finding with the command or permission needed to
-recover the missing issue/lane list.
+merged PR range and do not identify an included/excluded batch subset from PR
+links or heuristics. After confirmation, audit the merged PR range only and
+include a `worked_issue_scope: UNKNOWN` finding with the command or permission
+needed to recover the missing issue/lane list.
 
 After confirmation, audit each known worked issue for:
 - whether the implementation, no-PR comment, blocker, or parked disposition
@@ -218,8 +225,9 @@ Pay special attention to disagreements:
 Return:
 1. consensus high-risk findings
 2. disputed findings needing human review
-3. reconciled worked-issue coverage table with consensus classification and any
-   unresolved `UNKNOWN` facts
+3. reconciled worked-issue coverage table with issue number, coordination
+   lane/branch, linked PR or no-PR/blocker evidence, final state,
+   intent-achievement classification, and any unresolved `UNKNOWN` facts
 4. PRs both agents consider OK
 5. deduped issue plan
 6. recommended next actions

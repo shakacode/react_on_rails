@@ -38,10 +38,12 @@ For private coordination backend setup and CLI discovery, see
 3. Merged PR list: every PR merged between base and head.
 4. Worked issue list: when a batch/run id is known, run `agent-coord doctor` then `agent-coord status`,
    then inspect the named batch entry; use claims, heartbeats, and batch metadata as the
-   primary worked-issue scope. If `agent-coord` is missing, unavailable, or either command fails,
-   record `worked_issue_scope: UNKNOWN` with the exact command/error instead of inferring
-   completeness from merged PRs.
-5. Batch PR subset: map worked issues to PRs through coordination branch names, linked PRs, PR bodies, labels, comments, authors, merge timing, and git history. Keep PR-range inclusion separate from worked-issue coverage so no-PR, blocked, parked, and unmerged lanes are still evaluated.
+   primary worked-issue scope. If `agent-coord` is missing or `agent-coord doctor` fails,
+   record `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
+   `agent-coord doctor` passes but `agent-coord status` fails, record
+   `worked_issue_scope: UNKNOWN (access)` with the exact command/error. In both cases,
+   continue with merged PR range evidence only and do not infer completeness from merged PRs.
+5. Batch PR subset: when `worked_issue_scope` is known, map worked issues to PRs through coordination branch names, linked PRs, PR bodies, labels, comments, authors, merge timing, and git history. Keep PR-range inclusion separate from worked-issue coverage so no-PR, blocked, parked, and unmerged lanes are still evaluated.
 
 Show included worked issues, included PRs, excluded near-matches, base/head SHAs, coordination status evidence, and assumptions. Ask for confirmation before deep audit unless the user explicitly asks to proceed without confirmation.
 
