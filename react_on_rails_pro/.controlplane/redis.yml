@@ -26,6 +26,7 @@ spec:
     # that can disrupt cache state and connections.
     # Review cache restart tolerance before copying the Rails Capacity AI posture here.
     autoscaling:
+      metric: disabled
       minScale: 1
       maxScale: 1
     capacityAI: false
