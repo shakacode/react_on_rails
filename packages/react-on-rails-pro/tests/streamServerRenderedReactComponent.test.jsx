@@ -419,7 +419,8 @@ describe('streamServerRenderedReactComponent', () => {
   // Convenience for the common single-error case.
   const collectEmittedError = async (renderResult) => {
     const errors = await collectEmittedErrors(renderResult);
-    return errors[errors.length - 1];
+    expect(errors).toHaveLength(1);
+    return errors[0];
   };
 
   it('leaves a deferred-render error unenriched when no RSC diagnostics were captured (#3475)', async () => {
@@ -497,8 +498,9 @@ describe('streamServerRenderedReactComponent', () => {
     const renderResult = setupSingleCaptureTwoErrorsTest();
     const emittedErrors = await collectEmittedErrors(renderResult);
 
-    // Both Suspense boundaries fail, so two errors surface.
-    expect(emittedErrors.length).toBeGreaterThanOrEqual(2);
+    // Both Suspense boundaries fail, so exactly two errors surface. A surprise third error would
+    // make the attribution assertions below weaker, so fail loudly.
+    expect(emittedErrors).toHaveLength(2);
 
     const enrichedErrors = emittedErrors.filter((error) =>
       error.message.includes('RSC bundle rendering failed'),

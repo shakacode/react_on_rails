@@ -154,6 +154,10 @@ class RSCRequestTracker {
   /**
    * Returns all RSC bundle diagnostics captured during this render.
    *
+   * @internal Inspection-only helper for tests/debugging. Production error-surfacing paths must use
+   * `consumeCapturedRSCDiagnostics()` so captured diagnostics are cleared after the first correlated
+   * error and cannot be reattached to a later unrelated render failure.
+   *
    * @returns A copy of the captured diagnostics to prevent external mutation
    */
   getCapturedRSCDiagnostics(): CapturedRSCDiagnostic[] {
