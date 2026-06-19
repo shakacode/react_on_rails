@@ -104,6 +104,7 @@ const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk
           throw new Error(String(incompleteStreamWarning[0]));
         }
       } finally {
+        // flush() is synchronous, so restoring here preserves any outer spy safely.
         console.warn = originalWarn;
       }
     };
