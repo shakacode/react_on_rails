@@ -234,11 +234,7 @@ module ReactOnRails
 
       def invoke_generators
         ensure_shakapacker_installed
-        if options.typescript?
-          install_typescript_dependencies
-          create_css_module_types
-          create_typescript_config
-        end
+        install_typescript_dependencies if options.typescript?
         # `invoke` instantiates child generators with a fresh options hash, so
         # --pretend/--force/--skip must be forwarded explicitly at each boundary.
         invoke "react_on_rails:base", [],
@@ -246,6 +242,11 @@ module ReactOnRails
                  pro: use_pro?, rsc: use_rsc?, tailwind: use_tailwind?, new_app: options.new_app?,
                  shakapacker_just_installed: shakapacker_just_installed?,
                  force: options[:force], skip: options[:skip], pretend: options[:pretend] }
+
+        if options.typescript?
+          create_css_module_types
+          create_typescript_config
+        end
 
         # Component generator logic:
         # - --rsc without --redux: Skip HelloWorld, HelloServer will be generated in setup_rsc
