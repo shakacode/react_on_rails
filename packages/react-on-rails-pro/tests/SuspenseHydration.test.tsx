@@ -151,8 +151,8 @@ async function renderAndHydrate() {
   };
 
   const writeSecondChunk = async () => {
+    let decoded = await readNextChunk();
     let { done, value } = await reader.read();
-    let decoded = '';
     while (!done) {
       decoded += new TextDecoder().decode(value);
       // eslint-disable-next-line no-await-in-loop

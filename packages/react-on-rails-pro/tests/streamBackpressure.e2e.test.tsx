@@ -67,6 +67,10 @@ const toLengthPrefixedPayload = (content: string): Buffer => {
   ]);
 };
 
+const expectRSCPayloadPushScript = (html: string) => {
+  expect(html).toMatch(/REACT_ON_RAILS_RSC_PAYLOADS[^<]*\.push\(/);
+};
+
 type StreamResultChunk = {
   html: string;
   consoleReplayScript: string;
@@ -83,13 +87,12 @@ const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk
     const decoder = new TextDecoder();
 
     const flushParserOrThrow = () => {
-      // Collect warnings locally rather than reading consoleWarnSpy.mock.calls so the spy
-      // is never left active if parser.flush() throws, and so we never depend on spy
-      // bookkeeping that could shadow an unrelated outer console.warn spy.
+      // Capture warnings manually so this helper cannot restore an outer console.warn spy.
       const warnings: unknown[][] = [];
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation((...args) => {
+      const originalWarn = console.warn;
+      console.warn = (...args) => {
         warnings.push(args);
-      });
+      };
 
       try {
         parser.flush();
@@ -101,7 +104,7 @@ const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk
           throw new Error(String(incompleteStreamWarning[0]));
         }
       } finally {
-        consoleWarnSpy.mockRestore();
+        console.warn = originalWarn;
       }
     };
 
@@ -129,12 +132,31 @@ const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk
   });
 
 describe('collectChunks - length-prefixed stream parsing', () => {
+  it('preserves an outer console.warn spy while checking parser flush warnings', async () => {
+    const completeStream = new PassThrough();
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const result = collectChunks(completeStream);
+
+    try {
+      completeStream.push(toLengthPrefixedPayload('complete payload'));
+      completeStream.push(null);
+
+      await expect(result).resolves.toHaveLength(1);
+      expect(jest.isMockFunction(console.warn)).toBe(true);
+      expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining(INCOMPLETE_LENGTH_PREFIXED_STREAM_WARNING),
+      );
+    } finally {
+      consoleWarnSpy.mockRestore();
+    }
+  });
+
   it('rejects if the stream ends with an incomplete length-prefixed chunk', async () => {
     const truncatedStream = new PassThrough();
-    const completeChunk = toLengthPrefixedPayload('truncated payload');
+    const fullChunk = toLengthPrefixedPayload('truncated payload');
     const result = collectChunks(truncatedStream);
 
-    truncatedStream.push(completeChunk.subarray(0, completeChunk.length - 1));
+    truncatedStream.push(fullChunk.subarray(0, fullChunk.length - 1));
     truncatedStream.push(null);
 
     await expect(result).rejects.toThrow(INCOMPLETE_LENGTH_PREFIXED_STREAM_WARNING);
@@ -211,7 +233,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
 
     // Verify RSC payload initialization and data scripts are embedded
     expect(allHtml).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
-    expect(allHtml).toContain('.push(');
+    expectRSCPayloadPushScript(allHtml);
   });
 
   // Tests the edge case where the RSC Flight payload significantly exceeds the default
@@ -242,7 +264,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     expect(allHtml).toContain('rsc-content');
     expect(allHtml).toContain(`RSC payload: ${totalBytes} bytes`);
     expect(allHtml).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
-    expect(allHtml).toContain('.push(');
+    expectRSCPayloadPushScript(allHtml);
   }, 5000);
 
   // Same as above but with data pushed asynchronously — more closely simulates a real
@@ -276,7 +298,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     expect(allHtml).toContain('rsc-content');
     expect(allHtml).toContain(`RSC payload: ${totalBytes} bytes`);
     expect(allHtml).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
-    expect(allHtml).toContain('.push(');
+    expectRSCPayloadPushScript(allHtml);
   }, 10000);
 
   // Tests the boundary condition: payload just above ~32KB combined buffer capacity.
@@ -302,6 +324,6 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     expect(allHtml).toContain('rsc-content');
     expect(allHtml).toContain(`RSC payload: ${totalBytes} bytes`);
     expect(allHtml).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
-    expect(allHtml).toContain('.push(');
+    expectRSCPayloadPushScript(allHtml);
   }, 5000);
 });
