@@ -95,7 +95,12 @@ List every PR merged between base and head, not only the PRs that look like
 batch work. Ask me to confirm the included/excluded worked issues and PRs before
 deep audit.
 
-After confirmation, audit each worked issue for:
+If `worked_issue_scope` is `UNKNOWN`, do not invent a worked-issue list from the
+merged PR range. After confirmation, audit the merged PR range only and include
+a `worked_issue_scope: UNKNOWN` finding with the command or permission needed to
+recover the missing issue/lane list.
+
+After confirmation, audit each known worked issue for:
 - whether the implementation, no-PR comment, blocker, or parked disposition
   satisfied the issue intent and acceptance criteria
 - whether the final issue state is correct: merged, closed, still open,
