@@ -204,6 +204,7 @@ describe InstallGenerator, type: :generator do
   end
 
   def yaml_quoted_string(value)
+    # JSON strings are valid YAML scalars, so JSON.generate gives us safe quoting for free.
     JSON.generate(value.to_s)
   end
 
@@ -521,6 +522,25 @@ describe InstallGenerator, type: :generator do
 
     it "injects the stylesheet import into the generated client component" do
       assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx" do |content|
+        expect(content).to include("import '../../../stylesheets/application.css';")
+      end
+    end
+  end
+
+  context "with --redux --tailwind and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--redux --tailwind], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates Tailwind assets under the configured Shakapacker source path" do
+      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_no_file "app/javascript/stylesheets/application.css"
+    end
+
+    it "injects the stylesheet import into the generated Redux client component" do
+      assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx" do |content|
         expect(content).to include("import '../../../stylesheets/application.css';")
       end
     end
