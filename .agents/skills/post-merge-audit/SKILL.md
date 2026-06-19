@@ -102,7 +102,7 @@ For each included PR:
 - Review triage: flag any pre-merge review/comment with `Must Fix`, `MUST-FIX`, `Should Fix`, `DISCUSS`, `Changes Requested`, `blocking`, or similar actionable language when there is no later evidence it was fixed, waived, or explicitly classified.
 - Approval semantics: flag any merge that treated an AI reviewer approval, positive issue comment, or "no actionable comments" summary as required maintainer approval or a special approval gate. Also flag any AI finding that was ignored even though it identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval.
 - Adversarial review: flag any requested adversarial review that finished after merge, reviewed an older head SHA, or left untriaged `BLOCKING` or `DISCUSS` findings.
-- Changelog: if the diff or PR body indicates a user-visible behavior, API, error message, configuration, performance, security, or breaking change, verify `CHANGELOG.md` has a matching entry. When entries are missing, recommend running `/update-changelog`.
+- Changelog: if the diff or PR body indicates a user-visible behavior, API, error message, configuration, performance, security, or breaking change, verify the repo's changelog (see `AGENTS.md` → **Agent Workflow Configuration**) has a matching entry. When entries are missing, recommend running `/update-changelog`.
 - Lockfiles: if the PR changed committed lockfiles, verify the PR evidence satisfies the lockfile content-diff requirement from the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`.
 - Closing evidence: for any PR whose body or linked issue uses analysis, benchmark, or investigation
   evidence to support a `close` or `document/work around` disposition, verify the conclusion applies the
@@ -152,7 +152,7 @@ Classify each PR:
 
 - **OK**: no credible release risk found.
 - **Needs maintainer question**: a decision cannot be made safely from evidence.
-- **Needs changelog update**: user-visible change is missing from `CHANGELOG.md`; recommend `/update-changelog`.
+- **Needs changelog update**: user-visible change is missing from the repo's changelog; recommend `/update-changelog`.
 - **Needs follow-up issue**: non-blocking work remains valuable and is actionable after release.
 - **Needs fix PR**: a real defect, missing test, missing compatibility note, or bad interaction should be fixed before release.
 - **Needs revert consideration**: the merge appears risky enough that reverting may be safer than patching.
@@ -216,8 +216,8 @@ Before creating an approved issue, search existing open issues for the affected 
 ```markdown
 <!-- post-merge-audit-finding v1
 audit: <AUDIT_ID>
-fingerprint: pr-3724:changelog-server-bundle-load-error
-affected_prs: 3724
+fingerprint: pr-<PR>:<short-issue-slug>
+affected_prs: <PR>
 -->
 ```
 

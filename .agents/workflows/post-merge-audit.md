@@ -55,8 +55,8 @@ Suggested hidden fingerprint:
 ```markdown
 <!-- post-merge-audit-finding v1
 audit: <AUDIT_ID>
-fingerprint: pr-3724:changelog-server-bundle-load-error
-affected_prs: 3724
+fingerprint: pr-<PR>:<short-issue-slug>
+affected_prs: <PR>
 -->
 ```
 
@@ -216,7 +216,8 @@ Also audit each included merged PR for:
 - AI review findings that were ignored even though they identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval
 - requested adversarial reviews that were late, stale, missing, or left untriaged `BLOCKING`/`DISCUSS` findings
 - untriaged Must Fix, SHOULD-FIX, DISCUSS, Changes Requested, compatibility, security, regression, or missing-changelog review findings
-- changes touching CI, Pro, build config, generators, SSR, RSC, shared types, or release-sensitive docs
+- changes touching CI, packaged/commercial code, build config, code generators, performance- or
+  framework-sensitive paths, shared types, or release-sensitive docs (per `AGENTS.md`)
 - anything that could have bad consequences after merge
 
 Classify each PR:

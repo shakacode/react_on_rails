@@ -643,7 +643,8 @@ else
       echo "Inspect and fix ${issue_body_file} before retrying." >&2
       exit 1
     fi
-    FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
+    # Replace <follow-up prefix> with the repo's follow-up issue prefix (see `AGENTS.md` -> **Agent Workflow Configuration**).
+    FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "<follow-up prefix> Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
     TRACKING_OUTCOME="new issue ${FOLLOW_UP_URL}"
   fi
 
@@ -660,7 +661,7 @@ Rules for follow-up issues:
 - Follow-up issues are expensive; default to no new issue.
 - Prefer linking an existing issue over creating a new one.
 - Create at most one follow-up issue per PR by default. More than one follow-up issue requires explicit user approval.
-- Every new follow-up issue title must begin with the exact prefix `Follow-up:`.
+- Every new follow-up issue title must begin with the repo's follow-up issue prefix (see `AGENTS.md` → **Agent Workflow Configuration**).
 - Build multi-line issue bodies with `--body-file`; never pass escaped newline strings through `--body`.
 - Only include non-trivial `SKIPPED` items (skip pure duplicates and factually incorrect suggestions)
 - For `f+i`, omit the must-fix section because must-fix items were addressed in the current PR

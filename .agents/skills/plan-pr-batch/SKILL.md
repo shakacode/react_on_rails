@@ -34,7 +34,8 @@ Plan a PR batch
    - For every bare number, run both `gh pr view N` and `gh issue view N` when type is ambiguous.
    - For filters, run focused `gh pr list` or `gh issue list` commands and keep the query in the report.
    - Record title, URL, state, branch/author for PRs, labels, linked PR/issue refs, and blockers. If a fact cannot be verified, write `UNKNOWN`.
-   - Treat the private `shakacode/agent-coordination` backend as available when
+   - Treat the repo's private coordination backend (see `AGENTS.md` →
+     **Agent Workflow Configuration**) as available when
      `agent-coord doctor` and `agent-coord status` exit 0. If available, run
      `agent-coord status` and
      exclude/report targets that already have active live or stale private
