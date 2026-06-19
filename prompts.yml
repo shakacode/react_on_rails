@@ -1,0 +1,135 @@
+# Canonical AI-agent prompts for React on Rails.
+#
+# This file is the SINGLE SOURCE OF TRUTH for the copy-able "paste into your AI
+# agent" prompts shown on reactonrails.com (home Quick Start + the /prompts
+# page). reactonrails.com syncs FROM this file and generates its display plus the
+# public agent artifacts (prompts.json and the site's published llms.txt). See
+# PROMPTS.md for the full schema and artifact contract.
+#
+# Why this lives in the framework repo: the prompts must stay in lockstep with
+# the framework's own docs and versions, so the framework repo owns them and the
+# site is a downstream consumer. Tracking: shakacode/react_on_rails#3832 (Part A);
+# site sync/codegen: shakacode/reactonrails.com#126; original display: #125.
+#
+# IMPORTANT — single-source URLs: each prompt stores only a relative `doc_route`.
+# The absolute docs URL is resolved at build time as `site_url + doc_route` and
+# substituted into the prompt body wherever the `{{doc_url}}` placeholder
+# appears, so the URL lives in exactly one place and cannot drift between the
+# prompt text and the "Open guide" link.
+#
+# NOTE — do not confuse this with the repo-root ./llms.txt: that file is the
+# framework's machine-readable doc route-map (paired with llms-full*.txt). The
+# prompt-corpus llms.txt referenced by #3832 is a DIFFERENT, site-published
+# artifact generated from this file. See PROMPTS.md → "llms.txt disambiguation".
+
+schema_version: 1
+
+# Canonical site origin; matches `url` in reactonrails.com docusaurus.config.ts.
+site_url: https://reactonrails.com
+
+# Shown once per surface (home Quick Start + /prompts hero).
+agent_note: >-
+  Paste into Cursor, Claude Code, Copilot, or any AI assistant. Each prompt
+  points the agent at the official docs so it doesn't guess.
+
+# Category display metadata, in site display order. The site renders one group
+# per category on /prompts using `eyebrow` + `heading`.
+categories:
+  - id: get-started
+    eyebrow: Get started
+    heading: Spin up React on Rails.
+  - id: server-rendering
+    eyebrow: Server rendering
+    heading: "Render on the server: RSC, SSR, streaming."
+  - id: migrate
+    eyebrow: Migrate
+    heading: Move an existing setup to React on Rails.
+  - id: features
+    eyebrow: Build features
+    heading: Add common capabilities.
+  - id: production
+    eyebrow: Optimize & go to production
+    heading: Tune performance and ship with Pro.
+
+# Ordered subset surfaced in the home Quick Start (RSC first — the marquee).
+home_prompt_ids:
+  - turn-on-rsc
+  - create-app
+  - install-existing
+
+# The canonical prompts, grouped by category in display order. Bodies are
+# transcribed verbatim from the live site source (reactonrails.com
+# prototypes/docusaurus/src/constants/prompts.ts) with the inline absolute URL
+# replaced by the `{{doc_url}}` placeholder.
+prompts:
+  # --- get-started ---
+  - id: create-app
+    title: Start a new app
+    category: get-started
+    doc_route: /docs/getting-started/create-react-on-rails-app
+    prompt: "Set up a new Rails app with React on Rails, using TypeScript and server-side rendering. Follow the official guide at {{doc_url}} and use the exact commands and versions it specifies — don't improvise."
+
+  - id: install-existing
+    title: Add to an existing Rails app
+    category: get-started
+    doc_route: /docs/getting-started/existing-rails-app
+    prompt: "Add React on Rails to my existing Rails app with TypeScript, keeping my current routes and conventions. Follow {{doc_url}} and don't change any gem or package versions it doesn't tell you to."
+
+  # --- server-rendering ---
+  - id: turn-on-rsc
+    title: Turn on React Server Components
+    category: server-rendering
+    doc_route: /docs/pro/react-server-components
+    prompt: "Turn on React Server Components in my React on Rails app (no license required). Follow {{doc_url}} exactly, including the renderer and packer setup it specifies."
+
+  - id: streaming-ssr
+    title: Add streaming SSR
+    category: server-rendering
+    doc_route: /docs/pro/streaming-ssr
+    prompt: "Add streaming server-side rendering to my React on Rails app. Follow {{doc_url}} exactly and don't change versions it doesn't ask you to."
+
+  - id: async-rendering
+    title: Use async/Suspense rendering
+    category: server-rendering
+    # doc_route contains a '#' fragment anchor — must be quoted in YAML.
+    doc_route: "/docs/api-reference/ruby-api-pro#async_react_componentcomponent_name-options--"
+    prompt: "Set up async (Suspense) rendering for a React on Rails component. Follow {{doc_url}} exactly."
+
+  # --- migrate ---
+  - id: migrate-react-rails
+    title: Migrate from react-rails
+    category: migrate
+    doc_route: /docs/migrating/migrating-from-react-rails
+    prompt: "Migrate my app from react-rails to React on Rails, keeping my existing components working. Follow {{doc_url}} and don't skip any step it lists."
+
+  # --- features ---
+  - id: code-splitting
+    title: Add code splitting
+    category: features
+    doc_route: /docs/building-features/code-splitting
+    prompt: "Add code splitting / lazy loading to my React on Rails components. Follow {{doc_url}} exactly."
+
+  # --- production ---
+  - id: oss-vs-pro
+    title: Evaluate OSS vs Pro
+    category: production
+    doc_route: /docs/getting-started/oss-vs-pro
+    prompt: "Review my React on Rails setup and tell me whether OSS or Pro fits my workload, citing the tradeoffs. Base your answer on {{doc_url}}."
+
+  - id: node-renderer
+    title: Set up the Node renderer
+    category: production
+    doc_route: /docs/pro/node-renderer
+    prompt: "Set up the React on Rails Pro Node renderer for server rendering. Follow {{doc_url}} exactly, including the configuration it specifies."
+
+  - id: fragment-caching
+    title: Add fragment caching
+    category: production
+    doc_route: /docs/pro/fragment-caching
+    prompt: "Add fragment caching to my server-rendered React on Rails components. Follow {{doc_url}} exactly."
+
+  - id: upgrade-to-pro
+    title: Get a production license / upgrade to Pro
+    category: production
+    doc_route: /docs/pro/upgrading-to-pro
+    prompt: "Walk me through upgrading my React on Rails app to Pro and getting a production license. Follow {{doc_url}}."
