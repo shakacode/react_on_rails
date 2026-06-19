@@ -232,6 +232,7 @@ export class BoundedLRU<V> {
         return;
       }
       this.map.delete(evicted);
+      this.pinCounts.delete(evicted);
       this.onEvict(evicted);
     }
   }
@@ -279,7 +280,10 @@ export const createRSCProvider = ({
     // cleanup marker cannot outgrow the promise cache in high-cardinality apps.
     // If a mounted route reloads one of these keys through a normal cache-miss
     // `getComponent`, publish a success token only after that replacement payload
-    // actually resolves.
+    // actually resolves. The bounded marker is best-effort before a replacement
+    // load starts; once a reload observes the marker, the in-flight set below
+    // latches it until settlement so concurrent marker churn cannot hide the
+    // successful replacement.
     const evictedSuccessfulPayloadKeysRef = useRef<BoundedLRU<true> | null>(null);
     if (!evictedSuccessfulPayloadKeysRef.current) {
       evictedSuccessfulPayloadKeysRef.current = new BoundedLRU<true>(RSC_PAYLOAD_CACHE_MAX_ENTRIES, () => {});
