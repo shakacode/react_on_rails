@@ -28,6 +28,7 @@ import {
   mergeRSCStreamDiagnosticError,
   MERGED_DIAGNOSTIC_FLAG,
   RSC_STREAM_DIAGNOSTIC_ERROR_NAME,
+  rscStreamDiagnosticMatchesError,
 } from '../src/rscDiagnostics.ts';
 
 const encodeLengthPrefixedChunk = (metadata: Record<string, unknown>, content: string) => {
@@ -93,6 +94,28 @@ describe('RSC diagnostics', () => {
       'React stream error: An error occurred in the Server Components render.',
     );
     expect(mergedError.stack).toContain('CommentsToggle.jsx:12:15');
+  });
+
+  it('matches diagnostics to React generic Server Components render errors', () => {
+    const diagnosticError = new Error(
+      '[ReactOnRails] RSC bundle rendering failed.\n' +
+        'Component: CommentsToggle\n' +
+        'Original error: useState is not a function',
+    );
+    const genericStreamError = new Error('An error occurred in the Server Components render.');
+
+    expect(rscStreamDiagnosticMatchesError(diagnosticError, genericStreamError)).toBe(true);
+  });
+
+  it('does not match diagnostics to unrelated ordinary React errors', () => {
+    const diagnosticError = new Error(
+      '[ReactOnRails] RSC bundle rendering failed.\n' +
+        'Component: CommentsToggle\n' +
+        'Original error: useState is not a function',
+    );
+    const unrelatedStreamError = new Error('Unrelated Suspense failure');
+
+    expect(rscStreamDiagnosticMatchesError(diagnosticError, unrelatedStreamError)).toBe(false);
   });
 
   it('keeps diagnostic merges idempotent when a merged error reaches another catch handler', () => {

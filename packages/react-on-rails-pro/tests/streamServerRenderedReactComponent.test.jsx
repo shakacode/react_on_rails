@@ -112,11 +112,13 @@ const MixedRSCRouteBailoutAndNestedSuspenseErrorShell = () => (
 // Throws during the deferred render phase (after the shell flushes), mirroring an RSC component
 // whose lazy element rejects when a Suspense boundary resolves — the #3475 scenario where the
 // failure reaches renderToPipeableStream's onError rather than rejecting the stream parse.
+const GENERIC_RSC_DEFERRED_ERROR_MESSAGE = 'An error occurred in the Server Components render.';
+
 const DeferredThrow = async () => {
   await new Promise((resolve) => {
     setTimeout(resolve, 10);
   });
-  throw new Error('Deferred render failure');
+  throw new Error(GENERIC_RSC_DEFERRED_ERROR_MESSAGE);
 };
 
 const DeferredThrowShell = () => (
@@ -140,6 +142,8 @@ const makeDeferredThrower = (message, delayMs) => async () => {
 
 const FirstDeferredThrow = makeDeferredThrower('First deferred failure (correlated)', 10);
 const SecondDeferredThrow = makeDeferredThrower('Second deferred failure (unrelated)', 30);
+const UnrelatedFirstDeferredThrow = makeDeferredThrower('First deferred failure (unrelated)', 10);
+const CorrelatedSecondDeferredThrow = makeDeferredThrower(GENERIC_RSC_DEFERRED_ERROR_MESSAGE, 30);
 
 const AlreadyMergedDeferredThrow = async () => {
   await new Promise((resolve) => {
@@ -163,6 +167,18 @@ const TwoDeferredThrowShell = () => (
     </React.Suspense>
     <React.Suspense fallback={<div>Loading second...</div>}>
       <SecondDeferredThrow />
+    </React.Suspense>
+  </main>
+);
+
+const UnrelatedThenCorrelatedThrowShell = () => (
+  <main>
+    <h1>Header In The Shell</h1>
+    <React.Suspense fallback={<div>Loading unrelated...</div>}>
+      <UnrelatedFirstDeferredThrow />
+    </React.Suspense>
+    <React.Suspense fallback={<div>Loading correlated...</div>}>
+      <CorrelatedSecondDeferredThrow />
     </React.Suspense>
   </main>
 );
@@ -455,7 +471,7 @@ describe('streamServerRenderedReactComponent', () => {
     const emittedError = await collectEmittedError(renderResult);
 
     expect(emittedError).toBeDefined();
-    expect(emittedError.message).toContain('Deferred render failure');
+    expect(emittedError.message).toContain(GENERIC_RSC_DEFERRED_ERROR_MESSAGE);
     // No diagnostic captured -> generic React error only, no RSC bundle diagnostic.
     expect(emittedError.message).not.toContain('RSC bundle rendering failed');
   });
@@ -472,7 +488,7 @@ describe('streamServerRenderedReactComponent', () => {
     expect(emittedError.message).toContain('Component: CommentsToggle');
     expect(emittedError.message).toContain('Module: /app/components/CommentsToggle.jsx');
     // The original React stream error is preserved alongside the diagnostic.
-    expect(emittedError.message).toContain('React stream error: Deferred render failure');
+    expect(emittedError.message).toContain(`React stream error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`);
   });
 
   it('enriches a deferred-render error with combined candidates when 2+ diagnostics were captured (#3475)', async () => {
@@ -487,7 +503,7 @@ describe('streamServerRenderedReactComponent', () => {
     expect(emittedError.message).toContain('one of these 2 RSC components failed');
     expect(emittedError.message).toContain('Component: CommentsToggle');
     expect(emittedError.message).toContain('Component: PostsPage');
-    expect(emittedError.message).toContain('React stream error: Deferred render failure');
+    expect(emittedError.message).toContain(`React stream error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`);
   });
 
   // Misattribution guard (codex P2 #3475): with exactly one captured RSC diagnostic and TWO
@@ -500,7 +516,7 @@ describe('streamServerRenderedReactComponent', () => {
         `[ReactOnRails] RSC bundle rendering failed.\n` +
           `Component: CommentsToggle\n` +
           `Module: /app/components/CommentsToggle.jsx\n` +
-          `Original error: boom in CommentsToggle`,
+          `Original error: First deferred failure (correlated)`,
       );
       diagnosticError.name = 'ReactOnRailsRSCStreamError';
       railsContext.recordRSCDiagnostic('CommentsToggle', diagnosticError);
@@ -546,14 +562,67 @@ describe('streamServerRenderedReactComponent', () => {
     expect(unattributedErrors.some((error) => !error.message.includes('CommentsToggle'))).toBe(true);
   });
 
+  const setupUnrelatedFirstThenSingleCaptureTest = () => {
+    const renderFunction = (_props, railsContext) => {
+      const diagnosticError = new Error(
+        `[ReactOnRails] RSC bundle rendering failed.\n` +
+          `Component: CommentsToggle\n` +
+          `Module: /app/components/CommentsToggle.jsx\n` +
+          `Original error: Second deferred failure (correlated)`,
+      );
+      diagnosticError.name = 'ReactOnRailsRSCStreamError';
+      railsContext.recordRSCDiagnostic('CommentsToggle', diagnosticError);
+      return UnrelatedThenCorrelatedThrowShell;
+    };
+
+    ReactOnRails.register({
+      UnrelatedThenCorrelatedThrowShell: wrapServerComponentRenderer(
+        renderFunction,
+        'UnrelatedThenCorrelatedThrowShell',
+      ),
+    });
+
+    return streamServerRenderedReactComponent({
+      name: 'UnrelatedThenCorrelatedThrowShell',
+      domNodeId: 'unrelatedThenCorrelatedThrowDomId',
+      trace: false,
+      throwJsErrors: true,
+      railsContext: testingRailsContext,
+      generateRSCPayload: jest.fn(),
+    });
+  };
+
+  it('preserves a lone captured RSC diagnostic when an unrelated error surfaces first (#3475)', async () => {
+    const renderResult = setupUnrelatedFirstThenSingleCaptureTest();
+    const emittedErrors = await collectEmittedErrors(renderResult);
+
+    expect(emittedErrors).toHaveLength(2);
+
+    const firstError = emittedErrors.find((error) =>
+      error.message.includes('First deferred failure (unrelated)'),
+    );
+    expect(firstError).toBeDefined();
+    expect(firstError.message).not.toContain('RSC bundle rendering failed');
+    expect(firstError.message).not.toContain('CommentsToggle');
+
+    const secondError = emittedErrors.find((error) => error.message.includes('RSC bundle rendering failed'));
+    expect(secondError).toBeDefined();
+    expect(secondError.message).toContain(`React stream error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`);
+    expect(secondError.message).toContain('Component: CommentsToggle');
+  });
+
   const setupAlreadyMergedThenGenericErrorTest = () => {
     const renderFunction = (_props, railsContext) => {
       ['AlreadyMergedComponent', 'PreservedComponent'].forEach((componentName) => {
+        const originalError =
+          componentName === 'PreservedComponent'
+            ? 'Second deferred failure (unrelated)'
+            : `boom in ${componentName}`;
         const diagnosticError = new Error(
           `[ReactOnRails] RSC bundle rendering failed.\n` +
             `Component: ${componentName}\n` +
             `Module: /app/components/${componentName}.jsx\n` +
-            `Original error: boom in ${componentName}`,
+            `Original error: ${originalError}`,
         );
         diagnosticError.name = 'ReactOnRailsRSCStreamError';
         railsContext.recordRSCDiagnostic(componentName, diagnosticError);

@@ -46,6 +46,22 @@ const nonEmptyString = (value: unknown) => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const ORIGINAL_ERROR_PREFIX = 'Original error: ';
+const GENERIC_RSC_STREAM_ERROR_MESSAGES = new Set(['An error occurred in the Server Components render.']);
+
+export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamError: Error) => {
+  const streamMessage = nonEmptyString(streamError.message);
+  if (!streamMessage) return false;
+  // React can hide the underlying Server Component failure behind this generic message. If a
+  // diagnostic is waiting, that generic stream error is the correlation signal.
+  if (GENERIC_RSC_STREAM_ERROR_MESSAGES.has(streamMessage)) return true;
+
+  const originalErrorLine = diagnosticError.message
+    .split('\n')
+    .find((line) => line.startsWith(ORIGINAL_ERROR_PREFIX));
+  return originalErrorLine === `${ORIGINAL_ERROR_PREFIX}${streamMessage}`;
+};
+
 // Bundler/framework frames point at library code rather than the failing component, so they
 // are a poor value for `Module:`. Skip them when a later user-code frame is available.
 // Note: this is matched against the extracted file *path*, not the raw frame, so a webpack

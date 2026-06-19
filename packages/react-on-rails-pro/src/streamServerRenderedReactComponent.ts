@@ -37,6 +37,7 @@ import {
   combineRSCStreamDiagnosticErrors,
   MERGED_DIAGNOSTIC_FLAG,
   mergeRSCStreamDiagnosticError,
+  rscStreamDiagnosticMatchesError,
 } from './rscDiagnostics.ts';
 
 type MaybeMergedRSCStreamDiagnosticError = Error & {
@@ -86,39 +87,54 @@ const streamRenderReactComponent = (
   // RSC bundle diagnostic(s) captured this render — the deferred-render-phase half of #3475. React's
   // onError carries no component key, so the matching rule resolves the ambiguity conservatively:
   //   - 0 diagnostics captured -> no enrichment (return the error unchanged).
-  //   - exactly 1 captured     -> merge it exactly (the common single-server-component failure).
-  //   - 2+ captured            -> merge a COMBINED diagnostic listing all candidates, never a single
-  //                               false pinpoint.
+  //   - diagnostics whose `Original error` matches this React error -> merge those diagnostics.
+  //   - 2+ matching diagnostics -> merge a COMBINED diagnostic listing all matching candidates,
+  //                                never a single false pinpoint.
+  //   - captured diagnostics that do not match this React error -> restore them for a later error.
   //
   // Misattribution guard (codex P2): the diagnostics are *consumed* (cleared) here, not just read, so
-  // each captured diagnostic is merged into at most one surfaced error. An unrelated failure that
-  // surfaces later in the same render — a different Suspense boundary throwing, a serialization error,
-  // an addPostSSRHook throw — no longer finds a stale RSC diagnostic to attach, so it is reported as
-  // itself. The first error after an RSC payload reports a renderingError is the correlated one (React
-  // awaiting the failed lazy element), so first-use consumption attributes correctly in the common
-  // case while preventing confident-but-wrong attribution of subsequent errors.
+  // each captured diagnostic is merged into at most one surfaced matching error. An unrelated failure
+  // that surfaces earlier or later in the same render — a different Suspense boundary throwing, a
+  // serialization error, an addPostSSRHook throw — does not consume or attach a non-matching RSC
+  // diagnostic, so the actual RSC failure can still be enriched when it surfaces.
   //
   // An error already enriched on the synchronous reject path in getReactServerComponent.server.ts is
   // returned untouched. We still consume the current tracker, drop diagnostics already represented by
   // that merged error, and put the rest back so a later generic deferred error can still be enriched.
+  const restoreCapturedRSCDiagnostics = (
+    captured: ReturnType<typeof streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics>,
+  ) => {
+    captured.forEach((entry) =>
+      streamingTrackers.rscRequestTracker.recordRSCDiagnostic(entry.componentName, entry.diagnosticError),
+    );
+  };
+
   const enrichWithCapturedRSCDiagnostics = (error: Error): Error => {
     if ((error as MaybeMergedRSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG]) {
       const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
-      captured
-        .filter((entry) => !error.message.includes(entry.diagnosticError.message))
-        .forEach((entry) =>
-          streamingTrackers.rscRequestTracker.recordRSCDiagnostic(entry.componentName, entry.diagnosticError),
-        );
+      restoreCapturedRSCDiagnostics(
+        captured.filter((entry) => !error.message.includes(entry.diagnosticError.message)),
+      );
       return error;
     }
     const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
     if (captured.length === 0) {
       return error;
     }
+
+    const matchingCaptured = captured.filter((entry) =>
+      rscStreamDiagnosticMatchesError(entry.diagnosticError, error),
+    );
+    if (matchingCaptured.length === 0) {
+      restoreCapturedRSCDiagnostics(captured);
+      return error;
+    }
+    restoreCapturedRSCDiagnostics(captured.filter((entry) => !matchingCaptured.includes(entry)));
+
     const diagnosticError =
-      captured.length === 1
-        ? captured[0].diagnosticError
-        : combineRSCStreamDiagnosticErrors(captured.map((entry) => entry.diagnosticError));
+      matchingCaptured.length === 1
+        ? matchingCaptured[0].diagnosticError
+        : combineRSCStreamDiagnosticErrors(matchingCaptured.map((entry) => entry.diagnosticError));
     if (!diagnosticError) {
       return error;
     }

@@ -172,12 +172,10 @@ class RSCRequestTracker {
    *
    * This is the misattribution guard for the deferred-render enrichment (#3475). React's `onError`
    * carries no component key, so the enrichment site cannot prove a given error came from the
-   * captured RSC component. By *consuming* the diagnostics on first use, an unrelated error that
-   * surfaces later in the same render (e.g. a different Suspense boundary throwing, a serialization
-   * error) no longer finds a stale diagnostic to merge — it is reported as-is. The first error that
-   * surfaces after an RSC payload reported a `renderingError` is the correlated one (React awaiting
-   * the failed lazy element from that payload), so consuming on first use attributes correctly in
-   * the common case while preventing confident-but-wrong attribution of later failures.
+   * captured RSC component. The enrichment site consumes first so a matched diagnostic is attached at
+   * most once, then restores any non-matching diagnostics for later errors in the same render. This
+   * prevents a different Suspense boundary, serialization error, or addPostSSRHook throw from stealing
+   * a lone RSC diagnostic before the actual RSC failure surfaces.
    *
    * @returns The captured diagnostics (empty if none were captured or they were already consumed)
    */
