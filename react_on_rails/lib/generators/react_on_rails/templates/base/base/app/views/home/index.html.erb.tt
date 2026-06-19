@@ -261,11 +261,15 @@
 
   .command-list code,
   .hint-list code {
+    display: inline-block;
+    max-width: 100%;
     padding: 2px 6px;
     border-radius: 8px;
     background: rgba(17, 32, 49, 0.06);
     color: var(--ink);
     font-size: 0.95em;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .footer-note {

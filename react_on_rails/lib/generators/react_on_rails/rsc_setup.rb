@@ -198,7 +198,7 @@ module ReactOnRails
       end
 
       def create_hello_server_component
-        hello_server_dir = "app/javascript/src/HelloServer"
+        hello_server_dir = example_component_source_directory("HelloServer")
         ror_components_dir = "#{hello_server_dir}/ror_components"
         components_dir = "#{hello_server_dir}/components"
         ext = component_extension(options)
@@ -246,7 +246,7 @@ module ReactOnRails
         end
         return false unless relative_entry_path
 
-        # Path is relative to app/javascript/src/HelloServer/components/.
+        # Path is relative to the generated HelloServer components directory.
         stylesheet_import = "import '../../../stylesheets/application.css';"
         entry_path = File.join(destination_root, relative_entry_path)
         entry_content = File.read(entry_path)
@@ -296,7 +296,8 @@ module ReactOnRails
                  view_path,
                  build_hello_server_view_config(
                    landing_page: new_app_landing_page_available?,
-                   redux_demo: options[:redux]
+                   redux_demo: options[:redux],
+                   source_path: example_component_source_path("HelloServer")
                  ))
 
         say "✅ Created #{view_path}", :green

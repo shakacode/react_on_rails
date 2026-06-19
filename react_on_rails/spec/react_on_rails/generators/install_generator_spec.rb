@@ -166,6 +166,39 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  def simulate_preinstalled_shakapacker(source_path:, source_entry_path:)
+    simulate_existing_file("config/shakapacker.yml", <<~YAML)
+      default: &default
+        source_path: #{source_path}
+        source_entry_path: #{source_entry_path}
+        public_root_path: public
+        public_output_path: packs
+        cache_path: tmp/shakapacker
+        webpack_compile_output: true
+        shakapacker_precompile: true
+        additional_paths: []
+        cache_manifest: false
+        assets_bundler: "webpack"
+
+      development:
+        <<: *default
+
+      test:
+        <<: *default
+        compile: true
+
+      production:
+        <<: *default
+    YAML
+    simulate_existing_file("bin/shakapacker", "")
+    simulate_existing_file("bin/shakapacker-dev-server", "")
+    simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+      const { generateWebpackConfig } = require('shakapacker')
+      const webpackConfig = generateWebpackConfig()
+      module.exports = webpackConfig
+    JS
+  end
+
   # Reads the repo's own package.json packageManager pin and returns the version.
   # Anchoring on package.json (the user-visible source of truth) instead of
   # `const_get(:CI_PNPM_FALLBACK_VERSION)` keeps the assertion on observable surface
@@ -373,6 +406,31 @@ describe InstallGenerator, type: :generator do
     it "sets shakapacker test compile to false by default" do
       assert_file "config/shakapacker.yml" do |content|
         expect(content).to match(/^test:.*?^\s+compile:\s*false/m)
+      end
+    end
+  end
+
+  context "with a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates the demo source and entrypoint under the configured Shakapacker paths" do
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.server.jsx"
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.module.css"
+      assert_file "client/app/entrypoints/server-bundle.js"
+
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+      assert_no_file "app/javascript/packs/server-bundle.js"
+    end
+
+    it "uses the configured source path in generated demo hints" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include('<code class="path-hint">client/app/src/HelloWorld/</code>')
+        expect(content).not_to include("app/javascript/src/HelloWorld/")
       end
     end
   end

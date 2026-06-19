@@ -1,11 +1,15 @@
 # frozen_string_literal: true
 
 require "json"
+require "pathname"
 require_relative "shakapacker_precompile_hook_helper"
 
 # rubocop:disable Metrics/ModuleLength
 module GeneratorHelper
   include ReactOnRails::Generators::ShakapackerPrecompileHookHelper
+
+  DEFAULT_SHAKAPACKER_SOURCE_PATH = "app/javascript"
+  DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH = "packs"
 
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
@@ -73,6 +77,83 @@ module GeneratorHelper
 
   def component_extension(options)
     options.typescript? ? "tsx" : "jsx"
+  end
+
+  def shakapacker_source_path
+    configured_shakapacker_relative_path("source_path", DEFAULT_SHAKAPACKER_SOURCE_PATH)
+  end
+
+  def shakapacker_source_entry_path
+    configured_shakapacker_relative_path("source_entry_path", DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH)
+  end
+
+  def shakapacker_entrypoint_path(filename)
+    File.join(shakapacker_source_path, shakapacker_source_entry_path, filename)
+  end
+
+  def shakapacker_stylesheet_path(filename)
+    File.join(shakapacker_source_path, "stylesheets", filename)
+  end
+
+  def example_component_source_directory(component_name)
+    File.join(shakapacker_source_path, "src", component_name)
+  end
+
+  def example_component_source_path(component_name)
+    "#{example_component_source_directory(component_name)}/"
+  end
+
+  def configured_shakapacker_relative_path(config_key, default)
+    config_path = File.join(destination_root, "config/shakapacker.yml")
+    return default unless File.exist?(config_path)
+
+    config = parse_shakapacker_yml(config_path)
+    configured_path = shakapacker_path_config_value(config, config_key)
+
+    safe_generator_destination_path(configured_path, default:)
+  end
+
+  def shakapacker_path_config_value(config, config_key)
+    %w[development default].each do |section_name|
+      section = shakapacker_config_section(config, section_name)
+      value = shakapacker_config_value(section, config_key)
+      return value unless value.to_s.strip.empty?
+    end
+
+    nil
+  end
+
+  def safe_generator_destination_path(path, default:)
+    candidate = path.to_s.strip
+    return default if candidate.empty?
+
+    pathname = Pathname.new(candidate).cleanpath
+    relative_path = if pathname.absolute?
+                      absolute_path_relative_to_destination(pathname)
+                    else
+                      pathname.to_s
+                    end
+
+    return default if unsafe_generator_destination_path?(relative_path)
+
+    relative_path
+  rescue ArgumentError
+    default
+  end
+
+  def absolute_path_relative_to_destination(pathname)
+    destination = Pathname.new(destination_root).cleanpath
+    relative_path = pathname.relative_path_from(destination).to_s
+
+    return nil if unsafe_generator_destination_path?(relative_path)
+
+    relative_path
+  rescue ArgumentError
+    nil
+  end
+
+  def unsafe_generator_destination_path?(path)
+    path.nil? || path == "." || path == ".." || path.start_with?("../")
   end
 
   # Check if a gem is present in Gemfile.lock

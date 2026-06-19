@@ -192,7 +192,7 @@ module ReactOnRails
         # Skip HelloWorld directory for Redux (uses HelloWorldApp) or RSC (uses HelloServer)
         return if options.redux? || use_rsc?
 
-        empty_directory("app/javascript/src/HelloWorld/ror_components")
+        empty_directory(File.join(example_component_source_directory("HelloWorld"), "ror_components"))
       end
 
       def copy_base_files
@@ -235,14 +235,15 @@ module ReactOnRails
 
       def copy_js_bundle_files
         base_path = "base/base/"
-        base_files = %w[app/javascript/packs/server-bundle.js]
+        copy_file("#{base_path}app/javascript/packs/server-bundle.js",
+                  shakapacker_entrypoint_path("server-bundle.js"))
 
         # Skip HelloWorld CSS for Redux (uses HelloWorldApp) or RSC (uses HelloServer)
-        unless options.redux? || use_rsc? || use_tailwind?
-          base_files << "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
-        end
+        return if options.redux? || use_rsc? || use_tailwind?
 
-        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        copy_file("#{base_path}app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css",
+                  File.join(example_component_source_directory("HelloWorld"),
+                            "ror_components/HelloWorld.module.css"))
       end
 
       def copy_webpack_config
@@ -274,7 +275,7 @@ module ReactOnRails
 
         base_path = "base/tailwind/"
         copy_file("#{base_path}app/javascript/stylesheets/application.css",
-                  "app/javascript/stylesheets/application.css")
+                  shakapacker_stylesheet_path("application.css"))
       end
 
       def copy_packer_config
@@ -686,10 +687,10 @@ module ReactOnRails
       end
 
       def example_source_path
-        return "app/javascript/src/HelloServer/" if use_rsc? && !options.redux?
-        return "app/javascript/src/HelloWorldApp/" if options.redux?
+        return example_component_source_path("HelloServer") if use_rsc? && !options.redux?
+        return example_component_source_path("HelloWorldApp") if options.redux?
 
-        "app/javascript/src/HelloWorld/"
+        example_component_source_path("HelloWorld")
       end
 
       def example_view_path
