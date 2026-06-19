@@ -437,6 +437,19 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with a slash Shakapacker source entry path" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "/")
+      end
+    end
+
+    it "generates entrypoints directly under the configured Shakapacker source path" do
+      assert_file "client/app/server-bundle.js"
+      assert_no_file "client/app/packs/server-bundle.js"
+    end
+  end
+
   context "with --redux and a pre-installed custom Shakapacker source root" do
     before(:all) do
       run_generator_test_with_args(%w[--redux], package_json: true, force: false) do

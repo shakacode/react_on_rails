@@ -87,7 +87,8 @@ module GeneratorHelper
   def shakapacker_source_entry_path
     @shakapacker_source_entry_path ||= configured_shakapacker_relative_path(
       "source_entry_path",
-      DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH
+      DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH,
+      allow_root: true
     )
   end
 
@@ -107,14 +108,14 @@ module GeneratorHelper
     "#{example_component_source_directory(component_name)}/"
   end
 
-  def configured_shakapacker_relative_path(config_key, default)
+  def configured_shakapacker_relative_path(config_key, default, allow_root: false)
     config_path = File.join(destination_root, "config/shakapacker.yml")
     return default unless File.exist?(config_path)
 
     config = parse_shakapacker_yml(config_path)
     configured_path = shakapacker_path_config_value(config, config_key)
 
-    safe_generator_destination_path(configured_path, default:)
+    safe_generator_destination_path(configured_path, default:, allow_root:)
   end
 
   def shakapacker_path_config_value(config, config_key)
@@ -128,11 +129,13 @@ module GeneratorHelper
     nil
   end
 
-  def safe_generator_destination_path(path, default:)
+  def safe_generator_destination_path(path, default:, allow_root: false)
     candidate = path.to_s.strip
     return default if candidate.empty?
 
     pathname = Pathname.new(candidate).cleanpath
+    return "" if allow_root && pathname.to_s == "/"
+
     relative_path = if pathname.absolute?
                       absolute_path_relative_to_destination(pathname)
                     else

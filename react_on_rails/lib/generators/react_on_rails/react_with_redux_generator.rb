@@ -69,7 +69,6 @@ module ReactOnRails
 
         # Update import paths in client component
         ror_client_file = "#{component_dir}/ror_components/HelloWorldApp.client.#{ext}"
-        gsub_file(ror_client_file, "../store/helloWorldStore", "../store/helloWorldStore")
         gsub_file(ror_client_file, "../containers/HelloWorldContainer",
                   "../containers/HelloWorldContainer")
         return unless use_tailwind?
