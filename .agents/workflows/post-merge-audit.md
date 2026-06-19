@@ -240,6 +240,8 @@ placeholders; replace them with the real batch id and issues):
 | --- | --- | --- | --- | --- | --- |
 | #1234 | batch-abc:issue-1234 / codex/example | PR #2345 merged | merged | realized | none |
 | #1235 | batch-abc:issue-1235 / no branch | blocker comment URL | blocked | stalled | owner decision needed |
+| #1236 | batch-abc:issue-1236 / codex/partial-example | PR #2346 merged | merged | partial | acceptance criteria C not addressed |
+| #1237 | UNKNOWN (advisory) / no coord data | codex-claim comment URL (advisory) | UNKNOWN | unknown | coordination state needed to confirm |
 ```
 
 ## Comparison Prompt
