@@ -72,6 +72,20 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
         expect(message).to include("Connection lost")
       end
     end
+
+    it "marks the prop as pushed before writing so pull retries are filtered on write failure" do
+      mock_logger = instance_double(Logger)
+      pull_emitter = described_class.new(bundle_timestamp, request_stream, pull_enabled: true)
+      allow(Rails).to receive(:logger).and_return(mock_logger)
+      allow(request_stream).to receive(:<<).and_raise(StandardError.new("Connection lost"))
+      allow(mock_logger).to receive(:error)
+
+      pull_emitter.call("books", [])
+      pull_emitter.pull_requests.enqueue("books")
+      pull_emitter.pull_requests.close
+
+      expect(pull_emitter.pull_requests.dequeue).to be_nil
+    end
   end
 
   describe "#reject" do

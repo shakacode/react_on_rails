@@ -29,13 +29,13 @@ const PROP_REQUEST_EMITTER_KEY = 'propRequestEmitter';
 const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
 
 function formatPropRequestChunk(propName: string): Buffer {
-  const metadata = JSON.stringify({ messageType: 'propRequest', propName, payloadType: 'string' });
+  const metadata = JSON.stringify({ messageType: 'propRequest', propName });
   const header = `${metadata}\t${'0'.padStart(8, '0')}\n`;
   return Buffer.from(header);
 }
 
 function formatRenderCompleteChunk(): Buffer {
-  const metadata = JSON.stringify({ messageType: 'renderComplete', payloadType: 'string' });
+  const metadata = JSON.stringify({ messageType: 'renderComplete' });
   const header = `${metadata}\t${'0'.padStart(8, '0')}\n`;
   return Buffer.from(header);
 }
@@ -205,13 +205,12 @@ export async function handleIncrementalRenderRequest(
         }
       });
 
-      // Flush buffered propRequests (emitted during initial render after emitter existed)
-      // AND emit propRequests for props that were requested via getProp() before pull mode
-      // was enabled on sharedExecutionContext (isPullEnabled was false during initial render).
       const manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY) as
         | { flushPendingPullRequests?: () => void; emitPendingPullRequests?: () => void }
         | undefined;
+      // Flush requests buffered while pull mode was already enabled but before this emitter existed.
       manager?.flushPendingPullRequests?.();
+      // Emit requests for getProp() calls made before pull mode was enabled in sharedExecutionContext.
       manager?.emitPendingPullRequests?.();
 
       finalResponse = { ...response, stream: injectableStream };

@@ -164,6 +164,8 @@ module ReactOnRailsPro
           begin
             process_response_chunks(stream_response, &block)
           ensure
+            # renderComplete control messages also close this queue; close is idempotent.
+            # This safety net covers parser or stream aborts before renderComplete arrives.
             @emitter&.render_complete!
           end
           break
