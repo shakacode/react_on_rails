@@ -33,6 +33,14 @@
 export const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
 
 /**
+ * Evicted-success markers need a wider window than the primary payload cache:
+ * primary-cache churn can evict many successful keys before a mounted route asks
+ * for one of those keys again. Keep the marker bookkeeping bounded, but do not
+ * drop markers as soon as the primary cache churns once through its own cap.
+ */
+export const RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES = RSC_PAYLOAD_CACHE_MAX_ENTRIES * 4;
+
+/**
  * A tiny insertion-ordered LRU over a `Map`. `get` and `set` move the key to
  * the most-recently-used position (end of the Map); `has` and `peek` are
  * recency-neutral reads. When `set` pushes the size past `maxEntries`, the

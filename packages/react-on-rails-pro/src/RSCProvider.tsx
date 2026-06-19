@@ -27,7 +27,11 @@ import {
   type ReactNode,
 } from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
-import { BoundedLRU, RSC_PAYLOAD_CACHE_MAX_ENTRIES } from './RSCProviderCache.ts';
+import {
+  BoundedLRU,
+  RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
+  RSC_PAYLOAD_CACHE_MAX_ENTRIES,
+} from './RSCProviderCache.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
@@ -86,14 +90,19 @@ export const createRSCProvider = ({
     const [successfulVersions, setSuccessfulVersions] = useState<Record<string, number>>({});
     // Keys whose last successful payload was evicted. If a mounted route reloads
     // one of these keys through a normal cache-miss `getComponent`, publish a
-    // success token only after that replacement payload actually resolves. This
-    // marker set is intentionally not LRU-bounded: dropping a marker before the
-    // replacement load starts can leave an active refetchError visible forever.
-    // Entries are removed when a replacement load observes the marker, and
-    // re-added only if that replacement fails before producing a good payload.
-    const evictedSuccessfulPayloadKeysRef = useRef<Set<string> | null>(null);
+    // success token only after that replacement payload actually resolves. The
+    // marker LRU has a wider cap than the primary payload cache so ordinary
+    // primary-cache churn does not immediately hide the marker before the
+    // replacement starts, while still bounding never-revisited cold keys. If an
+    // extreme high-cardinality burst exceeds this marker window before the key
+    // reloads, a prior refetch error may remain until the user refetches or
+    // navigates.
+    const evictedSuccessfulPayloadKeysRef = useRef<BoundedLRU<true> | null>(null);
     if (!evictedSuccessfulPayloadKeysRef.current) {
-      evictedSuccessfulPayloadKeysRef.current = new Set<string>();
+      evictedSuccessfulPayloadKeysRef.current = new BoundedLRU<true>(
+        RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
+        () => {},
+      );
     }
     const evictedSuccessfulPayloadKeys = evictedSuccessfulPayloadKeysRef.current;
     // Unbounded but short-lived: entries are added only when a replacement load
@@ -126,7 +135,7 @@ export const createRSCProvider = ({
         RSC_PAYLOAD_CACHE_MAX_ENTRIES,
         (evictedKey) => {
           if (evictedKey in lastSuccessfulRSCPromisesRef.current) {
-            evictedSuccessfulPayloadKeys.add(evictedKey);
+            evictedSuccessfulPayloadKeys.set(evictedKey, true);
           }
           // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
           delete lastSuccessfulRSCPromisesRef.current[evictedKey];
@@ -176,12 +185,12 @@ export const createRSCProvider = ({
     const markSuccessfulPromise = useCallback(
       (key: string, promise: Promise<ReactNode>, notifyRoutes = false) => {
         if (fetchRSCPromises.peek(key) !== promise) {
-          return;
+          return false;
         }
 
         lastSuccessfulRSCPromisesRef.current[key] = promise;
         if (!notifyRoutes) {
-          return;
+          return true;
         }
 
         successfulVersionRef.current += 1;
@@ -191,6 +200,7 @@ export const createRSCProvider = ({
           // given key, so values may jump when other keys succeed first.
           setSuccessfulVersions((v) => ({ ...v, [key]: successfulVersion }));
         });
+        return true;
       },
       [fetchRSCPromises, startTransition],
     );
@@ -233,9 +243,11 @@ export const createRSCProvider = ({
             payloadSucceeded = true;
             const shouldNotifyRoutes =
               notifyRoutesOnSuccess && inFlightEvictedSuccessfulPayloadKeysRef.current.has(key);
-            evictedSuccessfulPayloadKeys.delete(key);
-            inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
-            markSuccessfulPromise(key, promise, shouldNotifyRoutes);
+            if (markSuccessfulPromise(key, promise, shouldNotifyRoutes)) {
+              evictedSuccessfulPayloadKeys.delete(key);
+              inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
+              payloadSucceeded = true;
+            }
           }
           return payload;
         };
@@ -249,7 +261,7 @@ export const createRSCProvider = ({
               inFlightEvictedSuccessfulPayloadKeysRef.current.has(key)
             ) {
               inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
-              evictedSuccessfulPayloadKeys.add(key);
+              evictedSuccessfulPayloadKeys.set(key, true);
             }
           });
         fetchRSCPromises.setPinned(key, promise);
@@ -293,10 +305,9 @@ export const createRSCProvider = ({
                 if (recoverOnError) {
                   restoreLastSuccessfulPromise();
                 }
-              } else {
+              } else if (markSuccessfulPromise(key, promise, true)) {
                 evictedSuccessfulPayloadKeys.delete(key);
                 inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
-                markSuccessfulPromise(key, promise, true);
               }
               return payload;
             },
