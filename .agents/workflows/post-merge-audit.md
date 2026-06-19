@@ -122,15 +122,16 @@ First, produce the exact worked-issue scope and merged-PR range:
   reducing the audit to the merged-PR range only
 
 Then produce the exact merged-PR range and, only when `worked_issue_scope` is
-known, the batch-subset list:
+verified from coordination state, the batch-subset list:
 - merged PR number and URL
 - merge commit
 - branch name
 - author
 - linked issue
 - included or excluded from the batch subset, only when `worked_issue_scope` is
-  known
-- why it is or is not part of the batch, only when `worked_issue_scope` is known
+  verified from coordination state
+- why it is or is not part of the batch, only when `worked_issue_scope` is
+  verified from coordination state
 
 List every PR merged between base and head, not only the PRs that look like
 batch work.
@@ -143,10 +144,14 @@ alongside the merged PR range, and include a `worked_issue_scope: UNKNOWN`
 finding with the command or permission needed to recover the missing issue/lane
 list.
 
+Treat `worked_issue_scope: not applicable`, `worked_issue_scope: UNKNOWN (...)`,
+and `worked_issue_scope: empty (...)` as merged-PR-range-only or advisory scope
+states, not verified batch subsets.
+
 Ask me to confirm the included/excluded worked issues, advisory `codex-claim`
 rows, and PR range before deep audit unless I explicitly say to proceed. When
 the scope is `UNKNOWN (needs batch confirmation)`, ask me to choose the
-candidate batch/run id before any worked-issue audit.
+candidate batch/run id before any confirmed worked-issue audit.
 
 After confirmation, audit each known worked issue or advisory `codex-claim` row
 for:
@@ -259,7 +264,9 @@ Pay special attention to disagreements:
   - when both reports record `worked_issue_scope: UNKNOWN`, consolidate the
     command/error evidence from both reports and surface a single unresolved
     `worked_issue_scope: UNKNOWN` finding that names the command or permission
-    needed before any worked-issue audit can proceed
+    needed before any confirmed worked-issue audit can proceed; continue
+    auditing advisory `codex-claim` rows alongside the merged PR range, keeping
+    those rows marked `UNKNOWN`
 - different intent-achievement classifications for the same worked issue
 - different PR inclusion lists
 - different release-candidate base

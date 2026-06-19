@@ -67,11 +67,13 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    rows marked `UNKNOWN`, and report the batch metadata correction needed before
    reducing the audit to the merged-PR range only.
 
-5. Batch PR subset: when `worked_issue_scope` is known, map worked issues to
-   PRs through coordination branch names, linked PRs, PR bodies, labels,
-   comments, authors, merge timing, and git history. Keep PR-range inclusion
-   separate from worked-issue coverage so no-PR, blocked, parked, and unmerged
-   lanes are still evaluated.
+5. Batch PR subset: only when `worked_issue_scope` is verified from
+   coordination state, map worked issues to PRs through coordination branch
+   names, linked PRs, PR bodies, labels, comments, authors, merge timing, and
+   git history. Treat `not applicable`, `UNKNOWN (...)`, and `empty (...)` as
+   merged-PR-range-only or advisory scope states, not verified batch subsets.
+   Keep PR-range inclusion separate from worked-issue coverage so no-PR,
+   blocked, parked, and unmerged lanes are still evaluated.
 
 Show included worked issues, included PRs, excluded near-matches, base/head SHAs, coordination status evidence, and assumptions. Ask for confirmation before deep audit unless the user explicitly asks to proceed without confirmation.
 

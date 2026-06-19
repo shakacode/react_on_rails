@@ -1171,19 +1171,20 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    rows marked `UNKNOWN`, and report the batch metadata correction needed before
    reducing the audit to the merged PR range only.
 
-3. List every PR merged in the range. When `worked_issue_scope` is known,
-   identify the batch subset by coordination state, branch names, PR bodies,
-   labels, comments, authors, merge timing, and linked issues. When
-   `worked_issue_scope` is `UNKNOWN`, keep the confirmed PR subset as a
-   merged-PR range only and do not classify PRs as included/excluded batch work
-   from PR links or heuristics. Use advisory public `codex-claim` rows from step
-   2 for possible no-PR, blocked, parked, and done-unmerged lanes, but keep
-   those rows marked `UNKNOWN` until coordination state is recovered.
+3. List every PR merged in the range. When `worked_issue_scope` is verified
+   from coordination state, identify the batch subset by coordination state,
+   branch names, PR bodies, labels, comments, authors, merge timing, and linked
+   issues. When `worked_issue_scope` is `not applicable`, `UNKNOWN (...)`, or
+   `empty (...)`, keep the confirmed PR list as a merged-PR range only and do
+   not classify PRs as included/excluded batch work from PR links or heuristics.
+   Use advisory public `codex-claim` rows from step 2 for possible no-PR,
+   blocked, parked, and done-unmerged lanes, but keep those rows marked
+   `UNKNOWN` until coordination state is recovered.
 4. Ask for confirmation of included and excluded worked issues, advisory public
    `codex-claim` rows, and the PR range before deep audit unless the user
    explicitly says to proceed. When the scope is
    `UNKNOWN (needs batch confirmation)`, ask the user to choose the candidate
-   batch/run id before any worked-issue audit.
+   batch/run id before any confirmed worked-issue audit.
 5. For each known worked issue or advisory public `codex-claim` row, evaluate
    whether the implementation, no-PR evidence, blocker, or parked disposition
    satisfied the issue intent; verify the final state; and classify it as
