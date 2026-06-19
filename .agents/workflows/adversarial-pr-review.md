@@ -168,6 +168,11 @@ code, Pro/core boundaries, or concurrent batch work. It does not replace the
 steps above; it adds proof-of-bug, simplicity, and merge-gate-clarity demands so
 a strong-looking handoff cannot hide an unsatisfied gate.
 
+For high-risk or concurrent-batch PRs, this review is required before readiness
+only in the sense that its `BLOCKING` and `DISCUSS` findings must be fixed,
+explicitly decided, or waived. It remains report-only; it is not a GitHub
+approval object and does not replace maintainer review or branch protection.
+
 ### Extra Steps
 
 1. **Prove the bug without the fix.** When feasible, reproduce the reported
@@ -177,6 +182,10 @@ a strong-looking handoff cannot hide an unsatisfied gate.
    Then confirm it passes on the current PR head. If the bug cannot be
    reproduced, say so and downgrade confidence — a fix for an unprovable bug is
    itself a `DISCUSS`.
+   Accepted infeasibility reasons are limited to missing historical repro
+   artifacts, a base that cannot build/run after reasonable setup, external
+   secrets or prod-only systems, destructive/unsafe operations, or cost/time
+   beyond the lane budget. Name the reason, evidence, and confidence impact.
 2. **Verify the fix is correct and minimal.** Check that it waits for the
    _minimum_ required condition (not an over-broad wait that masks races), that
    the invariant lives in the simplest single place rather than being duplicated
@@ -196,8 +205,8 @@ were conflated. Always report them separately for a high-risk PR:
 - **GitHub `reviewDecision`** — the formal review-object state
   (`APPROVED` / `CHANGES_REQUESTED` / `REVIEW_REQUIRED` / null). This is the only
   thing branch protection enforces.
-- **`script/pr-merge-ledger --strict`** — the local mechanical gate; check whether
-  it currently returns `complete_allowed: true` for the current head SHA.
+- **`script/pr-merge-ledger <PR> --strict`** — the local mechanical gate; check
+  whether it currently returns `complete_allowed: true` for the current head SHA.
 
 Then classify every remaining blocker by _type_ so the reader knows who/what
 clears it:
@@ -237,6 +246,9 @@ parse. Emit exactly one `state` from the allowed set so the dashboard can route
 the PR. Use `state: ready_to_merge` only when no maintainer action, CI, review
 agent, or code change remains.
 
+Allowed `state` values are `waiting_maintainer_review`, `waiting_ci`,
+`waiting_review_agent`, `waiting_code_change`, and `ready_to_merge`.
+
 ```yaml
 pending_maintainer_action:
   required: true # false only when state is ready_to_merge
@@ -250,7 +262,7 @@ pending_maintainer_action:
     head_sha: '<sha>'
     review_decision: null # APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | null
     maintainer_approval_comment: true # a human comment exists, but is not a review object
-    ledger_complete_allowed: false # script/pr-merge-ledger --strict
+    ledger_complete_allowed: false # script/pr-merge-ledger <PR> --strict
     ci_readiness: NOT_READY # from pr-ci-readiness: READY | NOT_READY | UNKNOWN
 ```
 
