@@ -171,7 +171,7 @@ The examples below are for the `main` branch of `react-on-rails` package.
 See [this issue](https://github.com/pnpm/pnpm/issues/4765).
 
 ```shell
-pnpm add "github:shakacode/react_on_rails/repo#main&path:packages/react-on-rails"
+pnpm add "github:shakacode/react_on_rails#main&path:packages/react-on-rails"
 ```
 
 #### Yarn Berry
