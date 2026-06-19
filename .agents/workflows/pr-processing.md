@@ -726,11 +726,13 @@ hatch**, not a single kill switch:
   updated `.agents/skills/...` and `.agents/workflows/...` files. A still-running
   worker that merely receives a new batch assignment keeps its old skill text.
 - **Fallback.** When the private backend is unavailable (`agent-coord doctor` /
-  `status` non-zero), fall back to the process-level escape hatch: a coordinator
-  or maintainer stops workers at the process level as described above. As an
-  operational record, they may post an advisory GitHub comment on the batch PR to
-  document the action, but this comment is human-targeted only — it is never a
-  machine-readable signal and no worker drains because of it.
+  `status` non-zero), do not assume cancellation state was recorded. If the
+  coordinator recorded cancellation before the outage, continue the hard escape
+  hatch from step 2. If the state was not recorded or is unknown, stop workers at
+  the process level, record the unknown backend state in a human-facing incident
+  note, and wait to reconcile claims and cancellation state in the private
+  backend before relaunch. Advisory GitHub comments are human-targeted only —
+  they are never machine-readable signals and no worker drains because of them.
 
 ### Coordinator Closeout Lane
 

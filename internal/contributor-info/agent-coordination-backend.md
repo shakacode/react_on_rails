@@ -238,10 +238,13 @@ the private backend repo. This public pointer carries only the contract:
   field name and cancel status values if they differ from this pointer.
 - Treat cancellation state as available only when `agent-coord doctor` and
   `agent-coord status` exit 0, exactly as for claim, heartbeat, and phase state.
-  Otherwise report it as `UNKNOWN` and fall back to the process-level escape
-  hatch. A coordinator or maintainer may post an advisory GitHub comment as a
-  human-facing incident note, but workers do not treat comments as a drain
-  signal. Arbitrary public comments cannot initiate this fallback.
+  Otherwise report it as `UNKNOWN`. If cancellation was already recorded before
+  the outage, a coordinator can continue the process-level escape hatch; if not,
+  stop worker processes and wait to reconcile claims and cancellation state in
+  the private backend before relaunch. A coordinator or maintainer may post an
+  advisory GitHub comment as a human-facing incident note, but workers do not
+  treat comments as a drain signal. Arbitrary public comments cannot initiate
+  this fallback.
 - A cancelled worker drains at its next safe checkpoint and then runs
   `agent-coord release` for the lane. See
   [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md)
