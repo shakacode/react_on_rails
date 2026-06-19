@@ -951,6 +951,40 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    context "when releasing from a release branch (ci_branch override)" do
+      it "evaluates the release branch tip and references it in violations" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "release/17.0.0")
+          .and_return(sha:, check_runs: [passing_run("Lint"), failing_run("JS unit tests")])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false,
+            ci_branch: "release/17.0.0"
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/release/17.0.0 is not healthy.*JS unit tests}m)
+      end
+
+      it "announces the release branch in the status header" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "release/17.0.0")
+          .and_return(sha:, check_runs: [passing_run("Lint")])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false,
+            ci_branch: "release/17.0.0"
+          )
+        end.to output(%r{Checking CI status on origin/release/17.0.0}).to_stdout
+      end
+    end
+
     context "when a check has failed on a stable release" do
       it "aborts with the failing check name and link" do
         allow(self).to receive(:fetch_main_ci_checks)
@@ -1987,6 +2021,35 @@ RSpec.describe "release.rake helper methods" do
       expect(result[:check_runs].length).to eq(2)
       expect(result[:check_runs].first["name"]).to eq("Lint")
     end
+
+    it "fetches and evaluates a release branch tip when ci_branch is overridden" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "origin/release/17.0.0")
+        .and_return(["rcsha123\n", success_status])
+      allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--paginate", "--jq", ".check_runs[]",
+              "repos/shakacode/react_on_rails/commits/rcsha123/check-runs")
+        .and_return([{ "name" => "Lint", "status" => "completed", "conclusion" => "success" }.to_json,
+                     success_status])
+
+      result = fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0")
+      expect(result[:sha]).to eq("rcsha123")
+      expect(result[:check_runs].first["name"]).to eq("Lint")
+    end
+
+    it "aborts referencing the release branch when its fetch fails" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
+        .and_return(["fetch failed: network down", failure_status])
+
+      expect do
+        fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0")
+      end.to raise_error(SystemExit, %r{Unable to fetch origin/release/17.0.0})
+    end
   end
 
   describe "#main_ci_evaluation_sha" do
@@ -2260,6 +2323,53 @@ RSpec.describe "release.rake helper methods" do
         .and_return([{ contexts: [], checks: [] }.to_json, success_status])
 
       expect(required_check_names_for_main(monorepo_root:)).to be_nil
+    end
+
+    it "queries the protection endpoint for the given ci_branch" do
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq,
+              "repos/shakacode/react_on_rails/branches/release/17.0.0/protection/required_status_checks")
+        .and_return([{ contexts: %w[Lint], checks: [] }.to_json, success_status])
+
+      expect(required_check_names_for_main(monorepo_root:, ci_branch: "release/17.0.0")).to eq(
+        contexts: %w[Lint],
+        checks: []
+      )
+    end
+  end
+
+  describe "#stable_release_branch_allowed?" do
+    it "allows a stable release from main" do
+      expect(stable_release_branch_allowed?(current_branch: "main", target_gem_version: "17.0.0")).to be(true)
+    end
+
+    it "allows a stable release from the matching release branch" do
+      expect(stable_release_branch_allowed?(current_branch: "release/17.0.0", target_gem_version: "17.0.0"))
+        .to be(true)
+    end
+
+    it "rejects a stable release from a mismatched release branch" do
+      expect(stable_release_branch_allowed?(current_branch: "release/16.7.1", target_gem_version: "17.0.0"))
+        .to be(false)
+    end
+
+    it "rejects a stable release from an arbitrary feature branch" do
+      expect(stable_release_branch_allowed?(current_branch: "jg/some-fix", target_gem_version: "17.0.0"))
+        .to be(false)
+    end
+  end
+
+  describe "#release_ci_branch" do
+    it "returns the release branch itself when on a release branch" do
+      expect(release_ci_branch("release/17.0.0")).to eq("release/17.0.0")
+    end
+
+    it "returns main for the main branch" do
+      expect(release_ci_branch("main")).to eq("main")
+    end
+
+    it "returns main for any non-release branch" do
+      expect(release_ci_branch("jg/some-fix")).to eq("main")
     end
   end
 end

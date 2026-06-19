@@ -429,6 +429,27 @@ def release_prerelease_version?(version)
   version.to_s.match?(/\.(test|beta|alpha|rc|pre)\./i)
 end
 
+# Whether a *stable* (non-prerelease) release may run from `current_branch`.
+# Stable releases are allowed from `main` (the standard path) or from the
+# ephemeral `release/X.Y.Z` promotion branch whose name matches the target
+# version exactly — that is how the release train promotes the last good RC to
+# its final tag in place, without re-cutting from `main` (see
+# internal/contributor-info/release-train-runbook.md). The exact-version match
+# prevents promoting, say, `17.0.0` from `release/16.7.1`. Prereleases are not
+# routed through this guard; they release from any branch.
+def stable_release_branch_allowed?(current_branch:, target_gem_version:)
+  ["main", "release/#{target_gem_version}"].include?(current_branch)
+end
+
+# The branch whose tip CI the release gate should validate. For a release cut or
+# promoted from a `release/X.Y.Z` branch, validate that branch's tip (the frozen,
+# stabilized commit set the tag is being applied to); otherwise validate `main`.
+# This keeps the gate honest for both RC cuts and final promotions off a release
+# branch instead of always evaluating `origin/main`, which can have drifted.
+def release_ci_branch(current_branch)
+  current_branch.to_s.start_with?("release/") ? current_branch : "main"
+end
+
 def npm_dist_tag_for_version(npm_version)
   prerelease_part = npm_version.to_s.split("-", 2)[1]
   return "latest" if prerelease_part.nil? || prerelease_part.empty?
@@ -566,23 +587,23 @@ CI_PASSING_CONCLUSIONS = %w[success skipped neutral].freeze
 MAIN_CI_NONRUNTIME_WALK_LIMIT = 25
 
 # rubocop:disable Metrics/MethodLength
-def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
+def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
   fetch_output, fetch_status = Open3.capture2e(
-    "git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet"
+    "git", "-C", monorepo_root, "fetch", "origin", ci_branch, "--quiet"
   )
   unless fetch_status.success?
     handle_main_ci_status_violation!(
-      message: "❌ Unable to fetch origin/main for CI status check.\n\n#{fetch_output}",
+      message: "❌ Unable to fetch origin/#{ci_branch} for CI status check.\n\n#{fetch_output}",
       allow_override:,
       dry_run:
     )
     return nil
   end
 
-  sha_output, sha_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "origin/main")
+  sha_output, sha_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "origin/#{ci_branch}")
   unless sha_status.success?
     handle_main_ci_status_violation!(
-      message: "❌ Unable to resolve origin/main HEAD.\n\n#{sha_output}",
+      message: "❌ Unable to resolve origin/#{ci_branch} HEAD.\n\n#{sha_output}",
       allow_override:,
       dry_run:
     )
@@ -824,9 +845,9 @@ def normalize_required_checks_payload(parsed)
   contexts.empty? && checks.empty? ? nil : { contexts:, checks: }
 end
 
-def required_check_names_for_main(monorepo_root:, repo_slug: nil)
+def required_check_names_for_main(monorepo_root:, repo_slug: nil, ci_branch: "main")
   repo_slug ||= github_repo_slug(monorepo_root)
-  api_path = "repos/#{repo_slug}/branches/main/protection/required_status_checks"
+  api_path = "repos/#{repo_slug}/branches/#{ci_branch}/protection/required_status_checks"
   # Keep legacy `contexts` separate from modern `checks` entries. Modern
   # required checks can be pinned to a GitHub App via `app_id`; legacy contexts
   # may be satisfied by either a Checks API run or a commit-status context.
@@ -950,22 +971,23 @@ def format_ci_status_run_line(run, kind:)
   url.strip.empty? ? "  #{icon} #{detail}: #{run['name']}" : "  #{icon} #{detail}: #{run['name']}\n      #{url}"
 end
 
-def format_main_ci_status_violation(kind:, short_sha:, runs:) # rubocop:disable Metrics/CyclomaticComplexity
+def format_main_ci_status_violation(kind:, short_sha:, runs:, branch: "main") # rubocop:disable Metrics/CyclomaticComplexity
+  ref = "origin/#{branch}"
   header = case kind
            when :in_progress
-             "⏳ CI is still in progress on origin/main (commit #{short_sha})."
+             "⏳ CI is still in progress on #{ref} (commit #{short_sha})."
            when :no_checks
-             "❌ No CI check runs visible on origin/main (commit #{short_sha}). " \
+             "❌ No CI check runs visible on #{ref} (commit #{short_sha}). " \
              "CI may not have started yet, or the GitHub Checks API is unavailable."
            when :no_required_checks
-             "❌ No required CI check runs found on origin/main (commit #{short_sha})."
+             "❌ No required CI check runs found on #{ref} (commit #{short_sha})."
            when :missing_required_checks
-             "❌ Some required CI checks are missing on origin/main (commit #{short_sha}). " \
+             "❌ Some required CI checks are missing on #{ref} (commit #{short_sha}). " \
              "Branch protection would refuse this merge."
            when :failed
-             "❌ CI on origin/main is not healthy (commit #{short_sha})."
+             "❌ CI on #{ref} is not healthy (commit #{short_sha})."
            when :unknown_status
-             "❌ Check run(s) with unrecognized status on origin/main (commit #{short_sha})."
+             "❌ Check run(s) with unrecognized status on #{ref} (commit #{short_sha})."
            else
              raise ArgumentError, "Unknown CI violation kind: #{kind.inspect}"
            end
@@ -999,10 +1021,14 @@ def handle_main_ci_status_violation!(message:, allow_override:, dry_run:)
 end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:)
-  puts "\nChecking CI status on origin/main..."
+def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:, ci_branch: "main")
+  puts "\nChecking CI status on origin/#{ci_branch}..."
 
-  data = fetch_main_ci_checks(monorepo_root:, allow_override:, dry_run:)
+  # Only thread the branch onward when it differs from the default so the
+  # `main` path keeps its exact call signature (and existing stubs/tests).
+  branch_kwargs = ci_branch == "main" ? {} : { ci_branch: }
+
+  data = fetch_main_ci_checks(monorepo_root:, allow_override:, dry_run:, **branch_kwargs)
   # `fetch_main_ci_checks` returns nil when it surfaced a violation through
   # `handle_main_ci_status_violation!` (dry-run or override path). In that case
   # the warning has already been printed and we should not continue.
@@ -1038,6 +1064,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   #   - stable:     every check_run on the commit (broader filter; any failure blocks)
   required_args = { monorepo_root: }
   required_args[:repo_slug] = repo_slug if repo_slug
+  required_args.merge!(branch_kwargs)
   required_names = required_check_names_for_main(**required_args)
   required_status_contexts = required_names ? legacy_status_contexts_for_required_checks(required_names) : []
   legacy_status_runs = []
@@ -1073,7 +1100,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
 
   if check_runs.empty? && legacy_status_runs.empty?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :no_checks, short_sha:, runs: nil),
+      message: format_main_ci_status_violation(kind: :no_checks, short_sha:, runs: nil, branch: ci_branch),
       allow_override:,
       dry_run:
     )
@@ -1098,7 +1125,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   end
   if failed.any?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :failed, short_sha:, runs: failed),
+      message: format_main_ci_status_violation(kind: :failed, short_sha:, runs: failed, branch: ci_branch),
       allow_override:,
       dry_run:
     )
@@ -1123,7 +1150,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     missing_names = missing_required[:labels]
     if missing_required[:count] == required_check_count(required_names)
       handle_main_ci_status_violation!(
-        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha:, runs: nil) +
+        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha:, runs: nil, branch: ci_branch) +
                  "\nRequired: #{required_labels.join(', ')}",
         allow_override:,
         dry_run:
@@ -1131,7 +1158,8 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
       return
     elsif missing_names.any?
       handle_main_ci_status_violation!(
-        message: format_main_ci_status_violation(kind: :missing_required_checks, short_sha:, runs: nil) +
+        message: format_main_ci_status_violation(kind: :missing_required_checks, short_sha:, runs: nil,
+                                                 branch: ci_branch) +
                  "\nRequired: #{required_labels.join(', ')}\nMissing: #{missing_names.join(', ')}",
         allow_override:,
         dry_run:
@@ -1143,7 +1171,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   in_progress = evaluated.select { |run| CI_INCOMPLETE_STATUSES.include?(run["status"]) }
   if in_progress.any?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :in_progress, short_sha:, runs: in_progress),
+      message: format_main_ci_status_violation(kind: :in_progress, short_sha:, runs: in_progress, branch: ci_branch),
       allow_override:,
       dry_run:
     )
@@ -1160,7 +1188,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   end
   if unknown.any?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :unknown_status, short_sha:, runs: unknown),
+      message: format_main_ci_status_violation(kind: :unknown_status, short_sha:, runs: unknown, branch: ci_branch),
       allow_override:,
       dry_run:
     )
@@ -1754,7 +1782,9 @@ Version argument can be:
   - Pre-release version: '16.2.0.beta.1' (rubygem format with dots, converted to 16.2.0-beta.1 for NPM)
 
 Note: Pre-release versions (containing .test., .beta., .alpha., .rc., or .pre.) automatically
-skip git branch checks, allowing releases from non-main branches.
+skip git branch checks, allowing releases from non-main branches. A stable release may run from
+`main` (standard) or from a matching `release/X.Y.Z` branch (release-train RC -> final promotion,
+see internal/contributor-info/release-train-runbook.md).
 
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
@@ -1775,7 +1805,8 @@ This will update and release:
 4th argument: Override release CI gates (true/false, default: false)
 
 Release CI policy:
-  Before releasing, the script checks CI status on origin/main.
+  Before releasing, the script checks CI status on the tip of the branch being released:
+  origin/main for a standard release, or origin/release/X.Y.Z when releasing from a release branch.
   - It evaluates the most recent commit that ran the full suite: if HEAD is
     changelog/docs/comment-only (e.g. the pre-release `update-changelog`
     commit), CI path-skips the runtime suite there, so the gate walks back to
@@ -1854,25 +1885,35 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     )
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
 
-    unless is_prerelease || current_branch == "main"
+    unless is_prerelease || stable_release_branch_allowed?(current_branch:,
+                                                           target_gem_version: resolved_target_gem_version)
       abort <<~ERROR
-        ❌ Release must be run from the main branch!
+        ❌ Stable release must be run from `main` or the matching release branch!
 
         Current branch: #{current_branch}
+        Target version: #{resolved_target_gem_version}
 
-        To release a stable version, please switch to main:
-          git checkout main && git pull --rebase
+        To release a stable version, run from one of:
+          - main (standard release):
+              git checkout main && git pull --rebase
+          - release/#{resolved_target_gem_version} (RC → final promotion, per the release-train runbook):
+              promote the last good RC in place; do not re-cut from main
 
         For pre-release versions (beta, alpha, rc, etc.), you can release from any branch:
           rake release[#{resolved_target_gem_version.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]
       ERROR
     end
 
+    # Validate the tip of the branch we are actually releasing from: the
+    # release/X.Y.Z tip for an RC cut or final promotion, otherwise origin/main.
+    ci_branch = release_ci_branch(current_branch)
+
     validate_main_ci_status!(
       monorepo_root: release_root,
       is_prerelease:,
       allow_override: allow_ci_status_override,
-      dry_run: is_dry_run
+      dry_run: is_dry_run,
+      ci_branch:
     )
 
     validate_release_version_policy!(

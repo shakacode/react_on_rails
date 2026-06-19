@@ -86,6 +86,17 @@ Execution flow when terminal access is available:
    - Set `SPECIFIC_TARGET=1` when the input targets a specific review URL or issue-comment URL; otherwise set `SPECIFIC_TARGET=0`.
    - If `gh` is unavailable or unauthenticated, stop and tell me to fix that first.
 
+2.5. Resolve the release phase from the PR base branch (the merge gate is a function of the target branch's phase; see `AGENTS.md` → _Release-Train Branching And Phase Gating_). A direct invocation has no orchestrator to inject the phase (PR #4018 thread Kr6wb), so resolve it here:
+   ```bash
+   BASE_REF=$(gh pr view "${PR_NUMBER}" --repo "${REPO}" --json baseRefName -q .baseRefName 2>/dev/null || echo "")
+   case "${BASE_REF}" in
+     release/*) RELEASE_PHASE="rc" ;;   # treat as final when the applicable tracker is in final-release mode
+     *)         RELEASE_PHASE="beta" ;;
+   esac
+   ```
+   - `RELEASE_PHASE=beta` (base `main` or a non-`release/*` branch): the autonomous low-risk optional-nit rule for `f` / `f+i` applies as written below.
+   - `RELEASE_PHASE=rc` or `final` (base `release/*`): **suppress the autonomous optional-nit rule** — `OPTIONAL` items require explicit selection (`f+o`, `o <nums>`, `all optional`) because edits expand the frozen diff — and require adversarial-pr-review + zero open MUST-FIX before merge-ready (for `final`, also no new features and human sign-off on the promotion). State the resolved phase in the triage summary.
+
 3. Determine scan window and summary cutoff:
    - For full-PR scans (plain PR number or PR URL with no specific review/comment anchor), default to reviewing only feedback posted after the latest PR summary comment created by this workflow.
    - The summary marker is a PR issue comment whose body starts with `<!-- address-review-summary -->` on its very first line. Requiring `startswith` (not `contains`) means a human comment that quotes or embeds the marker in prose is not mistaken for a checkpoint and cannot silently advance the cutoff.

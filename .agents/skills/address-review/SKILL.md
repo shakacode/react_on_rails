@@ -14,7 +14,9 @@ Apply the Maintainer Attention Contract from `AGENTS.md` for all broad
 code-changing actions. Skill-specific routing:
 
 - Autonomous low-risk optional handling with the behavior-preserving filter
-  applies to `f` and `f+i`.
+  applies to `f` and `f+i` **only when `RELEASE_PHASE=beta`** (Step 2.5). On a
+  `release/*` base (`rc` / `final`), the autonomous optional-nit rule is
+  suppressed: `OPTIONAL` items need explicit selection.
 - Action `f+o` selects every current `OPTIONAL` item for inline handling without
   the autonomous defer/decline filter; promote only items that need judgment,
   change behavior, or expand scope to `DISCUSS`.
@@ -81,6 +83,34 @@ SPECIFIC_TARGET=<0-or-1>
 ```
 
 Every subsequent snippet uses `${REPO}`, `${PR_NUMBER}`, `${COMMENT_ID}`, `${REVIEW_ID}`, and `${SPECIFIC_TARGET}` as shell variables; setting them once here means no manual substitution is required later. If `gh repo view` fails (and no URL was supplied), ensure `gh` CLI is installed and authenticated (`gh auth status`).
+
+## Step 2.5: Resolve the Release Phase from the PR Base Branch
+
+The merge gate is a function of the PR target branch's **release phase** (`beta` / `rc` / `final`); see
+`AGENTS.md` → _Release-Train Branching And Phase Gating_ and
+[`internal/contributor-info/release-train-runbook.md`](../../../internal/contributor-info/release-train-runbook.md).
+A direct `/address-review <PR>` invocation has no orchestrator to inject the phase, so resolve it here
+from the PR's base branch instead of defaulting to beta-tier autonomy (PR #4018 thread Kr6wb).
+
+```bash
+BASE_REF=$(gh pr view "${PR_NUMBER}" --repo "${REPO}" --json baseRefName -q .baseRefName 2>/dev/null || echo "")
+case "${BASE_REF}" in
+  release/*) RELEASE_PHASE="rc" ;;   # treat as final when the applicable tracker is in final-release mode
+  main|"")   RELEASE_PHASE="beta" ;;
+  *)         RELEASE_PHASE="beta" ;; # feature/topic branches derive to beta
+esac
+```
+
+- **`RELEASE_PHASE=beta`** (base `main` or a non-`release/*` branch): default behavior. The autonomous
+  low-risk optional-nit rule for `f` / `f+i` applies as written below.
+- **`RELEASE_PHASE=rc` or `final`** (base `release/*`): apply the stricter gate. **Suppress the
+  autonomous optional-nit rule** — do not fix or defer `OPTIONAL` nits without explicit selection
+  (`f+o`, `o <nums>`, `all optional`); on a stabilizing/promotion branch even "behavior-preserving"
+  edits expand the frozen diff. Require the `rc`/`final` evidence before signaling merge-ready:
+  adversarial-pr-review and **zero open MUST-FIX**; for `final`, also no new features and human sign-off
+  on the promotion. State the resolved phase in the triage summary so the stricter posture is visible.
+- If `gh pr view` fails, report that the phase could not be resolved and default to `beta` only when the
+  base is known to be `main`; otherwise ask the user to confirm the phase before applying nit-autonomy.
 
 ## Step 3: Determine Scan Window and Summary Cutoff
 
@@ -270,8 +300,12 @@ If a range is malformed, reversed, or out of bounds, show a validation message a
 
 This Claude slash command keeps optional polish out of the blocking merge gate.
 The autonomous low-risk optional-nit rule applies only to action `f` and the
-initial action `f+i` phase: fix behavior-preserving nits inline when they stay in
-scope, or log them as deferred/declined with rationale. Post-triage actions `a`,
+initial action `f+i` phase, **and only when `RELEASE_PHASE=beta`** (Step 2.5):
+fix behavior-preserving nits inline when they stay in
+scope, or log them as deferred/declined with rationale. On a `release/*` base
+(`rc` / `final`), do not apply the autonomous nit rule at all — `OPTIONAL` items
+require explicit selection, and merge-readiness additionally requires
+adversarial-pr-review and zero open MUST-FIX. Post-triage actions `a`,
 `f+o`, explicit `o <nums>`, and `all optional` remain inline code-changing
 choices for the selected optional items; if a selected optional item cannot be
 fixed safely, report it as unresolved instead of silently deferring it through
