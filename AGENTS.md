@@ -62,6 +62,41 @@ missing in the checkout but present on `origin/main`, update the worktree before
 continuing; if it is still missing, report the repo workflow state as `UNKNOWN`
 instead of silently using a global skill fallback.
 
+## Agent Workflow Configuration
+
+The shared `.agents/skills/` and `.agents/workflows/` files are repo-agnostic: they carry
+the workflow logic but defer every repo-specific command, branch, label, path, and policy
+to this section. When a skill says "run the repo's local validation" or "use the hosted-CI
+trigger," the concrete value is here. Adopting repos replace these values with their own and
+the shared workflow files stay byte-identical across repos (see
+[`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md)).
+
+- **Base branch**: `main` (fetch and compare via `origin/main`).
+- **Pre-push local validation**: `bin/ci-local` (optimized by default; `--changed` for narrow,
+  `--all` for broad). The script owns base discovery — do not pass a base ref. Contract:
+  [`internal/contributor-info/local-ci-contract.md`](internal/contributor-info/local-ci-contract.md).
+- **CI change detector**: `script/ci-changes-detector origin/main` (inspect suite routing).
+- **Hosted-CI trigger**: `+ci-*` PR-comment commands (`+ci-status`, `+ci-run-hosted`,
+  `+ci-force-full`, `+ci-stop-hosted`, `+ci-stop-full`, `+ci-skip-hosted [reason]`, `+ci-help`);
+  labels `ready-for-hosted-ci` and `force-full-hosted-ci`; human helper `bin/request-hosted-ci`.
+  Decision rules are in the **Review Workflow → PR CI Labels** section.
+- **Benchmark labels**: `benchmark`, `benchmark-core`, `benchmark-pro`,
+  `benchmark-pro-node-renderer`, and `hosted-ci-no-benchmarks` (suppress). Opt-in on PRs.
+- **Follow-up issue prefix**: `Follow-up:`. Default to no new issue; see the **Maintainer
+  Attention Contract** section.
+- **Changelog**: `/CHANGELOG.md`, user-visible changes only; entry format and the `**[Pro]**`
+  tag are defined in the **Changelog** section.
+- **Lint / format**: `bundle exec rake lint` (package lint), `bundle exec rake autofix` (fix),
+  `pnpm start format.listDifferent` (Prettier check), `bin/check-links` (markdown links). Full
+  list in the **Commands** section.
+- **Approval-exempt change categories**: workflow, build-config, package-script, dependency,
+  lockfile, and Pro edits on trusted assignments — allowed with focused scope, validation, and
+  clear PR evidence (not standing pre-approval). See the **Boundaries → Always** section.
+- **Coordination backend**: ShakaCode-internal repos share the private
+  `shakacode/agent-coordination` backend (claims/heartbeats namespaced by full repo name).
+  External adopters use the structured public claim-comment fallback in
+  [`.agents/workflows/pr-processing.md`](.agents/workflows/pr-processing.md).
+
 ## Commands
 
 ```bash
