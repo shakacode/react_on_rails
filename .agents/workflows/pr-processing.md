@@ -705,13 +705,15 @@ hatch**, not a single kill switch:
   `Agent`/`Workflow` coordinator, which ends its subagents with it). After the
   process stops, run `agent-coord release` for the lane or manually clear the
   orphaned claim so relaunch does not wait for lease expiry. Then clean that
-  lane's worktree: if the directory still exists, `git worktree remove --force
-<path>` removes both the directory and its `.git/worktrees/` entry; if the
-  directory is already gone, run `git worktree prune --expire now` to remove
-  stale metadata. Keep cancellation recorded until relaunch is ready so a
-  restarted machine agent does not re-acquire the released lane and resume; clear
-  the cancellation field in `batches/<batch-id>.json` immediately before
-  launching fresh workers.
+  lane's worktree and branch refs: if the directory still exists, run `git
+worktree remove --force <path>` to remove both the directory and its
+  `.git/worktrees/` entry; if the directory is already gone, run `git worktree
+prune --expire now` to remove stale metadata. Then delete or reset the lane's
+  local branch ref, or choose a fresh branch name for the relaunch, so the next
+  worker does not start from cancelled local commits. Keep cancellation recorded
+  until relaunch is ready so a restarted machine agent does not re-acquire the
+  released lane and resume; clear the cancellation field in
+  `batches/<batch-id>.json` immediately before launching fresh workers.
 - **Restarting with updated skills.** Stopping a batch does not reload skills,
   workflow rules, or this file into an already-running process; skills are read at
   process/session start. To roll an update into a running fleet, drain or stop the
