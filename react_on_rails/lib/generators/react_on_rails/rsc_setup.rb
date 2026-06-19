@@ -246,7 +246,7 @@ module ReactOnRails
         end
         return false unless relative_entry_path
 
-        # Path is relative to the generated HelloServer components directory.
+        # Always 3 levels deep: src/HelloServer/components/ -> ../../.. -> source_path/.
         stylesheet_import = "import '../../../stylesheets/application.css';"
         entry_path = File.join(destination_root, relative_entry_path)
         entry_content = File.read(entry_path)

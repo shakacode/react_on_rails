@@ -190,6 +190,8 @@ describe InstallGenerator, type: :generator do
       production:
         <<: *default
     YAML
+    # These files satisfy the generator's existing Shakapacker-install detection;
+    # the custom path assertions below exercise config/shakapacker.yml.
     simulate_existing_file("bin/shakapacker", "")
     simulate_existing_file("bin/shakapacker-dev-server", "")
     simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
@@ -431,6 +433,57 @@ describe InstallGenerator, type: :generator do
       assert_file "app/views/hello_world/index.html.erb" do |content|
         expect(content).to include('<code class="path-hint">client/app/src/HelloWorld/</code>')
         expect(content).not_to include("app/javascript/src/HelloWorld/")
+      end
+    end
+  end
+
+  context "with --redux and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--redux], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates Redux demo files under the configured Shakapacker source path" do
+      assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
+      assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx"
+      assert_file "client/app/src/HelloWorldApp/components/HelloWorld.jsx"
+      assert_file "client/app/entrypoints/server-bundle.js"
+
+      assert_no_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
+      assert_no_file "app/javascript/packs/server-bundle.js"
+    end
+
+    it "uses the configured source path in generated Redux demo hints" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include('<code class="path-hint">client/app/src/HelloWorldApp/</code>')
+        expect(content).not_to include("app/javascript/src/HelloWorldApp/")
+      end
+    end
+  end
+
+  context "with --rsc and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--rsc --no-rspack], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates RSC demo files under the configured Shakapacker source path" do
+      assert_file "client/app/src/HelloServer/ror_components/HelloServer.jsx"
+      assert_file "client/app/src/HelloServer/components/HelloServer.jsx"
+      assert_file "client/app/src/HelloServer/components/LikeButton.jsx"
+      assert_file "client/app/entrypoints/server-bundle.js"
+      assert_file "config/webpack/rscWebpackConfig.js"
+
+      assert_no_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
+      assert_no_file "app/javascript/packs/server-bundle.js"
+    end
+
+    it "uses the configured source path in generated RSC demo hints" do
+      assert_file "app/views/hello_server/index.html.erb" do |content|
+        expect(content).to include('<code class="path-hint">client/app/src/HelloServer/</code>')
+        expect(content).not_to include("app/javascript/src/HelloServer/")
       end
     end
   end

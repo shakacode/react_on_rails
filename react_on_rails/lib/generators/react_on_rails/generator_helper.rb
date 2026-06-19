@@ -10,6 +10,7 @@ module GeneratorHelper
 
   DEFAULT_SHAKAPACKER_SOURCE_PATH = "app/javascript"
   DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH = "packs"
+  private_constant :DEFAULT_SHAKAPACKER_SOURCE_PATH, :DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH
 
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
@@ -80,11 +81,14 @@ module GeneratorHelper
   end
 
   def shakapacker_source_path
-    configured_shakapacker_relative_path("source_path", DEFAULT_SHAKAPACKER_SOURCE_PATH)
+    @shakapacker_source_path ||= configured_shakapacker_relative_path("source_path", DEFAULT_SHAKAPACKER_SOURCE_PATH)
   end
 
   def shakapacker_source_entry_path
-    configured_shakapacker_relative_path("source_entry_path", DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH)
+    @shakapacker_source_entry_path ||= configured_shakapacker_relative_path(
+      "source_entry_path",
+      DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH
+    )
   end
 
   def shakapacker_entrypoint_path(filename)
@@ -114,6 +118,7 @@ module GeneratorHelper
   end
 
   def shakapacker_path_config_value(config, config_key)
+    # Generators run in the development context, so prefer that section before falling back to shared defaults.
     %w[development default].each do |section_name|
       section = shakapacker_config_section(config, section_name)
       value = shakapacker_config_value(section, config_key)
