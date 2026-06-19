@@ -21,9 +21,14 @@ spec:
         - path: /var/lib/postgresql/data
           recoveryPolicy: retain
           uri: 'scratch://postgres-vol'
-  # Important that postgres does not scaling because disk storage is local to one server!
+  # Keep Postgres on one manual replica because disk storage is local to one server.
+  # Capacity AI may restart the workload when adjusting resources; for Postgres
+  # that can disrupt the database despite the retained local volume.
+  # Keep the single-replica manual posture explicit instead of relying on platform defaults.
   defaultOptions:
     autoscaling:
+      metric: disabled
+      minScale: 1
       maxScale: 1
     capacityAI: false
   # This firewall configuration corresponds to using a simple, hard-coded password for postgres
