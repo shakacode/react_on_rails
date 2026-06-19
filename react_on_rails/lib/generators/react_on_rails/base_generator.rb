@@ -194,7 +194,7 @@ module ReactOnRails
         # shakapacker_source_entry_path; those helpers memoize on first read.
         if instance_variable_defined?(:@shakapacker_source_path) ||
            instance_variable_defined?(:@shakapacker_source_entry_path)
-          raise "copy_packer_config must run before path-dependent generator actions"
+          raise Thor::Error, "copy_packer_config must run before path-dependent generator actions"
         end
 
         base_path = "base/base/"

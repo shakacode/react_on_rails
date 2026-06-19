@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 require_relative "../support/generator_spec_helper"
 require_relative "../support/version_test_helpers"
 describe InstallGenerator, type: :generator do
@@ -169,8 +171,8 @@ describe InstallGenerator, type: :generator do
   def simulate_preinstalled_shakapacker(source_path:, source_entry_path:)
     simulate_existing_file("config/shakapacker.yml", <<~YAML)
       default: &default
-        source_path: #{source_path.to_s.inspect}
-        source_entry_path: #{source_entry_path.to_s.inspect}
+        source_path: #{yaml_quoted_string(source_path)}
+        source_entry_path: #{yaml_quoted_string(source_entry_path)}
         public_root_path: public
         public_output_path: packs
         cache_path: tmp/shakapacker
@@ -199,6 +201,10 @@ describe InstallGenerator, type: :generator do
       const webpackConfig = generateWebpackConfig()
       module.exports = webpackConfig
     JS
+  end
+
+  def yaml_quoted_string(value)
+    JSON.generate(value.to_s)
   end
 
   # Reads the repo's own package.json packageManager pin and returns the version.
@@ -539,6 +545,20 @@ describe InstallGenerator, type: :generator do
       assert_file "app/views/hello_server/index.html.erb" do |content|
         expect(content).to include('<code class="path-hint">client/app/src/HelloServer/</code>')
         expect(content).not_to include("app/javascript/src/HelloServer/")
+      end
+    end
+  end
+
+  context "with --rsc --tailwind and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--rsc --tailwind --no-rspack], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "injects the stylesheet import into the generated RSC client component" do
+      assert_file "client/app/src/HelloServer/components/LikeButton.jsx" do |content|
+        expect(content).to include("import '../../../stylesheets/application.css';")
       end
     end
   end
