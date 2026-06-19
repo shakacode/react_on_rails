@@ -4,6 +4,11 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
 
 ## Coordination Rules
 
+These prompts intentionally repeat the worked-issue scope state machine from
+`.agents/skills/post-merge-audit/SKILL.md` so copy-paste audits stay
+self-contained. Keep state-machine changes mirrored across this workflow,
+`SKILL.md`, and `.agents/workflows/pr-processing.md`.
+
 - Use one exact audit id, base, and head for every agent, for example `audit: <YYYY-MM-DD>-post-rc`.
 - Format `<AUDIT_ID>` as `<YYYY-MM-DD>-<short-purpose>`, for example `<YYYY-MM-DD>-post-rc` or `<YYYY-MM-DD>-agent-batch-audit`.
 - Run Codex and Claude independently first. Do not give either agent the other agent's report until both reports are complete.
@@ -34,12 +39,11 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
   `agent-coord status`, and inspect the named batch entry as the primary
   worked-issue scope when available. If coordination state cannot be verified,
   record `worked_issue_scope: UNKNOWN (setup)` or
-  `worked_issue_scope: UNKNOWN (access)` with the exact command/error. A
-  structured public `codex-claim` comment is a GitHub issue/PR comment
-  containing a `codex-claim` JSON block in the format documented by
-  `internal/contributor-info/agent-coordination-backend.md`. Use structured
-  public `codex-claim` comments as advisory recovery evidence when available
-  before reducing unknown scope to merged PRs.
+  `worked_issue_scope: UNKNOWN (access)` with the exact command/error. Use
+  structured public `codex-claim` comments (GitHub comments containing a
+  `codex-claim` JSON block in the "Public claim comment" format from
+  `.agents/workflows/pr-processing.md`) as advisory recovery evidence when
+  available before reducing unknown scope to merged PRs.
 - For private coordination backend setup and CLI discovery, see
   `internal/contributor-info/agent-coordination-backend.md`.
 

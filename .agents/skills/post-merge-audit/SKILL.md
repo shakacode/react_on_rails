@@ -22,6 +22,10 @@ Use `.agents/workflows/post-merge-audit.md` for reusable copy-paste prompts, inc
 Start by resolving the exact audit range and, when auditing a named agent
 batch/run, the exact worked-issue scope:
 
+Term: a structured public `codex-claim` comment is a GitHub issue/PR comment
+containing a `codex-claim` JSON block in the "Public claim comment" format from
+`.agents/workflows/pr-processing.md`.
+
 When this repository includes `.agents/skills/post-merge-audit/bin/post-merge-audit-scope`, run it first:
 
 ```bash
@@ -54,13 +58,11 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
    `agent-coord doctor` passes but
    `agent-coord status` fails, record `worked_issue_scope: UNKNOWN (access)`
-   with the exact command/error. A structured public `codex-claim` comment is a
-   GitHub issue/PR comment containing a `codex-claim` JSON block in the format
-   documented by `internal/contributor-info/agent-coordination-backend.md`. In
-   both UNKNOWN cases, use structured public `codex-claim` comments as an
-   advisory fallback for possible no-PR, blocked, parked, or done-unmerged lanes
-   before reducing scope to merged PRs. Keep advisory rows marked `UNKNOWN` as
-   needed, and do not infer confirmed completeness from merged PRs.
+   with the exact command/error. In both UNKNOWN cases, use structured public
+   `codex-claim` comments as an advisory fallback for possible no-PR, blocked,
+   parked, or done-unmerged lanes before reducing scope to merged PRs. Keep
+   advisory rows marked `UNKNOWN` as needed, and do not infer confirmed
+   completeness from merged PRs.
 
    If `agent-coord doctor` and `agent-coord status` both succeed but the named
    batch entry contains no worked issues or lanes, record
@@ -174,11 +176,11 @@ lane was evaluated, even when the issue produced no merged PR:
 The audit should usually produce an issue plan for non-OK findings, but not create issues until approval.
 
 - **No issue**: for `OK`, duplicate findings, findings fully resolved by the
-  audit evidence, or healthy `in_progress` lanes; include `in_progress` lanes
-  in the worked-issue coverage table so the coordinator can see they were
-  checked.
+  audit evidence, evidenced `realized` lanes, or healthy `in_progress` lanes;
+  include `realized` and `in_progress` lanes in the worked-issue coverage table
+  so the coordinator can see they were checked.
 - **Changelog only**: for missing changelog entries; prefer one bundled changelog issue or a recommendation to run `/update-changelog`, not one issue per entry.
-- **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
+- **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, follow-up task, or non-OK worked-issue outcome (`partial`, `missed`, `regressed`, or `unknown`) that needs follow-up.
 - **Parent issue**: create one parent issue only to group two or more related
   _child fix_ issues from the same audit. Do **not** create a standalone
   audit-snapshot tracker (a `Post-<range> audit` / `Post-rc.N catch-up audit`

@@ -39,7 +39,7 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      checked, report private state as `UNKNOWN` and use structured public
      `codex-claim` comments as an advisory fallback. A structured public
      `codex-claim` comment is a GitHub issue/PR comment containing a
-     `codex-claim` JSON block; see the public claim comment format below.
+     `codex-claim` JSON block; see the "Public claim comment" format below.
    - For lanes declared in `batches/<batch-id>.json` with `depends_on`, run
      `agent-coord status` at lane start and before rebase or push. If the lane
      shows unmet `blocked_on` refs, set that lane's heartbeat status to
@@ -1213,8 +1213,8 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - requested adversarial review that did not finish before merge, finished on an older head SHA, or left untriaged `BLOCKING`/`DISCUSS` findings
 8. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
 9. Produce a deduped issue plan for non-OK findings:
-   - no issue for OK, duplicates, fully resolved findings, or healthy
-     `in_progress` lanes
+   - no issue for OK, duplicates, fully resolved findings, evidenced `realized`
+     lanes, or healthy `in_progress` lanes
    - one bundled changelog issue or a `/update-changelog` recommendation for missing changelog entries
    - one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task
    - one parent issue when there are two or more related child issues from the same audit
@@ -1223,6 +1223,8 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - a coordinator action entry, not a follow-up issue, for each `stalled` lane
      that needs a resume/reassign/drop decision unless the user explicitly
      approves tracking it as an issue
+   - one child issue or approved coordinator action for each `partial`, `missed`,
+     `regressed`, or `unknown` worked-issue outcome that needs follow-up
    - hidden `post-merge-audit-finding` fingerprints so duplicate child issues can be detected
    - for process findings, include the Process Gap Disposition fields above,
      especially `Mechanism target` and `Replay evidence or park reason`, before
