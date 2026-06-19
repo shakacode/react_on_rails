@@ -1149,9 +1149,12 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    `agent-coord doctor` fails, record `worked_issue_scope: UNKNOWN (setup)`. If
    `agent-coord doctor` passes but `agent-coord status` fails, record
    `worked_issue_scope: UNKNOWN (access)`. In all UNKNOWN cases, include the
-   exact command/error, audit only the merged PR range, and report the command,
-   permission, or batch id confirmation needed to recover the worked issue list
-   instead of identifying a batch subset from PR links or heuristics.
+   exact command/error and use structured public `codex-claim` comments as an
+   advisory fallback for possible no-PR, blocked, parked, or done-unmerged lanes
+   before reducing scope to merged PRs. Keep advisory claim rows marked
+   `UNKNOWN` as needed, and report the command, permission, or batch id
+   confirmation needed to recover the worked issue list instead of identifying a
+   confirmed batch subset from PR links or heuristics.
 3. List every PR merged in the range. When `worked_issue_scope` is known,
    identify the batch subset by coordination state, branch names, PR bodies,
    labels, comments, authors, merge timing, and linked issues. When

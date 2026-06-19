@@ -116,19 +116,20 @@ Classify each PR:
 Classify each worked issue separately so the audit can prove every coordinated
 lane was evaluated, even when the issue produced no merged PR:
 
-- **In progress**: the lane is healthy active/live work with recent heartbeat,
+- `in_progress`: the lane is healthy active/live work with recent heartbeat,
   commits, or review activity and no stalled, regressed, partial, missed, or
   unknown signal; record it as a no-action item.
-- **Realized**: the issue intent was satisfied and the final state is supported
+- `realized`: the issue intent was satisfied and the final state is supported
   by evidence.
-- **Partial**: the issue intent was incompletely addressed; some acceptance
+- `partial`: the issue intent was incompletely addressed; some acceptance
   criteria landed and others did not.
-- **Missed**: the issue intent was not addressed; no meaningful implementation
+- `missed`: the issue intent was not addressed; no meaningful implementation
   or evidence comment exists.
-- **Regressed**: the merge harmed an outcome that was previously satisfied.
-- **Stalled**: the lane needs a coordinator decision to resume, reassign, or
-  drop.
-- **Unknown**: the auditor cannot verify the issue outcome from available
+- `regressed`: the merge harmed an outcome that was previously satisfied.
+- `stalled`: the lane needs a coordinator decision to resume, reassign, or
+  drop. Includes `stale` and `dead` lost-heartbeat operational states; see
+  `continuous-evaluation-loop.md` for the operational-to-intent mapping.
+- `unknown`: the auditor cannot verify the issue outcome from available
   coordination, GitHub, and git evidence.
 
 ## Issue Plan
