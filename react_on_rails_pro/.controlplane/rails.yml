@@ -47,8 +47,9 @@ spec:
         - number: 3800
           protocol: http
   defaultOptions:
-    # Public/staging test apps keep one warm replica while Capacity AI right-sizes CPU and memory.
-    # For production, increase maxScale and review Capacity AI suitability.
+    # Public/staging test apps keep one warm replica while Capacity AI right-sizes both containers.
+    # Capacity AI may restart that replica when applying resource changes.
+    # For production or high-availability staging, increase maxScale and review Capacity AI suitability.
     autoscaling:
       metric: disabled
       minScale: 1
