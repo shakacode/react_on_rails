@@ -303,11 +303,17 @@ RSpec.describe GeneratorHelper, type: :generator do
           source_path: client/app
       YAML
       remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
+      if instance_variable_defined?(:@shakapacker_source_entry_path)
+        remove_instance_variable(:@shakapacker_source_entry_path)
+      end
     end
 
     after do
       FileUtils.rm_rf(File.join(destination_root, "config"))
       remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
+      if instance_variable_defined?(:@shakapacker_source_entry_path)
+        remove_instance_variable(:@shakapacker_source_entry_path)
+      end
     end
 
     it "places generated demo stylesheets under the configured Shakapacker source path" do
