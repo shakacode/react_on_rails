@@ -364,6 +364,7 @@ describe('streamServerRenderedReactComponent', () => {
       expect(errors).toHaveLength(0);
       expect(onPostSSRHook).toHaveBeenCalledTimes(1);
       expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
+      expectNoDuplicateNotifySSREndWarning(consoleWarnSpy);
     } finally {
       consoleWarnSpy.mockRestore();
     }
@@ -386,6 +387,7 @@ describe('streamServerRenderedReactComponent', () => {
       expect(html).toContain('Loading skipped route...');
       expect(html).toContain('Loading errored boundary...');
       expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
+      expectNoDuplicateNotifySSREndWarning(consoleWarnSpy);
     } finally {
       consoleWarnSpy.mockRestore();
     }

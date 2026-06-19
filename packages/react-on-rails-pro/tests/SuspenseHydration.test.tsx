@@ -135,9 +135,17 @@ async function renderAndHydrate() {
     );
 
   const reader = stream.getReader();
+  const readNextChunk = async () => {
+    const { done, value } = await reader.read();
+    if (done) {
+      throw new Error('Expected another streamed HTML chunk before the stream ended.');
+    }
+
+    return new TextDecoder().decode(value);
+  };
+
   const writeFirstChunk = async () => {
-    const result = await reader.read();
-    const decoded = new TextDecoder().decode(result.value as Buffer);
+    const decoded = await readNextChunk();
     container.innerHTML = decoded;
     return decoded;
   };
@@ -146,7 +154,7 @@ async function renderAndHydrate() {
     let { done, value } = await reader.read();
     let decoded = '';
     while (!done) {
-      decoded += new TextDecoder().decode(value as Buffer);
+      decoded += new TextDecoder().decode(value);
       // eslint-disable-next-line no-await-in-loop
       ({ done, value } = await reader.read());
     }
@@ -166,8 +174,8 @@ async function renderAndHydrate() {
   };
 }
 
-// React Server Components tests require React 19 and only run with Node version 18 (`newest` in our CI matrix)
-(getNodeVersion() >= 18 ? describe : describe.skip)('RSCClientRoot', () => {
+// The package `test:streaming` script skips React < 19; this guard also skips older Node CI lanes.
+(getNodeVersion() >= 18 ? describe : describe.skip)('SuspenseHydration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     document.body.innerHTML = '';

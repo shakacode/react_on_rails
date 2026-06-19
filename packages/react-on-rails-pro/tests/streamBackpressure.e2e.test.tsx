@@ -40,7 +40,6 @@ import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
 import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
 
-const HIGHWATER_MARK = 16 * 1024; // Node.js default PassThrough highWaterMark: 16KB
 const INCOMPLETE_LENGTH_PREFIXED_STREAM_WARNING = '[react_on_rails] Incomplete length-prefixed stream';
 
 const testingRailsContext = {
@@ -50,7 +49,14 @@ const testingRailsContext = {
   componentSpecificMetadata: {
     renderRequestId: '123',
   },
-} as any;
+};
+
+type RailsContextWithRSCPayloadStream = typeof testingRailsContext & {
+  getRSCPayloadStream: (
+    componentName: string,
+    props: Record<string, unknown>,
+  ) => Promise<AsyncIterable<Buffer>>;
+};
 
 const toLengthPrefixedPayload = (content: string): Buffer => {
   const contentBuffer = Buffer.from(content, 'utf8');
@@ -108,7 +114,7 @@ const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk
           } as StreamResultChunk);
         });
       } catch (error) {
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
     stream.on('end', () => {
@@ -116,11 +122,24 @@ const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk
         flushParserOrThrow();
         resolve(chunks);
       } catch (error) {
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
     stream.on('error', reject);
   });
+
+describe('collectChunks - length-prefixed stream parsing', () => {
+  it('rejects if the stream ends with an incomplete length-prefixed chunk', async () => {
+    const truncatedStream = new PassThrough();
+    const completeChunk = toLengthPrefixedPayload('truncated payload');
+    const result = collectChunks(truncatedStream);
+
+    truncatedStream.push(completeChunk.subarray(0, completeChunk.length - 1));
+    truncatedStream.push(null);
+
+    await expect(result).rejects.toThrow(INCOMPLETE_LENGTH_PREFIXED_STREAM_WARNING);
+  });
+});
 
 describe('streamServerRenderedReactComponent - RSC payload exceeding default highWaterMark (e2e)', () => {
   let source: PassThrough;
@@ -132,17 +151,6 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     generateRSCPayload = jest.fn().mockResolvedValue(source);
   });
 
-  it('rejects if the rendered result stream ends with an incomplete length-prefixed chunk', async () => {
-    const truncatedStream = new PassThrough();
-    const completeChunk = toLengthPrefixedPayload('truncated payload');
-    const result = collectChunks(truncatedStream);
-
-    truncatedStream.push(completeChunk.subarray(0, completeChunk.length - 1));
-    truncatedStream.push(null);
-
-    await expect(result).rejects.toThrow(INCOMPLETE_LENGTH_PREFIXED_STREAM_WARNING);
-  });
-
   const renderComponent = (name: string) =>
     streamServerRenderedReactComponent({
       name,
@@ -152,7 +160,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
       throwJsErrors: true,
       railsContext: testingRailsContext,
       generateRSCPayload,
-    } as any);
+    } as unknown as Parameters<typeof streamServerRenderedReactComponent>[0]);
 
   // Helper: register a render function whose returned Promise reads ALL data from the RSC
   // payload stream before resolving to a React element. This simulates what
@@ -164,7 +172,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
   // that triggers backpressure issues when the payload exceeds stream2's buffer capacity.
   const registerRSCRenderFunction = (name: string) => {
     ReactOnRails.register({
-      [name]: (_props: Record<string, unknown>, railsContext: any) =>
+      [name]: (_props: Record<string, unknown>, railsContext: RailsContextWithRSCPayloadStream) =>
         railsContext
           .getRSCPayloadStream('ServerComponent', _props)
           .then(async (rscStream: AsyncIterable<Buffer>) => {
@@ -180,7 +188,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
               `RSC payload: ${totalBytes} bytes`,
             );
           }),
-    });
+    } as unknown as Parameters<typeof ReactOnRails.register>[0]);
   };
 
   it('completes with RSC payload scripts for payloads under the default highWaterMark', async () => {
@@ -221,7 +229,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     const chunkCount = 128;
     const chunk = toLengthPrefixedPayload('a'.repeat(chunkSize));
     const totalBytes = chunk.length * chunkCount;
-    for (let i = 0; i < chunkCount; i++) {
+    for (let i = 0; i < chunkCount; i += 1) {
       source.push(chunk);
     }
     source.push(null);
@@ -259,7 +267,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
         return;
       }
       source.push(chunk);
-      pushed++;
+      pushed += 1;
     }, 1);
 
     const chunks = await collectChunks(renderResult);
@@ -281,7 +289,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
     const chunkCount = 48;
     const chunk = toLengthPrefixedPayload('c'.repeat(chunkSize));
     const totalBytes = chunk.length * chunkCount;
-    for (let i = 0; i < chunkCount; i++) {
+    for (let i = 0; i < chunkCount; i += 1) {
       source.push(chunk);
     }
     source.push(null);
