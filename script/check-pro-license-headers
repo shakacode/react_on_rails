@@ -8,9 +8,9 @@
 # against the header silently drifting away as files are added or moved.
 #
 # Usage:
-#   script/check-pro-license-headers           # check; non-zero exit lists offenders
+#   script/check-pro-license-headers           # check working tree, incl. new untracked files; lists offenders
 #   script/check-pro-license-headers --check-staged  # check staged/index contents
-#   script/check-pro-license-headers --fix     # insert/upgrade headers in place
+#   script/check-pro-license-headers --fix     # insert/upgrade headers in place (tracked + new untracked)
 #   script/check-pro-license-headers --list    # print the in-scope file set and exit
 #   script/check-pro-license-headers --self-test  # run the in-memory unit tests
 #
@@ -243,6 +243,28 @@ def tracked_in_scope_files
   out.split("\x00").reject(&:empty?).select { |p| in_scope?(p) }.sort
 end
 
+# New Pro files that exist in the working tree but are not yet tracked (not
+# `git add`-ed) and are not gitignored. `git ls-files` lists only tracked
+# paths, so without this a brand-new headerless Pro file is invisible to a
+# local `--check`/`--fix`: the run reports a false pass and the missing header
+# only surfaces in hosted CI (which sees the file once it is committed).
+# `--exclude-standard` honors .gitignore, so build artifacts and node_modules
+# under the Pro trees are skipped.
+def untracked_in_scope_files
+  out, status = Open3.capture2("git", "ls-files", "-z", "--others", "--exclude-standard", *PRO_TREES)
+  abort "git ls-files (untracked) failed" unless status.success?
+
+  out.split("\x00").reject(&:empty?).select { |p| in_scope?(p) }.sort
+end
+
+# Files to validate against the working tree: tracked Pro files plus not-yet-
+# staged new ones, so a missing header fails locally before commit instead of
+# in hosted CI. (--check-staged stays tracked-only by design: it inspects the
+# index via `git show :path`, and an unstaged file is not part of the commit.)
+def working_tree_in_scope_files
+  (tracked_in_scope_files + untracked_in_scope_files).uniq.sort
+end
+
 def index_file_content(path)
   out, err, status = Open3.capture3("git", "show", ":#{path}")
   message = "git show :#{path} failed (exit #{status.exitstatus}): #{err.strip}"
@@ -252,7 +274,7 @@ def index_file_content(path)
 end
 
 def run_check
-  files = tracked_in_scope_files
+  files = working_tree_in_scope_files
   missing = files.reject { |p| File.read(p).include?(render_header(comment_style(p))) }
   if missing.empty?
     puts "All #{files.size} in-scope Pro files have the current license header."
@@ -285,7 +307,7 @@ end
 
 def run_fix
   changed = []
-  tracked_in_scope_files.each do |path|
+  working_tree_in_scope_files.each do |path|
     original = File.read(path)
     updated = apply_header(path, original)
     next if updated == original
@@ -303,7 +325,7 @@ def run_fix
 end
 
 def run_list
-  files = tracked_in_scope_files
+  files = working_tree_in_scope_files
   files.each { |p| puts p }
   warn "#{files.size} in-scope Pro files."
   0

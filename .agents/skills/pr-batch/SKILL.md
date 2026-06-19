@@ -22,6 +22,7 @@ Run a Codex batch
 Run `git fetch --prune origin main`, then use `.agents/workflows/pr-processing.md` as the deeper operating model for each issue, PR, review-fix pass, or merge-readiness item. If repo-local `.agents/skills/...` or `.agents/workflows/pr-processing.md` is missing in the checkout but present on `origin/main`, update the worktree before launching workers; if it remains missing, report repo workflow state as `UNKNOWN`.
 If the target scope is not verified yet, use `.agents/skills/plan-pr-batch/SKILL.md` first.
 For release-mode coordination, auto-merge confidence, and shared release tracker updates, follow `AGENTS.md` and the release-mode sections of `.agents/workflows/pr-processing.md`; do not invent new labels or overwrite tracker issue bodies from stale reads.
+Select the merge gate by the target branch's release phase (`beta` for `main`, `rc`/`final` for `release/*`): follow the **Release Phase Gate** in `.agents/workflows/pr-processing.md` and **Release-Train Branching And Phase Gating** in `AGENTS.md`. Prefer the phase published via `agent-coord`; only stabilizing fixes belong on `release/*`, and forward-port them to `main` with `git cherry-pick -x`.
 If any target's value, priority, or proposed fix scope is unclear, use `.agents/skills/evaluate-issue/SKILL.md` before assigning implementation workers.
 Skip issues labeled `needs-customer-feedback` unless the user explicitly provides customer evidence or maintainer approval for that issue; report each skipped target with `needs-customer-feedback` as the reason.
 
@@ -81,6 +82,21 @@ Before implementation or worker launch, produce:
 
 If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/goal` prompt. Do not begin implementation from plan approval unless the user explicitly says to launch now.
 
+## Handoff Contract
+
+For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
+`.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
+controls. For lockfile changes, include Dependabot ecosystem and
+directory/directories compatibility plus the lockfile content-diff note:
+
+- changed dependencies
+- rationale
+- sibling-lock comparison
+- any platform-precompiled / source-build or build-time dependency change
+
+This per-PR requirement also applies to each individual target PR in the batch
+whose committed lockfiles change.
+
 ## Goal Prompt Template
 
 Keep this template aligned with the matching plan-to-goal prompt in
@@ -135,7 +151,8 @@ one additional Claude Code review pass if available, such as `/code-review` or
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
 controls. For lockfile changes, include Dependabot ecosystem and
-directory/directories compatibility.
+directory/directories compatibility and the lockfile content-diff evidence
+required by the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 
@@ -188,7 +205,8 @@ final handoff.
 For the required-vs-full CI readiness decision, run
 `.agents/skills/pr-batch/bin/pr-ci-readiness <PR>` (add `--repo OWNER/REPO` when
 not in the repo). It runs `gh pr checks --required`, falls back to the full list
-when no required checks exist, ignores cancelled/superseded rows, and prints a
+when no usable required checks exist (none, or only cancelled rows), ignores
+cancelled/superseded rows, and prints a
 `verdict` of `READY`, `NOT_READY`, or `UNKNOWN` plus the `failing`/`pending`
 check names (`required_used` shows whether required checks gated the verdict).
 Treat `UNKNOWN` (an empty check list) as not ready and request hosted CI or
@@ -261,6 +279,14 @@ detailed policy belongs in the canonical workflow.
 
 ## Batch Handoff Format
 
+> **A handoff is a comment, not a new issue.** Per `AGENTS.md` → _Tracking Issues
+> And Handoffs_: record a handoff on the relevant parent tracking issue (or the
+> agent-coordination repo if one is in use), or — when there is no parent umbrella
+> — in the batch's own PR comment/description; and append point-in-time audits to
+> the standing release audit ledger in place. Never spawn a standalone
+> `Handoff: ...` or `Post-rc.N audit` issue. Close superseded process issues on
+> sight; closure follows the work, not whoever opened the tracker.
+
 <!-- Keep this handoff summary in sync with `.agents/workflows/pr-processing.md` -> `### Batch Handoff Format`. -->
 
 Use the canonical Batch Handoff Format in
@@ -290,8 +316,11 @@ advisory fallback state.
 
 Follow the canonical
 [Worker Rules](../../workflows/pr-processing.md#worker-rules) and keep one target
-or one disjoint lane per worker. The main agent owns final PR creation, status
-reporting, hosted-CI decisions, and merge sequencing.
+or one disjoint lane per worker. Every file-editing worker runs in its own
+worktree so two workers never share one working directory — Codex or
+multi-machine workers use `git worktree add`; in-process Claude Code
+`Agent`/`Workflow` subagents pass `isolation: 'worktree'`. The main agent owns
+final PR creation, status reporting, hosted-CI decisions, and merge sequencing.
 
 ## Coordinator Closeout Lane
 
@@ -303,3 +332,16 @@ per-PR merge-ledger run, stale release-mode classification updates and the final
 distinct), hosted-CI request and waitback when uncertainty remains, and any
 authorized ready/merge action, and the late post-merge bot-finding sweep before
 final batch handoff.
+
+When the batch goal delegates merge authority, definition of done for a target is merged +
+closed out (or a true blocker / no-PR with evidence), not "stopped at a recommendation." When
+merge authority is NOT delegated, done is a complete merge-readiness handoff per `AGENTS.md` —
+all current-head checks and review threads satisfied, with evidence and the generic `Confidence
+note:` recorded (the `Agent Merge Confidence` block is the accelerated-RC auto-merge block, not the
+normal-handoff note) — for the maintainer to merge; do not merge without authorization.
+Either way, do not surface merge readiness while review threads are still unresolved.
+
+Converge the review loop instead of chasing it: each push re-triggers every configured
+review bot on the new head, so resolve advisory threads in-thread (reply + resolve)
+**without a commit**, and reserve pushes for batched confirmed blockers. See
+[Review-Loop Convergence](../../workflows/pr-processing.md#review-loop-convergence-push-amplification).

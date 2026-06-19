@@ -105,9 +105,27 @@ class FetchPrReviewDataTest < Minitest::Test
     assert_includes out, "positive integer PR number is required"
   end
 
+  def test_rejects_zero_pr
+    out, status = Open3.capture2e("ruby", SCRIPT, "0", "--repo", "owner/repo")
+    refute status.success?
+    assert_includes out, "positive integer PR number is required"
+  end
+
   def test_rejects_bad_repo_form
     # gh is not reached for a malformed --repo, so this passes without network.
     out, status = Open3.capture2e("ruby", SCRIPT, "12", "--repo", "owneronly")
+    refute status.success?
+    assert_includes out, "--repo must be in OWNER/REPO form"
+  end
+
+  def test_rejects_repo_with_extra_path_segment
+    out, status = Open3.capture2e("ruby", SCRIPT, "12", "--repo", "a/b/c")
+    refute status.success?
+    assert_includes out, "--repo must be in OWNER/REPO form"
+  end
+
+  def test_rejects_repo_with_empty_owner
+    out, status = Open3.capture2e("ruby", SCRIPT, "12", "--repo", "/repo")
     refute status.success?
     assert_includes out, "--repo must be in OWNER/REPO form"
   end

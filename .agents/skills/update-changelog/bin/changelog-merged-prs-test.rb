@@ -160,6 +160,18 @@ class ChangelogMergedPrsTest < Minitest::Test
     assert_includes out, "range must be in BASE..TARGET form"
   end
 
+  def test_rejects_repo_with_extra_path_segment
+    out, status = Open3.capture2e("ruby", SCRIPT, "a..b", "--repo", "a/b/c")
+    refute status.success?
+    assert_includes out, "--repo must be in OWNER/REPO form"
+  end
+
+  def test_rejects_repo_with_empty_owner
+    out, status = Open3.capture2e("ruby", SCRIPT, "a..b", "--repo", "/repo")
+    refute status.success?
+    assert_includes out, "--repo must be in OWNER/REPO form"
+  end
+
   private
 
   # Build a throwaway repo + fake gh on PATH, then yield (repo, bin_dir).

@@ -1,5 +1,10 @@
 import { createElement, isValidElement, type ReactElement } from 'react';
-import type { CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index.ts';
+import type {
+  CreateParams,
+  ReactComponent,
+  ServerRenderFunction,
+  CreateReactOutputResult,
+} from './types/index.ts';
 import { isServerRenderHash, isPromise } from './isServerRenderResult.ts';
 import { isRendererTeardownResult } from './rendererTeardown.ts';
 
@@ -102,9 +107,12 @@ export default function createReactOutput({
       throw new Error(`Registered render function "${name}" must be a function.`);
     }
 
-    const renderFunctionResult = (component as RenderFunction)(props, railsContext);
-    // Defense-in-depth: a 2-argument render function isn't expected to return a teardown wrapper, but
-    // the public RenderFunction return type can't structurally exclude it, so reject that at runtime too.
+    // The cast only narrows the broad RegisteredComponentValue union (which isn't structurally
+    // callable) to a concrete render-function role; it does not widen what may be returned.
+    const renderFunctionResult = (component as ServerRenderFunction)(props, railsContext);
+    // Defense-in-depth: RenderFunction (= ServerRenderFunction) returns RenderFunctionResult, which
+    // already excludes RendererTeardownResult at the type level, so a teardown can't arrive here from
+    // a typed caller. Reject it at runtime anyway for untyped JS callers that ignore the contract.
     if (isRendererTeardownResult(renderFunctionResult)) {
       throw new Error(unsupportedManualRendererMessage(name));
     }

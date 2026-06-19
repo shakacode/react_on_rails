@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 470" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>How async props stream each slow value to its Suspense boundary</title>
+  <desc>Sequence diagram across three lanes — Browser, Rails, and the Node Renderer. The browser asks for a page, Rails starts the page with placeholders, the renderer returns an HTML shell with loading states, and the browser shows the shell. Then a loop runs for each slow data value: Rails sends the value, the renderer returns the HTML for that section, and the browser replaces the loading state.</desc>
+  <defs>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CC0000"/><stop offset="100%" stop-color="#990000"/>
+    </linearGradient>
+    <linearGradient id="browserGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A90D9"/><stop offset="100%" stop-color="#2E5A8A"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .lane-line { stroke: #E2E8F0; }
+      .loop-box { fill: none; stroke: #CBD5E1; }
+      .loop-label-bg { fill: #F1F5F9; stroke: #CBD5E1; }
+      .loop-label { fill: #475569; }
+      .msg-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .msg-text { fill: #1E40AF; }
+      .ret-box { fill: #ECFDF5; stroke: #86EFAC; }
+      .ret-text { fill: #166534; }
+      .arrow-fwd { stroke: #94A3B8; }
+      .arrow-ret { stroke: #22C55E; }
+      .head-fwd { fill: #94A3B8; }
+      .head-ret { fill: #22C55E; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .lane-line { stroke: #334155; }
+        .loop-box { stroke: #475569; }
+        .loop-label-bg { fill: #1E293B; stroke: #475569; }
+        .loop-label { fill: #94A3B8; }
+        .msg-box { fill: #172554; stroke: #3B82F6; }
+        .msg-text { fill: #93C5FD; }
+        .ret-box { fill: #052E16; stroke: #10B981; }
+        .ret-text { fill: #6EE7B7; }
+        .arrow-fwd { stroke: #CBD5E1; }
+        .head-fwd { fill: #CBD5E1; }
+        .arrow-ret { stroke: #4ADE80; }
+        .head-ret { fill: #4ADE80; }
+      }
+      .st1 { opacity:0; animation: reveal 11s ease 0.2s infinite; }
+      .st2 { opacity:0; animation: reveal 11s ease 1.0s infinite; }
+      .st3 { opacity:0; animation: reveal 11s ease 1.8s infinite; }
+      .st4 { opacity:0; animation: reveal 11s ease 2.6s infinite; }
+      .st5 { opacity:0; animation: reveal 11s ease 3.8s infinite; }
+      .st6 { opacity:0; animation: reveal 11s ease 4.6s infinite; }
+      .st7 { opacity:0; animation: reveal 11s ease 5.4s infinite; }
+      @keyframes reveal { 0% { opacity:0; } 3% { opacity:1; } 92% { opacity:1; } 97% { opacity:0; } 100% { opacity:0; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; } }
+    </style>
+  </defs>
+
+  <rect width="840" height="470" class="bg"/>
+  <text x="420" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Async props: Rails emits each value, the boundary fills</text>
+  <text x="420" y="47" text-anchor="middle" font-size="11" class="subtitle">The shell ships first; each slow prop streams in and replaces its loading state</text>
+
+  <rect x="70" y="62" width="100" height="30" rx="8" fill="url(#browserGrad)" filter="url(#shadow)"/>
+  <text x="120" y="82" text-anchor="middle" font-size="11" font-weight="600" fill="white">Browser</text>
+  <rect x="350" y="62" width="100" height="30" rx="8" fill="url(#railsGrad)" filter="url(#shadow)"/>
+  <text x="400" y="82" text-anchor="middle" font-size="11" font-weight="600" fill="white">Rails</text>
+  <rect x="635" y="62" width="130" height="30" rx="8" fill="url(#nodeGrad)" filter="url(#shadow)"/>
+  <text x="700" y="82" text-anchor="middle" font-size="11" font-weight="600" fill="white">Node Renderer</text>
+
+  <line x1="120" y1="98" x2="120" y2="440" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="400" y1="98" x2="400" y2="440" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="700" y1="98" x2="700" y2="440" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+  <g class="st1">
+    <line x1="126" y1="138" x2="392" y2="138" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="392,135 399,138 392,141" class="head-fwd"/>
+    <rect x="205" y="128" width="110" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="260" y="140" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Ask for a page</text>
+  </g>
+
+  <g class="st2">
+    <line x1="406" y1="176" x2="694" y2="176" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="694,173 701,176 694,179" class="head-fwd"/>
+    <rect x="478" y="166" width="144" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="550" y="178" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Start page with placeholders</text>
+  </g>
+
+  <g class="st3">
+    <line x1="694" y1="214" x2="406" y2="214" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="406,211 399,214 406,217" class="head-ret"/>
+    <rect x="478" y="204" width="144" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="550" y="216" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">HTML shell + loading states</text>
+  </g>
+
+  <g class="st4">
+    <line x1="394" y1="252" x2="126" y2="252" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="126,249 119,252 126,255" class="head-ret"/>
+    <rect x="196" y="242" width="128" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="260" y="254" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">Browser shows the shell</text>
+  </g>
+
+  <rect x="40" y="284" width="760" height="148" rx="8" class="loop-box" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <rect x="40" y="284" width="266" height="20" rx="6" class="loop-label-bg" stroke-width="1"/>
+  <text x="52" y="298" font-size="10" font-weight="600" class="loop-label">loop — each slow value becomes ready</text>
+
+  <g class="st5">
+    <line x1="406" y1="332" x2="694" y2="332" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="694,329 701,332 694,335" class="head-fwd"/>
+    <rect x="490" y="322" width="120" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="550" y="334" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Send the data value</text>
+  </g>
+
+  <g class="st6">
+    <line x1="694" y1="370" x2="406" y2="370" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="406,367 399,370 406,373" class="head-ret"/>
+    <rect x="476" y="360" width="148" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="550" y="372" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">HTML for that section</text>
+  </g>
+
+  <g class="st7">
+    <line x1="394" y1="408" x2="126" y2="408" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="126,405 119,408 126,411" class="head-ret"/>
+    <rect x="192" y="398" width="136" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="260" y="410" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">Replace the loading state</text>
+  </g>
+</svg>

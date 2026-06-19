@@ -334,9 +334,50 @@ contract unless a maintainer explicitly narrows the run.
   - Residual risk: <one-line risk summary, or "none">
   ```
 
+## Tracking Issues And Handoffs
+
+Keep the issue tracker for durable work — product features, real bugs, release
+gates — not for transient agent-process state. Process state accretes into
+clutter because "open a tracker" has no matching "close it" step.
+
+- **Do not open a new issue for a session handoff or a point-in-time audit.** A
+  handoff is transient coordination and an audit is a snapshot; neither is
+  durable backlog. Record a handoff as a comment on the relevant parent tracking
+  issue (for example the roadmap umbrella), or — if a dedicated agent-coordination
+  repo is in use — there. If the work has no parent umbrella (a standalone PR or a
+  one-off batch), put the handoff in the PR's final comment or description rather
+  than creating an issue to hold it. Append a point-in-time audit to the standing
+  release audit ledger in place. Never spawn a standalone `Handoff: ...` or
+  `Post-rc.N audit` issue.
+- **One durable ledger per recurring concern, updated in place.** Release audits
+  append to the standing release audit ledger; cross-agent coordination state —
+  the heartbeats and leases that signal which agent is live on which lane — lives
+  in the coordination-layer tracker. Do not create a sibling issue each cycle.
+  (At time of writing these are #4010 and #3974, but treat any such number as a
+  movable pointer: confirm it is still the live ledger before relying on it, and
+  update the pointer if it has been superseded — the same staleness this policy
+  guards against applies to the ledgers themselves.)
+- **Closure follows the work, not the opener.** A tracking issue closes when its
+  underlying PR/work lands, done by whoever finishes the work — not by whoever
+  opened the tracker. "I opened it" does not mean "I must close it": WIP can
+  outlive a session (lost chat, unanswered question, disconnect). The heartbeat —
+  the coordination layer's liveness signal that flags when no agent is active on a
+  lane — detects abandonment, and an unfinished PR is the real signal of remaining
+  work; act on the PR, not on a stale tracker.
+- **The 30-day test.** Before opening any tracking or meta issue, ask whether it
+  will still matter in 30 days. If not, it is a comment or a ledger entry, not an
+  issue.
+- **Sweep on sight.** When a handoff/audit/process-snapshot issue's underlying
+  work has landed or its snapshot is obsolete, close it — first consolidating any
+  still-live finding into the durable ledger or a real backlog issue. Verify it is
+  actually resolved or superseded before closing; never close a tracker that still
+  fronts unfinished work.
+
 ## Release Mode And Auto-Merge Coordination
 
 Use the current release tracker to decide whether PRs are in normal development, accelerated RC, strict RC, or final-release mode. The tracker is the live source of truth for the mode; committed docs define how to interpret it.
+
+The repo ships releases with a **release train**: `main` never freezes and keeps absorbing batch work, RCs are stabilized on an ephemeral `release/X.Y.Z` branch, and the final is the **last good RC promoted by dropping `-rc`** — not a re-cut from `main`. The merge gate an agent must apply is a function of the **target branch's release phase** (`beta` / `rc` / `final`); the phase composes with the mode below. See **[Release-Train Branching And Phase Gating](#release-train-branching-and-phase-gating)** for the phase→gate table and [`internal/contributor-info/release-train-runbook.md`](internal/contributor-info/release-train-runbook.md) for the full branching runbook.
 
 - An active tracker is an open release gate issue, usually found by the existing `release` and `TRACKING` labels or the `Release gate:` title. Also search closed release gate issues updated within the last 7 days before defaulting to `development`, so agents can detect stale trackers. The mode must be recorded in the issue body, not encoded by adding more labels.
 - Valid tracker modes are `development`, `accelerated-rc`, `strict-rc`, and `final-release`.
@@ -398,6 +439,25 @@ Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits huma
 
 Score from a `10/10` baseline: all checks complete, expected skips explained, changed surfaces validated, no unresolved blocker threads, no known residual risk, and an independent finalizer. A non-trivial concern is any finding that, if correct, would be a correctness bug, security issue, behavioral regression, API contract break, data-loss risk, release-process break, or credible CI/test coverage gap. Deduct 1-2 points for incomplete validation or unknown residual risk, using the larger deduction when unsure, and at least 2 points for any failed or unexplained check. Missing required validation for a changed surface is at least a 2-point deduction. Any unresolved non-trivial concern disqualifies auto-merge regardless of score. A missing independent finalizer disqualifies auto-merge regardless of score.
 
+### Release-Train Branching And Phase Gating
+
+Releases use a release-train branching model. Full mechanics (cut, stabilize, forward-port, promote, close out) live in [`internal/contributor-info/release-train-runbook.md`](internal/contributor-info/release-train-runbook.md). The rules an agent must follow:
+
+- **`main` never freezes.** It stays in the `beta` phase and keeps absorbing batch work the whole time.
+- **RCs stabilize on an ephemeral `release/X.Y.Z` branch** (one branch per final target, deleted after the final ships; tags are the durable record). Only stabilizing fixes target `release/*`; new features keep targeting `main`.
+- **Forward-port every `release/*` fix to `main` with `git cherry-pick -x <sha>`.** Never `git merge release/X.Y.Z` into `main` — that leaks the RC version-bump commits onto `main`.
+- **Final = promote the last good RC by dropping `-rc`**, not a re-cut from `main`. The final's runtime code tree must equal the last good RC's tree — only version/changelog **metadata** differs (under unified versioning the release task bumps `version.rb`, the Pro version file, every workspace `package.json`, and lockfiles in addition to `CHANGELOG.md`), never runtime source; post-cut `main` commits roll into the next version. See the [release-train runbook](internal/contributor-info/release-train-runbook.md) for the per-artifact diff check and the release-task constraints (it currently validates `origin/main` CI and aborts a stable `release[...]` off non-`main` branches — both need follow-up for true `release/*` promotion).
+
+The **merge gate is a function of the target branch's release phase**. Resolve the phase, then apply its row plus the mode rules above:
+
+| Phase     | Target            | Agent merge gate (lowest → highest)                                                                                                                                                                                                 |
+| --------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **beta**  | `main`            | **Lowest.** Confidence note + green required checks. Fast iteration; `main` may be unstable.                                                                                                                                        |
+| **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`.                                                                                                             |
+| **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial-pr-review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion**. No confidence-only auto-merge. |
+
+**Reading the phase.** The active phase per release line is published through the `shakacode/agent-coordination` backend so agents read the current gate without being told. Read it from the machine-readable `agent-coord` status output for the PR's target branch; treat it as available only when `agent-coord doctor` and `agent-coord status` exit 0 (the private backend README and `agent-coord --help` are authoritative for the exact field). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is the tool that is unavailable here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
+
 ## Review Workflow
 
 ### PR CI Labels
@@ -407,7 +467,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - **Default: no CI-expansion label.** For docs-only changes, focused tests, small isolated fixes, and refactors with no cross-package behavior change, rely on `ci-required / required-pr-gate` plus local verification during review.
 - **Use `ready-for-hosted-ci`** (or ask a maintainer to comment `+ci-run-hosted`) when the PR is ready for hosted GitHub Actions confirmation. This runs the hosted workflows for the current head SHA, but `script/ci-changes-detector` still chooses the applicable suites. Opening a draft PR or requesting code review does not by itself mean hosted CI should run.
 - **Use `force-full-hosted-ci`** only when a maintainer intentionally wants to bypass optimized suite selection and run every hosted suite, for example while validating CI detector changes, package manager or runtime floor changes, release/build/publishing logic, broad generator output, or another cross-cutting change where path selection itself is part of the risk. Prefer `+ci-force-full`, which also applies `ready-for-hosted-ci` and dispatches the workflows for the current head SHA.
-- **Use `benchmark`** (or a suite-specific `benchmark-core` / `benchmark-pro` / `benchmark-pro-node-renderer`) for performance-sensitive changes: server rendering paths, Node renderer, caching, bundle generation, asset serving/precompile behavior, concurrency/pooling, or anything expected to affect throughput, latency, memory, or bundle size. Benchmarks are opt-in on PRs: without a `benchmark*` label no suite runs, because per-PR benchmark numbers are informational only and noise-dominated on shared CI runners. They always run on push to `main`, the regression backstop. `ready-for-hosted-ci` and `force-full-hosted-ci` do not trigger benchmarks; use benchmark labels separately when performance evidence matters. Use `hosted-ci-no-benchmarks` only to suppress an explicit benchmark label on CI/tooling PRs that cannot move runtime performance.
+- **Use `benchmark`** (or a suite-specific `benchmark-core` / `benchmark-pro` / `benchmark-pro-node-renderer`) for performance-sensitive changes: server rendering paths, Node renderer, caching, bundle generation, asset serving/precompile behavior, concurrency/pooling, or anything expected to affect throughput, latency, memory, or bundle size. Benchmarks are opt-in on PRs: without a `benchmark*` label no suite runs, because per-PR benchmark numbers are informational only and noise-dominated on shared CI runners. They still run on push to `main` to keep the Bencher dashboard and PR-comparison baseline current, but automatic regression-issue filing is disabled by default (#4071): on shared runners those alerts were ±50-125% noise that filed false-positive issues (#4038-#4044), so the trustworthy signal now comes from the dedicated local runner (`benchmarks/run-local-benchmark.rb`, #4073). Set the repo variable `BENCHMARK_REGRESSION_ISSUES_ENABLED=true` to restore automatic filing. `ready-for-hosted-ci` and `force-full-hosted-ci` do not trigger benchmarks; use benchmark labels separately when performance evidence matters. Use `hosted-ci-no-benchmarks` only to suppress an explicit benchmark label on CI/tooling PRs that cannot move runtime performance.
 - **Remove hosted readiness when no longer needed** with `+ci-stop-hosted` if the PR returns to active iteration. Use `+ci-stop-full` when only the force-full override should be removed and optimized hosted CI should remain.
 - **Record intentional hosted-CI waivers** with `+ci-skip-hosted [optional reason]`. This is especially important for admins: the comment creates a SHA-bound audit trail without forcing docs-only or low-risk PRs to run hosted CI.
 - **Prefer comment commands for agents and batch coordinators.** A direct label added by a local human/user token can start label-triggered workflows; a label added by a GitHub workflow's `GITHUB_TOKEN` cannot. Agents should use `+ci-run-hosted` or `+ci-force-full` unless a human explicitly uses the local helper or direct label path.

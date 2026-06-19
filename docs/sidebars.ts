@@ -31,6 +31,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/create-react-on-rails-app',
         'getting-started/tutorial',
         'getting-started/installation-into-an-existing-rails-app',
+        'getting-started/consuming-an-unreleased-build',
         'getting-started/project-structure',
         'getting-started/using-react-on-rails',
         'getting-started/oss-vs-pro',
@@ -74,6 +75,7 @@ const sidebars: SidebarsConfig = {
           label: 'Rendering',
           items: [
             'building-features/code-splitting',
+            'building-features/hydration-scheduling',
             'building-features/react-helmet',
             'building-features/react-19-native-metadata',
             'building-features/react-19-activity',
@@ -108,6 +110,7 @@ const sidebars: SidebarsConfig = {
           items: [
             'building-features/dev-server-and-testing',
             'building-features/testing-configuration',
+            'building-features/accessibility',
             'building-features/extensible-precompile-pattern',
             'building-features/process-managers',
             'building-features/debugging',

@@ -20,7 +20,10 @@ def route_has_required_params?(path)
 end
 
 def strip_optional_params(route)
-  route.gsub(/\([^)]*\)/, "")
+  # Collapse runs of "/" so removing an optional group adjacent to a leading slash
+  # (e.g. "/(/:locale)/dashboard" -> "//dashboard") doesn't leave a double slash.
+  # These are route paths, never full URLs, so collapsing "/+" to "/" is safe.
+  route.gsub(/\([^)]*\)/, "").squeeze("/")
 end
 
 def sanitize_route_name(route)

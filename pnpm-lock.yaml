@@ -187,8 +187,8 @@ importers:
         specifier: ~19.0.4
         version: 19.0.7(react@19.0.7)
       react-on-rails-rsc:
-        specifier: 19.0.5-rc.7
-        version: 19.0.5-rc.7(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: 19.0.5
+        version: 19.0.5(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
       redux:
         specifier: ^4.2.1
         version: 4.2.1
@@ -280,8 +280,8 @@ importers:
         specifier: ~19.0.4
         version: 19.0.7(react@19.0.7)
       react-on-rails-rsc:
-        specifier: 19.0.5-rc.7
-        version: 19.0.5-rc.7(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: 19.0.5
+        version: 19.0.5(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -8585,8 +8585,8 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
-  react-on-rails-rsc@19.0.5-rc.7:
-    resolution: {integrity: sha512-cyQwZm7YW9FS0PEgwael5P9S5HsNeHwhnMm10ScgepZTv38dOeidf+gWf9x+z6w0wrgJ92aExZ8uLjCgpImxcQ==}
+  react-on-rails-rsc@19.0.5:
+    resolution: {integrity: sha512-EGa5ppIXMCiNRPKvIEydENGYCCbN6GD5F6g8qBlhxmFIUch4XvgJTh/VnaBJEpDNUd/W2k8PPTMzJO+0R3hmcg==}
     peerDependencies:
       react: ~19.0.4
       react-dom: ~19.0.4
@@ -19421,7 +19421,7 @@ snapshots:
 
   react-is@18.3.1: {}
 
-  react-on-rails-rsc@19.0.5-rc.7(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.0.5(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2

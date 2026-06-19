@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 360" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Rolling deploy with an adapter: every hash starts warm</title>
+  <desc>With a rolling_deploy_adapter, the new renderer pool is pre-seeded with both the draining hash abc and the current hash def before it serves traffic. Both old draining Rails and new Rails requests hit the cache, so there is no 410 and no retry during the deploy.</desc>
+  <defs>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CC0000"/><stop offset="100%" stop-color="#990000"/>
+    </linearGradient>
+    <linearGradient id="lbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A90D9"/><stop offset="100%" stop-color="#2E5A8A"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .draining { fill: #FEF3C7; stroke: #F59E0B; }
+      .draining-text { fill: #92400E; }
+      .new { fill: #D1FAE5; stroke: #22C55E; }
+      .new-text { fill: #166534; }
+      .hit { fill: #D1FAE5; stroke: #22C55E; }
+      .hit-text { fill: #166534; }
+      .arrow { stroke: #94A3B8; }
+      .head { fill: #94A3B8; }
+      .label { fill: #475569; }
+      .mono { font-family: monospace; }
+      .caption { fill: #475569; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .draining { fill: #422006; stroke: #F59E0B; }
+        .draining-text { fill: #FDE68A; }
+        .new { fill: #052E16; stroke: #10B981; }
+        .new-text { fill: #6EE7B7; }
+        .hit { fill: #052E16; stroke: #10B981; }
+        .hit-text { fill: #6EE7B7; }
+        .arrow { stroke: #CBD5E1; }
+        .head { fill: #CBD5E1; }
+        .label { fill: #94A3B8; }
+        .caption { fill: #94A3B8; }
+      }
+    </style>
+  </defs>
+
+  <rect width="880" height="360" class="bg"/>
+  <text x="440" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">The solution: pre-seed every in-flight hash</text>
+  <text x="440" y="47" text-anchor="middle" font-size="11" class="subtitle">The rolling_deploy_adapter warms the new renderer for abc AND def before it takes traffic</text>
+
+  <!-- LB -->
+  <rect x="34" y="158" width="120" height="40" rx="9" fill="url(#lbGrad)" filter="url(#shadow)"/>
+  <text x="94" y="182" text-anchor="middle" font-size="11" font-weight="600" fill="white">Load Balancer</text>
+  <text x="94" y="146" text-anchor="middle" font-size="9.5" class="label">Incoming traffic</text>
+
+  <!-- Old Rails -->
+  <rect x="220" y="88" width="190" height="56" rx="10" class="draining" stroke-width="1.5"/>
+  <text x="315" y="110" text-anchor="middle" font-size="11" font-weight="700" class="draining-text">Old Rails — draining</text>
+  <text x="315" y="127" text-anchor="middle" font-size="10" class="draining-text mono">bundle hash abc</text>
+
+  <!-- New Rails -->
+  <rect x="220" y="212" width="190" height="56" rx="10" class="new" stroke-width="1.5"/>
+  <text x="315" y="234" text-anchor="middle" font-size="11" font-weight="700" class="new-text">New Rails</text>
+  <text x="315" y="251" text-anchor="middle" font-size="10" class="new-text mono">bundle hash def</text>
+
+  <line x1="154" y1="172" x2="216" y2="120" class="arrow" stroke-width="1.5"/>
+  <polygon points="216,120 208,120 212,127" class="head"/>
+  <line x1="154" y1="184" x2="216" y2="236" class="arrow" stroke-width="1.5"/>
+  <polygon points="216,236 212,229 208,236" class="head"/>
+
+  <!-- Renderer -->
+  <rect x="468" y="142" width="204" height="92" rx="11" fill="url(#nodeGrad)" filter="url(#shadow)"/>
+  <text x="570" y="168" text-anchor="middle" font-size="11.5" font-weight="700" fill="white">New Node Renderer pool</text>
+  <text x="570" y="186" text-anchor="middle" font-size="9" fill="white" opacity="0.92">pre-seeded via</text>
+  <text x="570" y="200" text-anchor="middle" font-size="9" fill="white" opacity="0.92">rolling_deploy_adapter</text>
+  <text x="570" y="218" text-anchor="middle" font-size="10.5" font-weight="700" fill="white" class="mono">abc + def</text>
+
+  <line x1="410" y1="116" x2="464" y2="166" class="arrow" stroke-width="1.6"/>
+  <polygon points="464,166 456,164 460,158" class="head"/>
+  <rect x="404" y="128" width="74" height="15" rx="4" class="draining" stroke-width="1"/>
+  <text x="441" y="140" text-anchor="middle" font-size="8" font-weight="600" class="draining-text mono">req · abc</text>
+
+  <line x1="410" y1="240" x2="464" y2="210" class="arrow" stroke-width="1.6"/>
+  <polygon points="464,210 456,212 460,218" class="head"/>
+  <rect x="404" y="232" width="74" height="15" rx="4" class="new" stroke-width="1"/>
+  <text x="441" y="244" text-anchor="middle" font-size="8" font-weight="600" class="new-text mono">req · def</text>
+
+  <!-- outcomes: both hits — top label aligns with abc (draining) lane, bottom with def (current) lane -->
+  <line x1="672" y1="170" x2="724" y2="138" class="arrow" stroke-width="1.6"/>
+  <polygon points="724,138 716,139 719,146" class="head"/>
+  <rect x="724" y="108" width="130" height="50" rx="10" class="hit" stroke-width="1.5"/>
+  <text x="789" y="130" text-anchor="middle" font-size="11" font-weight="700" class="hit-text">abc → HIT</text>
+  <text x="789" y="147" text-anchor="middle" font-size="9" class="hit-text">no 410, no retry</text>
+
+  <line x1="672" y1="206" x2="724" y2="238" class="arrow" stroke-width="1.6"/>
+  <polygon points="724,238 719,232 716,239" class="head"/>
+  <rect x="724" y="218" width="130" height="56" rx="10" class="hit" stroke-width="1.5"/>
+  <text x="789" y="240" text-anchor="middle" font-size="11" font-weight="700" class="hit-text">def → HIT</text>
+  <text x="789" y="257" text-anchor="middle" font-size="9" class="hit-text">fast SSR</text>
+
+  <text x="440" y="324" text-anchor="middle" font-size="11" font-weight="600" class="hit-text">Every in-flight bundle hash is warm — the deploy causes no latency or error-rate spike.</text>
+</svg>

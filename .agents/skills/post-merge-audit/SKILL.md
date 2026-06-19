@@ -46,6 +46,12 @@ For each included PR:
 - Approval semantics: flag any merge that treated an AI reviewer approval, positive issue comment, or "no actionable comments" summary as required maintainer approval or a special approval gate. Also flag any AI finding that was ignored even though it identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval.
 - Adversarial review: flag any requested adversarial review that finished after merge, reviewed an older head SHA, or left untriaged `BLOCKING` or `DISCUSS` findings.
 - Changelog: if the diff or PR body indicates a user-visible behavior, API, error message, configuration, performance, security, or breaking change, verify `CHANGELOG.md` has a matching entry. When entries are missing, recommend running `/update-changelog`.
+- Lockfiles: if the PR changed committed lockfiles, verify the PR evidence satisfies the lockfile content-diff requirement from the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`.
+- Closing evidence: for any PR whose body or linked issue uses analysis, benchmark, or investigation
+  evidence to support a `close` or `document/work around` disposition, verify the conclusion applies the
+  full gate from the "Evaluate the fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md`:
+  reproducible artifact or justified missing-artifact caveat, internal consistency, production-environment
+  caveats, and refutable-conclusion handling.
 - Validation: compare changed areas with the validation evidence in the PR body or comments.
 - Cross-PR interactions: compare changed files, shared behavior, assumptions, and release-sensitive areas across the batch.
 - Decision log: inspect any `Codex Decision Log` or equivalent section and verify the decisions still hold after the merge.
@@ -78,7 +84,7 @@ The audit should usually produce an issue plan for non-OK findings, but not crea
 - **No issue**: for `OK`, duplicate findings, or findings fully resolved by the audit evidence.
 - **Changelog only**: for missing changelog entries; prefer one bundled changelog issue or a recommendation to run `/update-changelog`, not one issue per entry.
 - **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
-- **Parent issue**: create one parent issue when there are two or more related child issues from the same audit or when the audit spans a release-candidate readiness decision.
+- **Parent issue**: create one parent issue only to group two or more related _child fix_ issues from the same audit. Do **not** create a standalone audit-snapshot tracker (a `Post-<range> audit` / `Post-rc.N catch-up audit` issue): per `AGENTS.md` → _Tracking Issues And Handoffs_, the audit report is a point-in-time snapshot — append it to the standing release audit ledger in place. Genuine non-OK findings still become real child issues; only the snapshot/report is what goes to the ledger instead of a new issue.
 
 For process findings, the issue plan must include a Process Gap Disposition
 before issue creation:

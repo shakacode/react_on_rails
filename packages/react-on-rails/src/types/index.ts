@@ -263,21 +263,29 @@ type AsyncPropsManager = {
  * anotherRenderFunction.renderFunction = true;
  *
  * @remarks
- * The 3-argument "renderer" form `(props, railsContext, domNodeId)` owns its own DOM
- * rendering/hydration. Use {@link RendererFunction} for renderers that return nothing or an optional
- * `{ teardown }` wrapper for cleanup. `RenderFunction` still accepts legacy 3-argument renderers
- * that returned a component/server result only to satisfy the old type; React on Rails ignores those
- * return values on the client renderer path.
+ * `RenderFunction` is exactly this 2-argument server/client render-function form. The 3-argument
+ * "renderer" form `(props, railsContext, domNodeId)` owns its own DOM rendering/hydration and is a
+ * distinct role: type those functions {@link RendererFunction} (they return nothing or an optional
+ * `{ teardown }` wrapper for cleanup). For `RenderFunction`, this makes the illegal combination —
+ * a server render-function "returning" a teardown — unrepresentable instead of merely discouraged.
+ * (`RendererFunction` still accepts legacy {@link RenderFunctionResult} return shapes for backward
+ * compatibility with old 3-argument renderers; those values are ignored at runtime.)
+ *
+ * The doc block above describes {@link RenderFunction}, the public alias for this interface. Prefer
+ * `RenderFunction` in public-facing annotations; `ServerRenderFunction` is the concrete interface
+ * behind it (exported mainly so call sites can narrow to the precise role after runtime guards).
  */
 interface ServerRenderFunction extends RenderFunctionMarker {
   (props?: any, railsContext?: RailsContext): RenderFunctionResult;
 }
 
-interface LegacyRendererRenderFunction extends RenderFunctionMarker {
-  (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
-}
-
-type RenderFunction = ServerRenderFunction | LegacyRendererRenderFunction;
+/**
+ * The public name for the 2-argument server/client render-function form
+ * `(props, railsContext) => RenderFunctionResult`. Alias of {@link ServerRenderFunction}; prefer
+ * `RenderFunction` in public-facing annotations. See {@link ServerRenderFunction} for the full
+ * render-function vs. renderer role explanation.
+ */
+type RenderFunction = ServerRenderFunction;
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction | RendererFunction;
 // Plain-object modules registered via server_render_js: no render function and no React component.
@@ -292,10 +300,12 @@ export type {
   ReactComponentRenderFunction,
   AuthenticityHeaders,
   RenderFunction,
+  ServerRenderFunction,
   RendererTeardown,
   RendererTeardownResult,
   RendererFunction,
   RenderFunctionResult,
+  RendererFunctionResult,
   Store,
   StoreGenerator,
   CreateReactOutputResult,

@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Traditional SSR versus Streaming SSR first-paint timing</title>
+  <desc>Two side-by-side timelines on the same scale. With traditional SSR the first paint happens only after the slowest data fetch and the HTML render finish (about 1000 ms). With streaming SSR plus async props the shell paints almost immediately (about 50 ms) and each slow section streams in afterward.</desc>
+  <defs>
+    <linearGradient id="tradGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#64748B"/><stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+    <linearGradient id="streamGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22C55E"/><stop offset="100%" stop-color="#16A34A"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .axis { stroke: #CBD5E1; }
+      .tick-text { fill: #94A3B8; }
+      .bar-fetch { fill: #FEF3C7; stroke: #F59E0B; }
+      .bar-fetch-text { fill: #92400E; }
+      .bar-render { fill: #DBEAFE; stroke: #93C5FD; }
+      .bar-render-text { fill: #1E40AF; }
+      .bar-stream { fill: #D1FAE5; stroke: #22C55E; }
+      .bar-stream-text { fill: #166534; }
+      .paint-late { stroke: #DC2626; }
+      .paint-late-text { fill: #DC2626; }
+      .paint-early { stroke: #16A34A; }
+      .paint-early-text { fill: #16A34A; }
+      .caption { fill: #475569; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .axis { stroke: #475569; }
+        .tick-text { fill: #94A3B8; }
+        .bar-fetch { fill: #422006; stroke: #F59E0B; }
+        .bar-fetch-text { fill: #FDE68A; }
+        .bar-render { fill: #172554; stroke: #3B82F6; }
+        .bar-render-text { fill: #93C5FD; }
+        .bar-stream { fill: #052E16; stroke: #10B981; }
+        .bar-stream-text { fill: #6EE7B7; }
+        .paint-late { stroke: #F87171; }
+        .paint-late-text { fill: #F87171; }
+        .paint-early { stroke: #4ADE80; }
+        .paint-early-text { fill: #4ADE80; }
+        .caption { fill: #94A3B8; }
+      }
+      .pulse { animation: pulse 1.6s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+      .stream-in { opacity: 0; animation: streamIn 4s ease infinite; }
+      .stream-in-2 { opacity: 0; animation: streamIn 4s ease 0.5s infinite; }
+      @keyframes streamIn { 0%,20% { opacity: 0; } 35%,90% { opacity: 1; } 100% { opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; } }
+    </style>
+  </defs>
+
+  <rect width="900" height="330" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Traditional SSR vs Streaming SSR: when does the page paint?</text>
+  <text x="450" y="47" text-anchor="middle" font-size="11" class="subtitle">Same time scale on both sides. Timings are illustrative, not benchmarks.</text>
+
+  <!-- ===== Traditional card ===== -->
+  <g>
+    <rect x="20" y="64" width="410" height="246" rx="10" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="20" y="64" width="410" height="30" rx="10" fill="url(#tradGrad)"/>
+    <rect x="20" y="84" width="410" height="10" fill="url(#tradGrad)"/>
+    <text x="225" y="84" text-anchor="middle" font-size="12" font-weight="700" fill="white">Traditional SSR — paint waits for all data</text>
+
+    <text x="44" y="120" font-size="10" class="bar-fetch-text" font-weight="600">Fetch users · ~800 ms</text>
+    <rect x="44" y="124" width="290" height="16" rx="3" class="bar-fetch" stroke-width="1"/>
+
+    <text x="44" y="156" font-size="10" class="bar-fetch-text" font-weight="600">Fetch posts · ~600 ms</text>
+    <rect x="44" y="160" width="217" height="16" rx="3" class="bar-fetch" stroke-width="1"/>
+
+    <text x="44" y="192" font-size="10" class="bar-render-text" font-weight="600">Render HTML · ~200 ms</text>
+    <rect x="334" y="196" width="72" height="16" rx="3" class="bar-render" stroke-width="1"/>
+
+    <line x1="406" y1="116" x2="406" y2="244" class="paint-late pulse" stroke-width="2" stroke-dasharray="4 3"/>
+    <polygon points="406,116 430,116 430,130 406,130" class="paint-late pulse" fill="#DC2626" stroke="none"/>
+    <text x="402" y="240" text-anchor="end" font-size="10" font-weight="700" class="paint-late-text">First paint ~1000 ms</text>
+
+    <line x1="44" y1="252" x2="406" y2="252" class="axis" stroke-width="1.5"/>
+    <text x="44" y="266" text-anchor="middle" font-size="9" class="tick-text">0</text>
+    <text x="225" y="266" text-anchor="middle" font-size="9" class="tick-text">500 ms</text>
+    <text x="406" y="266" text-anchor="middle" font-size="9" class="tick-text">1000 ms</text>
+    <text x="225" y="294" text-anchor="middle" font-size="10" class="caption">Nothing visible until the slowest query and render finish.</text>
+  </g>
+
+  <!-- ===== Streaming card ===== -->
+  <g>
+    <rect x="470" y="64" width="410" height="246" rx="10" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="470" y="64" width="410" height="30" rx="10" fill="url(#streamGrad)"/>
+    <rect x="470" y="84" width="410" height="10" fill="url(#streamGrad)"/>
+    <text x="675" y="84" text-anchor="middle" font-size="12" font-weight="700" fill="white">Streaming SSR + async props — paint first</text>
+
+    <text x="494" y="120" font-size="10" class="bar-stream-text" font-weight="600">Render shell · ~50 ms</text>
+    <rect x="494" y="124" width="18" height="16" rx="3" class="bar-stream" stroke-width="1"/>
+
+    <text x="711" y="156" font-size="10" font-weight="600" class="bar-stream-text stream-in">Users stream in</text>
+    <rect x="711" y="160" width="80" height="16" rx="3" class="bar-stream stream-in" stroke-width="1" stroke-dasharray="4 2"/>
+
+    <text x="784" y="192" text-anchor="end" font-size="10" font-weight="600" class="bar-stream-text stream-in-2">Posts stream in</text>
+    <rect x="784" y="196" width="72" height="16" rx="3" class="bar-stream stream-in-2" stroke-width="1" stroke-dasharray="4 2"/>
+
+    <line x1="512" y1="116" x2="512" y2="244" class="paint-early pulse" stroke-width="2" stroke-dasharray="4 3"/>
+    <polygon points="512,116 536,116 536,130 512,130" class="paint-early pulse" fill="#16A34A" stroke="none"/>
+    <text x="540" y="128" text-anchor="start" font-size="10" font-weight="700" class="paint-early-text">First paint ~50 ms</text>
+
+    <line x1="494" y1="252" x2="856" y2="252" class="axis" stroke-width="1.5"/>
+    <text x="494" y="266" text-anchor="middle" font-size="9" class="tick-text">0</text>
+    <text x="675" y="266" text-anchor="middle" font-size="9" class="tick-text">500 ms</text>
+    <text x="856" y="266" text-anchor="middle" font-size="9" class="tick-text">1000 ms</text>
+    <text x="675" y="294" text-anchor="middle" font-size="10" class="caption">Shell paints immediately; each section streams in as its data is ready.</text>
+  </g>
+</svg>

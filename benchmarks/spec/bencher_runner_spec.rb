@@ -35,6 +35,27 @@ RSpec.describe BencherRunner do
       expect(args).to include("--start-point", "main")
     end
 
+    it "reports to the github-actions testbed by default" do
+      # Force the default path so the example is independent of any BENCHER_TESTBED exported in
+      # the developer/CI shell (which the runner intentionally honors).
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("BENCHER_TESTBED", "github-actions").and_return("github-actions")
+
+      args = capture_run_command
+
+      expect(args.each_cons(2)).to include(["--testbed", "github-actions"])
+    end
+
+    it "reports to BENCHER_TESTBED when set (local benchmark runner override)" do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("BENCHER_TESTBED", "github-actions").and_return("m1-bench")
+
+      args = capture_run_command
+
+      expect(args.each_cons(2)).to include(["--testbed", "m1-bench"])
+      expect(args.each_cons(2)).not_to include(["--testbed", "github-actions"])
+    end
+
     # Parse only the threshold tail: OptionParser raises InvalidOption on any flag it
     # doesn't declare, and the leading `bencher run` flags aren't declared here, so
     # drop everything before the first --threshold-measure.

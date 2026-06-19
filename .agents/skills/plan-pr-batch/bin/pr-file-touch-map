@@ -25,6 +25,8 @@ require "securerandom"
 # methods take raw strings so they can be unit-tested directly.
 module PrFileTouchMap
   FILES_API_CAP = 3000
+  # Files API statuses whose row owns both the previous and the new path.
+  RENAME_STATUSES = %w[renamed copied].freeze
 
   class Error < StandardError; end
 
@@ -76,9 +78,12 @@ module PrFileTouchMap
       raise Error, "files API row missing .filename" unless row.is_a?(Hash) && row["filename"]
 
       filename = row["filename"]
-      if row["status"] == "renamed"
+      # A renamed OR copied row owns both the previous and the new path (mirrors
+      # the Rxxx/Cxxx handling in parse_name_status). GitHub sets
+      # previous_filename on both statuses.
+      if RENAME_STATUSES.include?(row["status"])
         previous = row["previous_filename"]
-        raise Error, "renamed row missing .previous_filename" if previous.nil?
+        raise Error, "#{row['status']} row missing .previous_filename" if previous.nil?
 
         paths.push(previous, filename)
         renames << { "old" => previous, "new" => filename }
@@ -102,6 +107,16 @@ module PrFileTouchMap
 
   def unknown_result(repo:, pr_number:, changed_files:)
     result(repo:, pr_number:, source: "UNKNOWN", changed_files:, paths: [], renames: [])
+  end
+
+  # Cross-check decision: the local-diff and Files-API results (either may be nil
+  # when its source was unavailable) must agree on the path set. Agreement marks
+  # the result "verified" (safe to parallelize); anything else is UNKNOWN.
+  def reconcile(local, api, repo:, pr_number:, changed_files:)
+    return unknown_result(repo:, pr_number:, changed_files:) if local.nil? || api.nil?
+    return unknown_result(repo:, pr_number:, changed_files:) unless local["paths"] == api["paths"]
+
+    local.merge("source" => "verified")
   end
 
   def result(repo:, pr_number:, source:, changed_files:, paths:, renames:)
@@ -142,67 +157,154 @@ module PrFileTouchMap
     system(*cmd, out: File::NULL, err: File::NULL) || false
   end
 
-  def self_check
-    errors = self_check_errors
-    unless errors.empty?
-      warn "self-check failed: #{errors.join('; ')}"
-      return 1
+  # Returns the `git diff --name-status` text for the PR's three-dot diff, or nil
+  # when the local path cannot be used. Fetches base/head into session-unique
+  # temporary refs (never checking out PR code) and always cleans them up.
+  def local_diff(repo, pr_number, meta)
+    unless valid_branch?(meta[:base_ref])
+      warn "Warning: base branch failed validation; skipping local diff"
+      return nil
     end
-    puts "parser checks: ok"
-    puts gh_smoke
-    puts "self-check passed"
-    0
+
+    base_url = "https://github.com/#{repo}.git"
+    session = SecureRandom.hex(4)
+    base_tmp = "refs/tmp/pr-#{pr_number}-#{session}-base"
+    head_tmp = "refs/tmp/pr-#{pr_number}-#{session}-head"
+    begin
+      return nil unless fetch_base(base_url, meta[:base_ref], base_tmp)
+      return nil unless fetch_head(base_url, pr_number, meta, head_tmp)
+
+      run_three_dot_diff(base_url, meta[:base_ref], base_tmp, head_tmp)
+    ensure
+      system_quiet("git", "update-ref", "-d", base_tmp)
+      system_quiet("git", "update-ref", "-d", head_tmp)
+    end
   end
 
-  def self_check_errors
-    branch_check_errors + diff_parser_errors + files_api_parser_errors
-  end
+  def fetch_base(base_url, base_ref, base_tmp)
+    return true if system_quiet("git", "fetch", base_url, "refs/heads/#{base_ref}:#{base_tmp}")
 
-  def branch_check_errors
-    errors = []
-    errors << "valid branch rejected" unless valid_branch?("feature/ok")
-    errors << "colon branch accepted" if valid_branch?("bad:name")
-    errors
-  end
-
-  def diff_parser_errors
-    out = parse_name_status(
-      "M\tlib/a.rb\nA\tlib/b.rb\nD\tlib/c.rb\nR100\tlib/old.rb\tlib/new.rb\n",
-      repo: "owner/repo", pr_number: 12, changed_files: 4
-    )
-    errors = []
-    errors << "diff paths: #{out['paths'].inspect}" unless out["paths"] == ["lib/a.rb", "lib/b.rb", "lib/c.rb",
-                                                                            "lib/new.rb", "lib/old.rb"]
-    errors << "diff renames" unless out["renames"] == [{ "old" => "lib/old.rb", "new" => "lib/new.rb" }]
-    errors
-  end
-
-  def files_api_parser_errors
-    ok = parse_files_api(
-      '[[{"filename":"lib/a.rb","status":"modified"},' \
-      '{"filename":"lib/new.rb","status":"renamed","previous_filename":"lib/old.rb"}]]',
-      repo: "owner/repo", pr_number: 12, changed_files: 2
-    )
-    errors = []
-    errors << "api paths: #{ok['paths'].inspect}" unless ok["paths"] == ["lib/a.rb", "lib/new.rb", "lib/old.rb"]
-    errors << "renamed-without-previous not rejected" if rename_without_previous_accepted?
-    errors
-  end
-
-  def rename_without_previous_accepted?
-    parse_files_api('[[{"filename":"lib/new.rb","status":"renamed"}]]', repo: "o/r", pr_number: 12, changed_files: 1)
-    true
-  rescue Error
+    warn "Warning: could not fetch base branch into a temp ref; skipping local diff"
     false
   end
 
-  def gh_smoke
-    return "gh smoke: skipped (gh not installed)" unless system("command -v gh > /dev/null 2>&1")
+  # Prefer the target repo's pull ref (works for forks); then the head repo's
+  # branch; then a reachable-SHA fetch of headRefOid.
+  def fetch_head(base_url, pr_number, meta, head_tmp)
+    return true if system_quiet("git", "fetch", base_url, "pull/#{pr_number}/head:#{head_tmp}")
+    return true if fetch_head_from_repo(meta, head_tmp)
 
-    repo, status = Open3.capture2("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
-    return "gh smoke: skipped (gh not authenticated)" unless status.success? && !repo.strip.empty?
+    warn "Warning: could not fetch PR head into a temp ref; skipping local diff"
+    false
+  end
 
-    "gh smoke: ok for #{repo.strip}"
+  # Try the head repo's branch (only when the branch name validates), then a
+  # reachable-SHA fetch of headRefOid. The OID fetch does NOT depend on branch
+  # validity: an invalid/missing head branch must not gate the SHA fallback, and
+  # the 40-hex SHA is itself the only untrusted input it consumes.
+  def fetch_head_from_repo(meta, head_tmp)
+    head_url = "https://github.com/#{meta[:head_repo]}.git"
+    if valid_branch?(meta[:head_ref]) &&
+       system_quiet("git", "fetch", head_url, "refs/heads/#{meta[:head_ref]}:#{head_tmp}")
+      return true
+    end
+
+    # Reachable-SHA fetch; rejection is an expected portability outcome.
+    meta[:head_oid].match?(/\A[0-9a-f]{40}\z/) &&
+      system_quiet("git", "fetch", head_url, "#{meta[:head_oid]}:#{head_tmp}")
+  end
+
+  def run_three_dot_diff(base_url, base_ref, base_tmp, head_tmp)
+    out, status = diff_name_status(base_tmp, head_tmp)
+    return out.force_encoding("UTF-8") if status.success?
+
+    # Three-dot diff can fail when the merge base is missing in a shallow clone.
+    warn "Warning: three-dot diff failed; attempting a bounded deepen and one retry"
+    system_quiet("git", "fetch", "--deepen=200", base_url, "refs/heads/#{base_ref}")
+    out, status = diff_name_status(base_tmp, head_tmp)
+    status.success? ? out.force_encoding("UTF-8") : nil
+  end
+
+  def diff_name_status(base_tmp, head_tmp)
+    Open3.capture2("git", "diff", "--name-status", "--find-renames", "#{base_tmp}...#{head_tmp}")
+  end
+
+  def self_check
+    SelfCheck.run
+  end
+
+  # Self-check / diagnostics, kept in a nested class so it does not inflate the
+  # module's core surface. Exercises the pure parsers plus a read-only gh smoke.
+  class SelfCheck
+    class << self
+      def run
+        errors = errors_found
+        unless errors.empty?
+          warn "self-check failed: #{errors.join('; ')}"
+          return 1
+        end
+        puts "parser checks: ok"
+        puts gh_smoke
+        puts "self-check passed"
+        0
+      end
+
+      private
+
+      def errors_found
+        branch_check_errors + diff_parser_errors + files_api_parser_errors
+      end
+
+      def branch_check_errors
+        errors = []
+        errors << "valid branch rejected" unless PrFileTouchMap.valid_branch?("feature/ok")
+        errors << "colon branch accepted" if PrFileTouchMap.valid_branch?("bad:name")
+        errors
+      end
+
+      def diff_parser_errors
+        out = PrFileTouchMap.parse_name_status(
+          "M\tlib/a.rb\nA\tlib/b.rb\nD\tlib/c.rb\nR100\tlib/old.rb\tlib/new.rb\n",
+          repo: "owner/repo", pr_number: 12, changed_files: 4
+        )
+        errors = []
+        unless out["paths"] == ["lib/a.rb", "lib/b.rb", "lib/c.rb", "lib/new.rb", "lib/old.rb"]
+          errors << "diff paths: #{out['paths'].inspect}"
+        end
+        errors << "diff renames" unless out["renames"] == [{ "old" => "lib/old.rb", "new" => "lib/new.rb" }]
+        errors
+      end
+
+      def files_api_parser_errors
+        ok = PrFileTouchMap.parse_files_api(
+          '[[{"filename":"lib/a.rb","status":"modified"},' \
+          '{"filename":"lib/new.rb","status":"renamed","previous_filename":"lib/old.rb"}]]',
+          repo: "owner/repo", pr_number: 12, changed_files: 2
+        )
+        errors = []
+        errors << "api paths: #{ok['paths'].inspect}" unless ok["paths"] == ["lib/a.rb", "lib/new.rb", "lib/old.rb"]
+        errors << "renamed-without-previous not rejected" if rename_without_previous_accepted?
+        errors
+      end
+
+      def rename_without_previous_accepted?
+        PrFileTouchMap.parse_files_api(
+          '[[{"filename":"lib/new.rb","status":"renamed"}]]', repo: "o/r", pr_number: 12, changed_files: 1
+        )
+        true
+      rescue PrFileTouchMap::Error
+        false
+      end
+
+      def gh_smoke
+        return "gh smoke: skipped (gh not installed)" unless system("command -v gh > /dev/null 2>&1")
+
+        repo, status = Open3.capture2("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
+        return "gh smoke: skipped (gh not authenticated)" unless status.success? && !repo.strip.empty?
+
+        "gh smoke: ok for #{repo.strip}"
+      end
+    end
   end
 
   USAGE = <<~USAGE
@@ -218,14 +320,22 @@ module PrFileTouchMap
           --repo REPO    Base repo in OWNER/REPO form. Defaults to gh repo view.
           --json         Print JSON (default).
           --text         Print a human-readable summary instead of JSON.
+          --cross-check  Require the local diff and the Files API to agree on the
+                         path set; any disagreement or missing source yields
+                         UNKNOWN. Use this for parallel batch scheduling so a
+                         silent under-report cannot cause a worktree collision.
           --self-check   Run parser checks plus a read-only gh smoke check.
       -h, --help         Show this help.
 
     Output JSON: { pr, repo, source, changed_files, paths, renames }
-      source is "local-diff" (authoritative), "files-api" (best-effort
-      cross-check, used only when the local diff cannot run), or "UNKNOWN".
-      UNKNOWN means no trustworthy path list could be produced; the caller must
-      treat the item as serial (not safe for a parallel worktree lane).
+      source is:
+        "verified"   - cross-check mode, local diff and Files API agreed (safe to
+                       schedule in a parallel worktree lane)
+        "local-diff" - default mode, authoritative local three-dot diff
+        "files-api"  - default mode, best-effort fallback when the local diff
+                       could not run
+        "UNKNOWN"    - no trustworthy path list (or a cross-check disagreement);
+                       the caller MUST treat the item as serial, never parallel
 
     Requires: gh (GitHub CLI), git
   USAGE
@@ -243,7 +353,7 @@ module PrFileTouchMap
 
       pr_number = validate_pr!(opts[:pr])
       repo = resolve_repo!(opts[:repo])
-      print_result(resolve(repo, pr_number), opts[:format])
+      print_result(resolve(repo, pr_number, cross_check: opts[:cross_check]), opts[:format])
       0
     rescue Error => e
       warn "Error: #{e.message}"
@@ -253,14 +363,14 @@ module PrFileTouchMap
     private
 
     def parse_args(argv)
-      opts = { format: "json", help: false, self_check: false, pr: nil, repo: nil }
+      opts = { format: "json", help: false, self_check: false, cross_check: false, pr: nil, repo: nil }
       args = argv.dup
       until args.empty?
         arg = args.shift
         case arg
         when "--repo" then opts[:repo] = take_value!(args, "--repo")
-        when "--json" then opts[:format] = "json"
-        when "--text" then opts[:format] = "text"
+        when "--json", "--text" then opts[:format] = arg.delete_prefix("--")
+        when "--cross-check" then opts[:cross_check] = true
         when "--self-check" then opts[:self_check] = true
         when "-h", "--help" then opts[:help] = true
         when "--" then nil
@@ -284,22 +394,29 @@ module PrFileTouchMap
     end
 
     def validate_pr!(pr_number)
-      raise Error, "a positive integer PR number is required\n\n#{USAGE}" unless pr_number.to_s.match?(/\A\d+\z/)
+      raise Error, "a positive integer PR number is required\n\n#{USAGE}" unless pr_number.to_s.match?(/\A[1-9]\d*\z/)
 
       pr_number
     end
 
+    # Strict OWNER/REPO: non-empty owner and name, exactly one slash, no spaces.
+    REPO_FORMAT = %r{\A[^/\s]+/[^/\s]+\z}
+
     def resolve_repo!(repo)
       repo ||= capture!("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip
-      raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.include?("/")
+      raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.match?(REPO_FORMAT)
 
       repo
     end
 
-    # Authoritative local diff, then Files-API fallback, then UNKNOWN.
-    def resolve(repo, pr_number)
+    # Default: authoritative local diff, then Files-API fallback, then UNKNOWN.
+    # Cross-check: require local diff and Files API to agree on the path set, else
+    # UNKNOWN -- a fail-safe guardrail for parallel batch collision scheduling.
+    def resolve(repo, pr_number, cross_check: false)
       meta = pr_metadata(repo, pr_number)
-      name_status = local_diff(repo, pr_number, meta)
+      return resolve_cross_check(repo, pr_number, meta) if cross_check
+
+      name_status = PrFileTouchMap.local_diff(repo, pr_number, meta)
       if name_status
         return PrFileTouchMap.parse_name_status(name_status, repo:, pr_number:, changed_files: meta[:changed_files])
       end
@@ -307,7 +424,37 @@ module PrFileTouchMap
       files_api_or_unknown(repo, pr_number, meta[:changed_files])
     end
 
+    # Two independent sources must agree on the path set. Any disagreement, or a
+    # missing source, yields UNKNOWN (-> serial) so a silent under-report can
+    # never schedule two colliding items into parallel worktree lanes.
+    def resolve_cross_check(repo, pr_number, meta)
+      changed_files = meta[:changed_files]
+      name_status = PrFileTouchMap.local_diff(repo, pr_number, meta)
+      local = name_status && PrFileTouchMap.parse_name_status(name_status, repo:, pr_number:, changed_files:)
+      api = parse_files_api_safely(repo, pr_number, changed_files)
+      result = PrFileTouchMap.reconcile(local, api, repo:, pr_number:, changed_files:)
+      warn cross_check_warning(local, api) if result["source"] == "UNKNOWN"
+      result
+    end
+
+    def cross_check_warning(local, api)
+      if local.nil? || api.nil?
+        "Warning: cross-check missing a source (local=#{!local.nil?}, files-api=#{!api.nil?}); recording UNKNOWN"
+      else
+        "Warning: cross-check disagreement between local diff and Files API; recording UNKNOWN"
+      end
+    end
+
     def files_api_or_unknown(repo, pr_number, changed_files)
+      result = parse_files_api_safely(repo, pr_number, changed_files)
+      return result if result
+
+      PrFileTouchMap.unknown_result(repo:, pr_number:, changed_files:)
+    end
+
+    # Returns a parsed files-api result hash, or nil when the API is unavailable
+    # or the response cannot be trusted (logs the reason).
+    def parse_files_api_safely(repo, pr_number, changed_files)
       raw, status = Open3.capture2(
         "gh", "api", "--paginate", "--slurp", "--method", "GET",
         "repos/#{repo}/pulls/#{pr_number}/files?per_page=100"
@@ -316,8 +463,8 @@ module PrFileTouchMap
 
       PrFileTouchMap.parse_files_api(raw.force_encoding("UTF-8"), repo:, pr_number:, changed_files:)
     rescue Error => e
-      warn "Warning: #{e.message}; recording UNKNOWN"
-      PrFileTouchMap.unknown_result(repo:, pr_number:, changed_files:)
+      warn "Warning: #{e.message}"
+      nil
     end
 
     def pr_metadata(repo, pr_number)
@@ -334,72 +481,6 @@ module PrFileTouchMap
         head_oid: data["headRefOid"].to_s,
         changed_files: data["changedFiles"]
       }
-    end
-
-    # Returns the name-status text on success, or nil when the local path cannot
-    # be used. Temporary refs are always cleaned up.
-    def local_diff(repo, pr_number, meta)
-      unless PrFileTouchMap.valid_branch?(meta[:base_ref])
-        warn "Warning: base branch failed validation; skipping local diff"
-        return nil
-      end
-
-      base_url = "https://github.com/#{repo}.git"
-      session = SecureRandom.hex(4)
-      base_tmp = "refs/tmp/pr-#{pr_number}-#{session}-base"
-      head_tmp = "refs/tmp/pr-#{pr_number}-#{session}-head"
-      begin
-        return nil unless fetch_base(base_url, meta[:base_ref], base_tmp)
-        return nil unless fetch_head(base_url, pr_number, meta, head_tmp)
-
-        run_three_dot_diff(base_url, meta[:base_ref], base_tmp, head_tmp)
-      ensure
-        PrFileTouchMap.system_quiet("git", "update-ref", "-d", base_tmp)
-        PrFileTouchMap.system_quiet("git", "update-ref", "-d", head_tmp)
-      end
-    end
-
-    def fetch_base(base_url, base_ref, base_tmp)
-      return true if PrFileTouchMap.system_quiet("git", "fetch", base_url, "refs/heads/#{base_ref}:#{base_tmp}")
-
-      warn "Warning: could not fetch base branch into a temp ref; skipping local diff"
-      false
-    end
-
-    # Prefer the target repo's pull ref (works for forks); then the head repo's
-    # branch; then a reachable-SHA fetch of headRefOid.
-    def fetch_head(base_url, pr_number, meta, head_tmp)
-      return true if PrFileTouchMap.system_quiet("git", "fetch", base_url, "pull/#{pr_number}/head:#{head_tmp}")
-      return true if fetch_head_from_repo(meta, head_tmp)
-
-      warn "Warning: could not fetch PR head into a temp ref; skipping local diff"
-      false
-    end
-
-    def fetch_head_from_repo(meta, head_tmp)
-      return false unless PrFileTouchMap.valid_branch?(meta[:head_ref])
-
-      head_url = "https://github.com/#{meta[:head_repo]}.git"
-      return true if PrFileTouchMap.system_quiet("git", "fetch", head_url, "refs/heads/#{meta[:head_ref]}:#{head_tmp}")
-
-      # Reachable-SHA fetch; rejection is an expected portability outcome.
-      meta[:head_oid].match?(/\A[0-9a-f]{40}\z/) &&
-        PrFileTouchMap.system_quiet("git", "fetch", head_url, "#{meta[:head_oid]}:#{head_tmp}")
-    end
-
-    def run_three_dot_diff(base_url, base_ref, base_tmp, head_tmp)
-      out, status = diff_name_status(base_tmp, head_tmp)
-      return out.force_encoding("UTF-8") if status.success?
-
-      # Three-dot diff can fail when the merge base is missing in a shallow clone.
-      warn "Warning: three-dot diff failed; attempting a bounded deepen and one retry"
-      PrFileTouchMap.system_quiet("git", "fetch", "--deepen=200", base_url, "refs/heads/#{base_ref}")
-      out, status = diff_name_status(base_tmp, head_tmp)
-      status.success? ? out.force_encoding("UTF-8") : nil
-    end
-
-    def diff_name_status(base_tmp, head_tmp)
-      Open3.capture2("git", "diff", "--name-status", "--find-renames", "#{base_tmp}...#{head_tmp}")
     end
 
     # Run a command with no shell; return UTF-8 stdout or raise.

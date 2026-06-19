@@ -166,6 +166,8 @@ Execution flow when terminal access is available:
    - If a claim is wrong, classify it as `SKIPPED` and say why.
    - Preserve comment IDs and thread IDs for later replies and thread resolution.
    - Treat actionable review summary bodies as normal feedback to classify (`MUST-FIX`/`DISCUSS` as appropriate); skip only boilerplate or status-only summaries.
+   - For lockfile dependency drift feedback, apply the blocking triage rule from
+     the **Triage rules** section in `.agents/skills/address-review/SKILL.md`.
    - **Claim verification**: Before finalizing `MUST-FIX` classification, verify the reviewer's factual claims against the actual codebase. If local code inspection confirms the code already handles the concern (claim is demonstrably wrong), classify as `SKIPPED` per the rule above. If the evidence is ambiguous or you have only partial confidence the claim is wrong, downgrade to `DISCUSS` and note the discrepancy. If you have access to AI-powered codebase search tools (e.g., Greptile), use them to cross-reference claims for additional confidence, but treat their output as a signal — corroborated claims stay `MUST-FIX`, clearly contradicted claims go to `SKIPPED`, and inconclusive results go to `DISCUSS`.
    - Track only `MUST-FIX` items as your working checklist.
    - Use one checklist entry per must-fix item or deduplicated issue.
@@ -263,6 +265,7 @@ Execution flow when terminal access is available:
    - Do not resolve anything still in progress or uncertain.
    - **Self-review gate**: After making all code changes but before committing, review the diff for issues introduced by the fixes themselves. Check for correctness bugs, style violations, and inconsistencies with surrounding code. Fix critical issues immediately. This prevents new review cycles caused by the fixes. If you have access to a code-review agent or tool, use it; otherwise, do a manual diff review.
    - Ask for push confirmation before running `git push`. Action `a` must not push; it stops after staging files and returning the local summary.
+   - **Converge the review loop, don't chase it**: every push re-triggers the configured review bots on the new head and produces a fresh batch of comments. Batch all code fixes into a single push; resolve purely advisory threads (style, dead-code, "consider…", informational, positive) in-thread with a reply — **without a new commit**, since resolving a thread does not re-trigger reviews while a push does. Never resolve a confirmed blocker by reply alone. See [Review-Loop Convergence](pr-processing.md#review-loop-convergence-push-amplification).
    - **Parallel fixes**: When there are 2+ items to fix that touch different files with no logical dependencies, process them in parallel if your environment supports concurrent execution (e.g., sub-agents, background tasks). Items in the same file or with cross-file dependencies must be fixed sequentially. Instruct each sub-agent **not to commit** — all changes must remain unstaged so the self-review gate can run on the combined diff. After parallel fixes complete, verify no conflicts exist between the changes by checking whether any sub-agents touched the same files (`git diff --name-only`).
 
 9. Deferred-work tracking (after `f+i`, `m`, or an explicit user request):

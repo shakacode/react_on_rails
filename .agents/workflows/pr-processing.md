@@ -140,6 +140,35 @@ path so release rules do not drift.
 4. Do not auto-create release trackers. A maintainer creates one when entering
    accelerated RC, strict RC, or final-release coordination.
 
+### Release Phase Gate
+
+The merge-gate strictness is a function of the **target branch's release phase**,
+which composes with the mode above. The canonical phase->gate table is in
+`AGENTS.md` -> **Release-Train Branching And Phase Gating**; the full branching
+runbook is
+[release-train-runbook.md](../../internal/contributor-info/release-train-runbook.md).
+Worker path:
+
+1. Determine the PR's target branch and resolve its phase. Prefer the published
+   phase from `agent-coord` status for that branch (available only when
+   `agent-coord doctor` and `agent-coord status` exit 0). If the backend is up
+   but has no published phase entry for that line, derive the phase from the
+   target branch (the same rule below); never treat a missing entry as `beta` for
+   a `release/*` target. If the backend is `UNKNOWN`, derive it: `main` ->
+   `beta`; `release/*` -> `rc`, or `final` when the applicable tracker is in
+   `final-release` mode (the only machine-readable signal in the fallback path;
+   the promotion freeze is normally published via `agent-coord`, which is the
+   tool that is unavailable here).
+2. Apply that phase's gate: `beta` (target `main`) is lowest — confidence note +
+   green required checks. `rc` (target `release/*`) adds adversarial-pr-review and
+   requires zero open MUST-FIX, and only stabilizing fixes belong on `release/*`.
+   `final` is highest — only cherry-picked fully-verified fixes, no new features,
+   and explicit human sign-off on the promotion; no confidence-only auto-merge.
+3. Stabilizing fixes that land on `release/*` must be forward-ported to `main`
+   with `git cherry-pick -x <sha>`; never `git merge release/X.Y.Z` into `main`.
+4. If the published phase and the tracker disagree, treat it as a
+   `release-mode-conflict` per `AGENTS.md`, report it, and do not auto-merge.
+
 ### Tracker Update Safety
 
 Tracker issue bodies are shared mutable state. Avoid clobbering another agent's update:
@@ -227,6 +256,11 @@ compatibility before merge. Check that `.github/dependabot.yml` has matching
 `eval_gemfile` usage is compatible with Dependabot's supported static string
 form, and that npm/pnpm workspace layout matches the configured Dependabot
 directory or directories.
+
+When a committed lockfile's contents change, the PR evidence must satisfy the
+lockfile content-diff requirement from the Handoff Contract in
+`.agents/skills/pr-batch/SKILL.md`. Unexplained lockfile drift blocks
+merge-readiness until aligned or justified.
 
 Typical checks include `actionlint`, `yamllint .github/`,
 `script/ci-changes-detector origin/main`, package-script smoke checks, dependency
@@ -334,6 +368,18 @@ Classify each target before assigning a worker:
 - **No-PR evidence comment**: the issue is duplicate, low-value, already fixed, or better closed with evidence. The posted comment is the deliverable; include live evidence, the no-PR rationale, and whether the issue should stay open, close, or wait.
 - **Product-decision blocker**: the issue needs a maintainer/product decision before code would be safe. The deliverable is a surfaced question or decision request, not a speculative branch.
 
+For investigation or benchmark conclusions, apply the closing-evidence gate from
+the "Evaluate the fix plan separately" step in
+`.agents/skills/evaluate-issue/SKILL.md` before carrying a target as `close` or
+`document/work around`, or before using that conclusion to justify close/workaround
+language in an implementation PR, combined investigation PR, or no-PR evidence
+comment. Concrete corrective implementation PRs are not blocked merely because
+the target involves investigation or benchmark evidence.
+
+See the gate criteria in `.agents/skills/evaluate-issue/SKILL.md` under the
+"Evaluate the fix plan separately" step. When the gate cannot be satisfied, carry
+only a caveated no-PR `park` disposition or a product-decision blocker.
+
 Workers should not turn product-decision blockers into speculative PRs. They should post or draft the evidence-backed question and stop that target.
 
 ### Plan To Goal Handoff
@@ -377,7 +423,7 @@ plus confidence notes in handoffs.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
-For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
+For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main and target `main` by default. **Release-phase override:** when the work is a stabilizing fix for an active RC (the applicable release line is in the `rc`/`final` phase and the fix belongs on the release branch), branch from and open the PR against `origin/release/X.Y.Z` instead of `main`, then forward-port to `main` with `git cherry-pick -x <sha>` per the runbook — do not open the fix against `main` and rely on someone noticing it needs cherry-picking onto the RC. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
 
 For non-trivial, high-risk, `ready-for-hosted-ci`, `force-full-hosted-ci`,
 `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor PRs, commit the intended
@@ -396,7 +442,8 @@ one additional Claude Code review pass if available, such as `/code-review` or
 For workflow/build/dependency/lockfile gate changes, include the `AGENTS.md` /
 `.agents/workflows/pr-processing.md` audit evidence for new-gate stale-base
 controls. For lockfile changes, include Dependabot ecosystem and
-directory/directories compatibility.
+directory/directories compatibility, then apply the lockfile content-diff
+evidence requirement from the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`.
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 
@@ -501,6 +548,14 @@ Before merge or final readiness, scan the PR description for the decision log an
 
 <!-- Canonical batch handoff copy. `.agents/skills/pr-batch/SKILL.md` should point here instead of duplicating this section. -->
 
+> **A handoff is a comment, not a new issue.** Per `AGENTS.md` → _Tracking Issues
+> And Handoffs_: record the handoff below on the relevant parent tracking issue
+> (or the agent-coordination repo if one is in use), or in the batch's own PR
+> comment/description when there is no parent umbrella; and append point-in-time
+> audits to the standing release audit ledger in place. Never spawn a standalone
+> `Handoff: ...` or `Post-rc.N audit` issue. Close superseded process issues on
+> sight; closure follows the work, not whoever opened the tracker.
+
 Split batch handoffs into two sections:
 
 - **Immediate maintainer attention**: true blockers and questions only, such as
@@ -593,7 +648,11 @@ When worker subagents are explicitly authorized:
 - Acquire the lane's `agent-coord claim` before creating the worker worktree or
   branch when the backend is available. If the claim is refused, the worker
   reports the holder and heartbeat liveness, then stops that lane.
-- Give each worker a separate worktree and branch.
+- Give each worker a separate worktree and branch. For in-process subagents
+  (Claude Code `Agent`/`Workflow` tools), "separate worktree" means passing
+  `isolation: 'worktree'`. Never run two file-editing workers in the same working
+  directory at the same time; sharing one checkout corrupts the git index,
+  branch, and working tree as workers overwrite each other.
 - Tell workers they are not alone in the codebase and must not revert others' edits.
 - Keep write scopes disjoint unless the main agent serializes integration.
 - Refresh that worker's heartbeat whenever it starts an item, pushes or updates a
@@ -766,6 +825,23 @@ Use targeted checks when a full local run is too expensive, but explain the subs
 
 Use the 15-minute rule from `AGENTS.md`: if another short local check would likely catch the failure before CI, run it locally.
 
+### Local-vs-CI parity (blind spots)
+
+"Lint/tests pass locally" is not the same as "CI is green." Three classes of gap recur and are worth an
+explicit check before claiming readiness:
+
+- **Repo-wide gates are invisible to changed-files-only checks.** Linting just your diff (e.g.
+  `eslint <changed files>`) can pass while a separate CI step that scans the whole tree fails — for
+  example the Pro license-header check (`script/check-pro-license-headers --check`). Run the package's
+  actual CI lint target, not only your diff, especially when adding new files.
+- **A new test can be silently excluded from the test command.** A test that passes when invoked
+  directly may never run in CI because the package's `test` script filters paths (e.g. a
+  `testPathIgnorePatterns` that ignores `stream`, or an `*.rsc.test.*`-only target). After adding a
+  test, confirm the package's real `test` command actually executes it; otherwise the coverage is
+  illusory.
+- **Some suites cannot run locally** (heavy RSC/streaming E2E, hosted-only secrets). Lean on hosted
+  CI as the gate for those and say so explicitly rather than implying full local validation.
+
 ## Review Churn Measurement
 
 For each non-trivial or high-risk batch, add lightweight churn notes to the PR body or latest
@@ -880,6 +956,29 @@ The batch coordinator or merge finalizer owns the closeout sweep for late post-m
 before final batch handoff. Findings that arrive after closeout route into the next post-merge audit
 intake by default.
 
+### Review-Loop Convergence (push amplification)
+
+Every push re-triggers all configured review agents on the new head SHA, and each may emit a fresh
+batch of comments — including re-raises of already-addressed points, dead-code observations, optional
+nits, and positive confirmations. Responding to each comment with a commit therefore never
+terminates: every fix manufactures another full review round (and another CI cycle and reviewer-quota
+spend). Converge deliberately:
+
+- Use the local pre-push adversarial review (e.g. `codex review --base origin/<base>`) as the
+  authoritative gate to find real bugs cheaply, before any push. Treat the post-push GitHub review
+  bots (Claude, CodeRabbit, Greptile, Cursor Bugbot, Codex GitHub review) as advisory input to
+  triage per `AGENTS.md`, not as a gate to satisfy comment-by-comment.
+- Batch all confirmed blockers into a single push; do not push one fix per comment.
+- Resolve every remaining advisory thread in-thread (reply with rationale, then resolve) **without a
+  commit**. Resolving a thread does not re-trigger the review workflows, so the loop converges; a new
+  push restarts it. Never resolve a confirmed blocker by reply alone.
+- When the same class of finding recurs across rounds at different code sites, stop patching per-site
+  and apply one root-cause fix — recurrence across entry points is the signal to centralize.
+- Terminating state: authoritative/local review clean + the CI-readiness verdict is `READY`
+  (`.agents/skills/pr-batch/bin/pr-ci-readiness <PR>` — required checks, falling back to the full
+  current-head check list when no required checks are configured; an empty list is `UNKNOWN`/not
+  ready) + `mergeStateStatus` CLEAN + zero unresolved review threads reached via replies, not pushes.
+
 ## Review Completion Gate
 
 Before marking a PR ready, asking for merge, or merging it:
@@ -898,9 +997,9 @@ Use `address-review` for actionable GitHub review comments instead of skimming t
 
 ### Adversarial Review Gate
 
-Use `.agents/skills/adversarial-pr-review/SKILL.md` for high-risk PRs, concurrent batch PRs, suspected bad merges, release-candidate risk, or when the user asks for a Claude/Codex red-team pass.
+Use `.agents/skills/adversarial-pr-review/SKILL.md` for high-risk PRs, concurrent batch PRs, suspected bad merges, release-candidate risk, or when the user asks for a Claude/Codex red-team pass. **It is also required (not optional) at the `rc` and `final` phases** — i.e. any PR targeting `release/*` — per the phase-gate table in `AGENTS.md` -> **Release-Train Branching And Phase Gating** and the worker path above. The high-risk triggers in this paragraph are the _additional_ cases where it applies at the `beta` phase (target `main`).
 
-The adversarial review is report-only by default. It must check inline review comments, review timing, missing changelog entries, changed agent instructions, validation gaps, untrusted PR content, and cross-PR interactions. All `BLOCKING` and `DISCUSS` findings must be fixed, explicitly decided, or waived before final readiness.
+The adversarial review is report-only by default (it produces findings; it is not itself a merge approval). It must check inline review comments, review timing, missing changelog entries, changed agent instructions, validation gaps, untrusted PR content, and cross-PR interactions. All `BLOCKING` and `DISCUSS` findings must be fixed, explicitly decided, or waived before final readiness.
 
 ### Coordinating Claude Review
 
@@ -979,8 +1078,12 @@ real uncertainty, failed checks, or unresolved findings lower the score.
 
 Final-release mode is stricter than accelerated RC. Do not use confidence-only
 auto-merge for final release work; run the post-merge audit, update changelog or
-release notes as needed, confirm required checks on `main`, and get an explicit
-maintainer release decision before publishing.
+release notes as needed, and get an explicit maintainer release decision before
+publishing. Confirm required checks on the **SHA being promoted**: for a final
+promotion off `release/X.Y.Z` that is the release-branch / promoted-RC tip, not
+`origin/main` — once post-RC commits have landed on `main`, `main`'s checks are
+green or red independently of the RC being promoted, so validating `main` would
+prove the wrong SHA.
 
 Auto-merge requires all of the following:
 

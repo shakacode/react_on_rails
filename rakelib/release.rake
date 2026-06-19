@@ -547,11 +547,23 @@ def ci_status_override_enabled?(override_flag)
   release_truthy?(override_flag) || release_truthy?(ENV.fetch("RELEASE_CI_STATUS_OVERRIDE", nil))
 end
 
+# Escape hatch: force the CI gate to evaluate origin/main HEAD verbatim instead
+# of walking back over non-runtime-only commits (see `main_ci_evaluation_sha`).
+def ci_evaluate_head_only?
+  release_truthy?(ENV.fetch("RELEASE_CI_EVALUATE_HEAD", nil))
+end
+
 # Statuses considered "incomplete" — anything not yet a finalized conclusion.
 CI_INCOMPLETE_STATUSES = %w[in_progress queued waiting requested pending].freeze
 # Conclusions considered acceptable. `skipped`/`neutral` are not failures (e.g. docs-only
 # paths-ignore skips, or workflows that intentionally short-circuit).
 CI_PASSING_CONCLUSIONS = %w[success skipped neutral].freeze
+
+# Upper bound on how many consecutive non-runtime-only commits the CI gate will
+# walk past when choosing which origin/main commit to evaluate. Bounds the git
+# work and guards against an unbounded walk; beyond this we evaluate wherever we
+# stopped. A real chain of docs/changelog commits is far shorter than this.
+MAIN_CI_NONRUNTIME_WALK_LIMIT = 25
 
 # rubocop:disable Metrics/MethodLength
 def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
@@ -576,7 +588,11 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
     )
     return nil
   end
-  sha = sha_output.strip
+  # Evaluate the most recent commit that actually ran the full suite. When HEAD
+  # is changelog/docs/comment-only (e.g. the pre-release `update-changelog`
+  # commit), CI path-skips the runtime suite there, so its checks tell us
+  # nothing about release health — walk back to the last runtime-bearing commit.
+  sha = main_ci_evaluation_sha(monorepo_root:, head_sha: sha_output.strip)
 
   repo_slug = github_repo_slug(monorepo_root)
   api_path = "repos/#{repo_slug}/commits/#{sha}/check-runs"
@@ -632,6 +648,82 @@ def parse_gh_jsonl(output)
   output.lines.reject { |line| line.strip.empty? }.map do |line|
     JSON.parse(line)
   end
+end
+
+# Choose which origin/main commit the CI gate should evaluate. Starting at
+# `head_sha`, walk back over commits that `script/ci-changes-detector` classifies
+# as non-runtime-only (changelog/docs/source-comment changes — exactly the
+# commits on which CI path-skips the runtime suite) and return the first commit
+# that ran the full suite. The walk stops at HEAD when a commit isn't provably
+# non-runtime-only, so the behavior degrades to the original "evaluate HEAD" gate.
+def main_ci_evaluation_sha(monorepo_root:, head_sha:)
+  return head_sha if ci_evaluate_head_only?
+
+  current = head_sha
+  skipped = []
+  MAIN_CI_NONRUNTIME_WALK_LIMIT.times do
+    break unless commit_non_runtime_only?(monorepo_root:, sha: current)
+
+    parent = git_parent_sha(monorepo_root:, sha: current)
+    break if parent.nil?
+
+    skipped << current
+    current = parent
+  end
+
+  log_main_ci_walkback(head_sha:, evaluated_sha: current, skipped:) unless skipped.empty?
+  current
+end
+
+def log_main_ci_walkback(head_sha:, evaluated_sha:, skipped:)
+  puts "ℹ️ origin/main HEAD #{head_sha[0, 8]} is non-runtime-only " \
+       "(changelog/docs/comments); CI path-skips the full suite on such commits."
+  puts "   Skipped #{skipped.length} non-runtime commit(s): #{skipped.map { |s| s[0, 8] }.join(', ')}"
+  puts "   Evaluating main CI on #{evaluated_sha[0, 8]} — the most recent commit that ran the full suite."
+  puts "   (Set RELEASE_CI_EVALUATE_HEAD=true to force strict HEAD evaluation.)"
+end
+
+# Whether `sha`'s changes are *provably* non-runtime-only per the canonical CI
+# detector. Returns true only when the detector positively reports
+# `non_runtime_only=true`; every other outcome (script missing, git/detector
+# failure, unparseable output, or an explicit `false`) returns false. Conflating
+# "unknown" with "runtime-bearing" is the safe direction for a release gate: the
+# walk stops and the current commit is evaluated rather than skipped on a guess.
+def commit_non_runtime_only?(monorepo_root:, sha:)
+  detector = File.join(monorepo_root, "script", "ci-changes-detector")
+  return false unless File.executable?(detector)
+
+  Dir.mktmpdir("ror-ci-detector") do |dir|
+    output_file = File.join(dir, "github_output")
+    File.write(output_file, "")
+    # The detector writes `non_runtime_only=true|false` to $GITHUB_OUTPUT — the
+    # same machine interface CI consumes — so we reuse its path classification
+    # instead of re-deriving paths-ignore rules here. `<sha>^ <sha>` diffs just
+    # that commit; a non-HEAD current ref means no uncommitted folding.
+    _stdout, status = Open3.capture2e(
+      { "GITHUB_OUTPUT" => output_file }, detector, "#{sha}^", sha, chdir: monorepo_root
+    )
+    return false unless status.success?
+
+    flag = File.read(output_file).lines.reverse.find { |line| line.start_with?("non_runtime_only=") }
+    return false if flag.nil?
+
+    flag.split("=", 2).last.strip == "true"
+  end
+rescue StandardError
+  false
+end
+
+# First parent of `sha`, or nil at a root commit (or on any git failure) so the
+# walk terminates cleanly.
+def git_parent_sha(monorepo_root:, sha:)
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "#{sha}^"
+  )
+  return nil unless status.success?
+
+  parent = output.strip
+  parent.empty? ? nil : parent
 end
 
 def fetch_main_commit_statuses(repo_slug:, sha:, allow_override:, dry_run:)
@@ -1683,7 +1775,12 @@ This will update and release:
 4th argument: Override release CI gates (true/false, default: false)
 
 Release CI policy:
-  Before releasing, the script checks CI status on origin/main HEAD.
+  Before releasing, the script checks CI status on origin/main.
+  - It evaluates the most recent commit that ran the full suite: if HEAD is
+    changelog/docs/comment-only (e.g. the pre-release `update-changelog`
+    commit), CI path-skips the runtime suite there, so the gate walks back to
+    the last runtime-bearing commit instead of waiting on meaningless checks.
+    Set RELEASE_CI_EVALUATE_HEAD=true to force strict HEAD evaluation.
   - Stable releases require every check run on the commit to have succeeded.
   - Pre-releases require only the GitHub-branch-protection-required checks
     to have succeeded.
@@ -1701,6 +1798,7 @@ Environment variables:
   RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
   RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
   RELEASE_CI_STATUS_OVERRIDE=true      # Override release CI gates
+  RELEASE_CI_EVALUATE_HEAD=true        # Evaluate origin/main HEAD verbatim (skip the non-runtime walk-back)
   GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 
 Examples:

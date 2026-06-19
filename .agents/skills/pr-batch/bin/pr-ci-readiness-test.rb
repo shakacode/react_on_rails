@@ -77,12 +77,14 @@ class PrCiReadinessTest < Minitest::Test
 
   # --- parse helpers --------------------------------------------------------
 
-  def test_checks_discriminates_payloads
-    assert PrCiReadiness.checks?('[{"name":"a","bucket":"pass"}]')
-    refute PrCiReadiness.checks?("[]")
-    refute PrCiReadiness.checks?("")
-    refute PrCiReadiness.checks?(nil)
-    refute PrCiReadiness.checks?("no required checks") # non-JSON message
+  def test_usable_checks_discriminates_payloads
+    assert PrCiReadiness.usable_checks?('[{"name":"a","bucket":"pass"}]')
+    refute PrCiReadiness.usable_checks?("[]")
+    refute PrCiReadiness.usable_checks?("")
+    refute PrCiReadiness.usable_checks?(nil)
+    refute PrCiReadiness.usable_checks?("no required checks") # non-JSON message
+    # Cancel-only rows are not usable: they must not short-circuit the fallback.
+    refute PrCiReadiness.usable_checks?('[{"name":"stale","bucket":"cancel"}]')
   end
 
   def test_parse_rows_handles_non_array_json
@@ -102,7 +104,7 @@ class PrCiReadinessTest < Minitest::Test
 end
 
 # CLI / Runner integration via a fake gh on PATH.
-class PrCiReadinessCliTest < Minitest::Test
+class PrCiReadinessCliTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   # Build a temp dir with a fake `gh` executable that emits canned `gh pr
   # checks` JSON, then run the real script with that dir prepended to PATH.
   def with_fake_gh(required_json:, full_json:)
@@ -182,7 +184,25 @@ class PrCiReadinessCliTest < Minitest::Test
     end
   end
 
-  def test_cancelled_only_is_unknown_via_cli
+  def test_cancel_only_required_falls_back_to_full_list
+    # A required list of only cancelled rows is not usable: it must fall back to
+    # the full check list (which here surfaces a real failure) instead of
+    # silently collapsing to UNKNOWN.
+    with_fake_gh(
+      required_json: '[{"name":"stale","state":"CANCELLED","bucket":"cancel","link":"x"}]',
+      full_json: '[{"name":"lint","state":"FAILURE","bucket":"fail","link":"x"}]'
+    ) do |env|
+      out, = run_script(env, "123", "--repo", "owner/repo")
+      data = JSON.parse(out)
+      assert_equal "NOT_READY", data["verdict"]
+      # required form had no usable rows, so the full list was used.
+      assert_equal false, data["required_used"]
+      assert_equal ["lint"], data["failing"]
+    end
+  end
+
+  def test_cancel_only_required_and_empty_full_is_unknown_via_cli
+    # Cancel-only required falls back; if the full list is also empty, UNKNOWN.
     with_fake_gh(
       required_json: '[{"name":"stale","state":"CANCELLED","bucket":"cancel","link":"x"}]',
       full_json: "[]"
@@ -190,8 +210,7 @@ class PrCiReadinessCliTest < Minitest::Test
       out, = run_script(env, "123", "--repo", "owner/repo")
       data = JSON.parse(out)
       assert_equal "UNKNOWN", data["verdict"]
-      # required form yielded rows, so it was used even though all were cancel.
-      assert_equal true, data["required_used"]
+      assert_equal false, data["required_used"]
     end
   end
 
@@ -237,8 +256,26 @@ class PrCiReadinessCliTest < Minitest::Test
     assert_includes out, "positive integer PR number is required"
   end
 
+  def test_rejects_zero_pr
+    out, status = Open3.capture2e("ruby", SCRIPT, "0", "--repo", "owner/repo")
+    refute status.success?
+    assert_includes out, "positive integer PR number is required"
+  end
+
   def test_rejects_bad_repo_form
     out, status = Open3.capture2e("ruby", SCRIPT, "12", "--repo", "owneronly")
+    refute status.success?
+    assert_includes out, "--repo must be in OWNER/REPO form"
+  end
+
+  def test_rejects_repo_with_extra_path_segment
+    out, status = Open3.capture2e("ruby", SCRIPT, "12", "--repo", "a/b/c")
+    refute status.success?
+    assert_includes out, "--repo must be in OWNER/REPO form"
+  end
+
+  def test_rejects_repo_with_empty_owner
+    out, status = Open3.capture2e("ruby", SCRIPT, "12", "--repo", "/repo")
     refute status.success?
     assert_includes out, "--repo must be in OWNER/REPO form"
   end

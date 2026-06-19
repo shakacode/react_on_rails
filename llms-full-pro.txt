@@ -1877,23 +1877,7 @@ Traditional SSR renders the full page on the server, then sends the complete HTM
 
 With traditional SSR the first paint waits for the slowest query; with streaming the shell paints first and each slow section streams in afterward:
 
-```mermaid
-flowchart LR
-    subgraph TRAD["Traditional SSR — paint waits for all data"]
-        direction LR
-        t0([Request]) --> t1["Fetch users<br/>~800 ms"]
-        t0 --> t2["Fetch posts<br/>~600 ms"]
-        t1 --> t3["Render HTML<br/>~200 ms"]
-        t2 --> t3
-        t3 --> t4(["First paint<br/>~1000 ms"])
-    end
-    subgraph STREAM["Streaming SSR + async props — paint first, data streams in"]
-        direction LR
-        s0([Request]) --> s1["Render shell<br/>~50 ms"] --> s2(["First paint<br/>~50 ms"])
-        s2 -. stream as ready .-> s3["Users fill in"]
-        s2 -. stream as ready .-> s4["Posts fill in"]
-    end
-```
+[Diagram: Two side-by-side timelines on the same scale. With traditional SSR the first paint happens only after the slowest data fetch and the HTML render finish (about 1000 ms). With streaming SSR plus async props the shell paints almost immediately (about 50 ms) and each slow section streams in afterward.]
 
 _Timings are illustrative, not benchmarks — the point is **when** the first paint happens: only after all data is ready for traditional SSR, but right after the shell for streaming._
 
@@ -1904,21 +1888,7 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 3. As each `<Suspense>` boundary resolves (e.g., an async data fetch completes), the rendered HTML chunk is streamed to the browser
 4. The browser replaces placeholders with real content — no full-page reload needed
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Browser
-    participant Rails
-    participant Renderer as Node Renderer
-    Browser->>Rails: Ask for a page
-    Rails->>Renderer: Start rendering the page
-    Renderer-->>Rails: First HTML piece
-    Rails-->>Browser: Browser can paint right away
-    loop more page parts become ready
-        Renderer-->>Rails: Next HTML piece
-        Rails-->>Browser: Browser adds it to the page
-    end
-```
+[Diagram: Sequence diagram across three lanes — Browser, Rails, and the Node Renderer. The browser asks Rails for a page, Rails asks the renderer to start, the renderer streams the first HTML piece back through Rails so the browser can paint right away, then a loop streams each further HTML piece as more of the page becomes ready.]
 
 ## Prerequisites
 
@@ -1939,22 +1909,7 @@ This is the recommended answer to "my component needs Rails data during render":
 
 Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Browser
-    participant Rails
-    participant Renderer as Node Renderer
-    Browser->>Rails: Ask for a page
-    Rails->>Renderer: Start page with placeholders
-    Renderer-->>Rails: HTML shell + loading states
-    Rails-->>Browser: Browser shows the shell
-    loop each slow data value becomes ready
-        Rails->>Renderer: Send the data value
-        Renderer-->>Rails: HTML for that page section
-        Rails-->>Browser: Browser replaces the loading state
-    end
-```
+[Diagram: Sequence diagram across three lanes — Browser, Rails, and the Node Renderer. The browser asks for a page, Rails starts the page with placeholders, the renderer returns an HTML shell with loading states, and the browser shows the shell. Then a loop runs for each slow data value: Rails sends the value, the renderer returns the HTML for that section, and the browser replaces the loading state.]
 
 The view helper is `stream_react_component_with_async_props`, which yields an emitter:
 
@@ -1975,19 +1930,7 @@ For the full data-fetching guidance — synchronous props, parallelizing indepen
 
 For contrast, a Server Component _can_ reach Rails by calling `fetch` itself. This is a plain **network round-trip** — the renderer's VM has no in-process access to Rails models, sessions, or cookies — and it gives up what async props provide for free, so prefer async props for Rails-owned data:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Renderer as Node Renderer
-    participant Rails as Rails API
-    participant Data as DB / Models
-    Note over Renderer: Discouraged — usually let Rails pass the data instead
-    Renderer->>Rails: Ask Rails API for data
-    Rails->>Data: Load and authorize data
-    Data-->>Rails: Data
-    Rails-->>Renderer: JSON data
-    Renderer->>Renderer: Continue rendering
-```
+[Diagram: Sequence diagram across three lanes — Node Renderer, Rails API, and DB / Models. A warning banner notes this is discouraged. The renderer asks the Rails API for data, Rails loads and authorizes it from the database, returns the data to Rails, Rails returns JSON to the renderer, and the renderer continues rendering. Prefer async props so Rails keeps owning auth and caching.]
 
 Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` are **not** in the VM by default (bundle an HTTP client or inject them via [runtime globals](../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc)); cookies, auth, session, and CSRF are **not** forwarded automatically; and it bypasses Rails' authorization and caching layers.
 
@@ -2218,11 +2161,7 @@ To render more of the page progressively, add an async prop and a `<Suspense>` b
 
 Extending the example with a second slow section (`users`), the page fills in stage by stage from the browser's perspective — visible from the first paint and interactive as each part hydrates, with each `<Suspense>` boundary swapping its fallback for real content as its prop arrives:
 
-```mermaid
-flowchart LR
-    A["Stage 1 · shell (~50 ms)<br/><br/>Header ✓<br/>Users …loading<br/>Posts …loading<br/><br/>visible now · interactive as JS loads"] --> B["Stage 2 · users fill in<br/><br/>Header ✓<br/>Users ✓<br/>Posts …loading"]
-    B --> C["Stage 3 · complete<br/><br/>Header ✓<br/>Users ✓<br/>Posts ✓"]
-```
+[Diagram: Three browser snapshots. Stage 1 is the shell at about 50 ms: the header is done while users and posts show loading states, but the page is already visible and becomes interactive as JS loads. Stage 2: the users section fills in while posts still load. Stage 3: the page is complete with header, users, and posts all done. Each Suspense boundary swaps its fallback for real content as its prop arrives.]
 
 ## Compression Middleware Compatibility
 
@@ -2813,31 +2752,7 @@ The Pro Node Renderer solves all of these by running a standalone Node.js server
 
 The contrast in one picture — the old way runs JavaScript inside Rails, while the Node Renderer runs it in a separate service:
 
-```mermaid
-flowchart LR
-    subgraph Exec["ExecJS — JavaScript inside Rails"]
-        direction TB
-        E1["Rails process"] --> E2["JavaScript runtime<br/>inside the same process"]
-        E2 --> E3["Rails waits while<br/>JavaScript renders HTML"]
-    end
-    subgraph Node["Node Renderer — JavaScript in a separate service"]
-        direction TB
-        N1["Rails process"] -- "render request" --> N2["Node Renderer"]
-        N2 --> N3["Worker 1<br/>renders HTML"]
-        N2 --> N4["Worker 2<br/>renders HTML"]
-        N2 --> N5["Worker N<br/>renders HTML"]
-    end
-    style Exec fill:#fff4e5,stroke:#e0a000,color:#000
-    style E1 fill:#fff4e5,stroke:#e0a000,color:#000
-    style E2 fill:#fff4e5,stroke:#e0a000,color:#000
-    style E3 fill:#ffe5e5,stroke:#d1242f,color:#000
-    style Node fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style N1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style N2 fill:#e6ffed,stroke:#2da44e,color:#000
-    style N3 fill:#e6ffed,stroke:#2da44e,color:#000
-    style N4 fill:#e6ffed,stroke:#2da44e,color:#000
-    style N5 fill:#e6ffed,stroke:#2da44e,color:#000
-```
+[Diagram: ExecJS runs the JavaScript runtime inside the Rails process and blocks it during rendering, while the Node Renderer runs rendering in a separate service with a pool of workers.]
 
 ## Performance Benefits
 
@@ -2860,28 +2775,7 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 
 Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Each request is rendered in its own per-request `sharedExecutionContext`, so concurrent renders never leak data into one another:
 
-```mermaid
-flowchart TB
-    subgraph Rails["Rails receives many page requests"]
-        direction LR
-        Req1["page request 1"]
-        Req2["page request 2"]
-        Req3["page request N"]
-    end
-    Req1 -- "send render job" --> Master
-    Req2 -- "send render job" --> Master
-    Req3 -- "send render job" --> Master
-    subgraph Renderer["Node Renderer"]
-        Master["Dispatcher<br/>hands jobs to workers"]
-        Master --> WA["Worker A<br/>renders several pages at once"]
-        Master --> WB["Worker B<br/>renders several pages at once"]
-    end
-    style Rails fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
-    style Master fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style WA fill:#e6ffed,stroke:#2da44e,color:#000
-    style WB fill:#e6ffed,stroke:#2da44e,color:#000
-```
+[Diagram: Many concurrent Rails page requests send render jobs to the Node Renderer's dispatcher, which fans them out across a pool of workers that each render several pages at once.]
 
 By contrast, ExecJS renders one request per V8 context and blocks the Ruby thread for the duration. For concurrent _streaming_ specifically, see [Streaming SSR](./streaming-ssr.md).
 
@@ -2893,39 +2787,9 @@ By contrast, ExecJS renders one request per V8 context and blocks the Ruby threa
 - **Shared secret authentication** — Secure communication between Rails and Node
 - **Prerender caching** — Combined with [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching), rendering results are cached across requests
 
-React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The renderer cache layers sit on the server-side render path; request-scoped deduplication and browser chunk caching are shown as side optimizations because they do not feed into each other:
+React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The renderer cache layers sit on the server-side render path; request-scoped deduplication and browser chunk caching are separate side optimizations that do not feed into this chain, so they are left off the diagram below:
 
-```mermaid
-flowchart TB
-    Req["Need HTML for a component"] --> L1{"Does Rails already<br/>have the final HTML?"}
-    L1 -- "yes" --> Done["Return HTML"]
-    L1 -- "no" --> L2{"Does Rails have<br/>a saved render result?"}
-    L2 -- "yes" --> Done
-    L2 -- "no" --> L3
-    subgraph Renderer["Node Renderer"]
-        L3{"Is the JS bundle<br/>already warm in memory?"}
-        L3 -- "yes" --> Exec["Run JavaScript<br/>to make HTML"]
-        L3 -- "no" --> L4{"Is the JS bundle<br/>saved on disk?"}
-        L4 -- "yes" --> Exec
-    end
-    L4 -- "no" --> Upload["Rails uploads<br/>the bundle"]
-    Upload --> Exec
-    Exec --> Done
-    Exec -. "during one render" .-> L5["Repeated data reads<br/>share one result"]
-    Browser["Browser starts the page"] -. "later" .-> L6["Browser code chunks<br/>cached by the browser"]
-    style L1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style L2 fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Done fill:#e6ffed,stroke:#2da44e,color:#000
-    style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
-    style L3 fill:#e6ffed,stroke:#2da44e,color:#000
-    style L4 fill:#fff4e5,stroke:#e0a000,color:#000
-    style Upload fill:#ffe5e5,stroke:#d1242f,color:#000
-    style Browser fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style L5 fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style L6 fill:#e6f0ff,stroke:#2c6ecb,color:#000
-```
-
-(Fragment caching subsumes prerender caching: on a fragment-cache hit the prerender cache is never consulted.)
+[Diagram: Stacked render caches: a Rails fragment- or prerender-cache hit returns cached HTML without running JavaScript. On a miss the Node Renderer checks whether the JS bundle is warm in memory, then on disk — those hits skip the bundle upload but still run the SSR JavaScript — and only as a last resort does Rails upload the bundle before rendering.]
 
 ## Getting Started
 
@@ -3089,21 +2953,7 @@ When a new container starts, the Node Renderer has an empty bundle cache. The fi
 
 That round-trip is the difference between a warm and a cold render request:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Rails
-    participant Renderer as Node Renderer
-    Rails->>Renderer: Please render this page
-    alt renderer already has the bundle
-        Renderer-->>Rails: HTML
-    else renderer is missing the bundle
-        Renderer-->>Rails: I need that bundle first
-        Rails->>Renderer: Upload the bundle
-        Rails->>Renderer: Please render again
-        Renderer-->>Rails: HTML
-    end
-```
+[Diagram: When the renderer already has the bundle it returns HTML immediately; when it is missing the bundle it replies 410 Gone, Rails uploads the bundle and asks again, and only then does the render succeed — an extra round-trip on the first cold request.]
 
 Pre-seeding the cache (below) makes every fresh renderer take the warm path on its very first request.
 
@@ -3280,24 +3130,9 @@ Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpIn
 
 **Cache-miss note:** On a cache-miss path `ror.bundle.build_execution_context` appears twice. The first span has `cache.strategy=cache-first` and can end with ERROR status when the VM cache probe misses. The second span has `cache.strategy=cache-miss` for the real VM build after bundle upload or bundle discovery. Scope error alerts to exclude `cache.strategy=cache-first` when that miss is expected.
 
-As a trace, the spans nest under the root `ror.ssr.request`. On the warm path the spans fire in order: `ror.bundle.build_execution_context` (`cache-first`) → `ror.vm.execute` → `ror.result.prepare`. Cold-path spans (upload and `cache-miss` build) appear only between the first two; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans; and incremental (async-props) renders add their own stream/chunk spans:
+As a trace, the spans nest under the root `ror.ssr.request`. On the warm path `ror.bundle.build_execution_context` (`cache-first`) fires first to load the bundle into the VM, then `ror.result.prepare` opens and runs `ror.vm.execute` **inside it** (`vm.execute` is a child of `result.prepare`, not a sibling after it). Cold-path spans (upload and `cache-miss` build) appear only after the `cache-first` probe and before `result.prepare`; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans under `vm.execute`; and incremental (async-props) renders add their own stream/chunk spans:
 
-```mermaid
-flowchart TB
-    Root["One server-render trace"]
-    Root --> Warm["Load bundle -> run JavaScript -> prepare result"]
-    Root -. "cold start" .-> Cold["Upload bundle<br/>and build cache-miss VM"]
-    Cold -- "then continue" --> Warm
-    Warm -. "if JavaScript fetches data" .-> Http["Data-fetch spans"]
-    Root -. "if slow data is streamed" .-> Inc["Streaming-data spans"]
-    Inc --> Chunk["One span for each<br/>incoming data chunk"]
-    style Root fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Warm fill:#e6ffed,stroke:#2da44e,color:#000
-    style Cold fill:#fff4e5,stroke:#e0a000,color:#000
-    style Http fill:#fff4e5,stroke:#e0a000,color:#000
-    style Inc fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Chunk fill:#e6ffed,stroke:#2da44e,color:#000
-```
+[Diagram: OpenTelemetry span tree rooted at one server-render request: the cache-first build probe runs first, then (on a cache miss) a cold start adds bundle-upload and cache-miss build spans, then ror.result.prepare opens and wraps ror.vm.execute as its child; outbound fetches appear as HTTP child spans under vm.execute; and streaming async-props renders add their own stream and per-chunk spans.]
 
 ### Production defaults
 
@@ -3345,21 +3180,7 @@ During a rolling deploy:
 
 Pre-seeding the current hash (`def`) eliminates the 410→retry only for the new bundle. Requests referencing `abc` still hit a cold cache on new renderers, producing 410 retries per request until the renderer has cached that bundle via upload.
 
-```mermaid
-flowchart TB
-    Traffic(["Incoming traffic"]) --> LB["Load Balancer"]
-    LB --> Old["Old Rails — draining<br/>bundle hash <b>abc</b>"]
-    LB --> New["New Rails<br/>bundle hash <b>def</b>"]
-    Old -- "SSR request · hash = abc" --> R
-    New -- "SSR request · hash = def" --> R
-    R["New Node Renderer pool<br/>(cold start: cache seeded with<br/>current hash <b>def</b> only)"]
-    R -- "def" --> Hit["✅ Cache HIT<br/>fast SSR"]
-    R -- "abc" --> Miss["❌ Cache MISS → <b>410 Gone</b><br/>Rails re-uploads abc, then retries<br/>— once per request, until warm"]
-    style Old fill:#fff4e5,stroke:#e0a000,color:#000
-    style New fill:#e6ffed,stroke:#2da44e,color:#000
-    style Hit fill:#e6ffed,stroke:#2da44e,color:#000
-    style Miss fill:#ffe5e5,stroke:#d1242f,color:#000
-```
+[Diagram: During a rolling deploy, draining old Rails (hash abc) and new Rails (hash def) both send SSR requests to a new renderer pool seeded only with the current hash def. The def requests hit the cache, but the abc requests miss and trigger 410 Gone, re-upload, and retry once per request.]
 
 The cold path is bounded and self-healing, but it is not free. On a cache miss the renderer can't serve the request on its own: it returns `410 Gone`, Rails ships the bundle over to the renderer, and only then does the request render. That extra renderer ↔ Rails round-trip — a network hop plus the bundle transfer — adds latency to **every** request that touches a cold bundle, and it repeats per request until that bundle is cached, so a deploy shows up as a latency and error-rate spike. The whole point of a rolling-deploy adapter is to **avoid these cache misses entirely** so no request ever pays that cost during a deploy.
 
@@ -3367,22 +3188,7 @@ The cold path is bounded and self-healing, but it is not free. On a cache miss t
 
 A **rolling-deploy adapter** makes new renderer instances start warm for **every** in-flight bundle hash — not just the current one — so draining `abc` requests hit the cache instead of triggering a 410.
 
-```mermaid
-flowchart TB
-    Traffic(["Incoming traffic"]) --> LB["Load Balancer"]
-    LB --> Old["Old Rails — draining<br/>bundle hash <b>abc</b>"]
-    LB --> New["New Rails<br/>bundle hash <b>def</b>"]
-    Old -- "SSR request · hash = abc" --> R
-    New -- "SSR request · hash = def" --> R
-    R["New Node Renderer pool<br/>pre-seeded with <b>abc</b> AND <b>def</b><br/>via rolling_deploy_adapter"]
-    R -- "def" --> H1["✅ Cache HIT"]
-    R -- "abc" --> H2["✅ Cache HIT — no 410, no retry"]
-    style Old fill:#fff4e5,stroke:#e0a000,color:#000
-    style New fill:#e6ffed,stroke:#2da44e,color:#000
-    style R fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style H1 fill:#e6ffed,stroke:#2da44e,color:#000
-    style H2 fill:#e6ffed,stroke:#2da44e,color:#000
-```
+[Diagram: With a rolling_deploy_adapter the new renderer pool is pre-seeded with both the draining hash abc and the current hash def before it serves traffic, so both old draining Rails and new Rails requests hit the cache — no 410, no retry.]
 
 The built-in HTTP adapter is the simplest way to get there, and it's covered next. If your build can't reach the previous deployment, or you'd rather keep bundles in your own store, you can [write a custom adapter](./rolling-deploy-custom-adapters.md) instead.
 
@@ -3392,24 +3198,7 @@ The built-in HTTP adapter is the simplest way to get there, and it's covered nex
 
 The currently-deployed Rails server already has every bundle and companion asset on disk. The HTTP adapter has the **next** deploy's build pull those files directly from the **previous** deploy over an authenticated HTTP endpoint — `upload` is a deliberate no-op because the running server _is_ the store:
 
-```mermaid
-flowchart LR
-    subgraph Build["Next deploy · build CI"]
-        Http["RollingDeployAdapters::Http<br/>previous_bundle_hashes + fetch"]
-    end
-    subgraph Server["Previous deploy · still-running Rails"]
-        Ctrl["BundlesController<br/>GET /manifest<br/>GET /bundles/:hash"]
-        Disk[("Bundles + companion assets<br/>already on local disk")]
-    end
-    Http -- "GET /manifest · Bearer TOKEN" --> Ctrl
-    Http -- "GET /bundles/abc · Bearer TOKEN" --> Ctrl
-    Disk -- "reads from disk" --> Ctrl
-    Ctrl -- "gzipped tarball:<br/>bundle.js + companion assets" --> Http
-    Http -- "extract + stage" --> Cache["New renderer cache<br/>{cache}/abc/abc.js"]
-    style Server fill:#fff4e5,stroke:#e0a000,color:#000
-    style Build fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Cache fill:#e6ffed,stroke:#2da44e,color:#000
-```
+[Diagram: The next deploy's build CI runs the HTTP adapter, which calls the still-running previous deployment's authenticated GET /manifest and GET /bundles/:hash endpoints, receives a gzipped tarball of the bundle plus companion assets read from disk, and extracts and stages each bundle into the new renderer cache.]
 
 ### 1. Configure the adapter
 
@@ -3580,33 +3369,7 @@ end
 
 Each deploy plays two roles. It **publishes** its own bundles so a _future_ deploy can find them, and it **pre-seeds** the bundles a _prior_ deploy published so the requests still draining against those bundles stay warm:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Build as Current deploy (hash def)
-    participant Adapter as rolling_deploy_adapter
-    participant Store as Artifact store (S3 / image / volume)
-    participant Cache as New renderer cache
-
-    rect rgb(230, 240, 255)
-    Note over Build,Cache: Pre-seed — warm THIS deploy before it serves traffic
-    Build->>Adapter: previous_bundle_hashes()
-    Adapter->>Store: list recent hashes
-    Store-->>Adapter: ["abc"]  (still draining)
-    Build->>Adapter: fetch("abc")
-    Adapter->>Store: download bundle + companion assets
-    Store-->>Adapter: bundle abc + loadable-stats / RSC manifests
-    Adapter-->>Build: { bundle:, assets: }
-    Build->>Cache: stage at {cache}/abc/abc.js
-    Note over Cache: Warm for abc + def → zero 410 retries
-    end
-
-    rect rgb(232, 255, 237)
-    Note over Build,Store: Publish — leave def behind for the NEXT deploy
-    Build->>Adapter: upload("def", bundle:, assets:)
-    Adapter->>Store: store bundle def + companion assets
-    end
-```
+[Diagram: A deploy's two adapter roles. In the pre-seed phase the current deploy lists recent hashes, fetches the still-draining bundle plus its companion assets from the artifact store, and stages them into the new renderer cache so it is warm. In the publish phase the deploy uploads its own bundle so a future deploy can find it.]
 
 ## Companion assets
 
@@ -4056,10 +3819,7 @@ The Node Renderer reuses [V8 VM contexts](https://nodejs.org/api/vm.html) across
 
 This means **module-level state persists across all requests** for the lifetime of the worker process. Code that works fine in the browser — where each page navigation creates a fresh JavaScript context — can silently leak memory on the server.
 
-```text
-Browser:  page load → JS context created → user navigates → context destroyed ✓
-Node SSR: worker starts → JS context created → request 1, 2, 3, ... 10,000 → same context ✗
-```
+[Diagram: In the browser each navigation creates a fresh JavaScript context and destroys the previous one, so module-level state stays flat. In a Node Renderer worker, one context is created at startup and reused across thousands of requests, so module-level state climbs until the worker restarts.]
 
 > **Migrating from ExecJS?** ExecJS creates a fresh JavaScript context per render, so module-level state is automatically cleared. When you switch to the Node Renderer, code that "worked fine" before may start leaking because the same context is now reused across requests.
 
@@ -4803,9 +4563,7 @@ import numeral from 'numeral'; // ~25KB
 
 ### [Selective Hydration](https://github.com/reactwg/react-18/discussions/37) Benefits
 
-<p align="center">
-  <img src="images/selective-hydration-timeline.svg" alt="Animated timeline showing how selective hydration works with streamed RSC components. With async script loading, components hydrate independently as they stream in — the page becomes interactive before slow components finish loading. Compares defer (all-or-nothing) vs async (progressive) loading strategies." width="840" />
-</p>
+[Diagram: Animated timeline showing how selective hydration works with streamed RSC components. With async script loading, components hydrate independently as they stream in — the page becomes interactive before slow components finish loading. Compares defer (all-or-nothing) vs async (progressive) loading strategies.]
 
 React's selective hydration is a powerful feature that significantly improves page interactivity by:
 
@@ -5103,9 +4861,7 @@ The `react-on-rails-rsc/WebpackLoader` is a custom loader that removes the clien
 
 The RSC Webpack Loader works when it finds a file with the `'use client'` directive on top of it.
 
-<p align="center">
-  <img src="images/webpack-loader-transform.svg" alt="Animated before/after diagram showing how the RSC Webpack Loader transforms a 'use client' file: the original file with component implementations is replaced with ClientReference proxy stubs that point to the client bundle entry." width="840" />
-</p>
+[Diagram: Animated before/after diagram showing how the RSC Webpack Loader transforms a 'use client' file: the original file with component implementations is replaced with ClientReference proxy stubs that point to the client bundle entry.]
 
 ```js
 // app/javascript/client/app/components/HomePage.jsx
@@ -5239,9 +4995,7 @@ end
 
 ## React Server Component Payload (RSC Payload)
 
-<p align="center">
-  <img src="images/flight-payload-streaming.svg" alt="Animated diagram showing how React Server Components serialize the element tree into Flight protocol wire-format chunks that stream to the client, where React reconstructs the component tree. Shows hint chunks, import chunks, model chunks, and streaming promise resolution." width="840" />
-</p>
+[Diagram: Animated diagram showing how React Server Components serialize the element tree into Flight protocol wire-format chunks that stream to the client, where React reconstructs the component tree. Shows hint chunks, import chunks, model chunks, and streaming promise resolution.]
 
 The React Server Component Payload (RSC Payload) is a mechanism that allows you to pass the rendered server components from the server to the client. You can use the `rsc_payload_react_component` helper function to embed the RSC payload of any component in your Rails views. Let's try to embed the RSC payload of the `ReactServerComponentPage` component in the `app/views/pages/react_server_component_page_rsc_payload.html.erb` view.
 
@@ -5422,9 +5176,7 @@ For `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSign
 
 Traditional SSR without RSC is the simpler server-bundle-to-HTML path covered in the [Node Renderer](../node-renderer.md) and [Streaming SSR](../streaming-ssr.md) docs. The RSC path adds the RSC bundle and an embedded RSC payload:
 
-<p align="center">
-  <img src="images/bundle-architecture.svg" alt="Diagram showing three distinct bundles in an RSC project: the RSC Bundle containing server components and client references running in Node VM, the Server Bundle containing both component types for SSR in Node VM, and the Client Bundle split into chunks running in the browser." width="840" />
-</p>
+[Diagram: Diagram showing three distinct bundles in an RSC project: the RSC Bundle containing server components and client references running in Node VM, the Server Bundle containing both component types for SSR in Node VM, and the Client Bundle split into chunks running in the browser.]
 
 The sequence below traces the same interaction over time.
 
@@ -5458,9 +5210,7 @@ This approach offers significant advantages:
 - Reduces HTTP requests by embedding the RSC payload within the initial HTML response
 - Provides faster interactivity through streamlined rendering and hydration
 
-<p align="center">
-  <img src="images/rendering-flow-sequence.svg" alt="Animated sequence diagram showing the end-to-end React Server Components rendering flow: Browser requests page from Rails, Rails asks the Node renderer, the server bundle starts the page render, the RSC bundle builds the server component output, and a single streamed response flows back through Node Renderer and Rails to the browser for hydration." width="840" />
-</p>
+[Diagram: Animated sequence diagram showing the end-to-end React Server Components rendering flow: Browser requests page from Rails, Rails asks the Node renderer, the server bundle starts the page render, the RSC bundle builds the server component output, and a single streamed response flows back through Node Renderer and Rails to the browser for hydration.]
 
 ## Next Steps
 
@@ -6253,9 +6003,7 @@ Before reading this document, please read:
 
 These documents provide essential background on React Server Components and how they work without Server Side Rendering (SSR).
 
-<p align="center">
-  <img src="images/stream-vs-react-component.svg" alt="Static split-screen comparison showing why stream_react_component with renderToPipeableStream is required for RSC (supports Suspense and async), while react_component with renderToString breaks on async Server Components." width="840" />
-</p>
+[Diagram: Static split-screen comparison showing why stream_react_component with renderToPipeableStream is required for RSC (supports Suspense and async), while react_component with renderToString breaks on async Server Components.]
 
 ## Update the React Server Component Page
 
@@ -6337,9 +6085,7 @@ Let's create a `Posts` React Server Component. It receives its `posts` from Rail
 
 For **progressive loading** — where slow data streams in while the rest of the page is already interactive — you need [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently), which require SSR. That pattern is covered in [Server-Side Rendering](./server-side-rendering.md) and [Selective Hydration](./selective-hydration-in-streamed-components.md).
 
-<p align="center">
-  <img src="images/async-suspense-streaming.svg" alt="Diagram showing how async Server Components work with Suspense: the shell and fallback render immediately, the async component resolves server-side, streams to the browser, and the fallback is replaced with real content." width="840" />
-</p>
+[Diagram: Diagram showing how async Server Components work with Suspense: the shell and fallback render immediately, the async component resolves server-side, streams to the browser, and the fallback is replaced with real content.]
 
 ```js
 // app/javascript/components/Posts.jsx
@@ -6496,9 +6242,7 @@ The `ToggleContainer` is marked with [`'use client'`](https://react.dev/referenc
 
 It's important to note that while client components (like `ToggleContainer`) cannot directly import server components, they can receive server components as props (like children in this case). This is why we can pass the server-rendered image element as a child to our client-side `ToggleContainer` component. This pattern allows for flexible composition while maintaining the boundaries between server and client code.
 
-<p align="center">
-  <img src="images/donut-composition.svg" alt="Static diagram showing the donut or children-as-props composition pattern: a Client Component wraps Server Component children passed as props. The children stay server-rendered and are NOT included in the client bundle. Blue zones indicate server-rendered content, orange zones indicate client-rendered content." width="840" />
-</p>
+[Diagram: Static diagram showing the donut or children-as-props composition pattern: a Client Component wraps Server Component children passed as props. The children stay server-rendered and are NOT included in the client bundle. Blue zones indicate server-rendered content, orange zones indicate client-rendered content.]
 
 This pattern allows us to optimize performance by keeping most of the component logic on the server while selectively adding interactivity where needed on the client.
 
@@ -6557,19 +6301,19 @@ yarn add --exact react-on-rails-pro@VERSION
 bundle add react_on_rails_pro --version="= VERSION"
 ```
 
-Also, install React 19.0.x, React DOM 19.0.x, and the exact `react-on-rails-rsc` release candidate currently used by the generator:
+Also, install React 19.0.x, React DOM 19.0.x, and the exact `react-on-rails-rsc` release currently used by the generator:
 
 ```bash
-yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
-# npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
-# pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
-# bun add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
+yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# bun add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
 ```
 
 > [!NOTE]
 > React on Rails Pro RSC currently supports React 19.0.x with patch >= 19.0.4. Do not upgrade generated RSC apps to React 19.1 or 19.2 just because those versions are newer on npm; the RSC bundler APIs used internally can change between React minor versions. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
 >
-> The example above pins `react-on-rails-rsc@19.0.5-rc.7`, a release candidate. Keep that exact pin until a stable `react-on-rails-rsc@19.0.5` release is published and the generator/package metadata policy is reviewed together.
+> The generator pins `react-on-rails-rsc` to exactly `19.0.5` (no `^` or `~`), matching the generator default. Because the RSC bundler APIs are version-coupled, manual installers should record `react-on-rails-rsc` as exactly `19.0.5` in `package.json` rather than the default caret range; `react` and `react-dom` stay on `~19.0.4`.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
 
@@ -7051,9 +6795,7 @@ When React on Rails Pro encounters `<RSCRoute componentName="Dashboard" componen
 2. **During client-side navigation**, when `RSCRoute` appears in the tree for the first time (e.g., the user navigates to a new route), the client fetches the RSC payload from the server over HTTP and renders it.
 3. **When props change**, a new HTTP request is made for each unique combination of `componentName` and props. Identical combinations are cached (see [Performance and caching behavior](#performance-and-caching-behavior)).
 
-<p align="center">
-  <img src="images/rsc-route-lifecycle.svg" alt="Animated diagram showing the three RSCRoute lifecycle phases: initial SSR with embedded payload (no HTTP request), client-side navigation triggering an HTTP fetch, and prop changes using a cache keyed by componentName + JSON.stringify(props)." width="840" />
-</p>
+[Diagram: Animated diagram showing the three RSCRoute lifecycle phases: initial SSR with embedded payload (no HTTP request), client-side navigation triggering an HTTP fetch, and prop changes using a cache keyed by componentName + JSON.stringify(props).]
 
 For this to work, `RSCRoute` needs the `RSCProvider` context it relies on internally. A client component tree that server-renders `RSCRoute` payloads must be wrapped with `wrapServerComponentRenderer`, which provides that context automatically. You never need to create an `RSCProvider` yourself.
 
@@ -7712,9 +7454,7 @@ With selective hydration, React can now hydrate different parts of the page inde
 
 This approach significantly improves both perceived and actual performance by making the most relevant parts interactive first.
 
-<p align="center">
-  <img src="images/selective-hydration-timeline.svg" alt="Animated timeline showing how selective hydration works with streamed RSC components. With async script loading, components hydrate independently as they stream in — the page becomes interactive before slow components finish loading. Compares defer (all-or-nothing) vs async (progressive) loading strategies." width="840" />
-</p>
+[Diagram: Animated timeline showing how selective hydration works with streamed RSC components. With async script loading, components hydrate independently as they stream in — the page becomes interactive before slow components finish loading. Compares defer (all-or-nothing) vs async (progressive) loading strategies.]
 
 ## Try Selective Hydration with React Server Component Page
 
@@ -7806,9 +7546,7 @@ SOURCE: docs/pro/react-server-components/flight-protocol-syntax.md
 
 Flight Protocol, Wire format or RSC payload are different names for a serialization method that can be used to transfer different types of data between server and client. These data can be react elements, JSON objects, JavaScript primitives, react server function calls or results, ...etc. Flight Protocol format consists of multiple lines separated by new line, each line is called a chunk. Each chunk have the following format
 
-<p align="center">
-  <img src="images/flight-payload-streaming.svg" alt="Animated diagram showing how React Server Components serialize the element tree into Flight protocol wire-format chunks that stream to the client, where React reconstructs the component tree. Shows hint chunks, import chunks, model chunks, and streaming promise resolution." width="840" />
-</p>
+[Diagram: Animated diagram showing how React Server Components serialize the element tree into Flight protocol wire-format chunks that stream to the client, where React reconstructs the component tree. Shows hint chunks, import chunks, model chunks, and streaming promise resolution.]
 
 ```rsc
 <chunk id (hexa-decimal integer)>:<optional tag><JSON stringified payload>
@@ -8142,7 +7880,7 @@ Before running the generator, verify your environment:
 | React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version                                                                                                         |
 | React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.0.x with patch >= 19.0.4 (see [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for security context) |
 | React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version                                                                                                  |
-| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | Exact `19.0.5-rc.7` pin until stable `19.0.5` ships                                                                         |
+| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | Exact stable `19.0.5` pin                                                                                                   |
 | Node.js                  | `node --version`                                                                                                               | 18+                                                                                                                         |
 | Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                                                                                 |
 | Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                                                                        |
@@ -8150,9 +7888,9 @@ Before running the generator, verify your environment:
 If React is outside the supported 19.0.x range or below 19.0.4, upgrade it first:
 
 ```bash
-pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
-# or: yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
-# or: npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
+pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# or: yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# or: npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
 ```
 
 > **React 19.0.x with patch >= 19.0.4** is recommended. Earlier 19.0.x versions (19.0.0--19.0.3) have known security vulnerabilities — see the [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for details.
@@ -8161,7 +7899,12 @@ pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.7
 > The RSC generator intentionally stays on React 19.0.x and does not widen generated apps to React 19.1 or 19.2 yet. React's RSC runtime and bundler APIs can change between minor releases, so advance the React range only when the generator, docs, and package metadata policy are reviewed together.
 
 > [!NOTE]
-> `react-on-rails-rsc@19.0.5-rc.7` is an exact release-candidate pin. Keep that exact pin until a stable `react-on-rails-rsc@19.0.5` release is available. This is separate from the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609): metadata can allow prerelease RSC packages broadly enough for `npm ls`, while the generator still installs the tested exact RSC package pin.
+> The generator pins `react-on-rails-rsc` to exactly `19.0.5` (no `^` or `~`). Because the RSC bundler APIs are version-coupled, record `react-on-rails-rsc` as exactly `19.0.5` in `package.json` rather than the default caret range so a later `19.1.x`/`19.2.x` is not picked up; `react` and `react-dom` stay on `~19.0.4`. This is separate from the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609): metadata can allow RSC packages broadly enough for `npm ls`, while the generator still installs the tested exact RSC package pin.
+
+That exact pin is what goes in your app's `package.json`. Separately, the Pro package itself declares an optional peer range, which is broader on purpose:
+
+> [!NOTE]
+> The Pro package's optional `react-on-rails-rsc` peer range is `^19.0.5` (i.e. `>= 19.0.5 < 20.0.0`, see [issue #3965](https://github.com/shakacode/react_on_rails/issues/3965)). This is an advisory range: it sets the **floor** at `19.0.5` (the RSC CSS FOUC fix) and a **ceiling** below the next major `20.0.0` (a new `react-on-rails-rsc` major is a deliberate, reviewed bump). Within the `19.x` line it admits any `>= 19.0.5` release, including `19.1.x` and `19.2.x`; per-version compatibility is enforced not by this range but by the Pro node renderer's runtime version check (`rscPeerSupport.ts`), which tiers `react-on-rails-rsc` `19.0.x` against React `19.0.4+` and `19.2.x` against React `19.2.7+`. Compared to the old `"*"`, this range simply excludes pre-`19.0.5` builds (which lack the FOUC fix) and the unknown next major.
 
 ## Pre-Migration: Audit Components for Client API Usage
 
@@ -8390,8 +8133,8 @@ Then run `bundle install` before retrying the generator.
 
 If the RSC bundle build fails but server and client builds succeed, the issue is likely in `rscWebpackConfig.js`. Common causes:
 
-- **Missing `react-on-rails-rsc` package**: Run `pnpm add react-on-rails-rsc@19.0.5-rc.7`
-- **React or `react-on-rails-rsc` version mismatch**: RSC currently requires React 19.0.x with patch >= 19.0.4 and the exact `react-on-rails-rsc@19.0.5-rc.7` pin. Check with `pnpm list react react-dom react-on-rails-rsc`
+- **Missing `react-on-rails-rsc` package**: Run `pnpm add react-on-rails-rsc@19.0.5`
+- **React or `react-on-rails-rsc` version mismatch**: RSC currently requires React 19.0.x with patch >= 19.0.4 and the exact `react-on-rails-rsc@19.0.5` pin. Check with `pnpm list react react-dom react-on-rails-rsc`
 - **Custom webpack config incompatibility**: If your `serverWebpackConfig.js` was heavily customized, the generator's transforms may not apply cleanly. See [Preparing Your App: Step 4](../../oss/migrating/rsc-preparing-app.md#step-4-set-up-the-rsc-webpack-bundle) for the underlying intent of each webpack change
 
 ### Manifest Files Not Generated
@@ -8429,9 +8172,7 @@ SOURCE: docs/pro/react-server-components/per-request-data.md
 
 In traditional React, `useContext` lets any component in the tree access shared data like the current user, locale, or theme. Server Components cannot use Context — they render once on the server and never re-render. This guide covers how to share per-request data across Server Components without prop drilling, using `React.cache()` as a per-request store.
 
-<p align="center">
-  <img src="images/react-cache-vs-prop-drilling.svg" alt="Animated toggle between two approaches to sharing per-request data across Server Components: prop drilling (threading data through every component) versus React.cache() with zero-arg cached getters that any component can call directly." width="840" />
-</p>
+[Diagram: Animated toggle between two approaches to sharing per-request data across Server Components: prop drilling (threading data through every component) versus React.cache() with zero-arg cached getters that any component can call directly.]
 
 ## The Problem: Prop Drilling in Server Components
 
@@ -9156,7 +8897,7 @@ The generator supports Rspack — when `assets_bundler: rspack` is detected in `
 The RSC implementation depends on the `react-on-rails-rsc` npm package, which provides bundler-specific manifest plugins plus a shared loader:
 
 - **WebpackPlugin** (`react-on-rails-rsc/WebpackPlugin`) — generates client/server component manifest files under webpack.
-- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by the exact `react-on-rails-rsc@19.0.5-rc.7` pin (switch to 19.0.5 stable once published).
+- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by the stable `react-on-rails-rsc@19.0.5` pin.
 - **WebpackLoader** (`react-on-rails-rsc/WebpackLoader`) — transforms `'use client'` files into client reference proxies in the RSC bundle. Works under both webpack and rspack.
 
 ## React and Package Version Policy
@@ -9168,8 +8909,8 @@ integration can change between React minor releases, so the generator range shou
 advance only after the Webpack and Rspack paths are verified against the new React
 minor.
 
-The generator separately pins `react-on-rails-rsc@19.0.5-rc.7` exactly until a
-stable `react-on-rails-rsc@19.0.5` is published. That package pin is separate from
+The generator separately pins the stable `react-on-rails-rsc@19.0.5` release
+exactly. That package pin is separate from
 the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609):
 metadata can allow prerelease RSC packages broadly enough for `npm ls`, while the
 generator still installs the tested React range and exact RSC package pin.
@@ -9302,9 +9043,7 @@ A `.server.jsx` file is NOT a React Server Component. A `.client.jsx` file is NO
 
 ## Types of Components
 
-<p align="center">
-  <img src="images/server-vs-client-components.svg" alt="Animated split-screen comparison showing what Server Components and Client Components can and cannot do, and the boundary between them. Server Components can use async, heavy imports, and data props. Client Components can use state, effects, event handlers, and browser APIs." width="840" />
-</p>
+[Diagram: Animated split-screen comparison showing what Server Components and Client Components can and cannot do, and the boundary between them. Server Components can use async, heavy imports, and data props. Client Components can use state, effects, event handlers, and browser APIs.]
 
 ### Server Components
 

@@ -2478,7 +2478,6 @@ describe InstallGenerator, type: :generator do
   describe "#add_rsc_dependencies" do
     let(:install_generator) { described_class.new([], { rsc: true }, destination_root:) }
     let(:rsc_pin) { ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN }
-    let(:rsc_stable_target) { install_generator.send(:rsc_stable_package_version_target) }
 
     before do
       GeneratorMessages.clear
@@ -2486,7 +2485,7 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:fallback_package_manager).and_return("pnpm")
     end
 
-    it "explains why every RSC install is temporarily pinned to the prerelease package" do
+    it "explains why every RSC install is pinned to the stable package" do
       allow(install_generator).to receive(:add_packages).and_return(true)
 
       install_generator.send(:add_rsc_dependencies)
@@ -2494,9 +2493,11 @@ describe InstallGenerator, type: :generator do
       message_text = GeneratorMessages.messages.join("\n")
       expect(message_text).to include("all --rsc installs")
       expect(message_text).to include("react-on-rails-rsc@#{rsc_pin}")
-      expect(message_text).to include("stable react-on-rails-rsc@#{rsc_stable_target}")
       expect(message_text).to include("react-on-rails-rsc/RspackPlugin")
       expect(message_text).to include("Webpack")
+      expect(message_text).not_to include("prerelease")
+      expect(message_text).not_to include("temporarily")
+      expect(message_text).not_to include("until stable")
     end
 
     it "keeps the version pin and uses the detected package manager when manual RSC recovery is needed" do
@@ -3941,9 +3942,10 @@ describe InstallGenerator, type: :generator do
   # Bundler subprocess commands must run in unbundled environment to prevent
   # BUNDLE_GEMFILE inheritance from parent process
   describe "bundler environment isolation" do
-    # Pin to Webpack (--no-rspack) so shakapacker:install runs with an empty env hash here;
-    # the SHAKAPACKER_ASSETS_BUNDLER=rspack env is covered by the dedicated example below.
+    # Pin to Webpack (--no-rspack) so this shared fixture covers the explicit Webpack install path.
     let(:install_generator) { install_generator_fixture(rspack: false) }
+    let(:webpack_install_env) { { "SHAKAPACKER_ASSETS_BUNDLER" => "webpack" } }
+    let(:rspack_install_env) { { "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" } }
 
     it "clears BUNDLE_GEMFILE when running bundle add" do
       allow(install_generator).to receive(:shakapacker_in_gemfile?).and_return(false)
@@ -3958,13 +3960,46 @@ describe InstallGenerator, type: :generator do
       # Verify both system calls run inside with_unbundled_env
       allow(Bundler).to receive(:with_unbundled_env).and_yield
       allow(install_generator).to receive(:system).with("bundle install").and_return(true)
-      allow(install_generator).to receive(:system).with({}, "bundle exec rails shakapacker:install").and_return(true)
+      allow(install_generator).to receive(:system)
+        .with(webpack_install_env, "bundle exec rails shakapacker:install")
+        .and_return(true)
 
       install_generator.send(:install_shakapacker)
 
       expect(install_generator).to have_received(:system).with("bundle install")
-      expect(install_generator).to have_received(:system).with({}, "bundle exec rails shakapacker:install")
+      expect(install_generator).to have_received(:system)
+        .with(webpack_install_env, "bundle exec rails shakapacker:install")
       expect(Bundler).to have_received(:with_unbundled_env).at_least(:twice)
+    end
+
+    it "passes SHAKAPACKER_ASSETS_BUNDLER=webpack to shakapacker:install when --webpack is set" do
+      webpack_generator = install_generator_fixture(webpack: true)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(webpack_generator).to receive(:system).with("bundle install").and_return(true)
+      allow(webpack_generator).to receive(:system)
+        .with(webpack_install_env, "bundle exec rails shakapacker:install")
+        .and_return(true)
+
+      webpack_generator.send(:install_shakapacker)
+
+      expect(webpack_generator).to have_received(:system)
+        .with(webpack_install_env, "bundle exec rails shakapacker:install")
+    end
+
+    it "passes the resolved SHAKAPACKER_ASSETS_BUNDLER to shakapacker:install when no bundler flag is set" do
+      default_generator = install_generator_fixture
+      allow(default_generator).to receive_messages(project_declares_assets_bundler?: false,
+                                                   shakapacker_version_9_or_higher?: true)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(default_generator).to receive(:system).with("bundle install").and_return(true)
+      allow(default_generator).to receive(:system)
+        .with(rspack_install_env, "bundle exec rails shakapacker:install")
+        .and_return(true)
+
+      default_generator.send(:install_shakapacker)
+
+      expect(default_generator).to have_received(:system)
+        .with(rspack_install_env, "bundle exec rails shakapacker:install")
     end
 
     it "passes SHAKAPACKER_ASSETS_BUNDLER=rspack to shakapacker:install when --rspack is set" do
@@ -3972,13 +4007,13 @@ describe InstallGenerator, type: :generator do
       allow(Bundler).to receive(:with_unbundled_env).and_yield
       allow(rspack_generator).to receive(:system).with("bundle install").and_return(true)
       allow(rspack_generator).to receive(:system)
-        .with({ "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" }, "bundle exec rails shakapacker:install")
+        .with(rspack_install_env, "bundle exec rails shakapacker:install")
         .and_return(true)
 
       rspack_generator.send(:install_shakapacker)
 
       expect(rspack_generator).to have_received(:system)
-        .with({ "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" }, "bundle exec rails shakapacker:install")
+        .with(rspack_install_env, "bundle exec rails shakapacker:install")
     end
 
     context "with fake BUNDLE_GEMFILE set" do

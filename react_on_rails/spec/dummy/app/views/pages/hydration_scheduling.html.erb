@@ -1,0 +1,33 @@
+<h1>Hydration scheduling</h1>
+
+<p>
+  <a href="/server_side_hello_world" data-testid="turbo-navigation-target">Navigate away</a>
+</p>
+
+<%= react_component("HydrationSchedulingProbe",
+                    props: { label: "Immediate island", mode: "immediate", testId: "hydrate-immediate" },
+                    prerender: true,
+                    id: "hydrate-immediate",
+                    hydrate_on: :immediate) %>
+
+<%= react_component("HydrationSchedulingProbe",
+                    props: { label: "Idle island", mode: "idle", testId: "hydrate-idle" },
+                    prerender: true,
+                    id: "hydrate-idle",
+                    hydrate_on: :idle) %>
+
+<%= react_component("HydrationSchedulingProbe",
+                    props: { label: "Client-only visible island",
+                             mode: "visible-client-only",
+                             testId: "hydrate-visible-client-only" },
+                    prerender: false,
+                    id: "hydrate-visible-client-only",
+                    hydrate_on: :visible) %>
+
+<div style="height: 220vh" aria-hidden="true"></div>
+
+<%= react_component("HydrationSchedulingProbe",
+                    props: { label: "Visible island", mode: "visible", testId: "hydrate-visible" },
+                    prerender: true,
+                    id: "hydrate-visible",
+                    hydrate_on: :visible) %>

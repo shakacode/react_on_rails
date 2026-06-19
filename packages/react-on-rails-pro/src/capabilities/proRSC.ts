@@ -113,8 +113,19 @@ const streamRenderRSCComponent = (
     isShellReady: true,
   };
 
-  const { pipeToTransform, readableStream, emitError } =
+  const { pipeToTransform, readableStream, emitError, isConsumerAborted, onConsumerAbort } =
     transformRenderStreamChunksToResultObject(renderState);
+
+  // On client disconnect the RSC render stream is aborted by cancelUpstream; also release any RSC
+  // payload streams this render fetched so their upstream Rails/API work stops, and run post-SSR
+  // cleanup hooks that the normal `readableStream` 'end' would have run (an early disconnect destroys
+  // the stream without 'end') so request-scoped resources are not leaked (issue #3885). Mirrors the
+  // HTML path. Registered up front so an early disconnect (before the render stream exists) still
+  // triggers cleanup. notifySSREnd is idempotent; suppress the duplicate warning.
+  onConsumerAbort(() => {
+    streamingTrackers.rscRequestTracker.clear();
+    streamingTrackers.postSSRHookTracker.notifySSREnd({ suppressDuplicateWarning: true });
+  });
 
   const reportError = (error: Error): Error => {
     const diagnosticError = addRSCClientHookDiagnostic(error, componentName);
@@ -132,6 +143,12 @@ const streamRenderRSCComponent = (
     const { renderToPipeableStream } = await getServerRenderer();
     const rscStream = renderToPipeableStream(await reactRenderingResult, {
       onError: (err) => {
+        // A client disconnect aborts this RSC PipeableStream, and React responds by calling onError
+        // with its standard abort error. That is expected teardown, not a render failure, so skip
+        // reporting it (issue #3885).
+        if (isConsumerAborted()) {
+          return;
+        }
         const error = convertToError(err);
         reportError(error);
       },

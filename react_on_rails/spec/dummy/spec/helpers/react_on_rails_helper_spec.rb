@@ -691,6 +691,45 @@ describe ReactOnRailsHelper do
       end
     end
 
+    context "with hydrate_on" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "does not add data-hydrate-on when the option is omitted" do
+        result = react_component("App")
+
+        expect(result).not_to match(/data-hydrate-on=/)
+      end
+
+      it "adds data-hydrate-on for explicit immediate mode" do
+        result = react_component("App", hydrate_on: :immediate)
+
+        expect(result).to match(/data-hydrate-on="immediate"/)
+      end
+
+      it "adds data-hydrate-on for visible mode" do
+        result = react_component("App", hydrate_on: :visible)
+
+        expect(result).to match(/data-hydrate-on="visible"/)
+      end
+
+      it "rejects interaction mode because it is not implemented in OSS" do
+        expect do
+          react_component("App", hydrate_on: :interaction)
+        end.to raise_error(ArgumentError, /Supported OSS modes are :immediate, :visible, and :idle/)
+      end
+    end
+
+    context "with hydrate_on and React on Rails Pro installed" do
+      it "rejects deferred scheduling modes" do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        expect do
+          react_component("App", hydrate_on: :visible)
+        end.to raise_error(ArgumentError, /React on Rails Pro does not support hydrate_on scheduling/)
+      end
+    end
+
     context "with 'html_options' tag option" do
       subject { react_component("App", html_options: { tag: "span" }) }
 
@@ -1400,6 +1439,8 @@ describe ReactOnRailsHelper do
         dom_id: "HelloWorld-react-component-0",
         react_component_name: "HelloWorld",
         trace: false,
+        hydrate_on: :immediate,
+        internal_option: nil,
         store_dependencies: nil,
         html_streaming?: false,
         auto_load_bundle: false

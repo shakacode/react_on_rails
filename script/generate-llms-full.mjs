@@ -254,6 +254,81 @@ function sidebarTopLevelSections(docs) {
     .filter(Boolean);
 }
 
+// Turn one SVG diagram's alt text into a plain-text marker for the generated
+// reference. The alt text is the human-authored description of the diagram
+// (also the accessibility text), so it is the structured fallback machine
+// readers get in place of an image they cannot see.
+function diagramMarker(alt) {
+  const text = alt.replace(/\s+/g, ' ').trim();
+  return text ? `[Diagram: ${text}]` : '[Diagram]';
+}
+
+// Rewrite an `<img>` tag to its diagram marker, but only for SVG embeds — those
+// are the Mermaid-replacement diagrams (#3804). Non-SVG images (screenshots,
+// JSX `src={...}` examples) are left untouched.
+function rewriteImgTag(tag) {
+  const src = tag.match(/\bsrc="([^"]*)"/);
+  if (!src || !/\.svg$/i.test(src[1])) return tag;
+  const alt = tag.match(/\balt="([^"]*)"/);
+  return diagramMarker(alt ? alt[1] : '');
+}
+
+// Replace SVG diagram embeds in a non-code chunk of markdown. The published
+// docs embed each diagram as `<p><img src="…svg" alt="…" /></p>` (or as a
+// `![alt](…svg)` markdown image); in the generated text reference a raw `<img>`
+// is dead weight — the relative path resolves to nothing and there is no visual
+// — so we surface the alt text instead. See describeSvgDiagrams for why code
+// blocks never reach this function.
+function rewriteDiagramEmbeds(text) {
+  return text
+    .replace(/<p\b[^>]*>\s*(<img\b[^>]*>)\s*<\/p>/gi, (whole, img) => {
+      const rewritten = rewriteImgTag(img);
+      return rewritten === img ? whole : rewritten;
+    })
+    .replace(/<img\b[^>]*>/gi, (img) => rewriteImgTag(img))
+    .replace(/!\[([^\]]*)\]\([^)\s]*\.svg\)/gi, (_whole, alt) => diagramMarker(alt));
+}
+
+// Apply rewriteDiagramEmbeds to a doc body while leaving fenced code blocks
+// untouched: an `<img>` or `![](…)` inside a ``` fence is a code example, not a
+// diagram embed, and rewriting it would corrupt the sample. We scan line by
+// line, pass code-fence lines through verbatim, and rewrite each contiguous run
+// of prose as a block so multi-line `<p><img/></p>` embeds collapse cleanly.
+function describeSvgDiagrams(content) {
+  const result = [];
+  let prose = [];
+  let fence = null; // { char, len } while inside a fenced code block
+
+  const flushProse = () => {
+    if (prose.length) {
+      result.push(rewriteDiagramEmbeds(prose.join('\n')));
+      prose = [];
+    }
+  };
+
+  for (const line of content.split('\n')) {
+    const opener = line.match(/^[ \t]*(`{3,}|~{3,})/);
+    if (opener) {
+      const char = opener[1][0];
+      const len = opener[1].length;
+      const isBareFence = /^[ \t]*(?:`{3,}|~{3,})[ \t]*$/.test(line);
+      if (!fence) {
+        flushProse();
+        fence = { char, len };
+      } else if (char === fence.char && len >= fence.len && isBareFence) {
+        fence = null;
+      }
+      result.push(line);
+    } else if (fence) {
+      result.push(line);
+    } else {
+      prose.push(line);
+    }
+  }
+  flushProse();
+  return result.join('\n');
+}
+
 function generate(docs, orderedIds, { heading, crossLink }) {
   const preamble = fs.readFileSync(PREAMBLE_FILE, 'utf8').trimEnd();
   const parts = [
@@ -281,7 +356,7 @@ function generate(docs, orderedIds, { heading, crossLink }) {
       `SOURCE: ${relPath}`,
       '================================================================================',
       '',
-      content.trim(),
+      describeSvgDiagrams(content.trim()),
       '',
     );
   }

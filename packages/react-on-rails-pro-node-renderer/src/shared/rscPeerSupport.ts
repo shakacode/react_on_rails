@@ -16,14 +16,14 @@
 // Single source of truth for react-on-rails-pro's RSC peer compatibility window.
 // This is the only value to bump when compatibility changes.
 //
-// `recommendedMin` deliberately starts at the stable floor we currently recommend.
-// Raise it to the stable `react-on-rails-rsc` release (expected 19.0.5) once
-// 19.0.5-rc.7 is promoted, which activates the warn tier for anyone still on an older
-// 19.x build.
+// `recommendedMin` is the published stable `react-on-rails-rsc` floor we recommend.
+// It is now raised to 19.0.5 (the published stable release), which activates the warn
+// tier for anyone still on an older 19.x build in the 19.0.2–19.0.4 range — those
+// predate the coordinated fixes (FOUC stylesheet preloading, async manifest signatures).
 // Bump tracked by https://github.com/shakacode/react_on_rails/issues/3632
 // (the stable 19.0.5 ship/pin is tracked by issue #3634).
 export const RSC_PEER_SUPPORT = {
-  reactOnRailsRsc: { recommendedMin: '19.0.2', supportedMajor: 19 },
+  reactOnRailsRsc: { recommendedMin: '19.0.5', supportedMajor: 19 },
   react: {
     supportedMajor: 19,
     supportedRanges: [

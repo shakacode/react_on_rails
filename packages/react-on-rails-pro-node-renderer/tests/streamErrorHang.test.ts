@@ -238,4 +238,64 @@ describe('standard render stream context retention', () => {
     sourceStream.destroy();
     rawResponse.destroy();
   });
+
+  it('destroys the source render stream when the client disconnects mid-render (issue #3885)', async () => {
+    const sourceStream = new Readable({ read() {} });
+    const rawResponse = new PassThrough();
+    const executionContext = { release: jest.fn() };
+
+    const releaseHandle = releaseExecutionContextWhenStreamFinishes(
+      sourceStream,
+      { raw: rawResponse } as never,
+      executionContext as never,
+    );
+
+    // The render is mid-flight (a shell chunk emitted, stream not ended)...
+    sourceStream.push('shell');
+    expect(sourceStream.destroyed).toBe(false);
+
+    // ...then the HTTP client disconnects: Fastify destroys the raw response, emitting 'close'.
+    rawResponse.destroy();
+    await new Promise<void>((resolve) => {
+      rawResponse.once('close', () => resolve());
+    });
+
+    // The source render stream is destroyed, which the Pro streaming layer propagates into
+    // ReactDOM's PipeableStream.abort() so the in-flight render stops instead of leaking.
+    expect(sourceStream.destroyed).toBe(true);
+
+    releaseHandle.release();
+  });
+
+  it('removes the client-disconnect listener after a normal completion (issue #3885 listener hygiene)', async () => {
+    const sourceStream = new Readable({ read() {} });
+    const rawResponse = new PassThrough();
+    const executionContext = { release: jest.fn() };
+
+    const releaseHandle = releaseExecutionContextWhenStreamFinishes(
+      sourceStream,
+      { raw: rawResponse } as never,
+      executionContext as never,
+    );
+    // Drain the progress stream so the source can reach 'end'.
+    releaseHandle.stream.resume();
+    expect(rawResponse.listenerCount('close')).toBeGreaterThan(0);
+
+    // Source completes normally.
+    sourceStream.push('data');
+    sourceStream.push(null);
+    await new Promise<void>((resolve) => {
+      sourceStream.once('end', () => resolve());
+    });
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
+
+    // The disconnect listener (and the finish listener) must be deregistered after a normal completion
+    // so their closures over the finished render don't linger on a long-lived res.raw connection.
+    expect(rawResponse.listenerCount('close')).toBe(0);
+
+    releaseHandle.release();
+    rawResponse.destroy();
+  });
 });

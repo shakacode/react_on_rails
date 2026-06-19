@@ -221,6 +221,8 @@ Triage rules:
 - Deduplicate overlapping comments before classifying them. Keep one representative item for the underlying issue.
 - Verify factual claims locally before classifying a comment as `MUST-FIX`.
 - If a claim appears wrong, classify it as `SKIPPED` and note briefly why.
+- When a reviewer identifies an unexplained sibling-lock version split, platform-precompiled/source-build transition, or new build-time dependency, treat the lockfile dependency drift item as `MUST-FIX`.
+  - Verify the lockfile diff and require either alignment or an explicit rationale in PR evidence before classifying the item as resolved.
 - Preserve the original review comment ID and thread ID when available so the command can reply to the correct place and resolve the correct thread later.
 - Treat actionable review summary bodies as normal feedback to classify (`MUST-FIX`/`DISCUSS` as appropriate); skip only boilerplate or status-only summaries.
 
@@ -449,6 +451,8 @@ For actions other than `a`, if the user selects `DISCUSS` or `OPTIONAL` items to
 If the user selects skipped/declined items for rationale replies, post those replies too.
 
 Before committing or asking for push confirmation, run the self-review gate: review the combined fix diff for correctness bugs, style violations, and inconsistencies introduced by the fixes themselves. Fix critical issues immediately.
+
+Converge the review loop, don't chase it: every push re-triggers the configured review bots on the new head and produces a fresh batch of comments. Batch all code fixes into a single push; resolve purely advisory threads (style, dead-code, "consider…", informational, positive) in-thread with a reply — **without a new commit**, since resolving a thread does not re-trigger reviews while a push does. Never resolve a confirmed blocker by reply alone. See [Review-Loop Convergence](../../workflows/pr-processing.md#review-loop-convergence-push-amplification).
 
 When 2+ selected fixes touch different files with no logical dependency, process them in parallel if the environment supports it. Instruct parallel helpers not to commit; keep all changes unstaged until the combined diff passes the self-review gate.
 After parallel fixes complete, verify no conflicts exist between the changes by checking whether any helpers touched the same files (`git diff --name-only`).

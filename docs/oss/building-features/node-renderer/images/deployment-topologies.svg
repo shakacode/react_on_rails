@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 470" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="topo-title topo-desc">
+  <title id="topo-title">Three container topologies for running Rails with the Node Renderer</title>
+  <desc id="topo-desc">Three ways to deploy Rails and the Pro Node Renderer, simplest to most complex. Single container: both processes run in one container sharing OS resources and talking over localhost — lowest complexity, scaled together, versions always aligned. Sidecar containers: Rails and the Node Renderer run as two containers in the same pod or workload, still talking over localhost but each with its own resource limits and per-process visibility — scaled together, versions aligned. Separate workloads: Rails and the renderer run as independent workloads communicating over service DNS — scaled independently, but with a risk of version drift.</desc>
+  <defs>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CC0000"/>
+      <stop offset="100%" stop-color="#990000"/>
+    </linearGradient>
+    <linearGradient id="reactGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#61DAFB"/>
+      <stop offset="100%" stop-color="#21A0C8"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .panel-head { fill: #F1F5F9; stroke: #E2E8F0; }
+      .label { fill: #334155; }
+      .sub { fill: #64748B; }
+      .container { fill: #F1F5F9; stroke: #CBD5E1; }
+      .container-d { fill: #F8FAFC; stroke: #94A3B8; }
+      .rails-fill { fill: url(#railsGrad); }
+      .node-fill { fill: url(#reactGrad); }
+      .proc-text { fill: #FFFFFF; }
+      .node-text { fill: #0B3A47; }
+      .link { stroke: #64748B; }
+      .link-text { fill: #475569; }
+      .chip { fill: #EFF6FF; stroke: #BFDBFE; }
+      .chip-text { fill: #1E40AF; }
+      .warn-chip { fill: #FEF3C7; stroke: #FCD34D; }
+      .warn-text { fill: #92400E; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .panel-head { fill: #0F172A; stroke: #334155; }
+        .label { fill: #CBD5E1; }
+        .sub { fill: #94A3B8; }
+        .container { fill: #0F172A; stroke: #475569; }
+        .container-d { fill: #0B1220; stroke: #64748B; }
+        .node-text { fill: #06222B; }
+        .link { stroke: #94A3B8; }
+        .link-text { fill: #CBD5E1; }
+        .chip { fill: #172554; stroke: #3B82F6; }
+        .chip-text { fill: #93C5FD; }
+        .warn-chip { fill: #422006; stroke: #B45309; }
+        .warn-text { fill: #FCD34D; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="470" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Node Renderer Deployment Topologies</text>
+  <text x="450" y="48" text-anchor="middle" font-size="11" class="subtitle">Rails + Pro Node Renderer &#x2014; simplest to most complex</text>
+
+  <!-- ===== Option 1: Single container ===== -->
+  <rect x="24" y="66" width="276" height="338" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="24" y="66" width="276" height="40" rx="12" class="panel-head" stroke-width="1"/>
+  <rect x="24" y="90" width="276" height="16" class="panel-head"/>
+  <text x="162" y="84" text-anchor="middle" font-size="13" font-weight="700" class="label">1 &#x2022; Single Container</text>
+  <text x="162" y="100" text-anchor="middle" font-size="9.5" class="sub">default starting point</text>
+
+  <rect x="48" y="124" width="228" height="116" rx="10" class="container" stroke-width="1.5"/>
+  <text x="162" y="142" text-anchor="middle" font-size="9" font-weight="600" class="sub">Container</text>
+  <rect x="64" y="152" width="92" height="50" rx="8" class="rails-fill"/>
+  <text x="110" y="174" text-anchor="middle" font-size="10" font-weight="700" class="proc-text">Rails</text>
+  <text x="110" y="190" text-anchor="middle" font-size="8" class="proc-text">process</text>
+  <rect x="168" y="152" width="92" height="50" rx="8" class="node-fill"/>
+  <text x="214" y="174" text-anchor="middle" font-size="10" font-weight="700" class="node-text">Node</text>
+  <text x="214" y="190" text-anchor="middle" font-size="8" class="node-text">Renderer</text>
+  <line x1="156" y1="177" x2="168" y2="177" class="link" stroke-width="2"/>
+  <text x="162" y="222" text-anchor="middle" font-size="8.5" class="sub">shared OS / cgroup resources</text>
+
+  <rect x="48" y="252" width="228" height="22" rx="6" class="chip" stroke-width="1"/>
+  <text x="162" y="267" text-anchor="middle" font-size="9" font-family="monospace" class="chip-text">renderer_url: localhost:3800</text>
+  <g class="label" font-size="9.5">
+    <text x="56" y="296">Complexity: lowest</text>
+    <text x="56" y="316">Scaling: together</text>
+    <text x="56" y="336">Versions: always aligned</text>
+    <text x="56" y="356">Per-process visibility: no</text>
+  </g>
+  <text x="162" y="386" text-anchor="middle" font-size="8.5" class="sub">One image, one deploy.</text>
+
+  <!-- ===== Option 2: Sidecar ===== -->
+  <rect x="312" y="66" width="276" height="338" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="312" y="66" width="276" height="40" rx="12" class="panel-head" stroke-width="1"/>
+  <rect x="312" y="90" width="276" height="16" class="panel-head"/>
+  <text x="450" y="84" text-anchor="middle" font-size="13" font-weight="700" class="label">2 &#x2022; Sidecar Containers</text>
+  <text x="450" y="100" text-anchor="middle" font-size="9.5" class="sub">same pod / workload</text>
+
+  <rect x="336" y="124" width="228" height="116" rx="10" class="container" stroke-width="1.5"/>
+  <text x="450" y="142" text-anchor="middle" font-size="9" font-weight="600" class="sub">Pod / Workload</text>
+  <rect x="352" y="152" width="96" height="58" rx="8" class="container-d" stroke-width="1.5"/>
+  <rect x="358" y="158" width="84" height="30" rx="6" class="rails-fill"/>
+  <text x="400" y="178" text-anchor="middle" font-size="9.5" font-weight="700" class="proc-text">Rails</text>
+  <text x="400" y="202" text-anchor="middle" font-size="8.5" class="sub">2 CPU / 4 GB</text>
+  <rect x="452" y="152" width="96" height="58" rx="8" class="container-d" stroke-width="1.5"/>
+  <rect x="458" y="158" width="84" height="30" rx="6" class="node-fill"/>
+  <text x="500" y="178" text-anchor="middle" font-size="9.5" font-weight="700" class="node-text">Node Rndr</text>
+  <text x="500" y="202" text-anchor="middle" font-size="8.5" class="sub">2 CPU / 4 GB</text>
+  <line x1="448" y1="224" x2="452" y2="224" class="link" stroke-width="2"/>
+  <path d="M 400 210 L 400 224 L 500 224 L 500 210" class="link" fill="none" stroke-width="1.5"/>
+  <text x="450" y="237" text-anchor="middle" font-size="8" class="link-text">localhost (shared netns)</text>
+
+  <rect x="336" y="252" width="228" height="22" rx="6" class="chip" stroke-width="1"/>
+  <text x="450" y="267" text-anchor="middle" font-size="9" font-family="monospace" class="chip-text">renderer_url: localhost:3800</text>
+  <g class="label" font-size="9.5">
+    <text x="344" y="296">Complexity: medium</text>
+    <text x="344" y="316">Scaling: together</text>
+    <text x="344" y="336">Versions: aligned (same image)</text>
+    <text x="344" y="356">Per-process visibility: yes</text>
+  </g>
+  <text x="450" y="386" text-anchor="middle" font-size="8.5" class="sub">Diagnose which process OOMs.</text>
+
+  <!-- ===== Option 3: Separate ===== -->
+  <rect x="600" y="66" width="276" height="338" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="600" y="66" width="276" height="40" rx="12" class="panel-head" stroke-width="1"/>
+  <rect x="600" y="90" width="276" height="16" class="panel-head"/>
+  <text x="738" y="84" text-anchor="middle" font-size="13" font-weight="700" class="label">3 &#x2022; Separate Workloads</text>
+  <text x="738" y="100" text-anchor="middle" font-size="9.5" class="sub">independent scaling</text>
+
+  <rect x="624" y="124" width="104" height="116" rx="10" class="container" stroke-width="1.5"/>
+  <text x="676" y="142" text-anchor="middle" font-size="8.5" font-weight="600" class="sub">Workload A</text>
+  <rect x="638" y="152" width="76" height="48" rx="8" class="rails-fill"/>
+  <text x="676" y="173" text-anchor="middle" font-size="9.5" font-weight="700" class="proc-text">Rails</text>
+  <text x="676" y="187" text-anchor="middle" font-size="8.5" class="proc-text">replicas</text>
+  <text x="676" y="220" text-anchor="middle" font-size="8.5" class="sub">scale on its own</text>
+
+  <rect x="772" y="124" width="104" height="116" rx="10" class="container" stroke-width="1.5"/>
+  <text x="824" y="142" text-anchor="middle" font-size="8.5" font-weight="600" class="sub">Workload B</text>
+  <rect x="786" y="152" width="76" height="48" rx="8" class="node-fill"/>
+  <text x="824" y="171" text-anchor="middle" font-size="9" font-weight="700" class="node-text">Node</text>
+  <text x="824" y="184" text-anchor="middle" font-size="8" class="node-text">Renderer</text>
+  <text x="824" y="220" text-anchor="middle" font-size="8.5" class="sub">scale on its own</text>
+
+  <line x1="728" y1="176" x2="772" y2="176" class="link" stroke-width="2" stroke-dasharray="4 3"/>
+  <text x="750" y="170" text-anchor="middle" font-size="8.5" class="link-text">service DNS</text>
+
+  <rect x="624" y="252" width="252" height="22" rx="6" class="chip" stroke-width="1"/>
+  <text x="750" y="267" text-anchor="middle" font-size="8" font-family="monospace" class="chip-text">renderer_url: node-renderer-service:3800</text>
+  <g class="label" font-size="9.5">
+    <text x="632" y="296">Complexity: highest</text>
+    <text x="632" y="316">Scaling: independent</text>
+    <text x="632" y="356">Per-process visibility: yes</text>
+  </g>
+  <rect x="624" y="324" width="252" height="20" rx="5" class="warn-chip" stroke-width="1"/>
+  <text x="750" y="338" text-anchor="middle" font-size="8.5" font-weight="600" class="warn-text">&#x26A0; Versions: risk of drift on rolling deploy</text>
+  <text x="750" y="386" text-anchor="middle" font-size="8.5" class="sub">Rarely needed below high replicas.</text>
+
+  <text x="450" y="430" text-anchor="middle" font-size="10.5" font-weight="600" class="subtitle">Recommendation: start with a single container; move to sidecars for per-process memory visibility.</text>
+  <text x="450" y="450" text-anchor="middle" font-size="9.5" class="subtitle">Separate workloads only when you genuinely need to scale the renderer independently.</text>
+</svg>
