@@ -9,6 +9,7 @@ require "shellwords"
 require "tempfile"
 require "time"
 require "tmpdir"
+require "uri"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
 require_relative "../react_on_rails/lib/react_on_rails/git_utils"
@@ -847,7 +848,8 @@ end
 
 def required_check_names_for_main(monorepo_root:, repo_slug: nil, ci_branch: "main")
   repo_slug ||= github_repo_slug(monorepo_root)
-  api_path = "repos/#{repo_slug}/branches/#{ci_branch}/protection/required_status_checks"
+  encoded_branch = URI.encode_www_form_component(ci_branch.to_s)
+  api_path = "repos/#{repo_slug}/branches/#{encoded_branch}/protection/required_status_checks"
   # Keep legacy `contexts` separate from modern `checks` entries. Modern
   # required checks can be pinned to a GitHub App via `app_id`; legacy contexts
   # may be satisfied by either a Checks API run or a commit-status context.

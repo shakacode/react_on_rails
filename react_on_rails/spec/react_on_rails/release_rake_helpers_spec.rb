@@ -2325,10 +2325,10 @@ RSpec.describe "release.rake helper methods" do
       expect(required_check_names_for_main(monorepo_root:)).to be_nil
     end
 
-    it "queries the protection endpoint for the given ci_branch" do
+    it "url-encodes slashes when querying protection for the given ci_branch" do
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--jq", expected_jq,
-              "repos/shakacode/react_on_rails/branches/release/17.0.0/protection/required_status_checks")
+              "repos/shakacode/react_on_rails/branches/release%2F17.0.0/protection/required_status_checks")
         .and_return([{ contexts: %w[Lint], checks: [] }.to_json, success_status])
 
       expect(required_check_names_for_main(monorepo_root:, ci_branch: "release/17.0.0")).to eq(

@@ -34,10 +34,12 @@ Behavior rules:
 - Do not auto-fix everything. Stop after triage and wait for my selection unless the parsed input includes `autopilot`; in that case, present the triage for transparency and immediately execute action `a`.
 - Default to real issues only, and surface polish as `OPTIONAL` so it is visible without becoming a blocking merge gate.
 - Optional-item routing:
-  - For action `f` and the initial `f+i` phase, do not ask whether to fix
-    behavior-preserving optional nits. Apply low-risk in-scope nits inline, or
-    log them as deferred/declined with rationale, using `AGENTS.md` for the
-    behavior-preserving, low-risk, and final-candidate debounce definitions.
+  - When `RELEASE_PHASE=beta`, action `f` and the initial `f+i` phase do not ask
+    whether to fix behavior-preserving optional nits. Apply low-risk in-scope
+    nits inline, or log them as deferred/declined with rationale, using
+    `AGENTS.md` for the behavior-preserving, low-risk, and final-candidate
+    debounce definitions. When `RELEASE_PHASE=rc` or `final`, suppress this
+    autonomous optional-nit rule; optional items require explicit selection.
   - Explicit optional-code actions (`a`, `f+o`, `o <nums>`, and `all optional`)
     are code-changing only for their selected optional items: fix those items
     inline or report why they remain unresolved, and do not sweep unrelated
@@ -86,15 +88,36 @@ Execution flow when terminal access is available:
    - Set `SPECIFIC_TARGET=1` when the input targets a specific review URL or issue-comment URL; otherwise set `SPECIFIC_TARGET=0`.
    - If `gh` is unavailable or unauthenticated, stop and tell me to fix that first.
 
-2.5. Resolve the release phase from the PR base branch (the merge gate is a function of the target branch's phase; see `AGENTS.md` → _Release-Train Branching And Phase Gating_). A direct invocation has no orchestrator to inject the phase (PR #4018 thread Kr6wb), so resolve it here:
+2.5. Resolve the release phase from the PR base branch (the merge gate is a function of the target branch's phase; see `AGENTS.md` → _Release-Train Branching And Phase Gating_). A direct invocation may have no orchestrator to inject the phase. Resolve `main` to beta from the PR's base branch, but do not guess whether a `release/*` base is `rc` or `final` from the branch name alone: use an injected/published `RELEASE_PHASE` or fail closed and ask for confirmation (PR #4018 thread Kr6wb):
    ```bash
-   BASE_REF=$(gh pr view "${PR_NUMBER}" --repo "${REPO}" --json baseRefName -q .baseRefName 2>/dev/null || echo "")
+   if ! BASE_REF=$(gh pr view "${PR_NUMBER}" --repo "${REPO}" --json baseRefName -q .baseRefName 2>/dev/null); then
+     echo "Unable to resolve PR base branch; confirm RELEASE_PHASE before continuing." >&2
+     exit 1
+   fi
+   if [ -z "${BASE_REF}" ]; then
+     echo "Unable to resolve PR base branch; confirm RELEASE_PHASE before continuing." >&2
+     exit 1
+   fi
    case "${BASE_REF}" in
-     release/*) RELEASE_PHASE="rc" ;;   # treat as final when the applicable tracker is in final-release mode
-     *)         RELEASE_PHASE="beta" ;;
+     release/*)
+       if [ -z "${RELEASE_PHASE:-}" ]; then
+         echo "PR targets ${BASE_REF}; resolve the published phase or confirm RELEASE_PHASE=rc/final before continuing." >&2
+         exit 1
+       fi
+       case "${RELEASE_PHASE}" in
+         rc|final) ;;
+         *)
+           echo "Invalid RELEASE_PHASE='${RELEASE_PHASE}' for ${BASE_REF}; expected rc or final." >&2
+           exit 1
+           ;;
+       esac
+       ;;
+     main)      RELEASE_PHASE="beta" ;;
+     *)         RELEASE_PHASE="beta" ;; # feature/topic branches derive to beta
    esac
    ```
    - `RELEASE_PHASE=beta` (base `main` or a non-`release/*` branch): the autonomous low-risk optional-nit rule for `f` / `f+i` applies as written below.
+   - For a `release/*` base, set `RELEASE_PHASE` from `agent-coord` status or the applicable release tracker before running this snippet; if that signal is unavailable, stop and ask for confirmation.
    - `RELEASE_PHASE=rc` or `final` (base `release/*`): **suppress the autonomous optional-nit rule** — `OPTIONAL` items require explicit selection (`f+o`, `o <nums>`, `all optional`) because edits expand the frozen diff — and require adversarial-pr-review + zero open MUST-FIX before merge-ready (for `final`, also no new features and human sign-off on the promotion). State the resolved phase in the triage summary.
 
 3. Determine scan window and summary cutoff:
@@ -193,8 +216,8 @@ Execution flow when terminal access is available:
    - After the triage list, present this quick-action menu:
      ```
      Quick actions:
-      f     — Fix must-fix items, autonomously handle low-risk optional nits, then prompt for skipped rationale replies and discuss decisions
-      f+i   — Fix must-fix, autonomously handle low-risk optional nits, then prepare one deferred-work bundle for discuss/remaining optional items (and non-trivial skipped items)
+     f     — Fix must-fix items, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prompt for skipped rationale replies and discuss decisions
+     f+i   — Fix must-fix, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prepare one deferred-work bundle for discuss/remaining optional items (and non-trivial skipped items)
       f+o   — Fix must-fix + address all optional items explicitly inline (no autonomous filter; fix or promote each optional)
       a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations (local-only; no GitHub posts)
       d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
@@ -338,8 +361,8 @@ SKIPPED (count):
 4. item - short reason
 
 Quick actions:
-  f     — Fix #N, autonomously handle low-risk optional nits, then prompt for skipped rationale replies and discuss decisions
-  f+i   — Fix #N, autonomously handle low-risk optional nits, then prepare one deferred-work bundle for discuss/remaining optional/non-trivial skipped items
+  f     — Fix #N, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prompt for skipped rationale replies and discuss decisions
+  f+i   — Fix #N, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prepare one deferred-work bundle for discuss/remaining optional/non-trivial skipped items
   f+o   — Fix #N plus address all optional items explicitly inline (no autonomous filter)
   a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations (local-only; no GitHub posts)
   d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
