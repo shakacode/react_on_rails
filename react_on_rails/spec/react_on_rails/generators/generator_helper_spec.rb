@@ -374,6 +374,11 @@ RSpec.describe GeneratorHelper, type: :generator do
       expect(relative_stylesheet_import_path("client/app/src/HelloServer/components/nested/LikeButton.jsx"))
         .to eq("../../../../stylesheets/application.css")
     end
+
+    it "rejects entry paths outside the generator destination" do
+      expect { relative_stylesheet_import_path("../../outside/LikeButton.jsx") }
+        .to raise_error(ArgumentError, "entry_path must stay inside the generator destination")
+    end
   end
 
   describe "#active_precompile_hook_configured?" do

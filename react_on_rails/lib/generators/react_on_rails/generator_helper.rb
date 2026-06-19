@@ -109,7 +109,10 @@ module GeneratorHelper
 
   def relative_stylesheet_import_path(entry_path, filename: "application.css")
     # InstallGenerator copies the final Shakapacker config before path-dependent demo files are generated.
-    entry_dir = Pathname.new(File.join(destination_root, entry_path)).dirname
+    safe_entry_path = safe_generator_destination_path(entry_path, default: nil)
+    raise ArgumentError, "entry_path must stay inside the generator destination" if safe_entry_path.nil?
+
+    entry_dir = Pathname.new(File.join(destination_root, safe_entry_path)).dirname
     stylesheet = Pathname.new(File.join(destination_root, shakapacker_stylesheet_path(filename)))
 
     stylesheet.relative_path_from(entry_dir).to_s
@@ -120,6 +123,7 @@ module GeneratorHelper
   end
 
   def example_component_source_path(component_name)
+    # Trailing slash is intentional: this value is only for generated demo file hints.
     "#{example_component_source_directory(component_name)}/"
   end
 
@@ -169,7 +173,7 @@ module GeneratorHelper
     destination = Pathname.new(destination_root).cleanpath
     pathname.relative_path_from(destination).to_s
   rescue ArgumentError
-    nil
+    nil # Signals the caller to fall back to the default path.
   end
 
   def unsafe_generator_destination_path?(path)

@@ -169,8 +169,8 @@ describe InstallGenerator, type: :generator do
   def simulate_preinstalled_shakapacker(source_path:, source_entry_path:)
     simulate_existing_file("config/shakapacker.yml", <<~YAML)
       default: &default
-        source_path: #{source_path}
-        source_entry_path: #{source_entry_path}
+        source_path: #{source_path.to_s.inspect}
+        source_entry_path: #{source_entry_path.to_s.inspect}
         public_root_path: public
         public_output_path: packs
         cache_path: tmp/shakapacker

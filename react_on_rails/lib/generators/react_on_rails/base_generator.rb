@@ -190,8 +190,13 @@ module ReactOnRails
 
       def copy_packer_config
         # Rails generator actions run in method definition order.
-        # Keep this before path-dependent copy actions; GeneratorHelper memoizes
-        # Shakapacker paths on first read, so --force overwrites must happen first.
+        # Keep this before actions that call shakapacker_source_path or
+        # shakapacker_source_entry_path; those helpers memoize on first read.
+        if instance_variable_defined?(:@shakapacker_source_path) ||
+           instance_variable_defined?(:@shakapacker_source_entry_path)
+          raise "copy_packer_config must run before path-dependent generator actions"
+        end
+
         base_path = "base/base/"
         config = "config/shakapacker.yml"
 
