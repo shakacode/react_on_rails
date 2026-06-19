@@ -21,24 +21,13 @@ import log from '../shared/log';
 import { getRequestBundleFilePath, isErrorRenderResult } from '../shared/utils';
 import { subSpan } from '../shared/tracing.js';
 import type { ExecutionContext } from './vm';
+import { formatPropRequestChunk, formatRenderCompleteChunk } from './streamingUtils';
 
 // These keys must match the constants in AsyncPropsManager.ts (react-on-rails-pro package)
 const PULL_ENABLED_KEY = 'pullEnabled';
 const PUSH_PROPS_KEY = 'pushProps';
 const PROP_REQUEST_EMITTER_KEY = 'propRequestEmitter';
 const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
-
-function formatPropRequestChunk(propName: string): Buffer {
-  const metadata = JSON.stringify({ messageType: 'propRequest', propName });
-  const header = `${metadata}\t${'0'.padStart(8, '0')}\n`;
-  return Buffer.from(header);
-}
-
-function formatRenderCompleteChunk(): Buffer {
-  const metadata = JSON.stringify({ messageType: 'renderComplete' });
-  const header = `${metadata}\t${'0'.padStart(8, '0')}\n`;
-  return Buffer.from(header);
-}
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */

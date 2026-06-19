@@ -80,6 +80,8 @@ module ReactOnRailsPro
     # Rejects an async prop on the Node side so React can show an error boundary.
     def reject(prop_name, reason)
       update_chunk = generate_reject_chunk(prop_name, reason)
+      # Rejections stay retryable from the queue's perspective. React's manager
+      # suppresses duplicate pull emissions for the same render via pullRequested.
       @request_stream << "#{update_chunk.to_json}\n"
     rescue StandardError => e
       Rails.logger.error do

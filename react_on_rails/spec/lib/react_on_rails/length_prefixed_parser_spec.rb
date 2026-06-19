@@ -82,14 +82,14 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
   end
 
   describe "control messages (messageType)" do
-    def control_message_payload(metadata)
-      metadata_with_type = metadata.merge("payloadType" => "string")
+    def control_message_payload(metadata, include_payload_type: true)
+      metadata_with_type = include_payload_type ? metadata.merge("payloadType" => "string") : metadata
       meta_json = metadata_with_type.to_json
       "#{meta_json}\t0\n"
     end
 
     it "yields metadata with messageType but without html or payloadType keys" do
-      payload = control_message_payload("messageType" => "propRequest", "propName" => "users")
+      payload = control_message_payload({ "messageType" => "propRequest", "propName" => "users" })
       result = []
       parser = described_class.new
       parser.feed(payload) { |chunk| result << chunk }
@@ -100,8 +100,21 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
       expect(result.first).not_to have_key("payloadType")
     end
 
+    it "handles production control messages without payloadType" do
+      payload = control_message_payload(
+        { "messageType" => "propRequest", "propName" => "users" },
+        include_payload_type: false
+      )
+      result = []
+      parser = described_class.new
+      parser.feed(payload) { |chunk| result << chunk }
+
+      expect(result.size).to eq(1)
+      expect(result.first).to eq("messageType" => "propRequest", "propName" => "users")
+    end
+
     it "handles renderComplete control messages" do
-      payload = control_message_payload("messageType" => "renderComplete")
+      payload = control_message_payload({ "messageType" => "renderComplete" })
       result = []
       parser = described_class.new
       parser.feed(payload) { |chunk| result << chunk }
@@ -112,7 +125,7 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
 
     it "correctly interleaves control messages with normal HTML chunks" do
       html_chunk = length_prefixed_payload("<div>Hello</div>")
-      control_chunk = control_message_payload("messageType" => "propRequest", "propName" => "settings")
+      control_chunk = control_message_payload({ "messageType" => "propRequest", "propName" => "settings" })
       html_chunk2 = length_prefixed_payload("<p>World</p>")
 
       parser = described_class.new
