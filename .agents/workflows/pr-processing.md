@@ -1136,15 +1136,22 @@ For a manual multi-PR landing plan:
 Use this section when reviewing already-merged PRs from concurrent agent work, especially before a release candidate.
 
 1. Resolve the base release candidate tag/commit and head SHA.
-2. When auditing a named batch/run and the batch/run id is known, run
-   `agent-coord doctor` and `agent-coord status`, then inspect the named batch
-   entry to identify the worked issue set from claims, heartbeats, branches, and
-   dependency metadata. If coordination state is unavailable, record
-   `worked_issue_scope: UNKNOWN` with the exact command/error instead of
-   inferring completeness from merged PRs; when scope is `UNKNOWN`, audit only
-   the merged PR range and report the command or permission needed to recover
-   the worked issue list instead of identifying a batch subset from PR links or
-   heuristics.
+2. Resolve worked-issue scope from coordination state when coordinated batch
+   work is in scope. If no coordinated batch/run is in scope, record
+   `worked_issue_scope: not applicable`. If batch work is in scope but the
+   batch/run id is unknown, run `agent-coord doctor` and `agent-coord status` to
+   list candidate batch/run ids and lanes, record `worked_issue_scope: UNKNOWN
+(needs batch confirmation)`, and ask the user to confirm a candidate before
+   treating any candidate lane list as worked-issue scope. When the batch/run id
+   is known, run `agent-coord doctor` and `agent-coord status`, then inspect the
+   named batch entry to identify the worked issue set from claims, heartbeats,
+   branches, and dependency metadata. If `agent-coord` is missing or
+   `agent-coord doctor` fails, record `worked_issue_scope: UNKNOWN (setup)`. If
+   `agent-coord doctor` passes but `agent-coord status` fails, record
+   `worked_issue_scope: UNKNOWN (access)`. In all UNKNOWN cases, include the
+   exact command/error, audit only the merged PR range, and report the command,
+   permission, or batch id confirmation needed to recover the worked issue list
+   instead of identifying a batch subset from PR links or heuristics.
 3. List every PR merged in the range. When `worked_issue_scope` is known,
    identify the batch subset by coordination state, branch names, PR bodies,
    labels, comments, authors, merge timing, and linked issues. When
@@ -1153,7 +1160,9 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    heuristics. Keep no-PR, blocked, parked, and done-unmerged worked issues in
    the audit scope even when they have no merged PR.
 4. Ask for confirmation of included and excluded worked issues and PRs before
-   deep audit unless the user explicitly says to proceed.
+   deep audit when `worked_issue_scope` is known unless the user explicitly says
+   to proceed. When the scope is `UNKNOWN (needs batch confirmation)`, ask the
+   user to choose the candidate batch/run id before any worked-issue audit.
 5. For each known worked issue, evaluate whether the implementation, no-PR
    evidence, blocker, or parked disposition satisfied the issue intent; verify
    the final state; and classify it as `in_progress`, `realized`, `partial`,
@@ -1187,11 +1196,14 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - for process findings, include the Process Gap Disposition fields above,
      especially `Mechanism target` and `Replay evidence or park reason`, before
      filing issues
-   - after user approval, append the audit report to the release-gate audit
-     ledger before creating issues, then include the resulting ledger comment
-     URL in every approved parent or child issue body; if the ledger append
-     fails, do not create issues and report the exact command/API error plus the
-     ledger issue, permission, or retry needed
+   - for release-gate audits, after user approval, append the audit report to
+     the release-gate audit ledger before creating issues, then include the
+     resulting ledger comment URL in every approved parent or child issue body;
+     if the required ledger append fails, do not create issues and report the
+     exact command/API error plus the ledger issue, permission, or retry needed
+   - for non-release audits with no release-gate ledger, include
+     `Audit ledger: not applicable (non-release audit)` in every approved parent
+     or child issue body
 10. Return high-risk findings first, then review-gate violations, missing
     changelog candidates, cross-PR risks, the issue plan, a worked-issue
     coverage table (issue number, coordination lane/branch, linked PR or

@@ -9,14 +9,17 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
 - Run Codex and Claude independently first. Do not give either agent the other agent's report until both reports are complete.
 - During independent audits, agents may draft issue bodies but must not create issues, comments, labels, fixes, reverts, branches, or PRs.
 - Use one coordinator to compare reports, dedupe findings, and propose the issue plan.
-- Create GitHub issues only after the user approves the deduped issue plan and
-  the approved audit report has been appended to the release-gate audit ledger.
-- If appending to the release-gate audit ledger fails, do not create issues;
-  report the exact command/API error and the ledger issue or permission needed
-  to unblock issue creation.
+- Create GitHub issues only after the user approves the deduped issue plan. For
+  release-gate audits, append the approved audit report to the release-gate
+  audit ledger first.
+- If a required release-gate ledger append fails, do not create issues; report
+  the exact command/API error and the ledger issue or permission needed to
+  unblock issue creation.
 - If multiple child issues are needed, create one parent issue for the audit and one child issue per
-  independently actionable fix/revert/question. Link the release-gate audit ledger comment from every
-  approved parent or child issue created from the audit.
+  independently actionable fix/revert/question. For release-gate audits, link
+  the release-gate audit ledger comment from every approved parent or child
+  issue created from the audit. For non-release audits with no ledger, record
+  `Audit ledger: not applicable (non-release audit)` in approved issue bodies.
 - Before creating any issue, search existing open issues for the affected PR number and the hidden fingerprint.
 - For named batch/run audits, run `agent-coord doctor`, then `agent-coord status`, and inspect the named
   batch entry as the primary worked-issue scope when available. If coordination state cannot be verified,
@@ -68,15 +71,20 @@ Use git, GitHub, and agent-coord ground truth. Do not rely on prior chat memory.
 
 Scope:
 - Repository: <OWNER>/<REPO>
-- Batch id: <BATCH_ID, or UNKNOWN if not applicable>
+- Batch id: <BATCH_ID, UNKNOWN if batch work is in scope but the id was not supplied, or not applicable>
 - Base: resolve the most recent release candidate tag/commit unless I provide one explicitly
 - Head: current main
 - Focus: PRs that appear to be from recent high-concurrency agent/Codex/Claude batch work
 - Audit id: <AUDIT_ID>
 
 First, produce the exact worked-issue scope and merged-PR range:
-- when a batch id is `UNKNOWN` or not applicable, skip `agent-coord` and record
+- when no coordinated batch/run is in scope, skip `agent-coord` and record
   `worked_issue_scope: not applicable`
+- when batch work is in scope but the batch id is `UNKNOWN`, run
+  `agent-coord doctor`, then `agent-coord status` to list candidate batch/run
+  ids and lanes. Record `worked_issue_scope: UNKNOWN (needs batch
+  confirmation)` and ask me to confirm a candidate batch/run id before treating
+  any candidate lane list as the worked-issue scope.
 - when a batch id is known, run `agent-coord doctor`, then `agent-coord status`,
   then inspect `<BATCH_ID>` in the status output
 - list every worked issue/lane from claims, heartbeats, branches, and dependency
@@ -103,14 +111,18 @@ known, the batch-subset list:
 - why it is or is not part of the batch, only when `worked_issue_scope` is known
 
 List every PR merged between base and head, not only the PRs that look like
-batch work. Ask me to confirm the included/excluded worked issues and PRs before
-deep audit.
+batch work.
 
 If `worked_issue_scope` is `UNKNOWN`, do not invent a worked-issue list from the
 merged PR range and do not identify an included/excluded batch subset from PR
 links or heuristics. After confirmation, audit the merged PR range only and
 include a `worked_issue_scope: UNKNOWN` finding with the command or permission
 needed to recover the missing issue/lane list.
+
+Ask me to confirm the included/excluded worked issues and PRs before deep audit
+when `worked_issue_scope` is known. When the scope is `UNKNOWN (needs batch
+confirmation)`, ask me to choose the candidate batch/run id before any
+worked-issue audit.
 
 After confirmation, audit each known worked issue for:
 - whether the implementation, no-PR comment, blocker, or parked disposition
@@ -252,11 +264,15 @@ Rules:
 - Do not create duplicate child issues. If an issue already exists, link it in the parent issue plan instead.
 - If there are two or more related child issues, create one parent issue first.
 - Create one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
-- Append the audit report to the release-gate audit ledger before creating approved follow-up issues; include the
-  resulting ledger comment URL in every parent and child issue body.
-- If the ledger append fails, do not create parent or child issues. Report the
-  exact command/API error and the ledger issue, permission, or retry needed
-  before issue creation can proceed.
+- For release-gate audits, append the audit report to the release-gate audit
+  ledger before creating approved follow-up issues; include the resulting ledger
+  comment URL in every parent and child issue body.
+- If a required release-gate ledger append fails, do not create parent or child
+  issues. Report the exact command/API error and the ledger issue, permission,
+  or retry needed before issue creation can proceed.
+- For non-release audits with no release-gate ledger, include
+  `Audit ledger: not applicable (non-release audit)` in every parent and child
+  issue body.
 - For missing changelog findings, prefer one bundled changelog issue or recommend `/update-changelog`; do not create one issue per missing entry unless explicitly approved.
 - For process findings, preserve the approved Process Gap Disposition fields:
   `Mechanism target`, `Motivating miss`, `Replay evidence or park reason`, and
