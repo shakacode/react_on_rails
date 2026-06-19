@@ -1140,21 +1140,23 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    then inspect the named batch entry to identify the worked issue set from claims,
    heartbeats, branches, and dependency metadata. If coordination state is unavailable,
    record `worked_issue_scope: UNKNOWN` with the exact command/error instead of inferring
-   completeness from merged PRs.
-3. List every PR merged in the range, then identify the batch subset by
+   completeness from merged PRs; when scope is `UNKNOWN`, audit only the merged
+   PR range and report the command or permission needed to recover the worked
+   issue list instead of identifying a batch subset from PR links or heuristics.
+3. When `worked_issue_scope` is known, list every PR merged in the range, then identify the batch subset by
    coordination state, branch names, PR bodies, labels, comments, authors,
    merge timing, and linked issues. Keep no-PR, blocked, parked, and
    done-unmerged worked issues in the audit scope even when they have no merged
    PR.
 4. Ask for confirmation of included and excluded worked issues and PRs before
    deep audit unless the user explicitly says to proceed.
-5. For each worked issue, evaluate whether the implementation, no-PR evidence,
-   blocker, or parked disposition satisfied the issue intent; verify the final
-   state; and classify it as `in_progress`, `realized`, `partial`, `missed`,
-   `regressed`, `stalled`, or `unknown` using
+5. For each known worked issue, evaluate whether the implementation, no-PR
+   evidence, blocker, or parked disposition satisfied the issue intent; verify
+   the final state; and classify it as `in_progress`, `realized`, `partial`,
+   `missed`, `regressed`, `stalled`, or `unknown` using
    `.agents/workflows/continuous-evaluation-loop.md`. Treat healthy active/live
-   lanes as `in_progress` no-action items unless they have a stalled,
-   regressed, partial, missed, or unknown signal.
+   lanes as `in_progress` no-action items unless they have a stalled, regressed,
+   partial, missed, or unknown signal.
 6. For each included merged PR, inspect reviews, comments, checks, merge time,
    changed files, validation evidence, changelog coverage, and cross-PR
    interactions.
