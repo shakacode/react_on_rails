@@ -183,7 +183,8 @@ The worked-issue coverage table must include issue number, coordination
 lane/branch, linked PR or no-PR/blocker evidence, final state,
 intent-achievement classification, and `UNKNOWN` facts.
 
-Example worked-issue coverage table:
+Example worked-issue coverage table (`batch-abc` and issue numbers are
+placeholders; replace them with the real batch id and issues):
 | Issue | Lane/branch | Evidence | Final state | Classification | UNKNOWN facts |
 | --- | --- | --- | --- | --- | --- |
 | #1234 | batch-abc:issue-1234 / codex/example | PR #2345 merged | merged | realized | none |
@@ -214,6 +215,10 @@ Pay special attention to disagreements:
 - one agent flags risk and the other misses it
 - different worked-issue inclusion lists, including one agent having
   coordination data while the other records `worked_issue_scope: UNKNOWN`
+  - when one report has verified coordination data and another has
+    `worked_issue_scope: UNKNOWN`, treat the verified coordination data as the
+    candidate worked-issue scope and record the UNKNOWN report as a setup/access
+    gap to resolve, not as evidence that no worked-issue scope exists
 - different intent-achievement classifications for the same worked issue
 - different PR inclusion lists
 - different release-candidate base
@@ -249,6 +254,9 @@ Rules:
 - Create one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
 - Append the audit report to the release-gate audit ledger before creating approved follow-up issues; include the
   resulting ledger comment URL in every parent and child issue body.
+- If the ledger append fails, do not create parent or child issues. Report the
+  exact command/API error and the ledger issue, permission, or retry needed
+  before issue creation can proceed.
 - For missing changelog findings, prefer one bundled changelog issue or recommend `/update-changelog`; do not create one issue per missing entry unless explicitly approved.
 - For process findings, preserve the approved Process Gap Disposition fields:
   `Mechanism target`, `Motivating miss`, `Replay evidence or park reason`, and

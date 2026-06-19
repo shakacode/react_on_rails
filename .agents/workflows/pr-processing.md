@@ -1145,11 +1145,13 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    the merged PR range and report the command or permission needed to recover
    the worked issue list instead of identifying a batch subset from PR links or
    heuristics.
-3. When `worked_issue_scope` is known, list every PR merged in the range, then identify the batch subset by
-   coordination state, branch names, PR bodies, labels, comments, authors,
-   merge timing, and linked issues. Keep no-PR, blocked, parked, and
-   done-unmerged worked issues in the audit scope even when they have no merged
-   PR.
+3. List every PR merged in the range. When `worked_issue_scope` is known,
+   identify the batch subset by coordination state, branch names, PR bodies,
+   labels, comments, authors, merge timing, and linked issues. When
+   `worked_issue_scope` is `UNKNOWN`, keep this as a merged-PR range only and
+   do not classify PRs as included/excluded batch work from PR links or
+   heuristics. Keep no-PR, blocked, parked, and done-unmerged worked issues in
+   the audit scope even when they have no merged PR.
 4. Ask for confirmation of included and excluded worked issues and PRs before
    deep audit unless the user explicitly says to proceed.
 5. For each known worked issue, evaluate whether the implementation, no-PR
@@ -1187,7 +1189,9 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
      filing issues
    - after user approval, append the audit report to the release-gate audit
      ledger before creating issues, then include the resulting ledger comment
-     URL in every approved parent or child issue body
+     URL in every approved parent or child issue body; if the ledger append
+     fails, do not create issues and report the exact command/API error plus the
+     ledger issue, permission, or retry needed
 10. Return high-risk findings first, then review-gate violations, missing
     changelog candidates, cross-PR risks, the issue plan, a worked-issue
     coverage table (issue number, coordination lane/branch, linked PR or
