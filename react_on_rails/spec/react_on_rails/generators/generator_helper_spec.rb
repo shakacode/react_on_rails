@@ -315,6 +315,35 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
+  describe "#shakapacker_entrypoint_path" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        development:
+          source_path: client/app
+          source_entry_path: /
+      YAML
+      remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
+      if instance_variable_defined?(:@shakapacker_source_entry_path)
+        remove_instance_variable(:@shakapacker_source_entry_path)
+      end
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+      remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
+      if instance_variable_defined?(:@shakapacker_source_entry_path)
+        remove_instance_variable(:@shakapacker_source_entry_path)
+      end
+    end
+
+    it "places root entrypoints directly under source_path without a double slash" do
+      expect(shakapacker_entrypoint_path("server-bundle.js")).to eq("client/app/server-bundle.js")
+    end
+  end
+
   describe "#relative_stylesheet_import_path" do
     let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
 
