@@ -14,10 +14,10 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
   independently actionable fix/revert/question. Link the release-gate audit ledger comment from every
   approved parent or child issue created from the audit.
 - Before creating any issue, search existing open issues for the affected PR number and the hidden fingerprint.
-- For named batch/run audits, run `agent-coord status` and inspect the named
-  batch entry as the primary worked-issue scope when available. If coordination
-  state cannot be verified, record `worked_issue_scope: UNKNOWN` with the exact
-  command/error instead of silently reducing the audit to merged PRs.
+- For named batch/run audits, run `agent-coord doctor` and `agent-coord status` and inspect the named
+  batch entry as the primary worked-issue scope when available. If coordination state cannot be verified,
+  record `worked_issue_scope: UNKNOWN` with the exact command/error instead of silently reducing the audit
+  to merged PRs.
 - For private coordination backend setup and CLI discovery, see
   `internal/contributor-info/agent-coordination-backend.md`.
 

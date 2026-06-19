@@ -1141,8 +1141,6 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    heartbeats, branches, and dependency metadata. If coordination state is unavailable,
    record `worked_issue_scope: UNKNOWN` with the exact command/error instead of inferring
    completeness from merged PRs.
-   For private coordination backend setup and CLI discovery, see
-   `internal/contributor-info/agent-coordination-backend.md`.
 3. List every PR merged in the range, then identify the batch subset by
    coordination state, branch names, PR bodies, labels, comments, authors,
    merge timing, and linked issues. Keep no-PR, blocked, parked, and
