@@ -1158,18 +1158,20 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
 3. List every PR merged in the range. When `worked_issue_scope` is known,
    identify the batch subset by coordination state, branch names, PR bodies,
    labels, comments, authors, merge timing, and linked issues. When
-   `worked_issue_scope` is `UNKNOWN`, keep this as a merged-PR range only and
-   do not classify PRs as included/excluded batch work from PR links or
-   heuristics. Keep no-PR, blocked, parked, and done-unmerged worked issues in
-   the audit scope even when they have no merged PR.
+   `worked_issue_scope` is `UNKNOWN`, keep the confirmed PR subset as a
+   merged-PR range only and do not classify PRs as included/excluded batch work
+   from PR links or heuristics. Use advisory public `codex-claim` rows from step
+   2 for possible no-PR, blocked, parked, and done-unmerged lanes, but keep
+   those rows marked `UNKNOWN` until coordination state is recovered.
 4. Ask for confirmation of included and excluded worked issues and PRs before
    deep audit when `worked_issue_scope` is known unless the user explicitly says
    to proceed. When the scope is `UNKNOWN (needs batch confirmation)`, ask the
    user to choose the candidate batch/run id before any worked-issue audit.
-5. For each known worked issue, evaluate whether the implementation, no-PR
-   evidence, blocker, or parked disposition satisfied the issue intent; verify
-   the final state; and classify it as `in_progress`, `realized`, `partial`,
-   `missed`, `regressed`, `stalled`, or `unknown` using
+5. For each known worked issue or advisory public `codex-claim` row, evaluate
+   whether the implementation, no-PR evidence, blocker, or parked disposition
+   satisfied the issue intent; verify the final state; and classify it as
+   `in_progress`, `realized`, `partial`, `missed`, `regressed`, `stalled`, or
+   `unknown` using
    `.agents/workflows/continuous-evaluation-loop.md`. Treat healthy active/live
    lanes as `in_progress` no-action items unless they have a stalled, regressed,
    partial, missed, or unknown signal.

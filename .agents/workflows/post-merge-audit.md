@@ -24,7 +24,7 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
 - For named batch/run audits, run `agent-coord doctor`, then `agent-coord status`, and inspect the named
   batch entry as the primary worked-issue scope when available. If coordination state cannot be verified,
   record `worked_issue_scope: UNKNOWN (setup)` or `worked_issue_scope: UNKNOWN (access)` with the exact
-  command/error. Use structured public claim comments as advisory recovery evidence when available before
+  command/error. Use structured public `codex-claim` comments as advisory recovery evidence when available before
   reducing unknown scope to merged PRs.
 - For private coordination backend setup and CLI discovery, see
   `internal/contributor-info/agent-coordination-backend.md`.
@@ -95,10 +95,12 @@ First, produce the exact worked-issue scope and merged-PR range:
   parked, no-PR, done-unmerged, or UNKNOWN
 - if `agent-coord` is missing or `agent-coord doctor` fails, record
   `worked_issue_scope: UNKNOWN (setup)` with the exact command/error and
-  continue with GitHub/git evidence for the merged-PR range only
+  use structured public `codex-claim` comments as advisory coverage when
+  available before continuing with GitHub/git evidence for the merged-PR range
 - if `agent-coord doctor` passes but `agent-coord status` fails, record
   `worked_issue_scope: UNKNOWN (access)` with the exact command/error and
-  continue with GitHub/git evidence for the merged-PR range only
+  use structured public `codex-claim` comments as advisory coverage when
+  available before continuing with GitHub/git evidence for the merged-PR range
 
 Then produce the exact merged-PR range and, only when `worked_issue_scope` is
 known, the batch-subset list:
@@ -116,16 +118,19 @@ batch work.
 
 If `worked_issue_scope` is `UNKNOWN`, do not invent a worked-issue list from the
 merged PR range and do not identify an included/excluded batch subset from PR
-links or heuristics. After confirmation, audit the merged PR range only and
-include a `worked_issue_scope: UNKNOWN` finding with the command or permission
-needed to recover the missing issue/lane list.
+links or heuristics. Use structured public `codex-claim` comments as advisory
+worked-issue rows when available, keep those rows marked `UNKNOWN`, audit them
+alongside the merged PR range, and include a `worked_issue_scope: UNKNOWN`
+finding with the command or permission needed to recover the missing issue/lane
+list.
 
 Ask me to confirm the included/excluded worked issues and PRs before deep audit
 when `worked_issue_scope` is known. When the scope is `UNKNOWN (needs batch
 confirmation)`, ask me to choose the candidate batch/run id before any
 worked-issue audit.
 
-After confirmation, audit each known worked issue for:
+After confirmation, audit each known worked issue or advisory `codex-claim` row
+for:
 - whether the implementation, no-PR comment, blocker, or parked disposition
   satisfied the issue intent and acceptance criteria
 - whether the final issue state is correct: merged, closed, still open,

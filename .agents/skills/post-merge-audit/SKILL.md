@@ -76,8 +76,9 @@ For each included PR:
 - Cross-PR interactions: compare changed files, shared behavior, assumptions, and release-sensitive areas across the batch.
 - Decision log: inspect any `Codex Decision Log` or equivalent section and verify the decisions still hold after the merge.
 
-For each worked issue from coordination state, including no-PR, blocked,
-parked, done-unmerged, or still-open lanes:
+For each worked issue from coordination state or advisory `codex-claim`
+recovery rows, including no-PR, blocked, parked, done-unmerged, or still-open
+lanes:
 
 - Intent coverage: compare the issue intent and acceptance criteria with the PR
   diff, no-PR evidence comment, branch state, or blocker note.
