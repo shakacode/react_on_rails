@@ -1565,6 +1565,14 @@ describe InstallGenerator, type: :generator do
       expect { gen.copy_packer_config }
         .to raise_error(Thor::Error, /copy_packer_config must run before path-dependent generator actions/)
     end
+
+    it "raises when source_entry_path memoizes before copy_packer_config runs" do
+      gen = BaseGenerator.new([], {}, { destination_root: destination })
+      gen.instance_variable_set(:@shakapacker_source_entry_path, "entrypoints")
+
+      expect { gen.copy_packer_config }
+        .to raise_error(Thor::Error, /copy_packer_config must run before path-dependent generator actions/)
+    end
   end
 
   context "with --rspack" do

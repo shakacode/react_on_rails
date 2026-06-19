@@ -39,15 +39,14 @@ module ReactOnRails
           "#{component_dir}/ror_components/HelloWorld.client.#{ext}"
         server_component =
           "#{component_dir}/ror_components/HelloWorld.server.#{ext}"
+        client_component_template = "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{ext}"
 
         # Source paths are relative to this generator's templates; only
         # destinations vary with the app's Shakapacker config.
         if use_tailwind?
-          copy_file("#{tailwind_js_path}/app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{ext}",
-                    client_component)
+          copy_file("#{tailwind_js_path}/#{client_component_template}", client_component)
         else
-          copy_file("#{base_js_path}/app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{ext}",
-                    client_component)
+          copy_file("#{base_js_path}/#{client_component_template}", client_component)
           copy_file("#{base_js_path}/app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css",
                     "#{component_dir}/ror_components/HelloWorld.module.css")
         end
