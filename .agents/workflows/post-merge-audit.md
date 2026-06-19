@@ -9,12 +9,13 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
 - Run Codex and Claude independently first. Do not give either agent the other agent's report until both reports are complete.
 - During independent audits, agents may draft issue bodies but must not create issues, comments, labels, fixes, reverts, branches, or PRs.
 - Use one coordinator to compare reports, dedupe findings, and propose the issue plan.
-- Create GitHub issues only after the user approves the deduped issue plan.
+- Create GitHub issues only after the user approves the deduped issue plan and
+  the approved audit report has been appended to the release-gate audit ledger.
 - If multiple child issues are needed, create one parent issue for the audit and one child issue per
   independently actionable fix/revert/question. Link the release-gate audit ledger comment from every
   approved parent or child issue created from the audit.
 - Before creating any issue, search existing open issues for the affected PR number and the hidden fingerprint.
-- For named batch/run audits, run `agent-coord doctor` and `agent-coord status` and inspect the named
+- For named batch/run audits, run `agent-coord doctor`, then `agent-coord status`, and inspect the named
   batch entry as the primary worked-issue scope when available. If coordination state cannot be verified,
   record `worked_issue_scope: UNKNOWN` with the exact command/error instead of silently reducing the audit
   to merged PRs.
@@ -65,13 +66,14 @@ Use git, GitHub, and agent-coord ground truth. Do not rely on prior chat memory.
 Scope:
 - Repository: <OWNER>/<REPO>
 - Batch id: <BATCH_ID, or UNKNOWN if not applicable>
+  (if UNKNOWN or not applicable, skip the agent-coord lookup below)
 - Base: resolve the most recent release candidate tag/commit unless I provide one explicitly
 - Head: current main
 - Focus: PRs that appear to be from recent high-concurrency agent/Codex/Claude batch work
 - Audit id: <AUDIT_ID>
 
 First, produce the exact worked-issue scope and merged-PR range:
-- run `agent-coord doctor` and `agent-coord status` when a batch id is known,
+- run `agent-coord doctor`, then `agent-coord status` when a batch id is known,
   then inspect `<BATCH_ID>` in the status output
 - list every worked issue/lane from claims, heartbeats, branches, and dependency
   metadata
@@ -108,10 +110,12 @@ After confirmation, audit each known worked issue for:
 - whether review comments, handoff expectations, confidence notes, validation
   evidence, decision-point count, and Process Gap Disposition fields were
   handled when required
-- classify each worked issue as `realized`, `partial`, `missed`, `regressed`,
-  `stalled`, or `unknown`, using `.agents/workflows/continuous-evaluation-loop.md`
-  for the intent-achievement definitions
-- for `stalled` lanes, recommend resume, reassign, or drop; for merged non-OK
+- classify each worked issue as `in_progress`, `realized`, `partial`,
+  `missed`, `regressed`, `stalled`, or `unknown`, using
+  `.agents/workflows/continuous-evaluation-loop.md` for the intent-achievement
+  definitions
+- for healthy `in_progress` lanes, record no action in the worked-issue table;
+  for `stalled` lanes, recommend resume, reassign, or drop; for merged non-OK
   findings, prepare post-merge audit issue-plan entries
 
 Also audit each included merged PR for:
@@ -187,6 +191,9 @@ For each finding:
 
 Pay special attention to disagreements:
 - one agent flags risk and the other misses it
+- different worked-issue inclusion lists, including one agent having
+  coordination data while the other records `worked_issue_scope: UNKNOWN`
+- different intent-achievement classifications for the same worked issue
 - different PR inclusion lists
 - different release-candidate base
 - different interpretation of validation evidence
@@ -197,9 +204,11 @@ Pay special attention to disagreements:
 Return:
 1. consensus high-risk findings
 2. disputed findings needing human review
-3. PRs both agents consider OK
-4. deduped issue plan
-5. recommended next actions
+3. reconciled worked-issue coverage table with consensus classification and any
+   unresolved `UNKNOWN` facts
+4. PRs both agents consider OK
+5. deduped issue plan
+6. recommended next actions
 
 Do not create issues or PRs yet.
 ```

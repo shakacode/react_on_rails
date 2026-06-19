@@ -76,13 +76,14 @@ parked, done-unmerged, or still-open lanes:
   confidence notes, review/comment triage, and any Process Gap Disposition
   fields required by `.agents/workflows/pr-processing.md`.
 - Classification: reuse the intent-achievement classes from
-  `.agents/workflows/continuous-evaluation-loop.md` (`realized`, `partial`,
-  `missed`, `regressed`, `stalled`, or `unknown`) and explain any `UNKNOWN`
-  evidence needed to resolve the issue outcome.
+  `.agents/workflows/continuous-evaluation-loop.md` (`in_progress`,
+  `realized`, `partial`, `missed`, `regressed`, `stalled`, or `unknown`) and
+  explain any `UNKNOWN` evidence needed to resolve the issue outcome.
 - Post-merge intake: route merged non-OK issue outcomes into the issue plan
-  below; route active/stalled lanes back to the batch coordinator as
-  resume/reassign/drop decisions instead of treating them as merged-PR audit
-  findings.
+  below; record healthy `in_progress` lanes in the worked-issue table as
+  no-action items; route `stalled` lanes back to the batch coordinator as
+  resume/reassign/drop decisions in the audit report instead of treating them
+  as merged-PR audit findings.
 
 ## Codex And Claude Coordination
 
@@ -108,10 +109,16 @@ Classify each PR:
 Classify each worked issue separately so the audit can prove every coordinated
 lane was evaluated, even when the issue produced no merged PR:
 
+- **In progress**: the lane is healthy active/live work with recent heartbeat,
+  commits, or review activity and no stalled, regressed, partial, missed, or
+  unknown signal; record it as a no-action item.
 - **Realized**: the issue intent was satisfied and the final state is supported
   by evidence.
-- **Partial / missed / regressed**: the issue intent was incompletely addressed,
-  not addressed, or harmed by the result.
+- **Partial**: the issue intent was incompletely addressed; some acceptance
+  criteria landed and others did not.
+- **Missed**: the issue intent was not addressed; no meaningful implementation
+  or evidence comment exists.
+- **Regressed**: the merge harmed an outcome that was previously satisfied.
 - **Stalled**: the lane needs a coordinator decision to resume, reassign, or
   drop.
 - **Unknown**: the auditor cannot verify the issue outcome from available
@@ -121,7 +128,10 @@ lane was evaluated, even when the issue produced no merged PR:
 
 The audit should usually produce an issue plan for non-OK findings, but not create issues until approval.
 
-- **No issue**: for `OK`, duplicate findings, or findings fully resolved by the audit evidence.
+- **No issue**: for `OK`, duplicate findings, findings fully resolved by the
+  audit evidence, or healthy `in_progress` lanes; include `in_progress` lanes
+  in the worked-issue coverage table so the coordinator can see they were
+  checked.
 - **Changelog only**: for missing changelog entries; prefer one bundled changelog issue or a recommendation to run `/update-changelog`, not one issue per entry.
 - **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
 - **Parent issue**: create one parent issue only to group two or more related _child fix_ issues from the

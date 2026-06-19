@@ -1150,9 +1150,11 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    deep audit unless the user explicitly says to proceed.
 5. For each worked issue, evaluate whether the implementation, no-PR evidence,
    blocker, or parked disposition satisfied the issue intent; verify the final
-   state; and classify it as `realized`, `partial`, `missed`, `regressed`,
-   `stalled`, or `unknown` using
-   `.agents/workflows/continuous-evaluation-loop.md`.
+   state; and classify it as `in_progress`, `realized`, `partial`, `missed`,
+   `regressed`, `stalled`, or `unknown` using
+   `.agents/workflows/continuous-evaluation-loop.md`. Treat healthy active/live
+   lanes as `in_progress` no-action items unless they have a stalled,
+   regressed, partial, missed, or unknown signal.
 6. For each included merged PR, inspect reviews, comments, checks, merge time,
    changed files, validation evidence, changelog coverage, and cross-PR
    interactions.
@@ -1165,16 +1167,23 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - requested adversarial review that did not finish before merge, finished on an older head SHA, or left untriaged `BLOCKING`/`DISCUSS` findings
 8. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
 9. Produce a deduped issue plan for non-OK findings:
-   - no issue for OK, duplicates, or fully resolved findings
+   - no issue for OK, duplicates, fully resolved findings, or healthy
+     `in_progress` lanes
    - one bundled changelog issue or a `/update-changelog` recommendation for missing changelog entries
    - one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task
    - one parent issue when there are two or more related child issues from the same audit
+   - a coordinator action entry, not a follow-up issue, for each `stalled` lane
+     that needs a resume/reassign/drop decision unless the user explicitly
+     approves tracking it as an issue
    - hidden `post-merge-audit-finding` fingerprints so duplicate child issues can be detected
    - for process findings, include the Process Gap Disposition fields above,
      especially `Mechanism target` and `Replay evidence or park reason`, before
      filing issues
-10. Return high-risk findings first, then cross-PR risks, missing changelog
-    candidates, the issue plan, a worked-issue coverage table, a PR-by-PR
-    table, and exact commands/data sources.
+   - after user approval, append the audit report to the release-gate audit
+     ledger before creating issues, then include the resulting ledger comment
+     URL in every approved parent or child issue body
+10. Return high-risk findings first, then review-gate violations, cross-PR
+    risks, missing changelog candidates, the issue plan, a worked-issue coverage
+    table, a PR-by-PR table, and exact commands/data sources.
 
 Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs until the user approves the audit report and issue plan.
