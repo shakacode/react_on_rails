@@ -34,6 +34,12 @@ SERVER_PORT = 3001
 # Rails reaches it at REACT_RENDERER_URL. Pin both so a local override/stale renderer can't
 # desync them (see the pro server env + preflight below).
 RENDERER_PORT = 3800
+# How long to wait for the production server (and, for pro, the renderer) to bind. A cold
+# production Puma boot eager-loads the whole app before listening, which is slow on the first
+# run after a fresh build — observed ~83s on a 2021 M1 Max, vs ~2s warm. wait_for_port still
+# checks the process is alive each second, so a real crash fails fast; this generous ceiling
+# only affects a slow-but-alive boot. Override with BENCHMARK_SERVER_BOOT_TIMEOUT if needed.
+SERVER_BOOT_TIMEOUT = Integer(ENV.fetch("BENCHMARK_SERVER_BOOT_TIMEOUT", "240"))
 
 # Match CI, which runs benchmarks on the MINIMUM supported Ruby ("Ruby stays on minimum to
 # exercise gem compatibility"), not the repo's default. The default .tool-versions Ruby can
@@ -140,15 +146,15 @@ end
 
 def wait_for_port(pid, port, label)
   attempt = 0
-  while attempt < 30
+  while attempt < SERVER_BOOT_TIMEOUT
     raise "#{label} (pid #{pid}) exited during startup" unless process_alive?(pid)
     return if port_open?(port)
 
     attempt += 1
-    puts "  attempt #{attempt}/30: #{label} (port #{port}) not ready yet..."
+    puts "  attempt #{attempt}/#{SERVER_BOOT_TIMEOUT}: #{label} (port #{port}) not ready yet..."
     sleep 1
   end
-  raise "#{label} failed to start within 30s"
+  raise "#{label} failed to start within #{SERVER_BOOT_TIMEOUT}s"
 end
 
 def port_open?(port)
