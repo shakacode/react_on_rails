@@ -1402,7 +1402,7 @@ on your manager.
 pnpm can install a subdirectory of a Git repo directly:
 
 ```shell
-pnpm add "github:shakacode/react_on_rails/repo#main&path:packages/react-on-rails"
+pnpm add "github:shakacode/react_on_rails#main&path:packages/react-on-rails"
 ```
 
 For Pro, add the additional packages the same way, substituting
