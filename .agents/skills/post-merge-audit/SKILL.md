@@ -35,17 +35,23 @@ The resolver is read-only. It resolves the default release-candidate base, the h
 3. Merged PR list: every PR merged between base and head.
 4. Worked issue list: for private coordination backend setup and CLI discovery,
    see `internal/contributor-info/agent-coordination-backend.md`. If no
-   coordinated batch/run is in scope, record `worked_issue_scope: not
-applicable`. If batch work is in scope but the batch/run id is unknown, run
+   coordinated batch/run is in scope, record
+   `worked_issue_scope: not applicable`. If batch work is in scope but the
+   batch/run id is unknown, record
+   `worked_issue_scope: UNKNOWN (needs batch confirmation)`, run
    `agent-coord doctor` then `agent-coord status` to list candidate batch/run
-   ids and lanes, but ask for confirmation before treating any candidate as the
-   worked-issue scope. When a batch/run id is known, run `agent-coord doctor` then `agent-coord status`,
-   then inspect the named batch entry; use claims, heartbeats, and batch metadata as the
-   primary worked-issue scope. If `agent-coord` is missing or `agent-coord doctor` fails,
-   record `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
+   ids and lanes, and ask for confirmation before treating any candidate as the
+   worked-issue scope. When a batch/run id is known, run `agent-coord doctor`
+   then `agent-coord status`, then inspect the named batch entry; use claims,
+   heartbeats, and batch metadata as the primary worked-issue scope. If
+   `agent-coord` is missing or `agent-coord doctor` fails, record
+   `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
    `agent-coord doctor` passes but `agent-coord status` fails, record
-   `worked_issue_scope: UNKNOWN (access)` with the exact command/error. In both cases,
-   continue with merged PR range evidence only and do not infer completeness from merged PRs.
+   `worked_issue_scope: UNKNOWN (access)` with the exact command/error. In both
+   UNKNOWN cases, use structured public `codex-claim` comments as an advisory
+   fallback for possible no-PR, blocked, parked, or done-unmerged lanes before
+   reducing scope to merged PRs. Keep advisory rows marked `UNKNOWN` as needed,
+   and do not infer confirmed completeness from merged PRs.
 5. Batch PR subset: when `worked_issue_scope` is known, map worked issues to PRs through coordination branch names, linked PRs, PR bodies, labels, comments, authors, merge timing, and git history. Keep PR-range inclusion separate from worked-issue coverage so no-PR, blocked, parked, and unmerged lanes are still evaluated.
 
 Show included worked issues, included PRs, excluded near-matches, base/head SHAs, coordination status evidence, and assumptions. Ask for confirmation before deep audit unless the user explicitly asks to proceed without confirmation.

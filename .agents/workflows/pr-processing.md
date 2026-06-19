@@ -1140,8 +1140,8 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    work is in scope. If no coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown, run `agent-coord doctor` and `agent-coord status` to
-   list candidate batch/run ids and lanes, record `worked_issue_scope: UNKNOWN
-(needs batch confirmation)`, and ask the user to confirm a candidate before
+   list candidate batch/run ids and lanes, record
+   `worked_issue_scope: UNKNOWN (needs batch confirmation)`, and ask the user to confirm a candidate before
    treating any candidate lane list as worked-issue scope. When the batch/run id
    is known, run `agent-coord doctor` and `agent-coord status`, then inspect the
    named batch entry to identify the worked issue set from claims, heartbeats,
