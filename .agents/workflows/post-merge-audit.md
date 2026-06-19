@@ -114,9 +114,13 @@ After confirmation, audit each known worked issue for:
   `missed`, `regressed`, `stalled`, or `unknown`, using
   `.agents/workflows/continuous-evaluation-loop.md` for the intent-achievement
   definitions
-- for healthy `in_progress` lanes, record no action in the worked-issue table;
-  for `stalled` lanes, recommend resume, reassign, or drop; for merged non-OK
-  findings, prepare post-merge audit issue-plan entries
+- for healthy `in_progress` lanes and evidenced `realized` outcomes, record no
+  action in the worked-issue table; for `stalled` lanes, recommend resume,
+  reassign, or drop unless the user explicitly approves tracking the stalled
+  lane as an issue; for any other non-OK worked-issue class (`partial`,
+  `missed`, `regressed`, or `unknown`), merged or not, prepare a post-merge
+  audit issue-plan entry or an explicit coordinator action naming the missing
+  evidence or decision
 
 Also audit each included merged PR for:
 - risky behavior change
@@ -160,10 +164,11 @@ For every non-OK finding, include a draft issue entry but do not create it:
   `checklist+replay`, or `park`), `Motivating miss`, `Replay evidence or park
   reason`, and `Non-goal`
 
-Return high-risk findings first, then a worked-issue coverage table and a
-PR-by-PR table. Include exact commands and data sources used, plus any remaining
-`UNKNOWN` facts and the command or permission needed to resolve them. Do not
-make code changes, comments, labels, issues, reverts, or PRs without approval.
+Return high-risk findings first, then review-gate violations, missing changelog
+candidates, cross-PR interaction risks, the issue plan, a worked-issue coverage
+table, a PR-by-PR table, and exact commands/data sources. Include any remaining
+`UNKNOWN` facts and the command or permission needed to resolve them. Do not make
+code changes, comments, labels, issues, reverts, or PRs without approval.
 The worked-issue coverage table must include issue number, coordination
 lane/branch, linked PR or no-PR/blocker evidence, final state,
 intent-achievement classification, and `UNKNOWN` facts.

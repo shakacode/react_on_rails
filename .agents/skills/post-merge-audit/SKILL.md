@@ -79,11 +79,13 @@ parked, done-unmerged, or still-open lanes:
   `.agents/workflows/continuous-evaluation-loop.md` (`in_progress`,
   `realized`, `partial`, `missed`, `regressed`, `stalled`, or `unknown`) and
   explain any `UNKNOWN` evidence needed to resolve the issue outcome.
-- Post-merge intake: route merged non-OK issue outcomes into the issue plan
-  below; record healthy `in_progress` lanes in the worked-issue table as
-  no-action items; route `stalled` lanes back to the batch coordinator as
-  resume/reassign/drop decisions in the audit report instead of treating them
-  as merged-PR audit findings.
+- Post-merge intake: record healthy `in_progress` lanes and evidenced
+  `realized` outcomes in the worked-issue table as no-action items; route
+  `stalled` lanes back to the batch coordinator as resume/reassign/drop
+  decisions unless the user explicitly approves tracking the stalled lane as an
+  issue; route every other non-OK worked-issue class (`partial`, `missed`,
+  `regressed`, or `unknown`), merged or not, into the issue plan or an explicit
+  coordinator action that names the missing evidence or decision.
 
 ## Codex And Claude Coordination
 

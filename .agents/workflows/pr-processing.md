@@ -1182,8 +1182,10 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - after user approval, append the audit report to the release-gate audit
      ledger before creating issues, then include the resulting ledger comment
      URL in every approved parent or child issue body
-10. Return high-risk findings first, then review-gate violations, cross-PR
-    risks, missing changelog candidates, the issue plan, a worked-issue coverage
-    table, a PR-by-PR table, and exact commands/data sources.
+10. Return high-risk findings first, then review-gate violations, missing
+    changelog candidates, cross-PR risks, the issue plan, a worked-issue
+    coverage table (issue number, coordination lane/branch, linked PR or
+    no-PR/blocker evidence, final state, intent-achievement classification,
+    `UNKNOWN` facts), a PR-by-PR table, and exact commands/data sources.
 
 Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs until the user approves the audit report and issue plan.
