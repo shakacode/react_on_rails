@@ -1161,8 +1161,10 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    If `agent-coord doctor` and `agent-coord status` both succeed but the named
    batch entry contains no worked issues or lanes, record
    `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
-   audit the merged PR range only, and report the batch metadata correction
-   needed.
+   scan structured public `codex-claim` comments as advisory recovery rows for
+   possible no-PR, blocked, parked, or done-unmerged lanes, keep any recovered
+   rows marked `UNKNOWN`, and report the batch metadata correction needed before
+   reducing the audit to the merged PR range only.
 3. List every PR merged in the range. When `worked_issue_scope` is known,
    identify the batch subset by coordination state, branch names, PR bodies,
    labels, comments, authors, merge timing, and linked issues. When

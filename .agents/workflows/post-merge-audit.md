@@ -18,8 +18,9 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
   ledger append after the permission, quota, or transient API issue is resolved
   without regenerating the audit unless the base, head, or approved report
   changed.
-- If multiple child issues are needed, create one parent issue for the audit and one child issue per
-  independently actionable fix/revert/question. For release-gate audits, link
+- If multiple child issues are needed, create one parent issue for the audit
+  and one child issue per independently actionable fix/revert/question. For
+  release-gate audits, link
   the release-gate audit ledger comment from every approved parent or child
   issue created from the audit. For non-release audits with no ledger, record
   `Audit ledger: not applicable (non-release audit)` in approved issue bodies.
@@ -80,11 +81,14 @@ Use git, GitHub, and agent-coord ground truth. Do not rely on prior chat memory.
 
 Scope:
 - Repository: <OWNER>/<REPO>
-- Batch id: <BATCH_ID, UNKNOWN if batch work is in scope but the id was not supplied, or not applicable>
+- Batch id: <BATCH_ID | UNKNOWN | not applicable>
 - Base: resolve the most recent release candidate tag/commit unless I provide one explicitly
 - Head: current main
 - Focus: PRs that appear to be from recent high-concurrency agent/Codex/Claude batch work
 - Audit id: <AUDIT_ID>
+
+BATCH_ID = the known batch run id; UNKNOWN = batch work is in scope but the id
+was not supplied; not applicable = no coordinated batch is in scope.
 
 First, produce the exact worked-issue scope and merged-PR range:
 - when no coordinated batch/run is in scope, skip `agent-coord` and record
@@ -112,8 +116,10 @@ First, produce the exact worked-issue scope and merged-PR range:
 - if `agent-coord doctor` and `agent-coord status` both succeed but the named
   batch entry contains no worked issues or lanes, record
   `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
-  continue with the merged-PR range only, and report the batch metadata
-  correction needed
+  scan structured public `codex-claim` comments as advisory recovery rows for
+  possible no-PR, blocked, parked, or done-unmerged lanes, keep any recovered
+  rows marked `UNKNOWN`, and report the batch metadata correction needed before
+  reducing the audit to the merged-PR range only
 
 Then produce the exact merged-PR range and, only when `worked_issue_scope` is
 known, the batch-subset list:
@@ -250,6 +256,10 @@ Pay special attention to disagreements:
     `worked_issue_scope: UNKNOWN`, treat the verified coordination data as the
     candidate worked-issue scope and record the UNKNOWN report as a setup/access
     gap to resolve, not as evidence that no worked-issue scope exists
+  - when both reports record `worked_issue_scope: UNKNOWN`, consolidate the
+    command/error evidence from both reports and surface a single unresolved
+    `worked_issue_scope: UNKNOWN` finding that names the command or permission
+    needed before any worked-issue audit can proceed
 - different intent-achievement classifications for the same worked issue
 - different PR inclusion lists
 - different release-candidate base

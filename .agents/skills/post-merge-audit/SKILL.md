@@ -58,9 +58,15 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    If `agent-coord doctor` and `agent-coord status` both succeed but the named
    batch entry contains no worked issues or lanes, record
    `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
-   continue with the merged-PR range only, and report the batch metadata
-   correction needed.
-5. Batch PR subset: when `worked_issue_scope` is known, map worked issues to PRs through coordination branch names, linked PRs, PR bodies, labels, comments, authors, merge timing, and git history. Keep PR-range inclusion separate from worked-issue coverage so no-PR, blocked, parked, and unmerged lanes are still evaluated.
+   scan structured public `codex-claim` comments as advisory recovery rows for
+   possible no-PR, blocked, parked, or done-unmerged lanes, keep any recovered
+   rows marked `UNKNOWN`, and report the batch metadata correction needed before
+   reducing the audit to the merged-PR range only.
+5. Batch PR subset: when `worked_issue_scope` is known, map worked issues to
+   PRs through coordination branch names, linked PRs, PR bodies, labels,
+   comments, authors, merge timing, and git history. Keep PR-range inclusion
+   separate from worked-issue coverage so no-PR, blocked, parked, and unmerged
+   lanes are still evaluated.
 
 Show included worked issues, included PRs, excluded near-matches, base/head SHAs, coordination status evidence, and assumptions. Ask for confirmation before deep audit unless the user explicitly asks to proceed without confirmation.
 
