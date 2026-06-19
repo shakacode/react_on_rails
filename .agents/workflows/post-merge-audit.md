@@ -34,9 +34,12 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
   `agent-coord status`, and inspect the named batch entry as the primary
   worked-issue scope when available. If coordination state cannot be verified,
   record `worked_issue_scope: UNKNOWN (setup)` or
-  `worked_issue_scope: UNKNOWN (access)` with the exact command/error. Use
-  structured public `codex-claim` comments as advisory recovery evidence when
-  available before reducing unknown scope to merged PRs.
+  `worked_issue_scope: UNKNOWN (access)` with the exact command/error. A
+  structured public `codex-claim` comment is a GitHub issue/PR comment
+  containing a `codex-claim` JSON block in the format documented by
+  `internal/contributor-info/agent-coordination-backend.md`. Use structured
+  public `codex-claim` comments as advisory recovery evidence when available
+  before reducing unknown scope to merged PRs.
 - For private coordination backend setup and CLI discovery, see
   `internal/contributor-info/agent-coordination-backend.md`.
 
@@ -128,7 +131,11 @@ First, produce the exact worked-issue scope and merged-PR range:
   rows marked `UNKNOWN`, report the batch metadata correction needed, and ask
   for confirmation before reducing the audit to the merged-PR range only. If
   the user confirms no lanes were worked, record the empty-batch finding and
-  proceed to the merged-PR range.
+  proceed to the merged-PR range. If the user indicates lanes were worked
+  despite the empty entry, record
+  `worked_issue_scope: UNKNOWN (empty batch, lanes expected)`, collect a manual
+  lane list from the user or advisory `codex-claim` comments, and keep
+  recovered rows advisory `UNKNOWN` until coordination state is corrected.
 
 Then produce the exact merged-PR range and, only when `worked_issue_scope` is
 verified from coordination state, the batch-subset list:
@@ -242,6 +249,7 @@ placeholders; replace them with the real batch id and issues):
 | #1235 | batch-abc:issue-1235 / no branch | blocker comment URL | blocked | stalled | owner decision needed |
 | #1236 | batch-abc:issue-1236 / codex/partial-example | PR #2346 merged | merged | partial | acceptance criteria C not addressed |
 | #1237 | UNKNOWN (advisory) / no coord data | codex-claim comment URL (advisory) | UNKNOWN | unknown | coordination state needed to confirm |
+| #1238 | batch-abc:issue-1238 / codex/done-no-merge | no-PR evidence comment URL | done-unmerged | realized | none |
 ```
 
 ## Comparison Prompt

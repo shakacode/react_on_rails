@@ -54,11 +54,13 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
    `agent-coord doctor` passes but
    `agent-coord status` fails, record `worked_issue_scope: UNKNOWN (access)`
-   with the exact command/error. In both UNKNOWN cases, use structured public
-   `codex-claim` comments as an advisory fallback for possible no-PR, blocked,
-   parked, or done-unmerged lanes before reducing scope to merged PRs. Keep
-   advisory rows marked `UNKNOWN` as needed, and do not infer confirmed
-   completeness from merged PRs.
+   with the exact command/error. A structured public `codex-claim` comment is a
+   GitHub issue/PR comment containing a `codex-claim` JSON block in the format
+   documented by `internal/contributor-info/agent-coordination-backend.md`. In
+   both UNKNOWN cases, use structured public `codex-claim` comments as an
+   advisory fallback for possible no-PR, blocked, parked, or done-unmerged lanes
+   before reducing scope to merged PRs. Keep advisory rows marked `UNKNOWN` as
+   needed, and do not infer confirmed completeness from merged PRs.
 
    If `agent-coord doctor` and `agent-coord status` both succeed but the named
    batch entry contains no worked issues or lanes, record
@@ -68,7 +70,11 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    rows marked `UNKNOWN`, report the batch metadata correction needed, and ask
    for confirmation before reducing the audit to the merged-PR range only. If
    the user confirms no lanes were worked, record the empty-batch finding and
-   proceed to the merged-PR range.
+   proceed to the merged-PR range. If the user indicates lanes were worked
+   despite the empty entry, record
+   `worked_issue_scope: UNKNOWN (empty batch, lanes expected)`, collect a manual
+   lane list from the user or advisory `codex-claim` comments, and keep
+   recovered rows advisory `UNKNOWN` until coordination state is corrected.
 
 5. Batch PR subset: only when `worked_issue_scope` is verified from
    coordination state, map worked issues to PRs through coordination branch

@@ -37,7 +37,9 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      the backend's compare-and-swap gate, so the claim result is the source of
      truth for races. If `agent-coord doctor` or `agent-coord status` cannot be
      checked, report private state as `UNKNOWN` and use structured public
-     `codex-claim` comments as an advisory fallback.
+     `codex-claim` comments as an advisory fallback. A structured public
+     `codex-claim` comment is a GitHub issue/PR comment containing a
+     `codex-claim` JSON block; see the public claim comment format below.
    - For lanes declared in `batches/<batch-id>.json` with `depends_on`, run
      `agent-coord status` at lane start and before rebase or push. If the lane
      shows unmet `blocked_on` refs, set that lane's heartbeat status to
@@ -1171,7 +1173,11 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    rows marked `UNKNOWN`, report the batch metadata correction needed, and ask
    for confirmation before reducing the audit to the merged PR range only. If
    the user confirms no lanes were worked, record the empty-batch finding and
-   proceed to the merged PR range.
+   proceed to the merged PR range. If the user indicates lanes were worked
+   despite the empty entry, record
+   `worked_issue_scope: UNKNOWN (empty batch, lanes expected)`, collect a manual
+   lane list from the user or advisory `codex-claim` comments, and keep
+   recovered rows advisory `UNKNOWN` until coordination state is corrected.
 
 3. List every PR merged in the range. When `worked_issue_scope` is verified
    from coordination state, identify the batch subset by coordination state,
