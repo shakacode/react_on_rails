@@ -583,14 +583,17 @@ describe('streamServerRenderedReactComponent', () => {
     const emittedErrors = await collectEmittedErrors(renderResult);
 
     expect(emittedErrors).toHaveLength(2);
-    expect(emittedErrors[0].message).toContain('First deferred failure (already merged)');
+    const firstError = emittedErrors.find((error) =>
+      error.message.includes('First deferred failure (already merged)'),
+    );
+    expect(firstError).toBeDefined();
 
     const secondError = emittedErrors.find((error) =>
       error.message.includes('Second deferred failure (unrelated)'),
     );
     expect(secondError).toBeDefined();
-    expect(secondError.message).toContain('one of these 2 RSC components failed');
     expect(secondError.message).toContain('Component: PreservedComponent');
+    expect(secondError.message).not.toContain('Component: AlreadyMergedComponent');
   });
 
   it('renders the nearest Suspense fallback for RSCRoute ssr=false without generating an RSC payload', async () => {

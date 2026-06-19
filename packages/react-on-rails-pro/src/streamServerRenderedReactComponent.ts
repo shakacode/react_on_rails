@@ -99,10 +99,16 @@ const streamRenderReactComponent = (
   // case while preventing confident-but-wrong attribution of subsequent errors.
   //
   // An error already enriched on the synchronous reject path in getReactServerComponent.server.ts is
-  // returned untouched, and its presence must not consume captured diagnostics that may still belong
-  // to a later generic deferred error in the same render.
+  // returned untouched. We still consume the current tracker, drop diagnostics already represented by
+  // that merged error, and put the rest back so a later generic deferred error can still be enriched.
   const enrichWithCapturedRSCDiagnostics = (error: Error): Error => {
     if ((error as MaybeMergedRSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG]) {
+      const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
+      captured
+        .filter((entry) => !error.message.includes(entry.diagnosticError.message))
+        .forEach((entry) =>
+          streamingTrackers.rscRequestTracker.recordRSCDiagnostic(entry.componentName, entry.diagnosticError),
+        );
       return error;
     }
     const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
