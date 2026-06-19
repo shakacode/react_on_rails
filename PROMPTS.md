@@ -24,7 +24,7 @@ that already gates those docs, instead of drifting in a separate site constant.
 ```yaml
 schema_version: 1
 site_url: https://reactonrails.com # canonical origin; matches the site's docusaurus url
-agent_note: <string> # one-liner shown once per surface
+agent_note: <string> # short description shown once per surface
 
 categories: # display metadata, in display order
   - id: <category-id>
@@ -100,4 +100,6 @@ corpus. They share a filename and nothing else.
 1. Edit `prompts.yml` (add/modify an entry; keep `id` stable).
 2. Use a **relative** `doc_route`; reference it in the body via `{{doc_url}}`.
 3. If adding a category, add it to `categories` first.
-4. The site (reactonrails.com#126) re-syncs and regenerates display + artifacts.
+4. Open a PR against the `reactonrails.com` repo to re-sync the site display and
+   regenerate artifacts (tracked in reactonrails.com#126; once that lands,
+   re-sync may be automated).

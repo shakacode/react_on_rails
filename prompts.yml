@@ -91,8 +91,7 @@ prompts:
   - id: async-rendering
     title: Use async/Suspense rendering
     category: server-rendering
-    # Quoted because the value contains a '#' fragment anchor; unquoted it parses
-    # correctly (the '#' is not whitespace-preceded) but quoting makes that explicit.
+    # doc_route contains a '#' fragment anchor — must be quoted in YAML.
     doc_route: "/docs/api-reference/ruby-api-pro#async_react_componentcomponent_name-options--"
     prompt: "Set up async (Suspense) rendering for a React on Rails component. Follow {{doc_url}} exactly."
 
