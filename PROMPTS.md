@@ -56,6 +56,16 @@ prompts:
 - **`prompt`** — the verbatim body a user pastes. Use the `{{doc_url}}`
   placeholder anywhere the absolute docs URL should appear.
 
+### Versioning
+
+`schema_version` lets consumers (reactonrails.com#126, future tooling) react to
+structural changes:
+
+- **Bump it (breaking):** removing or renaming a field, changing a field's type,
+  or removing/renaming a category id or prompt id.
+- **Leave it (non-breaking):** adding optional fields, adding prompts or
+  categories, or editing prompt body / title text.
+
 ## Build-time URL resolution (single-source URLs)
 
 The absolute docs URL is **never hard-coded** in a prompt body. Consumers resolve
@@ -63,7 +73,7 @@ it at build time and substitute it for the placeholder:
 
 ```text
 doc_url = site_url + doc_route
-prompt_text = prompt.replace("{{doc_url}}", doc_url)
+prompt_text = prompt.replaceAll("{{doc_url}}", doc_url)   # replace ALL occurrences
 ```
 
 So the URL lives in exactly one place (`doc_route`) and cannot drift between the
