@@ -4936,6 +4936,13 @@ RSpec.describe "script/pr-merge-ledger" do
   end
 
   def unbundled_json_rejects_mistagged_utf8?
+    # The probe result is process-wide (it only depends on the system json gem),
+    # so spawn at most one subprocess per suite run. RSpec runs each example in a
+    # fresh instance, so memoize on the example-group class -- which is shared --
+    # rather than an instance variable, which would not persist across examples.
+    memo = self.class.instance_variable_get(:@unbundled_json_rejects_mistagged_utf8)
+    return memo unless memo.nil?
+
     # {"k":"<em-dash>"} as raw UTF-8 bytes, deliberately mislabeled US-ASCII.
     probe = <<~RUBY
       require "json"
@@ -4948,10 +4955,11 @@ RSpec.describe "script/pr-merge-ledger" do
         print "strict"
       end
     RUBY
-    with_unbundled_env do
+    result = with_unbundled_env do
       out, = Open3.capture2(ascii_locale_env, "ruby", "-e", probe)
       out == "strict"
     end
+    self.class.instance_variable_set(:@unbundled_json_rejects_mistagged_utf8, result)
   end
 
   it "parses non-ASCII GraphQL review-thread bodies under a US-ASCII locale" do
