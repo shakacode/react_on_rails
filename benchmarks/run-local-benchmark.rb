@@ -39,7 +39,12 @@ RENDERER_PORT = 3800
 # run after a fresh build — observed ~83s on a 2021 M1 Max, vs ~2s warm. wait_for_port still
 # checks the process is alive each second, so a real crash fails fast; this generous ceiling
 # only affects a slow-but-alive boot. Override with BENCHMARK_SERVER_BOOT_TIMEOUT if needed.
-SERVER_BOOT_TIMEOUT = Integer(ENV.fetch("BENCHMARK_SERVER_BOOT_TIMEOUT", "240"))
+SERVER_BOOT_TIMEOUT = ENV.fetch("BENCHMARK_SERVER_BOOT_TIMEOUT", "240").then do |raw|
+  seconds = Integer(raw, exception: false)
+  next seconds if seconds&.positive?
+
+  abort "BENCHMARK_SERVER_BOOT_TIMEOUT must be a positive integer (seconds); got #{raw.inspect}."
+end
 
 # Match CI, which runs benchmarks on the MINIMUM supported Ruby ("Ruby stays on minimum to
 # exercise gem compatibility"), not the repo's default. The default .tool-versions Ruby can
