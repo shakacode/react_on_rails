@@ -129,6 +129,8 @@
     background: rgba(17, 32, 49, 0.06);
     color: var(--ink);
     font-size: 0.95em;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   @media (max-width: 900px) {
