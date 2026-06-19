@@ -6,6 +6,17 @@ require "open3"
 require "optparse"
 require "time"
 
+# GitHub returns UTF-8 (em-dashes, emoji, etc. from bot reviewers like
+# coderabbitai/codex), and our JSON fixtures are UTF-8. When the process runs
+# under a non-UTF-8 locale (e.g. LANG/LC_ALL unset, defaulting to US-ASCII),
+# both subprocess pipes and File.read would otherwise tag bytes as US-ASCII and
+# JSON.parse raises Encoding::InvalidByteSequenceError on the first multibyte
+# sequence. Pin the default external encoding to UTF-8 so the script is
+# encoding-robust regardless of locale. This must run before any Open3 pipe is
+# created or any file is read, since pipes inherit the default external encoding
+# at creation time.
+Encoding.default_external = Encoding::UTF_8
+
 # rubocop:disable Metrics/ClassLength
 class PrMergeLedger
   SCHEMA_VERSION = "pr-merge-ledger/v1"
