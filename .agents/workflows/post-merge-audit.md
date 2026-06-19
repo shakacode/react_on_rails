@@ -57,13 +57,14 @@ If you do not know or cannot verify an item from GitHub/local git, say UNKNOWN r
 Run this separately in Codex and Claude. Do not share one agent's output with the other until both are done.
 
 ```text
-Run an independent post-merge audit of a batch/run and its merged PRs since the last release candidate.
+Run an independent post-merge audit of merged PRs (and, when a batch id is known, its worked-issue scope)
+since the last release candidate.
 
 Use git, GitHub, and agent-coord ground truth. Do not rely on prior chat memory.
 
 Scope:
 - Repository: <OWNER>/<REPO>
-- Batch id: <BATCH_ID or UNKNOWN>
+- Batch id: <BATCH_ID, or UNKNOWN if not applicable>
 - Base: resolve the most recent release candidate tag/commit unless I provide one explicitly
 - Head: current main
 - Focus: PRs that appear to be from recent high-concurrency agent/Codex/Claude batch work
@@ -77,7 +78,7 @@ First, produce the exact worked-issue scope and merged-PR range:
 - for each worked issue, include the lane owner, branch, heartbeat/final state,
   linked PR if known, and whether the final state is merged, open, blocked,
   parked, no-PR, done-unmerged, or UNKNOWN
-- if agent-coord is missing, unavailable, or status fails, record
+- if agent-coord is missing, unavailable, or either command fails, record
   `worked_issue_scope: UNKNOWN` with the exact command/error and continue with
   GitHub/git evidence for the merged-PR range only
 
@@ -154,6 +155,9 @@ Return high-risk findings first, then a worked-issue coverage table and a
 PR-by-PR table. Include exact commands and data sources used, plus any remaining
 `UNKNOWN` facts and the command or permission needed to resolve them. Do not
 make code changes, comments, labels, issues, reverts, or PRs without approval.
+The worked-issue coverage table must include issue number, coordination
+lane/branch, linked PR or no-PR/blocker evidence, final state,
+intent-achievement classification, and `UNKNOWN` facts.
 ```
 
 ## Comparison Prompt
@@ -207,7 +211,8 @@ Rules:
 - Do not create duplicate child issues. If an issue already exists, link it in the parent issue plan instead.
 - If there are two or more related child issues, create one parent issue first.
 - Create one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
-- Include the release-gate audit ledger comment URL in every parent and child issue body.
+- Append the audit report to the release-gate audit ledger before creating approved follow-up issues; include the
+  resulting ledger comment URL in every parent and child issue body.
 - For missing changelog findings, prefer one bundled changelog issue or recommend `/update-changelog`; do not create one issue per missing entry unless explicitly approved.
 - For process findings, preserve the approved Process Gap Disposition fields:
   `Mechanism target`, `Motivating miss`, `Replay evidence or park reason`, and

@@ -36,9 +36,9 @@ For private coordination backend setup and CLI discovery, see
 1. Base: the user-supplied tag/commit, or the most recent release candidate tag when the user says "since the last RC".
 2. Head: usually `origin/main` or the current release branch.
 3. Merged PR list: every PR merged between base and head.
-4. Worked issue list: when a batch/run id is known, run `agent-coord doctor` and
-   `agent-coord status`, then inspect the named batch entry; use claims, heartbeats, and batch metadata as the
-   primary worked-issue scope. If `agent-coord` is missing, unavailable, or the status command fails,
+4. Worked issue list: when a batch/run id is known, run `agent-coord doctor` then `agent-coord status`,
+   then inspect the named batch entry; use claims, heartbeats, and batch metadata as the
+   primary worked-issue scope. If `agent-coord` is missing, unavailable, or either command fails,
    record `worked_issue_scope: UNKNOWN` with the exact command/error instead of inferring
    completeness from merged PRs.
 5. Batch PR subset: map worked issues to PRs through coordination branch names, linked PRs, PR bodies, labels, comments, authors, merge timing, and git history. Keep PR-range inclusion separate from worked-issue coverage so no-PR, blocked, parked, and unmerged lanes are still evaluated.
