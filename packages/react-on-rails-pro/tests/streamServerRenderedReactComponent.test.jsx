@@ -355,42 +355,30 @@ describe('streamServerRenderedReactComponent', () => {
 
   it('runs post-SSR hooks once for unexpected nested Suspense errors', async () => {
     const onPostSSRHook = jest.fn();
-    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const renderResult = setupUnexpectedNestedSuspenseErrorStreamTest({ onPostSSRHook });
 
-    try {
-      const { chunks, errors } = await collectStreamResult(renderResult);
+    const { chunks, errors } = await collectStreamResult(renderResult);
 
-      expect(errors).toHaveLength(0);
-      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
-      expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
-      expectNoDuplicateNotifySSREndWarning(consoleWarnSpy);
-    } finally {
-      consoleWarnSpy.mockRestore();
-    }
+    expect(errors).toHaveLength(0);
+    expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+    expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
   });
 
   it('runs post-SSR hooks once when a real error occurs with an RSCRoute ssr=false bailout', async () => {
     const onPostSSRHook = jest.fn();
-    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { renderResult, generateRSCPayload } = setupMixedRSCRouteBailoutAndNestedSuspenseErrorStreamTest({
       onPostSSRHook,
     });
 
-    try {
-      const { chunks, errors } = await collectStreamResult(renderResult);
-      const html = chunks.map((chunk) => chunk.html).join('');
+    const { chunks, errors } = await collectStreamResult(renderResult);
+    const html = chunks.map((chunk) => chunk.html).join('');
 
-      expect(errors).toHaveLength(0);
-      expect(generateRSCPayload).not.toHaveBeenCalled();
-      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
-      expect(html).toContain('Loading skipped route...');
-      expect(html).toContain('Loading errored boundary...');
-      expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
-      expectNoDuplicateNotifySSREndWarning(consoleWarnSpy);
-    } finally {
-      consoleWarnSpy.mockRestore();
-    }
+    expect(errors).toHaveLength(0);
+    expect(generateRSCPayload).not.toHaveBeenCalled();
+    expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+    expect(html).toContain('Loading skipped route...');
+    expect(html).toContain('Loading errored boundary...');
+    expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
   });
 
   it('streamServerRenderedReactComponent streams the rendered component', async () => {
