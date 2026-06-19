@@ -250,6 +250,9 @@ the private backend repo. This public pointer carries only the contract:
 - Only a coordinator or maintainer publishes or clears a batch's cancellation,
   exactly as for the release phase. Record the cancellation, and any hard
   process-level stop, in the batch handoff as the authoritative incident note.
+- Once relaunch is ready, clear the cancellation field in
+  `batches/<batch-id>.json` before launching fresh workers so new claims are not
+  refused by stale cancellation state.
 
 > **Planned (not yet in `agent-coord` 0.1.0):** a first-class `agent-coord cancel`
 > verb and a `status` field that surfaces batch/lane cancellation directly, so
