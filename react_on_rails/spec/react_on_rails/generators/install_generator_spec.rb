@@ -455,6 +455,40 @@ describe InstallGenerator, type: :generator do
       assert_file "client/app/server-bundle.js"
       assert_no_file "client/app/packs/server-bundle.js"
     end
+
+    it "generates demo source files under the configured Shakapacker source path" do
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.server.jsx"
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.module.css"
+
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+    end
+
+    it "uses the configured source path in generated demo hints" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include('<code class="path-hint">client/app/src/HelloWorld/</code>')
+        expect(content).not_to include("app/javascript/src/HelloWorld/")
+      end
+    end
+  end
+
+  context "with --tailwind and a slash Shakapacker source entry path" do
+    before(:all) do
+      run_generator_test_with_args(%w[--tailwind], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "/")
+      end
+    end
+
+    it "keeps Tailwind assets and imports anchored to the configured source path" do
+      assert_file "client/app/server-bundle.js"
+      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx" do |content|
+        expect(content).to include("import '../../../stylesheets/application.css';")
+      end
+
+      assert_no_file "client/app/packs/server-bundle.js"
+      assert_no_file "app/javascript/stylesheets/application.css"
+    end
   end
 
   context "with --force and a pre-installed custom Shakapacker source root" do
