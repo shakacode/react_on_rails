@@ -173,6 +173,10 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
     let(:pushed_props) { Set.new }
     let(:queue) { described_class.new(pushed_props) }
 
+    it "uses the locked async queue closed exception API" do
+      expect(Async::Queue.const_defined?(:ClosedError, false)).to be(true)
+    end
+
     describe "#enqueue and #dequeue" do
       it "returns props in FIFO order" do
         Async do

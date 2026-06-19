@@ -161,8 +161,11 @@ module ReactOnRailsPro
             stream_response = result
           end
 
-          process_response_chunks(stream_response, &block)
-          @emitter&.render_complete!
+          begin
+            process_response_chunks(stream_response, &block)
+          ensure
+            @emitter&.render_complete!
+          end
           break
         rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
           stop_tasks(tasks) if retrying_with_bundle_upload?(e, send_bundle)
@@ -211,7 +214,7 @@ module ReactOnRailsPro
       @first_chunk_warn_callback&.call(Time.now - request_start_time)
     end
 
-    def parse_and_route_chunk(parser, chunk)
+    def parse_and_route_chunk(parser, chunk, &)
       parser.feed(chunk) do |parsed|
         if parsed.key?("messageType")
           route_control_message(parsed)
@@ -226,7 +229,8 @@ module ReactOnRailsPro
 
       case parsed["messageType"]
       when "propRequest"
-        @emitter.pull_requests&.enqueue(parsed["propName"])
+        prop_name = parsed["propName"]
+        @emitter.pull_requests&.enqueue(prop_name) if prop_name.is_a?(String) && !prop_name.empty?
       when "renderComplete"
         @emitter.render_complete!
       end

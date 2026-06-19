@@ -234,6 +234,21 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(status_calls).to eq(1)
       expect(request.http_status).to eq(200)
     end
+
+    it "ignores propRequest control messages without a non-empty string propName" do
+      emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
+      invalid_missing_name = to_length_prefixed("", "messageType" => "propRequest")
+      invalid_empty_name = to_length_prefixed("", "messageType" => "propRequest", "propName" => "")
+      valid_request = to_length_prefixed("", "messageType" => "propRequest", "propName" => "users")
+      response = mock_ok_response(invalid_missing_name + invalid_empty_name + valid_request)
+      request.instance_variable_set(:@emitter, emitter)
+
+      request.send(:process_response_chunks, response) { |_| nil }
+      emitter.render_complete!
+
+      expect(emitter.pull_requests.dequeue).to eq("users")
+      expect(emitter.pull_requests.dequeue).to be_nil
+    end
   end
 
   describe "#each_chunk with tasks" do
@@ -290,6 +305,19 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end.to raise_error(RuntimeError, "client disconnected")
 
       expect(task_stopped).to be true
+    end
+
+    it "closes pull request queues when unexpected chunk parsing errors abort the stream" do
+      emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
+      response = mock_ok_response("malformed\n")
+      stream = described_class.create(pull_enabled: true) do |_send_bundle, _tasks|
+        [response, emitter]
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRails::Error, /missing tab separator/)
+
+      expect(emitter.pull_requests).to be_closed
+      expect(emitter.pull_requests.dequeue).to be_nil
     end
   end
 

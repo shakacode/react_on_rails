@@ -468,18 +468,26 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
             next
           end
 
-          if message_key.start_with?("!")
-            # "!" prefix means reject the prop
-            emitter.reject(message_key[1..], message_value)
-          else
-            # ":" prefix means set the prop (same as existing convention)
-            emitter.call(message_key[1..], JSON.parse(message_value))
-          end
+          route_lazy_prop_entry(emitter, message_key, message_value)
         end
       end
     end
   ensure
     redis&.close
+  end
+
+  def route_lazy_prop_entry(emitter, message_key, message_value)
+    if message_key.start_with?("!")
+      # "!" prefix means reject the prop
+      emitter.reject(message_key[1..], message_value)
+    elsif message_key.start_with?(":")
+      # ":" prefix means set the prop (same as existing convention)
+      emitter.call(message_key[1..], JSON.parse(message_value))
+    else
+      Rails.logger.warn(
+        "[ReactOnRailsPro] Ignoring Redis async prop entry with unsupported prefix: #{message_key}"
+      )
+    end
   end
 
   def calc_slow_app_props_server_render
