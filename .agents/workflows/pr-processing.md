@@ -688,16 +688,22 @@ hatch**, not a single kill switch:
 - **Worker drain rule.** A worker re-reads its batch and lane state at every
   phase-transition heartbeat (item start, push, review pass, blocked, resumed).
   When its batch or lane is cancelled, the worker stops at the next safe
-  checkpoint: it does not claim or start new targets, it finishes or cleanly
-  abandons the in-flight target without leaving a half-pushed branch or corrupted
-  worktree, it runs `agent-coord release` for the lane, records the cancelled lane
-  as its final state, and exits. Drain latency is bounded by one phase transition,
-  so a worker deep inside one target may not stop until its next checkpoint.
+  checkpoint: it does not claim or start new targets, it finishes the in-flight
+  target only when abandoning would leave remote state inconsistent (for example,
+  after a push has already landed), otherwise abandons still-local work without
+  pushing, runs `agent-coord release` for the lane, records the cancelled lane as
+  its final state, and exits without leaving a half-pushed branch or corrupted
+  worktree. Drain latency is designed to be bounded by one phase transition,
+  provided workers check `agent-coord status` at each phase transition, so a
+  worker deep inside one target may not stop until its next checkpoint.
 - **Hard escape hatch.** For a wedged or unresponsive worker that is not reaching a
-  checkpoint, the coordinator stops it at the process level — terminate the
-  `codex exec` / `claude -p` process (or close the Conductor workspace running an
-  in-process `Agent`/`Workflow` coordinator, which ends its subagents with it) and
-  clean that lane's worktree. Record the cancellation in the backend first so a
+  checkpoint, the coordinator records cancellation in the backend first, then
+  stops it at the process level — terminate the `codex exec` / `claude -p`
+  process (or close the Conductor workspace running an in-process
+  `Agent`/`Workflow` coordinator, which ends its subagents with it). After the
+  process stops, release or manually clear that lane's claim and clean that
+  lane's worktree (`git worktree remove --force <path>`; use `git worktree prune`
+  for stale metadata). Keep cancellation recorded until relaunch is ready so a
   restarted machine agent does not re-acquire the released lane and resume.
 - **Restarting with updated skills.** Stopping a batch does not reload skills,
   workflow rules, or this file into an already-running process; skills are read at
@@ -706,9 +712,11 @@ hatch**, not a single kill switch:
   updated `.agents/skills/...` and `.agents/workflows/...` files. A still-running
   worker that merely receives a new batch assignment keeps its old skill text.
 - **Fallback.** When the private backend is unavailable (`agent-coord doctor` /
-  `status` non-zero), use an advisory public claim/PR comment to request drain and
-  fall back to the process-level escape hatch, exactly as for other coordination
-  state. A public comment is never the machine-readable override channel.
+  `status` non-zero), have a coordinator or maintainer post an advisory GitHub
+  comment on the batch PR requesting drain and fall back to the process-level
+  escape hatch, exactly as for other coordination state. Arbitrary public comments
+  cannot initiate or authorize this fallback, and the advisory comment is never
+  the machine-readable override channel.
 
 ### Coordinator Closeout Lane
 

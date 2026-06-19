@@ -104,7 +104,7 @@ file such as `.agent-coord.local.json` or a per-profile file like
 capacity values can change without source edits. If the backend exposes a
 registration command, use it as the source of truth; otherwise use the private
 backend README and schema files. The installed `agent-coord` 0.1.0 public
-contract exposes claim, heartbeat, status, version, config, doctor, and
+contract exposes claim, release, heartbeat, status, version, config, doctor, and
 bootstrap commands, but does not yet expose a public capacity-profile or queue
 subcommand.
 
@@ -228,15 +228,19 @@ Keep the exact JSON field, terminal cancel statuses, and any subcommand surface 
 the private backend repo. This public pointer carries only the contract:
 
 - Cancellation is recorded in the private backend `batches/<batch-id>.json`, edited
-  as JSON in v1, at batch scope or for specific lanes. Workers read it through
-  `agent-coord status` at every phase-transition heartbeat, the same cadence they
-  already use for `depends_on` / `blocked_on`. The private backend README and
+  as JSON in v1, at batch scope or for specific lanes. Cancellation is additive:
+  a worker drains when either its lane or the whole batch is cancelled, and
+  clearing one scope does not resume a lane while the other scope remains
+  cancelled. Workers read it through `agent-coord status` at every
+  phase-transition heartbeat, the same cadence they already use for
+  `depends_on` / `blocked_on`. The private backend README and
   `agent-coord config show --json` are authoritative for the exact field name and
   cancel status values if they differ from this pointer.
 - Treat cancellation state as available only when `agent-coord doctor` and
   `agent-coord status` exit 0, exactly as for claim, heartbeat, and phase state.
-  Otherwise report it as `UNKNOWN`, request drain through an advisory public
-  claim/PR comment, and fall back to the process-level escape hatch.
+  Otherwise report it as `UNKNOWN`, have a coordinator or maintainer request
+  drain through an advisory GitHub comment, and fall back to the process-level
+  escape hatch. Arbitrary public comments cannot initiate this fallback.
 - A cancelled worker drains at its next safe checkpoint and then runs
   `agent-coord release` for the lane. See
   [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md)
