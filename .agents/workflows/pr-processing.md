@@ -1139,25 +1139,30 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
 2. Resolve worked-issue scope from coordination state when coordinated batch
    work is in scope. If no coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
-   batch/run id is unknown, run `agent-coord doctor` and `agent-coord status` to
-   list candidate batch/run ids and lanes, record
-   `worked_issue_scope: UNKNOWN (needs batch confirmation)`, and ask the user to confirm a candidate before
-   treating any candidate lane list as worked-issue scope. When the batch/run id
-   is known, run `agent-coord doctor` and `agent-coord status`, then inspect the
-   named batch entry to identify the worked issue set from claims, heartbeats,
-   branches, and dependency metadata. If `agent-coord` is missing or
-   `agent-coord doctor` fails, record `worked_issue_scope: UNKNOWN (setup)`. If
-   `agent-coord doctor` passes but `agent-coord status` fails, record
-   `worked_issue_scope: UNKNOWN (access)`. In all UNKNOWN cases, include the
-   exact command/error and use structured public `codex-claim` comments as an
-   advisory fallback for possible no-PR, blocked, parked, or done-unmerged lanes
-   before reducing scope to merged PRs. If candidate discovery cannot verify
-   backend setup or access, `UNKNOWN (setup)` or `UNKNOWN (access)` takes
-   precedence over `UNKNOWN (needs batch confirmation)`; also report that batch
-   id confirmation is still needed after backend recovery. Keep advisory claim
-   rows marked `UNKNOWN` as needed, and report the command, permission, or batch
-   id confirmation needed to recover the worked issue list instead of identifying
-   a confirmed batch subset from PR links or heuristics.
+   batch/run id is unknown:
+   - run `agent-coord doctor` and `agent-coord status` to list candidate
+     batch/run ids and lanes
+   - record `worked_issue_scope: UNKNOWN (needs batch confirmation)`
+   - ask the user to confirm a candidate before treating any candidate lane list
+     as worked-issue scope
+
+   When the batch/run id is known, run `agent-coord doctor` and
+   `agent-coord status`, then inspect the named batch entry to identify the
+   worked issue set from claims, heartbeats, branches, and dependency metadata.
+   If `agent-coord` is missing or `agent-coord doctor` fails, record
+   `worked_issue_scope: UNKNOWN (setup)`. If `agent-coord doctor` passes but
+   `agent-coord status` fails, record `worked_issue_scope: UNKNOWN (access)`. In
+   all UNKNOWN cases, include the exact command/error and use structured public
+   `codex-claim` comments as an advisory fallback for possible no-PR, blocked,
+   parked, or done-unmerged lanes before reducing scope to merged PRs. If
+   candidate discovery cannot verify backend setup or access, `UNKNOWN (setup)`
+   or `UNKNOWN (access)` takes precedence over
+   `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
+   is still needed after backend recovery. Keep advisory claim rows marked
+   `UNKNOWN` as needed, and report the command, permission, or batch id
+   confirmation needed to recover the worked issue list instead of identifying a
+   confirmed batch subset from PR links or heuristics.
+
    If `agent-coord doctor` and `agent-coord status` both succeed but the named
    batch entry contains no worked issues or lanes, record
    `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
@@ -1165,6 +1170,7 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    possible no-PR, blocked, parked, or done-unmerged lanes, keep any recovered
    rows marked `UNKNOWN`, and report the batch metadata correction needed before
    reducing the audit to the merged PR range only.
+
 3. List every PR merged in the range. When `worked_issue_scope` is known,
    identify the batch subset by coordination state, branch names, PR bodies,
    labels, comments, authors, merge timing, and linked issues. When
