@@ -327,6 +327,25 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
+  describe "#shakapacker_stylesheet_path with malformed Shakapacker config" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, "default:\n  source_path: [unterminated\n")
+      reset_shakapacker_memoization!
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+      reset_shakapacker_memoization!
+    end
+
+    it "falls back to the default generated stylesheet path" do
+      expect(shakapacker_stylesheet_path("application.css")).to eq("app/javascript/stylesheets/application.css")
+    end
+  end
+
   describe "#shakapacker_entrypoint_path" do
     let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
 

@@ -1558,6 +1558,33 @@ describe InstallGenerator, type: :generator do
         .with("base/base/config/shakapacker.yml.tt", "config/shakapacker.yml")
     end
 
+    it "preserves an existing Rspack choice before overwriting the Shakapacker config" do
+      shakapacker_yml_path = File.join(destination, "config/shakapacker.yml")
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        default:
+          assets_bundler: "rspack"
+      YAML
+
+      gen = BaseGenerator.new([], { force: true }, { destination_root: destination })
+      allow(gen).to receive(:template) do |_source, target, *_args|
+        File.write(File.join(destination, target), <<~YAML)
+          default:
+            assets_bundler: "webpack"
+        YAML
+      end
+      allow(gen).to receive(:configure_rspack_in_shakapacker)
+      allow(gen).to receive(:configure_precompile_hook_in_shakapacker)
+      allow(gen).to receive(:configure_private_output_path_in_shakapacker)
+
+      gen.copy_packer_config
+
+      expect(gen).to have_received(:configure_rspack_in_shakapacker)
+      expect(gen.using_rspack?).to be(true)
+    ensure
+      FileUtils.rm_rf(File.join(destination, "config"))
+    end
+
     it "raises when path helpers memoize before copy_packer_config runs" do
       gen = BaseGenerator.new([], {}, { destination_root: destination })
       gen.instance_variable_set(:@shakapacker_source_path, "client/app")

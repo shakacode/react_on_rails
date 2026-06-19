@@ -135,6 +135,8 @@ module GeneratorHelper
     configured_path = shakapacker_path_config_value(config, config_key)
 
     safe_generator_destination_path(configured_path, default:, allow_root:)
+  rescue Psych::SyntaxError
+    default
   end
 
   def shakapacker_path_config_value(config, config_key)

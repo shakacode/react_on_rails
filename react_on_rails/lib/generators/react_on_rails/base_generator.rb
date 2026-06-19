@@ -199,6 +199,7 @@ module ReactOnRails
 
         base_path = "base/base/"
         config = "config/shakapacker.yml"
+        use_rspack = using_rspack?
 
         if options.shakapacker_just_installed?
           say "Replacing Shakapacker default config with React on Rails version"
@@ -212,7 +213,7 @@ module ReactOnRails
         end
 
         # Configure bundler-specific settings
-        configure_rspack_in_shakapacker if using_rspack?
+        configure_rspack_in_shakapacker if use_rspack
 
         # Always ensure precompile_hook is configured (Shakapacker 9.0+ only)
         configure_precompile_hook_in_shakapacker
