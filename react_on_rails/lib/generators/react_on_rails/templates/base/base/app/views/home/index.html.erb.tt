@@ -259,6 +259,7 @@
     letter-spacing: 0.08em;
   }
 
+  /* Home-page code samples are all compact commands or path hints, so they share wrapping rules. */
   .command-list code,
   .hint-list code {
     display: inline-block;

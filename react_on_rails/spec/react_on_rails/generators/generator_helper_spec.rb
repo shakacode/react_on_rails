@@ -262,6 +262,59 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
+  describe "#safe_generator_destination_path" do
+    let(:default_path) { "app/javascript" }
+
+    it "keeps safe relative paths" do
+      expect(safe_generator_destination_path("client/app", default: default_path)).to eq("client/app")
+    end
+
+    it "relativizes absolute paths inside the destination root" do
+      absolute_path = File.join(destination_root, "client/app")
+
+      expect(safe_generator_destination_path(absolute_path, default: default_path)).to eq("client/app")
+    end
+
+    it "falls back for paths outside the destination root" do
+      expect(safe_generator_destination_path("/tmp/client/app", default: default_path)).to eq(default_path)
+    end
+
+    it "falls back for degenerate or traversing paths" do
+      expect(safe_generator_destination_path(".", default: default_path)).to eq(default_path)
+      expect(safe_generator_destination_path("..", default: default_path)).to eq(default_path)
+      expect(safe_generator_destination_path("../client/app", default: default_path)).to eq(default_path)
+    end
+
+    it "uses an empty sentinel for Shakapacker root entry paths" do
+      expect(safe_generator_destination_path("/", default: "packs", allow_root: true)).to eq("")
+    end
+  end
+
+  describe "#shakapacker_stylesheet_path" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        default:
+          source_path: app/javascript
+
+        development:
+          source_path: client/app
+      YAML
+      remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+      remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
+    end
+
+    it "places generated demo stylesheets under the configured Shakapacker source path" do
+      expect(shakapacker_stylesheet_path("application.css")).to eq("client/app/stylesheets/application.css")
+    end
+  end
+
   describe "#active_precompile_hook_configured?" do
     it "treats quoted and unquoted command strings beside a placeholder as active" do
       expect(active_precompile_hook_configured?(<<~YAML)).to be(true)

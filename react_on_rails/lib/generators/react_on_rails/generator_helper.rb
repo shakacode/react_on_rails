@@ -81,6 +81,8 @@ module GeneratorHelper
   end
 
   def shakapacker_source_path
+    # These helpers memoize config-backed paths. Install generators must copy or
+    # overwrite config/shakapacker.yml before any path-dependent copy action runs.
     @shakapacker_source_path ||= configured_shakapacker_relative_path("source_path", DEFAULT_SHAKAPACKER_SOURCE_PATH)
   end
 
@@ -93,10 +95,12 @@ module GeneratorHelper
   end
 
   def shakapacker_entrypoint_path(filename)
-    File.join(shakapacker_source_path, shakapacker_source_entry_path, filename)
+    entry_dir = shakapacker_source_entry_path # "" means entrypoints live directly under source_path.
+    File.join(shakapacker_source_path, entry_dir, filename)
   end
 
   def shakapacker_stylesheet_path(filename)
+    # "stylesheets" is a generated demo convention, not a Shakapacker config key.
     File.join(shakapacker_source_path, "stylesheets", filename)
   end
 
