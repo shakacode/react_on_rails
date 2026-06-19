@@ -6,9 +6,9 @@
 # Encapsulates the repeated "is this PR's CI ready?" rule that is otherwise
 # restated in prose across pr-batch, adversarial-pr-review, and pr-processing:
 #
-#   1. Run `gh pr checks <PR> --required`. If it reports NO required checks
-#      (it exits non-zero with no JSON), fall back to the full
-#      `gh pr checks <PR>` list.
+#   1. Run `gh pr checks <PR> --required`. If it reports no usable required
+#      checks -- either no JSON at all, or only cancelled/superseded rows --
+#      fall back to the full `gh pr checks <PR>` list.
 #   2. An empty check list => UNKNOWN / not ready.
 #   3. Ignore superseded/cancelled rows (bucket "cancel").
 #   4. Otherwise READY only when no failing (bucket "fail") and no pending
@@ -41,9 +41,13 @@ module PrCiReadiness
     []
   end
 
-  # True when the raw payload holds a non-empty JSON array of check rows.
-  def checks?(raw)
-    !parse_rows(raw).empty?
+  # True when the raw payload holds a JSON array with at least one row that
+  # counts toward the gate. A required-check list made up entirely of cancelled
+  # rows would otherwise short-circuit the full-list fallback and then drop to
+  # zero active rows, producing a spurious UNKNOWN; treating it as "no usable
+  # checks" lets the caller fall back to the full list instead.
+  def usable_checks?(raw)
+    !active_rows(parse_rows(raw)).empty?
   end
 
   # Rows that count toward the gate: cancelled/superseded rows are dropped.
@@ -99,8 +103,9 @@ module PrCiReadiness
     Usage: pr-ci-readiness <pr-number> [options]
 
     Decide whether a PR's CI is ready to merge. Runs `gh pr checks <PR> --required`
-    first; when no required checks exist, falls back to the full `gh pr checks <PR>`
-    list. An empty list is UNKNOWN/not-ready. Cancelled/superseded rows are ignored.
+    first; when no usable required checks exist (no rows, or only cancelled rows),
+    falls back to the full `gh pr checks <PR>` list. An empty list is
+    UNKNOWN/not-ready. Cancelled/superseded rows are ignored.
     The PR is READY only when no failing or pending checks remain.
 
     Arguments:
@@ -183,14 +188,17 @@ module PrCiReadiness
     end
 
     def validate_pr!(pr_number)
-      raise Error, "a positive integer PR number is required\n\n#{USAGE}" unless pr_number.to_s.match?(/\A\d+\z/)
+      raise Error, "a positive integer PR number is required\n\n#{USAGE}" unless pr_number.to_s.match?(/\A[1-9]\d*\z/)
 
       pr_number
     end
 
+    # Strict OWNER/REPO: non-empty owner and name, exactly one slash, no spaces.
+    REPO_FORMAT = %r{\A[^/\s]+/[^/\s]+\z}
+
     def resolve_repo!(repo)
       repo ||= capture_required!("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip
-      raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.include?("/")
+      raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.match?(REPO_FORMAT)
 
       repo
     end
@@ -199,7 +207,7 @@ module PrCiReadiness
     # required form yields no rows. required_used flips to false on fallback.
     def assess(repo, pr_number)
       required_raw = fetch_checks(repo, pr_number, required: true)
-      if PrCiReadiness.checks?(required_raw)
+      if PrCiReadiness.usable_checks?(required_raw)
         rows = PrCiReadiness.parse_rows(required_raw)
         required_used = true
       else
@@ -295,10 +303,14 @@ module PrCiReadiness
 
     def check_parse_helpers
       errors = []
-      errors << "checks? missed a non-empty array" unless PrCiReadiness.checks?('[{"name":"a","bucket":"pass"}]')
-      errors << "checks? treated [] as non-empty" if PrCiReadiness.checks?("[]")
-      errors << "checks? treated blank as non-empty" if PrCiReadiness.checks?("")
-      errors << "checks? treated non-JSON as non-empty" if PrCiReadiness.checks?("no required checks")
+      active = PrCiReadiness.usable_checks?('[{"name":"a","bucket":"pass"}]')
+      errors << "usable_checks? missed an active array" unless active
+      errors << "usable_checks? treated [] as usable" if PrCiReadiness.usable_checks?("[]")
+      errors << "usable_checks? treated blank as usable" if PrCiReadiness.usable_checks?("")
+      errors << "usable_checks? treated non-JSON as usable" if PrCiReadiness.usable_checks?("no required checks")
+      if PrCiReadiness.usable_checks?('[{"name":"stale","bucket":"cancel"}]')
+        errors << "usable_checks? treated cancel-only as usable"
+      end
       errors
     end
 

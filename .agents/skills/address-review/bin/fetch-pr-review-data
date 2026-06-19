@@ -256,14 +256,17 @@ module FetchPrReviewData
     end
 
     def validate_pr!(pr_number)
-      raise Error, "a positive integer PR number is required\n\n#{USAGE}" unless pr_number.to_s.match?(/\A\d+\z/)
+      raise Error, "a positive integer PR number is required\n\n#{USAGE}" unless pr_number.to_s.match?(/\A[1-9]\d*\z/)
 
       pr_number
     end
 
+    # Strict OWNER/REPO: non-empty owner and name, exactly one slash, no spaces.
+    REPO_FORMAT = %r{\A[^/\s]+/[^/\s]+\z}
+
     def resolve_repo!(repo)
       repo ||= capture!("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip
-      raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.include?("/")
+      raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.match?(REPO_FORMAT)
 
       repo
     end

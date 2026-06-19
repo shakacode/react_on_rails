@@ -205,7 +205,8 @@ final handoff.
 For the required-vs-full CI readiness decision, run
 `.agents/skills/pr-batch/bin/pr-ci-readiness <PR>` (add `--repo OWNER/REPO` when
 not in the repo). It runs `gh pr checks --required`, falls back to the full list
-when no required checks exist, ignores cancelled/superseded rows, and prints a
+when no usable required checks exist (none, or only cancelled rows), ignores
+cancelled/superseded rows, and prints a
 `verdict` of `READY`, `NOT_READY`, or `UNKNOWN` plus the `failing`/`pending`
 check names (`required_used` shows whether required checks gated the verdict).
 Treat `UNKNOWN` (an empty check list) as not ready and request hosted CI or

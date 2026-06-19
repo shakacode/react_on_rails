@@ -6,11 +6,14 @@
 
 require "minitest/autorun"
 require "open3"
+require "tmpdir"
+require "fileutils"
+require "shellwords"
 
 SCRIPT = File.expand_path("pr-file-touch-map", __dir__)
 load SCRIPT
 
-class PrFileTouchMapTest < Minitest::Test
+class PrFileTouchMapTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def test_name_status_rename_and_copy_own_both_paths
     out = PrFileTouchMap.parse_name_status(
       "M\tlib/a.rb\nA\tlib/b.rb\nD\tlib/c.rb\nR096\tlib/old.rb\tlib/new.rb\nC100\tsrc/orig.rb\tsrc/copy.rb\n",
@@ -21,6 +24,48 @@ class PrFileTouchMapTest < Minitest::Test
     assert_equal [{ "old" => "lib/old.rb", "new" => "lib/new.rb" }, { "old" => "src/orig.rb", "new" => "src/copy.rb" }],
                  out["renames"]
     assert_equal "local-diff", out["source"]
+  end
+
+  # An invalid head branch (rejected before any git call) must NOT gate the
+  # reachable-SHA fetch of headRefOid: the OID fetch is independent of branch
+  # validity (per #4065 review). A fake `git` records its fetch args so we can
+  # assert the OID refspec was attempted even though the branch was invalid.
+  def test_head_oid_fetch_runs_even_when_branch_invalid
+    oid = "a" * 40
+    with_fake_git do |log_path, env|
+      meta = { head_ref: "bad:ref", head_repo: "owner/repo", head_oid: oid }
+      with_path(env) do
+        PrFileTouchMap.fetch_head_from_repo(meta, "refs/tmp/head")
+      end
+      log = File.exist?(log_path) ? File.read(log_path) : ""
+      assert_includes log, "#{oid}:refs/tmp/head", "OID fetch should run despite invalid branch"
+      refute_includes log, "refs/heads/bad:ref", "invalid branch must not be fetched"
+    end
+  end
+
+  # A fake `git` that succeeds for `check-ref-format` and records `fetch` args,
+  # while failing the fetch (exit 1) so no network is touched.
+  def with_fake_git
+    Dir.mktmpdir do |dir|
+      log_path = File.join(dir, "git.log")
+      git = File.join(dir, "git")
+      File.write(git, <<~SH)
+        #!/usr/bin/env bash
+        if [ "$1" = "check-ref-format" ]; then exit 0; fi
+        if [ "$1" = "fetch" ]; then echo "$@" >> #{Shellwords.shellescape(log_path)}; exit 1; fi
+        exit 0
+      SH
+      FileUtils.chmod(0o755, git)
+      yield log_path, { "PATH" => "#{dir}#{File::PATH_SEPARATOR}#{ENV.fetch('PATH')}" }
+    end
+  end
+
+  def with_path(env)
+    original = ENV.fetch("PATH")
+    ENV["PATH"] = env.fetch("PATH")
+    yield
+  ensure
+    ENV["PATH"] = original
   end
 
   def test_name_status_empty
@@ -152,8 +197,26 @@ class PrFileTouchMapTest < Minitest::Test
     assert_includes out, "positive integer PR number is required"
   end
 
+  def test_rejects_zero_pr
+    out, status = Open3.capture2e("ruby", SCRIPT, "0", "--repo", "owner/repo")
+    refute status.success?
+    assert_includes out, "positive integer PR number is required"
+  end
+
   def test_rejects_bad_repo_form
     out, status = Open3.capture2e("ruby", SCRIPT, "12", "--repo", "owneronly")
+    refute status.success?
+    assert_includes out, "--repo must be in OWNER/REPO form"
+  end
+
+  def test_rejects_repo_with_extra_path_segment
+    out, status = Open3.capture2e("ruby", SCRIPT, "12", "--repo", "a/b/c")
+    refute status.success?
+    assert_includes out, "--repo must be in OWNER/REPO form"
+  end
+
+  def test_rejects_repo_with_empty_owner
+    out, status = Open3.capture2e("ruby", SCRIPT, "12", "--repo", "/repo")
     refute status.success?
     assert_includes out, "--repo must be in OWNER/REPO form"
   end
