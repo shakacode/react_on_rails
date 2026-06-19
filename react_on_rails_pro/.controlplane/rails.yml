@@ -47,7 +47,8 @@ spec:
         - number: 3800
           protocol: http
   defaultOptions:
-    # Public/staging test apps keep one warm replica while Capacity AI right-sizes both containers.
+    # Public/staging test apps keep one warm replica while Capacity AI right-sizes both workload
+    # containers (rails and node-renderer).
     # Capacity AI may restart that replica when applying resource changes.
     # For production or high-availability staging, increase maxScale and review Capacity AI suitability.
     autoscaling:
