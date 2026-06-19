@@ -238,9 +238,10 @@ the private backend repo. This public pointer carries only the contract:
   field name and cancel status values if they differ from this pointer.
 - Treat cancellation state as available only when `agent-coord doctor` and
   `agent-coord status` exit 0, exactly as for claim, heartbeat, and phase state.
-  Otherwise report it as `UNKNOWN`, have a coordinator or maintainer request
-  drain through an advisory GitHub comment, and fall back to the process-level
-  escape hatch. Arbitrary public comments cannot initiate this fallback.
+  Otherwise report it as `UNKNOWN` and fall back to the process-level escape
+  hatch. A coordinator or maintainer may post an advisory GitHub comment as a
+  human-facing incident note, but workers do not treat comments as a drain
+  signal. Arbitrary public comments cannot initiate this fallback.
 - A cancelled worker drains at its next safe checkpoint and then runs
   `agent-coord release` for the lane. See
   [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md)
@@ -250,10 +251,11 @@ the private backend repo. This public pointer carries only the contract:
 - Only a coordinator or maintainer publishes or clears a batch's cancellation,
   exactly as for the release phase. Record the cancellation, and any hard
   process-level stop, in the batch handoff as the authoritative incident note.
-- Once relaunch is ready, record the relaunch intent in the handoff or private
-  state, then clear the cancellation field in `batches/<batch-id>.json`
-  immediately before launching fresh workers so new claims are not refused by
-  stale cancellation state.
+- Once every old worker has drained, released its claim, or been stopped and
+  cleaned up, record the relaunch intent in the handoff or private state. Then
+  clear the cancellation field in `batches/<batch-id>.json` immediately before
+  launching fresh workers so new claims are not refused by stale cancellation
+  state.
 
 > **Planned (not yet in `agent-coord` 0.1.0):** a first-class `agent-coord cancel`
 > verb and a `status` field that surfaces batch/lane cancellation directly, so

@@ -695,10 +695,10 @@ hatch**, not a single kill switch:
   (for example, after a push has already landed), otherwise abandons still-local
   work without pushing, runs `agent-coord release` for the lane, records the
   cancelled lane as its final state, and exits without leaving a half-pushed
-  branch or corrupted worktree. Drain latency is designed to be bounded by one
-  phase transition, provided workers check `agent-coord status` at each phase
-  transition, so a worker deep inside one target may not stop until its next
-  checkpoint.
+  branch or corrupted worktree. The one-phase-transition latency bound holds
+  only for workers that successfully check `agent-coord status` at each phase
+  transition; a worker deep inside one target may not stop until its next
+  checkpoint, and a wedged worker requires the hard escape hatch.
 - **Hard escape hatch.** For a wedged or unresponsive worker that is not reaching a
   checkpoint, use this sequence:
   1. Record cancellation in the backend.
@@ -714,10 +714,11 @@ hatch**, not a single kill switch:
   5. Delete or reset the lane's local branch ref, or choose a fresh branch name
      for the relaunch, so the next worker does not start from cancelled local
      commits.
-  6. Keep cancellation recorded until relaunch is ready. Record the relaunch
-     intent in the batch handoff or private state, then clear the cancellation
-     field in `batches/<batch-id>.json` immediately before launching fresh
-     workers.
+  6. Keep cancellation recorded until all old workers have drained, released
+     their claims, or been stopped and cleaned up through this hard escape hatch.
+     Record the relaunch intent in the batch handoff or private state, prepare
+     the fresh-worker launch command, then clear the cancellation field in
+     `batches/<batch-id>.json` and immediately launch the fresh workers.
 - **Restarting with updated skills.** Stopping a batch does not reload skills,
   workflow rules, or this file into an already-running process; skills are read at
   process/session start. To roll an update into a running fleet, drain or stop the
