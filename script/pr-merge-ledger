@@ -9,7 +9,7 @@ require "time"
 # Pipes and File.read inherit the default external encoding at creation time, so
 # this must run before any Open3 call or file read. Without it, a non-UTF-8
 # locale (e.g. LANG/LC_ALL unset) leaves GitHub's UTF-8 bytes tagged US-ASCII and
-# JSON.parse raises on the first multibyte sequence. See PR #4123 for details.
+# JSON.parse raises on the first multibyte sequence.
 Encoding.default_external = Encoding::UTF_8
 
 # rubocop:disable Metrics/ClassLength

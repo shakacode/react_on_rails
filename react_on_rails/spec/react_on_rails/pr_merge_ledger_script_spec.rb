@@ -4941,6 +4941,7 @@ RSpec.describe "script/pr-merge-ledger" do
     # fresh instance, so memoize on the example-group class -- which is shared --
     # rather than an instance variable, which would not persist across examples.
     memo = self.class.instance_variable_get(:@unbundled_json_rejects_mistagged_utf8)
+    # Three-state: nil = not probed yet, false = tolerant json, true = strict json.
     return memo unless memo.nil?
 
     # {"k":"<em-dash>"} as raw UTF-8 bytes, deliberately mislabeled US-ASCII.
