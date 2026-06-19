@@ -151,6 +151,7 @@ async function renderAndHydrate() {
   };
 
   const writeSecondChunk = async () => {
+    // Assert at least one more chunk exists, then drain the rest.
     let decoded = await readNextChunk();
     let { done, value } = await reader.read();
     while (!done) {

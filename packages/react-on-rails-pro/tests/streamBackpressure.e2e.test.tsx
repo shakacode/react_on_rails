@@ -87,7 +87,7 @@ const collectChunks = (stream: NodeJS.ReadableStream): Promise<StreamResultChunk
     const decoder = new TextDecoder();
 
     const flushParserOrThrow = () => {
-      // Capture warnings manually so this helper cannot restore an outer console.warn spy.
+      // Capture warnings manually to preserve any outer console.warn spy after flush().
       const warnings: unknown[][] = [];
       const originalWarn = console.warn;
       console.warn = (...args) => {
