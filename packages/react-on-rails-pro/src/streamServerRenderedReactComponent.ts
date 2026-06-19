@@ -33,7 +33,15 @@ import {
   transformRenderStreamChunksToResultObject,
 } from './streamingUtils.ts';
 import handleError from './handleError.ts';
-import { combineRSCStreamDiagnosticErrors, mergeRSCStreamDiagnosticError } from './rscDiagnostics.ts';
+import {
+  combineRSCStreamDiagnosticErrors,
+  MERGED_DIAGNOSTIC_FLAG,
+  mergeRSCStreamDiagnosticError,
+} from './rscDiagnostics.ts';
+
+type MaybeMergedRSCStreamDiagnosticError = Error & {
+  [MERGED_DIAGNOSTIC_FLAG]?: true;
+};
 
 const streamRenderReactComponent = (
   reactRenderingResult: StreamableComponentResult,
@@ -90,9 +98,13 @@ const streamRenderReactComponent = (
   // awaiting the failed lazy element), so first-use consumption attributes correctly in the common
   // case while preventing confident-but-wrong attribution of subsequent errors.
   //
-  // mergeRSCStreamDiagnosticError is idempotent, so an error already enriched on the synchronous
-  // reject path in getReactServerComponent.server.ts is returned untouched.
+  // An error already enriched on the synchronous reject path in getReactServerComponent.server.ts is
+  // returned untouched, and its presence must not consume captured diagnostics that may still belong
+  // to a later generic deferred error in the same render.
   const enrichWithCapturedRSCDiagnostics = (error: Error): Error => {
+    if ((error as MaybeMergedRSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG]) {
+      return error;
+    }
     const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
     if (captured.length === 0) {
       return error;
@@ -101,6 +113,9 @@ const streamRenderReactComponent = (
       captured.length === 1
         ? captured[0].diagnosticError
         : combineRSCStreamDiagnosticErrors(captured.map((entry) => entry.diagnosticError));
+    if (!diagnosticError) {
+      return error;
+    }
     return mergeRSCStreamDiagnosticError(error, diagnosticError);
   };
 
@@ -235,7 +250,9 @@ const streamRenderReactComponent = (
       // `onError` runs synchronously inside React's render before this `.catch` rejection settles in a
       // later microtask — so if `onError` reported an error, `hasErrors` is already true when read here.
       const convertedError = convertToError(e);
-      const error = renderState.hasErrors ? convertedError : enrichWithCapturedRSCDiagnostics(convertedError);
+      const error = renderState.hasErrors
+        ? convertedError // onError already handled this render error; don't re-enrich (a no-op, but explicit).
+        : enrichWithCapturedRSCDiagnostics(convertedError);
       reportError(error);
       sendErrorHtml(error);
     });

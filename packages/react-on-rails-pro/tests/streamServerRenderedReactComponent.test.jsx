@@ -27,6 +27,7 @@ import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
 import wrapServerComponentRenderer from '../src/wrapServerComponentRenderer/server.tsx';
 import RSCRoute from '../src/RSCRoute.tsx';
 import { RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST } from '../src/RSCRouteSSRFalseBailoutError.ts';
+import { mergeRSCStreamDiagnosticError } from '../src/rscDiagnostics.ts';
 
 jest.mock('react-on-rails/ReactDOMServer', () => {
   const actual = jest.requireActual('react-on-rails/ReactDOMServer');
@@ -140,11 +141,37 @@ const makeDeferredThrower = (message, delayMs) => async () => {
 const FirstDeferredThrow = makeDeferredThrower('First deferred failure (correlated)', 10);
 const SecondDeferredThrow = makeDeferredThrower('Second deferred failure (unrelated)', 30);
 
+const AlreadyMergedDeferredThrow = async () => {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 10);
+  });
+  const diagnosticError = new Error(
+    `[ReactOnRails] RSC bundle rendering failed.\n` +
+      `Component: AlreadyMergedComponent\n` +
+      `Module: /app/components/AlreadyMergedComponent.jsx\n` +
+      `Original error: boom in AlreadyMergedComponent`,
+  );
+  diagnosticError.name = 'ReactOnRailsRSCStreamError';
+  throw mergeRSCStreamDiagnosticError(new Error('First deferred failure (already merged)'), diagnosticError);
+};
+
 const TwoDeferredThrowShell = () => (
   <main>
     <h1>Header In The Shell</h1>
     <React.Suspense fallback={<div>Loading first...</div>}>
       <FirstDeferredThrow />
+    </React.Suspense>
+    <React.Suspense fallback={<div>Loading second...</div>}>
+      <SecondDeferredThrow />
+    </React.Suspense>
+  </main>
+);
+
+const AlreadyMergedThenGenericThrowShell = () => (
+  <main>
+    <h1>Header In The Shell</h1>
+    <React.Suspense fallback={<div>Loading already merged...</div>}>
+      <AlreadyMergedDeferredThrow />
     </React.Suspense>
     <React.Suspense fallback={<div>Loading second...</div>}>
       <SecondDeferredThrow />
@@ -519,6 +546,53 @@ describe('streamServerRenderedReactComponent', () => {
     expect(unattributedErrors.some((error) => !error.message.includes('CommentsToggle'))).toBe(true);
   });
 
+  const setupAlreadyMergedThenGenericErrorTest = () => {
+    const renderFunction = (_props, railsContext) => {
+      ['AlreadyMergedComponent', 'PreservedComponent'].forEach((componentName) => {
+        const diagnosticError = new Error(
+          `[ReactOnRails] RSC bundle rendering failed.\n` +
+            `Component: ${componentName}\n` +
+            `Module: /app/components/${componentName}.jsx\n` +
+            `Original error: boom in ${componentName}`,
+        );
+        diagnosticError.name = 'ReactOnRailsRSCStreamError';
+        railsContext.recordRSCDiagnostic(componentName, diagnosticError);
+      });
+      return AlreadyMergedThenGenericThrowShell;
+    };
+
+    ReactOnRails.register({
+      AlreadyMergedThenGenericThrowShell: wrapServerComponentRenderer(
+        renderFunction,
+        'AlreadyMergedThenGenericThrowShell',
+      ),
+    });
+
+    return streamServerRenderedReactComponent({
+      name: 'AlreadyMergedThenGenericThrowShell',
+      domNodeId: 'alreadyMergedThenGenericThrowDomId',
+      trace: false,
+      throwJsErrors: true,
+      railsContext: testingRailsContext,
+      generateRSCPayload: jest.fn(),
+    });
+  };
+
+  it('preserves captured RSC diagnostics when an already-merged error surfaces first (#3475)', async () => {
+    const renderResult = setupAlreadyMergedThenGenericErrorTest();
+    const emittedErrors = await collectEmittedErrors(renderResult);
+
+    expect(emittedErrors).toHaveLength(2);
+    expect(emittedErrors[0].message).toContain('First deferred failure (already merged)');
+
+    const secondError = emittedErrors.find((error) =>
+      error.message.includes('Second deferred failure (unrelated)'),
+    );
+    expect(secondError).toBeDefined();
+    expect(secondError.message).toContain('one of these 2 RSC components failed');
+    expect(secondError.message).toContain('Component: PreservedComponent');
+  });
+
   it('renders the nearest Suspense fallback for RSCRoute ssr=false without generating an RSC payload', async () => {
     const { renderResult, generateRSCPayload } = setupRSCRouteSSRFalseStreamTest();
     const { chunks, errors } = await collectStreamResult(renderResult);
@@ -565,48 +639,32 @@ describe('streamServerRenderedReactComponent', () => {
     }
   });
 
-  it('preserves the duplicate notifySSREnd warning for unexpected nested Suspense errors', async () => {
+  it('runs post-SSR hooks once for unexpected nested Suspense errors', async () => {
     const onPostSSRHook = jest.fn();
-    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const renderResult = setupUnexpectedNestedSuspenseErrorStreamTest({ onPostSSRHook });
 
-    try {
-      const { chunks, errors } = await collectStreamResult(renderResult);
+    const { chunks, errors } = await collectStreamResult(renderResult);
 
-      expect(errors).toHaveLength(0);
-      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
-      expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('notifySSREnd() called multiple times'),
-      );
-    } finally {
-      consoleWarnSpy.mockRestore();
-    }
+    expect(errors).toHaveLength(0);
+    expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+    expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
   });
 
-  it('preserves the duplicate notifySSREnd warning when a real error occurs with an RSCRoute ssr=false bailout', async () => {
+  it('runs post-SSR hooks once when a real error occurs with an RSCRoute ssr=false bailout', async () => {
     const onPostSSRHook = jest.fn();
-    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { renderResult, generateRSCPayload } = setupMixedRSCRouteBailoutAndNestedSuspenseErrorStreamTest({
       onPostSSRHook,
     });
 
-    try {
-      const { chunks, errors } = await collectStreamResult(renderResult);
-      const html = chunks.map((chunk) => chunk.html).join('');
+    const { chunks, errors } = await collectStreamResult(renderResult);
+    const html = chunks.map((chunk) => chunk.html).join('');
 
-      expect(errors).toHaveLength(0);
-      expect(generateRSCPayload).not.toHaveBeenCalled();
-      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
-      expect(html).toContain('Loading skipped route...');
-      expect(html).toContain('Loading errored boundary...');
-      expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('notifySSREnd() called multiple times'),
-      );
-    } finally {
-      consoleWarnSpy.mockRestore();
-    }
+    expect(errors).toHaveLength(0);
+    expect(generateRSCPayload).not.toHaveBeenCalled();
+    expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+    expect(html).toContain('Loading skipped route...');
+    expect(html).toContain('Loading errored boundary...');
+    expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
   });
 
   it('streamServerRenderedReactComponent streams the rendered component', async () => {

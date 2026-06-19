@@ -141,6 +141,8 @@ class RSCRequestTracker {
     // the second and lose error information. Keying on name + message keeps distinct failures while
     // collapsing exact repeats. (`transformRSCStream` is already first-wins per stream parse, so a
     // single payload never double-records; this guards the cross-instance case only.)
+    // The stack is intentionally excluded: the user-visible module path and original error are already
+    // normalized into the diagnostic message, so stack-only frame noise should not defeat deduping.
     const isDuplicate = this.capturedRSCDiagnostics.some(
       (entry) =>
         entry.componentName === componentName && entry.diagnosticError.message === diagnosticError.message,
@@ -180,7 +182,7 @@ class RSCRequestTracker {
    * @returns The captured diagnostics (empty if none were captured or they were already consumed)
    */
   consumeCapturedRSCDiagnostics(): CapturedRSCDiagnostic[] {
-    const captured = this.capturedRSCDiagnostics;
+    const captured = this.capturedRSCDiagnostics; // ownership transferred: caller owns this array after return.
     this.capturedRSCDiagnostics = [];
     return captured;
   }
