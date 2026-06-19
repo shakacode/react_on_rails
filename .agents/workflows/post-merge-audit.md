@@ -10,8 +10,14 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
 - During independent audits, agents may draft issue bodies but must not create issues, comments, labels, fixes, reverts, branches, or PRs.
 - Use one coordinator to compare reports, dedupe findings, and propose the issue plan.
 - Create GitHub issues only after the user approves the deduped issue plan.
-- If multiple child issues are needed, create one parent issue for the audit and one child issue per independently actionable fix/revert/question.
+- If multiple child issues are needed, create one parent issue for the audit and one child issue per
+  independently actionable fix/revert/question. Link the release-gate audit ledger comment from every
+  approved parent or child issue created from the audit.
 - Before creating any issue, search existing open issues for the affected PR number and the hidden fingerprint.
+- For named batch/run audits, run `agent-coord status` and inspect the named
+  batch entry as the primary worked-issue scope when available. If coordination
+  state cannot be verified, record `worked_issue_scope: UNKNOWN` with the exact
+  command/error instead of silently reducing the audit to merged PRs.
 
 Suggested hidden fingerprint:
 
@@ -49,18 +55,31 @@ If you do not know or cannot verify an item from GitHub/local git, say UNKNOWN r
 Run this separately in Codex and Claude. Do not share one agent's output with the other until both are done.
 
 ```text
-Run an independent post-merge audit of merged PRs since the last release candidate.
+Run an independent post-merge audit of a batch/run and its merged PRs since the last release candidate.
 
-Use git and GitHub ground truth. Do not rely on prior chat memory.
+Use git, GitHub, and agent-coord ground truth. Do not rely on prior chat memory.
 
 Scope:
 - Repository: <OWNER>/<REPO>
+- Batch id: <BATCH_ID or UNKNOWN>
 - Base: resolve the most recent release candidate tag/commit unless I provide one explicitly
 - Head: current main
 - Focus: PRs that appear to be from recent high-concurrency agent/Codex/Claude batch work
 - Audit id: <AUDIT_ID>
 
-First, produce the exact merged-PR range and batch-subset list:
+First, produce the exact worked-issue scope and merged-PR range:
+- run `agent-coord doctor` and `agent-coord status` when a batch id is known,
+  then inspect `<BATCH_ID>` in the status output
+- list every worked issue/lane from claims, heartbeats, branches, and dependency
+  metadata
+- for each worked issue, include the lane owner, branch, heartbeat/final state,
+  linked PR if known, and whether the final state is merged, open, blocked,
+  parked, no-PR, done-unmerged, or UNKNOWN
+- if agent-coord is missing, unavailable, or status fails, record
+  `worked_issue_scope: UNKNOWN` with the exact command/error and continue with
+  GitHub/git evidence for the merged-PR range only
+
+Then produce the exact merged-PR range and batch-subset list:
 - merged PR number and URL
 - merge commit
 - branch name
@@ -70,9 +89,24 @@ First, produce the exact merged-PR range and batch-subset list:
 - why you think it is or is not part of the batch
 
 List every PR merged between base and head, not only the PRs that look like
-batch work. Ask me to confirm the included and excluded PRs before deep audit.
+batch work. Ask me to confirm the included/excluded worked issues and PRs before
+deep audit.
 
-After confirmation, audit each included PR for:
+After confirmation, audit each worked issue for:
+- whether the implementation, no-PR comment, blocker, or parked disposition
+  satisfied the issue intent and acceptance criteria
+- whether the final issue state is correct: merged, closed, still open,
+  parked, blocked, no-PR, done-unmerged, or UNKNOWN
+- whether review comments, handoff expectations, confidence notes, validation
+  evidence, decision-point count, and Process Gap Disposition fields were
+  handled when required
+- classify each worked issue as `realized`, `partial`, `missed`, `regressed`,
+  `stalled`, or `unknown`, using `.agents/workflows/continuous-evaluation-loop.md`
+  for the intent-achievement definitions
+- for `stalled` lanes, recommend resume, reassign, or drop; for merged non-OK
+  findings, prepare post-merge audit issue-plan entries
+
+Also audit each included merged PR for:
 - risky behavior change
 - missing or weak validation
 - missing lockfile content-diff evidence when committed lockfiles changed, using
@@ -114,7 +148,10 @@ For every non-OK finding, include a draft issue entry but do not create it:
   `checklist+replay`, or `park`), `Motivating miss`, `Replay evidence or park
   reason`, and `Non-goal`
 
-Return high-risk findings first, then a PR-by-PR table. Include exact commands and data sources used. Do not make code changes, comments, labels, issues, reverts, or PRs without approval.
+Return high-risk findings first, then a worked-issue coverage table and a
+PR-by-PR table. Include exact commands and data sources used, plus any remaining
+`UNKNOWN` facts and the command or permission needed to resolve them. Do not
+make code changes, comments, labels, issues, reverts, or PRs without approval.
 ```
 
 ## Comparison Prompt
@@ -168,6 +205,7 @@ Rules:
 - Do not create duplicate child issues. If an issue already exists, link it in the parent issue plan instead.
 - If there are two or more related child issues, create one parent issue first.
 - Create one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
+- Include the release-gate audit ledger comment URL in every parent and child issue body.
 - For missing changelog findings, prefer one bundled changelog issue or recommend `/update-changelog`; do not create one issue per missing entry unless explicitly approved.
 - For process findings, preserve the approved Process Gap Disposition fields:
   `Mechanism target`, `Motivating miss`, `Replay evidence or park reason`, and

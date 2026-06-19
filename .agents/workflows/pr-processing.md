@@ -1136,18 +1136,35 @@ For a manual multi-PR landing plan:
 Use this section when reviewing already-merged PRs from concurrent agent work, especially before a release candidate.
 
 1. Resolve the base release candidate tag/commit and head SHA.
-2. List every PR merged in the range, then identify the batch subset by branch names, PR bodies, labels, comments, authors, merge timing, and linked issues.
-3. Ask for confirmation of included and excluded PRs before deep audit unless the user explicitly says to proceed.
-4. For each included PR, inspect reviews, comments, checks, merge time, changed files, validation evidence, changelog coverage, and cross-PR interactions.
-5. Flag review-gate violations:
+2. When auditing a named batch/run, run `agent-coord doctor` and `agent-coord status`,
+   then inspect the named batch entry to identify the worked issue set from claims,
+   heartbeats, branches, and dependency metadata. If coordination state is unavailable,
+   record `worked_issue_scope: UNKNOWN` with the exact command/error instead of inferring
+   completeness from merged PRs.
+3. List every PR merged in the range, then identify the batch subset by
+   coordination state, branch names, PR bodies, labels, comments, authors,
+   merge timing, and linked issues. Keep no-PR, blocked, parked, and
+   done-unmerged worked issues in the audit scope even when they have no merged
+   PR.
+4. Ask for confirmation of included and excluded worked issues and PRs before
+   deep audit unless the user explicitly says to proceed.
+5. For each worked issue, evaluate whether the implementation, no-PR evidence,
+   blocker, or parked disposition satisfied the issue intent; verify the final
+   state; and classify it as `realized`, `partial`, `missed`, `regressed`,
+   `stalled`, or `unknown` using
+   `.agents/workflows/continuous-evaluation-loop.md`.
+6. For each included merged PR, inspect reviews, comments, checks, merge time,
+   changed files, validation evidence, changelog coverage, and cross-PR
+   interactions.
+7. Flag review-gate violations:
    - review checks, reviews, or comments that landed after merge
    - review checks that were queued, in progress, stale, or asynchronous at merge time
    - pre-merge `Must Fix`, `MUST-FIX`, `Should Fix`, `DISCUSS`, `Changes Requested`, or similar actionable comments with no later evidence they were fixed, waived, or classified
    - AI reviewer approvals, positive issue comments, or "no actionable comments" summaries that were incorrectly treated as required maintainer approval or special approval gates
    - AI review findings that were ignored even though they identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval
    - requested adversarial review that did not finish before merge, finished on an older head SHA, or left untriaged `BLOCKING`/`DISCUSS` findings
-6. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
-7. Produce a deduped issue plan for non-OK findings:
+8. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
+9. Produce a deduped issue plan for non-OK findings:
    - no issue for OK, duplicates, or fully resolved findings
    - one bundled changelog issue or a `/update-changelog` recommendation for missing changelog entries
    - one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task
@@ -1156,6 +1173,8 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - for process findings, include the Process Gap Disposition fields above,
      especially `Mechanism target` and `Replay evidence or park reason`, before
      filing issues
-8. Return high-risk findings first, then cross-PR risks, missing changelog candidates, the issue plan, a PR-by-PR table, and exact commands/data sources.
+10. Return high-risk findings first, then cross-PR risks, missing changelog
+    candidates, the issue plan, a worked-issue coverage table, a PR-by-PR
+    table, and exact commands/data sources.
 
 Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs until the user approves the audit report and issue plan.
