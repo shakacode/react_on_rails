@@ -1136,13 +1136,15 @@ For a manual multi-PR landing plan:
 Use this section when reviewing already-merged PRs from concurrent agent work, especially before a release candidate.
 
 1. Resolve the base release candidate tag/commit and head SHA.
-2. When auditing a named batch/run, run `agent-coord doctor` and `agent-coord status`,
-   then inspect the named batch entry to identify the worked issue set from claims,
-   heartbeats, branches, and dependency metadata. If coordination state is unavailable,
-   record `worked_issue_scope: UNKNOWN` with the exact command/error instead of inferring
-   completeness from merged PRs; when scope is `UNKNOWN`, audit only the merged
-   PR range and report the command or permission needed to recover the worked
-   issue list instead of identifying a batch subset from PR links or heuristics.
+2. When auditing a named batch/run and the batch/run id is known, run
+   `agent-coord doctor` and `agent-coord status`, then inspect the named batch
+   entry to identify the worked issue set from claims, heartbeats, branches, and
+   dependency metadata. If coordination state is unavailable, record
+   `worked_issue_scope: UNKNOWN` with the exact command/error instead of
+   inferring completeness from merged PRs; when scope is `UNKNOWN`, audit only
+   the merged PR range and report the command or permission needed to recover
+   the worked issue list instead of identifying a batch subset from PR links or
+   heuristics.
 3. When `worked_issue_scope` is known, list every PR merged in the range, then identify the batch subset by
    coordination state, branch names, PR bodies, labels, comments, authors,
    merge timing, and linked issues. Keep no-PR, blocked, parked, and
@@ -1174,6 +1176,8 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - one bundled changelog issue or a `/update-changelog` recommendation for missing changelog entries
    - one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task
    - one parent issue when there are two or more related child issues from the same audit
+   - include healthy `in_progress` lanes in the worked-issue coverage table so
+     the coordinator can verify complete coverage
    - a coordinator action entry, not a follow-up issue, for each `stalled` lane
      that needs a resume/reassign/drop decision unless the user explicitly
      approves tracking it as an issue

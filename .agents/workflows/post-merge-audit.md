@@ -11,6 +11,9 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
 - Use one coordinator to compare reports, dedupe findings, and propose the issue plan.
 - Create GitHub issues only after the user approves the deduped issue plan and
   the approved audit report has been appended to the release-gate audit ledger.
+- If appending to the release-gate audit ledger fails, do not create issues;
+  report the exact command/API error and the ledger issue or permission needed
+  to unblock issue creation.
 - If multiple child issues are needed, create one parent issue for the audit and one child issue per
   independently actionable fix/revert/question. Link the release-gate audit ledger comment from every
   approved parent or child issue created from the audit.
@@ -172,6 +175,12 @@ code changes, comments, labels, issues, reverts, or PRs without approval.
 The worked-issue coverage table must include issue number, coordination
 lane/branch, linked PR or no-PR/blocker evidence, final state,
 intent-achievement classification, and `UNKNOWN` facts.
+
+Example worked-issue coverage table:
+| Issue | Lane/branch | Evidence | Final state | Classification | UNKNOWN facts |
+| --- | --- | --- | --- | --- | --- |
+| #1234 | batch-abc:issue-1234 / codex/example | PR #2345 merged | merged | realized | none |
+| #1235 | batch-abc:issue-1235 / no branch | blocker comment URL | blocked | stalled | owner decision needed |
 ```
 
 ## Comparison Prompt
