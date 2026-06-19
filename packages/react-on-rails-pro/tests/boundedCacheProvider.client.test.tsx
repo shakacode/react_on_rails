@@ -212,6 +212,24 @@ describe('BoundedLRU', () => {
     expect(lru.has('p3')).toBe(true);
   });
 
+  it('setProtected keeps a restored key when all other over-cap entries are pinned', () => {
+    const { lru, evicted } = makeLRU(1);
+
+    lru.setPinned('restored', 'failed refetch');
+    lru.setPinned('other inflight', 'I');
+    lru.setProtected('restored', 'R');
+
+    expect(lru.has('other inflight')).toBe(true);
+    expect(lru.has('restored')).toBe(true);
+    expect(evicted).toEqual([]);
+
+    lru.unpin('restored');
+
+    expect(lru.has('other inflight')).toBe(true);
+    expect(lru.has('restored')).toBe(true);
+    expect(evicted).toEqual([]);
+  });
+
   it('unpin does not evict the just-settled key when it is the only unpinned entry (over-cap reconciliation)', () => {
     // Regression guard for the over-cap reconciliation bug: a burst of
     // concurrent in-flight loads pushes the cache past the cap with every key

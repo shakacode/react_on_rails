@@ -251,19 +251,27 @@ export const createRSCProvider = ({
           }
           return payload;
         };
-        promise = getServerComponent({ componentName, componentProps })
-          .then(markPayloadIfSuccessful)
-          .finally(() => {
-            fetchRSCPromises.unpin(key);
-            if (
-              notifyRoutesOnSuccess &&
-              !payloadSucceeded &&
-              inFlightEvictedSuccessfulPayloadKeysRef.current.has(key)
-            ) {
-              inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
-              evictedSuccessfulPayloadKeys.set(key, true);
-            }
-          });
+        let serverComponentPromise: Promise<ReactNode>;
+        try {
+          serverComponentPromise = getServerComponent({ componentName, componentProps });
+        } catch (error) {
+          if (notifyRoutesOnSuccess) {
+            inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
+          }
+          throw error;
+        }
+
+        promise = serverComponentPromise.then(markPayloadIfSuccessful).finally(() => {
+          fetchRSCPromises.unpin(key);
+          if (
+            notifyRoutesOnSuccess &&
+            !payloadSucceeded &&
+            inFlightEvictedSuccessfulPayloadKeysRef.current.has(key)
+          ) {
+            inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
+            evictedSuccessfulPayloadKeys.set(key, true);
+          }
+        });
         fetchRSCPromises.setPinned(key, promise);
         return promise;
       },
@@ -281,7 +289,7 @@ export const createRSCProvider = ({
           }
 
           if (key in lastSuccessfulRSCPromisesRef.current) {
-            fetchRSCPromises.set(key, lastSuccessfulRSCPromisesRef.current[key]);
+            fetchRSCPromises.setProtected(key, lastSuccessfulRSCPromisesRef.current[key]);
           } else {
             fetchRSCPromises.deleteValuePreservingPins(key);
           }

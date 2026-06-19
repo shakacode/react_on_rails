@@ -111,6 +111,16 @@ export class BoundedLRU<V> {
     this.evictIfNeeded();
   }
 
+  setProtected(key: string, value: V): void {
+    // Re-insert so an existing key moves to most-recently-used, then protect
+    // that just-restored key from its own over-cap reconciliation. This lets
+    // callers restore a visible last-good payload while other in-flight keys
+    // are still pinned; a later set/unpin can evict a colder key.
+    this.map.delete(key);
+    this.map.set(key, value);
+    this.evictIfNeeded(key);
+  }
+
   /**
    * Insert (or refresh) `key` and pin it atomically — the pin is registered
    * BEFORE eviction runs. This is required when inserting an in-flight promise
