@@ -30,11 +30,13 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
   discovery cannot verify backend setup or access, record `UNKNOWN (setup)` or
   `UNKNOWN (access)` with the exact command/error and report that batch id
   confirmation is still needed after backend recovery.
-- For named batch/run audits, run `agent-coord doctor`, then `agent-coord status`, and inspect the named
-  batch entry as the primary worked-issue scope when available. If coordination state cannot be verified,
-  record `worked_issue_scope: UNKNOWN (setup)` or `worked_issue_scope: UNKNOWN (access)` with the exact
-  command/error. Use structured public `codex-claim` comments as advisory recovery evidence when available before
-  reducing unknown scope to merged PRs.
+- For named batch/run audits, run `agent-coord doctor`, then
+  `agent-coord status`, and inspect the named batch entry as the primary
+  worked-issue scope when available. If coordination state cannot be verified,
+  record `worked_issue_scope: UNKNOWN (setup)` or
+  `worked_issue_scope: UNKNOWN (access)` with the exact command/error. Use
+  structured public `codex-claim` comments as advisory recovery evidence when
+  available before reducing unknown scope to merged PRs.
 - For private coordination backend setup and CLI discovery, see
   `internal/contributor-info/agent-coordination-backend.md`.
 
@@ -98,13 +100,18 @@ First, produce the exact worked-issue scope and merged-PR range:
   ids and lanes. Record `worked_issue_scope: UNKNOWN (needs batch
   confirmation)` and ask me to confirm a candidate batch/run id before treating
   any candidate lane list as the worked-issue scope.
-- when a batch id is known, run `agent-coord doctor`, then `agent-coord status`,
-  then inspect `<BATCH_ID>` in the status output
-- list every worked issue/lane from claims, heartbeats, branches, and dependency
-  metadata
-- for each worked issue, include the lane owner, branch, heartbeat/final state,
-  linked PR if known, and whether the final state is merged, open, blocked,
-  parked, no-PR, done-unmerged, or UNKNOWN
+  If candidate discovery cannot verify backend setup or access, record
+  `worked_issue_scope: UNKNOWN (setup)` or
+  `worked_issue_scope: UNKNOWN (access)` instead of
+  `UNKNOWN (needs batch confirmation)`, with the exact command/error.
+- when a batch id is known:
+  - run `agent-coord doctor`, then `agent-coord status`, then inspect
+    `<BATCH_ID>` in the status output
+  - list every worked issue/lane from claims, heartbeats, branches, and
+    dependency metadata
+  - for each worked issue, include the lane owner, branch, heartbeat/final
+    state, linked PR if known, and whether the final state is merged, open,
+    blocked, parked, no-PR, done-unmerged, or UNKNOWN
 - if `agent-coord` is missing or `agent-coord doctor` fails, record
   `worked_issue_scope: UNKNOWN (setup)` with the exact command/error and
   use structured public `codex-claim` comments as advisory coverage when
@@ -118,8 +125,10 @@ First, produce the exact worked-issue scope and merged-PR range:
   `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
   scan structured public `codex-claim` comments as advisory recovery rows for
   possible no-PR, blocked, parked, or done-unmerged lanes, keep any recovered
-  rows marked `UNKNOWN`, and report the batch metadata correction needed before
-  reducing the audit to the merged-PR range only
+  rows marked `UNKNOWN`, report the batch metadata correction needed, and ask
+  for confirmation before reducing the audit to the merged-PR range only. If
+  the user confirms no lanes were worked, record the empty-batch finding and
+  proceed to the merged-PR range.
 
 Then produce the exact merged-PR range and, only when `worked_issue_scope` is
 verified from coordination state, the batch-subset list:
@@ -279,11 +288,11 @@ Return:
 1. consensus high-risk findings
 2. reconciled review-gate violations
 3. disputed findings needing human review
-4. reconciled worked-issue coverage table with issue number, coordination
+4. deduped issue plan
+5. PRs both agents consider OK
+6. reconciled worked-issue coverage table with issue number, coordination
    lane/branch, linked PR or no-PR/blocker evidence, final state,
    intent-achievement classification, and any unresolved `UNKNOWN` facts
-5. PRs both agents consider OK
-6. deduped issue plan
 7. recommended next actions
 
 Do not create issues or PRs yet.

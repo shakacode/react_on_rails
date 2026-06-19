@@ -45,13 +45,14 @@ The resolver is read-only. It resolves the default release-candidate base, the h
      scope
 
    If candidate discovery cannot verify backend setup or access,
-   `UNKNOWN (setup)` or `UNKNOWN (access)` takes precedence; also report that
-   batch id confirmation is still needed after backend recovery. When a
-   batch/run id is known, run `agent-coord doctor` then `agent-coord status`,
-   then inspect the named batch entry; use claims, heartbeats, and batch
-   metadata as the primary worked-issue scope. If `agent-coord` is missing or
-   `agent-coord doctor` fails, record `worked_issue_scope: UNKNOWN (setup)` with
-   the exact command/error. If `agent-coord doctor` passes but
+   `UNKNOWN (setup)` or `UNKNOWN (access)` takes precedence over
+   `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
+   is still needed after backend recovery. When a batch/run id is known, run
+   `agent-coord doctor` then `agent-coord status`, then inspect the named batch
+   entry; use claims, heartbeats, and batch metadata as the primary worked-issue
+   scope. If `agent-coord` is missing or `agent-coord doctor` fails, record
+   `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
+   `agent-coord doctor` passes but
    `agent-coord status` fails, record `worked_issue_scope: UNKNOWN (access)`
    with the exact command/error. In both UNKNOWN cases, use structured public
    `codex-claim` comments as an advisory fallback for possible no-PR, blocked,
@@ -64,8 +65,10 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
    scan structured public `codex-claim` comments as advisory recovery rows for
    possible no-PR, blocked, parked, or done-unmerged lanes, keep any recovered
-   rows marked `UNKNOWN`, and report the batch metadata correction needed before
-   reducing the audit to the merged-PR range only.
+   rows marked `UNKNOWN`, report the batch metadata correction needed, and ask
+   for confirmation before reducing the audit to the merged-PR range only. If
+   the user confirms no lanes were worked, record the empty-batch finding and
+   proceed to the merged-PR range.
 
 5. Batch PR subset: only when `worked_issue_scope` is verified from
    coordination state, map worked issues to PRs through coordination branch
