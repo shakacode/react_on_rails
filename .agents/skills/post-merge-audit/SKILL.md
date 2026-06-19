@@ -52,6 +52,11 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    fallback for possible no-PR, blocked, parked, or done-unmerged lanes before
    reducing scope to merged PRs. Keep advisory rows marked `UNKNOWN` as needed,
    and do not infer confirmed completeness from merged PRs.
+   If `agent-coord doctor` and `agent-coord status` both succeed but the named
+   batch entry contains no worked issues or lanes, record
+   `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
+   continue with the merged-PR range only, and report the batch metadata
+   correction needed.
 5. Batch PR subset: when `worked_issue_scope` is known, map worked issues to PRs through coordination branch names, linked PRs, PR bodies, labels, comments, authors, merge timing, and git history. Keep PR-range inclusion separate from worked-issue coverage so no-PR, blocked, parked, and unmerged lanes are still evaluated.
 
 Show included worked issues, included PRs, excluded near-matches, base/head SHAs, coordination status evidence, and assumptions. Ask for confirmation before deep audit unless the user explicitly asks to proceed without confirmation.
@@ -149,13 +154,17 @@ The audit should usually produce an issue plan for non-OK findings, but not crea
   checked.
 - **Changelog only**: for missing changelog entries; prefer one bundled changelog issue or a recommendation to run `/update-changelog`, not one issue per entry.
 - **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
-- **Parent issue**: create one parent issue only to group two or more related _child fix_ issues from the
-  same audit. Do **not** create a standalone audit-snapshot tracker (a `Post-<range> audit` /
-  `Post-rc.N catch-up audit` issue): per `AGENTS.md` → _Tracking Issues And Handoffs_, the audit
-  report is a point-in-time snapshot — append it to the standing release audit ledger in place, and
-  include that ledger comment URL in every approved parent or child issue created from the audit.
-  Genuine non-OK findings still become real child issues; only the snapshot/report is what goes to
-  the ledger instead of a new issue.
+- **Parent issue**: create one parent issue only to group two or more related
+  _child fix_ issues from the same audit. Do **not** create a standalone
+  audit-snapshot tracker (a `Post-<range> audit` / `Post-rc.N catch-up audit`
+  issue): per `AGENTS.md` → _Tracking Issues And Handoffs_, the audit report is
+  a point-in-time snapshot. For release-gate audits, append that snapshot to the
+  standing release audit ledger in place and include the ledger comment URL in
+  every approved parent or child issue created from the audit. For non-release
+  audits with no release-gate ledger, record
+  `Audit ledger: not applicable (non-release audit)` in every approved parent or
+  child issue. Genuine non-OK findings still become real child issues; only the
+  snapshot/report is what goes to the ledger instead of a new issue.
 
 For process findings, the issue plan must include a Process Gap Disposition
 before issue creation:

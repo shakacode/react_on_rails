@@ -14,7 +14,10 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
   audit ledger first.
 - If a required release-gate ledger append fails, do not create issues; report
   the exact command/API error and the ledger issue or permission needed to
-  unblock issue creation.
+  unblock issue creation. The approved audit report remains valid; retry the
+  ledger append after the permission, quota, or transient API issue is resolved
+  without regenerating the audit unless the base, head, or approved report
+  changed.
 - If multiple child issues are needed, create one parent issue for the audit and one child issue per
   independently actionable fix/revert/question. For release-gate audits, link
   the release-gate audit ledger comment from every approved parent or child
@@ -101,6 +104,11 @@ First, produce the exact worked-issue scope and merged-PR range:
   `worked_issue_scope: UNKNOWN (access)` with the exact command/error and
   use structured public `codex-claim` comments as advisory coverage when
   available before continuing with GitHub/git evidence for the merged-PR range
+- if `agent-coord doctor` and `agent-coord status` both succeed but the named
+  batch entry contains no worked issues or lanes, record
+  `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
+  continue with the merged-PR range only, and report the batch metadata
+  correction needed
 
 Then produce the exact merged-PR range and, only when `worked_issue_scope` is
 known, the batch-subset list:
@@ -124,10 +132,10 @@ alongside the merged PR range, and include a `worked_issue_scope: UNKNOWN`
 finding with the command or permission needed to recover the missing issue/lane
 list.
 
-Ask me to confirm the included/excluded worked issues and PRs before deep audit
-when `worked_issue_scope` is known. When the scope is `UNKNOWN (needs batch
-confirmation)`, ask me to choose the candidate batch/run id before any
-worked-issue audit.
+Ask me to confirm the included/excluded worked issues, advisory `codex-claim`
+rows, and PR range before deep audit unless I explicitly say to proceed. When
+the scope is `UNKNOWN (needs batch confirmation)`, ask me to choose the
+candidate batch/run id before any worked-issue audit.
 
 After confirmation, audit each known worked issue or advisory `codex-claim` row
 for:
@@ -247,13 +255,14 @@ Pay special attention to disagreements:
 
 Return:
 1. consensus high-risk findings
-2. disputed findings needing human review
-3. reconciled worked-issue coverage table with issue number, coordination
+2. reconciled review-gate violations
+3. disputed findings needing human review
+4. reconciled worked-issue coverage table with issue number, coordination
    lane/branch, linked PR or no-PR/blocker evidence, final state,
    intent-achievement classification, and any unresolved `UNKNOWN` facts
-4. PRs both agents consider OK
-5. deduped issue plan
-6. recommended next actions
+5. PRs both agents consider OK
+6. deduped issue plan
+7. recommended next actions
 
 Do not create issues or PRs yet.
 ```

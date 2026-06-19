@@ -36,8 +36,8 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      liveness. `agent-coord status` is a preflight view; the claim operation is
      the backend's compare-and-swap gate, so the claim result is the source of
      truth for races. If `agent-coord doctor` or `agent-coord status` cannot be
-     checked, report private state as `UNKNOWN` and use structured public claim
-     comments as an advisory fallback.
+     checked, report private state as `UNKNOWN` and use structured public
+     `codex-claim` comments as an advisory fallback.
    - For lanes declared in `batches/<batch-id>.json` with `depends_on`, run
      `agent-coord status` at lane start and before rebase or push. If the lane
      shows unmet `blocked_on` refs, set that lane's heartbeat status to
@@ -1155,6 +1155,11 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    `UNKNOWN` as needed, and report the command, permission, or batch id
    confirmation needed to recover the worked issue list instead of identifying a
    confirmed batch subset from PR links or heuristics.
+   If `agent-coord doctor` and `agent-coord status` both succeed but the named
+   batch entry contains no worked issues or lanes, record
+   `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
+   audit the merged PR range only, and report the batch metadata correction
+   needed.
 3. List every PR merged in the range. When `worked_issue_scope` is known,
    identify the batch subset by coordination state, branch names, PR bodies,
    labels, comments, authors, merge timing, and linked issues. When
@@ -1163,10 +1168,11 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    from PR links or heuristics. Use advisory public `codex-claim` rows from step
    2 for possible no-PR, blocked, parked, and done-unmerged lanes, but keep
    those rows marked `UNKNOWN` until coordination state is recovered.
-4. Ask for confirmation of included and excluded worked issues and PRs before
-   deep audit when `worked_issue_scope` is known unless the user explicitly says
-   to proceed. When the scope is `UNKNOWN (needs batch confirmation)`, ask the
-   user to choose the candidate batch/run id before any worked-issue audit.
+4. Ask for confirmation of included and excluded worked issues, advisory public
+   `codex-claim` rows, and the PR range before deep audit unless the user
+   explicitly says to proceed. When the scope is
+   `UNKNOWN (needs batch confirmation)`, ask the user to choose the candidate
+   batch/run id before any worked-issue audit.
 5. For each known worked issue or advisory public `codex-claim` row, evaluate
    whether the implementation, no-PR evidence, blocker, or parked disposition
    satisfied the issue intent; verify the final state; and classify it as
