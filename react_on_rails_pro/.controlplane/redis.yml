@@ -22,6 +22,8 @@ spec:
         - number: 6379
           protocol: tcp
   defaultOptions:
+    # Redis keeps Capacity AI off: right-sizing restarts are a poor default for a cache.
+    # Review cache restart tolerance before copying the Rails Capacity AI posture here.
     autoscaling:
       maxScale: 1
     capacityAI: false
