@@ -285,6 +285,7 @@ export const createRSCProvider = ({
       evictedSuccessfulPayloadKeysRef.current = new BoundedLRU<true>(RSC_PAYLOAD_CACHE_MAX_ENTRIES, () => {});
     }
     const evictedSuccessfulPayloadKeys = evictedSuccessfulPayloadKeysRef.current;
+    const inFlightEvictedSuccessfulPayloadKeysRef = useRef(new Set<string>());
     // Provider-wide successful-refetch token. Values only need to be comparable
     // for "newer successful payload happened" checks, so a global monotonic
     // token lets a mounted route ignore eviction cleanup decreases (N -> 0) but
@@ -405,11 +406,18 @@ export const createRSCProvider = ({
         // needs `let` (mirrors `refetchComponent`, which defines its
         // `restoreLastSuccessfulPromise` closure before assigning `promise`).
         let promise!: Promise<ReactNode>;
+        let payloadSucceeded = false;
+        const notifyRoutesOnSuccess =
+          evictedSuccessfulPayloadKeys.has(key) || inFlightEvictedSuccessfulPayloadKeysRef.current.has(key);
+        if (notifyRoutesOnSuccess) {
+          inFlightEvictedSuccessfulPayloadKeysRef.current.add(key);
+        }
         const markPayloadIfSuccessful = (payload: ReactNode) => {
           if (!(payload instanceof Error)) {
-            const notifyRoutes = evictedSuccessfulPayloadKeys.has(key);
+            payloadSucceeded = true;
             evictedSuccessfulPayloadKeys.delete(key);
-            markSuccessfulPromise(key, promise, notifyRoutes);
+            inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
+            markSuccessfulPromise(key, promise, notifyRoutesOnSuccess);
           }
           return payload;
         };
@@ -417,6 +425,10 @@ export const createRSCProvider = ({
           .then(markPayloadIfSuccessful)
           .finally(() => {
             fetchRSCPromises.unpin(key);
+            if (notifyRoutesOnSuccess && !payloadSucceeded) {
+              inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
+              evictedSuccessfulPayloadKeys.set(key, true);
+            }
           });
         fetchRSCPromises.setPinned(key, promise);
         return promise;

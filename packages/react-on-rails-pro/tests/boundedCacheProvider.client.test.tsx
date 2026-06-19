@@ -18,9 +18,10 @@ import { Suspense } from 'react';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-import { BoundedLRU, createRSCProvider, RSC_PAYLOAD_CACHE_MAX_ENTRIES } from '../src/RSCProvider.tsx';
+import { BoundedLRU, createRSCProvider, RSC_PAYLOAD_CACHE_MAX_ENTRIES, useRSC } from '../src/RSCProvider.tsx';
 import RSCRoute, { type RSCRouteHandle } from '../src/RSCRoute.tsx';
 import { shouldClearRefetchErrorOnSuccessfulVersionChange } from '../src/RSCRouteSuccessfulVersion.ts';
+import { createRSCPayloadKey } from '../src/utils.ts';
 import { getNodeVersion } from './testUtils';
 
 // Imported from the source so the test cap cannot drift from the real cap.
@@ -306,6 +307,19 @@ describe('RSCRoute successful-version error reset', () => {
       throw new Error('Expected RSCRoute ref to be attached');
     }
     return ref.current;
+  };
+
+  const findPendingForId = (
+    pending: Array<Deferred & { args: GetServerComponentArgs }>,
+    id: number,
+  ): Deferred & { args: GetServerComponentArgs } => {
+    const deferred = [...pending]
+      .reverse()
+      .find((d) => !d.args.enforceRefetch && (d.args.componentProps as { id: number }).id === id);
+    if (!deferred) {
+      throw new Error(`Expected pending RSC request for id ${id}`);
+    }
+    return deferred;
   };
 
   // NODE_ENV is process-global; restore it after each case so the
@@ -749,5 +763,72 @@ describe('RSCRoute successful-version error reset', () => {
       initialLoads.forEach((d, i) => d.resolve(<span>{`payload ${i}`}</span>));
       await Promise.all(initialLoads.map((d) => d.promise));
     });
+  });
+
+  it('i. evicted-success markers survive marker-cache churn while a replacement load is pending', async () => {
+    process.env.NODE_ENV = 'production';
+
+    type PendingEntry = Deferred & { args: GetServerComponentArgs };
+    const pending: PendingEntry[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      pending.push({ ...d, args: _args[0] });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+    await renderInAct(
+      <RSCProvider>
+        <Probe />
+      </RSCProvider>,
+    );
+
+    const startLoad = async (id: number) => {
+      let promise!: Promise<React.ReactNode>;
+      await act(async () => {
+        promise = rscApi.getComponent('Card', { id });
+        await Promise.resolve();
+      });
+      return { promise, deferred: findPendingForId(pending, id) };
+    };
+
+    const resolveLoad = async (started: Awaited<ReturnType<typeof startLoad>>, payload: React.ReactNode) => {
+      await act(async () => {
+        started.deferred.resolve(payload);
+        await started.promise;
+      });
+    };
+
+    // Give ids 0..CACHE_CAP a successful payload. Loading the (cap+1)-th key
+    // evicts id 0 and records its "last successful payload was evicted" marker.
+    for (let id = 0; id <= CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`initial ${id}`}</span>);
+    }
+
+    // Start id 0's replacement load while its marker is present, but keep it
+    // pending. The provider must latch that marker for this in-flight load.
+    const replacement = await startLoad(0);
+
+    // Churn enough additional successful keys to push id 0 out of the bounded
+    // evicted-marker LRU before the replacement resolves.
+    for (let id = CACHE_CAP + 1; id <= CACHE_CAP * 2 + 2; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`churn ${id}`}</span>);
+    }
+
+    await resolveLoad(replacement, <span>replacement 0</span>);
+
+    const key = createRSCPayloadKey('Card', { id: 0 });
+    await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
   });
 });
