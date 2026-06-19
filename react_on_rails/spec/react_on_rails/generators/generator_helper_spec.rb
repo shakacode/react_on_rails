@@ -348,6 +348,10 @@ RSpec.describe GeneratorHelper, type: :generator do
     it "places root entrypoints directly under source_path without a double slash" do
       expect(shakapacker_entrypoint_path("server-bundle.js")).to eq("client/app/server-bundle.js")
     end
+
+    it "raises a clear error for blank entrypoint filenames" do
+      expect { shakapacker_entrypoint_path("") }.to raise_error(ArgumentError, "filename must be present")
+    end
   end
 
   describe "#relative_stylesheet_import_path" do
@@ -360,11 +364,17 @@ RSpec.describe GeneratorHelper, type: :generator do
           source_path: client/app
       YAML
       remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
+      if instance_variable_defined?(:@shakapacker_source_entry_path)
+        remove_instance_variable(:@shakapacker_source_entry_path)
+      end
     end
 
     after do
       FileUtils.rm_rf(File.join(destination_root, "config"))
       remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
+      if instance_variable_defined?(:@shakapacker_source_entry_path)
+        remove_instance_variable(:@shakapacker_source_entry_path)
+      end
     end
 
     it "computes the stylesheet import path from the generated entry file" do

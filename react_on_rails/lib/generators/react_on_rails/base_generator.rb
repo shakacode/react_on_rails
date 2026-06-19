@@ -189,6 +189,7 @@ module ReactOnRails
       end
 
       def copy_packer_config
+        # Rails generator actions run in method definition order.
         # Keep this before path-dependent copy actions; GeneratorHelper memoizes
         # Shakapacker paths on first read, so --force overwrites must happen first.
         base_path = "base/base/"

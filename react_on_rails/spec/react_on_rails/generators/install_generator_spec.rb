@@ -457,7 +457,7 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "generates base demo files from the final Shakapacker config" do
+    it "generates base demo files from the config after --force overwrites the custom setup" do
       # Thor's global --force overwrites the pre-installed config before path-dependent files are copied.
       assert_file "app/javascript/packs/server-bundle.js"
       assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"

@@ -95,6 +95,9 @@ module GeneratorHelper
   end
 
   def shakapacker_entrypoint_path(filename)
+    filename = filename.to_s
+    raise ArgumentError, "filename must be present" if filename.empty?
+
     entry_dir = shakapacker_source_entry_path # "" means entrypoints live directly under source_path.
     File.join(*[shakapacker_source_path, entry_dir, filename].reject(&:empty?))
   end
