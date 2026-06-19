@@ -652,6 +652,22 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rsc and a slash Shakapacker source entry path" do
+    before(:all) do
+      run_generator_test_with_args(%w[--rsc --no-rspack], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "/")
+      end
+    end
+
+    it "normalizes the RSC discovery registration entry path" do
+      assert_file "client/app/server-bundle.js"
+      assert_file "config/webpack/rscWebpackConfig.js" do |content|
+        expect(content).to include("const sourceEntryPath = config.source_entry_path === '/' ? '' :")
+        expect(content).to include("sourceEntryPath,\n    '../generated/server-component-registration-entry.js'")
+      end
+    end
+  end
+
   context "with --rsc --tailwind and a pre-installed custom Shakapacker source root" do
     before(:all) do
       run_generator_test_with_args(%w[--rsc --tailwind --no-rspack], package_json: true, force: false) do

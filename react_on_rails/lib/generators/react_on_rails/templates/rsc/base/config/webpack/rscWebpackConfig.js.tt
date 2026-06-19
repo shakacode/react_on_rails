@@ -50,10 +50,13 @@ const configureRsc = () => {
   // Pass true to skip the RSC manifest plugin - RSC bundle doesn't need it
   const rscConfig = serverWebpackConfig(true);
   const discoveryBuild = process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true';
+  // Shakapacker uses "/" to mean entrypoints live directly under source_path.
+  // Keep that sentinel relative so path.resolve does not escape to the filesystem root.
+  const sourceEntryPath = config.source_entry_path === '/' ? '' : config.source_entry_path;
 
   const defaultServerComponentRegistrationEntry = resolve(
     config.source_path,
-    config.source_entry_path,
+    sourceEntryPath,
     '../generated/server-component-registration-entry.js',
   );
   const expectedServerComponentRegistrationEntry = 'server-component-registration-entry.js';
