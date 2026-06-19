@@ -464,7 +464,10 @@ describe InstallGenerator, type: :generator do
     end
 
     it "generates base demo files from the config after --force overwrites the custom setup" do
-      # Thor's global --force overwrites the pre-installed config before path-dependent files are copied.
+      # --force causes copy_packer_config (which runs first) to overwrite the
+      # pre-installed custom config with the stock config before
+      # shakapacker_source_path memoizes. All path-dependent copies see the
+      # stock app/javascript root.
       assert_file "app/javascript/packs/server-bundle.js"
       assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
       assert_no_file "client/app/entrypoints/server-bundle.js"
@@ -1533,6 +1536,14 @@ describe InstallGenerator, type: :generator do
 
       expect(gen).to have_received(:template)
         .with("base/base/config/shakapacker.yml.tt", "config/shakapacker.yml")
+    end
+
+    it "raises when path helpers memoize before copy_packer_config runs" do
+      gen = BaseGenerator.new([], {}, { destination_root: destination })
+      gen.instance_variable_set(:@shakapacker_source_path, "client/app")
+
+      expect { gen.copy_packer_config }
+        .to raise_error(Thor::Error, /copy_packer_config must run before path-dependent generator actions/)
     end
   end
 

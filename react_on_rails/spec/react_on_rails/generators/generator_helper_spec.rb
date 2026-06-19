@@ -285,6 +285,12 @@ RSpec.describe GeneratorHelper, type: :generator do
       expect(safe_generator_destination_path("/tmp/client/app", default: default_path)).to eq(default_path)
     end
 
+    it "falls back for absolute paths that relativize outside the destination root" do
+      outside_destination_path = File.expand_path("../client/app", destination_root)
+
+      expect(safe_generator_destination_path(outside_destination_path, default: default_path)).to eq(default_path)
+    end
+
     it "falls back for degenerate or traversing paths" do
       expect(safe_generator_destination_path(".", default: default_path)).to eq(default_path)
       expect(safe_generator_destination_path("..", default: default_path)).to eq(default_path)
