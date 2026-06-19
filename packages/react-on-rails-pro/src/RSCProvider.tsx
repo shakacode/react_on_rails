@@ -58,6 +58,9 @@ const RSCContext = createContext<RSCContextType | undefined>(undefined);
  * NOTE: the per-key `useSyncExternalStore` subscription/fan-out optimization
  * from #3564 is intentionally deferred pending profiling; only eviction is
  * implemented here.
+ *
+ * TODO(#3564): Consider exposing this as a `createRSCProvider` option if apps
+ * need to tune the cap for unusually high-cardinality RSC routes.
  */
 export const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
 
@@ -155,6 +158,9 @@ export class BoundedLRU<V> {
   }
 
   delete(key: string): void {
+    // Intentionally does not call `onEvict`: current callers handle companion
+    // state before deleting/restoring a key. Future callers that need eviction
+    // cleanup should use an eviction path, not this raw delete.
     this.map.delete(key);
     this.pinCounts.delete(key);
   }
@@ -174,7 +180,6 @@ export class BoundedLRU<V> {
     }
     if (count > 1) {
       this.pinCounts.set(key, count - 1);
-      this.evictIfNeeded();
       return;
     }
 
@@ -270,6 +275,21 @@ export const createRSCProvider = ({
     // tree visible until the new payload resolves.
     const [versions, setVersions] = useState<Record<string, number>>({});
     const [successfulVersions, setSuccessfulVersions] = useState<Record<string, number>>({});
+    // Keys whose last successful payload was evicted. Bounded separately so the
+    // cleanup marker cannot outgrow the promise cache in high-cardinality apps.
+    // If a mounted route reloads one of these keys through a normal cache-miss
+    // `getComponent`, publish a success token only after that replacement payload
+    // actually resolves.
+    const evictedSuccessfulPayloadKeysRef = useRef<BoundedLRU<true> | null>(null);
+    if (!evictedSuccessfulPayloadKeysRef.current) {
+      evictedSuccessfulPayloadKeysRef.current = new BoundedLRU<true>(RSC_PAYLOAD_CACHE_MAX_ENTRIES, () => {});
+    }
+    const evictedSuccessfulPayloadKeys = evictedSuccessfulPayloadKeysRef.current;
+    // Provider-wide successful-refetch token. Values only need to be comparable
+    // for "newer successful payload happened" checks, so a global monotonic
+    // token lets a mounted route ignore eviction cleanup decreases (N -> 0) but
+    // still observe a later successful refetch after that key was cleaned up.
+    const successfulVersionRef = useRef(0);
     const [, startTransition] = useTransition();
 
     // Bounded promise cache (#3564): the authoritative cache `getComponent`
@@ -290,6 +310,9 @@ export const createRSCProvider = ({
       fetchRSCPromisesRef.current = new BoundedLRU<Promise<ReactNode>>(
         RSC_PAYLOAD_CACHE_MAX_ENTRIES,
         (evictedKey) => {
+          if (evictedKey in lastSuccessfulRSCPromisesRef.current) {
+            evictedSuccessfulPayloadKeys.set(evictedKey, true);
+          }
           // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
           delete lastSuccessfulRSCPromisesRef.current[evictedKey];
           // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -346,8 +369,10 @@ export const createRSCProvider = ({
           return;
         }
 
+        successfulVersionRef.current += 1;
+        const successfulVersion = successfulVersionRef.current;
         startTransition(() => {
-          setSuccessfulVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
+          setSuccessfulVersions((v) => ({ ...v, [key]: successfulVersion }));
         });
       },
       [fetchRSCPromises, startTransition],
@@ -382,7 +407,9 @@ export const createRSCProvider = ({
         let promise!: Promise<ReactNode>;
         const markPayloadIfSuccessful = (payload: ReactNode) => {
           if (!(payload instanceof Error)) {
-            markSuccessfulPromise(key, promise);
+            const notifyRoutes = evictedSuccessfulPayloadKeys.has(key);
+            evictedSuccessfulPayloadKeys.delete(key);
+            markSuccessfulPromise(key, promise, notifyRoutes);
           }
           return payload;
         };
@@ -394,7 +421,7 @@ export const createRSCProvider = ({
         fetchRSCPromises.setPinned(key, promise);
         return promise;
       },
-      [fetchRSCPromises, markSuccessfulPromise],
+      [evictedSuccessfulPayloadKeys, fetchRSCPromises, markSuccessfulPromise],
     );
 
     const refetchComponent = useCallback(
@@ -433,6 +460,7 @@ export const createRSCProvider = ({
                   restoreLastSuccessfulPromise();
                 }
               } else {
+                evictedSuccessfulPayloadKeys.delete(key);
                 markSuccessfulPromise(key, promise, true);
               }
               return payload;
@@ -458,7 +486,7 @@ export const createRSCProvider = ({
         });
         return promise;
       },
-      [fetchRSCPromises, markSuccessfulPromise, startTransition],
+      [evictedSuccessfulPayloadKeys, fetchRSCPromises, markSuccessfulPromise, startTransition],
     );
 
     // `versions` and `successfulVersions` intentionally refresh this context.

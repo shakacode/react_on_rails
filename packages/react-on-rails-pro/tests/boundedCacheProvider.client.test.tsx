@@ -13,7 +13,6 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-/* eslint-disable react/prop-types */
 import * as React from 'react';
 import { Suspense } from 'react';
 import { render, screen, act, waitFor } from '@testing-library/react';
@@ -21,6 +20,7 @@ import '@testing-library/jest-dom';
 
 import { BoundedLRU, createRSCProvider, RSC_PAYLOAD_CACHE_MAX_ENTRIES } from '../src/RSCProvider.tsx';
 import RSCRoute, { type RSCRouteHandle } from '../src/RSCRoute.tsx';
+import { shouldClearRefetchErrorOnSuccessfulVersionChange } from '../src/RSCRouteSuccessfulVersion.ts';
 import { getNodeVersion } from './testUtils';
 
 // Imported from the source so the test cap cannot drift from the real cap.
@@ -232,6 +232,31 @@ describe('BoundedLRU', () => {
   });
 });
 
+describe('RSCRoute successful-version error reset', () => {
+  const routeKey = 'Card-{"id":0}';
+
+  it('does not treat same-key version cleanup as a successful retry', () => {
+    expect(
+      shouldClearRefetchErrorOnSuccessfulVersionChange(
+        { key: routeKey, version: 3 },
+        { key: routeKey, version: 0 },
+      ),
+    ).toBe(false);
+    expect(
+      shouldClearRefetchErrorOnSuccessfulVersionChange(
+        { key: routeKey, version: 3 },
+        { key: routeKey, version: 4 },
+      ),
+    ).toBe(true);
+    expect(
+      shouldClearRefetchErrorOnSuccessfulVersionChange(
+        { key: routeKey, version: 3 },
+        { key: 'Card-{"id":1}', version: 0 },
+      ),
+    ).toBe(true);
+  });
+});
+
 (getNodeVersion() >= 18 ? describe : describe.skip)('RSCProvider bounded LRU cache (#3564)', () => {
   let getServerComponent: jest.Mock<Promise<React.ReactNode>, [GetServerComponentArgs]>;
   let RSCProvider: React.FC<{ children: React.ReactNode }>;
@@ -261,6 +286,7 @@ describe('BoundedLRU', () => {
     let result!: ReturnType<typeof render>;
     await act(async () => {
       result = render(ui);
+      await Promise.resolve();
     });
     return result;
   };
@@ -268,11 +294,19 @@ describe('BoundedLRU', () => {
   const rerenderInAct = async (result: ReturnType<typeof render>, ui: React.ReactElement) => {
     await act(async () => {
       result.rerender(ui);
+      await Promise.resolve();
     });
   };
 
   const fetchCount = (id: number) =>
     getServerComponent.mock.calls.filter((c) => (c[0].componentProps as { id: number }).id === id).length;
+
+  const getRouteHandle = (ref: React.RefObject<RSCRouteHandle | null>) => {
+    if (!ref.current) {
+      throw new Error('Expected RSCRoute ref to be attached');
+    }
+    return ref.current;
+  };
 
   // NODE_ENV is process-global; restore it after each case so the
   // production/development branches in RSCRoute do not leak between tests.
@@ -387,7 +421,7 @@ describe('BoundedLRU', () => {
     expect(getServerComponent).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      await ref.current!.refetch();
+      await getRouteHandle(ref).refetch();
     });
 
     // Refetch forces a fresh fetch (enforceRefetch) and the UI updates.
@@ -428,10 +462,10 @@ describe('BoundedLRU', () => {
     // recoverOnError refetch fails; the route must keep showing the prior
     // successful payload (restoreLastSuccessfulPromise) rather than blanking.
     await act(async () => {
-      await expect(ref.current!.refetch()).rejects.toThrow('refetch boom');
+      await expect(getRouteHandle(ref).refetch()).rejects.toThrow('refetch boom');
     });
 
-    await waitFor(() => expect(ref.current!.refetchError?.message).toBe('refetch boom'));
+    await waitFor(() => expect(getRouteHandle(ref).refetchError?.message).toBe('refetch boom'));
     expect(screen.getByTestId('payload')).toHaveTextContent('Card v1');
   });
 
@@ -483,6 +517,7 @@ describe('BoundedLRU', () => {
     const result = await renderInAct(<Root fillerId={null} />);
     await act(async () => {
       pending[0].resolve(<span data-testid="payload">id 0 v1</span>);
+      await pending[0].promise;
     });
     await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('id 0 v1'));
     expect(pending[0].args).toEqual({ componentName: 'Card', componentProps: { id: 0 } });
@@ -493,12 +528,14 @@ describe('BoundedLRU', () => {
     let refetchA!: Promise<React.ReactNode>;
     let refetchB!: Promise<React.ReactNode>;
     await act(async () => {
-      refetchA = ref.current!.refetch();
-      refetchB = ref.current!.refetch();
+      const routeHandle = getRouteHandle(ref);
+      refetchA = routeHandle.refetch();
+      refetchB = routeHandle.refetch();
       // Swallow the eventual rejections here so an unhandled-rejection warning
       // doesn't fire before the assertions below await them.
       void refetchA.catch(() => undefined);
       void refetchB.catch(() => undefined);
+      await Promise.resolve();
     });
     expect(getServerComponent).toHaveBeenCalledTimes(3);
     // Two enforceRefetch fetches for id 0 are now pending (A then B).
@@ -519,6 +556,7 @@ describe('BoundedLRU', () => {
         // eslint-disable-next-line no-await-in-loop
         await act(async () => {
           fillerDeferred.resolve(<span>{`filler ${id}`}</span>);
+          await fillerDeferred.promise;
         });
       }
     }
@@ -546,6 +584,7 @@ describe('BoundedLRU', () => {
     if (extraColdDeferred) {
       await act(async () => {
         extraColdDeferred.resolve(<span>{`filler ${extraColdId}`}</span>);
+        await extraColdDeferred.promise;
       });
     }
 
@@ -606,6 +645,7 @@ describe('BoundedLRU', () => {
         // eslint-disable-next-line no-await-in-loop
         await act(async () => {
           fillerDeferred.resolve(<span>{`filler ${id}`}</span>);
+          await fillerDeferred.promise;
         });
       }
     }
@@ -614,6 +654,7 @@ describe('BoundedLRU', () => {
     // entry is still live and markSuccessfulPromise records it.
     await act(async () => {
       initialDeferred.resolve(<span data-testid="payload">id 0 v1</span>);
+      await initialDeferred.promise;
     });
     await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('id 0 v1'));
 
@@ -621,14 +662,17 @@ describe('BoundedLRU', () => {
     // last-successful companion — which was recorded only because of the pin.
     let refetchPromise!: Promise<React.ReactNode>;
     await act(async () => {
-      refetchPromise = ref.current!.refetch();
+      refetchPromise = getRouteHandle(ref).refetch();
       void refetchPromise.catch(() => undefined);
+      await Promise.resolve();
     });
 
     const refetchDeferred = pending.find((d) => d.args.enforceRefetch);
-    expect(refetchDeferred).toBeDefined();
+    if (!refetchDeferred) {
+      throw new Error('Expected recoverOnError refetch request to be pending');
+    }
     await act(async () => {
-      refetchDeferred!.reject(new Error('refetch boom'));
+      refetchDeferred.reject(new Error('refetch boom'));
       await expect(refetchPromise).rejects.toThrow('refetch boom');
     });
 
@@ -646,7 +690,7 @@ describe('BoundedLRU', () => {
     //
     // The survival invariant is asserted via FETCH COUNT: if the newest key
     // were self-evicted on insertion, a later render would miss and re-fetch
-    // it (count 2). It stays at exactly 1 fetch, proving it was never evicted.
+    // it, raising the count to 2. It stays at exactly 1 fetch, proving it was never evicted.
     // (The deterministic data-structure proof lives in the `setPinned` unit
     // test above; this exercises the same path end-to-end through RSCProvider.)
     process.env.NODE_ENV = 'production';
@@ -701,9 +745,9 @@ describe('BoundedLRU', () => {
     // Now drain every in-flight load so the cache reconciles back toward cap
     // and no unsettled promises leak into later tests.
     await act(async () => {
-      pending
-        .filter((d) => !d.args.enforceRefetch)
-        .forEach((d, i) => d.resolve(<span>{`payload ${i}`}</span>));
+      const initialLoads = pending.filter((d) => !d.args.enforceRefetch);
+      initialLoads.forEach((d, i) => d.resolve(<span>{`payload ${i}`}</span>));
+      await Promise.all(initialLoads.map((d) => d.promise));
     });
   });
 });
