@@ -458,6 +458,7 @@ describe InstallGenerator, type: :generator do
     end
 
     it "generates base demo files from the final Shakapacker config" do
+      # Thor's global --force overwrites the pre-installed config before path-dependent files are copied.
       assert_file "app/javascript/packs/server-bundle.js"
       assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
       assert_no_file "client/app/entrypoints/server-bundle.js"
@@ -493,6 +494,25 @@ describe InstallGenerator, type: :generator do
       assert_file "app/views/hello_world/index.html.erb" do |content|
         expect(content).to include('<code class="path-hint">client/app/src/HelloWorldApp/</code>')
         expect(content).not_to include("app/javascript/src/HelloWorldApp/")
+      end
+    end
+  end
+
+  context "with --tailwind and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--tailwind], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates Tailwind assets under the configured Shakapacker source path" do
+      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_no_file "app/javascript/stylesheets/application.css"
+    end
+
+    it "injects the stylesheet import into the generated client component" do
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx" do |content|
+        expect(content).to include("import '../../../stylesheets/application.css';")
       end
     end
   end

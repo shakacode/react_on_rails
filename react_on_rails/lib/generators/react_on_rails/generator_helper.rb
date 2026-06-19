@@ -105,6 +105,7 @@ module GeneratorHelper
   end
 
   def relative_stylesheet_import_path(entry_path, filename: "application.css")
+    # InstallGenerator copies the final Shakapacker config before path-dependent demo files are generated.
     entry_dir = Pathname.new(File.join(destination_root, entry_path)).dirname
     stylesheet = Pathname.new(File.join(destination_root, shakapacker_stylesheet_path(filename)))
 
