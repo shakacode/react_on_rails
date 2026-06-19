@@ -354,6 +354,8 @@ describe('streamServerRenderedReactComponent', () => {
   });
 
   it('runs post-SSR hooks once for unexpected nested Suspense errors', async () => {
+    // In this test environment, onAllReady fires once for this error path, so
+    // notifySSREnd is called once and no duplicate warning occurs.
     const onPostSSRHook = jest.fn();
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const renderResult = setupUnexpectedNestedSuspenseErrorStreamTest({ onPostSSRHook });
