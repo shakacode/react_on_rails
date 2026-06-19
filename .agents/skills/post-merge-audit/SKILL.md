@@ -217,7 +217,8 @@ Return high-risk findings first, then:
 4. A deduped issue plan with parent/child recommendations and fingerprints.
 5. A worked-issue coverage table with issue number, coordination lane/branch,
    linked PR or no-PR/blocker evidence, final state, intent-achievement
-   classification, and `UNKNOWN` facts.
+   classification, and `UNKNOWN` facts (see the example in
+   `.agents/workflows/post-merge-audit.md`).
 6. A PR-by-PR table.
 7. Exact commands and data sources used, including `agent-coord status` output
    for the named batch or the exact reason coordination state was `UNKNOWN`.

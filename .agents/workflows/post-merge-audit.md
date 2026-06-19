@@ -20,9 +20,9 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
   changed.
 - If multiple child issues are needed, create one parent issue for the audit
   and one child issue per independently actionable fix/revert/question. For
-  release-gate audits, link
-  the release-gate audit ledger comment from every approved parent or child
-  issue created from the audit. For non-release audits with no ledger, record
+  release-gate audits, include the release-gate audit ledger comment URL in
+  every approved parent or child issue created from the audit. For non-release
+  audits with no ledger, record
   `Audit ledger: not applicable (non-release audit)` in approved issue bodies.
 - Before creating any issue, search existing open issues for the affected PR number and the hidden fingerprint.
 - When batch work is in scope but the batch/run id was not supplied, record
@@ -288,8 +288,8 @@ Return:
 1. consensus high-risk findings
 2. reconciled review-gate violations
 3. disputed findings needing human review
-4. deduped issue plan
-5. PRs both agents consider OK
+4. PRs both agents consider OK
+5. deduped issue plan
 6. reconciled worked-issue coverage table with issue number, coordination
    lane/branch, linked PR or no-PR/blocker evidence, final state,
    intent-achievement classification, and any unresolved `UNKNOWN` facts
