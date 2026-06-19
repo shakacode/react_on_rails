@@ -21,4 +21,7 @@ export type SuccessfulVersionSnapshot = {
 export const shouldClearRefetchErrorOnSuccessfulVersionChange = (
   previous: SuccessfulVersionSnapshot,
   current: SuccessfulVersionSnapshot,
-): boolean => previous.key !== current.key || current.version > previous.version;
+): boolean =>
+  // A route-key change means the visible route changed, so clear the previous
+  // key's refetch error even when the new key has no successful payload token yet.
+  previous.key !== current.key || current.version > previous.version;

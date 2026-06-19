@@ -165,6 +165,13 @@ export class BoundedLRU<V> {
     this.pinCounts.delete(key);
   }
 
+  deleteValuePreservingPins(key: string): void {
+    // Used when deleting the current map value for a failed same-key request
+    // while older/newer same-key requests may still hold pins. Clearing the pin
+    // count here would let a stale finally() unpin consume a newer request's pin.
+    this.map.delete(key);
+  }
+
   /**
    * Prevent `key` from being evicted until a matching `unpin` runs. Ref-counted:
    * overlapping in-flight refetches for the same key each add a pin.
@@ -276,19 +283,21 @@ export const createRSCProvider = ({
     // tree visible until the new payload resolves.
     const [versions, setVersions] = useState<Record<string, number>>({});
     const [successfulVersions, setSuccessfulVersions] = useState<Record<string, number>>({});
-    // Keys whose last successful payload was evicted. Bounded separately so the
-    // cleanup marker cannot outgrow the promise cache in high-cardinality apps.
-    // If a mounted route reloads one of these keys through a normal cache-miss
-    // `getComponent`, publish a success token only after that replacement payload
-    // actually resolves. The bounded marker is best-effort before a replacement
-    // load starts; once a reload observes the marker, the in-flight set below
-    // latches it until settlement so concurrent marker churn cannot hide the
-    // successful replacement.
-    const evictedSuccessfulPayloadKeysRef = useRef<BoundedLRU<true> | null>(null);
+    // Keys whose last successful payload was evicted. If a mounted route reloads
+    // one of these keys through a normal cache-miss `getComponent`, publish a
+    // success token only after that replacement payload actually resolves. This
+    // marker set is intentionally not LRU-bounded: dropping a marker before the
+    // replacement load starts can leave an active refetchError visible forever.
+    // Entries are removed when a replacement load observes the marker, and
+    // re-added only if that replacement fails before producing a good payload.
+    const evictedSuccessfulPayloadKeysRef = useRef<Set<string> | null>(null);
     if (!evictedSuccessfulPayloadKeysRef.current) {
-      evictedSuccessfulPayloadKeysRef.current = new BoundedLRU<true>(RSC_PAYLOAD_CACHE_MAX_ENTRIES, () => {});
+      evictedSuccessfulPayloadKeysRef.current = new Set<string>();
     }
     const evictedSuccessfulPayloadKeys = evictedSuccessfulPayloadKeysRef.current;
+    // Unbounded but short-lived: entries are added only when a replacement load
+    // starts after observing an evicted-success marker, and are always removed
+    // when that specific promise settles.
     const inFlightEvictedSuccessfulPayloadKeysRef = useRef(new Set<string>());
     // Provider-wide successful-refetch token. Values only need to be comparable
     // for "newer successful payload happened" checks, so a global monotonic
@@ -316,7 +325,7 @@ export const createRSCProvider = ({
         RSC_PAYLOAD_CACHE_MAX_ENTRIES,
         (evictedKey) => {
           if (evictedKey in lastSuccessfulRSCPromisesRef.current) {
-            evictedSuccessfulPayloadKeys.set(evictedKey, true);
+            evictedSuccessfulPayloadKeys.add(evictedKey);
           }
           // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
           delete lastSuccessfulRSCPromisesRef.current[evictedKey];
@@ -377,6 +386,8 @@ export const createRSCProvider = ({
         successfulVersionRef.current += 1;
         const successfulVersion = successfulVersionRef.current;
         startTransition(() => {
+          // Provider-wide monotonic token. Consumers only compare `>` for a
+          // given key, so values may jump when other keys succeed first.
           setSuccessfulVersions((v) => ({ ...v, [key]: successfulVersion }));
         });
       },
@@ -431,7 +442,7 @@ export const createRSCProvider = ({
             fetchRSCPromises.unpin(key);
             if (notifyRoutesOnSuccess && !payloadSucceeded) {
               inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
-              evictedSuccessfulPayloadKeys.set(key, true);
+              evictedSuccessfulPayloadKeys.add(key);
             }
           });
         fetchRSCPromises.setPinned(key, promise);
@@ -453,7 +464,7 @@ export const createRSCProvider = ({
           if (key in lastSuccessfulRSCPromisesRef.current) {
             fetchRSCPromises.set(key, lastSuccessfulRSCPromisesRef.current[key]);
           } else {
-            fetchRSCPromises.delete(key);
+            fetchRSCPromises.deleteValuePreservingPins(key);
           }
 
           startTransition(() => {

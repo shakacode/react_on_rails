@@ -149,6 +149,28 @@ describe('BoundedLRU', () => {
     expect(lru.has('a')).toBe(false);
   });
 
+  it('deleteValuePreservingPins keeps outstanding same-key pins intact', () => {
+    const { lru, evicted } = makeLRU(1);
+
+    lru.setPinned('k', 'old request'); // older request pin
+    lru.setPinned('k', 'failed request'); // failed request pin
+    lru.deleteValuePreservingPins('k'); // failed request removes only its value
+    lru.setPinned('k', 'retry request'); // newer retry pin
+
+    // Stale finally handlers from the failed and older requests settle after
+    // the retry starts. They must not consume the retry's pin.
+    lru.unpin('k');
+    lru.unpin('k');
+
+    lru.set('cold', 'COLD');
+    expect(lru.has('k')).toBe(true);
+    expect(evicted).toEqual(['cold']);
+
+    lru.unpin('k');
+    lru.set('next cold', 'NEXT');
+    expect(lru.has('k')).toBe(false);
+  });
+
   it('setPinned: a new key inserted into an all-pinned full cache is not self-evicted', () => {
     // Regression guard for the pin-before-evict race: with a plain `set` then
     // `pin`, inserting a key into a cache whose every entry is already pinned
@@ -826,6 +848,68 @@ describe('RSCRoute successful-version error reset', () => {
       await resolveLoad(started, <span>{`churn ${id}`}</span>);
     }
 
+    await resolveLoad(replacement, <span>replacement 0</span>);
+
+    const key = createRSCPayloadKey('Card', { id: 0 });
+    await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+  });
+
+  it('j. evicted-success markers survive churn before a replacement load starts', async () => {
+    process.env.NODE_ENV = 'production';
+
+    type PendingEntry = Deferred & { args: GetServerComponentArgs };
+    const pending: PendingEntry[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      pending.push({ ...d, args: _args[0] });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+    await renderInAct(
+      <RSCProvider>
+        <Probe />
+      </RSCProvider>,
+    );
+
+    const startLoad = async (id: number) => {
+      let promise!: Promise<React.ReactNode>;
+      await act(async () => {
+        promise = rscApi.getComponent('Card', { id });
+        await Promise.resolve();
+      });
+      return { promise, deferred: findPendingForId(pending, id) };
+    };
+
+    const resolveLoad = async (started: Awaited<ReturnType<typeof startLoad>>, payload: React.ReactNode) => {
+      await act(async () => {
+        started.deferred.resolve(payload);
+        await started.promise;
+      });
+    };
+
+    for (let id = 0; id <= CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`initial ${id}`}</span>);
+    }
+
+    // Churn enough additional successful keys that a bounded secondary marker
+    // LRU would drop id 0 before its replacement load even starts.
+    for (let id = CACHE_CAP + 1; id <= CACHE_CAP * 2 + 2; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`churn ${id}`}</span>);
+    }
+
+    const replacement = await startLoad(0);
     await resolveLoad(replacement, <span>replacement 0</span>);
 
     const key = createRSCPayloadKey('Card', { id: 0 });
