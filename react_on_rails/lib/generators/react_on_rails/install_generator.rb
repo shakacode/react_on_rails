@@ -1171,8 +1171,6 @@ module ReactOnRails
         say "📝 Creating CSS module type definitions...", :yellow
 
         css_module_types_path = File.join(shakapacker_source_path, "types", "css-modules.d.ts")
-        FileUtils.mkdir_p(File.dirname(css_module_types_path))
-
         css_module_types_content = <<~TS.strip
           // TypeScript definitions for CSS modules
           declare module "*.module.css" {
@@ -1191,7 +1189,7 @@ module ReactOnRails
           }
         TS
 
-        File.write(css_module_types_path, css_module_types_content)
+        create_file(css_module_types_path, css_module_types_content)
         say "✅ Created CSS module type definitions", :green
       end
 

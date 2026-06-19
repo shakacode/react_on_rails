@@ -3714,6 +3714,18 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "#create_css_module_types" do
+    it "uses Thor file creation at the configured Shakapacker source path" do
+      install_generator = install_generator_fixture(skip: true)
+      allow(install_generator).to receive(:shakapacker_source_path).and_return("client/app")
+
+      expect(install_generator).to receive(:create_file)
+        .with("client/app/types/css-modules.d.ts", a_string_including('declare module "*.module.css"'))
+
+      install_generator.send(:create_css_module_types)
+    end
+  end
+
   context "when detecting node availability" do
     let(:install_generator) { install_generator_fixture }
 
