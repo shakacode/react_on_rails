@@ -13,7 +13,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   skills as launchers. After fetching, prefer repo-local `.agents/skills/...`
   and `.agents/workflows/...` files when they exist; installed/global skills do
   not override this repo's policy.
-- `internal/contributor-info/agent-workflow-adoption.md`: guide for copying these agent workflows into other repositories
+- `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing these agent workflows with other repositories via git subtree and keeping them updated
 - `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
 - `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing

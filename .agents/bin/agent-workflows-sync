@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# agent-workflows-sync — vendor or update the shared agent workflows.
+#
+# The .agents/ tree (skills + workflows) is a git subtree of the canonical
+# upstream shakacode/agent-workflows. This script vendors it (first run) or
+# pulls updates (subsequent runs), then records the synced upstream SHA in
+# .agents/UPSTREAM. All per-repo differences live in AGENTS.md ->
+# "Agent Workflow Configuration", never in .agents/, so pulls stay
+# conflict-free. See internal/contributor-info/agent-workflow-adoption.md.
+#
+# Usage:
+#   .agents/bin/agent-workflows-sync [--ref <branch-or-tag>] [--remote <url>]
+#
+# Env overrides:
+#   AGENT_WORKFLOWS_REMOTE   upstream git URL (default below)
+#   AGENT_WORKFLOWS_REF      upstream ref to sync (default: main)
+set -euo pipefail
+
+PREFIX=".agents"
+REMOTE="${AGENT_WORKFLOWS_REMOTE:-https://github.com/shakacode/agent-workflows.git}"
+REF="${AGENT_WORKFLOWS_REF:-main}"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --ref) REF="$2"; shift 2 ;;
+    --remote) REMOTE="$2"; shift 2 ;;
+    -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+cd "$(git rev-parse --show-toplevel)"
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "error: working tree is not clean. Commit or stash first." >&2
+  exit 1
+fi
+
+echo "==> Fetching ${REMOTE} ${REF}"
+git fetch "$REMOTE" "$REF"
+SYNCED_SHA="$(git rev-parse FETCH_HEAD)"
+
+if [ -d "$PREFIX" ] && git log -1 --format= -- "$PREFIX" >/dev/null 2>&1 \
+   && [ -n "$(git log --oneline -- "$PREFIX" | head -1)" ]; then
+  echo "==> Updating existing subtree at ${PREFIX}"
+  git subtree pull --prefix="$PREFIX" "$REMOTE" "$REF" --squash \
+    -m "Sync ${PREFIX} from ${REMOTE}@${REF} (${SYNCED_SHA})"
+else
+  echo "==> Vendoring ${PREFIX} for the first time"
+  git subtree add --prefix="$PREFIX" "$REMOTE" "$REF" --squash \
+    -m "Vendor ${PREFIX} from ${REMOTE}@${REF} (${SYNCED_SHA})"
+fi
+
+# Record the synced upstream SHA so a repo's workflow version is visible at a glance.
+{
+  echo "remote: ${REMOTE}"
+  echo "ref: ${REF}"
+  echo "sha: ${SYNCED_SHA}"
+} > "${PREFIX}/UPSTREAM"
+git add "${PREFIX}/UPSTREAM"
+git commit -q -m "agent-workflows: record synced upstream ${SYNCED_SHA}" || true
+
+echo "==> Synced ${PREFIX} to ${SYNCED_SHA}"
+echo
+echo "Next:"
+echo "  1. Confirm AGENTS.md -> 'Agent Workflow Configuration' covers every value the"
+echo "     shared files reference (base branch, validation, labels, changelog, etc.)."
+echo "  2. Run this repo's markdown format + link checks."
+echo "  3. Dry-run one pr-batch / pr-processing pass to confirm the seam resolves."
