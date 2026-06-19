@@ -22,9 +22,11 @@ spec:
         - number: 6379
           protocol: tcp
   defaultOptions:
-    # Redis keeps Capacity AI off: right-sizing restarts are a poor default for a cache.
+    # Capacity AI may restart the workload when adjusting resources; for Redis
+    # that can disrupt cache state and connections.
     # Review cache restart tolerance before copying the Rails Capacity AI posture here.
     autoscaling:
+      minScale: 1
       maxScale: 1
     capacityAI: false
   # This firewall configuration corresponds to using no password for Redis in the gvc.yml template.
