@@ -47,11 +47,12 @@ spec:
         - number: 3800
           protocol: http
   defaultOptions:
-    # Start out like this for "test apps"
+    # Public/staging test apps keep one warm replica while Capacity AI right-sizes CPU and memory.
     autoscaling:
-      # Max of 1 effectively disables autoscaling, so a like a Heroku dyno count of 1
+      metric: disabled
+      minScale: 1
       maxScale: 1
-    capacityAI: false
+    capacityAI: true
   firewallConfig:
     external:
       # Default to allow public access to Rails server
