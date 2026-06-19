@@ -72,8 +72,9 @@ the shared workflow files stay byte-identical across repos (see
 [`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md)).
 
 - **Base branch**: `main` (fetch and compare via `origin/main`).
-- **Pre-push local validation**: `bin/ci-local` (optimized by default; `--changed` for narrow,
-  `--all` for broad). The script owns base discovery — do not pass a base ref. Contract:
+- **Pre-push local validation**: `bin/ci-local` (optimized by default; `--changed` narrow,
+  `--all` broad, `--fast` quick). The script owns base discovery — do not pass a base ref.
+  Broad suites: `bundle exec rake all_but_examples` vs `bundle exec rake`. Contract:
   [`internal/contributor-info/local-ci-contract.md`](internal/contributor-info/local-ci-contract.md).
 - **CI change detector**: `script/ci-changes-detector origin/main` (inspect suite routing).
 - **Hosted-CI trigger**: `+ci-*` PR-comment commands (`+ci-status`, `+ci-run-hosted`,
@@ -84,11 +85,21 @@ the shared workflow files stay byte-identical across repos (see
   `benchmark-pro-node-renderer`, and `hosted-ci-no-benchmarks` (suppress). Opt-in on PRs.
 - **Follow-up issue prefix**: `Follow-up:`. Default to no new issue; see the **Maintainer
   Attention Contract** section.
-- **Changelog**: `/CHANGELOG.md`, user-visible changes only; entry format and the `**[Pro]**`
-  tag are defined in the **Changelog** section.
+- **Changelog**: `/CHANGELOG.md`, user-visible changes only. Entry format, the `**[Pro]**`
+  scope tag, the version-stamping task (`bundle exec rake "update_changelog[...]"`), and the
+  classification taxonomy are in the **Changelog** section.
 - **Lint / format**: `bundle exec rake lint` (package lint), `bundle exec rake autofix` (fix),
   `pnpm start format.listDifferent` (Prettier check), `bin/check-links` (markdown links). Full
   list in the **Commands** section.
+- **Merge ledger**: `script/pr-merge-ledger <PR> --strict` — machine-checkable per-PR
+  merge-readiness check emitting changelog classification and a `complete_allowed` verdict.
+- **Docs checks**: `script/check-docs-sidebar` (sidebar coverage), `bin/check-links` (links).
+- **Tests**: unit/integration/e2e per the **Testing** and **Commands** sections
+  (`bundle exec rake run_rspec:*`, `pnpm run test`, `pnpm test:e2e`).
+- **Build / type checks**: `pnpm run build`, `pnpm run type-check`, `bundle exec rake rbs:validate`,
+  `actionlint`, `yamllint .github/` — see the **Commands** section.
+- **Review gate**: `claude-review` is the preferred independent review check; see the
+  **Review Workflow** section.
 - **Approval-exempt change categories**: workflow, build-config, package-script, dependency,
   lockfile, and Pro edits on trusted assignments — allowed with focused scope, validation, and
   clear PR evidence (not standing pre-approval). See the **Boundaries → Always** section.
@@ -180,6 +191,10 @@ Run specific test files:
 bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb
 cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 ```
+
+**Pro RSpec encoding**: `react_on_rails_pro`'s `Gemfile.loader` can die with
+`invalid byte sequence in US-ASCII`. Run Pro specs with a UTF-8 locale:
+`LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 RUBYOPT="-EUTF-8" bundle exec rspec <file>`.
 
 ## Project Structure
 
@@ -689,3 +704,14 @@ Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, b
 
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash before PR number)
 - **Pro-only changes** use an inline `**[Pro]**` tag prefix within the standard category sections (e.g., `- **[Pro]** **Feature name**: Description...`); do NOT create separate `#### Pro` subsections
+- **Version stamping**: `bundle exec rake "update_changelog[release|rc|beta|<version>]"` stamps version headers, collapses prereleases, and rewrites compare links. The GitHub release is created from the changelog by `bundle exec rake release[...]`.
+
+### Changelog classification taxonomy
+
+The `update-changelog` skill classifies each merged PR by `Category`. Allowed values (copy exactly, including spaces, hyphens, and casing):
+
+- `product code`: OSS gem/npm package runtime, generators, public types, public config, or user-facing examples.
+- `Pro runtime`: proprietary Pro package/runtime behavior, RSC integration, Node renderer behavior, Pro-generated config, Pro package compatibility.
+- `perf-reliability`: runtime performance/reliability fixes, benchmark/regression systems, crash recovery, and failure classification. Applies regardless of result.
+- `release-process`: release tasks, CI selection, dependency pins used only for releasing/testing, changelog mechanics, PR batch mechanics, agent skills, GitHub Actions, and maintainer workflow.
+- `internal`: docs/planning, tests, fixtures, refactors, cleanup, diagnostics, and non-user-facing maintenance.
