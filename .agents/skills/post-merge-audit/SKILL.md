@@ -41,7 +41,10 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    `worked_issue_scope: UNKNOWN (needs batch confirmation)`, run
    `agent-coord doctor` then `agent-coord status` to list candidate batch/run
    ids and lanes, and ask for confirmation before treating any candidate as the
-   worked-issue scope. When a batch/run id is known, run `agent-coord doctor`
+   worked-issue scope. If candidate discovery cannot verify backend setup or
+   access, `UNKNOWN (setup)` or `UNKNOWN (access)` takes precedence; also report
+   that batch id confirmation is still needed after backend recovery. When a
+   batch/run id is known, run `agent-coord doctor`
    then `agent-coord status`, then inspect the named batch entry; use claims,
    heartbeats, and batch metadata as the primary worked-issue scope. If
    `agent-coord` is missing or `agent-coord doctor` fails, record

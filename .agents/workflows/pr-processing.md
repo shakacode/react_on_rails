@@ -1151,10 +1151,13 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    `worked_issue_scope: UNKNOWN (access)`. In all UNKNOWN cases, include the
    exact command/error and use structured public `codex-claim` comments as an
    advisory fallback for possible no-PR, blocked, parked, or done-unmerged lanes
-   before reducing scope to merged PRs. Keep advisory claim rows marked
-   `UNKNOWN` as needed, and report the command, permission, or batch id
-   confirmation needed to recover the worked issue list instead of identifying a
-   confirmed batch subset from PR links or heuristics.
+   before reducing scope to merged PRs. If candidate discovery cannot verify
+   backend setup or access, `UNKNOWN (setup)` or `UNKNOWN (access)` takes
+   precedence over `UNKNOWN (needs batch confirmation)`; also report that batch
+   id confirmation is still needed after backend recovery. Keep advisory claim
+   rows marked `UNKNOWN` as needed, and report the command, permission, or batch
+   id confirmation needed to recover the worked issue list instead of identifying
+   a confirmed batch subset from PR links or heuristics.
    If `agent-coord doctor` and `agent-coord status` both succeed but the named
    batch entry contains no worked issues or lanes, record
    `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
@@ -1221,4 +1224,7 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
     no-PR/blocker evidence, final state, intent-achievement classification,
     `UNKNOWN` facts), a PR-by-PR table, and exact commands/data sources.
 
-Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs until the user approves the audit report and issue plan.
+Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs
+until the user approves the audit report and issue plan. For release-gate
+audits, also append the approved audit report to the release-gate ledger
+successfully before issue creation.

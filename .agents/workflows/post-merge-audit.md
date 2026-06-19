@@ -24,6 +24,11 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
   issue created from the audit. For non-release audits with no ledger, record
   `Audit ledger: not applicable (non-release audit)` in approved issue bodies.
 - Before creating any issue, search existing open issues for the affected PR number and the hidden fingerprint.
+- When batch work is in scope but the batch/run id was not supplied, record
+  `worked_issue_scope: UNKNOWN (needs batch confirmation)`. If candidate
+  discovery cannot verify backend setup or access, record `UNKNOWN (setup)` or
+  `UNKNOWN (access)` with the exact command/error and report that batch id
+  confirmation is still needed after backend recovery.
 - For named batch/run audits, run `agent-coord doctor`, then `agent-coord status`, and inspect the named
   batch entry as the primary worked-issue scope when available. If coordination state cannot be verified,
   record `worked_issue_scope: UNKNOWN (setup)` or `worked_issue_scope: UNKNOWN (access)` with the exact
