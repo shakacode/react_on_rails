@@ -561,6 +561,32 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --typescript and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--typescript], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates TypeScript demo files under the configured Shakapacker source path" do
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.server.tsx"
+
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+    end
+
+    it "points TypeScript support files at the configured Shakapacker source path" do
+      assert_file "client/app/types/css-modules.d.ts"
+      assert_no_file "app/javascript/types/css-modules.d.ts"
+
+      assert_file "tsconfig.json" do |content|
+        config = JSON.parse(content)
+        expect(config["include"]).to include("client/app/**/*")
+        expect(config["include"]).not_to include("app/javascript/**/*")
+      end
+    end
+  end
+
   context "with --redux --tailwind and a pre-installed custom Shakapacker source root" do
     before(:all) do
       run_generator_test_with_args(%w[--redux --tailwind], package_json: true, force: false) do

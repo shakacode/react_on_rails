@@ -1169,8 +1169,8 @@ module ReactOnRails
 
         say "📝 Creating CSS module type definitions...", :yellow
 
-        # Ensure the types directory exists
-        FileUtils.mkdir_p("app/javascript/types")
+        css_module_types_path = File.join(shakapacker_source_path, "types", "css-modules.d.ts")
+        FileUtils.mkdir_p(File.dirname(css_module_types_path))
 
         css_module_types_content = <<~TS.strip
           // TypeScript definitions for CSS modules
@@ -1190,7 +1190,7 @@ module ReactOnRails
           }
         TS
 
-        File.write("app/javascript/types/css-modules.d.ts", css_module_types_content)
+        File.write(css_module_types_path, css_module_types_content)
         say "✅ Created CSS module type definitions", :green
       end
 
@@ -1222,7 +1222,7 @@ module ReactOnRails
             "jsx" => "react-jsx"
           },
           "include" => [
-            "app/javascript/**/*"
+            File.join(shakapacker_source_path, "**/*")
           ]
         }
 
