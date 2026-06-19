@@ -57,7 +57,7 @@ home_prompt_ids:
   - create-app
   - install-existing
 
-# The 11 canonical prompts, grouped by category in display order. Bodies are
+# The canonical prompts, grouped by category in display order. Bodies are
 # transcribed verbatim from the live site source (reactonrails.com
 # prototypes/docusaurus/src/constants/prompts.ts) with the inline absolute URL
 # replaced by the `{{doc_url}}` placeholder.

@@ -73,8 +73,13 @@ it at build time and substitute it for the placeholder:
 
 ```text
 doc_url = site_url + doc_route
-prompt_text = prompt.replaceAll("{{doc_url}}", doc_url)   # replace ALL occurrences
+prompt_text = prompt.replaceAll("{{doc_url}}", doc_url)   # ALL occurrences
 ```
+
+Use `replaceAll` (not a first-match `replace`): a body may reference
+`{{doc_url}}` more than once (e.g. an intro plus a closing "Full reference:
+{{doc_url}}"), and a first-match replace would silently leave the rest
+unresolved.
 
 So the URL lives in exactly one place (`doc_route`) and cannot drift between the
 prompt text and the rendered "Open guide" link.
