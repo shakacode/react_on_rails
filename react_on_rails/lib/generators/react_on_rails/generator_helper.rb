@@ -161,7 +161,7 @@ module GeneratorHelper
     return default if unsafe_generator_destination_path?(relative_path)
 
     relative_path
-  rescue ArgumentError
+  rescue ArgumentError # Pathname.new raises on null bytes in path strings.
     default
   end
 

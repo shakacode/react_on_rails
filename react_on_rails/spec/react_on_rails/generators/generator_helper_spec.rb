@@ -32,6 +32,12 @@ RSpec.describe GeneratorHelper, type: :generator do
     @options ||= {}
   end
 
+  def reset_shakapacker_memoization!
+    %i[@shakapacker_source_path @shakapacker_source_entry_path].each do |ivar|
+      remove_instance_variable(ivar) if instance_variable_defined?(ivar)
+    end
+  end
+
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
 
   describe "#print_generator_messages" do
@@ -302,18 +308,12 @@ RSpec.describe GeneratorHelper, type: :generator do
         development:
           source_path: client/app
       YAML
-      remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
-      if instance_variable_defined?(:@shakapacker_source_entry_path)
-        remove_instance_variable(:@shakapacker_source_entry_path)
-      end
+      reset_shakapacker_memoization!
     end
 
     after do
       FileUtils.rm_rf(File.join(destination_root, "config"))
-      remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
-      if instance_variable_defined?(:@shakapacker_source_entry_path)
-        remove_instance_variable(:@shakapacker_source_entry_path)
-      end
+      reset_shakapacker_memoization!
     end
 
     it "places generated demo stylesheets under the configured Shakapacker source path" do
@@ -331,18 +331,12 @@ RSpec.describe GeneratorHelper, type: :generator do
           source_path: client/app
           source_entry_path: /
       YAML
-      remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
-      if instance_variable_defined?(:@shakapacker_source_entry_path)
-        remove_instance_variable(:@shakapacker_source_entry_path)
-      end
+      reset_shakapacker_memoization!
     end
 
     after do
       FileUtils.rm_rf(File.join(destination_root, "config"))
-      remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
-      if instance_variable_defined?(:@shakapacker_source_entry_path)
-        remove_instance_variable(:@shakapacker_source_entry_path)
-      end
+      reset_shakapacker_memoization!
     end
 
     it "places root entrypoints directly under source_path without a double slash" do
@@ -363,18 +357,12 @@ RSpec.describe GeneratorHelper, type: :generator do
         development:
           source_path: client/app
       YAML
-      remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
-      if instance_variable_defined?(:@shakapacker_source_entry_path)
-        remove_instance_variable(:@shakapacker_source_entry_path)
-      end
+      reset_shakapacker_memoization!
     end
 
     after do
       FileUtils.rm_rf(File.join(destination_root, "config"))
-      remove_instance_variable(:@shakapacker_source_path) if instance_variable_defined?(:@shakapacker_source_path)
-      if instance_variable_defined?(:@shakapacker_source_entry_path)
-        remove_instance_variable(:@shakapacker_source_entry_path)
-      end
+      reset_shakapacker_memoization!
     end
 
     it "computes the stylesheet import path from the generated entry file" do
