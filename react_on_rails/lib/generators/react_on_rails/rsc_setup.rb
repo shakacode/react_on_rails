@@ -246,9 +246,7 @@ module ReactOnRails
         end
         return false unless relative_entry_path
 
-        # The component entry is always 3 levels below source_path via example_component_source_directory.
-        # If that structure changes, update this import depth too.
-        stylesheet_import = "import '../../../stylesheets/application.css';"
+        stylesheet_import = "import '#{relative_stylesheet_import_path(relative_entry_path)}';"
         entry_path = File.join(destination_root, relative_entry_path)
         entry_content = File.read(entry_path)
         return false if entry_content.include?(stylesheet_import)

@@ -69,8 +69,8 @@ module ReactOnRails
 
         return unless use_tailwind?
 
-        stylesheet_import = "import '../../../stylesheets/application.css';\n"
         ror_client_file = "#{component_dir}/ror_components/HelloWorldApp.client.#{ext}"
+        stylesheet_import = "import '#{relative_stylesheet_import_path(ror_client_file)}';\n"
         ror_client_file_path = File.join(destination_root, ror_client_file)
         if options[:pretend]
           say_status :pretend, "Would add Tailwind stylesheet import to #{ror_client_file}", :yellow

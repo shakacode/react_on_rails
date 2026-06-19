@@ -96,12 +96,19 @@ module GeneratorHelper
 
   def shakapacker_entrypoint_path(filename)
     entry_dir = shakapacker_source_entry_path # "" means entrypoints live directly under source_path.
-    File.join(shakapacker_source_path, entry_dir, filename)
+    File.join(*[shakapacker_source_path, entry_dir, filename].reject(&:empty?))
   end
 
   def shakapacker_stylesheet_path(filename)
     # "stylesheets" is a generated demo convention, not a Shakapacker config key.
     File.join(shakapacker_source_path, "stylesheets", filename)
+  end
+
+  def relative_stylesheet_import_path(entry_path, filename: "application.css")
+    entry_dir = Pathname.new(File.join(destination_root, entry_path)).dirname
+    stylesheet = Pathname.new(File.join(destination_root, shakapacker_stylesheet_path(filename)))
+
+    stylesheet.relative_path_from(entry_dir).to_s
   end
 
   def example_component_source_directory(component_name)
