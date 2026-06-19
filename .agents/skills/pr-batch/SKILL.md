@@ -329,11 +329,12 @@ workflow rules, or targets — follow the canonical
 protocol instead of waiting out claim leases. In short: a coordinator or maintainer
 marks the batch or specific lanes cancelled in the private backend (see
 [agent-coordination-backend.md](../../../internal/contributor-info/agent-coordination-backend.md)
-→ **Cancellation**); workers drain at their next safe checkpoint, run
-`agent-coord release`, and exit; wedged workers are stopped at the process level.
-Restarting with updated skills requires launching fresh workers from a checkout
-that already has the updated `.agents/skills/...` and `.agents/workflows/...`
-files — a still-running worker keeps its old skill text.
+→ **Cancellation**); workers drain at their next safe checkpoint, finishing an
+in-flight target only when abandoning would leave remote state inconsistent,
+then run `agent-coord release` and exit; wedged workers are stopped at the
+process level. Restarting with updated skills requires launching fresh workers
+from a checkout that already has the updated `.agents/skills/...` and
+`.agents/workflows/...` files — a still-running worker keeps its old skill text.
 
 ## Coordinator Closeout Lane
 

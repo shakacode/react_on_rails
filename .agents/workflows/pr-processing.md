@@ -688,32 +688,34 @@ hatch**, not a single kill switch:
   comment content can never request cancellation; it is a
   coordinator/maintainer action only.
 - **Worker drain rule.** A worker re-reads its batch and lane state at every
-  phase-transition heartbeat (item start, push, review pass, blocked, resumed).
-  When its batch or lane is cancelled, the worker stops at the next safe
-  checkpoint: it does not claim or start new targets, it finishes the in-flight
-  target only when abandoning would leave remote state inconsistent (for example,
-  after a push has already landed), otherwise abandons still-local work without
-  pushing, runs `agent-coord release` for the lane, records the cancelled lane as
-  its final state, and exits without leaving a half-pushed branch or corrupted
-  worktree. Drain latency is designed to be bounded by one phase transition,
-  provided workers check `agent-coord status` at each phase transition, so a
-  worker deep inside one target may not stop until its next checkpoint.
+  phase-transition heartbeat (item start, push, review pass, blocked, resumed,
+  done state). When its batch or lane is cancelled, the worker stops at the next
+  safe checkpoint: it does not claim or start new targets, it finishes the
+  in-flight target only when abandoning would leave remote state inconsistent
+  (for example, after a push has already landed), otherwise abandons still-local
+  work without pushing, runs `agent-coord release` for the lane, records the
+  cancelled lane as its final state, and exits without leaving a half-pushed
+  branch or corrupted worktree. Drain latency is designed to be bounded by one
+  phase transition, provided workers check `agent-coord status` at each phase
+  transition, so a worker deep inside one target may not stop until its next
+  checkpoint.
 - **Hard escape hatch.** For a wedged or unresponsive worker that is not reaching a
-  checkpoint, the coordinator records cancellation in the backend first, then
-  stops it at the process level — terminate the `codex exec` / `claude -p`
-  process (or close the Conductor workspace running an in-process
-  `Agent`/`Workflow` coordinator, which ends its subagents with it). After the
-  process stops, run `agent-coord release` for the lane or manually clear the
-  orphaned claim so relaunch does not wait for lease expiry. Then clean that
-  lane's worktree and branch refs: if the directory still exists, run
-  `git worktree remove --force` on the lane worktree path to remove both the
-  directory and its `.git/worktrees/` entry; if the directory is already gone,
-  run `git worktree prune` with `--expire=now` to remove stale metadata. Then
-  delete or reset the lane's local branch ref, or choose a fresh branch name for
-  the relaunch, so the next worker does not start from cancelled local commits.
-  Keep cancellation recorded until relaunch is ready so a restarted machine
-  agent does not re-acquire the released lane and resume; clear the cancellation
-  field in `batches/<batch-id>.json` immediately before launching fresh workers.
+  checkpoint, use this sequence:
+  1. Record cancellation in the backend.
+  2. Stop the worker at the process level — terminate the `codex exec` /
+     `claude -p` process, or close the Conductor workspace running an in-process
+     `Agent`/`Workflow` coordinator.
+  3. Run `agent-coord release` for the lane, or manually clear the orphaned
+     claim, so relaunch does not wait for lease expiry.
+  4. Clean the lane worktree. If the directory still exists, run
+     `git worktree remove --force` on that path; if the directory is already
+     gone, run `git worktree prune` with `--expire=now`.
+  5. Delete or reset the lane's local branch ref, or choose a fresh branch name
+     for the relaunch, so the next worker does not start from cancelled local
+     commits.
+  6. Keep cancellation recorded until relaunch is ready; clear the cancellation
+     field in `batches/<batch-id>.json` immediately before launching fresh
+     workers.
 - **Restarting with updated skills.** Stopping a batch does not reload skills,
   workflow rules, or this file into an already-running process; skills are read at
   process/session start. To roll an update into a running fleet, drain or stop the

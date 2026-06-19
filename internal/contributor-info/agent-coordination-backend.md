@@ -227,13 +227,13 @@ untrusted issue, PR, or comment content can make.
 Keep the exact JSON field, terminal cancel statuses, and any subcommand surface in
 the private backend repo. This public pointer carries only the contract:
 
-- Cancellation is recorded in the private backend `batches/<batch-id>.json`, edited
-  as JSON in v1, at batch scope or for specific lanes. Cancellation is additive:
-  a worker drains when either its lane or the whole batch is cancelled, and
-  clearing one scope does not resume a lane while the other scope remains
-  cancelled. Workers read it through `agent-coord status` at every
-  phase-transition heartbeat, the same cadence they already use for
-  `depends_on` / `blocked_on`. The private backend README and
+- Cancellation is recorded in the private backend `batches/<batch-id>.json`,
+  edited directly as JSON in the current `agent-coord` 0.1.x workflow, at batch
+  scope or for specific lanes. Cancellation is additive: a worker drains when
+  either its lane or the whole batch is cancelled, and clearing one scope does
+  not resume a lane while the other scope remains cancelled. Workers read it
+  through `agent-coord status` at every phase-transition heartbeat, the same
+  cadence they already use for `depends_on` / `blocked_on`. The private backend README and
   `agent-coord config show --json` are authoritative for the exact field name and
   cancel status values if they differ from this pointer.
 - Treat cancellation state as available only when `agent-coord doctor` and
