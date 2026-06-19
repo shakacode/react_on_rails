@@ -18,6 +18,8 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
   batch entry as the primary worked-issue scope when available. If coordination
   state cannot be verified, record `worked_issue_scope: UNKNOWN` with the exact
   command/error instead of silently reducing the audit to merged PRs.
+- For private coordination backend setup and CLI discovery, see
+  `internal/contributor-info/agent-coordination-backend.md`.
 
 Suggested hidden fingerprint:
 

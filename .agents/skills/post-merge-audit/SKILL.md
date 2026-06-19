@@ -30,11 +30,14 @@ When this repository includes `.agents/skills/post-merge-audit/bin/post-merge-au
 
 The resolver is read-only. It resolves the default release-candidate base, the head SHA, squash-aware merged PRs, prior `post-merge-audit-finding` fingerprints, PRs with open finding markers, and the `to_audit` list. Open finding markers create carry-over PRs that are subtracted from `to_audit`; closed markers remain fingerprint context only. Use the output as the initial merged-PR scope table, then verify assumptions before deep audit.
 
+For private coordination backend setup and CLI discovery, see
+`internal/contributor-info/agent-coordination-backend.md`.
+
 1. Base: the user-supplied tag/commit, or the most recent release candidate tag when the user says "since the last RC".
 2. Head: usually `origin/main` or the current release branch.
 3. Merged PR list: every PR merged between base and head.
-4. Worked issue list: when a batch/run id is known, run `agent-coord status` after `agent-coord
-doctor`, then inspect the named batch entry; use claims, heartbeats, and batch metadata as the
+4. Worked issue list: when a batch/run id is known, run `agent-coord doctor` and
+   `agent-coord status`, then inspect the named batch entry; use claims, heartbeats, and batch metadata as the
    primary worked-issue scope. If `agent-coord` is missing, unavailable, or the status command fails,
    record `worked_issue_scope: UNKNOWN` with the exact command/error instead of inferring
    completeness from merged PRs.
