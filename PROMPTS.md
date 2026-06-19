@@ -38,7 +38,7 @@ prompts:
   - id: <stable-slug> # React key + selects the home subset; never reuse
     title: <human title>
     category: <one of categories[].id>
-    doc_route: <relative docs route> # e.g. /docs/pro/react-server-components
+    doc_route: <relative docs route> # e.g. /docs/pro/react-server-components (may end in #fragment; quote if so)
     prompt: <prompt body, may contain {{doc_url}}>
 ```
 
@@ -48,8 +48,11 @@ prompts:
   per-prompt eval reports). Renaming one is a breaking change for downstream
   consumers; prefer adding a new prompt.
 - **`category`** — must reference a `categories[].id`.
-- **`doc_route`** — a **relative** route only (starts with `/docs/`). This is the
-  single home for each prompt's URL.
+- **`doc_route`** — a **relative** route only (starts with `/docs/`), optionally
+  ending in a `#fragment` anchor (e.g.
+  `/docs/api-reference/ruby-api-pro#async_react_component...`). This is the
+  single home for each prompt's URL. Quote any value containing `#` in YAML so
+  the fragment is never mistaken for a comment.
 - **`prompt`** — the verbatim body a user pastes. Use the `{{doc_url}}`
   placeholder anywhere the absolute docs URL should appear.
 
@@ -58,7 +61,7 @@ prompts:
 The absolute docs URL is **never hard-coded** in a prompt body. Consumers resolve
 it at build time and substitute it for the placeholder:
 
-```
+```text
 doc_url = site_url + doc_route
 prompt_text = prompt.replace("{{doc_url}}", doc_url)
 ```
