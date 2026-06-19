@@ -134,6 +134,7 @@ module GeneratorHelper
     return default if candidate.empty?
 
     pathname = Pathname.new(candidate).cleanpath
+    # Shakapacker uses "/" to mean entrypoints live directly under source_path.
     return "" if allow_root && pathname.to_s == "/"
 
     relative_path = if pathname.absolute?
@@ -151,11 +152,7 @@ module GeneratorHelper
 
   def absolute_path_relative_to_destination(pathname)
     destination = Pathname.new(destination_root).cleanpath
-    relative_path = pathname.relative_path_from(destination).to_s
-
-    return nil if unsafe_generator_destination_path?(relative_path)
-
-    relative_path
+    pathname.relative_path_from(destination).to_s
   rescue ArgumentError
     nil
   end

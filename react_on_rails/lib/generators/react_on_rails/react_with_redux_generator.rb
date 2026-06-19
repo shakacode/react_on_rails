@@ -67,13 +67,10 @@ module ReactOnRails
                     "#{component_dir}/components/HelloWorld.module.css")
         end
 
-        # Update import paths in client component
-        ror_client_file = "#{component_dir}/ror_components/HelloWorldApp.client.#{ext}"
-        gsub_file(ror_client_file, "../containers/HelloWorldContainer",
-                  "../containers/HelloWorldContainer")
         return unless use_tailwind?
 
         stylesheet_import = "import '../../../stylesheets/application.css';\n"
+        ror_client_file = "#{component_dir}/ror_components/HelloWorldApp.client.#{ext}"
         ror_client_file_path = File.join(destination_root, ror_client_file)
         if options[:pretend]
           say_status :pretend, "Would add Tailwind stylesheet import to #{ror_client_file}", :yellow
