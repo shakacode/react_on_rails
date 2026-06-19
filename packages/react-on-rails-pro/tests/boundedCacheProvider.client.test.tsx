@@ -18,7 +18,8 @@ import { Suspense } from 'react';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-import { BoundedLRU, createRSCProvider, RSC_PAYLOAD_CACHE_MAX_ENTRIES, useRSC } from '../src/RSCProvider.tsx';
+import { BoundedLRU, RSC_PAYLOAD_CACHE_MAX_ENTRIES } from '../src/RSCProviderCache.ts';
+import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
 import RSCRoute, { type RSCRouteHandle } from '../src/RSCRoute.tsx';
 import { shouldClearRefetchErrorOnSuccessfulVersionChange } from '../src/RSCRouteSuccessfulVersion.ts';
 import { createRSCPayloadKey } from '../src/utils.ts';
@@ -914,5 +915,79 @@ describe('RSCRoute successful-version error reset', () => {
 
     const key = createRSCPayloadKey('Card', { id: 0 });
     await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+  });
+
+  it('k. stale replacement loads do not notify after a newer refetch succeeds', async () => {
+    process.env.NODE_ENV = 'production';
+
+    type PendingEntry = Deferred & { args: GetServerComponentArgs };
+    const pending: PendingEntry[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      pending.push({ ...d, args: _args[0] });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+    await renderInAct(
+      <RSCProvider>
+        <Probe />
+      </RSCProvider>,
+    );
+
+    const startLoad = async (id: number) => {
+      let promise!: Promise<React.ReactNode>;
+      await act(async () => {
+        promise = rscApi.getComponent('Card', { id });
+        await Promise.resolve();
+      });
+      return { promise, deferred: findPendingForId(pending, id) };
+    };
+
+    const resolveLoad = async (started: Awaited<ReturnType<typeof startLoad>>, payload: React.ReactNode) => {
+      await act(async () => {
+        started.deferred.resolve(payload);
+        await started.promise;
+      });
+    };
+
+    for (let id = 0; id <= CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`initial ${id}`}</span>);
+    }
+
+    const replacement = await startLoad(0);
+    let refetchPromise!: Promise<React.ReactNode>;
+    await act(async () => {
+      refetchPromise = rscApi.refetchComponent('Card', { id: 0 });
+      await Promise.resolve();
+    });
+
+    const refetch = pending.find(
+      (d) => d.args.enforceRefetch && (d.args.componentProps as { id: number }).id === 0,
+    );
+    if (!refetch) {
+      throw new Error('Expected refetch request for id 0');
+    }
+
+    await act(async () => {
+      refetch.resolve(<span>refetch 0</span>);
+      await refetchPromise;
+    });
+
+    const key = createRSCPayloadKey('Card', { id: 0 });
+    await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+    const versionAfterRefetch = rscApi.successfulVersions[key];
+
+    await resolveLoad(replacement, <span>stale replacement 0</span>);
+
+    expect(rscApi.successfulVersions[key]).toBe(versionAfterRefetch);
   });
 });
