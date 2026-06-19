@@ -171,10 +171,12 @@ a strong-looking handoff cannot hide an unsatisfied gate.
 ### Extra Steps
 
 1. **Prove the bug without the fix.** When feasible, reproduce the reported
-   failure against the base branch (or `HEAD~` of the PR) using the same repro,
-   test, or script the PR adds, and capture the failing evidence. Then confirm it
-   passes on the current PR head. If the bug cannot be reproduced, say so and
-   downgrade confidence — a fix for an unprovable bug is itself a `DISCUSS`.
+   failure against a merge-base/base checkout, or against a verified
+   test-only/pre-fix fixture commit that is known not to contain the fix, using
+   the same repro, test, or script the PR adds, and capture the failing evidence.
+   Then confirm it passes on the current PR head. If the bug cannot be
+   reproduced, say so and downgrade confidence — a fix for an unprovable bug is
+   itself a `DISCUSS`.
 2. **Verify the fix is correct and minimal.** Check that it waits for the
    _minimum_ required condition (not an over-broad wait that masks races), that
    the invariant lives in the simplest single place rather than being duplicated
@@ -239,12 +241,12 @@ agent, or code change remains.
 pending_maintainer_action:
   required: true # false only when state is ready_to_merge
   state: waiting_maintainer_review # | waiting_ci | waiting_review_agent | waiting_code_change | ready_to_merge
-  owner: maintainer # who must act: maintainer | author | none
+  owner: maintainer # who must act: maintainer | author | review-agent | none
   action: 'Submit formal GitHub review for current head'
   reason: 'reviewDecision is null'
   blocks_merge: true
   evidence:
-    pr: 4047
+    pr: <PR_NUMBER>
     head_sha: '<sha>'
     review_decision: null # APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | null
     maintainer_approval_comment: true # a human comment exists, but is not a review object

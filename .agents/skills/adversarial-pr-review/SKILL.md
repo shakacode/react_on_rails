@@ -69,7 +69,8 @@ of the steps above; see `.agents/workflows/adversarial-pr-review.md` under
    failure on the base (without the fix) and confirm it disappears on the current
    head. Then check the fix waits for the _minimum_ required condition and is the
    simplest plausible location for the invariant — not an over-broad wait or a
-   policy duplicated across layers.
+   policy duplicated across layers. If the bug cannot be reproduced, report that
+   explicitly and classify the fix as `DISCUSS` rather than `BLOCKING`.
 2. **Separate implementation confidence from merge-gate readiness.** Strong test
    evidence does not mean the merge gate is satisfied.
 3. **Report merge-gate state without conflating the three approval concepts.** A
