@@ -188,6 +188,32 @@ module ReactOnRails
         route "get 'hello_world', to: 'hello_world#index'"
       end
 
+      def copy_packer_config
+        base_path = "base/base/"
+        config = "config/shakapacker.yml"
+
+        if options.shakapacker_just_installed?
+          say "Replacing Shakapacker default config with React on Rails version"
+          # Shakapacker's installer just created this file from scratch (no pre-existing config).
+          # Safe to overwrite silently with RoR's version-aware template (e.g., private_output_path).
+          template("#{base_path}#{config}.tt", config, force: true)
+        else
+          say "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
+          # Thor handles the conflict: prompts user interactively, or respects --force/--skip flags.
+          template("#{base_path}#{config}.tt", config)
+        end
+
+        # Configure bundler-specific settings
+        configure_rspack_in_shakapacker if using_rspack?
+
+        # Always ensure precompile_hook is configured (Shakapacker 9.0+ only)
+        configure_precompile_hook_in_shakapacker
+
+        # For SSR bundles, configure Shakapacker private_output_path (9.0+ only)
+        # This keeps Shakapacker and React on Rails server bundle paths in sync.
+        configure_private_output_path_in_shakapacker
+      end
+
       def create_react_directories
         # Skip HelloWorld directory for Redux (uses HelloWorldApp) or RSC (uses HelloServer)
         return if options.redux? || use_rsc?
@@ -276,32 +302,6 @@ module ReactOnRails
         base_path = "base/tailwind/"
         copy_file("#{base_path}app/javascript/stylesheets/application.css",
                   shakapacker_stylesheet_path("application.css"))
-      end
-
-      def copy_packer_config
-        base_path = "base/base/"
-        config = "config/shakapacker.yml"
-
-        if options.shakapacker_just_installed?
-          say "Replacing Shakapacker default config with React on Rails version"
-          # Shakapacker's installer just created this file from scratch (no pre-existing config).
-          # Safe to overwrite silently with RoR's version-aware template (e.g., private_output_path).
-          template("#{base_path}#{config}.tt", config, force: true)
-        else
-          say "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
-          # Thor handles the conflict: prompts user interactively, or respects --force/--skip flags.
-          template("#{base_path}#{config}.tt", config)
-        end
-
-        # Configure bundler-specific settings
-        configure_rspack_in_shakapacker if using_rspack?
-
-        # Always ensure precompile_hook is configured (Shakapacker 9.0+ only)
-        configure_precompile_hook_in_shakapacker
-
-        # For SSR bundles, configure Shakapacker private_output_path (9.0+ only)
-        # This keeps Shakapacker and React on Rails server bundle paths in sync.
-        configure_private_output_path_in_shakapacker
       end
 
       def add_base_gems_to_gemfile

@@ -450,6 +450,28 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --force and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true, force: true) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates base demo files from the final Shakapacker config" do
+      assert_file "app/javascript/packs/server-bundle.js"
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+      assert_no_file "client/app/entrypoints/server-bundle.js"
+      assert_no_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+    end
+
+    it "uses the final Shakapacker source path in generated demo hints" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include('<code class="path-hint">app/javascript/src/HelloWorld/</code>')
+        expect(content).not_to include("client/app/src/HelloWorld/")
+      end
+    end
+  end
+
   context "with --redux and a pre-installed custom Shakapacker source root" do
     before(:all) do
       run_generator_test_with_args(%w[--redux], package_json: true, force: false) do
