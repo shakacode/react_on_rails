@@ -708,12 +708,14 @@ hatch**, not a single kill switch:
   3. Run `agent-coord release` for the lane, or manually clear the orphaned
      claim, so relaunch does not wait for lease expiry.
   4. Clean the lane worktree. If the directory still exists, run
-     `git worktree remove --force` on that path; if the directory is already
-     gone, run `git worktree prune` with `--expire=now`.
+     `git worktree remove --force` on that path. If the directory is already
+     gone, confirm no other active lane depends on deleted worktree metadata,
+     then run repo-wide `git worktree prune` with `--expire=now`.
   5. Delete or reset the lane's local branch ref, or choose a fresh branch name
      for the relaunch, so the next worker does not start from cancelled local
      commits.
-  6. Keep cancellation recorded until relaunch is ready; clear the cancellation
+  6. Keep cancellation recorded until relaunch is ready. Record the relaunch
+     intent in the batch handoff or private state, then clear the cancellation
      field in `batches/<batch-id>.json` immediately before launching fresh
      workers.
 - **Restarting with updated skills.** Stopping a batch does not reload skills,
