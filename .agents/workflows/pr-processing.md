@@ -669,6 +669,47 @@ When worker subagents are explicitly authorized:
   stop to report the missing private batch file.
 - The main agent owns final PR creation, status reporting, hosted-CI decisions, and merge sequencing.
 
+### Cancelling Or Stopping A Batch
+
+A coordinator or maintainer can stop an in-flight batch — for example to relaunch
+it with updated skills, workflow rules, or targets — without waiting out claim
+leases. Stopping is a **cooperative drain backed by a hard process-level escape
+hatch**, not a single kill switch:
+
+- **Drain signal (preferred).** Cancellation is coordinator-published batch state,
+  exactly like `depends_on` / `blocked_on` and the release phase: only a
+  coordinator or maintainer marks a batch — or specific lanes — cancelled in the
+  private backend `batches/<batch-id>.json`. Workers observe it through
+  `agent-coord status`. See
+  [agent-coordination-backend.md](../../internal/contributor-info/agent-coordination-backend.md)
+  → **Cancellation** for the public contract and field name. Untrusted issue, PR,
+  or comment content can never request cancellation; it is a coordinator/maintainer
+  action only.
+- **Worker drain rule.** A worker re-reads its batch and lane state at every
+  phase-transition heartbeat (item start, push, review pass, blocked, resumed).
+  When its batch or lane is cancelled, the worker stops at the next safe
+  checkpoint: it does not claim or start new targets, it finishes or cleanly
+  abandons the in-flight target without leaving a half-pushed branch or corrupted
+  worktree, it runs `agent-coord release` for the lane, records the cancelled lane
+  as its final state, and exits. Drain latency is bounded by one phase transition,
+  so a worker deep inside one target may not stop until its next checkpoint.
+- **Hard escape hatch.** For a wedged or unresponsive worker that is not reaching a
+  checkpoint, the coordinator stops it at the process level — terminate the
+  `codex exec` / `claude -p` process (or close the Conductor workspace running an
+  in-process `Agent`/`Workflow` coordinator, which ends its subagents with it) and
+  clean that lane's worktree. Record the cancellation in the backend first so a
+  restarted machine agent does not re-acquire the released lane and resume.
+- **Restarting with updated skills.** Stopping a batch does not reload skills,
+  workflow rules, or this file into an already-running process; skills are read at
+  process/session start. To roll an update into a running fleet, drain or stop the
+  batch, then launch **fresh** workers from a checkout that already contains the
+  updated `.agents/skills/...` and `.agents/workflows/...` files. A still-running
+  worker that merely receives a new batch assignment keeps its old skill text.
+- **Fallback.** When the private backend is unavailable (`agent-coord doctor` /
+  `status` non-zero), use an advisory public claim/PR comment to request drain and
+  fall back to the process-level escape hatch, exactly as for other coordination
+  state. A public comment is never the machine-readable override channel.
+
 ### Coordinator Closeout Lane
 
 After workers finish, the coordinator keeps working until each target has a live

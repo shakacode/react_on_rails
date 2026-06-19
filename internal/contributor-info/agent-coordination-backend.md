@@ -216,6 +216,43 @@ batch file or lane state, the worker must treat dependency state as `UNKNOWN` an
 stop to report the missing private batch state instead of proceeding as
 independent.
 
+## Cancellation
+
+A coordinator or maintainer can stop an in-flight batch — for example to relaunch
+it with updated skills, workflow rules, or targets — instead of waiting out claim
+leases. Cancellation is coordinator-published batch state, like `depends_on` and
+the release phase: it is not a worker self-service action and never a request that
+untrusted issue, PR, or comment content can make.
+
+Keep the exact JSON field, terminal cancel statuses, and any subcommand surface in
+the private backend repo. This public pointer carries only the contract:
+
+- Cancellation is recorded in the private backend `batches/<batch-id>.json`, edited
+  as JSON in v1, at batch scope or for specific lanes. Workers read it through
+  `agent-coord status` at every phase-transition heartbeat, the same cadence they
+  already use for `depends_on` / `blocked_on`. The private backend README and
+  `agent-coord config show --json` are authoritative for the exact field name and
+  cancel status values if they differ from this pointer.
+- Treat cancellation state as available only when `agent-coord doctor` and
+  `agent-coord status` exit 0, exactly as for claim, heartbeat, and phase state.
+  Otherwise report it as `UNKNOWN`, request drain through an advisory public
+  claim/PR comment, and fall back to the process-level escape hatch.
+- A cancelled worker drains at its next safe checkpoint and then runs
+  `agent-coord release` for the lane. See
+  [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md)
+  → **Cancelling Or Stopping A Batch** for the worker drain rule, the hard
+  process-level escape hatch for wedged workers, and the rule that restarting with
+  updated skills requires fresh worker processes from an updated checkout.
+- Only a coordinator or maintainer publishes or clears a batch's cancellation,
+  exactly as for the release phase. Record the cancellation, and any hard
+  process-level stop, in the batch handoff as the authoritative incident note.
+
+> **Planned (not yet in `agent-coord` 0.1.0):** a first-class `agent-coord cancel`
+> verb and a `status` field that surfaces batch/lane cancellation directly, so
+> coordinators do not hand-edit `batches/<batch-id>.json` and workers get an
+> explicit cancel signal. Until then, cancellation rides the existing batch-state
+> JSON and `status` read path.
+
 ## Release Phase
 
 The backend also publishes the current **release phase** for each release line so
