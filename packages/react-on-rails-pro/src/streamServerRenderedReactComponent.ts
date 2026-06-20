@@ -127,6 +127,8 @@ const streamRenderReactComponent = (
       return error;
     }
     streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(
+      // Reference equality is intentional: matching entries are the same objects consumed from
+      // `captured`, not separately reconstructed diagnostics with matching component names.
       captured.filter((entry) => !matchingCaptured.includes(entry)),
     );
 

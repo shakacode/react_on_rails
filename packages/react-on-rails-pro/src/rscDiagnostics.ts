@@ -52,8 +52,10 @@ const ORIGINAL_ERROR_PREFIX = 'Original error: ';
 // @react-version-invariant
 // Source: packages/react-dom/src/server/ReactFizzServer.js — search for:
 //   "An error occurred in the Server Components render"
-// If React renames this string, deferred-render enrichment degrades to the
-// generic React error. Verify this prefix when upgrading React.
+// React exposes no public constant for this text, so tests pin the currently
+// observed messages and this marker makes React-upgrade audits grep-able. If
+// React renames the string, deferred-render enrichment degrades to the generic
+// React error until this prefix is updated.
 const GENERIC_RSC_STREAM_ERROR_PREFIXES = ['An error occurred in the Server Components render.'];
 const isGenericRSCStreamError = (message: string) =>
   GENERIC_RSC_STREAM_ERROR_PREFIXES.some((prefix) => {
@@ -76,7 +78,8 @@ export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamEr
   const originalErrorLine = diagnosticError.message
     .split('\n')
     .find((line) => line.startsWith(ORIGINAL_ERROR_PREFIX));
-  // React puts the original exception message on line 1 of its re-thrown stream error.
+  // React puts the original exception message on line 1 of its re-thrown stream error; multi-line
+  // messages intentionally match on that first line only.
   const streamFirstLine = streamMessage.split('\n')[0];
   return originalErrorLine === `${ORIGINAL_ERROR_PREFIX}${streamFirstLine}`;
 };
@@ -270,8 +273,7 @@ export const extractMergedRSCStreamDiagnosticMessage = (error: Error) => {
     }
   }
 
-  // Defensive fallback for legacy/external merged-looking errors that do not carry the Error cause
-  // set by `mergeRSCStreamDiagnosticError`.
-  const separatorIndex = error.message.lastIndexOf(REACT_STREAM_ERROR_SEPARATOR);
-  return separatorIndex === -1 ? error.message : error.message.slice(0, separatorIndex);
+  // Without the Error `cause` set by `mergeRSCStreamDiagnosticError`, there is no safe boundary:
+  // diagnostic text itself may contain REACT_STREAM_ERROR_SEPARATOR. Preserve the whole message.
+  return error.message;
 };

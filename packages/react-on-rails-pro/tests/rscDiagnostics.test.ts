@@ -119,6 +119,15 @@ describe('RSC diagnostics', () => {
     expect(extractMergedRSCStreamDiagnosticMessage(mergedError)).toBe(diagnosticError.message);
   });
 
+  it('preserves merged-looking messages without an Error cause', () => {
+    const error = new Error(
+      `[ReactOnRails] RSC bundle rendering failed.${REACT_STREAM_ERROR_SEPARATOR} inside user text` +
+        `${REACT_STREAM_ERROR_SEPARATOR} React suffix without structural cause`,
+    );
+
+    expect(extractMergedRSCStreamDiagnosticMessage(error)).toBe(error.message);
+  });
+
   it('matches diagnostics to React generic Server Components render errors', () => {
     const diagnosticError = new Error(
       '[ReactOnRails] RSC bundle rendering failed.\n' +
