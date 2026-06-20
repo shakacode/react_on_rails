@@ -545,6 +545,60 @@ describe('RSCRoute successful-version error reset', () => {
     expect(screen.getByTestId('payload')).toHaveTextContent('Card v1');
   });
 
+  it('e2. recoverOnError without a last-success payload cleans orphaned refetch version state', async () => {
+    process.env.NODE_ENV = 'production';
+    getServerComponent = jest.fn(async ({ componentProps, enforceRefetch }: GetServerComponentArgs) => {
+      await Promise.resolve();
+      const { id } = componentProps as { id: number };
+      if (enforceRefetch) {
+        throw new Error('refetch boom');
+      }
+      return <span data-testid={`payload-${id}`}>{`Card ${id}`}</span>;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+    let rscApi!: ReturnType<typeof useRSC>;
+
+    const ProviderProbe = () => {
+      rscApi = useRSC();
+      return <span data-testid="version">{rscApi.getRefetchVersion('Card', { id: 0 })}</span>;
+    };
+
+    await renderInAct(
+      <TestHarness>
+        <ProviderProbe />
+      </TestHarness>,
+    );
+    expect(screen.getByTestId('version')).toHaveTextContent('0');
+
+    await act(async () => {
+      await rscApi.getComponent('Card', { id: 0 });
+    });
+    for (let id = 1; id <= CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => {
+        await rscApi.getComponent('Card', { id });
+      });
+    }
+    expect(fetchCount(CACHE_CAP)).toBe(1);
+
+    let refetchPromise!: Promise<React.ReactNode>;
+    await act(async () => {
+      refetchPromise = rscApi.refetchComponent('Card', { id: 0 }, true);
+      void refetchPromise.catch(() => undefined);
+      await expect(refetchPromise).rejects.toThrow('refetch boom');
+    });
+
+    expect(screen.getByTestId('version')).toHaveTextContent('1');
+
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+
+    await waitFor(() => expect(screen.getByTestId('version')).toHaveTextContent('0'));
+  });
+
   it('f. overlapping same-key refetches both recover and keep the key cached with the LRU in place', async () => {
     // Integration coverage for the ref-counted-pin fix: TWO overlapping
     // recoverOnError refetches for the same key (id 0) run while the cache is

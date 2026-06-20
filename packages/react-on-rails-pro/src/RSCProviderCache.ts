@@ -177,6 +177,9 @@ export class BoundedLRU<V> {
    * reconciliation.
    */
   private evictIfNeeded(preventEvictingKey?: string): void {
+    // INVARIANT: onEvict must not call set/setPinned/delete on this same
+    // BoundedLRU during this loop. Map iteration is live in JS, and re-entrant
+    // insertion here would be skipped by the active iterator.
     for (const candidate of this.map.keys()) {
       if (this.map.size <= this.maxEntries) {
         return;
@@ -187,7 +190,9 @@ export class BoundedLRU<V> {
         this.onEvict(candidate);
       }
     }
-    // Every remaining key is pinned (in-flight) or protected; stop and let a
-    // later set/unpin reconcile once a colder key becomes evictable.
+    // Every remaining key is pinned (in-flight) or protected by
+    // `preventEvictingKey`: this is expected when the cache is temporarily
+    // over-cap due to concurrent in-flight loads. A later set/unpin reconciles
+    // once a colder key becomes evictable.
   }
 }

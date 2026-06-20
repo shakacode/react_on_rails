@@ -107,10 +107,11 @@ export const createRSCProvider = ({
     }
     const evictedSuccessfulPayloadKeys = evictedSuccessfulPayloadKeysRef.current;
     // Transient counters for replacement loads that observed an evicted-success
-    // marker. Counts avoid retaining promise references while still keeping a
-    // key latched until every overlapping replacement settles. Entries are
-    // deleted when the matching replacement loads settle, so a marker cannot be
-    // dropped while its current replacement is still pending.
+    // marker. Logically bounded by concurrently in-flight replacement loads:
+    // counts avoid retaining promise references while still keeping a key
+    // latched until every overlapping replacement settles. Entries are deleted
+    // when the matching replacement loads settle, so a marker cannot be dropped
+    // while its current replacement is still pending.
     const inFlightEvictedSuccessfulPayloadCountsRef = useRef(new Map<string, number>());
     const inFlightEvictedSuccessfulPayloadCounts = inFlightEvictedSuccessfulPayloadCountsRef.current;
     // Provider-wide successful-refetch token. Values only need to be comparable
@@ -127,12 +128,11 @@ export const createRSCProvider = ({
     //
     // The LRU (and its `onEvict` closure) is created once, on the first render
     // where `fetchRSCPromisesRef.current` is null, and never recreated. That is
-    // safe even though `onEvict` closes over `lastSuccessfulRSCPromisesRef`,
-    // `refetchVersionsRef`, `startTransition`, `setVersions`, and
-    // `setSuccessfulVersions`: refs are accessed via `.current` at call time
-    // (always current), and the state setters / `startTransition` are
-    // guaranteed stable by React across renders. So there is no stale-closure
-    // risk from not recreating `onEvict` on re-renders.
+    // safe even though `onEvict` closes over provider state: mutable refs are
+    // accessed via `.current` at call time, while `evictedSuccessfulPayloadKeys`,
+    // the state setters, and `startTransition` are stable for this provider's
+    // lifetime. So there is no stale-closure risk from not recreating `onEvict`
+    // on re-renders.
     const fetchRSCPromisesRef = useRef<BoundedLRU<Promise<ReactNode>> | null>(null);
     if (!fetchRSCPromisesRef.current) {
       fetchRSCPromisesRef.current = new BoundedLRU<Promise<ReactNode>>(
@@ -154,7 +154,8 @@ export const createRSCProvider = ({
             // state for the re-entered key.
             if (
               refetchVersionsRef.current[evictedKey] !== undefined ||
-              fetchRSCPromisesRef.current?.get(evictedKey, false) !== undefined
+              (fetchRSCPromisesRef.current !== null &&
+                fetchRSCPromisesRef.current.get(evictedKey, false) !== undefined)
             ) {
               return;
             }
@@ -167,7 +168,8 @@ export const createRSCProvider = ({
                 // between the outer check and this setState commit.
                 if (
                   refetchVersionsRef.current[evictedKey] !== undefined ||
-                  fetchRSCPromisesRef.current?.get(evictedKey, false) !== undefined
+                  (fetchRSCPromisesRef.current !== null &&
+                    fetchRSCPromisesRef.current.get(evictedKey, false) !== undefined)
                 ) {
                   return prev;
                 }
@@ -184,6 +186,41 @@ export const createRSCProvider = ({
       );
     }
     const fetchRSCPromises = fetchRSCPromisesRef.current;
+
+    const dropVersionStateForKey = useCallback((key: string) => {
+      const dropVersionState = (prev: Record<string, number>) => {
+        if (!(key in prev)) {
+          return prev;
+        }
+        const next = { ...prev };
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete next[key];
+        return next;
+      };
+
+      setVersions(dropVersionState);
+      setSuccessfulVersions(dropVersionState);
+    }, []);
+
+    const scheduleAbsentKeyVersionCleanup = useCallback(
+      (key: string) => {
+        // Keep this refetch version visible until RSCRoute.refetch's rejection
+        // handler observes it, then drop orphaned bookkeeping if the key never
+        // re-entered the cache.
+        setTimeout(() => {
+          if (fetchRSCPromises.get(key, false) !== undefined) {
+            return;
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+          delete refetchVersionsRef.current[key];
+          startTransition(() => {
+            dropVersionStateForKey(key);
+          });
+        }, 0);
+      },
+      [dropVersionStateForKey, fetchRSCPromises, startTransition],
+    );
 
     const getRefetchVersion = useCallback((componentName: string, componentProps: unknown) => {
       const key = createRSCPayloadKey(componentName, componentProps);
@@ -260,6 +297,9 @@ export const createRSCProvider = ({
           if (!(payload instanceof Error)) {
             payloadSucceeded = markSuccessfulPromise(key, promise, notifyRoutesOnSuccess);
             if (payloadSucceeded) {
+              // Delete the entire count: once this replacement wins the cache
+              // identity check and notifies routes, concurrent stale
+              // replacements should not re-set the marker when they settle.
               evictedSuccessfulPayloadKeys.delete(key);
               inFlightEvictedSuccessfulPayloadCounts.delete(key);
             }
@@ -320,7 +360,13 @@ export const createRSCProvider = ({
             // is called from a `.then`/`.catch` rejection handler (a microtask), so
             // the rejection chain and RSCRoute.refetch() error surface complete
             // before this macrotask runs. A direct unpin or `queueMicrotask` would
-            // drop the pin before the caller observes the current refetch version.
+            // drop the pin before the caller observes the current refetch version:
+            // RSCRoute.refetch's own `.catch` queues in the same microtask
+            // checkpoint as this rejection handler.
+            //
+            // NOTE: fake-timer tests on this path must use real timers or run
+            // pending timers; otherwise this temporary pin intentionally stays
+            // until the test advances timers.
             setTimeout(() => {
               fetchRSCPromises.unpin(key);
             }, 0);
@@ -328,6 +374,7 @@ export const createRSCProvider = ({
             // Preserve this refetch's outstanding pin; the promise finally owns
             // the matching unpin after the caller observes the failure.
             fetchRSCPromises.delete(key, true);
+            scheduleAbsentKeyVersionCleanup(key);
           }
 
           startTransition(() => {
@@ -350,6 +397,9 @@ export const createRSCProvider = ({
                   restoreLastSuccessfulPromise();
                 }
               } else if (markSuccessfulPromise(key, promise, true)) {
+                // Delete the entire count: a winning refetch supersedes
+                // replacement-load latches for this key, so stale replacements
+                // should not re-notify when their `.finally()` handlers run.
                 evictedSuccessfulPayloadKeys.delete(key);
                 inFlightEvictedSuccessfulPayloadCounts.delete(key);
               }
@@ -381,6 +431,7 @@ export const createRSCProvider = ({
         fetchRSCPromises,
         inFlightEvictedSuccessfulPayloadCounts,
         markSuccessfulPromise,
+        scheduleAbsentKeyVersionCleanup,
         startTransition,
       ],
     );
