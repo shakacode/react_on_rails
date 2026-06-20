@@ -65,6 +65,35 @@ RSpec.describe PagesController do
       )
     end
 
+    it "ignores malformed JSON prop values and continues reading later entries" do
+      request_id = "lazy-props-malformed-json"
+      stream_id = "stream:#{request_id}"
+      messages = [
+        [
+          "1-0",
+          [
+            [":users", "{not-json"],
+            [":comments", [{ "body" => "hello" }].to_json],
+            ["end", "true"]
+          ]
+        ]
+      ]
+      redis = instance_double(Redis, xread: { stream_id => messages }, close: nil)
+      emitter = instance_spy(ReactOnRailsPro::AsyncPropsEmitter)
+
+      allow(Redis).to receive(:new).and_return(redis)
+      allow(controller).to receive(:params).and_return(ActionController::Parameters.new(request_id:))
+      allow(Rails.logger).to receive(:warn)
+
+      controller.send(:read_lazy_props_from_redis, emitter)
+
+      expect(emitter).not_to have_received(:call).with("users", anything)
+      expect(emitter).to have_received(:call).once.with("comments", [{ "body" => "hello" }])
+      expect(Rails.logger).to have_received(:warn).with(
+        a_string_matching(/\[ReactOnRailsPro\] Ignoring malformed Redis async prop JSON for :users:/)
+      )
+    end
+
     it "raises after repeated empty Redis reads" do
       request_id = "lazy-props-timeout"
       stream_id = "stream:#{request_id}"

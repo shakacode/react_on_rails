@@ -515,7 +515,13 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
       emitter.reject(message_key[1..], message_value)
     elsif message_key.start_with?(":")
       # ":" prefix means set the prop (same as existing convention)
-      emitter.call(message_key[1..], JSON.parse(message_value))
+      begin
+        emitter.call(message_key[1..], JSON.parse(message_value))
+      rescue JSON::ParserError => e
+        Rails.logger.warn(
+          "[ReactOnRailsPro] Ignoring malformed Redis async prop JSON for #{message_key}: #{e.message}"
+        )
+      end
     else
       Rails.logger.warn(
         "[ReactOnRailsPro] Ignoring Redis async prop entry with unsupported prefix: #{message_key}"
