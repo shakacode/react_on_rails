@@ -49,13 +49,18 @@ const nonEmptyString = (value: unknown) => {
 
 const ORIGINAL_ERROR_PREFIX = 'Original error: ';
 // Stable prefix of React's generic Server Components render error.
+// @react-version-invariant
 // Source: packages/react-dom/src/server/ReactFizzServer.js — search for:
 //   "An error occurred in the Server Components render"
 // If React renames this string, deferred-render enrichment degrades to the
 // generic React error. Verify this prefix when upgrading React.
 const GENERIC_RSC_STREAM_ERROR_PREFIXES = ['An error occurred in the Server Components render.'];
 const isGenericRSCStreamError = (message: string) =>
-  GENERIC_RSC_STREAM_ERROR_PREFIXES.some((prefix) => message === prefix || message.startsWith(`${prefix} `));
+  GENERIC_RSC_STREAM_ERROR_PREFIXES.some((prefix) => {
+    if (!message.startsWith(prefix)) return false;
+    const nextCharacter = message[prefix.length];
+    return nextCharacter === undefined || /\s/.test(nextCharacter);
+  });
 
 export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamError: Error) => {
   const streamMessage = nonEmptyString(streamError.message);
@@ -265,6 +270,8 @@ export const extractMergedRSCStreamDiagnosticMessage = (error: Error) => {
     }
   }
 
+  // Defensive fallback for legacy/external merged-looking errors that do not carry the Error cause
+  // set by `mergeRSCStreamDiagnosticError`.
   const separatorIndex = error.message.lastIndexOf(REACT_STREAM_ERROR_SEPARATOR);
   return separatorIndex === -1 ? error.message : error.message.slice(0, separatorIndex);
 };

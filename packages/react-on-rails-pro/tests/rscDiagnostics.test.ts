@@ -145,6 +145,20 @@ describe('RSC diagnostics', () => {
     expect(rscStreamDiagnosticMatchesError(diagnosticError, genericStreamError)).toBe(true);
   });
 
+  it('matches React generic Server Components render errors with newline-delimited details', () => {
+    const diagnosticError = new Error(
+      '[ReactOnRails] RSC bundle rendering failed.\n' +
+        'Component: CommentsToggle\n' +
+        'Original error: useState is not a function',
+    );
+    const genericStreamError = new Error(
+      'An error occurred in the Server Components render.\nThe specific message is omitted in production builds.',
+    );
+
+    // NOTE: if this assertion breaks after a React upgrade, update GENERIC_RSC_STREAM_ERROR_PREFIXES.
+    expect(rscStreamDiagnosticMatchesError(diagnosticError, genericStreamError)).toBe(true);
+  });
+
   it('matches ordinary diagnostics when React reports a multi-line stream error', () => {
     const diagnosticError = new Error(
       '[ReactOnRails] RSC bundle rendering failed.\n' +

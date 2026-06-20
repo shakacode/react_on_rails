@@ -43,6 +43,8 @@ export interface CapturedRSCDiagnostic {
  * It includes both tracking functionality for the server renderer and fetching
  * functionality for components.
  */
+// Internal request-scoped helper. Default-exported only for sibling Pro modules and tests; it is not
+// exposed through the package export map.
 class RSCRequestTracker {
   private streams: RSCPayloadStreamInfo[] = [];
 

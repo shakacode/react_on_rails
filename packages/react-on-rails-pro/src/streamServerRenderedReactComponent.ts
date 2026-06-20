@@ -98,6 +98,7 @@ const streamRenderReactComponent = (
   // that surfaces earlier or later in the same render — a different Suspense boundary throwing, a
   // serialization error, an addPostSSRHook throw — does not consume or attach a non-matching RSC
   // diagnostic, so the actual RSC failure can still be enriched when it surfaces.
+  // @react-version-invariant
   // React delivers `onError` synchronously during render, so the consume/restore cycle below
   // completes before another `onError` or the later `.catch` microtask can observe the tracker.
   //
@@ -183,7 +184,8 @@ const streamRenderReactComponent = (
           }
           sendErrorHtml(
             // onError fires before onShellError and sets renderState.error to the enriched error.
-            // Reuse it when present; otherwise enrich the shell error here.
+            // Reuse it when present; otherwise enrich the shell error here as a defensive fallback for
+            // nonstandard or future React callback ordering.
             renderState.error instanceof Error ? renderState.error : enrichWithCapturedRSCDiagnostics(error),
           );
         },
