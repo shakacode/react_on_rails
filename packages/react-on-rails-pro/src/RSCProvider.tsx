@@ -88,7 +88,8 @@ export const createRSCProvider = ({
     // tree visible until the new payload resolves.
     const [versions, setVersions] = useState<Record<string, number>>({});
     const [successfulVersions, setSuccessfulVersions] = useState<Record<string, number>>({});
-    // Keys whose last successful payload was evicted. If a mounted route reloads
+    // Keys whose last successful payload was evicted. Used as a bounded set;
+    // the stored `true` value is only a membership sentinel. If a mounted route reloads
     // one of these keys through a normal cache-miss `getComponent`, publish a
     // success token only after that replacement payload actually resolves. The
     // marker LRU has a wider cap than the primary payload cache so ordinary
@@ -105,13 +106,11 @@ export const createRSCProvider = ({
       );
     }
     const evictedSuccessfulPayloadKeys = evictedSuccessfulPayloadKeysRef.current;
-    // Unbounded but short-lived: entries are added only when a replacement load
-    // starts after observing an evicted-success marker, and each entry is removed
-    // when that specific promise settles or a newer refetch success supersedes
-    // the key. The per-promise latch prevents an older stale replacement from
-    // clearing a newer replacement's success notification.
-    const inFlightEvictedSuccessfulPayloadPromisesRef = useRef(new Map<string, Set<Promise<ReactNode>>>());
-    const inFlightEvictedSuccessfulPayloadPromises = inFlightEvictedSuccessfulPayloadPromisesRef.current;
+    // Bounded counters for replacement loads that observed an evicted-success
+    // marker. Counts avoid retaining promise references while still keeping a
+    // key latched until every overlapping replacement settles.
+    const inFlightEvictedSuccessfulPayloadCountsRef = useRef(new Map<string, number>());
+    const inFlightEvictedSuccessfulPayloadCounts = inFlightEvictedSuccessfulPayloadCountsRef.current;
     // Provider-wide successful-refetch token. Values only need to be comparable
     // for "newer successful payload happened" checks, so a global monotonic
     // token lets a mounted route ignore eviction cleanup decreases (N -> 0) but
@@ -240,25 +239,27 @@ export const createRSCProvider = ({
         // `restoreLastSuccessfulPromise` closure before assigning `promise`).
         let promise!: Promise<ReactNode>;
         let payloadSucceeded = false;
-        const removeInFlightEvictedSuccessLatch = () => {
-          const promises = inFlightEvictedSuccessfulPayloadPromises.get(key);
-          if (!promises?.delete(promise)) {
+        const releaseInFlightEvictedSuccessLatch = () => {
+          const count = inFlightEvictedSuccessfulPayloadCounts.get(key);
+          if (count === undefined) {
             return false;
           }
-          if (promises.size === 0) {
-            inFlightEvictedSuccessfulPayloadPromises.delete(key);
+          if (count > 1) {
+            inFlightEvictedSuccessfulPayloadCounts.set(key, count - 1);
+          } else {
+            inFlightEvictedSuccessfulPayloadCounts.delete(key);
           }
           return true;
         };
         const notifyRoutesOnSuccess =
           evictedSuccessfulPayloadKeys.get(key, false) !== undefined ||
-          (inFlightEvictedSuccessfulPayloadPromises.get(key)?.size ?? 0) > 0;
+          (inFlightEvictedSuccessfulPayloadCounts.get(key) ?? 0) > 0;
         const markPayloadIfSuccessful = (payload: ReactNode) => {
           if (!(payload instanceof Error)) {
             payloadSucceeded = markSuccessfulPromise(key, promise, notifyRoutesOnSuccess);
             if (payloadSucceeded) {
               evictedSuccessfulPayloadKeys.delete(key);
-              removeInFlightEvictedSuccessLatch();
+              releaseInFlightEvictedSuccessLatch();
             }
           }
           return payload;
@@ -275,14 +276,24 @@ export const createRSCProvider = ({
 
         promise = serverComponentPromise.then(markPayloadIfSuccessful).finally(() => {
           fetchRSCPromises.unpin(key);
-          if (notifyRoutesOnSuccess && !payloadSucceeded && removeInFlightEvictedSuccessLatch()) {
+          if (notifyRoutesOnSuccess && !payloadSucceeded && releaseInFlightEvictedSuccessLatch()) {
             evictedSuccessfulPayloadKeys.set(key, true);
           }
         });
         if (notifyRoutesOnSuccess) {
-          const promises = inFlightEvictedSuccessfulPayloadPromises.get(key) ?? new Set<Promise<ReactNode>>();
-          promises.add(promise);
-          inFlightEvictedSuccessfulPayloadPromises.set(key, promises);
+          if (
+            !inFlightEvictedSuccessfulPayloadCounts.has(key) &&
+            inFlightEvictedSuccessfulPayloadCounts.size >= RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES
+          ) {
+            const oldestKey = inFlightEvictedSuccessfulPayloadCounts.keys().next().value;
+            if (oldestKey !== undefined) {
+              inFlightEvictedSuccessfulPayloadCounts.delete(oldestKey);
+            }
+          }
+          inFlightEvictedSuccessfulPayloadCounts.set(
+            key,
+            (inFlightEvictedSuccessfulPayloadCounts.get(key) ?? 0) + 1,
+          );
         }
         fetchRSCPromises.setPinned(key, promise);
         return promise;
@@ -290,7 +301,7 @@ export const createRSCProvider = ({
       [
         evictedSuccessfulPayloadKeys,
         fetchRSCPromises,
-        inFlightEvictedSuccessfulPayloadPromises,
+        inFlightEvictedSuccessfulPayloadCounts,
         markSuccessfulPromise,
       ],
     );
@@ -306,7 +317,15 @@ export const createRSCProvider = ({
           }
 
           if (key in lastSuccessfulRSCPromisesRef.current) {
-            fetchRSCPromises.set(key, lastSuccessfulRSCPromisesRef.current[key], true);
+            // Keep the restored last-successful payload protected until the
+            // caller's rejection handler has observed the still-current refetch
+            // version. Otherwise, an unrelated key settling in the same turn
+            // could reconcile an over-cap cache and delete this version before
+            // RSCRoute.refetch() surfaces the error.
+            fetchRSCPromises.setPinned(key, lastSuccessfulRSCPromisesRef.current[key]);
+            setTimeout(() => {
+              fetchRSCPromises.unpin(key);
+            }, 0);
           } else {
             fetchRSCPromises.delete(key, true);
           }
@@ -332,7 +351,7 @@ export const createRSCProvider = ({
                 }
               } else if (markSuccessfulPromise(key, promise, true)) {
                 evictedSuccessfulPayloadKeys.delete(key);
-                inFlightEvictedSuccessfulPayloadPromises.delete(key);
+                inFlightEvictedSuccessfulPayloadCounts.delete(key);
               }
               return payload;
             },
@@ -360,7 +379,7 @@ export const createRSCProvider = ({
       [
         evictedSuccessfulPayloadKeys,
         fetchRSCPromises,
-        inFlightEvictedSuccessfulPayloadPromises,
+        inFlightEvictedSuccessfulPayloadCounts,
         markSuccessfulPromise,
         startTransition,
       ],

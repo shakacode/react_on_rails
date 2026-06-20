@@ -188,6 +188,8 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
     const latestPropsRef = useRef<[string, unknown]>([componentName, componentProps]);
     const onRefetchErrorRef = useRef(onRefetchError);
     const latestRefetchRequestRef = useRef(0);
+    // Version 0 means "evicted or not yet seen"; it lets a later monotonic
+    // success token clear a stale refetch error after the key reloads.
     const previousSuccessfulVersionRef = useRef({ key: currentRouteKey, version: successfulVersion });
     const isMountedRef = useRef(false);
     useLayoutEffect(() => {

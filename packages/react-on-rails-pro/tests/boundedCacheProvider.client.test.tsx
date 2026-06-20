@@ -227,6 +227,28 @@ describe('BoundedLRU', () => {
     expect(evicted).toEqual([]);
   });
 
+  it('a temporarily pinned restored key survives unrelated over-cap reconciliation', () => {
+    const { lru, evicted } = makeLRU(1);
+
+    lru.setPinned('restored', 'failed refetch');
+    lru.setPinned('other inflight', 'I');
+    lru.setPinned('restored', 'last successful payload');
+
+    // The failed refetch settles first. The restored payload is still protected
+    // by its temporary pin while the caller's rejection handler observes the
+    // current refetch version.
+    lru.unpin('restored');
+    lru.unpin('other inflight');
+
+    expect(has(lru, 'restored')).toBe(true);
+    expect(evicted).not.toContain('restored');
+
+    // Once that temporary pin is released, normal bounded LRU eviction applies.
+    lru.unpin('restored');
+    lru.set('cold', 'C');
+    expect(has(lru, 'restored')).toBe(false);
+  });
+
   it('unpin does not evict the just-settled key when it is the only unpinned entry (over-cap reconciliation)', () => {
     // Regression guard for the over-cap reconciliation bug: a burst of
     // concurrent in-flight loads pushes the cache past the cap with every key
