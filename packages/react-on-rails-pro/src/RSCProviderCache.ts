@@ -149,6 +149,10 @@ export class BoundedLRU<V> {
     }
   }
 
+  deletePreservingPins(key: string): void {
+    this.delete(key, true);
+  }
+
   unpin(key: string): void {
     this.assertNotEvicting('unpin');
     const count = this.pins.get(key);

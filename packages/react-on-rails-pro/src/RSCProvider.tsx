@@ -383,7 +383,7 @@ export const createRSCProvider = ({
           } else {
             // Preserve this refetch's outstanding pin; the promise finally owns
             // the matching unpin after the caller observes the failure.
-            fetchRSCPromises.delete(key, true);
+            fetchRSCPromises.deletePreservingPins(key);
             scheduleAbsentKeyVersionCleanup(key);
           }
 
