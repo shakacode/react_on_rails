@@ -31,7 +31,14 @@ describe('package scripts', () => {
     expect(script).toContain('bin/shakapacker-precompile-hook');
   });
 
-  it.each(['build:test', 'build:test:rspack'])('%s prepares the generated i18n directory', (scriptName) => {
+  it.each([
+    'build:client',
+    'build:server',
+    'build:dev',
+    'build:test',
+    'build:test:rspack',
+    'build:dev:watch',
+  ])('%s prepares the generated i18n directory before the precompile hook', (scriptName) => {
     const script = packageJson.scripts[scriptName];
     const prepareIndex = script.indexOf('pnpm run prepare:i18n');
     const precompileIndex = script.indexOf('bin/shakapacker-precompile-hook');

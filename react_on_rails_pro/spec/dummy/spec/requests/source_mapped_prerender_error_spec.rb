@@ -14,9 +14,8 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "rails_helper"
-require "stringio"
 
-RSpec.describe "source-mapped prerender errors", :server_rendering do
+describe "source-mapped prerender errors", :server_rendering do
   it "logs the original TSX frame when Rails handles a PrerenderError" do
     log_output = StringIO.new
     allow(Rails).to receive(:logger).and_return(ActiveSupport::Logger.new(log_output))
@@ -24,6 +23,8 @@ RSpec.describe "source-mapped prerender errors", :server_rendering do
     get source_mapped_prerender_error_probe_path
 
     expect(response).to redirect_to(server_side_log_throw_raise_invoker_path)
+    expect(log_output.string)
+      .to include("Caught ReactOnRails::PrerenderError in ApplicationController error handler.")
     expect(log_output.string).to include("source-mapped TSX prerender probe")
     expect(log_output.string).to match(/SourceMappedPrerenderErrorProbe\.tsx:\d+:\d+/)
   end
