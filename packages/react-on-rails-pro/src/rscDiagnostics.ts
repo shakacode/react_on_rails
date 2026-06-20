@@ -39,7 +39,7 @@ type RSCStreamDiagnosticError = Error & {
   cause?: unknown;
 };
 
-const nonEmptyString = (value: unknown) => {
+const nonBlankString = (value: unknown) => {
   if (typeof value !== 'string') return undefined;
   // Trim so a whitespace-only `renderingError.message`/`stack` (e.g. `"  "` or `"\n"`) is
   // treated as absent rather than surfacing as `Original error:` with blank text.
@@ -65,7 +65,7 @@ const isGenericRSCStreamError = (message: string) =>
   });
 
 export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamError: Error) => {
-  const streamMessage = nonEmptyString(streamError.message);
+  const streamMessage = nonBlankString(streamError.message);
   if (!streamMessage) return false;
   // React can hide the underlying Server Component failure behind this generic message. If a
   // diagnostic is waiting, that generic stream error is the correlation signal. This deliberately
@@ -118,10 +118,10 @@ export const buildRSCStreamDiagnosticError = (
 ) => {
   const raw = metadata.renderingError;
   // `RenderingErrorMetadata` has only optional `unknown` fields, so a plain annotation
-  // accepts any object without a type assertion; `nonEmptyString()` validates each field at runtime.
+  // accepts any object without a type assertion; `nonBlankString()` validates each field at runtime.
   const re: RenderingErrorMetadata = typeof raw === 'object' && raw !== null ? raw : {};
-  const originalMessage = nonEmptyString(re.message);
-  const originalStack = nonEmptyString(re.stack);
+  const originalMessage = nonBlankString(re.message);
+  const originalStack = nonBlankString(re.stack);
   // Wire contract: the React on Rails server bundle only emits `renderingError` on actual
   // failure, so presence of a message or stack is treated as a failure signal even when
   // `hasErrors` isn't explicitly set. Belt-and-suspenders intentional — if a future producer
@@ -266,7 +266,7 @@ export const mergeRSCStreamDiagnosticError = (error: unknown, diagnosticError?: 
 export const extractMergedRSCStreamDiagnosticMessage = (error: Error) => {
   const streamError = (error as RSCStreamDiagnosticError).cause;
   if (streamError instanceof Error) {
-    const streamMessage = nonEmptyString(streamError.message);
+    const streamMessage = nonBlankString(streamError.message);
     const suffix = streamMessage && `${REACT_STREAM_ERROR_SEPARATOR} ${streamMessage}`;
     if (suffix && error.message.endsWith(suffix)) {
       return error.message.slice(0, -suffix.length);

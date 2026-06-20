@@ -108,6 +108,12 @@ const streamRenderReactComponent = (
   const enrichWithCapturedRSCDiagnostics = (error: Error): Error => {
     if ((error as MaybeMergedRSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG]) {
       const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
+      // The only current pre-merge path is the synchronous reject in
+      // getReactServerComponent.server.ts, which merges a single diagnostic; its extracted
+      // message matches one captured entry and removes that entry from the restore set. If a future
+      // path pre-merges a combined diagnostic, revisit this filter: the combined message will not
+      // equal any individual captured entry and could leave diagnostics available for an unrelated
+      // later error.
       const mergedDiagnosticMessage = extractMergedRSCStreamDiagnosticMessage(error);
       streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(
         captured.filter((entry) => entry.diagnosticError.message !== mergedDiagnosticMessage),
@@ -188,6 +194,10 @@ const streamRenderReactComponent = (
             // onError fires before onShellError and sets renderState.error to the enriched error.
             // Reuse it when present; otherwise enrich the shell error here as a defensive fallback for
             // nonstandard or future React callback ordering.
+            //
+            // Current shell-error coverage throws synchronously, so onError sets renderState.error
+            // first. If this fallback is reached after the tracker was already consumed,
+            // enrichWithCapturedRSCDiagnostics returns the original error unchanged.
             renderState.error instanceof Error ? renderState.error : enrichWithCapturedRSCDiagnostics(error),
           );
         },

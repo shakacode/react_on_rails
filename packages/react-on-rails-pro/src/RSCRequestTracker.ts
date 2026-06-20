@@ -186,6 +186,11 @@ class RSCRequestTracker {
    * @param captured - Previously consumed diagnostics to make available for a later surfaced error
    */
   restoreCapturedRSCDiagnostics(captured: CapturedRSCDiagnostic[]): void {
+    // Direct push without re-running the dedup filter in `recordRSCDiagnostic` is safe because
+    // React delivers onError synchronously: there is no microtask gap between
+    // `consumeCapturedRSCDiagnostics()` and this restore where a new record can interleave. RSC
+    // payload parsing also completes before the deferred render phase where onError fires. If
+    // either invariant changes, re-add the dedup check here.
     this.capturedRSCDiagnostics.push(...captured);
   }
 
