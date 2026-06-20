@@ -161,8 +161,11 @@ module ReactOnRailsPro
           begin
             process_response_chunks(stream_response, &block)
           ensure
-            # renderComplete control messages also close this queue; close is idempotent.
-            # This safety net covers parser or stream aborts before renderComplete arrives.
+            # renderComplete control messages normally close this queue earlier.
+            # This safety net covers parser errors, stream aborts, and timeouts
+            # before renderComplete arrives. The user's pull_requests.dequeue loop
+            # then exits with nil; any in-flight emit.call is protected by
+            # AsyncPropsEmitter#call's rescue.
             @emitter&.render_complete!
           end
           break
@@ -206,6 +209,9 @@ module ReactOnRailsPro
       raise
     end
 
+    # Expected shapes from callers:
+    #   render_code_with_incremental_updates => { response:, emitter: }
+    #   render_code_as_stream                => bare response object (pre-pull mode)
     def normalize_executor_result(result)
       # Incremental rendering returns a named result so unrelated Array-like responses are never
       # mistaken for [response, emitter]. Older renderers still return only response.

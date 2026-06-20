@@ -26,6 +26,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   POSTS_PAGE_DEFAULT_POSTS_COUNT = 2
   POSTS_PAGE_MAX_ARTIFICIAL_DELAY = 10_000
   POSTS_PAGE_MAX_POSTS_COUNT = 100
+  # Test-harness bounds. Production apps must choose their own timeout and
+  # backpressure strategy; 30s x 10 can block a server thread for five minutes.
   LAZY_PROP_REDIS_BLOCK_MS = 30_000
   MAX_LAZY_PROP_REDIS_EMPTY_READS = 10
   LAZY_PROP_REDIS_STALL_WARN_READS = 3

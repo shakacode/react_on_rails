@@ -106,8 +106,7 @@ class AsyncPropsManager {
       if (propName.length > MAX_PULL_PROP_NAME_LENGTH) {
         return AsyncPropsManager.rejectOversizedPullPropRequest(propName, promiseController);
       }
-      promiseController.pullRequested = true;
-      this.emitPropRequest(propName);
+      promiseController.pullRequested = this.emitPropRequest(propName);
     }
 
     return promiseController.promise;
@@ -180,8 +179,7 @@ class AsyncPropsManager {
           return;
         }
         // eslint-disable-next-line no-param-reassign
-        controller.pullRequested = true;
-        this.emitPropRequest(propName);
+        controller.pullRequested = this.emitPropRequest(propName);
       }
     });
   }
@@ -213,23 +211,24 @@ class AsyncPropsManager {
     return (this.sharedExecutionContext?.get(PROP_REQUEST_EMITTER_KEY) as PropRequestEmitter | null) ?? null;
   }
 
-  private emitPropRequest(propName: string) {
+  private emitPropRequest(propName: string): boolean {
     const emitter = this.getPropRequestEmitter();
     if (emitter) {
       emitter(propName);
-    } else {
-      if (this.bufferedPropRequests.length >= AsyncPropsManager.MAX_BUFFERED_REQUESTS) {
-        console.warn(
-          `AsyncPropsManager buffered propRequest cap reached; dropping request for "${propName}". ` +
-            'The prop request emitter may not have been installed.',
-        );
-        return;
-      }
-      // Marking `pullRequested` happens before this call, so buffered requests
-      // will not be re-emitted by `catchUpPropRequests()` after the emitter
-      // is installed.
-      this.bufferedPropRequests.push(propName);
+      return true;
     }
+    if (this.bufferedPropRequests.length >= AsyncPropsManager.MAX_BUFFERED_REQUESTS) {
+      console.warn(
+        `AsyncPropsManager buffered propRequest cap reached; keeping request eligible for catch-up: "${propName}". ` +
+          'The prop request emitter may not have been installed.',
+      );
+      return false;
+    }
+    // The caller marks `pullRequested` only after this succeeds, so buffered
+    // requests will not be re-emitted by `catchUpPropRequests()` after the
+    // emitter is installed.
+    this.bufferedPropRequests.push(propName);
+    return true;
   }
 
   private static rejectOversizedPullPropRequest(propName: string, promiseController: PromiseController) {

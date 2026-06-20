@@ -177,6 +177,9 @@ module ReactOnRailsPro
     # Enqueue a propRequest from the Node renderer.
     # Silently drops requests for props that have already been pushed.
     def enqueue(prop_name)
+      # @pushed_props is mutated by AsyncPropsEmitter#call. In fiber-concurrent
+      # code this has a narrow TOCTOU window; duplicate requests are filtered on
+      # the TypeScript side via AsyncPropsManager's pullRequested flag.
       return if @closed || @pushed_props.include?(prop_name)
 
       @queue.enqueue(prop_name)

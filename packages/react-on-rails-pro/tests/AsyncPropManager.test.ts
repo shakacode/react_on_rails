@@ -328,6 +328,17 @@ describe('rejectProp', () => {
     expect(() => manager.rejectProp('endedProp', 'fetch failed')).not.toThrow();
   });
 
+  it('is a no-op when rejectProp is called twice on the same prop', async () => {
+    const manager = new AsyncPropsManager();
+    const promise = manager.getProp('foo');
+
+    manager.rejectProp('foo', 'first reason');
+    manager.rejectProp('foo', 'second reason');
+
+    await expect(promise).rejects.toThrow(/first reason/);
+    await expect(promise).rejects.not.toThrow(/second reason/);
+  });
+
   it('rejectProp after endStream does not change the endStream rejection reason', async () => {
     const manager = new AsyncPropsManager();
     const promise = manager.getProp('foo');
@@ -419,7 +430,7 @@ describe('Pull mode propRequest emission', () => {
     expect(propRequestEmitter).toHaveBeenCalledTimes(1);
   });
 
-  it('caps buffered propRequests when the emitter is never installed', () => {
+  it('keeps over-cap buffered propRequests eligible for catch-up when the emitter is installed', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const bufferedContext = new Map<string, unknown>([
       [PULL_ENABLED_KEY, true],
@@ -435,8 +446,8 @@ describe('Pull mode propRequest emission', () => {
       bufferedContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
       bufferedManager.catchUpPropRequests();
 
-      expect(propRequestEmitter).toHaveBeenCalledTimes(500);
-      expect(propRequestEmitter).not.toHaveBeenCalledWith('buffered-500');
+      expect(propRequestEmitter).toHaveBeenCalledTimes(501);
+      expect(propRequestEmitter).toHaveBeenCalledWith('buffered-500');
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('buffered propRequest cap reached'));
     } finally {
       warnSpy.mockRestore();

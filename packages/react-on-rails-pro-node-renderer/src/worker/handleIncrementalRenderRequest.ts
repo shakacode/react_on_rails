@@ -100,6 +100,10 @@ export function catchUpAsyncPropsManagerPullBridge(value: unknown): boolean {
   }
 
   if (isLegacyAsyncPropsManagerPullBridge(value)) {
+    // Current AsyncPropsManager keeps both methods as aliases of
+    // catchUpPropRequests() for older node renderers. Calling both is
+    // intentionally harmless: buffered requests drain on the first call and
+    // pullRequested flags prevent duplicate emissions on the second.
     value.flushPendingPullRequests();
     value.emitPendingPullRequests();
     return true;
