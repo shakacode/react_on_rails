@@ -130,7 +130,9 @@ export class BoundedLRU<V> {
   delete(key: string, preservePins = false): void {
     // Intentionally does not call `onEvict`: current callers handle companion
     // state before deleting/restoring a key. Future callers that need eviction
-    // cleanup should use an eviction path, not this raw delete.
+    // cleanup should use an eviction path, not this raw delete. The default also
+    // wipes outstanding pins; pass preservePins=true only when the caller owns
+    // the matching unpin lifecycle.
     this.map.delete(key);
     if (!preservePins) {
       this.pins.delete(key);
