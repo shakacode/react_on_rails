@@ -301,8 +301,10 @@ export const createRSCProvider = ({
             payloadSucceeded = markSuccessfulPromise(key, promise, notifyRoutesOnSuccess);
             if (payloadSucceeded) {
               // Delete the entire count: once this replacement wins the cache
-              // identity check and notifies routes, concurrent stale
-              // replacements should not re-set the marker when they settle.
+              // identity check and notifies routes, same-key `getComponent`
+              // replacements cannot have piled up because later callers reuse
+              // the cached promise, while stale refetch races are guarded
+              // separately.
               evictedSuccessfulPayloadKeys.delete(key);
               inFlightEvictedSuccessfulPayloadCounts.delete(key);
             }

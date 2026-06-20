@@ -21,7 +21,9 @@
  * along with all of its companion bookkeeping (last-successful promise and
  * refetch version). The common case — a small, stable set of routes — never
  * hits the cap, so cache hits, refetch, and recoverOnError restore are
- * unaffected. See https://github.com/shakacode/react_on_rails/issues/3564.
+ * unaffected. This cap is intentionally not configurable through
+ * `createRSCProvider` today. See
+ * https://github.com/shakacode/react_on_rails/issues/3564.
  *
  * NOTE: the per-key `useSyncExternalStore` subscription/fan-out optimization
  * from #3564 is intentionally deferred pending profiling; only eviction is

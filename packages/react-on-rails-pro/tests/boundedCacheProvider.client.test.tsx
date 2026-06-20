@@ -1333,4 +1333,69 @@ describe('RSCRoute successful-version error reset', () => {
     const key = createRSCPayloadKey('Card', { id: 0 });
     expect(rscApi.successfulVersions[key] ?? 0).toBe(0);
   });
+
+  it('o. synchronous replacement throws restore the evicted-success marker for a later replacement', async () => {
+    process.env.NODE_ENV = 'production';
+
+    type PendingEntry = Deferred & { args: GetServerComponentArgs };
+    const pending: PendingEntry[] = [];
+    const syncThrowIds = new Set<number>();
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const args = _args[0];
+      const id = (args.componentProps as { id: number }).id;
+      if (!args.enforceRefetch && syncThrowIds.delete(id)) {
+        throw new Error(`sync boom ${id}`);
+      }
+
+      const d = makeDeferred();
+      pending.push({ ...d, args });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+    await renderInAct(
+      <RSCProvider>
+        <Probe />
+      </RSCProvider>,
+    );
+
+    const startLoad = async (id: number) => {
+      let promise!: Promise<React.ReactNode>;
+      await act(async () => {
+        promise = rscApi.getComponent('Card', { id });
+        await Promise.resolve();
+      });
+      return { promise, deferred: findPendingForId(pending, id) };
+    };
+
+    const resolveLoad = async (started: Awaited<ReturnType<typeof startLoad>>, payload: React.ReactNode) => {
+      await act(async () => {
+        started.deferred.resolve(payload);
+        await started.promise;
+      });
+    };
+
+    // Give ids 0..CACHE_CAP a successful payload. Loading the (cap+1)-th key
+    // evicts id 0 and records its "last successful payload was evicted" marker.
+    for (let id = 0; id <= CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`initial ${id}`}</span>);
+    }
+
+    syncThrowIds.add(0);
+    expect(() => rscApi.getComponent('Card', { id: 0 })).toThrow('sync boom 0');
+
+    const replacement = await startLoad(0);
+    await resolveLoad(replacement, <span>replacement 0</span>);
+
+    const key = createRSCPayloadKey('Card', { id: 0 });
+    await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+  });
 });
