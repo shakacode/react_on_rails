@@ -16,16 +16,6 @@ module ReactOnRails
           export const translations = #{@translations};
         JS
       end
-
-      def template_default
-        <<~JS
-          const defaultLocale = '#{default_locale}';
-
-          const defaultMessages = #{@defaults};
-
-          export { defaultMessages, defaultLocale };
-        JS
-      end
     end
   end
 end
