@@ -99,11 +99,11 @@ export class BoundedLRU<V> {
     return value;
   }
 
-  set(key: string, value: V, preventSelfEviction = false): void {
+  set(key: string, value: V): void {
     // Re-insert so an existing key moves to most-recently-used.
     this.map.delete(key);
     this.map.set(key, value);
-    this.evictIfNeeded(preventSelfEviction ? key : undefined);
+    this.evictIfNeeded();
   }
 
   /**

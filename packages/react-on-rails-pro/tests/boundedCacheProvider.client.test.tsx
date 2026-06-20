@@ -209,17 +209,19 @@ describe('BoundedLRU', () => {
     expect(has(lru, 'p3')).toBe(true);
   });
 
-  it('set(..., true) keeps a restored key when all other over-cap entries are pinned', () => {
+  it('temporarily pinned restore keeps the restored key when all other over-cap entries are pinned', () => {
     const { lru, evicted } = makeLRU(1);
 
     lru.setPinned('restored', 'failed refetch');
     lru.setPinned('other inflight', 'I');
-    lru.set('restored', 'R', true);
+    lru.delete('restored', true);
+    lru.setPinned('restored', 'R');
 
     expect(has(lru, 'other inflight')).toBe(true);
     expect(has(lru, 'restored')).toBe(true);
     expect(evicted).toEqual([]);
 
+    lru.unpin('restored');
     lru.unpin('restored');
 
     expect(has(lru, 'other inflight')).toBe(true);

@@ -34,6 +34,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useRSC } from './RSCProvider.tsx';
+import { shouldClearRefetchErrorOnSuccessfulVersionChange } from './RSCRouteSuccessfulVersion.ts';
 import { RSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import { isServerComponentFetchError, ServerComponentFetchError } from './ServerComponentFetchError.ts';
 import { createRSCPayloadKey } from './utils.ts';
@@ -209,7 +210,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       const current = { key: currentRouteKey, version: successfulVersion };
       previousSuccessfulVersionRef.current = current;
 
-      if (previous.key !== current.key || current.version > previous.version) {
+      if (shouldClearRefetchErrorOnSuccessfulVersionChange(previous, current)) {
         setRefetchErrorState(null);
       }
     }, [currentRouteKey, successfulVersion]);

@@ -106,9 +106,11 @@ export const createRSCProvider = ({
       );
     }
     const evictedSuccessfulPayloadKeys = evictedSuccessfulPayloadKeysRef.current;
-    // Bounded counters for replacement loads that observed an evicted-success
+    // Transient counters for replacement loads that observed an evicted-success
     // marker. Counts avoid retaining promise references while still keeping a
-    // key latched until every overlapping replacement settles.
+    // key latched until every overlapping replacement settles. Entries are
+    // deleted when the matching replacement loads settle, so a marker cannot be
+    // dropped while its current replacement is still pending.
     const inFlightEvictedSuccessfulPayloadCountsRef = useRef(new Map<string, number>());
     const inFlightEvictedSuccessfulPayloadCounts = inFlightEvictedSuccessfulPayloadCountsRef.current;
     // Provider-wide successful-refetch token. Values only need to be comparable
@@ -281,15 +283,6 @@ export const createRSCProvider = ({
           }
         });
         if (notifyRoutesOnSuccess) {
-          if (
-            !inFlightEvictedSuccessfulPayloadCounts.has(key) &&
-            inFlightEvictedSuccessfulPayloadCounts.size >= RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES
-          ) {
-            const oldestKey = inFlightEvictedSuccessfulPayloadCounts.keys().next().value;
-            if (oldestKey !== undefined) {
-              inFlightEvictedSuccessfulPayloadCounts.delete(oldestKey);
-            }
-          }
           inFlightEvictedSuccessfulPayloadCounts.set(
             key,
             (inFlightEvictedSuccessfulPayloadCounts.get(key) ?? 0) + 1,
@@ -323,6 +316,9 @@ export const createRSCProvider = ({
             // could reconcile an over-cap cache and delete this version before
             // RSCRoute.refetch() surfaces the error.
             fetchRSCPromises.setPinned(key, lastSuccessfulRSCPromisesRef.current[key]);
+            // `setTimeout(0)` queues a macrotask, so this temporary pin outlives
+            // the microtask queue where the caller's rejection handler observes
+            // the restored last-successful promise.
             setTimeout(() => {
               fetchRSCPromises.unpin(key);
             }, 0);
