@@ -100,6 +100,7 @@ Rails.application.routes.draw do
   get "client_side_log_throw" => "pages#client_side_log_throw"
   get "server_side_log_throw" => "pages#server_side_log_throw"
   get "server_side_log_throw_plain_js" => "pages#server_side_log_throw_plain_js"
+  get "source_mapped_prerender_error_probe" => "pages#source_mapped_prerender_error_probe"
   get "server_side_log_throw_raise" => "pages#server_side_log_throw_raise"
   get "server_side_log_throw_raise_invoker" => "pages#server_side_log_throw_raise_invoker"
   get "server_side_hello_world_es5" => "pages#server_side_hello_world_es5"
