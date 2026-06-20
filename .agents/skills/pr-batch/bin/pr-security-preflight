@@ -1,0 +1,650 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "open3"
+require "optparse"
+# Ruby versions before 3.2 do not load Set by default.
+# rubocop:disable Lint/RedundantRequireStatement
+require "set"
+# rubocop:enable Lint/RedundantRequireStatement
+require "timeout"
+require "yaml"
+
+options = {
+  repo: nil,
+  fail_on_high_risk_files: false,
+  trust_config: ".agents/trusted-github-actors.yml"
+}
+
+GH_TIMEOUT_SECONDS = Integer(ENV.fetch("PR_SECURITY_PREFLIGHT_GH_TIMEOUT_SECONDS", "60"))
+
+KNOWN_BOT_LOGINS = Set.new(%w[
+                             chatgpt-codex-connector
+                             claude
+                             coderabbitai
+                             cursor
+                             dependabot
+                             greptile-apps
+                           ]).freeze
+
+SUSPICIOUS_PATTERN = /
+  ignore\s+(all|previous|above|system|developer)|
+  system\s+prompt|
+  developer\s+message|
+  prompt\s+injection|
+  reveal\s+(secret|token|prompt|instruction)|
+  exfiltrat|
+  GITHUB_TOKEN|
+  private\s+key|
+  seed\s+phrase|
+  (crypto|web3)[^\n]{0,40}wallet|
+  wallet[^\n]{0,40}(seed|private|key|secret)|
+  \bcurl\s|
+  \bwget\s|
+  rm\s+-rf|
+  base64\s+-d|
+  \beval\s*\(|
+  \bexec\s*\(|
+  sudo\s|
+  ssh-key
+/ix
+
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--fail-on-high-risk-files] NUMBER [...]"
+  opts.on("--repo OWNER/REPO", "GitHub repository, defaulting to gh repo view") { |repo| options[:repo] = repo }
+  opts.on("--trust-config PATH", "Trusted GitHub actor allowlist") { |path| options[:trust_config] = path }
+  opts.on("--fail-on-high-risk-files", "Exit non-zero when high-risk surfaces changed") do
+    options[:fail_on_high_risk_files] = true
+  end
+end
+
+parser.parse!(ARGV)
+
+if ARGV.empty?
+  warn parser
+  exit 64
+end
+
+def run_gh(*args)
+  stdout = nil
+  stderr = nil
+  status = nil
+
+  Timeout.timeout(GH_TIMEOUT_SECONDS) do
+    stdout, stderr, status = Open3.capture3("gh", *args)
+  end
+
+  return stdout if status.success?
+
+  output = [stderr, stdout].reject { |text| text.to_s.empty? }.join("\n")
+  raise "gh #{args.join(' ')} failed:\n#{output}"
+rescue Timeout::Error
+  raise "gh #{args.join(' ')} timed out after #{GH_TIMEOUT_SECONDS}s"
+end
+
+def run_gh_json(*)
+  JSON.parse(run_gh(*))
+end
+
+def run_gh_paginated_json_array(*)
+  run_gh_json(*, "--paginate", "--slurp").flatten
+end
+
+def current_repo
+  JSON.parse(run_gh("repo", "view", "--json", "nameWithOwner")).fetch("nameWithOwner")
+end
+
+def issue_payload(repo, number)
+  run_gh_json("api", "repos/#{repo}/issues/#{number}")
+end
+
+def visible_actor_logins(node, graph_field)
+  actors = Set.new
+  target = node.fetch("data").fetch("repository").fetch(graph_field)
+  actors << target.dig("author", "login")
+
+  target.dig("timelineItems", "nodes").each do |item|
+    actors << item.dig("author", "login")
+    actors << item.dig("actor", "login")
+
+    item.dig("commit", "authors", "nodes")&.each do |author|
+      actors << author.dig("user", "login")
+    end
+  end
+
+  actors.delete(nil)
+  actors
+end
+
+def normalized_login(login)
+  login.to_s.delete_prefix("@").delete_suffix("[bot]").downcase
+end
+
+def load_trust_config(path)
+  data = File.exist?(path) ? YAML.safe_load_file(path, aliases: false) || {} : {}
+  configured_bots = Array(data["trusted_bots"]).map { |login| normalized_login(login) }
+  trusted_bots = KNOWN_BOT_LOGINS.map { |login| normalized_login(login) } + configured_bots
+
+  {
+    path:,
+    trusted_bots: trusted_bots.to_set,
+    trusted_teams: Array(data["trusted_teams"]).map(&:to_s),
+    trusted_users: Array(data["trusted_users"]).to_set { |login| normalized_login(login) }
+  }
+end
+
+def trusted_bot?(login, trust_config)
+  trust_config.fetch(:trusted_bots).include?(normalized_login(login))
+end
+
+def collaborator_permission(repo, login)
+  JSON.parse(run_gh("api", "repos/#{repo}/collaborators/#{login}/permission")).fetch("permission")
+rescue StandardError
+  "none"
+end
+
+def trusted_team_member?(repo, login, trust_config, team_cache)
+  owner = repo.split("/", 2).first
+  trust_config.fetch(:trusted_teams).any? do |team_slug|
+    cache_key = [owner, team_slug, normalized_login(login)]
+    team_cache[cache_key] ||= begin
+      membership = run_gh_json("api", "orgs/#{owner}/teams/#{team_slug}/memberships/#{login}")
+      membership.fetch("state") == "active"
+    rescue StandardError
+      false
+    end
+  end
+end
+
+def trusted_actor?(repo, login, trust_config, team_cache)
+  return false if login.to_s.empty?
+  return true if trust_config.fetch(:trusted_users).include?(normalized_login(login))
+  return true if trusted_bot?(login, trust_config)
+
+  trusted_team_member?(repo, login, trust_config, team_cache)
+end
+
+def rest_context(repo, number, include_pull_comments:, issue:)
+  context = {
+    issue:,
+    issue_comments: run_gh_paginated_json_array("api", "repos/#{repo}/issues/#{number}/comments?per_page=100"),
+    review_comments: [],
+    reviews: []
+  }
+
+  return context unless include_pull_comments
+
+  context[:review_comments] = run_gh_paginated_json_array(
+    "api",
+    "repos/#{repo}/pulls/#{number}/comments?per_page=100"
+  )
+  context[:reviews] = run_gh_paginated_json_array("api", "repos/#{repo}/pulls/#{number}/reviews?per_page=100")
+  context
+end
+
+def visible_rest_actor_logins(rest_context)
+  users = Set.new
+
+  users.merge(rest_context.fetch(:issue_comments).filter_map { |comment| comment.dig("user", "login") })
+  users.merge(rest_context.fetch(:review_comments).filter_map { |comment| comment.dig("user", "login") })
+  users.merge(rest_context.fetch(:reviews).filter_map { |review| review.dig("user", "login") })
+  users.delete(nil)
+  users
+end
+
+def paginated_reaction_users(repo, endpoint)
+  reactions = run_gh_paginated_json_array(
+    "api",
+    "-H",
+    "Accept: application/vnd.github+json",
+    "repos/#{repo}/#{endpoint}?per_page=100"
+  )
+  reactions.to_set { |reaction| reaction.dig("user", "login") }.tap { |users| users.delete(nil) }
+end
+
+def comment_reaction_users(repo, comments, reaction_endpoint)
+  users = Set.new
+
+  comments.each do |comment|
+    next unless comment.dig("reactions", "total_count").to_i.positive?
+
+    users.merge(paginated_reaction_users(repo, "#{reaction_endpoint}/#{comment.fetch('id')}/reactions"))
+  end
+
+  users
+end
+
+def reaction_users(repo, number, rest_context:, include_pull_comments:)
+  users = paginated_reaction_users(repo, "issues/#{number}/reactions")
+  users.merge(comment_reaction_users(repo, rest_context.fetch(:issue_comments), "issues/comments"))
+
+  if include_pull_comments
+    users.merge(comment_reaction_users(repo, rest_context.fetch(:review_comments), "pulls/comments"))
+  end
+
+  users.delete(nil)
+  users
+rescue StandardError => e
+  warn "WARN: could not fetch all reaction users for ##{number}: #{e.message.lines.first&.strip}"
+  users.delete(nil)
+  users
+end
+
+def suspicious_added_lines(repo, pr_number)
+  diff = run_gh("pr", "diff", pr_number.to_s, "--repo", repo)
+
+  diff.lines.filter_map.with_index(1) do |line, index|
+    next unless line.start_with?("+") && !line.start_with?("+++")
+    next unless line.match?(SUSPICIOUS_PATTERN)
+
+    { location: "diff line #{index}" }
+  end
+end
+
+def suspicious_issue_text(rest_context, repo, trust_config:, team_cache:)
+  findings = []
+  issue = rest_context.fetch(:issue)
+
+  issue_author = issue.dig("user", "login")
+  if trusted_actor?(repo, issue_author, trust_config, team_cache) && (issue["body"] || "").match?(SUSPICIOUS_PATTERN)
+    findings << { location: "issue body", author: issue_author, url: issue.fetch("html_url") }
+  end
+
+  rest_context.fetch(:issue_comments).each do |comment|
+    author = comment.dig("user", "login")
+    next unless trusted_actor?(repo, author, trust_config, team_cache)
+    next unless (comment["body"] || "").match?(SUSPICIOUS_PATTERN)
+
+    findings << {
+      location: "issue comment #{comment.fetch('id')}",
+      author:,
+      url: comment.fetch("html_url")
+    }
+  end
+
+  findings
+end
+
+def suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:)
+  findings = []
+
+  rest_context.fetch(:review_comments).each do |comment|
+    author = comment.dig("user", "login")
+    next unless trusted_actor?(repo, author, trust_config, team_cache)
+    next unless (comment["body"] || "").match?(SUSPICIOUS_PATTERN)
+
+    findings << {
+      location: "review comment #{comment.fetch('id')}",
+      author:,
+      url: comment.fetch("html_url")
+    }
+  end
+
+  findings
+end
+
+def suspicious_pr_reviews(rest_context, repo, trust_config:, team_cache:)
+  findings = []
+
+  rest_context.fetch(:reviews).each do |review|
+    author = review.dig("user", "login")
+    next unless trusted_actor?(repo, author, trust_config, team_cache)
+    next unless (review["body"] || "").match?(SUSPICIOUS_PATTERN)
+
+    findings << {
+      location: "pull request review #{review.fetch('id')}",
+      author:,
+      url: review.fetch("html_url")
+    }
+  end
+
+  findings
+end
+
+def suspicious_pr_review_text(rest_context, repo, trust_config:, team_cache:)
+  suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:) +
+    suspicious_pr_reviews(rest_context, repo, trust_config:, team_cache:)
+end
+
+def untrusted_interaction_findings(rest_context, repo, include_pull_comments:, trust_config:, team_cache:)
+  findings = []
+
+  rest_context.fetch(:issue_comments).each do |comment|
+    author = comment.dig("user", "login")
+    next if trusted_actor?(repo, author, trust_config, team_cache)
+
+    findings << { author:, kind: "issue comment", url: comment.fetch("html_url") }
+  end
+
+  return findings unless include_pull_comments
+
+  rest_context.fetch(:review_comments).each do |comment|
+    author = comment.dig("user", "login")
+    next if trusted_actor?(repo, author, trust_config, team_cache)
+
+    findings << { author:, kind: "review comment", url: comment.fetch("html_url") }
+  end
+
+  rest_context.fetch(:reviews).each do |review|
+    author = review.dig("user", "login")
+    next if trusted_actor?(repo, author, trust_config, team_cache)
+
+    findings << { author:, kind: "pull request review", url: review.fetch("html_url") }
+  end
+
+  findings
+end
+
+def changed_files(repo, pr_number)
+  run_gh("pr", "diff", pr_number.to_s, "--repo", repo, "--name-only").lines.map(&:strip).reject(&:empty?)
+end
+
+def high_risk_files(files)
+  high_risk_roots = %r{\A(\.github/|\.agents/|\.claude/|bin/|script/|scripts/)}
+  nested_script_dirs = %r{/(bin|script|scripts)/}
+  high_risk_exact = %w[
+    .npmrc
+    .pnpmfile.cjs
+    .yarnrc.yml
+    .lefthook.yml
+    AGENTS.md
+    CLAUDE.md
+    Gemfile
+    Gemfile.lock
+    Rakefile
+    package.json
+    package-scripts.yml
+    pnpm-lock.yaml
+  ]
+
+  files.select do |path|
+    path.match?(high_risk_roots) ||
+      path.match?(nested_script_dirs) ||
+      high_risk_exact.include?(path)
+  end
+end
+
+def fetch_target_graph(owner:, name:, number:, query:)
+  run_gh_json(
+    "api",
+    "graphql",
+    "-f",
+    "owner=#{owner}",
+    "-f",
+    "name=#{name}",
+    "-F",
+    "number=#{number}",
+    "-f",
+    "query=#{query}"
+  )
+end
+
+def connection_overflow_finding(target, connection_name)
+  connection = target.fetch(connection_name)
+  return unless connection.dig("pageInfo", "hasNextPage")
+
+  total_count = connection["totalCount"].to_i
+  fetched_count = Array(connection["nodes"]).size
+
+  { connection: connection_name, fetched_count:, total_count: }
+end
+
+def graph_coverage_findings(target)
+  %w[participants timelineItems].filter_map { |connection_name| connection_overflow_finding(target, connection_name) }
+end
+
+def participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:)
+  participants = target.dig("participants", "nodes").to_set { |participant| participant.fetch("login") }
+  untrusted_participants = participants.reject { |login| trusted_actor?(repo, login, trust_config, team_cache) }
+
+  untrusted_participants.filter_map do |login|
+    permission = permission_cache[login] ||= collaborator_permission(repo, login)
+    hidden = !visible.include?(login)
+
+    {
+      login:,
+      permission:,
+      hidden:,
+      untrusted: true
+    }
+  end
+end
+
+def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, permission_cache:, trust_config:, team_cache:)
+  issue = issue_payload(repo, number)
+  target_is_pr = issue.key?("pull_request")
+  graph_field = target_is_pr ? "pullRequest" : "issue"
+  query = target_is_pr ? pr_query : issue_query
+  graph = fetch_target_graph(owner:, name:, number:, query:)
+  target = graph.fetch("data").fetch("repository").fetch(graph_field)
+  rest = rest_context(repo, number, include_pull_comments: target_is_pr, issue:)
+  visible = visible_actor_logins(graph, graph_field)
+  visible.merge(visible_rest_actor_logins(rest))
+  visible.merge(reaction_users(repo, number, rest_context: rest, include_pull_comments: target_is_pr))
+  files = target_is_pr ? changed_files(repo, number) : []
+  suspicious = suspicious_issue_text(rest, repo, trust_config:, team_cache:)
+  suspicious.concat(suspicious_pr_review_text(rest, repo, trust_config:, team_cache:)) if target_is_pr
+  suspicious.concat(suspicious_added_lines(repo, number)) if target_is_pr
+  untrusted_interactions = untrusted_interaction_findings(
+    rest,
+    repo,
+    include_pull_comments: target_is_pr,
+    trust_config:,
+    team_cache:
+  )
+
+  {
+    files:,
+    number:,
+    graph_coverage_findings: graph_coverage_findings(target),
+    participant_findings: participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:),
+    risky_files: high_risk_files(files),
+    suspicious:,
+    target:,
+    target_is_pr:,
+    untrusted_interactions:
+  }
+end
+
+def print_graph_coverage_findings(findings)
+  if findings.empty?
+    puts "  GitHub API coverage findings: none"
+    return
+  end
+
+  puts "  GitHub API coverage findings:"
+  findings.each do |finding|
+    puts "    - #{finding.fetch(:connection)} fetched #{finding.fetch(:fetched_count)} of " \
+         "#{finding.fetch(:total_count)} nodes"
+  end
+end
+
+def print_participant_findings(findings)
+  if findings.empty?
+    puts "  Untrusted participant finding: none"
+    return
+  end
+
+  puts "  Untrusted participant findings:"
+  findings.each do |finding|
+    reasons = []
+    reasons << "no visible comment/review/commit/reaction trail" if finding.fetch(:hidden)
+    reasons << "not in trusted actor allowlist" if finding.fetch(:untrusted)
+    puts "    - #{finding.fetch(:login)}: #{reasons.join('; ')}; permission=#{finding.fetch(:permission)}"
+  end
+end
+
+def print_untrusted_interactions(findings)
+  if findings.empty?
+    puts "  Untrusted comment/review queue: none"
+    return
+  end
+
+  puts "  Untrusted comment/review queue:"
+  findings.first(10).each do |finding|
+    puts "    - #{finding.fetch(:author)} #{finding.fetch(:kind)} (#{finding.fetch(:url)})"
+  end
+  puts "    - ... #{findings.size - 10} more" if findings.size > 10
+end
+
+def print_suspicious_findings(findings)
+  if findings.empty?
+    puts "  Suspicious text findings: none"
+    return
+  end
+
+  puts "  Suspicious text findings:"
+  findings.first(10).each do |finding|
+    detail = "    - #{finding.fetch(:location)}"
+    detail += " by #{finding.fetch(:author)}" if finding[:author]
+    detail += " (#{finding.fetch(:url)})" if finding[:url]
+    puts detail
+  end
+  puts "    - ... #{findings.size - 10} more" if findings.size > 10
+end
+
+def record_blockers(result, overall_blockers, fail_on_high_risk_files:)
+  number = result.fetch(:number)
+  overall_blockers << "##{number}: GitHub API coverage truncated" if result.fetch(:graph_coverage_findings).any?
+  overall_blockers << "##{number}: untrusted or hidden human participant(s)" if result.fetch(:participant_findings).any?
+  overall_blockers << "##{number}: untrusted comment/review author(s)" if result.fetch(:untrusted_interactions).any?
+  overall_blockers << "##{number}: suspicious text" if result.fetch(:suspicious).any?
+  return if result.fetch(:risky_files).empty? || !fail_on_high_risk_files
+
+  overall_blockers << "##{number}: high-risk files changed"
+end
+
+def print_file_findings(result)
+  files = result.fetch(:files)
+  puts "  Changed files: #{files.empty? ? 'none' : files.join(', ')}"
+
+  if result.fetch(:risky_files).empty?
+    puts "  High-risk changed files: none"
+  else
+    puts "  High-risk changed files: #{result.fetch(:risky_files).join(', ')}"
+  end
+end
+
+def print_scan_result(result, overall_blockers, fail_on_high_risk_files:)
+  target_label = result.fetch(:target_is_pr) ? "PR" : "Issue"
+  target = result.fetch(:target)
+
+  puts "#{target_label} ##{result.fetch(:number)}: #{target.fetch('title')}"
+  puts "  URL: #{target.fetch('url')}"
+  puts "  Head: #{target.fetch('headRefOid')}" if result.fetch(:target_is_pr)
+  print_graph_coverage_findings(result.fetch(:graph_coverage_findings))
+  print_participant_findings(result.fetch(:participant_findings))
+  print_untrusted_interactions(result.fetch(:untrusted_interactions))
+  print_suspicious_findings(result.fetch(:suspicious))
+  print_file_findings(result)
+  record_blockers(result, overall_blockers, fail_on_high_risk_files:)
+
+  puts
+end
+
+repo = options[:repo] || current_repo
+owner, name = repo.split("/", 2)
+abort "Repository must be OWNER/REPO, got #{repo.inspect}" unless owner && name
+
+pr_query = <<~GRAPHQL
+  query($owner:String!, $name:String!, $number:Int!) {
+    repository(owner:$owner, name:$name) {
+      pullRequest(number:$number) {
+        number
+        title
+        url
+        headRefOid
+        author { login }
+        participants(first:100) {
+          totalCount
+          pageInfo { hasNextPage }
+          nodes { login url __typename }
+        }
+        timelineItems(first:100) {
+          totalCount
+          pageInfo { hasNextPage }
+          nodes {
+            __typename
+            ... on IssueComment { author { login } }
+            ... on PullRequestReview { author { login } }
+            ... on CrossReferencedEvent { actor { login } }
+            ... on ReadyForReviewEvent { actor { login } }
+            ... on ReviewRequestedEvent { actor { login } }
+            ... on MentionedEvent { actor { login } }
+            ... on SubscribedEvent { actor { login } }
+            ... on UnsubscribedEvent { actor { login } }
+            ... on ClosedEvent { actor { login } }
+            ... on ReopenedEvent { actor { login } }
+            ... on PullRequestCommit {
+              commit { authors(first:10) { nodes { user { login } } } }
+            }
+          }
+        }
+      }
+    }
+  }
+GRAPHQL
+
+issue_query = <<~GRAPHQL
+  query($owner:String!, $name:String!, $number:Int!) {
+    repository(owner:$owner, name:$name) {
+      issue(number:$number) {
+        number
+        title
+        url
+        author { login }
+        participants(first:100) {
+          totalCount
+          pageInfo { hasNextPage }
+          nodes { login url __typename }
+        }
+        timelineItems(first:100) {
+          totalCount
+          pageInfo { hasNextPage }
+          nodes {
+            __typename
+            ... on IssueComment { author { login } }
+            ... on CrossReferencedEvent { actor { login } }
+            ... on MentionedEvent { actor { login } }
+            ... on SubscribedEvent { actor { login } }
+            ... on UnsubscribedEvent { actor { login } }
+            ... on ClosedEvent { actor { login } }
+            ... on ReopenedEvent { actor { login } }
+          }
+        }
+      }
+    }
+  }
+GRAPHQL
+
+overall_blockers = []
+permission_cache = {}
+team_cache = {}
+trust_config = load_trust_config(options.fetch(:trust_config))
+
+ARGV.each do |arg|
+  number = Integer(arg, exception: false)
+  abort "Invalid issue/PR number: #{arg.inspect}" unless number
+
+  result = scan_target(
+    repo:,
+    owner:,
+    name:,
+    number:,
+    pr_query:,
+    issue_query:,
+    permission_cache:,
+    trust_config:,
+    team_cache:
+  )
+  print_scan_result(result, overall_blockers, fail_on_high_risk_files: options[:fail_on_high_risk_files])
+end
+
+if overall_blockers.any?
+  puts "SECURITY_PREFLIGHT_BLOCKED"
+  overall_blockers.each { |blocker| puts "- #{blocker}" }
+  exit 2
+end
+
+puts "SECURITY_PREFLIGHT_OK"
