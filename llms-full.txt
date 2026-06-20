@@ -13533,7 +13533,7 @@ Then:
 
 1. Build both variants in production mode on the same data and configuration.
 2. Drive both with the **same throttled Lighthouse config** (Slow 4G + 4x CPU).
-3. Collect at least **6 paired samples** per page so the comparison has enough power; n >= 10 gives better power for moderate effects.
+3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six samples is the Wilcoxon floor: p < 0.05 requires all pairs to move in the same direction.
 4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as a confirmed shift when the paired samples consistently move in the same direction.
 
 We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
