@@ -11,6 +11,8 @@ module ReactOnRails
   # Used by both streaming (Pro) and non-streaming (OSS) paths.
   # Strict protocol parser — any format violation raises an error.
   class LengthPrefixedParser
+    # Keep aligned with ReactOnRailsPro::StreamRequest::CONTROL_MESSAGE_TYPES,
+    # which routes these same control frames during bidirectional streaming.
     CONTROL_MESSAGE_TYPES = %w[propRequest renderComplete].freeze
     private_constant :CONTROL_MESSAGE_TYPES
 

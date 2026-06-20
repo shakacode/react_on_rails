@@ -111,6 +111,8 @@ module ReactOnRailsPro
 
   class StreamRequest
     MAX_PULL_PROP_NAME_LENGTH = 256
+    # Keep aligned with ReactOnRails::LengthPrefixedParser::CONTROL_MESSAGE_TYPES,
+    # which parses these same control frames from the shared wire format.
     CONTROL_MESSAGE_TYPES = %w[propRequest renderComplete].freeze
     private_constant :CONTROL_MESSAGE_TYPES
 
@@ -213,8 +215,9 @@ module ReactOnRailsPro
     #   render_code_as_stream                => bare response object (pre-pull mode)
     def normalize_executor_result(result)
       # Incremental rendering returns a named result so unrelated Array-like responses are never
-      # mistaken for [response, emitter]. Older renderers still return only response.
-      return result.values_at(:response, :emitter) if result.is_a?(Hash) && result[:pull_result] == true
+      # mistaken for [response, emitter]. Older renderers still return only response. The
+      # :pull_result key is the protocol discriminator, so future response-shaped hashes are safe.
+      return result.values_at(:response, :emitter) if result.is_a?(Hash) && result.key?(:pull_result)
 
       [result, nil]
     end

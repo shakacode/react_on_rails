@@ -172,19 +172,19 @@ class AsyncPropsManager {
     }
     this.bufferedPropRequests = [];
 
-    if (!this.isPullEnabled()) return;
-
-    this.propNameToPromiseController.forEach((controller, propName) => {
-      if (!controller.resolved && !controller.pullRequested && !this.isPushProp(propName)) {
-        if (propName.length > MAX_PULL_PROP_NAME_LENGTH) {
-          AsyncPropsManager.rejectOversizedPullPropRequestInPlace(propName, controller);
-          return;
+    if (this.isPullEnabled()) {
+      this.propNameToPromiseController.forEach((controller, propName) => {
+        if (!controller.resolved && !controller.pullRequested && !this.isPushProp(propName)) {
+          if (propName.length > MAX_PULL_PROP_NAME_LENGTH) {
+            AsyncPropsManager.rejectOversizedPullPropRequestInPlace(propName, controller);
+            return;
+          }
+          // eslint-disable-next-line no-param-reassign
+          controller.pullRequested = this.emitPropRequest(propName);
         }
-        // eslint-disable-next-line no-param-reassign
-        controller.pullRequested = this.emitPropRequest(propName);
-      }
-    });
-    this.overCapBufferedPropRequestCount = 0;
+      });
+      this.overCapBufferedPropRequestCount = 0;
+    }
   }
 
   /**
