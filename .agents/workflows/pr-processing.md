@@ -36,8 +36,11 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      liveness. `agent-coord status` is a preflight view; the claim operation is
      the backend's compare-and-swap gate, so the claim result is the source of
      truth for races. If `agent-coord doctor` or `agent-coord status` cannot be
-     checked, report private state as `UNKNOWN` and use structured public claim
-     comments as an advisory fallback.
+     checked, report private state as `UNKNOWN` and use structured public
+     `codex-claim` comments as an advisory fallback. A structured public
+     `codex-claim` comment is a GitHub issue/PR comment containing a
+     `codex-claim` HTML comment (`<!-- codex-claim v1 ... -->`) with key/value
+     fields; see the "Public claim comment" format below.
    - For lanes declared in `batches/<batch-id>.json` with `depends_on`, run
      `agent-coord status` at lane start and before rebase or push. If the lane
      shows unmet `blocked_on` refs, set that lane's heartbeat status to
@@ -552,7 +555,11 @@ Before merge or final readiness, scan the PR description for the decision log an
 > And Handoffs_: record the handoff below on the relevant parent tracking issue
 > (or the agent-coordination repo if one is in use), or in the batch's own PR
 > comment/description when there is no parent umbrella; and append point-in-time
-> audits to the standing release audit ledger in place. Never spawn a standalone
+> audits to the standing release audit ledger in place. Locate that ledger with
+> the release-mode preflight search: open issues with the `release` and
+> `TRACKING` labels, plus `Release gate:` title matches; if no release-gate
+> ledger exists for a release audit, surface that absence before creating
+> follow-up issues. Never spawn a standalone
 > `Handoff: ...` or `Post-rc.N audit` issue. Close superseded process issues on
 > sight; closure follows the work, not whoever opened the tracker.
 
@@ -1136,26 +1143,119 @@ For a manual multi-PR landing plan:
 Use this section when reviewing already-merged PRs from concurrent agent work, especially before a release candidate.
 
 1. Resolve the base release candidate tag/commit and head SHA.
-2. List every PR merged in the range, then identify the batch subset by branch names, PR bodies, labels, comments, authors, merge timing, and linked issues.
-3. Ask for confirmation of included and excluded PRs before deep audit unless the user explicitly says to proceed.
-4. For each included PR, inspect reviews, comments, checks, merge time, changed files, validation evidence, changelog coverage, and cross-PR interactions.
-5. Flag review-gate violations:
+2. Resolve worked-issue scope from coordination state when coordinated batch
+   work is in scope. If no coordinated batch/run is in scope, record
+   `worked_issue_scope: not applicable`. If batch work is in scope but the
+   batch/run id is unknown:
+   - run `agent-coord doctor`, then `agent-coord status` to list candidate
+     batch/run ids and lanes
+   - record `worked_issue_scope: UNKNOWN (needs batch confirmation)`
+   - ask the user to confirm a candidate before treating any candidate lane list
+     as worked-issue scope
+
+   When the batch/run id is known, run `agent-coord doctor` and
+   `agent-coord status`, then inspect the named batch entry to identify the
+   worked issue set from claims, heartbeats, branches, and dependency metadata.
+   If `agent-coord` is missing or `agent-coord doctor` fails, record
+   `worked_issue_scope: UNKNOWN (setup)`. If `agent-coord doctor` passes but
+   `agent-coord status` fails, record `worked_issue_scope: UNKNOWN (access)`. In
+   all UNKNOWN cases, include the exact command/error and use structured public
+   `codex-claim` comments as an advisory fallback for possible no-PR, blocked,
+   parked, or done-unmerged lanes before reducing scope to merged PRs. If
+   candidate discovery cannot verify backend setup or access, `UNKNOWN (setup)`
+   or `UNKNOWN (access)` takes precedence over
+   `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
+   is still needed after backend recovery. Keep advisory claim rows marked
+   `UNKNOWN` as needed, and report the command, permission, or batch id
+   confirmation needed to recover the worked issue list instead of identifying a
+   confirmed batch subset from PR links or heuristics.
+   If the batch id itself is unknown, scope advisory public-claim discovery to
+   issues and open PRs active within the audit time window, and use each claim's
+   `batch:` field only to surface candidate ids until the user confirms one.
+
+   If `agent-coord doctor` and `agent-coord status` both succeed but the named
+   batch entry contains no worked issues or lanes, record
+   `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
+   scan structured public `codex-claim` comments as advisory recovery rows for
+   possible no-PR, blocked, parked, or done-unmerged lanes, keep any recovered
+   rows marked `UNKNOWN`, report the batch metadata correction needed, and ask
+   for confirmation before reducing the audit to the merged PR range only. If
+   the user confirms no lanes were worked, record the empty-batch finding and
+   proceed to the merged PR range. If the user indicates lanes were worked
+   despite the empty entry, record
+   `worked_issue_scope: UNKNOWN (empty batch, lanes expected)`, collect a manual
+   lane list from the user or advisory `codex-claim` comments, and keep
+   recovered rows advisory `UNKNOWN` until coordination state is corrected.
+
+   Sync note: this scope algorithm is intentionally mirrored in
+   `.agents/skills/post-merge-audit/SKILL.md` and
+   `.agents/workflows/post-merge-audit.md`; update all copies together.
+
+3. List every PR merged in the range. When `worked_issue_scope` is verified
+   from coordination state, identify the batch subset by coordination state,
+   branch names, PR bodies, labels, comments, authors, merge timing, and linked
+   issues. When `worked_issue_scope` is `not applicable`, `UNKNOWN (...)`, or
+   `empty (...)`, keep the confirmed PR list as a merged-PR range only and do
+   not classify PRs as included/excluded batch work from PR links or heuristics.
+   Use advisory public `codex-claim` rows from step 2 for possible no-PR,
+   blocked, parked, and done-unmerged lanes, but keep those rows marked
+   `UNKNOWN` until coordination state is recovered.
+4. Ask for confirmation of included and excluded worked issues, advisory public
+   `codex-claim` rows, and the PR range before deep audit unless the user
+   explicitly says to proceed. When the scope is
+   `UNKNOWN (needs batch confirmation)`, ask the user to choose the candidate
+   batch/run id before any confirmed worked-issue audit.
+5. For each known worked issue or advisory public `codex-claim` row, evaluate
+   whether the implementation, no-PR evidence, blocker, or parked disposition
+   satisfied the issue intent; verify the final state; and classify it as
+   `in_progress`, `realized`, `partial`, `missed`, `regressed`, `stalled`, or
+   `unknown` using
+   `.agents/workflows/continuous-evaluation-loop.md`. Treat healthy active/live
+   lanes as `in_progress` no-action items unless they have a stalled, regressed,
+   partial, missed, or unknown signal.
+6. For each included merged PR, inspect reviews, comments, checks, merge time,
+   changed files, validation evidence, changelog coverage, and cross-PR
+   interactions.
+7. Flag review-gate violations:
    - review checks, reviews, or comments that landed after merge
    - review checks that were queued, in progress, stale, or asynchronous at merge time
    - pre-merge `Must Fix`, `MUST-FIX`, `Should Fix`, `DISCUSS`, `Changes Requested`, or similar actionable comments with no later evidence they were fixed, waived, or classified
    - AI reviewer approvals, positive issue comments, or "no actionable comments" summaries that were incorrectly treated as required maintainer approval or special approval gates
    - AI review findings that were ignored even though they identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval
    - requested adversarial review that did not finish before merge, finished on an older head SHA, or left untriaged `BLOCKING`/`DISCUSS` findings
-6. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
-7. Produce a deduped issue plan for non-OK findings:
-   - no issue for OK, duplicates, or fully resolved findings
+8. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
+9. Produce a deduped issue plan for non-OK findings:
+   - no issue for OK, duplicates, fully resolved findings, evidenced `realized`
+     lanes, or healthy `in_progress` lanes
    - one bundled changelog issue or a `/update-changelog` recommendation for missing changelog entries
    - one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task
    - one parent issue when there are two or more related child issues from the same audit
+   - include healthy `in_progress` lanes in the worked-issue coverage table so
+     the coordinator can verify complete coverage
+   - a coordinator action entry, not a follow-up issue, for each `stalled` lane
+     that needs a resume/reassign/drop decision unless the user explicitly
+     approves tracking it as an issue
+   - one child issue or approved coordinator action for each `partial`, `missed`,
+     `regressed`, or `unknown` worked-issue outcome that needs follow-up
    - hidden `post-merge-audit-finding` fingerprints so duplicate child issues can be detected
    - for process findings, include the Process Gap Disposition fields above,
      especially `Mechanism target` and `Replay evidence or park reason`, before
      filing issues
-8. Return high-risk findings first, then cross-PR risks, missing changelog candidates, the issue plan, a PR-by-PR table, and exact commands/data sources.
+   - for release-gate audits, after user approval, append the audit report to
+     the release-gate audit ledger before creating issues, then include the
+     resulting ledger comment URL in every approved parent or child issue body;
+     if the required ledger append fails, do not create issues and report the
+     exact command/API error plus the ledger issue, permission, or retry needed
+   - for non-release audits with no release-gate ledger, include
+     `Audit ledger: not applicable (non-release audit)` in every approved parent
+     or child issue body
+10. Return high-risk findings first, then review-gate violations, missing
+    changelog candidates, cross-PR risks, the issue plan, a worked-issue
+    coverage table (issue number, coordination lane/branch, linked PR or
+    no-PR/blocker evidence, final state, intent-achievement classification,
+    `UNKNOWN` facts), a PR-by-PR table, and exact commands/data sources.
 
-Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs until the user approves the audit report and issue plan.
+Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs
+until the user approves the audit report and issue plan. For release-gate
+audits, also append the approved audit report to the release-gate ledger
+successfully before issue creation.
