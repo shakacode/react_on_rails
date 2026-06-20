@@ -1090,7 +1090,81 @@ describe('RSCRoute successful-version error reset', () => {
     await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
   });
 
-  it('m. stale replacement successes do not keep an unbounded in-flight marker latch', async () => {
+  it('m. stale replacement settlement does not clear a newer replacement success latch', async () => {
+    process.env.NODE_ENV = 'production';
+
+    type PendingEntry = Deferred & { args: GetServerComponentArgs };
+    const pending: PendingEntry[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      pending.push({ ...d, args: _args[0] });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+    await renderInAct(
+      <RSCProvider>
+        <Probe />
+      </RSCProvider>,
+    );
+
+    const startLoad = async (id: number) => {
+      let promise!: Promise<React.ReactNode>;
+      await act(async () => {
+        promise = rscApi.getComponent('Card', { id });
+        await Promise.resolve();
+      });
+      return { promise, deferred: findPendingForId(pending, id) };
+    };
+
+    const resolveLoad = async (started: Awaited<ReturnType<typeof startLoad>>, payload: React.ReactNode) => {
+      await act(async () => {
+        started.deferred.resolve(payload);
+        await started.promise;
+      });
+    };
+
+    for (let id = 0; id <= CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`initial ${id}`}</span>);
+    }
+
+    const staleReplacement = await startLoad(0);
+    let refetchPromise!: Promise<React.ReactNode>;
+    await act(async () => {
+      refetchPromise = rscApi.refetchComponent('Card', { id: 0 }, true);
+      void refetchPromise.catch(() => undefined);
+      await Promise.resolve();
+    });
+
+    const refetch = pending.find(
+      (d) => d.args.enforceRefetch && (d.args.componentProps as { id: number }).id === 0,
+    );
+    if (!refetch) {
+      throw new Error('Expected recoverable refetch request for id 0');
+    }
+
+    await act(async () => {
+      refetch.reject(new Error('refetch boom'));
+      await expect(refetchPromise).rejects.toThrow('refetch boom');
+    });
+
+    const freshReplacement = await startLoad(0);
+    await resolveLoad(staleReplacement, <span>stale replacement 0</span>);
+    await resolveLoad(freshReplacement, <span>fresh replacement 0</span>);
+
+    const key = createRSCPayloadKey('Card', { id: 0 });
+    await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+  });
+
+  it('n. stale replacement successes do not keep an unbounded in-flight marker latch', async () => {
     process.env.NODE_ENV = 'production';
 
     type PendingEntry = Deferred & { args: GetServerComponentArgs };

@@ -102,11 +102,11 @@ export class BoundedLRU<V> {
     return value;
   }
 
-  set(key: string, value: V, protectKey = false): void {
+  set(key: string, value: V, preventSelfEviction = false): void {
     // Re-insert so an existing key moves to most-recently-used.
     this.map.delete(key);
     this.map.set(key, value);
-    this.evictIfNeeded(protectKey ? key : undefined);
+    this.evictIfNeeded(preventSelfEviction ? key : undefined);
   }
 
   /**
@@ -186,17 +186,18 @@ export class BoundedLRU<V> {
 
   /**
    * Evict least-recently-used unpinned keys until the map is back within
-   * `maxEntries`. `protectKey`, when given, is treated as un-evictable for this
-   * reconciliation (in addition to pinned keys) so a key that was JUST unpinned
-   * after its in-flight load settled is not evicted by its own `unpin`. If
-   * every evictable candidate is pinned or protected, the loop stops and the
-   * map is allowed to stay temporarily over cap until the next reconciliation.
+   * `maxEntries`. `preventEvictingKey`, when given, is treated as un-evictable
+   * for this reconciliation (in addition to pinned keys) so a key that was JUST
+   * unpinned after its in-flight load settled is not evicted by its own
+   * `unpin`. If every evictable candidate is pinned or protected, the loop stops
+   * and the map is allowed to stay temporarily over cap until the next
+   * reconciliation.
    */
-  private evictIfNeeded(protectKey?: string): void {
+  private evictIfNeeded(preventEvictingKey?: string): void {
     while (this.map.size > this.maxEntries) {
       let evicted: string | undefined;
       for (const candidate of this.map.keys()) {
-        if (candidate !== protectKey && !this.isPinned(candidate)) {
+        if (candidate !== preventEvictingKey && !this.isPinned(candidate)) {
           evicted = candidate;
           break;
         }
