@@ -27,7 +27,7 @@ import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
 import RSCRoute, { type RSCRouteHandle } from '../src/RSCRoute.tsx';
 import { shouldClearRefetchErrorOnSuccessfulVersionChange } from '../src/RSCRouteSuccessfulVersion.ts';
 import { createRSCPayloadKey } from '../src/utils.ts';
-import { getNodeVersion } from './testUtils';
+import { flushMacrotasks, getNodeVersion } from './testUtils';
 
 // Imported from the source so the test cap cannot drift from the real cap.
 const CACHE_CAP = RSC_PAYLOAD_CACHE_MAX_ENTRIES;
@@ -609,9 +609,7 @@ describe('RSCRoute successful-version error reset', () => {
     expect(screen.getByTestId('version')).toHaveTextContent('1');
 
     await act(async () => {
-      await new Promise((resolve) => {
-        setTimeout(resolve, 0);
-      });
+      await flushMacrotasks();
     });
 
     await waitFor(() => expect(screen.getByTestId('version')).toHaveTextContent('0'));

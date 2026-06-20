@@ -45,6 +45,12 @@ type RSCContextType = {
 
   getRefetchVersion: (componentName: string, componentProps: unknown) => number;
 
+  /**
+   * Per-key successful-payload tokens. Values come from one provider-wide
+   * monotonic counter, so they may jump for a key when other keys succeed
+   * first. Compare them with `>` for the same key; missing/0 means no retained
+   * token, not proof the key never succeeded.
+   */
   successfulVersions: Record<string, number>;
 };
 
@@ -375,8 +381,10 @@ export const createRSCProvider = ({
             // checkpoint as this rejection handler.
             //
             // NOTE: fake-timer tests on this path must use real timers or run
-            // pending timers; otherwise this temporary pin intentionally stays
-            // until the test advances timers.
+            // pending timers. Promise flushing is not enough because the
+            // cleanup is deliberately macrotask-scheduled (tests can use
+            // flushMacrotasks from testUtils); otherwise this temporary pin
+            // intentionally stays until the test advances timers.
             setTimeout(() => {
               fetchRSCPromises.unpin(key);
             }, 0);
