@@ -65,6 +65,7 @@ export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamEr
   const originalErrorLine = diagnosticError.message
     .split('\n')
     .find((line) => line.startsWith(ORIGINAL_ERROR_PREFIX));
+  // React puts the original exception message on line 1 of its re-thrown stream error.
   const streamFirstLine = streamMessage.split('\n')[0];
   return originalErrorLine === `${ORIGINAL_ERROR_PREFIX}${streamFirstLine}`;
 };

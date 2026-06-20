@@ -186,9 +186,8 @@ const streamRenderReactComponent = (
             error.stack = augmentedStack;
           }
           sendErrorHtml(
-            // If onError already ran it set renderState.error to the enriched error; use that
-            // directly so we don't consume diagnostics a second time. This mirrors the
-            // renderState.hasErrors gate in the .catch path.
+            // onError fires before onShellError and sets renderState.error to the enriched error.
+            // Reuse it when present; otherwise enrich the shell error here.
             renderState.error instanceof Error ? renderState.error : enrichWithCapturedRSCDiagnostics(error),
           );
         },
