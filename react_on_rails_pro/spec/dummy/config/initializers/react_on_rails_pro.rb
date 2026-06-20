@@ -63,8 +63,8 @@ ReactOnRailsPro.configure do |config|
   # The value should be a file_path or an Array of file_paths. The files should have extensions
   # to resolve the content types, such as "application/json".
   config.assets_to_copy = (if ENV["HMR"] != "true"
-                             assets = [Rails.root.join("public", "webpack", Rails.env, "loadable-stats.json")]
-                             assets << Rails.root.join("ssr-generated", "server-bundle.js.map") if Rails.env.test?
-                             assets
+                             paths = [Rails.root.join("public", "webpack", Rails.env, "loadable-stats.json")]
+                             paths << Rails.root.join("ssr-generated", "server-bundle.js.map") if Rails.env.test?
+                             paths
                            end)
 end

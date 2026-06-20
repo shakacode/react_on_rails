@@ -15,7 +15,9 @@
 
 'use client';
 
-const SourceMappedPrerenderErrorProbe = (_props: unknown, _context: unknown) => {
+// Keep this in the traditional react_component SSR path. Without the directive,
+// the RSC-enabled dummy app auto-registers the probe as a Server Component.
+const SourceMappedPrerenderErrorProbe = () => {
   throw new Error('source-mapped TSX prerender probe');
 };
 

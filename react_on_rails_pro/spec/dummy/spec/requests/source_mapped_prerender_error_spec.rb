@@ -19,15 +19,12 @@ require "stringio"
 RSpec.describe "source-mapped prerender errors", :server_rendering do
   it "logs the original TSX frame when Rails handles a PrerenderError" do
     log_output = StringIO.new
-    original_logger = Rails.logger
-    Rails.logger = ActiveSupport::Logger.new(log_output)
+    allow(Rails).to receive(:logger).and_return(ActiveSupport::Logger.new(log_output))
 
     get source_mapped_prerender_error_probe_path
 
     expect(response).to redirect_to(server_side_log_throw_raise_invoker_path)
     expect(log_output.string).to include("source-mapped TSX prerender probe")
     expect(log_output.string).to match(/SourceMappedPrerenderErrorProbe\.tsx:\d+:\d+/)
-  ensure
-    Rails.logger = original_logger
   end
 end
