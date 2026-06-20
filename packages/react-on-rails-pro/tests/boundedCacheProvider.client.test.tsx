@@ -429,6 +429,7 @@ describe('RSCRoute successful-version error reset', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     process.env.NODE_ENV = originalNodeEnv;
   });
 
@@ -651,15 +652,22 @@ describe('RSCRoute successful-version error reset', () => {
     await act(async () => {
       await rscApi.getComponent('Card', { id: 0 });
     });
+    await act(async () => {
+      await flushMacrotasks();
+    });
     for (let id = 1; id <= CACHE_CAP; id += 1) {
       // eslint-disable-next-line no-await-in-loop
       await act(async () => {
         await rscApi.getComponent('Card', { id });
       });
     }
+    await act(async () => {
+      await flushMacrotasks();
+    });
     expect(fetchCount(CACHE_CAP)).toBe(1);
 
     let refetchPromise!: Promise<React.ReactNode>;
+    jest.useFakeTimers();
     await act(async () => {
       refetchPromise = rscApi.refetchComponent('Card', { id: 0 }, true);
       void refetchPromise.catch(() => undefined);
@@ -669,8 +677,10 @@ describe('RSCRoute successful-version error reset', () => {
     expect(screen.getByTestId('version')).toHaveTextContent('1');
 
     await act(async () => {
-      await flushMacrotasks();
+      await Promise.resolve();
+      await jest.runOnlyPendingTimersAsync();
     });
+    jest.useRealTimers();
 
     await waitFor(() => expect(screen.getByTestId('version')).toHaveTextContent('0'));
   });
