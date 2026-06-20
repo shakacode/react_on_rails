@@ -186,6 +186,9 @@ job-level conditions:
 
 - Ordinary PR updates run the required gate only unless `ready-for-hosted-ci`,
   `force-full-hosted-ci`, or a release-target base branch allows hosted jobs.
+- Generator-sensitive PRs are stricter: if change detection sets
+  `run_generators=true`, `ci-required / required-pr-gate` fails on ordinary PRs
+  until hosted CI is requested.
 - `ready-for-hosted-ci` permits hosted jobs, but the change detector still
   selects applicable suites.
 - `force-full-hosted-ci` or `workflow_dispatch` with `force_full_hosted: true`

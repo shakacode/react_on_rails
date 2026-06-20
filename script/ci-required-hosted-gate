@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Fails the required PR gate when generator-sensitive changes have not requested
+# hosted CI. Keep this small: ci-required must stay fast and deterministic.
+
+set -euo pipefail
+
+event_name="${GITHUB_EVENT_NAME:-}"
+run_generators="${RUN_GENERATORS:-false}"
+should_run_hosted_ci="${SHOULD_RUN_HOSTED_CI:-false}"
+
+if [ "$event_name" = "pull_request" ] &&
+  [ "$run_generators" = "true" ] &&
+  [ "$should_run_hosted_ci" != "true" ]; then
+  cat >&2 <<'MSG'
+Generator changes require hosted CI before merge.
+
+This PR changes generator-sensitive paths, but hosted CI has not been requested.
+Comment +ci-run-hosted on the PR, or add the ready-for-hosted-ci label with a maintainer/user token.
+Then wait for the hosted generator checks before merging.
+MSG
+  exit 1
+fi
