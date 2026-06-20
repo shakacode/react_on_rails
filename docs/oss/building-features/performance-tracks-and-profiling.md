@@ -91,3 +91,72 @@ Use production-safe instrumentation instead:
 - [OpenTelemetry](../../pro/node-renderer.md#observability-with-opentelemetry) for SSR request spans from the Pro Node Renderer.
 - [Error Reporting and Tracing](./node-renderer/error-reporting-and-tracing.md) for Sentry, Honeybadger, and custom tracing integrations.
 - [Profiling Server-Side Rendering Code](../../pro/profiling-server-side-rendering-code.md) for short, local CPU profiling sessions when you can reproduce the slow path.
+
+## Measuring an RSC conversion with a paired A/B
+
+When you convert a page to React Server Components, the only honest way to know whether you regressed user-visible performance is a paired, throttled A/B comparison of the page before and after the conversion. The profiling workflows above tell you _where_ time goes inside one build; this workflow tells you whether the conversion moved the numbers that users feel.
+
+### Why paired and throttled is mandatory
+
+An unthrottled load on `localhost` will hide the regression almost entirely. Local hardware is fast and the network is effectively free, so the page is bound by main-thread and loopback timing that no real user shares. The regression only surfaces under Lighthouse mobile throttling, which models a phone on a slow connection:
+
+- **Slow 4G** network throttling.
+- **4x CPU** slowdown.
+
+Sampling matters as much as throttling. A single server measured sequentially — control runs, then experiment runs — is noise-dominated: background load, thermal state, and JIT warmup drift between the two runs and swamp the effect you are trying to measure. Sample the two variants **simultaneously (paired)** instead, so each control sample shares its environment with the experiment sample it is compared against.
+
+### Setup
+
+Stand up two production-mode servers serving identical data and config, side by side:
+
+| Variant        | Build                                                            |
+| -------------- | ---------------------------------------------------------------- |
+| **Control**    | Pre-RSC baseline (your default branch before the RSC conversion) |
+| **Experiment** | RSC branch                                                       |
+
+Then:
+
+1. Build both variants in production mode on the same data and configuration.
+2. Drive both with the **same throttled Lighthouse config** (Slow 4G + 4x CPU).
+3. Collect at least **6 paired samples** per page so the comparison has enough power.
+4. Report a **Wilcoxon signed-rank p-value** so you can tell a real shift from noise.
+
+We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
+
+### Reading the result
+
+Do not just stare at LCP. Decompose the metrics, because the fix depends on which ones moved:
+
+| Signal                                | Likely cause                                                                                                 | Where to look                                                                                                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| **FCP and TBT both high**             | JS-bundle / hydration bound — the `'use client'` tail is shipping and executing too much                     | Reduce client boundaries. See [Chunk Contamination](../migrating/rsc-troubleshooting.md#chunk-contamination). |
+| **LCP pinned near the load-wait cap** | The largest element (often a hero image) cannot paint because first render is late, and/or a slow asset host | Fix the asset host; LCP usually follows once FCP drops.                                                       |
+| **CLS and Lighthouse score**          | Corroboration                                                                                                | Use as secondary confirmation, not as the primary signal.                                                     |
+
+A high FCP that drags LCP behind it is the common RSC-conversion pattern: the largest element is healthy, it simply cannot paint until the late first render lets it. Fix FCP first and LCP usually follows.
+
+### Iterate
+
+Treat each fix as one controlled change:
+
+1. Apply one fix.
+2. Rebuild the **experiment only** — the control stays fixed as your baseline.
+3. Re-measure the paired comparison.
+4. Repeat.
+
+Because the control never moves, every change has a defensible before/after instead of a number you have to argue about.
+
+### Case study: HiChee home and FAQ
+
+A real RSC conversion of the HiChee `home` and `faq` pages, measured with a paired ShakaPerf A/B under Slow 4G + 4x CPU (p ≈ 0.03):
+
+| Page     | FCP          | LCP          | TBT       | Lighthouse |
+| -------- | ------------ | ------------ | --------- | ---------- |
+| **Home** | 2.0s → 9.3s  | 2.1s → 21.1s | 0 → 928ms | 79 → 8.5   |
+| **FAQ**  | 2.0s → 15.9s | 2.2s → 20.5s | —         | —          |
+
+The decomposition pointed straight at the `'use client'` JS tail: FCP and TBT both blew up, and LCP was pinned near the load-wait cap because first render arrived far too late, not because the hero element itself was slow.
+
+A CSS broadcast fix (react_on_rails_rsc [#108](https://github.com/shakacode/react_on_rails_rsc/pull/108) → [#110](https://github.com/shakacode/react_on_rails_rsc/pull/110) / [#113](https://github.com/shakacode/react_on_rails_rsc/pull/113), shipped in `react-on-rails-rsc` 19.2.0-rc.3) was correct, but it was a **second-order** effect. The dominant driver was the client JS tail, not CSS delivery. Chasing the CSS fix first would have spent effort without moving the metrics that mattered.
+
+The lesson to take from this: **measure paired and throttled, then decompose FCP/TBT versus LCP before choosing a fix.** A related second-order CSS concern worth knowing about is the end-of-`<head>` rsc-css precedence trap described in [CSS and styling for RSC](../../pro/react-server-components/css-and-styling.md) — but confirm with the decomposition that CSS delivery is actually on your critical path before you spend time there.
