@@ -47,9 +47,10 @@ const nonEmptyString = (value: unknown) => {
 };
 
 const ORIGINAL_ERROR_PREFIX = 'Original error: ';
-// Keep in sync with React's generic RSC render error in
-// `packages/react-dom/src/server/ReactFizzServer.js`; production builds append
-// redaction details after this stable prefix.
+// Stable prefix of React's generic Server Components render error.
+// Source: packages/react-dom/src/server/ReactFizzServer.js (React 18.x-19.x).
+// If React renames this string, deferred-render enrichment degrades to the
+// generic React error. Verify this prefix when upgrading React.
 const GENERIC_RSC_STREAM_ERROR_PREFIXES = ['An error occurred in the Server Components render.'];
 const isGenericRSCStreamError = (message: string) =>
   GENERIC_RSC_STREAM_ERROR_PREFIXES.some((prefix) => message === prefix || message.startsWith(`${prefix} `));
@@ -174,6 +175,10 @@ export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Err
         '[ReactOnRails] combineRSCStreamDiagnosticErrors: received an already-merged error as input; pass only raw diagnostics from buildRSCStreamDiagnosticError',
       );
     }
+  } else if (diagnosticErrors.some((error) => (error as RSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG])) {
+    console.error(
+      '[ReactOnRails] combineRSCStreamDiagnosticErrors: received an already-merged error as input; pass only raw diagnostics from buildRSCStreamDiagnosticError',
+    );
   }
   if (diagnosticErrors.length === 1) return diagnosticErrors[0];
 
@@ -195,7 +200,7 @@ export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Err
   const candidateStacks = diagnosticErrors
     .map((error, index) => error.stack && `Candidate ${index + 1} stack:\n${error.stack}`)
     .filter((line): line is string => Boolean(line));
-  combinedError.stack = [`${combinedError.name}: ${message}`, ...candidateStacks].join('\n\n');
+  combinedError.stack = [`${combinedError.name}: ${message}`, ...candidateStacks].join('\n');
   return combinedError;
 };
 

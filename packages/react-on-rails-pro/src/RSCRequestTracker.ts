@@ -186,6 +186,19 @@ class RSCRequestTracker {
   }
 
   /**
+   * Restores consumed diagnostics that were not matched to the current surfaced error.
+   *
+   * These entries already came from `capturedRSCDiagnostics`, so they have passed
+   * `recordRSCDiagnostic`'s dedup filter. Push them back directly to preserve the exact consumed
+   * set without re-running deduplication during restore.
+   *
+   * @param captured - Previously consumed diagnostics to make available for a later surfaced error
+   */
+  restoreCapturedRSCDiagnostics(captured: CapturedRSCDiagnostic[]): void {
+    this.capturedRSCDiagnostics.push(...captured);
+  }
+
+  /**
    * Registers a callback to be executed when RSC payloads are generated.
    *
    * This function:

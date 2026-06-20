@@ -104,9 +104,7 @@ const streamRenderReactComponent = (
   const restoreCapturedRSCDiagnostics = (
     captured: ReturnType<typeof streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics>,
   ) => {
-    captured.forEach((entry) =>
-      streamingTrackers.rscRequestTracker.recordRSCDiagnostic(entry.componentName, entry.diagnosticError),
-    );
+    streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(captured);
   };
 
   const enrichWithCapturedRSCDiagnostics = (error: Error): Error => {
@@ -138,9 +136,8 @@ const streamRenderReactComponent = (
     const diagnosticError = combineRSCStreamDiagnosticErrors(
       matchingCaptured.map((entry) => entry.diagnosticError),
     );
-    if (!diagnosticError) {
-      return error;
-    }
+    // `combineRSCStreamDiagnosticErrors` returns undefined only for an empty list; matchingCaptured
+    // is non-empty here because of the guard above.
     return mergeRSCStreamDiagnosticError(error, diagnosticError);
   };
 
@@ -189,6 +186,9 @@ const streamRenderReactComponent = (
             error.stack = augmentedStack;
           }
           sendErrorHtml(
+            // If onError already ran it set renderState.error to the enriched error; use that
+            // directly so we don't consume diagnostics a second time. This mirrors the
+            // renderState.hasErrors gate in the .catch path.
             renderState.error instanceof Error ? renderState.error : enrichWithCapturedRSCDiagnostics(error),
           );
         },

@@ -309,6 +309,16 @@ describe('RSCRequestTracker', () => {
       expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([]);
       expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([]);
     });
+
+    it('restoreCapturedRSCDiagnostics restores consumed captures without re-deduping', () => {
+      const tracker = createTracker();
+      const diagnosticError = new Error('boom');
+      const captured = [{ componentName: 'CommentsToggle', diagnosticError }];
+
+      tracker.restoreCapturedRSCDiagnostics(captured);
+
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual(captured);
+    });
   });
 
   // Integration tests: RSCRequestTracker + injectRSCPayload wired together.
