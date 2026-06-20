@@ -115,13 +115,9 @@ module ReactOnRailsPro
   class StreamRequest
     MAX_PULL_PROP_NAME_LENGTH = 256
 
-    def http_status
-      @status
-    end
+    def http_status = @status
 
-    def http_status_recorded?
-      @status_recorded
-    end
+    def http_status_recorded? = @status_recorded
 
     def initialize(first_chunk_warn_callback: nil, pull_enabled: false, &request_block)
       @request_executor = request_block
@@ -169,6 +165,7 @@ module ReactOnRailsPro
             # then exits with nil; any in-flight emit.call is protected by
             # AsyncPropsEmitter#call's rescue.
             @emitter&.render_complete!
+            @emitter = nil
           end
           break
         rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
@@ -199,6 +196,7 @@ module ReactOnRailsPro
         next if stream_response.error?
 
         yielded_content = parse_and_route_chunk(parser, chunk, &block)
+        # Control messages are protocol bookkeeping, so they do not satisfy the slow-first-chunk marker.
         record_first_chunk(request_start_time) if yielded_content
       end
       record_status(stream_response) unless @status_recorded

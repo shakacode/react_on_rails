@@ -77,6 +77,8 @@ class AsyncPropsManager {
 
   private bufferedPropRequests: string[] = [];
 
+  private overCapBufferedPropRequestCount = 0;
+
   constructor(sharedExecutionContext?: Map<string, unknown>) {
     this.sharedExecutionContext = sharedExecutionContext ?? null;
   }
@@ -182,6 +184,7 @@ class AsyncPropsManager {
         controller.pullRequested = this.emitPropRequest(propName);
       }
     });
+    this.overCapBufferedPropRequestCount = 0;
   }
 
   /**
@@ -218,8 +221,10 @@ class AsyncPropsManager {
       return true;
     }
     if (this.bufferedPropRequests.length >= AsyncPropsManager.MAX_BUFFERED_REQUESTS) {
+      this.overCapBufferedPropRequestCount += 1;
       console.warn(
         `AsyncPropsManager buffered propRequest cap reached; keeping request eligible for catch-up: "${propName}". ` +
+          `${this.overCapBufferedPropRequestCount} over-cap propRequest(s) have stayed unbuffered until catch-up. ` +
           'The prop request emitter may not have been installed.',
       );
       return false;

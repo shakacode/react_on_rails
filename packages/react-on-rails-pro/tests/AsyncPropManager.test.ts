@@ -449,6 +449,7 @@ describe('Pull mode propRequest emission', () => {
       expect(propRequestEmitter).toHaveBeenCalledTimes(501);
       expect(propRequestEmitter).toHaveBeenCalledWith('buffered-500');
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('buffered propRequest cap reached'));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('1 over-cap propRequest(s)'));
     } finally {
       warnSpy.mockRestore();
     }
