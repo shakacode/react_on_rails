@@ -218,6 +218,7 @@ export async function handleIncrementalRenderRequest(
     let finalResponse = response;
     const { pullEnabled, pushProps } = firstRequestChunk;
     if (pullEnabled && response.stream) {
+      const sourceStream = response.stream;
       const { sharedExecutionContext } = executionContext;
       sharedExecutionContext.set(PULL_ENABLED_KEY, true);
       sharedExecutionContext.set(PUSH_PROPS_KEY, new Set(pushProps || []));
@@ -237,20 +238,28 @@ export async function handleIncrementalRenderRequest(
 
       // Register event handlers BEFORE pipe() to guarantee we catch 'end'
       // even if the source stream has already buffered all its data.
-      response.stream.on('end', () => {
+      sourceStream.on('end', () => {
         if (injectableStream.writableNeedDrain) {
           injectableStream.once('drain', writeRenderCompleteAndEnd);
           return;
         }
         writeRenderCompleteAndEnd();
       });
-      response.stream.on('error', (err) => {
+      sourceStream.on('error', (err) => {
         injectableStream.destroy(err);
+      });
+      // Fastify destroys the returned stream when the browser/Rails client disconnects.
+      // Propagate that premature teardown back through the pull wrapper so upstream
+      // React/RSC work and async prop fetches abort just like the non-pull path.
+      injectableStream.once('close', () => {
+        if (!injectableStream.writableEnded && !sourceStream.destroyed) {
+          sourceStream.destroy();
+        }
       });
 
       // { end: false } prevents pipe from auto-closing injectableStream when
       // the source ends — we write renderComplete in the 'end' handler above.
-      response.stream.pipe(injectableStream, { end: false });
+      sourceStream.pipe(injectableStream, { end: false });
 
       // Set the emitter callback — AsyncPropsManager calls this from inside the VM
       sharedExecutionContext.set(PROP_REQUEST_EMITTER_KEY, (propName: string) => {

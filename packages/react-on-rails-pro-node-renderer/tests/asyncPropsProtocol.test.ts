@@ -15,6 +15,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { PassThrough } from 'node:stream';
 import {
   ASYNC_PROPS_MANAGER_KEY as MANAGER_ASYNC_PROPS_MANAGER_KEY,
   PROP_REQUEST_EMITTER_KEY as MANAGER_PROP_REQUEST_EMITTER_KEY,
@@ -29,7 +30,14 @@ import {
   PUSH_PROPS_KEY,
   MAX_PULL_PROP_NAME_LENGTH,
   catchUpAsyncPropsManagerPullBridge,
+  handleIncrementalRenderRequest,
 } from '../src/worker/handleIncrementalRenderRequest';
+import * as handleRenderRequestModule from '../src/worker/handleRenderRequest';
+import type { ExecutionContext } from '../src/worker/vm';
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe('async props protocol constants', () => {
   it('keeps node renderer sharedExecutionContext keys in sync with AsyncPropsManager', () => {
@@ -85,5 +93,47 @@ describe('async props protocol constants', () => {
     ).toBe(true);
 
     expect(calls).toEqual(['catch-up']);
+  });
+
+  it('destroys the pull-mode source stream when the returned stream closes early', async () => {
+    const sourceStream = new PassThrough();
+    const sharedExecutionContext = new Map<string, unknown>();
+
+    jest.spyOn(handleRenderRequestModule, 'handleRenderRequest').mockResolvedValue({
+      response: {
+        headers: { 'Cache-Control': 'public, max-age=31536000' },
+        status: 200,
+        stream: sourceStream,
+      },
+      executionContext: {
+        sharedExecutionContext,
+        runInVM: jest.fn(),
+        release: jest.fn(),
+      } as unknown as ExecutionContext,
+    });
+
+    const { response } = await handleIncrementalRenderRequest({
+      firstRequestChunk: {
+        renderingRequest: 'ReactOnRails.dummy',
+        pullEnabled: true,
+      },
+      bundleTimestamp: 'pull-close-regression',
+    });
+
+    const { stream } = response;
+    expect(stream).toBeDefined();
+    expect(stream).not.toBe(sourceStream);
+
+    if (!stream) {
+      throw new Error('Expected pull mode to return an injectable stream');
+    }
+
+    const closePromise = new Promise<void>((resolveClose) => {
+      stream.once('close', resolveClose);
+    });
+    stream.destroy();
+    await closePromise;
+
+    expect(sourceStream.destroyed).toBe(true);
   });
 });
