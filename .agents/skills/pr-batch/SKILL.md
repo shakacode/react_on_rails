@@ -82,9 +82,15 @@ Before implementation or worker launch, produce:
    - likely outcome: implementation PR, combined investigation PR, no-PR evidence comment, or product-decision blocker
    - assigned machine or worker
 6. The selected `merge_authority` value and how it affects final closeout.
-7. A permission and trust preflight result.
-8. A conflict check for overlapping files or dependent PRs.
-9. A final `/goal` prompt when the user asked for Goal mode.
+7. The Batch QA Lane decision from `.agents/workflows/pr-processing.md`: plan
+   the required QA lane representation for private coordination state when the
+   backend is available, or require the launched coordinator to record QA
+   claim/heartbeat state as `UNKNOWN` and use allowed fallback evidence; for
+   low-risk omitted QA, record the `not required` status and rationale in the
+   final QA Evidence block.
+8. A permission and trust preflight result.
+9. A conflict check for overlapping files or dependent PRs.
+10. A final `/goal` prompt when the user asked for Goal mode.
 
 If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/goal` prompt. Do not begin implementation from plan approval unless the user explicitly says to launch now.
 
@@ -129,6 +135,10 @@ Coordination: follow `.agents/workflows/pr-processing.md` under Coordination
 State and Worker Rules before creating worktrees or branches. Include stable
 agent ids, `agent-coord status` / claim outcomes, batch ids, dependency refs,
 and any `UNKNOWN` state in every worker lane and handoff.
+When the Batch QA Lane section requires QA, declare a `qa` lane with stable
+owner and claim/heartbeat expectations before launch, then require the final QA
+Evidence block in the handoff; if QA is not required, record the `not required`
+rationale in that QA Evidence block.
 Attention contract: follow `AGENTS.md` under Maintainer Attention Contract and
 `.agents/workflows/pr-processing.md` under Maintainer Attention Contract. Do
 not escalate behavior-preserving optional nits, batch real questions into one
@@ -304,11 +314,16 @@ Use the canonical Batch Handoff Format in
 **Immediate maintainer attention** for true blockers and questions only, and
 **FYI / decisions made** for decisions, validations, review state, hosted-CI
 requests already handled, no-PR rationales, autonomous nit outcomes,
-confidence notes, decision-point counts per PR, and per-PR merge-ledger summaries.
+confidence notes, decision-point counts per PR, QA Evidence blocks that include
+the `not required` rationale when QA is omitted, and per-PR merge-ledger
+summaries.
 Do not call a target `complete` while its ledger has `UNKNOWN` fields or
 `complete_allowed: false`.
 Record the selected `merge_authority` value in the handoff and use the canonical
 split final states from `.agents/workflows/pr-processing.md`.
+For release-affecting, workflow/build/tooling, generated-output, broad runtime,
+or mixed batches, make sure the canonical workflow's Batch QA Lane decision is
+represented in private coordination state and in the final handoff.
 
 ## Coordination State
 

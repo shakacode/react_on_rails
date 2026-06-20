@@ -171,20 +171,27 @@ Treat `worked_issue_scope: not applicable`, `worked_issue_scope: UNKNOWN (...)`,
 and `worked_issue_scope: empty (...)` as merged-PR-range-only or advisory scope
 states, not verified batch subsets.
 
+After the scope algorithm identifies the batch or reports an `UNKNOWN` scope,
+collect any QA lane and QA Evidence block for that batch. Do not use missing QA
+state to shrink the worked-issue scope; report it as a QA coverage finding or
+`UNKNOWN` fact instead.
+
 Ask me to confirm the included/excluded worked issues, advisory `codex-claim`
 rows, and PR range before deep audit unless I explicitly say to proceed. When
 the scope is `UNKNOWN (needs batch confirmation)`, ask me to choose the
 candidate batch/run id before any confirmed worked-issue audit.
 
-After confirmation, audit each known worked issue or advisory `codex-claim` row
-for:
-- whether the implementation, no-PR comment, blocker, or parked disposition
-  satisfied the issue intent and acceptance criteria
+After confirmation, audit each known worked issue, QA lane, or advisory
+`codex-claim` row for:
+- whether the implementation, no-PR comment, QA evidence, blocker, or parked
+  disposition satisfied the issue or QA-lane intent and acceptance criteria
 - whether the final issue state is correct: merged, closed, still open,
   parked, blocked, no-PR, done-unmerged, or UNKNOWN
+- for QA lanes, whether the final lane state is correct: clear, blocked,
+  waived, not required, done, still healthy `in_progress`, or UNKNOWN
 - whether review comments, handoff expectations, confidence notes, validation
-  evidence, decision-point count, and Process Gap Disposition fields were
-  handled when required
+  evidence, QA evidence, decision-point count, and Process Gap Disposition
+  fields were handled when required
 - classify each worked issue as `in_progress`, `realized`, `partial`,
   `missed`, `regressed`, `stalled`, or `unknown`, using
   `.agents/workflows/continuous-evaluation-loop.md` for the intent-achievement
@@ -216,6 +223,8 @@ Also audit each included merged PR for:
 - AI review findings that were ignored even though they identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval
 - requested adversarial reviews that were late, stale, missing, or left untriaged `BLOCKING`/`DISCUSS` findings
 - untriaged Must Fix, SHOULD-FIX, DISCUSS, Changes Requested, compatibility, security, regression, or missing-changelog review findings
+- missing, stale, still-`UNKNOWN`, insufficiently scoped, or release-blocking
+  QA evidence required by `.agents/workflows/pr-processing.md`
 - changes touching CI, Pro, build config, generators, SSR, RSC, shared types, or release-sensitive docs
 - anything that could have bad consequences after merge
 
@@ -239,13 +248,14 @@ For every non-OK finding, include a draft issue entry but do not create it:
   `checklist+replay`, or `park`), `Motivating miss`, `Replay evidence or park
   reason`, and `Non-goal`
 
-Return high-risk findings first, then review-gate violations, missing changelog
-candidates, cross-PR interaction risks, the issue plan, a worked-issue coverage
-table, a PR-by-PR table, and exact commands/data sources. Include any remaining
-`UNKNOWN` facts and the command or permission needed to resolve them. Do not make
-code changes, comments, labels, issues, reverts, or PRs without approval.
-The worked-issue coverage table must include issue number, coordination
-lane/branch, linked PR or no-PR/blocker evidence, final state,
+Return high-risk findings first, then review-gate violations, QA coverage
+findings, missing changelog candidates, cross-PR interaction risks, the issue
+plan, a worked-issue/QA-lane coverage table, a PR-by-PR table, and exact
+commands/data sources. Include any remaining `UNKNOWN` facts and the command or
+permission needed to resolve them. Do not make code changes, comments, labels,
+issues, reverts, or PRs without approval.
+The worked-issue/QA-lane coverage table must include issue number or QA lane id,
+coordination lane/branch, linked PR or no-PR/blocker/QA evidence, final state,
 intent-achievement classification, and `UNKNOWN` facts.
 
 Example worked-issue coverage table (`batch-abc` and issue numbers are
@@ -257,6 +267,7 @@ placeholders; replace them with the real batch id and issues):
 | #1236 | batch-abc:issue-1236 / codex/partial-example | PR #2346 merged | merged | partial | acceptance criteria C not addressed |
 | #1237 | UNKNOWN (advisory) / no coord data | codex-claim comment URL (advisory) | UNKNOWN | unknown | coordination state needed to confirm |
 | #1238 | batch-abc:issue-1238 / codex/done-no-merge | no-PR evidence comment URL | done-unmerged | realized | none |
+| qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | done | realized | none |
 ```
 
 ## Comparison Prompt
@@ -281,6 +292,7 @@ For each finding:
 
 Pay special attention to disagreements:
 - one agent flags risk and the other misses it
+- different QA coverage findings, QA lane states, or QA Evidence freshness/scope
 - different worked-issue inclusion lists, including one agent having
   coordination data while the other records `worked_issue_scope: UNKNOWN`
   - when one report has verified coordination data and another has
@@ -304,13 +316,14 @@ Pay special attention to disagreements:
 Return:
 1. consensus high-risk findings
 2. reconciled review-gate violations
-3. disputed findings needing human review
-4. PRs both agents consider OK
-5. deduped issue plan
-6. reconciled worked-issue coverage table with issue number, coordination
-   lane/branch, linked PR or no-PR/blocker evidence, final state,
-   intent-achievement classification, and any unresolved `UNKNOWN` facts
-7. recommended next actions, including a coordinator resume/reassign/drop
+3. reconciled QA coverage findings
+4. disputed findings needing human review
+5. PRs both agents consider OK
+6. deduped issue plan
+7. reconciled worked-issue/QA-lane coverage table with issue number or QA lane
+   id, coordination lane/branch, linked PR or no-PR/blocker/QA evidence, final
+   state, intent-achievement classification, and any unresolved `UNKNOWN` facts
+8. recommended next actions, including a coordinator resume/reassign/drop
    decision for `stalled` lanes instead of defaulting to issue creation
 
 Do not create issues or PRs yet.

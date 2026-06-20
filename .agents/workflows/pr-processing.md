@@ -425,9 +425,10 @@ of the batch, while audit verifies that the QA coverage and evidence were adequa
 Create an explicit QA lane for release-affecting batches, RC or final-release preparation,
 CI/tooling changes, generated-example or generator-output changes, developer-workflow changes, broad
 runtime behavior changes, and any batch where the coordinator cannot tell from worker validation alone
-whether the intended surfaces were exercised. For docs-only, no-code process, no-PR evidence, and other
-low-risk batches, QA may be recorded as `not required` with a one-line rationale instead of spawning a
-separate worker.
+whether the intended surfaces were exercised. These required categories take precedence over low-risk
+exceptions. For docs-only, no-code process, no-PR evidence, and other low-risk batches that are not
+release-affecting, developer-workflow-affecting, or otherwise covered by the required categories above,
+QA may be recorded as `not required` with a one-line rationale instead of spawning a separate worker.
 
 For mixed batches, apply QA to any subset that would individually qualify as release-affecting or
 workflow-affecting, even when the remaining targets would be low-risk on their own.
@@ -460,7 +461,8 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 - Findings: <none, fixed in PR(s), waived with link, or follow-up recommended>
 - Release-blocking status: <clear | blocked | waived | not required with rationale>
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable; use not
-  applicable when QA found no recurring process miss>
+  applicable when QA found no recurring process miss; see Process Gap Disposition under Batch Handoff
+  Format for value definitions>
 ```
 
 ### Plan To Goal Handoff
@@ -500,9 +502,10 @@ private batch state, report dependency state as `UNKNOWN` and stop that lane.
 If status cannot be checked for a declared dependency lane, stop with dependency
 state `UNKNOWN` instead of using advisory fallback for that lane.
 When the Batch QA Lane section requires QA, declare a `qa` lane with stable
-owner, claim/heartbeat evidence, and a final QA Evidence block; allow it to run
-in parallel once changed areas are known, and make audit verify the QA coverage
-before release-promotion or release-readiness decisions rely on the batch.
+owner and claim/heartbeat expectations before dispatch, require the final QA
+Evidence block in the handoff, allow QA to run in parallel once changed areas
+are known, and make audit verify the QA coverage before release-promotion or
+release-readiness decisions rely on the batch.
 
 Attention contract: follow `AGENTS.md` under Maintainer Attention Contract.
 Autonomously handle behavior-preserving optional nits when they stay in scope,
@@ -656,10 +659,10 @@ Split batch handoffs into two sections:
   unresolved `DISCUSS` feedback, or a merge/release-mode conflict.
 - **FYI / decisions made**: no-PR rationales, non-blocking decisions, hosted CI
   requested because the coordinator was unsure at readiness time, validation
-  evidence, QA evidence or the `not required` rationale, review churn notes,
-  autonomous nit outcomes, confidence notes, decision-point counts per PR,
-  already-answered questions, and a per-PR merge-ledger table or JSON artifact
-  path.
+  evidence, QA Evidence blocks that include the `not required` rationale when QA
+  is omitted, review churn notes, autonomous nit outcomes, confidence notes,
+  decision-point counts per PR, already-answered questions, and a per-PR
+  merge-ledger table or JSON artifact path.
 
 Every target must use one explicit final state:
 
@@ -883,8 +886,9 @@ The closeout lane is:
    `complete_allowed: false`.
 6. Verify the batch QA evidence when the Batch QA Lane section requires QA, or
    verify the `not required` rationale for low-risk batches. Audit and release
-   decisions must treat missing, blocked, or still-`UNKNOWN` QA evidence as a
-   readiness blocker until fixed, waived, or carried as an explicit blocker.
+   decisions must treat missing, stale, insufficiently scoped, blocked,
+   surface-mismatched, or still-`UNKNOWN` QA evidence as a readiness blocker
+   until fixed, waived, or carried as an explicit blocker.
 7. Refresh stale release-mode classification from the release tracker when
    needed. For accelerated-RC merge readiness, refresh the latest finalized
    PR-body `Agent Merge Confidence` block required by `AGENTS.md`; keep this
@@ -1446,10 +1450,10 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
      or child issue body
 10. Return high-risk findings first, then review-gate violations, QA coverage
     findings, missing changelog candidates, cross-PR risks, the issue plan, a
-    worked-issue coverage table (issue number, coordination lane/branch, linked
-    PR or no-PR/blocker/QA evidence, final state, intent-achievement
-    classification, `UNKNOWN` facts), a PR-by-PR table, and exact
-    commands/data sources.
+    worked-issue/QA-lane coverage table (issue number or QA lane id,
+    coordination lane/branch, linked PR or no-PR/blocker/QA evidence, final
+    state, intent-achievement classification, `UNKNOWN` facts), a PR-by-PR
+    table, and exact commands/data sources.
 
 Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs
 until the user approves the audit report and issue plan. For release-gate
