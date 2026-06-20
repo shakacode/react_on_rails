@@ -98,6 +98,8 @@ const streamRenderReactComponent = (
   // that surfaces earlier or later in the same render — a different Suspense boundary throwing, a
   // serialization error, an addPostSSRHook throw — does not consume or attach a non-matching RSC
   // diagnostic, so the actual RSC failure can still be enriched when it surfaces.
+  // React delivers `onError` synchronously during render, so the consume/restore cycle below
+  // completes before another `onError` or the later `.catch` microtask can observe the tracker.
   //
   // An error already enriched on the synchronous reject path in getReactServerComponent.server.ts is
   // returned untouched. We still consume the current tracker, drop diagnostics already represented by
@@ -260,11 +262,14 @@ const streamRenderReactComponent = (
       // renderToPipeableStream's onError) still recovers its bundle diagnostic (#3475).
       //
       // Only enrich when onError has not already reported an error (`renderState.hasErrors` is still
-      // false). If onError fired, it already consumed the captured diagnostics and attributed them to
-      // the correlated error; reaching the .catch afterwards means this rejection is a *different*
-      // failure (or downstream fallout), so enriching it would risk re-attaching an unrelated RSC
-      // diagnostic. Consumption in enrichWithCapturedRSCDiagnostics already prevents reuse, but this
-      // gate also avoids double-reporting the same render's failure.
+      // false). The normal paths are effectively mutually exclusive: a rejected render promise lands
+      // here before `renderToPipeableStream` is called, while a deferred RSC component failure reaches
+      // React's `onError` after `renderToPipeableStream` starts. If onError fired, it already consumed
+      // the captured diagnostics and attributed them to the correlated error; reaching the .catch
+      // afterwards means this rejection is a *different* failure (or downstream fallout), so enriching
+      // it would risk re-attaching an unrelated RSC diagnostic. Consumption in
+      // enrichWithCapturedRSCDiagnostics already prevents reuse, but this gate also avoids
+      // double-reporting the same render's failure.
       //
       // Ordering invariant: `reportError` sets `renderState.hasErrors = true` synchronously, and
       // `onError` runs synchronously inside React's render before this `.catch` rejection settles in a

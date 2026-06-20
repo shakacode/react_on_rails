@@ -61,8 +61,11 @@ export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamEr
   const streamMessage = nonEmptyString(streamError.message);
   if (!streamMessage) return false;
   // React can hide the underlying Server Component failure behind this generic message. If a
-  // diagnostic is waiting, that generic stream error is the correlation signal. This assumes only
-  // React's RSC machinery emits the exact prefix above at runtime; verify the prefix on React bumps.
+  // diagnostic is waiting, that generic stream error is the correlation signal. This deliberately
+  // matches every captured diagnostic: with one capture we assume it is the failing component, and
+  // with 2+ captures the caller reports all of them as candidates instead of pretending to know
+  // which component failed. This assumes only React's RSC machinery emits the exact prefix above at
+  // runtime; verify the prefix on React bumps.
   if (isGenericRSCStreamError(streamMessage)) return true;
 
   const originalErrorLine = diagnosticError.message

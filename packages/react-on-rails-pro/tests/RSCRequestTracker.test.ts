@@ -232,10 +232,10 @@ describe('RSCRequestTracker', () => {
   describe('captured RSC diagnostics (#3475)', () => {
     it('starts with no captured diagnostics', () => {
       const tracker = createTracker();
-      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([]);
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([]);
     });
 
-    it('records diagnostics keyed by component name and returns a copy', () => {
+    it('records diagnostics keyed by component name', () => {
       const tracker = createTracker();
       const firstError = new Error('first');
       const secondError = new Error('second');
@@ -243,24 +243,31 @@ describe('RSCRequestTracker', () => {
       tracker.recordRSCDiagnostic('CommentsToggle', firstError);
       tracker.recordRSCDiagnostic('PostsPage', secondError);
 
-      const captured = tracker.getCapturedRSCDiagnosticsForTesting();
+      const captured = tracker.consumeCapturedRSCDiagnostics();
       expect(captured).toEqual([
         { componentName: 'CommentsToggle', diagnosticError: firstError },
         { componentName: 'PostsPage', diagnosticError: secondError },
       ]);
 
-      // Returned array is a copy — mutating it must not affect the tracker.
+      tracker.restoreCapturedRSCDiagnostics(captured);
+
+      // Restoring copies the array entries back into tracker storage — mutating the consumed array
+      // afterwards must not add new tracker entries.
       captured.push({ componentName: 'Injected', diagnosticError: new Error('nope') });
-      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toHaveLength(2);
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([
+        { componentName: 'CommentsToggle', diagnosticError: firstError },
+        { componentName: 'PostsPage', diagnosticError: secondError },
+      ]);
     });
 
     it('clears captured diagnostics on clear()', () => {
       const tracker = createTracker();
       tracker.recordRSCDiagnostic('CommentsToggle', new Error('boom'));
-      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toHaveLength(1);
+      expect(tracker.consumeCapturedRSCDiagnostics()).toHaveLength(1);
+      tracker.recordRSCDiagnostic('CommentsToggle', new Error('boom'));
 
       tracker.clear();
-      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([]);
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([]);
     });
 
     it('suppresses a true duplicate (same component name AND same message) recorded twice', () => {
@@ -274,7 +281,7 @@ describe('RSCRequestTracker', () => {
       tracker.recordRSCDiagnostic('CommentsToggle', firstError);
       tracker.recordRSCDiagnostic('CommentsToggle', duplicateError);
 
-      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([
         { componentName: 'CommentsToggle', diagnosticError: firstError },
       ]);
     });
@@ -290,7 +297,7 @@ describe('RSCRequestTracker', () => {
       tracker.recordRSCDiagnostic('CommentsToggle', firstError);
       tracker.recordRSCDiagnostic('CommentsToggle', secondError);
 
-      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([
         { componentName: 'CommentsToggle', diagnosticError: firstError },
         { componentName: 'CommentsToggle', diagnosticError: secondError },
       ]);
@@ -307,7 +314,6 @@ describe('RSCRequestTracker', () => {
       // After consumption a second consumer (e.g. an unrelated later error) finds nothing to merge,
       // so the stale diagnostic cannot be reattached — this is the codex P2 fix (#3475).
       expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([]);
-      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([]);
     });
 
     it('restoreCapturedRSCDiagnostics restores consumed captures without re-deduping', () => {
