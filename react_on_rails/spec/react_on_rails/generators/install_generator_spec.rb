@@ -3717,12 +3717,20 @@ describe InstallGenerator, type: :generator do
     it "does not read the copied Redux Tailwind entry in pretend mode" do
       redux_generator = redux_generator_fixture(pretend: true, tailwind: true)
       client_entry = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+
+        development:
+          <<: *default
+      YAML
 
       allow(redux_generator).to receive(:copy_file)
       allow(redux_generator).to receive(:gsub_file)
       allow(redux_generator).to receive(:prepend_to_file)
+      allow(File).to receive(:read).and_call_original
 
-      expect(File).not_to receive(:read)
+      expect(File).not_to receive(:read).with(File.join(destination_root, client_entry))
       expect(redux_generator).to receive(:say_status)
         .with(:pretend, "Would add Tailwind stylesheet import to #{client_entry}", :yellow)
 
