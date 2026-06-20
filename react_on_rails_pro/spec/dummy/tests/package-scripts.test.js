@@ -31,6 +31,13 @@ describe('package scripts', () => {
     expect(script).toContain('bin/shakapacker-precompile-hook');
   });
 
+  it.each(['build:test', 'build:test:rspack'])('%s prepares the generated i18n directory', (scriptName) => {
+    const script = packageJson.scripts[scriptName];
+
+    expect(packageJson.scripts['prepare:i18n']).toBe('mkdir -p client/app/i18n/generated');
+    expect(script).toContain('pnpm run prepare:i18n');
+  });
+
   it('has a focused RSC Playwright script for bundler runtime gates', () => {
     const script = packageJson.scripts['e2e-test:rsc'];
 
