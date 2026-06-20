@@ -37,6 +37,8 @@ export const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
  * primary-cache churn can evict many successful keys before a mounted route asks
  * for one of those keys again. Keep the marker bookkeeping bounded, but do not
  * drop markers as soon as the primary cache churns once through its own cap.
+ * The 4x window keeps a marker through four full primary-cache rotations before
+ * never-revisited keys age out.
  */
 export const RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES = RSC_PAYLOAD_CACHE_MAX_ENTRIES * 4;
 

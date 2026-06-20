@@ -111,7 +111,10 @@ export const createRSCProvider = ({
     // counts avoid retaining promise references while still keeping a key
     // latched until every overlapping replacement settles. Entries are deleted
     // when the matching replacement loads settle, so a marker cannot be dropped
-    // while its current replacement is still pending.
+    // while its current replacement is still pending. Same-key `getComponent`
+    // replacement loads cannot pile up: once the first call inserts its promise,
+    // later same-key calls return that cached promise, so total map size is
+    // bounded by distinct keys currently replacing evicted successful payloads.
     const inFlightEvictedSuccessfulPayloadCountsRef = useRef(new Map<string, number>());
     const inFlightEvictedSuccessfulPayloadCounts = inFlightEvictedSuccessfulPayloadCountsRef.current;
     // Provider-wide successful-refetch token. Values only need to be comparable
@@ -310,6 +313,8 @@ export const createRSCProvider = ({
         try {
           serverComponentPromise = getServerComponent({ componentName, componentProps });
         } catch (error) {
+          // The in-flight latch is incremented only after `setPinned` succeeds
+          // below, so a synchronous producer throw only restores the marker.
           if (notifyRoutesOnSuccess) {
             evictedSuccessfulPayloadKeys.set(key, true);
           }
