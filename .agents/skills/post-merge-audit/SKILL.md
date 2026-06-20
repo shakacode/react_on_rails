@@ -115,9 +115,11 @@ For each included PR:
   reproducible artifact or justified missing-artifact caveat, internal consistency, production-environment
   caveats, and refutable-conclusion handling.
 - Validation: compare changed areas with the validation evidence in the PR body or comments.
-- QA evidence: verify required QA Evidence exists, is current for the audited
-  head/range, covers the changed surfaces, and does not leave release-blocking
-  findings untriaged.
+- QA evidence: verify required QA Evidence exists, records the PR/head SHA or
+  audited range it applies to, is current for that head/range, covers the changed
+  surfaces, and does not leave release-blocking findings untriaged. If private
+  coordination claim/heartbeat state is `UNKNOWN`, verify the documented
+  fallback evidence is complete before treating QA coverage as satisfied.
 - Cross-PR interactions: compare changed files, shared behavior, assumptions, and release-sensitive areas across the batch.
 - Decision log: inspect any `Codex Decision Log` or equivalent section and verify the decisions still hold after the merge.
 
@@ -238,8 +240,8 @@ Only the coordinator should create issues. Independent Codex and Claude audits s
 Return high-risk findings first, then:
 
 1. Review-gate violations, including PRs merged before requested reviews finished, before actionable review findings were triaged, or with AI review systems incorrectly counted as approval gates.
-2. QA coverage findings, including missing, stale, still-`UNKNOWN`, or
-   insufficient required QA evidence.
+2. QA coverage findings, including missing, stale, still-`UNKNOWN` coverage/scope,
+   or insufficient required QA evidence.
 3. Missing changelog candidates, with a single recommendation to run `/update-changelog` when any are found.
 4. Cross-PR interaction risks.
 5. A deduped issue plan with parent/child recommendations and fingerprints.

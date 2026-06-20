@@ -131,14 +131,17 @@ Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
 merge_authority: <none | ask | auto_merge_when_gates_pass>.
+Batch QA Lane: <required: lane/owner/scope/private-state or UNKNOWN fallback | not required: rationale>.
 Coordination: follow `.agents/workflows/pr-processing.md` under Coordination
 State and Worker Rules before creating worktrees or branches. Include stable
 agent ids, `agent-coord status` / claim outcomes, batch ids, dependency refs,
 and any `UNKNOWN` state in every worker lane and handoff.
 When the Batch QA Lane section requires QA, declare a `qa` lane with stable
-owner and claim/heartbeat expectations before launch, then require the final QA
-Evidence block in the handoff; if QA is not required, record the `not required`
-rationale in that QA Evidence block.
+owner and claim/heartbeat expectations before launch when the private backend is
+available. If private state is unavailable, record QA claim/heartbeat state as
+`UNKNOWN` and use allowed fallback evidence instead of downgrading required QA to
+`not required`. Require the final QA Evidence block in the handoff; if QA is not
+required, record the `not required` status and rationale in that block.
 Attention contract: follow `AGENTS.md` under Maintainer Attention Contract and
 `.agents/workflows/pr-processing.md` under Maintainer Attention Contract. Do
 not escalate behavior-preserving optional nits, batch real questions into one
@@ -315,15 +318,16 @@ Use the canonical Batch Handoff Format in
 **FYI / decisions made** for decisions, validations, review state, hosted-CI
 requests already handled, no-PR rationales, autonomous nit outcomes,
 confidence notes, decision-point counts per PR, QA Evidence blocks that include
-the `not required` rationale when QA is omitted, and per-PR merge-ledger
-summaries.
+the evidence head(s), QA lane status, and QA lane rationale, and per-PR
+merge-ledger summaries.
 Do not call a target `complete` while its ledger has `UNKNOWN` fields or
 `complete_allowed: false`.
 Record the selected `merge_authority` value in the handoff and use the canonical
 split final states from `.agents/workflows/pr-processing.md`.
 For release-affecting, workflow/build/tooling, generated-output, broad runtime,
 or mixed batches, make sure the canonical workflow's Batch QA Lane decision is
-represented in private coordination state and in the final handoff.
+represented in private coordination state when available, or explicitly recorded
+as `UNKNOWN` with allowed fallback evidence, and in the final handoff.
 
 ## Coordination State
 

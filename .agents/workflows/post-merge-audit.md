@@ -78,6 +78,13 @@ List every issue/PR you worked on in this batch, with:
 - any risk you would want a maintainer to re-check after merge
 - anything that might interact badly with other PRs from the same batch
 
+List any QA lane or intentionally omitted QA lane, with:
+- QA lane id/owner, claim status, and last heartbeat status
+- QA Evidence block URL or copied contents
+- evidence head(s) or audited range
+- QA lane status and rationale
+- release-blocking status and any findings
+
 If you do not know or cannot verify an item from GitHub/local git, say UNKNOWN rather than guessing.
 ```
 
@@ -224,8 +231,11 @@ Also audit each included merged PR for:
 - AI review findings that were ignored even though they identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval
 - requested adversarial reviews that were late, stale, missing, or left untriaged `BLOCKING`/`DISCUSS` findings
 - untriaged Must Fix, SHOULD-FIX, DISCUSS, Changes Requested, compatibility, security, regression, or missing-changelog review findings
-- missing, stale, still-`UNKNOWN`, insufficiently scoped, or release-blocking
-  QA evidence required by `.agents/workflows/pr-processing.md`
+- missing, stale, insufficiently scoped, head/range-ambiguous, release-blocking,
+  or still-`UNKNOWN` QA coverage/scope evidence required by
+  `.agents/workflows/pr-processing.md`; do not treat private coordination
+  claim/heartbeat `UNKNOWN` as blocking when the documented fallback evidence is
+  complete
 - changes touching CI, Pro, build config, generators, SSR, RSC, shared types, or release-sensitive docs
 - anything that could have bad consequences after merge
 

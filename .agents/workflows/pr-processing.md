@@ -458,14 +458,16 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 
 - QA lane: <agent id, branch/worktree, claim status, last heartbeat status or UNKNOWN>
 - Scope checked: <changed areas, PRs, release phase, and why this QA depth was enough>
+- Evidence head(s): <PR/head SHA(s), audited range, or "not applicable: no PR/code changes">
 - Automated checks: <commands, CI links, or "covered by worker validation: ...">
 - Manual checks: <workflow/app smoke checks, screenshots, or "not applicable: ...">
 - Findings: <none, fixed in PR(s), waived with link, or follow-up recommended>
-- QA lane status: <required | not required with rationale>
+- QA lane status: <required | not required>
+- QA lane rationale: <one-line reason for the status and selected QA depth>
 - Release-blocking status: <clear | blocked | waived | not applicable>
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable; use not
-  applicable when QA found no recurring process miss; see Process Gap Disposition under Batch Handoff
-  Format for value definitions>
+  applicable when QA found no recurring process miss; see the top-level Process Gap Disposition
+  section for value definitions>
 ```
 
 ### Plan To Goal Handoff
@@ -493,6 +495,7 @@ Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
 merge_authority: <none | ask | auto_merge_when_gates_pass>.
+Batch QA Lane: <required: lane/owner/scope/private-state or UNKNOWN fallback | not required: rationale>.
 Coordination: follow the canonical coordination protocol in
 `.agents/workflows/pr-processing.md` under Coordination State and Worker Rules
 before creating worktrees or branches. Assign stable agent ids, claim before
@@ -505,9 +508,11 @@ private batch state, report dependency state as `UNKNOWN` and stop that lane.
 If status cannot be checked for a declared dependency lane, stop with dependency
 state `UNKNOWN` instead of using advisory fallback for that lane.
 When the Batch QA Lane section requires QA, declare a `qa` lane with stable
-owner and claim/heartbeat expectations before dispatch, require the final QA
-Evidence block in the handoff, allow QA to run in parallel once changed areas
-are known, and make audit verify the QA coverage before release-promotion or
+owner and claim/heartbeat expectations before dispatch when the private backend
+is available. If private state is unavailable, record QA claim/heartbeat state
+as `UNKNOWN` and use allowed fallback evidence. Require the final QA Evidence
+block in the handoff, allow QA to run in parallel once changed areas are known,
+and make audit verify the QA coverage before release-promotion or
 release-readiness decisions rely on the batch.
 
 Attention contract: follow `AGENTS.md` under Maintainer Attention Contract.
@@ -662,9 +667,9 @@ Split batch handoffs into two sections:
   unresolved `DISCUSS` feedback, or a merge/release-mode conflict.
 - **FYI / decisions made**: no-PR rationales, non-blocking decisions, hosted CI
   requested because the coordinator was unsure at readiness time, validation
-  evidence, QA Evidence blocks that include the `not required` rationale when QA
-  is omitted, review churn notes, autonomous nit outcomes, confidence notes,
-  decision-point counts per PR, already-answered questions, and a per-PR
+  evidence, QA Evidence blocks that include the evidence head(s), QA lane status,
+  and QA lane rationale, review churn notes, autonomous nit outcomes, confidence
+  notes, decision-point counts per PR, already-answered questions, and a per-PR
   merge-ledger table or JSON artifact path.
 
 Every target must use one explicit final state:
@@ -693,7 +698,9 @@ validation and the final push. Request hosted CI and log it in FYI.
 Do not report a PR/target as `complete` while `script/pr-merge-ledger <PR>
 --strict` reports `UNKNOWN` fields, review-thread/review-object violations, or
 `complete_allowed: false`. Do not report any batch that requires QA ready while
-required QA evidence is missing, marked `blocked`, or still `UNKNOWN`.
+required QA coverage/scope evidence is missing, marked `blocked`, or still
+`UNKNOWN`; a QA lane whose only `UNKNOWN` is private coordination
+claim/heartbeat state may use the documented fallback evidence.
 
 ### Coordination State
 
@@ -890,8 +897,10 @@ The closeout lane is:
 6. Verify the batch QA evidence when the Batch QA Lane section requires QA, or
    verify the `not required` rationale for low-risk batches. Audit and release
    decisions must treat missing, stale, insufficiently scoped, blocked,
-   surface-mismatched, or still-`UNKNOWN` QA evidence as a readiness blocker
-   until fixed, waived, or carried as an explicit blocker.
+   surface-mismatched, or still-`UNKNOWN` QA coverage/scope evidence as a
+   readiness blocker until fixed, waived, or carried as an explicit blocker. A
+   QA lane whose only `UNKNOWN` is private coordination claim/heartbeat state may
+   use the documented fallback evidence.
 7. Refresh stale release-mode classification from the release tracker when
    needed. For accelerated-RC merge readiness, refresh the latest finalized
    PR-body `Agent Merge Confidence` block required by `AGENTS.md`; keep this
@@ -1384,8 +1393,8 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    Sync note: this scope algorithm is intentionally mirrored in
    `.agents/skills/post-merge-audit/SKILL.md` and
    `.agents/workflows/post-merge-audit.md`; QA lane planning and handoff
-   touchpoints are also mirrored in `.agents/skills/pr-batch/SKILL.md`; update
-   all copies together.
+   touchpoints are also mirrored in `.agents/skills/pr-batch/SKILL.md` and
+   `.agents/skills/plan-pr-batch/SKILL.md`; update all copies together.
 
    After the scope algorithm identifies the batch or reports an `UNKNOWN` scope,
    collect any QA lane and QA Evidence block for that batch. Do not use missing
@@ -1425,8 +1434,9 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - AI reviewer approvals, positive issue comments, or "no actionable comments" summaries that were incorrectly treated as required maintainer approval or special approval gates
    - AI review findings that were ignored even though they identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval
    - requested adversarial review that did not finish before merge, finished on an older head SHA, or left untriaged `BLOCKING`/`DISCUSS` findings
-   - required QA evidence that was missing, stale, still `UNKNOWN`, did not cover
-     the changed surfaces, or left release-blocking findings untriaged
+   - required QA coverage/scope evidence that was missing, stale, still
+     `UNKNOWN`, did not cover the changed surfaces, or left release-blocking
+     findings untriaged
 8. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
 9. Produce a deduped issue plan for non-OK findings:
    - no issue for OK, duplicates, fully resolved findings, evidenced `realized`
