@@ -26,8 +26,15 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   POSTS_PAGE_DEFAULT_POSTS_COUNT = 2
   POSTS_PAGE_MAX_ARTIFICIAL_DELAY = 10_000
   POSTS_PAGE_MAX_POSTS_COUNT = 100
+  # Test-harness bounds. Production apps must choose their own timeout and
+  # backpressure strategy; 30s x 10 can block a server thread for five minutes.
+  LAZY_PROP_REDIS_BLOCK_MS = 30_000
+  MAX_LAZY_PROP_REDIS_EMPTY_READS = 10
+  LAZY_PROP_REDIS_STALL_WARN_READS = 3
   private_constant :POSTS_PAGE_DEFAULT_ARTIFICIAL_DELAY, :POSTS_PAGE_DEFAULT_POSTS_COUNT,
-                   :POSTS_PAGE_MAX_ARTIFICIAL_DELAY, :POSTS_PAGE_MAX_POSTS_COUNT
+                   :POSTS_PAGE_MAX_ARTIFICIAL_DELAY, :POSTS_PAGE_MAX_POSTS_COUNT,
+                   :LAZY_PROP_REDIS_BLOCK_MS, :MAX_LAZY_PROP_REDIS_EMPTY_READS,
+                   :LAZY_PROP_REDIS_STALL_WARN_READS
   APP_PROPS_SERVER_RENDER = {
     helloWorldData: {
       name: PROPS_NAME
@@ -213,6 +220,30 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/redis_receiver")
   end
 
+  def lazy_props_for_testing
+    stream_view_containing_react_components(template: "/pages/lazy_props_for_testing")
+  end
+
+  def lazy_props_redis_for_testing
+    stream_view_containing_react_components(template: "/pages/lazy_props_redis_for_testing")
+  end
+
+  def mixed_props_for_testing
+    stream_view_containing_react_components(template: "/pages/mixed_props_for_testing")
+  end
+
+  def mixed_props_redis_for_testing
+    stream_view_containing_react_components(template: "/pages/mixed_props_redis_for_testing")
+  end
+
+  def rejection_props_for_testing
+    stream_view_containing_react_components(template: "/pages/rejection_props_for_testing")
+  end
+
+  def rejection_props_redis_for_testing
+    stream_view_containing_react_components(template: "/pages/rejection_props_redis_for_testing")
+  end
+
   def async_on_server_sync_on_client
     @render_on_server = true
     stream_view_containing_react_components(template: "/pages/async_on_server_sync_on_client")
@@ -321,7 +352,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   # See files in spec/dummy/app/views/pages
 
   helper_method :calc_slow_app_props_server_render, :error_hub_config_value
-  helper_method :read_async_props_from_redis
+  helper_method :read_async_props_from_redis, :read_lazy_props_from_redis
 
   private
 
@@ -404,10 +435,11 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     last_received_id = "0-0"
     stream_id = "stream:#{request_id}"
     until ended
-      received_messages = redis.xread(stream_id, last_received_id, block: 0)[stream_id]
+      received_messages = redis_stream_messages(redis, stream_id, last_received_id)
+
       # receive_messages are like [[msg1_id, [**msg_entries]], [msg2_id, [**msg_entries]]]
-      last_received_id = received_messages.last.first
-      received_messages.each do |_message_id, message_entries| # rubocop:disable Style/HashEachMethods
+      received_messages.each do |message_id, message_entries|
+        last_received_id = message_id
         message_entries.each do |message_key, message_value|
           if message_key == "end"
             ended = true
@@ -419,6 +451,93 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
           emitter.call(message_key[1..], JSON.parse(message_value))
         end
       end
+    end
+  end
+
+  def read_lazy_props_from_redis(emitter)
+    ensure_test_only_lazy_props_redis_reader!
+
+    redis = ::Redis.new
+    request_id = params[:request_id]
+
+    unless request_id
+      raise "You must pass the request_id param to the page, this page is intended to be used for testing only"
+    end
+
+    ended = false
+    empty_reads = 0
+    last_received_id = "0-0"
+    stream_id = "stream:#{request_id}"
+    # Test-only safety bound: 10 empty reads * 30s XREAD block = 5 minutes before timeout.
+    until ended
+      received_messages = redis_stream_messages(redis, stream_id, last_received_id, block: LAZY_PROP_REDIS_BLOCK_MS)
+      if received_messages.empty?
+        empty_reads = increment_lazy_prop_empty_reads(empty_reads, stream_id)
+        next
+      end
+
+      empty_reads = 0
+
+      received_messages.each do |message_id, message_entries|
+        last_received_id = message_id
+        message_entries.each do |message_key, message_value|
+          if message_key == "end"
+            ended = true
+            next
+          end
+
+          route_lazy_prop_entry(emitter, message_key, message_value)
+        end
+      end
+    end
+  ensure
+    redis&.close
+  end
+
+  def redis_stream_messages(redis, stream_id, last_received_id, block: 0)
+    redis.xread(stream_id, last_received_id, block:)&.dig(stream_id) || []
+  end
+
+  def ensure_test_only_lazy_props_redis_reader!
+    raise "read_lazy_props_from_redis is a test-only helper" unless Rails.env.test?
+  end
+
+  def increment_lazy_prop_empty_reads(empty_reads, stream_id)
+    next_empty_reads = empty_reads + 1
+    if next_empty_reads == LAZY_PROP_REDIS_STALL_WARN_READS
+      Rails.logger.warn(
+        "[ReactOnRailsPro] Async props stream #{stream_id} has #{next_empty_reads} empty Redis reads; " \
+        "stream may be stalled"
+      )
+    end
+    raise "Timed out waiting for async props stream #{stream_id}" if next_empty_reads >= MAX_LAZY_PROP_REDIS_EMPTY_READS
+
+    next_empty_reads
+  end
+
+  # Lazy/pull-mode Redis entry protocol:
+  # - ":propName" carries a JSON value that resolves propName.
+  # - "!propName" carries a rejection reason that rejects propName.
+  # - unsupported prefixes are logged and skipped so later entries still drain.
+  def route_lazy_prop_entry(emitter, message_key, message_value)
+    if message_key.start_with?("!")
+      # "!" prefix means reject the prop
+      emitter.reject(message_key[1..], message_value)
+    elsif message_key.start_with?(":")
+      # ":" prefix means set the prop (same as existing convention)
+      prop_name = message_key[1..]
+      begin
+        emitter.call(prop_name, JSON.parse(message_value))
+      rescue JSON::ParserError => e
+        Rails.logger.warn(
+          "[ReactOnRailsPro] Rejecting malformed Redis async prop JSON for #{message_key}: #{e.message}"
+        )
+        emitter.reject(prop_name, "Malformed Redis async prop JSON")
+      end
+    else
+      Rails.logger.warn(
+        "[ReactOnRailsPro] Ignoring Redis async prop entry with unsupported prefix: #{message_key}"
+      )
     end
   end
 
