@@ -63,6 +63,7 @@ type PropRequestEmitter = (propName: string) => void;
 const PULL_ENABLED_KEY = 'pullEnabled';
 const PUSH_PROPS_KEY = 'pushProps';
 const PROP_REQUEST_EMITTER_KEY = 'propRequestEmitter';
+const MAX_PULL_PROP_NAME_LENGTH = 256;
 
 class AsyncPropsManager {
   private static readonly MAX_BUFFERED_REQUESTS = 500;
@@ -101,6 +102,9 @@ class AsyncPropsManager {
       this.isPullEnabled() &&
       !this.isPushProp(propName)
     ) {
+      if (propName.length > MAX_PULL_PROP_NAME_LENGTH) {
+        return AsyncPropsManager.rejectOversizedPullPropRequest(propName, promiseController);
+      }
       promiseController.pullRequested = true;
       this.emitPropRequest(propName);
     }
@@ -177,6 +181,10 @@ class AsyncPropsManager {
 
     this.propNameToPromiseController.forEach((controller, propName) => {
       if (!controller.resolved && !controller.pullRequested && !this.isPushProp(propName)) {
+        if (propName.length > MAX_PULL_PROP_NAME_LENGTH) {
+          void AsyncPropsManager.rejectOversizedPullPropRequest(propName, controller);
+          return;
+        }
         // eslint-disable-next-line no-param-reassign
         controller.pullRequested = true;
         this.emitPropRequest(propName);
@@ -216,6 +224,13 @@ class AsyncPropsManager {
     }
   }
 
+  private static rejectOversizedPullPropRequest(propName: string, promiseController: PromiseController) {
+    promiseController.reject(AsyncPropsManager.getOversizedPropNameError(propName));
+    // eslint-disable-next-line no-param-reassign
+    promiseController.resolved = true;
+    return promiseController.promise;
+  }
+
   private getOrCreatePromiseController(propName: string) {
     const promiseController = this.propNameToPromiseController.get(propName);
     if (promiseController) {
@@ -251,6 +266,12 @@ class AsyncPropsManager {
       `The async prop "${propName}" is not received. Ensure to send the async prop from ruby side`,
     );
   }
+
+  private static getOversizedPropNameError(propName: string) {
+    return new Error(
+      `Async prop name length ${propName.length} exceeds ${MAX_PULL_PROP_NAME_LENGTH} characters`,
+    );
+  }
 }
 
 const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
@@ -279,5 +300,11 @@ export function getOrCreateAsyncPropsManager(
   return manager;
 }
 
-export { PULL_ENABLED_KEY, PUSH_PROPS_KEY, PROP_REQUEST_EMITTER_KEY, ASYNC_PROPS_MANAGER_KEY };
+export {
+  PULL_ENABLED_KEY,
+  PUSH_PROPS_KEY,
+  PROP_REQUEST_EMITTER_KEY,
+  ASYNC_PROPS_MANAGER_KEY,
+  MAX_PULL_PROP_NAME_LENGTH,
+};
 export default AsyncPropsManager;

@@ -28,6 +28,7 @@ export const PULL_ENABLED_KEY = 'pullEnabled';
 export const PUSH_PROPS_KEY = 'pushProps';
 export const PROP_REQUEST_EMITTER_KEY = 'propRequestEmitter';
 export const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
+export const MAX_PULL_PROP_NAME_LENGTH = 256;
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
@@ -39,6 +40,11 @@ export type IncrementalRenderSink = {
 export type UpdateChunk = {
   bundleTimestamp: string | number;
   updateChunk: string;
+};
+
+type AsyncPropsManagerPullBridge = {
+  flushPendingPullRequests: () => void;
+  emitPendingPullRequests: () => void;
 };
 
 class InvalidIncrementalRenderChunkError extends Error {
@@ -59,6 +65,18 @@ function assertIsUpdateChunk(value: unknown): asserts value is UpdateChunk {
   ) {
     throw new InvalidIncrementalRenderChunkError();
   }
+}
+
+function isAsyncPropsManagerPullBridge(value: unknown): value is AsyncPropsManagerPullBridge {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<AsyncPropsManagerPullBridge>;
+  return (
+    typeof candidate.flushPendingPullRequests === 'function' &&
+    typeof candidate.emitPendingPullRequests === 'function'
+  );
 }
 
 export type IncrementalRenderInitialRequest = {
@@ -187,6 +205,14 @@ export async function handleIncrementalRenderRequest(
           log.warn({ msg: 'Skipping propRequest after stream closed', propName });
           return;
         }
+        if (propName.length > MAX_PULL_PROP_NAME_LENGTH) {
+          log.warn({
+            msg: 'Skipping oversized propRequest',
+            propNameLength: propName.length,
+            maxPropNameLength: MAX_PULL_PROP_NAME_LENGTH,
+          });
+          return;
+        }
         try {
           injectableStream.write(formatPropRequestChunk(propName));
         } catch (err) {
@@ -194,13 +220,13 @@ export async function handleIncrementalRenderRequest(
         }
       });
 
-      const manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY) as
-        | { flushPendingPullRequests?: () => void; emitPendingPullRequests?: () => void }
-        | undefined;
+      const manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY);
       // Flush requests buffered while pull mode was already enabled but before this emitter existed.
-      manager?.flushPendingPullRequests?.();
-      // Emit requests for getProp() calls made before pull mode was enabled in sharedExecutionContext.
-      manager?.emitPendingPullRequests?.();
+      if (isAsyncPropsManagerPullBridge(manager)) {
+        manager.flushPendingPullRequests();
+        // Emit requests for getProp() calls made before pull mode was enabled in sharedExecutionContext.
+        manager.emitPendingPullRequests();
+      }
 
       finalResponse = { ...response, stream: injectableStream };
     }

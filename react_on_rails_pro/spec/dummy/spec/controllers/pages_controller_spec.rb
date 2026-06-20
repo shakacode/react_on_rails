@@ -64,5 +64,19 @@ RSpec.describe PagesController do
         "[ReactOnRailsPro] Ignoring Redis async prop entry with unsupported prefix: %ignored"
       )
     end
+
+    it "raises after repeated empty Redis reads" do
+      request_id = "lazy-props-timeout"
+      stream_id = "stream:#{request_id}"
+      redis = instance_double(Redis, xread: { stream_id => [] }, close: nil)
+      emitter = instance_spy(ReactOnRailsPro::AsyncPropsEmitter)
+
+      allow(Redis).to receive(:new).and_return(redis)
+      allow(controller).to receive(:params).and_return(ActionController::Parameters.new(request_id:))
+
+      expect { controller.send(:read_lazy_props_from_redis, emitter) }
+        .to raise_error(RuntimeError, "Timed out waiting for async props stream #{stream_id}")
+      expect(redis).to have_received(:xread).exactly(10).times.with(stream_id, "0-0", block: 30_000)
+    end
   end
 end

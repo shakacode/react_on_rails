@@ -204,6 +204,8 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
     let(:queue) { described_class.new(pushed_props) }
 
     it "uses the locked async queue closed exception API" do
+      # PullRequestQueue rescues this constant directly; pin the API so a gem
+      # change fails in this spec instead of raising at runtime inside rescue.
       expect(Async::Queue.const_defined?(:ClosedError, false)).to be(true)
     end
 

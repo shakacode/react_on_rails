@@ -26,8 +26,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   POSTS_PAGE_DEFAULT_POSTS_COUNT = 2
   POSTS_PAGE_MAX_ARTIFICIAL_DELAY = 10_000
   POSTS_PAGE_MAX_POSTS_COUNT = 100
+  MAX_LAZY_PROP_REDIS_EMPTY_READS = 10
   private_constant :POSTS_PAGE_DEFAULT_ARTIFICIAL_DELAY, :POSTS_PAGE_DEFAULT_POSTS_COUNT,
-                   :POSTS_PAGE_MAX_ARTIFICIAL_DELAY, :POSTS_PAGE_MAX_POSTS_COUNT
+                   :POSTS_PAGE_MAX_ARTIFICIAL_DELAY, :POSTS_PAGE_MAX_POSTS_COUNT,
+                   :MAX_LAZY_PROP_REDIS_EMPTY_READS
   APP_PROPS_SERVER_RENDER = {
     helloWorldData: {
       name: PROPS_NAME
@@ -452,15 +454,21 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     request_id = params[:request_id]
 
     unless request_id
-      sleep 1
       raise "You must pass the request_id param to the page, this page is intended to be used for testing only"
     end
 
     ended = false
+    empty_reads = 0
     last_received_id = "0-0"
     stream_id = "stream:#{request_id}"
     until ended
       received_messages = redis_stream_messages(redis, stream_id, last_received_id, block: 30_000)
+      if received_messages.empty?
+        empty_reads = increment_lazy_prop_empty_reads(empty_reads, stream_id)
+        next
+      end
+
+      empty_reads = 0
 
       received_messages.each do |message_id, message_entries|
         last_received_id = message_id
@@ -480,6 +488,13 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def redis_stream_messages(redis, stream_id, last_received_id, block: 0)
     redis.xread(stream_id, last_received_id, block:)&.dig(stream_id) || []
+  end
+
+  def increment_lazy_prop_empty_reads(empty_reads, stream_id)
+    next_empty_reads = empty_reads + 1
+    raise "Timed out waiting for async props stream #{stream_id}" if next_empty_reads >= MAX_LAZY_PROP_REDIS_EMPTY_READS
+
+    next_empty_reads
   end
 
   def route_lazy_prop_entry(emitter, message_key, message_value)

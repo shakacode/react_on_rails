@@ -206,6 +206,8 @@ module ReactOnRailsPro
     end
 
     def normalize_executor_result(result)
+      # Node incremental rendering returns [response, emitter] for pull mode.
+      # Older renderers still return only response, so normalize at this private boundary.
       result.is_a?(Array) ? result : [result, nil]
     end
 

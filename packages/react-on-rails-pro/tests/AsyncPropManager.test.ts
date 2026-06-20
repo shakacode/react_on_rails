@@ -18,6 +18,7 @@ import AsyncPropsManager, {
   PULL_ENABLED_KEY,
   PUSH_PROPS_KEY,
   PROP_REQUEST_EMITTER_KEY,
+  MAX_PULL_PROP_NAME_LENGTH,
 } from '../src/AsyncPropsManager.ts';
 
 describe('Access AsyncPropManager prop before setting it', () => {
@@ -371,6 +372,26 @@ describe('Pull mode propRequest emission', () => {
   it('does not emit propRequest for push props', () => {
     manager.getProp('pushProp');
 
+    expect(propRequestEmitter).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized prop names before emitting propRequest', async () => {
+    const propName = 'x'.repeat(MAX_PULL_PROP_NAME_LENGTH + 1);
+
+    await expect(manager.getProp(propName)).rejects.toThrow(
+      `Async prop name length ${MAX_PULL_PROP_NAME_LENGTH + 1} exceeds ${MAX_PULL_PROP_NAME_LENGTH} characters`,
+    );
+    await expect(manager.getProp(propName)).rejects.not.toThrow(propName);
+    expect(propRequestEmitter).not.toHaveBeenCalled();
+  });
+
+  it('allows oversized push props without emitting propRequest', async () => {
+    const propName = 'x'.repeat(MAX_PULL_PROP_NAME_LENGTH + 1);
+    sharedExecutionContext.set(PUSH_PROPS_KEY, new Set([propName]));
+
+    manager.setProp(propName, 'Resolved Value');
+
+    await expect(manager.getProp(propName)).resolves.toBe('Resolved Value');
     expect(propRequestEmitter).not.toHaveBeenCalled();
   });
 
