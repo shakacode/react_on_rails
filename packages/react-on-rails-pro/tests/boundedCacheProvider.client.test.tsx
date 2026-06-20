@@ -552,6 +552,9 @@ describe('RSCRoute successful-version error reset', () => {
       });
       await Promise.all(pending.map((d) => d.promise));
     });
+    await act(async () => {
+      await flushMacrotasks();
+    });
     await waitFor(() => expect(screen.getByTestId('payload-0')).toHaveTextContent('payload 0'));
     expect(fetchCount(0)).toBe(1);
     expect(fetchCount(CACHE_CAP)).toBe(1);
