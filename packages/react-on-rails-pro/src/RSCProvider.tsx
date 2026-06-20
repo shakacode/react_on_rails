@@ -45,6 +45,8 @@ type RSCContextType = {
 
   getRefetchVersion: (componentName: string, componentProps: unknown) => number;
 
+  retainComponent: (componentName: string, componentProps: unknown) => () => void;
+
   /**
    * Per-key successful-payload tokens. Values come from one provider-wide
    * monotonic counter, so they may jump for a key when other keys succeed
@@ -237,6 +239,25 @@ export const createRSCProvider = ({
       return refetchVersionsRef.current[key] ?? 0;
     }, []);
 
+    const retainComponent = useCallback(
+      (componentName: string, componentProps: unknown) => {
+        const key = createRSCPayloadKey(componentName, componentProps);
+        if (!fetchRSCPromises.pin(key)) {
+          return () => {};
+        }
+
+        let released = false;
+        return () => {
+          if (released) {
+            return;
+          }
+          released = true;
+          fetchRSCPromises.unpin(key);
+        };
+      },
+      [fetchRSCPromises],
+    );
+
     const markSuccessfulPromise = useCallback(
       (key: string, promise: Promise<ReactNode>, notifyRoutes = false) => {
         if (fetchRSCPromises.get(key, false) !== promise) {
@@ -331,10 +352,17 @@ export const createRSCProvider = ({
         }
 
         promise = serverComponentPromise.then(markPayloadIfSuccessful).finally(() => {
-          fetchRSCPromises.unpin(key);
           if (notifyRoutesOnSuccess && !payloadSucceeded && releaseInFlightEvictedSuccessLatch()) {
             evictedSuccessfulPayloadKeys.set(key, true);
           }
+          // Defer the initial-load pin release so a route whose promise just
+          // resolved can commit and install its mounted retain before over-cap
+          // reconciliation runs. Without this handoff, 51+ simultaneously
+          // resolving mounted routes can evict early visible keys before their
+          // layout effects get to pin them as mounted.
+          setTimeout(() => {
+            fetchRSCPromises.unpin(key);
+          }, 0);
         });
         fetchRSCPromises.setPinned(key, promise);
         if (notifyRoutesOnSuccess) {
@@ -457,9 +485,9 @@ export const createRSCProvider = ({
 
     // `versions` and `successfulVersions` intentionally refresh this context.
     const contextValue = useMemo(
-      () => ({ getComponent, refetchComponent, getRefetchVersion, successfulVersions }),
+      () => ({ getComponent, refetchComponent, getRefetchVersion, retainComponent, successfulVersions }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [getComponent, refetchComponent, getRefetchVersion, versions, successfulVersions],
+      [getComponent, refetchComponent, getRefetchVersion, retainComponent, versions, successfulVersions],
     );
 
     return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;

@@ -175,7 +175,8 @@ type RefetchErrorState = [string, ServerComponentFetchError];
 
 const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
   ({ componentName, componentProps, onRefetchError }, ref) => {
-    const { getComponent, refetchComponent, getRefetchVersion, successfulVersions } = useRSC();
+    const { getComponent, refetchComponent, getRefetchVersion, retainComponent, successfulVersions } =
+      useRSC();
     const currentRouteKey = useMemo(
       () => createRSCPayloadKey(componentName, componentProps),
       [componentName, componentProps],
@@ -205,6 +206,10 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
     useLayoutEffect(() => {
       onRefetchErrorRef.current = onRefetchError;
     }, [onRefetchError]);
+    useLayoutEffect(
+      () => retainComponent(componentName, componentProps),
+      [componentName, componentProps, retainComponent],
+    );
     useLayoutEffect(() => {
       const previous = previousSuccessfulVersionRef.current;
       const current = { key: currentRouteKey, version: successfulVersion };

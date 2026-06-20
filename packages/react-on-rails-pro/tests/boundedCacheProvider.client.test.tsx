@@ -98,6 +98,23 @@ describe('BoundedLRU', () => {
     expect(lru.get('missing', false)).toBeUndefined();
   });
 
+  it('pin() protects an already cached mounted key until release', () => {
+    const { lru, evicted } = makeLRU(1);
+    lru.set('mounted', 'MOUNTED');
+
+    expect(lru.pin('mounted')).toBe(true);
+    expect(lru.pin('missing')).toBe(false);
+
+    lru.set('cold', 'COLD');
+    expect(has(lru, 'mounted')).toBe(true);
+    expect(has(lru, 'cold')).toBe(false);
+    expect(evicted).toEqual(['cold']);
+
+    lru.unpin('mounted');
+    lru.set('next cold', 'NEXT');
+    expect(has(lru, 'mounted')).toBe(false);
+  });
+
   it('REF-COUNTED pins: a key survives until every pin is released', () => {
     const { lru, evicted } = makeLRU(1);
     // Two overlapping holders pin the same key.
@@ -501,6 +518,49 @@ describe('RSCRoute successful-version error reset', () => {
     // id 1 was evicted: re-rendering it re-fetches.
     await rerenderInAct(result, <Slot id={1} />);
     await waitFor(() => expect(fetchCount(1)).toBe(2));
+  });
+
+  it('c2. mounted routes stay cached across rerenders when mounted count exceeds the cap', async () => {
+    type PendingEntry = Deferred & { args: GetServerComponentArgs };
+    const pending: PendingEntry[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      pending.push({ ...d, args: _args[0] });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    const Root: React.FC<{ revision: number }> = ({ revision }) => (
+      <RSCProvider>
+        <span data-testid="revision">{revision}</span>
+        {Array.from({ length: CACHE_CAP + 1 }, (_, id) => (
+          <Suspense key={id} fallback={<div>{`loading ${id}`}</div>}>
+            <RSCRoute componentName="Card" componentProps={{ id }} />
+          </Suspense>
+        ))}
+      </RSCProvider>
+    );
+
+    const result = await renderInAct(<Root revision={0} />);
+    expect(getServerComponent).toHaveBeenCalledTimes(CACHE_CAP + 1);
+
+    await act(async () => {
+      pending.forEach((d) => {
+        const { id } = d.args.componentProps as { id: number };
+        d.resolve(<span data-testid={`payload-${id}`}>{`payload ${id}`}</span>);
+      });
+      await Promise.all(pending.map((d) => d.promise));
+    });
+    await waitFor(() => expect(screen.getByTestId('payload-0')).toHaveTextContent('payload 0'));
+    expect(fetchCount(0)).toBe(1);
+    expect(fetchCount(CACHE_CAP)).toBe(1);
+
+    await rerenderInAct(result, <Root revision={1} />);
+    await waitFor(() => expect(screen.getByTestId('revision')).toHaveTextContent('1'));
+
+    expect(getServerComponent).toHaveBeenCalledTimes(CACHE_CAP + 1);
+    expect(fetchCount(0)).toBe(1);
+    expect(fetchCount(CACHE_CAP)).toBe(1);
   });
 
   it('d. refetch still works with the LRU in place', async () => {

@@ -52,10 +52,10 @@ export const RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES = RSC_PAYLOAD_CACHE_MAX_ENTR
  * least-recently-used key (front of the Map) is evicted and passed to `onEvict`
  * so callers can drop companion state keyed by the same payload key.
  *
- * A key can be `pin`-ned to prevent eviction while it is in-flight. Pins are
- * REF-COUNTED: each `pin` increments and each `unpin` decrements a per-key
- * counter, and the key is only evictable once the count returns to zero. This
- * is required for two reasons:
+ * A key can be `pin`-ned to prevent eviction while it is in-flight or mounted.
+ * Pins are REF-COUNTED: each `pin` increments and each `unpin` decrements a
+ * per-key counter, and the key is only evictable once the count returns to
+ * zero. This is required for three reasons:
  *
  * 1. Overlapping same-key `refetch()` calls each take their own pin/unpin pair
  *    — a plain set would let the first call's `unpin` drop the pin while a
@@ -64,6 +64,9 @@ export const RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES = RSC_PAYLOAD_CACHE_MAX_ENTR
  *    a burst of 50+ other keys cannot evict the key before its successful
  *    payload is recorded in `lastSuccessfulRSCPromisesRef` (which is used to
  *    restore the last-good view in `recoverOnError` refetch paths).
+ * 3. Mounted `<RSCRoute>` entries retain their payload keys so provider-wide
+ *    refreshes do not make visible routes miss and refetch just because the
+ *    provider cache contains more mounted routes than the soft cap.
  *
  * Inserting an in-flight promise uses `setPinned`, which pins BEFORE running
  * eviction so the just-inserted key can never be chosen as the eviction victim
@@ -134,6 +137,15 @@ export class BoundedLRU<V> {
     // Pin before eviction so the new key cannot be the eviction victim.
     this.pins.set(key, (this.pins.get(key) ?? 0) + 1);
     this.evictIfNeeded();
+  }
+
+  pin(key: string): boolean {
+    this.assertNotEvicting('pin');
+    if (!this.map.has(key)) {
+      return false;
+    }
+    this.pins.set(key, (this.pins.get(key) ?? 0) + 1);
+    return true;
   }
 
   deleteWithoutEvict(key: string, preservePins = false): void {
