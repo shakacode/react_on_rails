@@ -116,6 +116,11 @@ export const createRSCProvider = ({
     // extreme high-cardinality burst exceeds this marker window before the key
     // reloads, a prior refetch error may remain until the user refetches or
     // navigates.
+    //
+    // LATCH INVARIANT: this marker survives after eviction until a replacement
+    // load starts, then `inFlightEvictedSuccessfulPayloadCounts` below prevents
+    // marker eviction while that replacement is pending. Success, failure, and
+    // synchronous producer throws all settle one side of that latch.
     const evictedSuccessfulPayloadKeysRef = useRef<BoundedLRU<true> | null>(null);
     if (!evictedSuccessfulPayloadKeysRef.current) {
       evictedSuccessfulPayloadKeysRef.current = new BoundedLRU<true>(
@@ -366,9 +371,8 @@ export const createRSCProvider = ({
         });
         fetchRSCPromises.setPinned(key, promise);
         if (notifyRoutesOnSuccess) {
-          // Ordering matters with the synchronous getServerComponent call above:
-          // the catch path restores the evicted marker without decrementing this
-          // latch because the count is only incremented after the promise exists.
+          // Incremented only after setPinned succeeds; the catch block above can
+          // restore the marker without decrementing a count that was never set.
           inFlightEvictedSuccessfulPayloadCounts.set(
             key,
             (inFlightEvictedSuccessfulPayloadCounts.get(key) ?? 0) + 1,

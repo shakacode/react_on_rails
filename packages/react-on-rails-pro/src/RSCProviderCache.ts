@@ -99,6 +99,8 @@ export class BoundedLRU<V> {
     if (value === undefined) {
       return undefined;
     }
+    // Recency-neutral reads are allowed during `onEvict`: they do not mutate
+    // Map insertion order or trigger nested eviction.
     if (!promote) {
       return value;
     }
@@ -109,6 +111,11 @@ export class BoundedLRU<V> {
     return value;
   }
 
+  /**
+   * Raw write for values that do not need an outstanding protection pin. Use
+   * `setPinned` for in-flight payloads and `pin` for mounted payloads so
+   * eviction cannot drop entries that are pending or visible on screen.
+   */
   set(key: string, value: V): void {
     this.assertNotEvicting('set');
     // Re-insert so an existing key moves to most-recently-used.
@@ -206,10 +213,10 @@ export class BoundedLRU<V> {
    * reconciliation.
    */
   private evictIfNeeded(preventEvictingKey?: string): void {
-    // INVARIANT: onEvict must not call mutating methods on this same BoundedLRU
-    // during this loop. Map iteration is live in JS, and re-entrant insertion
-    // here would be skipped by the active iterator, so mutators throw while the
-    // eviction callback is running.
+    // INVARIANT: onEvict may clean companion state, but must not mutate this
+    // BoundedLRU while the reconciliation loop is active. Re-entrant mutation
+    // could recurse into eviction, double-evict the same key, or keep the outer
+    // loop from making progress.
     for (const candidate of this.map.keys()) {
       if (this.map.size <= this.maxEntries) {
         return;
