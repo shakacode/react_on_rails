@@ -104,7 +104,7 @@ describe('Access non sent AsyncPropManager prop', () => {
     const manager = new AsyncPropsManager();
     manager.endStream();
     await expect(manager.getProp('Non Existing Prop')).rejects.toThrow(
-      /The async prop "Non Existing Prop" is not received/,
+      /The async prop "Non Existing Prop" was not received/,
     );
   });
 
@@ -112,7 +112,7 @@ describe('Access non sent AsyncPropManager prop', () => {
     const manager = new AsyncPropsManager();
     const getPropPromise = manager.getProp('wrongProp');
     manager.endStream();
-    await expect(getPropPromise).rejects.toThrow(/The async prop "wrongProp" is not received/);
+    await expect(getPropPromise).rejects.toThrow(/The async prop "wrongProp" was not received/);
   });
 
   it('throws an error if a prop is set after closing the stream', () => {
@@ -152,8 +152,8 @@ describe('Accessing AsyncPropManager prop in complex scenarios', () => {
 
     // Non existing props
     manager.endStream();
-    await expect(nonExistingPropPromise).rejects.toThrow(/The async prop "nonExistingProp" is not received/);
-    await expect(manager.getProp('wrongProp')).rejects.toThrow(/The async prop "wrongProp" is not received/);
+    await expect(nonExistingPropPromise).rejects.toThrow(/The async prop "nonExistingProp" was not received/);
+    await expect(manager.getProp('wrongProp')).rejects.toThrow(/The async prop "wrongProp" was not received/);
 
     // Setting after closing
     expect(() => manager.setProp('wrongProp', 'Nothing')).toThrow(
@@ -290,7 +290,7 @@ describe('getOrCreateAsyncPropsManager lazy initialization', () => {
 
     // First prop should resolve, second should reject
     await expect(prop1Promise).resolves.toBe('received');
-    await expect(prop2Promise).rejects.toThrow(/The async prop "prop2" is not received/);
+    await expect(prop2Promise).rejects.toThrow(/The async prop "prop2" was not received/);
   });
 });
 
@@ -346,7 +346,7 @@ describe('rejectProp', () => {
     manager.endStream();
     manager.rejectProp('foo', 'late rejection');
 
-    await expect(promise).rejects.toThrow(/The async prop "foo" is not received/);
+    await expect(promise).rejects.toThrow(/The async prop "foo" was not received/);
     await expect(promise).rejects.not.toThrow(/late rejection/);
   });
 });

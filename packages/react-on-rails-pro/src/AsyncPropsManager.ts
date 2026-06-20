@@ -271,7 +271,7 @@ class AsyncPropsManager {
 
   private static getNoPropFoundError(propName: string) {
     return new Error(
-      `The async prop "${propName}" is not received. Ensure to send the async prop from ruby side`,
+      `The async prop "${propName}" was not received. Make sure you send it from the Rails side`,
     );
   }
 

@@ -80,12 +80,14 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       allow(request_stream).to receive(:<<).and_raise(StandardError.new("Connection lost"))
       allow(mock_logger).to receive(:error)
 
-      pull_emitter.call("books", [])
-      pull_emitter.pull_requests.enqueue("books")
-      pull_emitter.pull_requests.close
+      Async do
+        pull_emitter.call("books", [])
+        pull_emitter.pull_requests.enqueue("books")
+        pull_emitter.pull_requests.close
 
-      expect(pull_emitter.pull_requests.dequeue).to eq("books")
-      expect(pull_emitter.pull_requests.dequeue).to be_nil
+        expect(pull_emitter.pull_requests.dequeue).to eq("books")
+        expect(pull_emitter.pull_requests.dequeue).to be_nil
+      end
     end
   end
 

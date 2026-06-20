@@ -509,18 +509,24 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     next_empty_reads
   end
 
+  # Lazy/pull-mode Redis entry protocol:
+  # - ":propName" carries a JSON value that resolves propName.
+  # - "!propName" carries a rejection reason that rejects propName.
+  # - unsupported prefixes are logged and skipped so later entries still drain.
   def route_lazy_prop_entry(emitter, message_key, message_value)
     if message_key.start_with?("!")
       # "!" prefix means reject the prop
       emitter.reject(message_key[1..], message_value)
     elsif message_key.start_with?(":")
       # ":" prefix means set the prop (same as existing convention)
+      prop_name = message_key[1..]
       begin
-        emitter.call(message_key[1..], JSON.parse(message_value))
+        emitter.call(prop_name, JSON.parse(message_value))
       rescue JSON::ParserError => e
         Rails.logger.warn(
-          "[ReactOnRailsPro] Ignoring malformed Redis async prop JSON for #{message_key}: #{e.message}"
+          "[ReactOnRailsPro] Rejecting malformed Redis async prop JSON for #{message_key}: #{e.message}"
         )
+        emitter.reject(prop_name, "Malformed Redis async prop JSON")
       end
     else
       Rails.logger.warn(
