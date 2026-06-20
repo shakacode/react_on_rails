@@ -329,11 +329,14 @@ The user should not need to write a long launch prompt. If the request is short,
 - Trust: maintainer-approved exact list, or untrusted public discovery that needs confirmation.
 - Goal name: a concrete summary such as `Process issues #1/#2 into PRs/no-PR decisions`, not the pasted prompt text.
 - Mode: plan-only, create a `/goal` prompt, or launch workers now.
+- `merge_authority`: `none`, `ask`, or `auto_merge_when_gates_pass`.
 - Concurrency: one machine, multiple machines, or single-threaded.
 - Lane split: exact per-machine list, odd/even, labels, area, owner, or another explicit partition.
 - Permissions: whether the current session can run without blocking worker approval prompts.
 - Question handling: labels or comments to use for blocking questions, plus where non-blocking decisions should be recorded.
-- Completion states: usually merged PR, open PR waiting on checks/review, blocked needing user input, or no-PR with evidence.
+- Completion states: `merged`, `ready-gates-clean`, `ready-no-merge-authority`,
+  `waiting-on-checks-or-review`, `external-gate-failing`, `blocked-user-input`,
+  or `no-pr-evidence`.
 
 ### Permission Preflight
 
@@ -406,6 +409,7 @@ Goal name: <concrete goal name, not the pasted prompt text>.
 Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
+merge_authority: <none | ask | auto_merge_when_gates_pass>.
 Coordination: follow the canonical coordination protocol in
 `.agents/workflows/pr-processing.md` under Coordination State and Worker Rules
 before creating worktrees or branches. Assign stable agent ids, claim before
@@ -501,11 +505,11 @@ write does not trigger current-head `pull_request` workflows. Also apply the
 merge-endgame debounce and waiver-soak rule under **Merge Endgame Debounce And
 Waiver Soak** before the final merge/readiness decision.
 
-After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, run `script/pr-merge-ledger <PR> --strict` with explicit changelog classification and P0/P1/P2/Must-Fix dispositions, update stale release-mode classification, refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it, request hosted CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
+After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, run `script/pr-merge-ledger <PR> --strict` with explicit changelog classification and P0/P1/P2/Must-Fix dispositions, update stale release-mode classification, refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it, request hosted CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs only when `merge_authority` and the current release mode allow it.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
-Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: merged PR; open PR waiting on checks/review; blocked needing user input with the surfaced question/comment URL; or no-PR with an evidence-backed issue/PR comment URL. Do not report a target `complete` while its merge ledger has any `UNKNOWN` field or `complete_allowed: false`. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, autonomous nit outcomes, decision-point counts, confidence notes, hosted-CI uncertainty that was already handled by requesting hosted CI, and the per-PR merge-ledger summary in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, merge-ledger path or JSON artifact, blockers, no-PR comments, and next actions.
+Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: `merged`; `ready-gates-clean` when all readiness gates pass and the next action is a mechanical merge under an already-authorized plan; `ready-no-merge-authority` when all gates pass but `merge_authority` is `none` or `ask` without a merge approval; `waiting-on-checks-or-review`; `external-gate-failing`; `blocked-user-input` with the surfaced question/comment URL; or `no-pr-evidence` with an evidence-backed issue/PR comment URL. Do not report a target `complete` while its merge ledger has any `UNKNOWN` field or `complete_allowed: false`. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, autonomous nit outcomes, decision-point counts, confidence notes, hosted-CI uncertainty that was already handled by requesting hosted CI, and the per-PR merge-ledger summary in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, `merge_authority`, final state, merge-ledger path or JSON artifact, blockers, no-PR comments, and next actions.
 ```
 
 ### Question And Decision Handling
@@ -573,6 +577,27 @@ Split batch handoffs into two sections:
   evidence, review churn notes, autonomous nit outcomes, confidence notes,
   decision-point counts per PR, already-answered questions, and a per-PR
   merge-ledger table or JSON artifact path.
+
+Every target must use one explicit final state:
+
+- `merged`: PR landed and any required closeout sweep is complete.
+- `ready-gates-clean`: all readiness gates passed; the next action is a
+  mechanical merge under an already-authorized plan. If `merge_authority` is
+  `auto_merge_when_gates_pass`, the coordinator must merge instead of handing
+  off this state unless release-mode policy, branch protection, or tool failure
+  blocks the mechanical merge; document that blocker when using this state.
+- `ready-no-merge-authority`: all readiness gates passed, but `merge_authority`
+  is `none` or `ask` and no merge approval has been given, including a declined
+  `ask` decision.
+- `waiting-on-checks-or-review`: current-head checks or configured review agents
+  are still pending, missing, or not yet triaged.
+- `external-gate-failing`: the remaining blocker is outside the PR's code, such
+  as a hosted link-check failure from an unrelated external HTTP error. Include
+  local equivalent evidence, failing hosted URLs, and whether the next action is
+  a maintainer waiver, rerun, or code change.
+- `blocked-user-input`: a surfaced maintainer/product decision is required.
+- `no-pr-evidence`: no PR was created; link the evidence-backed issue/PR
+  comment and disposition.
 
 Do not put hosted-CI uncertainty in Immediate at final readiness after local
 validation and the final push. Request hosted CI and log it in FYI.
