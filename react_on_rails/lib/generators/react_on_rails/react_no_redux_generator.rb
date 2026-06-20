@@ -32,22 +32,27 @@ module ReactOnRails
         base_js_path = "base/base"
         tailwind_js_path = "base/tailwind"
         ext = component_extension(options)
+        component_dir = example_component_source_directory("HelloWorld")
 
         # Determine which component files to copy based on TypeScript option
         client_component =
-          "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{ext}"
+          "#{component_dir}/ror_components/HelloWorld.client.#{ext}"
         server_component =
-          "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.#{ext}"
+          "#{component_dir}/ror_components/HelloWorld.server.#{ext}"
+        client_component_template = "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{ext}"
 
+        # Source paths are relative to this generator's templates; only
+        # destinations vary with the app's Shakapacker config.
         if use_tailwind?
-          copy_file("#{tailwind_js_path}/#{client_component}", client_component)
+          copy_file("#{tailwind_js_path}/#{client_component_template}", client_component)
         else
-          copy_file("#{base_js_path}/#{client_component}", client_component)
+          copy_file("#{base_js_path}/#{client_component_template}", client_component)
           copy_file("#{base_js_path}/app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css",
-                    "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css")
+                    "#{component_dir}/ror_components/HelloWorld.module.css")
         end
 
-        copy_file("#{base_js_path}/#{server_component}", server_component)
+        copy_file("#{base_js_path}/app/javascript/src/HelloWorld/ror_components/HelloWorld.server.#{ext}",
+                  server_component)
       end
 
       def create_appropriate_templates
@@ -58,7 +63,7 @@ module ReactOnRails
                  "app/views/hello_world/index.html.erb",
                  build_hello_world_view_config(
                    component_name: "HelloWorld",
-                   source_path: "app/javascript/src/HelloWorld/",
+                   source_path: example_component_source_path("HelloWorld"),
                    landing_page: new_app_landing_page_available?,
                    redux: false,
                    rsc_demo: false

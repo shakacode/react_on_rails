@@ -32,6 +32,12 @@ RSpec.describe GeneratorHelper, type: :generator do
     @options ||= {}
   end
 
+  def reset_shakapacker_memoization!
+    %i[@shakapacker_source_path @shakapacker_source_entry_path].each do |ivar|
+      remove_instance_variable(ivar) if instance_variable_defined?(ivar)
+    end
+  end
+
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
 
   describe "#print_generator_messages" do
@@ -259,6 +265,144 @@ RSpec.describe GeneratorHelper, type: :generator do
       )
     ensure
       FileUtils.rm_f(shakapacker_yml_path)
+    end
+  end
+
+  describe "#safe_generator_destination_path" do
+    let(:default_path) { "app/javascript" }
+
+    it "keeps safe relative paths" do
+      expect(safe_generator_destination_path("client/app", default: default_path)).to eq("client/app")
+    end
+
+    it "relativizes absolute paths inside the destination root" do
+      absolute_path = File.join(destination_root, "client/app")
+
+      expect(safe_generator_destination_path(absolute_path, default: default_path)).to eq("client/app")
+    end
+
+    it "falls back for paths outside the destination root" do
+      expect(safe_generator_destination_path("/tmp/client/app", default: default_path)).to eq(default_path)
+    end
+
+    it "falls back for absolute paths that relativize outside the destination root" do
+      outside_destination_path = File.expand_path("../client/app", destination_root)
+
+      expect(safe_generator_destination_path(outside_destination_path, default: default_path)).to eq(default_path)
+    end
+
+    it "falls back for degenerate or traversing paths" do
+      expect(safe_generator_destination_path(".", default: default_path)).to eq(default_path)
+      expect(safe_generator_destination_path("..", default: default_path)).to eq(default_path)
+      expect(safe_generator_destination_path("../client/app", default: default_path)).to eq(default_path)
+    end
+
+    it "uses an empty sentinel for Shakapacker root entry paths" do
+      expect(safe_generator_destination_path("/", default: "packs", allow_root: true)).to eq("")
+    end
+  end
+
+  describe "#shakapacker_stylesheet_path" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        default:
+          source_path: app/javascript
+
+        development:
+          source_path: client/app
+      YAML
+      reset_shakapacker_memoization!
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+      reset_shakapacker_memoization!
+    end
+
+    it "places generated demo stylesheets under the configured Shakapacker source path" do
+      expect(shakapacker_stylesheet_path("application.css")).to eq("client/app/stylesheets/application.css")
+    end
+  end
+
+  describe "#shakapacker_stylesheet_path with malformed Shakapacker config" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, "default:\n  source_path: [unterminated\n")
+      reset_shakapacker_memoization!
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+      reset_shakapacker_memoization!
+    end
+
+    it "falls back to the default generated stylesheet path" do
+      expect(shakapacker_stylesheet_path("application.css")).to eq("app/javascript/stylesheets/application.css")
+    end
+  end
+
+  describe "#shakapacker_entrypoint_path" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        development:
+          source_path: client/app
+          source_entry_path: /
+      YAML
+      reset_shakapacker_memoization!
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+      reset_shakapacker_memoization!
+    end
+
+    it "places root entrypoints directly under source_path without a double slash" do
+      expect(shakapacker_entrypoint_path("server-bundle.js")).to eq("client/app/server-bundle.js")
+    end
+
+    it "raises a clear error for blank entrypoint filenames" do
+      expect { shakapacker_entrypoint_path("") }.to raise_error(ArgumentError, "filename must be present")
+    end
+  end
+
+  describe "#relative_stylesheet_import_path" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        development:
+          source_path: client/app
+      YAML
+      reset_shakapacker_memoization!
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+      reset_shakapacker_memoization!
+    end
+
+    it "computes the stylesheet import path from the generated entry file" do
+      expect(relative_stylesheet_import_path("client/app/src/HelloServer/components/LikeButton.jsx"))
+        .to eq("../../../stylesheets/application.css")
+    end
+
+    it "adjusts when the generated entry moves deeper under the source path" do
+      expect(relative_stylesheet_import_path("client/app/src/HelloServer/components/nested/LikeButton.jsx"))
+        .to eq("../../../../stylesheets/application.css")
+    end
+
+    it "rejects entry paths outside the generator destination" do
+      expect { relative_stylesheet_import_path("../../outside/LikeButton.jsx") }
+        .to raise_error(ArgumentError, "entry_path must stay inside the generator destination")
     end
   end
 

@@ -1,11 +1,16 @@
 # frozen_string_literal: true
 
 require "json"
+require "pathname"
 require_relative "shakapacker_precompile_hook_helper"
 
 # rubocop:disable Metrics/ModuleLength
 module GeneratorHelper
   include ReactOnRails::Generators::ShakapackerPrecompileHookHelper
+
+  DEFAULT_SHAKAPACKER_SOURCE_PATH = "app/javascript"
+  DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH = "packs"
+  private_constant :DEFAULT_SHAKAPACKER_SOURCE_PATH, :DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH
 
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
@@ -73,6 +78,108 @@ module GeneratorHelper
 
   def component_extension(options)
     options.typescript? ? "tsx" : "jsx"
+  end
+
+  def shakapacker_source_path
+    # These helpers memoize config-backed paths. Install generators must copy or
+    # overwrite config/shakapacker.yml before any path-dependent copy action runs.
+    @shakapacker_source_path ||= configured_shakapacker_relative_path("source_path", DEFAULT_SHAKAPACKER_SOURCE_PATH)
+  end
+
+  def shakapacker_source_entry_path
+    @shakapacker_source_entry_path ||= configured_shakapacker_relative_path(
+      "source_entry_path",
+      DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH,
+      allow_root: true
+    )
+  end
+
+  def shakapacker_entrypoint_path(filename)
+    filename = filename.to_s
+    raise ArgumentError, "filename must be present" if filename.empty?
+
+    entry_dir = shakapacker_source_entry_path # "" means entrypoints live directly under source_path.
+    File.join(*[shakapacker_source_path, entry_dir, filename].reject(&:empty?))
+  end
+
+  def shakapacker_stylesheet_path(filename)
+    # "stylesheets" is a generated demo convention, not a Shakapacker config key.
+    File.join(shakapacker_source_path, "stylesheets", filename)
+  end
+
+  def relative_stylesheet_import_path(entry_path, filename: "application.css")
+    # InstallGenerator copies the final Shakapacker config before path-dependent demo files are generated.
+    safe_entry_path = safe_generator_destination_path(entry_path, default: nil)
+    raise ArgumentError, "entry_path must stay inside the generator destination" if safe_entry_path.nil?
+
+    entry_dir = Pathname.new(File.join(destination_root, safe_entry_path)).dirname
+    stylesheet = Pathname.new(File.join(destination_root, shakapacker_stylesheet_path(filename)))
+
+    stylesheet.relative_path_from(entry_dir).to_s
+  end
+
+  def example_component_source_directory(component_name)
+    File.join(shakapacker_source_path, "src", component_name)
+  end
+
+  def example_component_source_path(component_name)
+    # Trailing slash is intentional: this value is only for generated demo file hints.
+    "#{example_component_source_directory(component_name)}/"
+  end
+
+  def configured_shakapacker_relative_path(config_key, default, allow_root: false)
+    config_path = File.join(destination_root, "config/shakapacker.yml")
+    return default unless File.exist?(config_path)
+
+    config = parse_shakapacker_yml(config_path)
+    configured_path = shakapacker_path_config_value(config, config_key)
+
+    safe_generator_destination_path(configured_path, default:, allow_root:)
+  rescue Psych::SyntaxError
+    default
+  end
+
+  def shakapacker_path_config_value(config, config_key)
+    # Generators run in the development context, so prefer that section before falling back to shared defaults.
+    %w[development default].each do |section_name|
+      section = shakapacker_config_section(config, section_name)
+      value = shakapacker_config_value(section, config_key)
+      return value unless value.to_s.strip.empty?
+    end
+
+    nil
+  end
+
+  def safe_generator_destination_path(path, default:, allow_root: false)
+    candidate = path.to_s.strip
+    return default if candidate.empty?
+
+    pathname = Pathname.new(candidate).cleanpath
+    # Shakapacker uses "/" to mean entrypoints live directly under source_path.
+    return "" if allow_root && pathname.to_s == "/"
+
+    relative_path = if pathname.absolute?
+                      absolute_path_relative_to_destination(pathname)
+                    else
+                      pathname.to_s
+                    end
+
+    return default if unsafe_generator_destination_path?(relative_path)
+
+    relative_path
+  rescue ArgumentError # Pathname.new raises on null bytes in path strings.
+    default
+  end
+
+  def absolute_path_relative_to_destination(pathname)
+    destination = Pathname.new(destination_root).cleanpath
+    pathname.relative_path_from(destination).to_s
+  rescue ArgumentError
+    nil # Signals the caller to fall back to the default path.
+  end
+
+  def unsafe_generator_destination_path?(path)
+    path.nil? || path == "." || path == ".." || path.start_with?("../")
   end
 
   # Check if a gem is present in Gemfile.lock

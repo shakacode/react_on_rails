@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 require_relative "../support/generator_spec_helper"
 require_relative "../support/version_test_helpers"
 describe InstallGenerator, type: :generator do
@@ -164,6 +166,46 @@ describe InstallGenerator, type: :generator do
     managed_template_map.each do |filename, template_path|
       simulate_existing_file("config/webpack/#{filename}", render_stock_webpack_template(template_path, options))
     end
+  end
+
+  def simulate_preinstalled_shakapacker(source_path:, source_entry_path:)
+    simulate_existing_file("config/shakapacker.yml", <<~YAML)
+      default: &default
+        source_path: #{yaml_quoted_string(source_path)}
+        source_entry_path: #{yaml_quoted_string(source_entry_path)}
+        public_root_path: public
+        public_output_path: packs
+        cache_path: tmp/shakapacker
+        webpack_compile_output: true
+        shakapacker_precompile: true
+        additional_paths: []
+        cache_manifest: false
+        assets_bundler: "webpack"
+
+      development:
+        <<: *default
+
+      test:
+        <<: *default
+        compile: true
+
+      production:
+        <<: *default
+    YAML
+    # These files satisfy the generator's existing Shakapacker-install detection;
+    # the custom path assertions below exercise config/shakapacker.yml.
+    simulate_existing_file("bin/shakapacker", "")
+    simulate_existing_file("bin/shakapacker-dev-server", "")
+    simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+      const { generateWebpackConfig } = require('shakapacker')
+      const webpackConfig = generateWebpackConfig()
+      module.exports = webpackConfig
+    JS
+  end
+
+  def yaml_quoted_string(value)
+    # JSON strings are valid YAML scalars, so JSON.generate gives us safe quoting for free.
+    JSON.generate(value.to_s)
   end
 
   # Reads the repo's own package.json packageManager pin and returns the version.
@@ -373,6 +415,269 @@ describe InstallGenerator, type: :generator do
     it "sets shakapacker test compile to false by default" do
       assert_file "config/shakapacker.yml" do |content|
         expect(content).to match(/^test:.*?^\s+compile:\s*false/m)
+      end
+    end
+  end
+
+  context "with a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates the demo source and entrypoint under the configured Shakapacker paths" do
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.server.jsx"
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.module.css"
+      assert_file "client/app/entrypoints/server-bundle.js"
+
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+      assert_no_file "app/javascript/packs/server-bundle.js"
+    end
+
+    it "uses the configured source path in generated demo hints" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include('<code class="path-hint">client/app/src/HelloWorld/</code>')
+        expect(content).not_to include("app/javascript/src/HelloWorld/")
+      end
+    end
+  end
+
+  context "with a slash Shakapacker source entry path" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "/")
+      end
+    end
+
+    it "generates entrypoints directly under the configured Shakapacker source path" do
+      assert_file "client/app/server-bundle.js"
+      assert_no_file "client/app/packs/server-bundle.js"
+    end
+
+    it "generates demo source files under the configured Shakapacker source path" do
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.server.jsx"
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.module.css"
+
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+    end
+
+    it "uses the configured source path in generated demo hints" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include('<code class="path-hint">client/app/src/HelloWorld/</code>')
+        expect(content).not_to include("app/javascript/src/HelloWorld/")
+      end
+    end
+  end
+
+  context "with --tailwind and a slash Shakapacker source entry path" do
+    before(:all) do
+      run_generator_test_with_args(%w[--tailwind], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "/")
+      end
+    end
+
+    it "keeps Tailwind assets and imports anchored to the configured source path" do
+      assert_file "client/app/server-bundle.js"
+      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx" do |content|
+        expect(content).to include("import '../../../stylesheets/application.css';")
+      end
+
+      assert_no_file "client/app/packs/server-bundle.js"
+      assert_no_file "app/javascript/stylesheets/application.css"
+    end
+  end
+
+  context "with --force and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true, force: true) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates base demo files from the config after --force overwrites the custom setup" do
+      # --force causes copy_packer_config (which runs first) to overwrite the
+      # pre-installed custom config with the stock config before
+      # shakapacker_source_path memoizes. All path-dependent copies see the
+      # stock app/javascript root.
+      assert_file "app/javascript/packs/server-bundle.js"
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+      assert_no_file "client/app/entrypoints/server-bundle.js"
+      assert_no_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+    end
+
+    it "uses the final Shakapacker source path in generated demo hints" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include('<code class="path-hint">app/javascript/src/HelloWorld/</code>')
+        expect(content).not_to include("client/app/src/HelloWorld/")
+      end
+    end
+  end
+
+  context "with --redux and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--redux], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates Redux demo files under the configured Shakapacker source path" do
+      assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
+      assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx"
+      assert_file "client/app/src/HelloWorldApp/components/HelloWorld.jsx"
+      assert_file "client/app/entrypoints/server-bundle.js"
+
+      assert_no_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
+      assert_no_file "app/javascript/packs/server-bundle.js"
+    end
+
+    it "uses the configured source path in generated Redux demo hints" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include('<code class="path-hint">client/app/src/HelloWorldApp/</code>')
+        expect(content).not_to include("app/javascript/src/HelloWorldApp/")
+      end
+    end
+  end
+
+  context "with --tailwind and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--tailwind], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates Tailwind assets under the configured Shakapacker source path" do
+      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_no_file "app/javascript/stylesheets/application.css"
+    end
+
+    it "injects the stylesheet import into the generated client component" do
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx" do |content|
+        expect(content).to include("import '../../../stylesheets/application.css';")
+      end
+    end
+  end
+
+  context "with --typescript and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--typescript], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates TypeScript demo files under the configured Shakapacker source path" do
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+      assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.server.tsx"
+
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+    end
+
+    it "points TypeScript support files at the configured Shakapacker source path" do
+      assert_file "client/app/types/css-modules.d.ts"
+      assert_no_file "app/javascript/types/css-modules.d.ts"
+
+      assert_file "tsconfig.json" do |content|
+        config = JSON.parse(content)
+        expect(config["include"]).to include("client/app/**/*")
+        expect(config["include"]).not_to include("app/javascript/**/*")
+      end
+    end
+  end
+
+  context "with --typescript --force and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--typescript], package_json: true, force: true) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "points TypeScript support files at the overwritten Shakapacker source path" do
+      assert_file "app/javascript/types/css-modules.d.ts"
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+      assert_no_file "client/app/types/css-modules.d.ts"
+
+      assert_file "tsconfig.json" do |content|
+        config = JSON.parse(content)
+        expect(config["include"]).to include("app/javascript/**/*")
+        expect(config["include"]).not_to include("client/app/**/*")
+      end
+    end
+  end
+
+  context "with --redux --tailwind and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--redux --tailwind], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates Tailwind assets under the configured Shakapacker source path" do
+      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_no_file "app/javascript/stylesheets/application.css"
+    end
+
+    it "injects the stylesheet import into the generated Redux client component" do
+      assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx" do |content|
+        expect(content).to include("import '../../../stylesheets/application.css';")
+      end
+    end
+  end
+
+  context "with --rsc and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--rsc --no-rspack], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "generates RSC demo files under the configured Shakapacker source path" do
+      assert_file "client/app/src/HelloServer/ror_components/HelloServer.jsx"
+      assert_file "client/app/src/HelloServer/components/HelloServer.jsx"
+      assert_file "client/app/src/HelloServer/components/LikeButton.jsx"
+      assert_file "client/app/entrypoints/server-bundle.js"
+      assert_file "config/webpack/rscWebpackConfig.js"
+
+      assert_no_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
+      assert_no_file "app/javascript/packs/server-bundle.js"
+    end
+
+    it "uses the configured source path in generated RSC demo hints" do
+      assert_file "app/views/hello_server/index.html.erb" do |content|
+        expect(content).to include('<code class="path-hint">client/app/src/HelloServer/</code>')
+        expect(content).not_to include("app/javascript/src/HelloServer/")
+      end
+    end
+  end
+
+  context "with --rsc and a slash Shakapacker source entry path" do
+    before(:all) do
+      run_generator_test_with_args(%w[--rsc --no-rspack], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "/")
+      end
+    end
+
+    it "normalizes the RSC discovery registration entry path" do
+      assert_file "client/app/server-bundle.js"
+      assert_file "config/webpack/rscWebpackConfig.js" do |content|
+        expect(content).to include("const sourceEntryPath = config.source_entry_path === '/' ? '' :")
+        expect(content).to include("sourceEntryPath,\n    '../generated/server-component-registration-entry.js'")
+      end
+    end
+  end
+
+  context "with --rsc --tailwind and a pre-installed custom Shakapacker source root" do
+    before(:all) do
+      run_generator_test_with_args(%w[--rsc --tailwind --no-rspack], package_json: true, force: false) do
+        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
+      end
+    end
+
+    it "injects the stylesheet import into the generated RSC client component" do
+      assert_file "client/app/src/HelloServer/components/LikeButton.jsx" do |content|
+        expect(content).to include("import '../../../stylesheets/application.css';")
       end
     end
   end
@@ -1347,6 +1652,49 @@ describe InstallGenerator, type: :generator do
 
       expect(gen).to have_received(:template)
         .with("base/base/config/shakapacker.yml.tt", "config/shakapacker.yml")
+    end
+
+    it "preserves an existing Rspack choice before overwriting the Shakapacker config" do
+      shakapacker_yml_path = File.join(destination, "config/shakapacker.yml")
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        default:
+          assets_bundler: "rspack"
+      YAML
+
+      gen = BaseGenerator.new([], { force: true }, { destination_root: destination })
+      allow(gen).to receive(:template) do |_source, target, *_args|
+        File.write(File.join(destination, target), <<~YAML)
+          default:
+            assets_bundler: "webpack"
+        YAML
+      end
+      allow(gen).to receive(:configure_rspack_in_shakapacker)
+      allow(gen).to receive(:configure_precompile_hook_in_shakapacker)
+      allow(gen).to receive(:configure_private_output_path_in_shakapacker)
+
+      gen.copy_packer_config
+
+      expect(gen).to have_received(:configure_rspack_in_shakapacker)
+      expect(gen.using_rspack?).to be(true)
+    ensure
+      FileUtils.rm_rf(File.join(destination, "config"))
+    end
+
+    it "raises when path helpers memoize before copy_packer_config runs" do
+      gen = BaseGenerator.new([], {}, { destination_root: destination })
+      gen.instance_variable_set(:@shakapacker_source_path, "client/app")
+
+      expect { gen.copy_packer_config }
+        .to raise_error(Thor::Error, /copy_packer_config must run before path-dependent generator actions/)
+    end
+
+    it "raises when source_entry_path memoizes before copy_packer_config runs" do
+      gen = BaseGenerator.new([], {}, { destination_root: destination })
+      gen.instance_variable_set(:@shakapacker_source_entry_path, "entrypoints")
+
+      expect { gen.copy_packer_config }
+        .to raise_error(Thor::Error, /copy_packer_config must run before path-dependent generator actions/)
     end
   end
 
@@ -3379,6 +3727,18 @@ describe InstallGenerator, type: :generator do
         .with(:pretend, "Would add Tailwind stylesheet import to #{client_entry}", :yellow)
 
       redux_generator.send(:copy_base_files)
+    end
+  end
+
+  describe "#create_css_module_types" do
+    it "uses Thor file creation at the configured Shakapacker source path" do
+      install_generator = install_generator_fixture(skip: true)
+      allow(install_generator).to receive(:shakapacker_source_path).and_return("client/app")
+
+      expect(install_generator).to receive(:create_file)
+        .with("client/app/types/css-modules.d.ts", a_string_including('declare module "*.module.css"'))
+
+      install_generator.send(:create_css_module_types)
     end
   end
 

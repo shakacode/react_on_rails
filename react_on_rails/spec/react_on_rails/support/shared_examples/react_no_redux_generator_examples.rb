@@ -10,6 +10,8 @@ shared_examples "no_redux_generator" do
       expect(contents).to include("React SSR Demo")
       expect(contents).to include("What this page shows")
       expect(contents).to include("Inspect these files next")
+      expect(contents).to include('<code class="path-hint">app/javascript/src/HelloWorld/</code>')
+      expect(contents).to include("overflow-wrap: anywhere")
       expect(contents).to include("Compare OSS and Pro")
     end
   end

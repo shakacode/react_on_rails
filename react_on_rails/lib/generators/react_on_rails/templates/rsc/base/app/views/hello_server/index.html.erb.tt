@@ -131,6 +131,13 @@
     font-size: 0.95em;
   }
 
+  .path-hint {
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   @media (max-width: 900px) {
     .hero,
     .card,
@@ -179,7 +186,7 @@
       <ul>
         <% config[:file_hints].each do |hint| %>
           <li>
-            <code><%= hint[:path] %></code><br>
+            <code class="path-hint"><%= hint[:path] %></code><br>
             <%= hint[:description] %>
           </li>
         <% end %>
