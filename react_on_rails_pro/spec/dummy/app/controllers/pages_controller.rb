@@ -455,6 +455,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   end
 
   def read_lazy_props_from_redis(emitter)
+    ensure_test_only_lazy_props_redis_reader!
+
     redis = ::Redis.new
     request_id = params[:request_id]
 
@@ -494,6 +496,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def redis_stream_messages(redis, stream_id, last_received_id, block: 0)
     redis.xread(stream_id, last_received_id, block:)&.dig(stream_id) || []
+  end
+
+  def ensure_test_only_lazy_props_redis_reader!
+    raise "read_lazy_props_from_redis is a test-only helper" unless Rails.env.test?
   end
 
   def increment_lazy_prop_empty_reads(empty_reads, stream_id)
