@@ -18,7 +18,10 @@
  */
 
 import { PassThrough, Transform } from 'stream';
-import { RailsContextWithServerComponentMetadata } from 'react-on-rails/types';
+import type {
+  GenerateRSCPayloadFunction,
+  RailsContextWithServerComponentMetadata,
+} from 'react-on-rails/types';
 import RSCRequestTracker from '../src/RSCRequestTracker.ts';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
 
@@ -26,7 +29,9 @@ const HIGHWATER_MARK = 16 * 1024; // Node.js default PassThrough highWaterMark: 
 
 const createTracker = () => {
   const railsContext = {} as RailsContextWithServerComponentMetadata;
-  return new RSCRequestTracker(railsContext, (globalThis as any).generateRSCPayload);
+  const generateRSCPayload = (globalThis as { generateRSCPayload?: GenerateRSCPayloadFunction })
+    .generateRSCPayload;
+  return new RSCRequestTracker(railsContext, generateRSCPayload);
 };
 
 // Helper: create a PassThrough that we control manually as the "source" RSC stream.

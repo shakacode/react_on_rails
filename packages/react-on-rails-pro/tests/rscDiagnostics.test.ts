@@ -107,6 +107,19 @@ describe('RSC diagnostics', () => {
     expect(rscStreamDiagnosticMatchesError(diagnosticError, genericStreamError)).toBe(true);
   });
 
+  it('matches diagnostics to production-expanded React generic Server Components render errors', () => {
+    const diagnosticError = new Error(
+      '[ReactOnRails] RSC bundle rendering failed.\n' +
+        'Component: CommentsToggle\n' +
+        'Original error: useState is not a function',
+    );
+    const genericStreamError = new Error(
+      'An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details.',
+    );
+
+    expect(rscStreamDiagnosticMatchesError(diagnosticError, genericStreamError)).toBe(true);
+  });
+
   it('does not match diagnostics to unrelated ordinary React errors', () => {
     const diagnosticError = new Error(
       '[ReactOnRails] RSC bundle rendering failed.\n' +
@@ -285,6 +298,18 @@ describe('RSC diagnostics', () => {
     it('returns the single diagnostic unchanged when exactly one is provided', () => {
       const diagnostic = makeDiagnostic('CommentsToggle');
       expect(combineRSCStreamDiagnosticErrors([diagnostic])).toBe(diagnostic);
+    });
+
+    it('throws in dev/test when given an already-merged diagnostic', () => {
+      const diagnostic = makeDiagnostic('CommentsToggle');
+      const merged = mergeRSCStreamDiagnosticError(
+        new Error('An error occurred in the Server Components render.'),
+        diagnostic,
+      );
+
+      expect(() => combineRSCStreamDiagnosticErrors([merged])).toThrow(
+        'received an already-merged error as input',
+      );
     });
 
     it('lists every captured component as a candidate when two or more are provided', () => {

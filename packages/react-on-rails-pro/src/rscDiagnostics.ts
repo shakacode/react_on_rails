@@ -47,14 +47,19 @@ const nonEmptyString = (value: unknown) => {
 };
 
 const ORIGINAL_ERROR_PREFIX = 'Original error: ';
-const GENERIC_RSC_STREAM_ERROR_MESSAGES = new Set(['An error occurred in the Server Components render.']);
+// Keep in sync with React's generic RSC render error in
+// `packages/react-dom/src/server/ReactFizzServer.js`; production builds append
+// redaction details after this stable prefix.
+const GENERIC_RSC_STREAM_ERROR_PREFIXES = ['An error occurred in the Server Components render.'];
+const isGenericRSCStreamError = (message: string) =>
+  GENERIC_RSC_STREAM_ERROR_PREFIXES.some((prefix) => message === prefix || message.startsWith(`${prefix} `));
 
 export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamError: Error) => {
   const streamMessage = nonEmptyString(streamError.message);
   if (!streamMessage) return false;
   // React can hide the underlying Server Component failure behind this generic message. If a
   // diagnostic is waiting, that generic stream error is the correlation signal.
-  if (GENERIC_RSC_STREAM_ERROR_MESSAGES.has(streamMessage)) return true;
+  if (isGenericRSCStreamError(streamMessage)) return true;
 
   const originalErrorLine = diagnosticError.message
     .split('\n')
@@ -159,6 +164,16 @@ export const buildRSCStreamDiagnosticError = (
  */
 export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Error | undefined => {
   if (diagnosticErrors.length === 0) return undefined;
+  if (process.env.NODE_ENV !== 'production') {
+    const alreadyMerged = diagnosticErrors.find(
+      (error) => (error as RSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG],
+    );
+    if (alreadyMerged) {
+      throw new Error(
+        '[ReactOnRails] combineRSCStreamDiagnosticErrors: received an already-merged error as input; pass only raw diagnostics from buildRSCStreamDiagnosticError',
+      );
+    }
+  }
   if (diagnosticErrors.length === 1) return diagnosticErrors[0];
 
   const candidateBlocks = diagnosticErrors

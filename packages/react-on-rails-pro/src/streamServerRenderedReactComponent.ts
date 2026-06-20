@@ -113,6 +113,10 @@ const streamRenderReactComponent = (
     if ((error as MaybeMergedRSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG]) {
       const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
       restoreCapturedRSCDiagnostics(
+        // A merged error embeds each full diagnostic message as a complete block
+        // (`[ReactOnRails]... Component: ... Original error: ...`), so this is
+        // matching the structured diagnostic text rather than a bare component
+        // name that could overlap another component.
         captured.filter((entry) => !error.message.includes(entry.diagnosticError.message)),
       );
       return error;
