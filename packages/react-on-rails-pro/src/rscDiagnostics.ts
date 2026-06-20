@@ -221,6 +221,10 @@ export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Err
   const candidateStacks = candidateDiagnosticErrors
     .map((error, index) => error.stack && `Candidate ${index + 1} stack:\n${error.stack}`)
     .filter((line): line is string => Boolean(line));
+  // The stack header `name: message` is intentionally multi-line because `message` lists every
+  // candidate. Tools that expect a single-line header will show the full candidate block as the
+  // header; that is preferable to losing candidate details. Same pattern as
+  // buildRSCStreamDiagnosticError.
   combinedError.stack = [`${combinedError.name}: ${message}`, ...candidateStacks].join('\n');
   return combinedError;
 };
@@ -266,9 +270,11 @@ export const mergeRSCStreamDiagnosticError = (error: unknown, diagnosticError?: 
 export const extractMergedRSCStreamDiagnosticMessage = (error: Error) => {
   const streamError = (error as RSCStreamDiagnosticError).cause;
   if (streamError instanceof Error) {
-    const streamMessage = nonBlankString(streamError.message);
-    const suffix = streamMessage && `${REACT_STREAM_ERROR_SEPARATOR} ${streamMessage}`;
-    if (suffix && error.message.endsWith(suffix)) {
+    // Match the exact raw stream message that mergeRSCStreamDiagnosticError appended. Do not
+    // trim here: trailing whitespace/newlines and even whitespace-only messages are part of the
+    // merged suffix and must still let callers recover the diagnostic-only portion.
+    const suffix = `${REACT_STREAM_ERROR_SEPARATOR} ${streamError.message}`;
+    if (error.message.endsWith(suffix)) {
       return error.message.slice(0, -suffix.length);
     }
   }

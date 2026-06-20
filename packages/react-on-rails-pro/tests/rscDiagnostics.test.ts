@@ -119,6 +119,18 @@ describe('RSC diagnostics', () => {
     expect(extractMergedRSCStreamDiagnosticMessage(mergedError)).toBe(diagnosticError.message);
   });
 
+  it.each(['stream message with trailing whitespace \n', '   '])(
+    'extracts the diagnostic side by matching the raw stream suffix %#',
+    (streamMessage) => {
+      const diagnosticError = new Error('[ReactOnRails] RSC bundle rendering failed.');
+      const streamError = new Error(streamMessage);
+
+      const mergedError = mergeRSCStreamDiagnosticError(streamError, diagnosticError);
+
+      expect(extractMergedRSCStreamDiagnosticMessage(mergedError)).toBe(diagnosticError.message);
+    },
+  );
+
   it('preserves merged-looking messages without an Error cause', () => {
     const error = new Error(
       `[ReactOnRails] RSC bundle rendering failed.${REACT_STREAM_ERROR_SEPARATOR} inside user text` +
