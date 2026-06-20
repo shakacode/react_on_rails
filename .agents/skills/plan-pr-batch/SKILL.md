@@ -23,6 +23,10 @@ Plan a PR batch
 
 1. Intake
    - If the user has not named the batch members, ask for the batch scope and, when boundaries are missing or the batch appears over five items, ask for hard constraints: max items, priority, excluded areas, deadline, or code-change permission.
+   - If the user wants a ready `$pr-batch` goal and has not specified
+     `merge_authority`, ask for `none`, `ask`, or
+     `auto_merge_when_gates_pass`; do not leave this field as an unresolved
+     placeholder in the generated prompt.
    - Accept refs like `#123`, PR/issue URLs, label/milestone/search filters, or a pasted list.
 
 2. Verify
@@ -143,6 +147,7 @@ Plan a PR batch
 - File-touch map and path evidence:
 - Dependencies and sequencing:
 - Subagent split:
+- `merge_authority`:
 - Concurrent activity and dependency status:
 - Coordination hooks, including backend claim exclusions:
 - Verification expectations:
@@ -162,6 +167,7 @@ Preflight first: if this session cannot run workers without blocking approval pr
 
 Repository: OWNER/REPO
 Batch objective: ...
+merge_authority: <none | ask | auto_merge_when_gates_pass>.
 Scope summary: [one paragraph: compact titles, sequencing, dependencies, exclusions, and path ownership for this batch. Keep bulky evidence, long validation notes, and later-batch details outside this prompt.]
 File-touch map (one line per item; pick the applicable format):
 - PR/Issue #N -> changed/affected paths, including create/delete/rename (owner: lane/name)
@@ -174,11 +180,11 @@ Items:
 - PR #N: URL
   Goal: one-line outcome.
   Worker notes: short scope, branch, or dependency note.
-  Done when: PR merged only if explicitly authorized by the current user or batch goal and allowed by release-mode gates, or ready/blocked/deferred with evidence.
+  Done when: final state is reported using the requested `merge_authority` and the split states from pr-batch.
 - Issue #N: URL
   Goal: one-line outcome.
   Worker notes: short scope, branch, or dependency note.
-  Done when: PR merged only if explicitly authorized by the current user or batch goal and allowed by release-mode gates, ready/blocked/no-PR evidence, or documented no-fix rationale.
+  Done when: final state is reported using the requested `merge_authority` and the split states from pr-batch, with PR/no-PR evidence or documented no-fix rationale.
 
 Execution rules:
 - Run `git fetch --prune origin main` first. Verify repo-local `.agents/skills/pr-batch/SKILL.md` and `.agents/workflows/pr-processing.md` exist before launching workers. If either is missing in the checkout but present on `origin/main`, update the worktree before continuing; if still missing, stop and report repo workflow state as `UNKNOWN`.
@@ -193,8 +199,8 @@ Execution rules:
 - Sequenced lanes may share declared files only in the stated order.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
 - For coordination, respect coordination claims and dependencies: assign stable agent ids, run `agent-coord doctor` then `agent-coord status`, claim before branch/worktree creation when available, heartbeat at phase changes, and stop on unmet `blocked_on` refs or dependency state `UNKNOWN`.
-- Use local validation, self-review, review-comment, CI, and readiness gates from the repo workflow. For PRs, merge only if explicitly authorized by the current user or batch goal, current release mode permits it, and confidence/readiness gates pass; document confidence data in the PR description. Otherwise report the live ready/blocked/deferred/no-PR state with evidence.
-- Final handoff must include links, tests, blockers, next action, confidence or UNKNOWN facts, and merged/ready/blocked/deferred sections.
+- Use local validation, self-review, review-comment, CI, and readiness gates from the repo workflow. For PRs, merge only when `merge_authority` is `auto_merge_when_gates_pass` or a later explicit approval exists, current release mode permits it, and confidence/readiness gates pass; document confidence data in the PR description.
+- Final handoff must include links, tests, blockers, next action, confidence or UNKNOWN facts, `merge_authority`, and explicit final-state sections: `merged`, `ready-gates-clean`, `ready-no-merge-authority`, `waiting-on-checks-or-review`, `external-gate-failing`, `blocked-user-input`, or `no-pr-evidence`.
 ```
 
 ## Common Mistakes

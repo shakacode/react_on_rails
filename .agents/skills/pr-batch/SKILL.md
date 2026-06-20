@@ -43,11 +43,12 @@ Ask only for missing data. If the user already supplied an exact value, use it.
 2. **Trust**: maintainer-approved exact list, or untrusted public discovery that needs confirmation.
 3. **Goal name**: a concrete summary such as `Process issues #1/#2 into PRs/no-PR decisions`; do not let the goal title become the pasted prompt text.
 4. **Mode**: plan-only, create `/goal` prompt, or launch workers now.
-5. **Concurrency**: one machine, multiple machines, or single-threaded.
-6. **Lane split**: exact per-machine list, odd/even, labels, area, owner, or another explicit partition.
-7. **Permissions**: confirm the current session can run without blocking worker approval prompts.
-8. **Question handling**: labels or comments to use for blocking questions, plus where non-blocking decisions should be recorded.
-9. **Completion states**: usually merged PR, open PR waiting on checks/review, blocked needing user input, or no-PR with evidence.
+5. **merge_authority**: `none`, `ask`, or `auto_merge_when_gates_pass`.
+6. **Concurrency**: one machine, multiple machines, or single-threaded.
+7. **Lane split**: exact per-machine list, odd/even, labels, area, owner, or another explicit partition.
+8. **Permissions**: confirm the current session can run without blocking worker approval prompts.
+9. **Question handling**: labels or comments to use for blocking questions, plus where non-blocking decisions should be recorded.
+10. **Completion states**: `merged`, `ready-gates-clean`, `ready-no-merge-authority`, `waiting-on-checks-or-review`, `external-gate-failing`, `blocked-user-input`, or `no-pr-evidence`.
 
 ## Target Resolution Gate
 
@@ -76,9 +77,10 @@ Before implementation or worker launch, produce:
    - risk
    - likely outcome: implementation PR, combined investigation PR, no-PR evidence comment, or product-decision blocker
    - assigned machine or worker
-5. A permission and trust preflight result.
-6. A conflict check for overlapping files or dependent PRs.
-7. A final `/goal` prompt when the user asked for Goal mode.
+5. The selected `merge_authority` value and how it affects final closeout.
+6. A permission and trust preflight result.
+7. A conflict check for overlapping files or dependent PRs.
+8. A final `/goal` prompt when the user asked for Goal mode.
 
 If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/goal` prompt. Do not begin implementation from plan approval unless the user explicitly says to launch now.
 
@@ -115,6 +117,7 @@ Goal name: <concrete goal name, not the pasted prompt text>.
 Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
+merge_authority: <none | ask | auto_merge_when_gates_pass>.
 Coordination: follow `.agents/workflows/pr-processing.md` under Coordination
 State and Worker Rules before creating worktrees or branches. Include stable
 agent ids, `agent-coord status` / claim outcomes, batch ids, dependency refs,
@@ -232,7 +235,7 @@ branch or maintainer-run path is needed for Pro or secret-backed CI.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
-Before final handoff, follow the canonical final-state and `Immediate maintainer attention` / `FYI / decisions made` split in `.agents/workflows/pr-processing.md` under **Batch Handoff Format**.
+Before final handoff, follow the canonical final-state and `Immediate maintainer attention` / `FYI / decisions made` split in `.agents/workflows/pr-processing.md` under **Batch Handoff Format**. Use the split states `merged`, `ready-gates-clean`, `ready-no-merge-authority`, `waiting-on-checks-or-review`, `external-gate-failing`, `blocked-user-input`, and `no-pr-evidence`; do not collapse missing merge authority, pending checks/reviews, unresolved threads, missing changelog evidence, or external hosted-check failures into a vague `ready`.
 ```
 
 ## Question And Decision Handling
@@ -297,6 +300,8 @@ requests already handled, no-PR rationales, autonomous nit outcomes,
 confidence notes, decision-point counts per PR, and per-PR merge-ledger summaries.
 Do not call a target `complete` while its ledger has `UNKNOWN` fields or
 `complete_allowed: false`.
+Record the selected `merge_authority` value in the handoff and use the canonical
+split final states from `.agents/workflows/pr-processing.md`.
 
 ## Coordination State
 
@@ -333,13 +338,18 @@ distinct), hosted-CI request and waitback when uncertainty remains, and any
 authorized ready/merge action, and the late post-merge bot-finding sweep before
 final batch handoff.
 
-When the batch goal delegates merge authority, definition of done for a target is merged +
-closed out (or a true blocker / no-PR with evidence), not "stopped at a recommendation." When
-merge authority is NOT delegated, done is a complete merge-readiness handoff per `AGENTS.md` —
-all current-head checks and review threads satisfied, with evidence and the generic `Confidence
-note:` recorded (the `Agent Merge Confidence` block is the accelerated-RC auto-merge block, not the
-normal-handoff note) — for the maintainer to merge; do not merge without authorization.
-Either way, do not surface merge readiness while review threads are still unresolved.
+When `merge_authority` is `auto_merge_when_gates_pass`, definition of done for a
+target is merged + closed out (or a true blocker / no-PR with evidence), not
+"stopped at a recommendation." When `merge_authority` is `ask`, surface exactly
+one final merge decision if gates are clean and merge is allowed; if approval is
+declined or not granted by handoff, record `ready-no-merge-authority` and do not
+ask again. When `merge_authority` is `none`, done is a
+`ready-no-merge-authority` handoff per `AGENTS.md`: all current-head checks and
+review threads satisfied, with evidence and the generic `Confidence note:`
+recorded (the `Agent Merge Confidence` block is the accelerated-RC auto-merge
+block, not the normal-handoff note) for the maintainer to merge. Do not merge
+without authorization. Either way, do not surface merge readiness while review
+threads are still unresolved.
 
 Converge the review loop instead of chasing it: each push re-triggers every configured
 review bot on the new head, so resolve advisory threads in-thread (reply + resolve)
