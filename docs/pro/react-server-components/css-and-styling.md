@@ -753,8 +753,10 @@ RSC CSS Module — scope every rule to a class. Keep global resets like `html { 
 dedicated global stylesheet loaded through the Rails layout, not in a CSS Module that rides along
 with a `'use client'` reference.
 
-For strict automated enforcement, add a per-file override so CI catches bare element selectors in CSS
-Modules before they reach production:
+For teams that want a strict no-type-selector convention, add a per-file override so CI catches bare
+element selectors in CSS Modules before they reach production.
+
+Example `.stylelintrc.json`:
 
 ```json
 {
