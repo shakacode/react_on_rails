@@ -5951,10 +5951,10 @@ when specificity is equal, these stylesheets win source-order ties against prece
 stylesheets — including the Rails-layout `stylesheet_pack_tag` links that have no `data-precedence`
 attribute.
 
-This matters when an RSC CSS Module contains a **bare element selector**. CSS Module _class names_
-are scoped, but bare element selectors (`html`, `body`, `a:focus`, and so on) still apply globally.
-Because the `data-precedence="rsc-css"` group lands last, a bare selector inside a CSS Module can
-override your global styles unexpectedly once that stylesheet is delivered:
+This matters when an RSC CSS Module contains an **unscoped global selector**. CSS Module _class names_
+are scoped, but selectors such as `html`, `body`, or `:root` still apply globally. Because the
+`data-precedence="rsc-css"` group lands last, an unscoped selector inside a CSS Module can override
+your global styles unexpectedly once that stylesheet is delivered:
 
 ```css
 /* WRONG: a Bootstrap-style bare element selector inside an RSC CSS Module.
@@ -5976,8 +5976,9 @@ RSC CSS Module — scope every rule to a class. Keep global resets like `html { 
 dedicated global stylesheet loaded through the Rails layout, not in a CSS Module that rides along
 with a `'use client'` reference.
 
-For teams that want a strict no-type-selector convention, add a per-file override so CI catches bare
-element selectors in CSS Modules before they reach production.
+For teams that want a strict no-type-selector convention, including rejecting scoped descendants such
+as `.card a`, add a per-file override so CI catches element selectors in CSS Modules before they
+reach production.
 
 Example `.stylelintrc.json`:
 
@@ -5992,9 +5993,9 @@ Example `.stylelintrc.json`:
 }
 ```
 
-If your CSS Module convention intentionally permits scoped descendants such as `.card a`, use a
-custom rule or a tested `selector-max-type` configuration with `ignore` options rather than allowing
-bare `html` or `body` selectors.
+If your CSS Module convention intentionally permits scoped descendants such as `.card a`, do not use
+that strict override as-is. Use a custom rule or a tested `selector-max-type` configuration with
+`ignore` options rather than allowing bare `html` or `body` selectors.
 
 ```css
 /* ProductCard.module.css -- CORRECT: class-scoped rules only */

@@ -354,8 +354,8 @@ If you see the same vendor stylesheet `<link>` repeated many times in an RSC pag
 coordinated React 19.2-compatible release set that includes a stable `react-on-rails-rsc` 19.2.x
 version with the fix. Key constraints:
 
-- Use a stable coordinated 19.2.x set when available. Only pin the `react-on-rails-rsc` 19.2.0-rc.3
-  prerelease if its release notes name a matching React on Rails Pro package or peer range;
+- Use a stable coordinated 19.2.x-or-newer set that satisfies the Pro peer metadata. Only pin the
+  `react-on-rails-rsc` 19.2.0-rc.3 prerelease if its release notes name a matching React on Rails Pro package or peer range;
   prereleases are not accepted by the current stable Pro peer metadata.
 - **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
   React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
