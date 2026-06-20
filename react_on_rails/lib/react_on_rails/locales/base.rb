@@ -188,11 +188,9 @@ module ReactOnRails
 
       def template_default
         <<~JS
-          import { defineMessages } from 'react-intl';
-
           const defaultLocale = '#{default_locale}';
 
-          const defaultMessages = defineMessages(#{@defaults});
+          const defaultMessages = #{@defaults};
 
           export { defaultMessages, defaultLocale };
         JS
