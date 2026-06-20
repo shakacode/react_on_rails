@@ -50,16 +50,25 @@ FOUC prevention pipeline:
    deduplicating and prefixing with `moduleLoading.prefix` for CDN deployments.
 
 3. **Stream injection:** `proRSC.ts` wraps the rendered RSC tree with
-   `<link rel="stylesheet" href="..." precedence="ror-rsc">` elements for each collected CSS href.
+   `<link rel="stylesheet" href="..." data-precedence="rsc-css">` elements for each collected CSS href.
 
-4. **Browser behavior:** React 19 hoists `<link>` elements with a `precedence` attribute into `<head>`,
-   deduplicates them across the RSC stream, and blocks tree commit until the stylesheets load. This
-   prevents the styled Client Component from painting before its CSS is available.
+4. **Browser behavior:** React 19 hoists stylesheet `<link>` elements into `<head>`, deduplicates
+   them across the RSC stream, and blocks tree commit until the stylesheets load. This prevents the
+   styled Client Component from painting before its CSS is available.
 
 > [!NOTE]
 > The manifest CSS hrefs are collected manifest-wide, not per-request. This means CSS for all
 > `'use client'` modules is linked even if only some are rendered on a specific page. This
 > trades minimal CSS for guaranteed no-FOUC behavior.
+
+> [!CAUTION]
+> These stylesheet links are render-blocking. Broad `'use client'` entry points that import
+> page-specific global CSS can make unrelated RSC pages wait on that CSS even when they do not
+> visually need it. Prefer thin client wrappers, CSS Modules, Tailwind utilities, or layout-level
+> global CSS for styles that are truly shared across pages.
+> Contaminated global CSS can also win source-order ties if React hoists the RSC stylesheet links
+> after earlier Rails layout styles. Avoid bare element selectors in component stylesheets; if app
+> globals must override framework CSS, make that specificity explicit in the app's global stylesheet.
 
 ### What this means for different CSS approaches
 
@@ -621,7 +630,7 @@ Then inspect:
 2. **`public/<public_output_path>/react-client-manifest.json`** — RSC client manifest. Check that
    `'use client'` modules have `css` arrays pointing to the correct stylesheet files.
 3. **Server-rendered HTML** — Look for `<link rel="stylesheet">` tags before the first styled
-   component. For RSC pages, look for `<link rel="stylesheet" precedence="ror-rsc">` tags.
+   component. For RSC pages, look for `<link rel="stylesheet" data-precedence="rsc-css">` tags.
 
 ## Compatibility matrix
 
@@ -708,7 +717,8 @@ output.
 ## Known limitations
 
 - RSC stylesheet links are derived from the full client manifest, not filtered to the specific
-  client references rendered by a given request. This favors correctness over minimal CSS.
+  client references rendered by a given request. This favors correctness over minimal CSS, but the
+  resulting links are render-blocking for the streamed RSC tree.
 - Older `react-client-manifest.json` files without `css` arrays (pre `react-on-rails-rsc@19.0.5-rc.6`)
   cannot produce RSC stylesheet links. Rebuild all three bundles after upgrading.
 - For client-side RSC navigation (`RSCRoute`), the RSC payload still needs stylesheet links.
@@ -718,7 +728,7 @@ output.
   filters to `.js` files only and does not collect `.css` files into the manifest's `css` arrays.
   This means `resolveCssHrefs` returns an empty array for Rspack builds, and the FOUC prevention
   pipeline is silently inactive. CSS for `'use client'` components still works via the Rails layout
-  `stylesheet_pack_tag`, but without per-component `<link precedence>` injection. See
+  `stylesheet_pack_tag`, but without per-component stylesheet injection. See
   [Rspack compatibility](./rspack-compatibility.md) for details.
 - **Rspack CSS Module class name divergence:** When using Rspack with CSS Modules, avoid
   `[contenthash]` in `localIdentName`. Rspack client and server builds may produce different
