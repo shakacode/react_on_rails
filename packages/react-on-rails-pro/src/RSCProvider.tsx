@@ -261,7 +261,7 @@ export const createRSCProvider = ({
             payloadSucceeded = markSuccessfulPromise(key, promise, notifyRoutesOnSuccess);
             if (payloadSucceeded) {
               evictedSuccessfulPayloadKeys.delete(key);
-              releaseInFlightEvictedSuccessLatch();
+              inFlightEvictedSuccessfulPayloadCounts.delete(key);
             }
           }
           return payload;
