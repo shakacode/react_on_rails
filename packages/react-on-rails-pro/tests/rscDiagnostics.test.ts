@@ -104,6 +104,7 @@ describe('RSC diagnostics', () => {
     );
     const genericStreamError = new Error('An error occurred in the Server Components render.');
 
+    // NOTE: if this assertion breaks after a React upgrade, update GENERIC_RSC_STREAM_ERROR_PREFIXES.
     expect(rscStreamDiagnosticMatchesError(diagnosticError, genericStreamError)).toBe(true);
   });
 
@@ -117,6 +118,7 @@ describe('RSC diagnostics', () => {
       'An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details.',
     );
 
+    // NOTE: if this assertion breaks after a React upgrade, update GENERIC_RSC_STREAM_ERROR_PREFIXES.
     expect(rscStreamDiagnosticMatchesError(diagnosticError, genericStreamError)).toBe(true);
   });
 

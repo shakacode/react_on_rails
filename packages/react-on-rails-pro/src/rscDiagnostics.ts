@@ -168,10 +168,7 @@ export const buildRSCStreamDiagnosticError = (
 export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Error | undefined => {
   if (diagnosticErrors.length === 0) return undefined;
   if (process.env.NODE_ENV !== 'production') {
-    const alreadyMerged = diagnosticErrors.find(
-      (error) => (error as RSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG],
-    );
-    if (alreadyMerged) {
+    if (diagnosticErrors.some((error) => (error as RSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG])) {
       throw new Error(
         '[ReactOnRails] combineRSCStreamDiagnosticErrors: received an already-merged error as input; pass only raw diagnostics from buildRSCStreamDiagnosticError',
       );

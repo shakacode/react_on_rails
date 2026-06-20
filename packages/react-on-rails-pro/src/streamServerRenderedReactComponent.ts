@@ -101,21 +101,12 @@ const streamRenderReactComponent = (
   // An error already enriched on the synchronous reject path in getReactServerComponent.server.ts is
   // returned untouched. We still consume the current tracker, drop diagnostics already represented by
   // that merged error, and put the rest back so a later generic deferred error can still be enriched.
-  const restoreCapturedRSCDiagnostics = (
-    captured: ReturnType<typeof streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics>,
-  ) => {
-    streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(captured);
-  };
-
   const enrichWithCapturedRSCDiagnostics = (error: Error): Error => {
     if ((error as MaybeMergedRSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG]) {
       const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
-      restoreCapturedRSCDiagnostics(
-        // A merged error embeds each full diagnostic message as a complete block
-        // (`[ReactOnRails]... Component: ... Original error: ...`), so this is
-        // matching the structured diagnostic text rather than a bare component
-        // name that could overlap another component.
-        captured.filter((entry) => !error.message.includes(entry.diagnosticError.message)),
+      const [mergedDiagnosticMessage] = error.message.split('\nReact stream error:');
+      streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(
+        captured.filter((entry) => entry.diagnosticError.message !== mergedDiagnosticMessage),
       );
       return error;
     }
@@ -128,10 +119,12 @@ const streamRenderReactComponent = (
       rscStreamDiagnosticMatchesError(entry.diagnosticError, error),
     );
     if (matchingCaptured.length === 0) {
-      restoreCapturedRSCDiagnostics(captured);
+      streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(captured);
       return error;
     }
-    restoreCapturedRSCDiagnostics(captured.filter((entry) => !matchingCaptured.includes(entry)));
+    streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(
+      captured.filter((entry) => !matchingCaptured.includes(entry)),
+    );
 
     const diagnosticError = combineRSCStreamDiagnosticErrors(
       matchingCaptured.map((entry) => entry.diagnosticError),

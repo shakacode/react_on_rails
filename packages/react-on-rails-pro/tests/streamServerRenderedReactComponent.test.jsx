@@ -141,21 +141,29 @@ const makeDeferredThrower = (message, delayMs) => async () => {
 };
 
 const FirstDeferredThrow = makeDeferredThrower('First deferred failure (correlated)', 10);
-const SecondDeferredThrow = makeDeferredThrower('Second deferred failure (unrelated)', 30);
+const SECOND_DEFERRED_FAILURE_MESSAGE = 'Second deferred failure (unrelated)';
+const SecondDeferredThrow = makeDeferredThrower(SECOND_DEFERRED_FAILURE_MESSAGE, 30);
 const UnrelatedFirstDeferredThrow = makeDeferredThrower('First deferred failure (unrelated)', 10);
 const CorrelatedSecondDeferredThrow = makeDeferredThrower(GENERIC_RSC_DEFERRED_ERROR_MESSAGE, 30);
+
+const SHARED_DIAGNOSTIC_COMPONENT = 'SharedDiagnosticComponent';
+const SHARED_DIAGNOSTIC_MODULE = `/app/components/${SHARED_DIAGNOSTIC_COMPONENT}.jsx`;
+const makeSharedDiagnosticError = (originalError) => {
+  const diagnosticError = new Error(
+    `[ReactOnRails] RSC bundle rendering failed.\n` +
+      `Component: ${SHARED_DIAGNOSTIC_COMPONENT}\n` +
+      `Module: ${SHARED_DIAGNOSTIC_MODULE}\n` +
+      `Original error: ${originalError}`,
+  );
+  diagnosticError.name = 'ReactOnRailsRSCStreamError';
+  return diagnosticError;
+};
 
 const AlreadyMergedDeferredThrow = async () => {
   await new Promise((resolve) => {
     setTimeout(resolve, 10);
   });
-  const diagnosticError = new Error(
-    `[ReactOnRails] RSC bundle rendering failed.\n` +
-      `Component: AlreadyMergedComponent\n` +
-      `Module: /app/components/AlreadyMergedComponent.jsx\n` +
-      `Original error: boom in AlreadyMergedComponent`,
-  );
-  diagnosticError.name = 'ReactOnRailsRSCStreamError';
+  const diagnosticError = makeSharedDiagnosticError(`${SECOND_DEFERRED_FAILURE_MESSAGE} while loading`);
   throw mergeRSCStreamDiagnosticError(new Error('First deferred failure (already merged)'), diagnosticError);
 };
 
@@ -704,20 +712,14 @@ describe('streamServerRenderedReactComponent', () => {
 
   const setupAlreadyMergedThenGenericErrorTest = () => {
     const renderFunction = (_props, railsContext) => {
-      ['AlreadyMergedComponent', 'PreservedComponent'].forEach((componentName) => {
-        const originalError =
-          componentName === 'PreservedComponent'
-            ? 'Second deferred failure (unrelated)'
-            : `boom in ${componentName}`;
-        const diagnosticError = new Error(
-          `[ReactOnRails] RSC bundle rendering failed.\n` +
-            `Component: ${componentName}\n` +
-            `Module: /app/components/${componentName}.jsx\n` +
-            `Original error: ${originalError}`,
-        );
-        diagnosticError.name = 'ReactOnRailsRSCStreamError';
-        railsContext.recordRSCDiagnostic(componentName, diagnosticError);
-      });
+      railsContext.recordRSCDiagnostic(
+        SHARED_DIAGNOSTIC_COMPONENT,
+        makeSharedDiagnosticError(SECOND_DEFERRED_FAILURE_MESSAGE),
+      );
+      railsContext.recordRSCDiagnostic(
+        SHARED_DIAGNOSTIC_COMPONENT,
+        makeSharedDiagnosticError(`${SECOND_DEFERRED_FAILURE_MESSAGE} while loading`),
+      );
       return AlreadyMergedThenGenericThrowShell;
     };
 
@@ -747,13 +749,15 @@ describe('streamServerRenderedReactComponent', () => {
       error.message.includes('First deferred failure (already merged)'),
     );
     expect(firstError).toBeDefined();
+    expect(firstError.message).toContain(`Original error: ${SECOND_DEFERRED_FAILURE_MESSAGE} while loading`);
 
     const secondError = emittedErrors.find((error) =>
-      error.message.includes('Second deferred failure (unrelated)'),
+      error.message.includes(`React stream error: ${SECOND_DEFERRED_FAILURE_MESSAGE}`),
     );
     expect(secondError).toBeDefined();
-    expect(secondError.message).toContain('Component: PreservedComponent');
-    expect(secondError.message).not.toContain('Component: AlreadyMergedComponent');
+    expect(secondError.message).toContain(`Component: ${SHARED_DIAGNOSTIC_COMPONENT}`);
+    expect(secondError.message).toContain(`Original error: ${SECOND_DEFERRED_FAILURE_MESSAGE}`);
+    expect(secondError.message).not.toContain('while loading');
   });
 
   it('renders the nearest Suspense fallback for RSCRoute ssr=false without generating an RSC payload', async () => {
