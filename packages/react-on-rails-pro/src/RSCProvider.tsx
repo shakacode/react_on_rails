@@ -27,11 +27,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
-import {
-  BoundedLRU,
-  RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
-  RSC_PAYLOAD_CACHE_MAX_ENTRIES,
-} from './RSCProviderCache.ts';
+import { BoundedLRU, RSC_PAYLOAD_CACHE_MAX_ENTRIES } from './RSCProviderCache.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
@@ -100,7 +96,7 @@ export const createRSCProvider = ({
     const evictedSuccessfulPayloadKeysRef = useRef<BoundedLRU<true> | null>(null);
     if (!evictedSuccessfulPayloadKeysRef.current) {
       evictedSuccessfulPayloadKeysRef.current = new BoundedLRU<true>(
-        RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
+        RSC_PAYLOAD_CACHE_MAX_ENTRIES * 4,
         () => {},
       );
     }
@@ -109,6 +105,7 @@ export const createRSCProvider = ({
     // starts after observing an evicted-success marker, and are always removed
     // when that specific promise settles.
     const inFlightEvictedSuccessfulPayloadKeysRef = useRef(new Set<string>());
+    const inFlightEvictedSuccessfulPayloadKeys = inFlightEvictedSuccessfulPayloadKeysRef.current;
     // Provider-wide successful-refetch token. Values only need to be comparable
     // for "newer successful payload happened" checks, so a global monotonic
     // token lets a mounted route ignore eviction cleanup decreases (N -> 0) but
@@ -146,10 +143,12 @@ export const createRSCProvider = ({
           // render-phase cache write) never triggers a state update mid-render.
           queueMicrotask(() => {
             // Guard: if the key was re-entered between eviction and the microtask
-            // firing (e.g. a refetch that incremented refetchVersionsRef before
-            // this microtask ran), skip the version-state delete so we don't
-            // clobber fresh state for the re-entered key.
-            if (refetchVersionsRef.current[evictedKey] !== undefined) {
+            // firing, skip the version-state delete so we don't clobber fresh
+            // state for the re-entered key.
+            if (
+              refetchVersionsRef.current[evictedKey] !== undefined ||
+              fetchRSCPromisesRef.current?.has(evictedKey)
+            ) {
               return;
             }
             startTransition(() => {
@@ -157,10 +156,12 @@ export const createRSCProvider = ({
                 if (!(evictedKey in prev)) {
                   return prev;
                 }
-                // Second guard inside the reducer: bail if a concurrent refetch
-                // repopulated the ref between the outer check and this setState
-                // commit.
-                if (refetchVersionsRef.current[evictedKey] !== undefined) {
+                // Second guard inside the reducer: bail if the key re-entered
+                // between the outer check and this setState commit.
+                if (
+                  refetchVersionsRef.current[evictedKey] !== undefined ||
+                  fetchRSCPromisesRef.current?.has(evictedKey)
+                ) {
                   return prev;
                 }
                 const next = { ...prev };
@@ -184,7 +185,7 @@ export const createRSCProvider = ({
 
     const markSuccessfulPromise = useCallback(
       (key: string, promise: Promise<ReactNode>, notifyRoutes = false) => {
-        if (fetchRSCPromises.peek(key) !== promise) {
+        if (fetchRSCPromises.get(key, false) !== promise) {
           return false;
         }
 
@@ -234,19 +235,21 @@ export const createRSCProvider = ({
         let promise!: Promise<ReactNode>;
         let payloadSucceeded = false;
         const notifyRoutesOnSuccess =
-          evictedSuccessfulPayloadKeys.has(key) || inFlightEvictedSuccessfulPayloadKeysRef.current.has(key);
+          evictedSuccessfulPayloadKeys.has(key) || inFlightEvictedSuccessfulPayloadKeys.has(key);
         if (notifyRoutesOnSuccess) {
-          inFlightEvictedSuccessfulPayloadKeysRef.current.add(key);
+          inFlightEvictedSuccessfulPayloadKeys.add(key);
         }
+        const keepEvictedSuccessMarker = () => {
+          inFlightEvictedSuccessfulPayloadKeys.delete(key);
+          evictedSuccessfulPayloadKeys.set(key, true);
+        };
         const markPayloadIfSuccessful = (payload: ReactNode) => {
           if (!(payload instanceof Error)) {
-            payloadSucceeded = true;
-            const shouldNotifyRoutes =
-              notifyRoutesOnSuccess && inFlightEvictedSuccessfulPayloadKeysRef.current.has(key);
-            if (markSuccessfulPromise(key, promise, shouldNotifyRoutes)) {
+            const shouldNotifyRoutes = notifyRoutesOnSuccess && inFlightEvictedSuccessfulPayloadKeys.has(key);
+            payloadSucceeded = markSuccessfulPromise(key, promise, shouldNotifyRoutes);
+            if (payloadSucceeded) {
               evictedSuccessfulPayloadKeys.delete(key);
-              inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
-              payloadSucceeded = true;
+              inFlightEvictedSuccessfulPayloadKeys.delete(key);
             }
           }
           return payload;
@@ -256,26 +259,26 @@ export const createRSCProvider = ({
           serverComponentPromise = getServerComponent({ componentName, componentProps });
         } catch (error) {
           if (notifyRoutesOnSuccess) {
-            inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
+            keepEvictedSuccessMarker();
           }
           throw error;
         }
 
         promise = serverComponentPromise.then(markPayloadIfSuccessful).finally(() => {
           fetchRSCPromises.unpin(key);
-          if (
-            notifyRoutesOnSuccess &&
-            !payloadSucceeded &&
-            inFlightEvictedSuccessfulPayloadKeysRef.current.has(key)
-          ) {
-            inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
-            evictedSuccessfulPayloadKeys.set(key, true);
+          if (notifyRoutesOnSuccess && !payloadSucceeded && inFlightEvictedSuccessfulPayloadKeys.has(key)) {
+            keepEvictedSuccessMarker();
           }
         });
         fetchRSCPromises.setPinned(key, promise);
         return promise;
       },
-      [evictedSuccessfulPayloadKeys, fetchRSCPromises, markSuccessfulPromise],
+      [
+        evictedSuccessfulPayloadKeys,
+        fetchRSCPromises,
+        inFlightEvictedSuccessfulPayloadKeys,
+        markSuccessfulPromise,
+      ],
     );
 
     const refetchComponent = useCallback(
@@ -284,14 +287,14 @@ export const createRSCProvider = ({
         refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
         let promise!: Promise<ReactNode>;
         const restoreLastSuccessfulPromise = () => {
-          if (fetchRSCPromises.peek(key) !== promise) {
+          if (fetchRSCPromises.get(key, false) !== promise) {
             return;
           }
 
           if (key in lastSuccessfulRSCPromisesRef.current) {
-            fetchRSCPromises.setProtected(key, lastSuccessfulRSCPromisesRef.current[key]);
+            fetchRSCPromises.set(key, lastSuccessfulRSCPromisesRef.current[key], true);
           } else {
-            fetchRSCPromises.deleteValuePreservingPins(key);
+            fetchRSCPromises.delete(key, true);
           }
 
           startTransition(() => {
@@ -315,7 +318,7 @@ export const createRSCProvider = ({
                 }
               } else if (markSuccessfulPromise(key, promise, true)) {
                 evictedSuccessfulPayloadKeys.delete(key);
-                inFlightEvictedSuccessfulPayloadKeysRef.current.delete(key);
+                inFlightEvictedSuccessfulPayloadKeys.delete(key);
               }
               return payload;
             },
@@ -340,7 +343,13 @@ export const createRSCProvider = ({
         });
         return promise;
       },
-      [evictedSuccessfulPayloadKeys, fetchRSCPromises, markSuccessfulPromise, startTransition],
+      [
+        evictedSuccessfulPayloadKeys,
+        fetchRSCPromises,
+        inFlightEvictedSuccessfulPayloadKeys,
+        markSuccessfulPromise,
+        startTransition,
+      ],
     );
 
     // `versions` and `successfulVersions` intentionally refresh this context.

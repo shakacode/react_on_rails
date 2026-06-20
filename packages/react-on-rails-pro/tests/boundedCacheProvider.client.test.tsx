@@ -18,7 +18,11 @@ import { Suspense } from 'react';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-import { BoundedLRU, RSC_PAYLOAD_CACHE_MAX_ENTRIES } from '../src/RSCProviderCache.ts';
+import {
+  BoundedLRU,
+  RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
+  RSC_PAYLOAD_CACHE_MAX_ENTRIES,
+} from '../src/RSCProviderCache.ts';
 import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
 import RSCRoute, { type RSCRouteHandle } from '../src/RSCRoute.tsx';
 import { shouldClearRefetchErrorOnSuccessfulVersionChange } from '../src/RSCRouteSuccessfulVersion.ts';
@@ -27,6 +31,7 @@ import { getNodeVersion } from './testUtils';
 
 // Imported from the source so the test cap cannot drift from the real cap.
 const CACHE_CAP = RSC_PAYLOAD_CACHE_MAX_ENTRIES;
+const MARKER_CAP = RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES;
 
 type GetServerComponentArgs = {
   componentName: string;
@@ -72,13 +77,13 @@ describe('BoundedLRU', () => {
     expect(lru.has('c')).toBe(true);
   });
 
-  it('get() promotes a key to most-recently-used; has()/peek() do not', () => {
+  it('get() promotes a key to most-recently-used; has()/get(key, false) do not', () => {
     const { lru, evicted } = makeLRU(2);
     lru.set('a', 'A');
     lru.set('b', 'B');
     // Recency-neutral reads leave 'a' as the LRU.
     expect(lru.has('a')).toBe(true);
-    expect(lru.peek('a')).toBe('A');
+    expect(lru.get('a', false)).toBe('A');
     // Promote 'a' so 'b' becomes the LRU victim.
     expect(lru.get('a')).toBe('A');
     lru.set('c', 'C');
@@ -86,16 +91,16 @@ describe('BoundedLRU', () => {
     expect(lru.has('a')).toBe(true);
   });
 
-  it('get()/peek() return undefined for a missing key but handle a stored undefined value', () => {
+  it('get() returns undefined for a missing key but handles a stored undefined value', () => {
     const { lru } = makeLRU(2);
     const undefinedLru = new BoundedLRU<string | undefined>(2, () => {});
     expect(lru.get('missing')).toBeUndefined();
-    expect(lru.peek('missing')).toBeUndefined();
+    expect(lru.get('missing', false)).toBeUndefined();
     undefinedLru.set('u', undefined);
     expect(undefinedLru.has('u')).toBe(true);
     // A stored `undefined` is a real hit, not treated as absent.
     expect(undefinedLru.get('u')).toBeUndefined();
-    expect(undefinedLru.peek('u')).toBeUndefined();
+    expect(undefinedLru.get('u', false)).toBeUndefined();
   });
 
   it('REF-COUNTED pins: a key survives until every pin is released', () => {
@@ -150,12 +155,12 @@ describe('BoundedLRU', () => {
     expect(lru.has('a')).toBe(false);
   });
 
-  it('deleteValuePreservingPins keeps outstanding same-key pins intact', () => {
+  it('delete(key, true) keeps outstanding same-key pins intact', () => {
     const { lru, evicted } = makeLRU(1);
 
     lru.setPinned('k', 'old request'); // older request pin
     lru.setPinned('k', 'failed request'); // failed request pin
-    lru.deleteValuePreservingPins('k'); // failed request removes only its value
+    lru.delete('k', true); // failed request removes only its value
     lru.setPinned('k', 'retry request'); // newer retry pin
 
     // Stale finally handlers from the failed and older requests settle after
@@ -212,12 +217,12 @@ describe('BoundedLRU', () => {
     expect(lru.has('p3')).toBe(true);
   });
 
-  it('setProtected keeps a restored key when all other over-cap entries are pinned', () => {
+  it('set(..., true) keeps a restored key when all other over-cap entries are pinned', () => {
     const { lru, evicted } = makeLRU(1);
 
     lru.setPinned('restored', 'failed refetch');
     lru.setPinned('other inflight', 'I');
-    lru.setProtected('restored', 'R');
+    lru.set('restored', 'R', true);
 
     expect(lru.has('other inflight')).toBe(true);
     expect(lru.has('restored')).toBe(true);
@@ -859,8 +864,9 @@ describe('RSCRoute successful-version error reset', () => {
     const replacement = await startLoad(0);
 
     // Churn enough additional successful keys to push id 0 out of the bounded
-    // evicted-marker LRU before the replacement resolves.
-    for (let id = CACHE_CAP + 1; id <= CACHE_CAP * 2 + 2; id += 1) {
+    // evicted-marker LRU before the replacement resolves. The in-flight marker
+    // latch must still remember that this specific replacement should notify.
+    for (let id = CACHE_CAP + 1; id <= CACHE_CAP + MARKER_CAP + 2; id += 1) {
       // eslint-disable-next-line no-await-in-loop
       const started = await startLoad(id);
       // eslint-disable-next-line no-await-in-loop
@@ -873,7 +879,7 @@ describe('RSCRoute successful-version error reset', () => {
     await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
   });
 
-  it('j. evicted-success markers survive churn before a replacement load starts', async () => {
+  it('j. replacement load degrades gracefully when its marker drops before it starts', async () => {
     process.env.NODE_ENV = 'production';
 
     type PendingEntry = Deferred & { args: GetServerComponentArgs };
@@ -919,9 +925,9 @@ describe('RSCRoute successful-version error reset', () => {
       await resolveLoad(started, <span>{`initial ${id}`}</span>);
     }
 
-    // Churn enough additional successful keys that a bounded secondary marker
-    // LRU would drop id 0 before its replacement load even starts.
-    for (let id = CACHE_CAP + 1; id <= CACHE_CAP * 2 + 2; id += 1) {
+    // Churn enough additional successful keys that the bounded secondary
+    // marker LRU drops id 0 before its replacement load starts.
+    for (let id = CACHE_CAP + 1; id <= CACHE_CAP + MARKER_CAP + 2; id += 1) {
       // eslint-disable-next-line no-await-in-loop
       const started = await startLoad(id);
       // eslint-disable-next-line no-await-in-loop
@@ -932,7 +938,7 @@ describe('RSCRoute successful-version error reset', () => {
     await resolveLoad(replacement, <span>replacement 0</span>);
 
     const key = createRSCPayloadKey('Card', { id: 0 });
-    await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+    expect(rscApi.successfulVersions[key] ?? 0).toBe(0);
   });
 
   it('k. stale replacement loads do not notify after a newer refetch succeeds', async () => {
@@ -1082,5 +1088,87 @@ describe('RSCRoute successful-version error reset', () => {
 
     const key = createRSCPayloadKey('Card', { id: 0 });
     await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+  });
+
+  it('m. stale replacement successes do not keep an unbounded in-flight marker latch', async () => {
+    process.env.NODE_ENV = 'production';
+
+    type PendingEntry = Deferred & { args: GetServerComponentArgs };
+    const pending: PendingEntry[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      pending.push({ ...d, args: _args[0] });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+    await renderInAct(
+      <RSCProvider>
+        <Probe />
+      </RSCProvider>,
+    );
+
+    const startLoad = async (id: number) => {
+      let promise!: Promise<React.ReactNode>;
+      await act(async () => {
+        promise = rscApi.getComponent('Card', { id });
+        await Promise.resolve();
+      });
+      return { promise, deferred: findPendingForId(pending, id) };
+    };
+
+    const resolveLoad = async (started: Awaited<ReturnType<typeof startLoad>>, payload: React.ReactNode) => {
+      await act(async () => {
+        started.deferred.resolve(payload);
+        await started.promise;
+      });
+    };
+
+    for (let id = 0; id <= CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`initial ${id}`}</span>);
+    }
+
+    const staleReplacement = await startLoad(0);
+    let refetchPromise!: Promise<React.ReactNode>;
+    await act(async () => {
+      refetchPromise = rscApi.refetchComponent('Card', { id: 0 }, true);
+      void refetchPromise.catch(() => undefined);
+      await Promise.resolve();
+    });
+
+    const refetch = pending.find(
+      (d) => d.args.enforceRefetch && (d.args.componentProps as { id: number }).id === 0,
+    );
+    if (!refetch) {
+      throw new Error('Expected recoverable refetch request for id 0');
+    }
+
+    await resolveLoad(staleReplacement, <span>stale replacement 0</span>);
+
+    await act(async () => {
+      refetch.reject(new Error('refetch boom'));
+      await expect(refetchPromise).rejects.toThrow('refetch boom');
+    });
+
+    for (let id = CACHE_CAP + 1; id <= CACHE_CAP + MARKER_CAP + 2; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`marker churn ${id}`}</span>);
+    }
+
+    const replacementAfterMarkerChurn = await startLoad(0);
+    await resolveLoad(replacementAfterMarkerChurn, <span>replacement after marker churn</span>);
+
+    const key = createRSCPayloadKey('Card', { id: 0 });
+    expect(rscApi.successfulVersions[key] ?? 0).toBe(0);
   });
 });

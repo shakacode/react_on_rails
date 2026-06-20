@@ -42,9 +42,9 @@ export const RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES = RSC_PAYLOAD_CACHE_MAX_ENTR
 
 /**
  * A tiny insertion-ordered LRU over a `Map`. `get` and `set` move the key to
- * the most-recently-used position (end of the Map); `has` and `peek` are
- * recency-neutral reads. When `set` pushes the size past `maxEntries`, the
- * least-recently-used key (front of the Map) is evicted and passed to
+ * the most-recently-used position (end of the Map), while `has` and
+ * `get(key, false)` are recency-neutral reads. When `set` pushes the size past
+ * `maxEntries`, the least-recently-used key (front of the Map) is evicted and passed to
  * `onEvict` so callers can drop companion state keyed by the same payload key.
  *
  * A key can be `pin`-ned to prevent eviction while it is in-flight. Pins are
@@ -88,37 +88,25 @@ export class BoundedLRU<V> {
     return this.map.has(key);
   }
 
-  /** Read without affecting recency — for identity checks on in-flight promises. */
-  peek(key: string): V | undefined {
-    return this.map.get(key);
-  }
-
-  get(key: string): V | undefined {
+  get(key: string, promote = true): V | undefined {
     if (!this.map.has(key)) {
       return undefined;
     }
     const value = this.map.get(key) as V;
+    if (!promote) {
+      return value;
+    }
     // Re-insert to mark most-recently-used.
     this.map.delete(key);
     this.map.set(key, value);
     return value;
   }
 
-  set(key: string, value: V): void {
+  set(key: string, value: V, protectKey = false): void {
     // Re-insert so an existing key moves to most-recently-used.
     this.map.delete(key);
     this.map.set(key, value);
-    this.evictIfNeeded();
-  }
-
-  setProtected(key: string, value: V): void {
-    // Re-insert so an existing key moves to most-recently-used, then protect
-    // that just-restored key from its own over-cap reconciliation. This lets
-    // callers restore a visible last-good payload while other in-flight keys
-    // are still pinned; a later set/unpin can evict a colder key.
-    this.map.delete(key);
-    this.map.set(key, value);
-    this.evictIfNeeded(key);
+    this.evictIfNeeded(protectKey ? key : undefined);
   }
 
   /**
@@ -142,19 +130,14 @@ export class BoundedLRU<V> {
     this.evictIfNeeded();
   }
 
-  delete(key: string): void {
+  delete(key: string, preservePins = false): void {
     // Intentionally does not call `onEvict`: current callers handle companion
     // state before deleting/restoring a key. Future callers that need eviction
     // cleanup should use an eviction path, not this raw delete.
     this.map.delete(key);
-    this.pinCounts.delete(key);
-  }
-
-  deleteValuePreservingPins(key: string): void {
-    // Used when deleting the current map value for a failed same-key request
-    // while older/newer same-key requests may still hold pins. Clearing the pin
-    // count here would let a stale finally() unpin consume a newer request's pin.
-    this.map.delete(key);
+    if (!preservePins) {
+      this.pinCounts.delete(key);
+    }
   }
 
   /**
