@@ -61,7 +61,8 @@ export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamEr
   const streamMessage = nonEmptyString(streamError.message);
   if (!streamMessage) return false;
   // React can hide the underlying Server Component failure behind this generic message. If a
-  // diagnostic is waiting, that generic stream error is the correlation signal.
+  // diagnostic is waiting, that generic stream error is the correlation signal. This assumes only
+  // React's RSC machinery emits the exact prefix above at runtime; verify the prefix on React bumps.
   if (isGenericRSCStreamError(streamMessage)) return true;
 
   const originalErrorLine = diagnosticError.message
@@ -249,4 +250,18 @@ export const mergeRSCStreamDiagnosticError = (error: unknown, diagnosticError?: 
     .filter((line): line is string => Boolean(line))
     .join('\n\n');
   return mergedError;
+};
+
+export const extractMergedRSCStreamDiagnosticMessage = (error: Error) => {
+  const streamError = (error as RSCStreamDiagnosticError).cause;
+  if (streamError instanceof Error) {
+    const streamMessage = nonEmptyString(streamError.message);
+    const suffix = streamMessage && `${REACT_STREAM_ERROR_SEPARATOR} ${streamMessage}`;
+    if (suffix && error.message.endsWith(suffix)) {
+      return error.message.slice(0, -suffix.length);
+    }
+  }
+
+  const separatorIndex = error.message.lastIndexOf(REACT_STREAM_ERROR_SEPARATOR);
+  return separatorIndex === -1 ? error.message : error.message.slice(0, separatorIndex);
 };

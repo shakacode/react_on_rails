@@ -24,6 +24,7 @@ import transformRSCStream from '../src/transformRSCNodeStream.ts';
 import {
   buildRSCStreamDiagnosticError,
   combineRSCStreamDiagnosticErrors,
+  extractMergedRSCStreamDiagnosticMessage,
   extractModulePathFromStack,
   mergeRSCStreamDiagnosticError,
   MERGED_DIAGNOSTIC_FLAG,
@@ -95,6 +96,27 @@ describe('RSC diagnostics', () => {
       `${REACT_STREAM_ERROR_SEPARATOR} An error occurred in the Server Components render.`,
     );
     expect(mergedError.stack).toContain('CommentsToggle.jsx:12:15');
+  });
+
+  it('extracts the diagnostic side when diagnostic text contains the React stream separator', () => {
+    const diagnosticError = new Error(
+      '[ReactOnRails] RSC bundle rendering failed.\n' +
+        `Original error: user text includes${REACT_STREAM_ERROR_SEPARATOR} inside it`,
+    );
+    const genericStreamError = new Error('An error occurred in the Server Components render.');
+
+    const mergedError = mergeRSCStreamDiagnosticError(genericStreamError, diagnosticError);
+
+    expect(extractMergedRSCStreamDiagnosticMessage(mergedError)).toBe(diagnosticError.message);
+  });
+
+  it('extracts the diagnostic side when stream text contains the React stream separator', () => {
+    const diagnosticError = new Error('[ReactOnRails] RSC bundle rendering failed.');
+    const streamError = new Error(`stream text includes${REACT_STREAM_ERROR_SEPARATOR} inside it`);
+
+    const mergedError = mergeRSCStreamDiagnosticError(streamError, diagnosticError);
+
+    expect(extractMergedRSCStreamDiagnosticMessage(mergedError)).toBe(diagnosticError.message);
   });
 
   it('matches diagnostics to React generic Server Components render errors', () => {

@@ -35,9 +35,9 @@ import {
 import handleError from './handleError.ts';
 import {
   combineRSCStreamDiagnosticErrors,
+  extractMergedRSCStreamDiagnosticMessage,
   MERGED_DIAGNOSTIC_FLAG,
   mergeRSCStreamDiagnosticError,
-  REACT_STREAM_ERROR_SEPARATOR,
   rscStreamDiagnosticMatchesError,
 } from './rscDiagnostics.ts';
 
@@ -105,7 +105,7 @@ const streamRenderReactComponent = (
   const enrichWithCapturedRSCDiagnostics = (error: Error): Error => {
     if ((error as MaybeMergedRSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG]) {
       const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
-      const [mergedDiagnosticMessage] = error.message.split(REACT_STREAM_ERROR_SEPARATOR);
+      const mergedDiagnosticMessage = extractMergedRSCStreamDiagnosticMessage(error);
       streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(
         captured.filter((entry) => entry.diagnosticError.message !== mergedDiagnosticMessage),
       );
