@@ -763,7 +763,7 @@ Example `.stylelintrc.json`:
 {
   "overrides": [
     {
-      "files": ["**/*.module.css"],
+      "files": ["**/*.module.css", "**/*.module.scss", "**/*.module.sass"],
       "rules": { "selector-max-type": 0 }
     }
   ]

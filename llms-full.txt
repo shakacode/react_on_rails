@@ -13576,7 +13576,7 @@ The FAQ run did not capture TBT or Lighthouse score. The captured signals pointe
 
 A CSS broadcast fix (react_on_rails_rsc [#108](https://github.com/shakacode/react_on_rails_rsc/pull/108) → [#110](https://github.com/shakacode/react_on_rails_rsc/pull/110) / [#113](https://github.com/shakacode/react_on_rails_rsc/pull/113), shipped in `react-on-rails-rsc` 19.2.0-rc.3) was correct, but it was a **second-order** effect. The dominant driver was the client JS tail, not CSS delivery. Chasing the CSS fix first would have spent effort without moving the metrics that mattered.
 
-The lesson to take from this: **measure paired and throttled, then decompose FCP/TBT versus LCP before choosing a fix.** A related second-order CSS concern worth knowing about is the end-of-`<head>` rsc-css precedence trap described in [CSS and styling for RSC](../../pro/react-server-components/css-and-styling.md) — but confirm with the decomposition that CSS delivery is actually on your critical path before you spend time there.
+The lesson to take from this: **measure paired and throttled, then decompose FCP/TBT versus LCP before choosing a fix.** A related second-order CSS concern worth knowing about is the end-of-`<head>` rsc-css precedence trap described in [CSS and styling for RSC](../../pro/react-server-components/css-and-styling.md#rsc-stylesheet-cascade-order-end-of-head-precedence) — but confirm with the decomposition that CSS delivery is actually on your critical path before you spend time there.
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/building-features/web-vitals-and-rum
@@ -27867,9 +27867,9 @@ If you see the same vendor stylesheet `<link>` repeated many times in an RSC pag
 coordinated React 19.2-compatible release set that includes a stable `react-on-rails-rsc` 19.2.x
 version with the fix. Key constraints:
 
-- Use a stable coordinated 19.2.x-or-newer set that satisfies the Pro peer metadata. Only pin the
-  `react-on-rails-rsc` 19.2.0-rc.3 prerelease if its release notes name a matching React on Rails Pro package or peer range;
-  prereleases are not accepted by the current stable Pro peer metadata.
+- Use a stable coordinated 19.2.x-or-newer set that satisfies the Pro peer metadata. Treat
+  `react-on-rails-rsc` 19.2.0-rc.3 as the upstream fix landing point, not as a general Pro install
+  target; prereleases are not accepted by the current stable Pro peer metadata.
 - **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
   React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
   can fail at startup.
