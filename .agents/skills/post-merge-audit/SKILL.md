@@ -23,7 +23,8 @@ Start by resolving the exact audit range and, when auditing a named agent
 batch/run, the exact worked-issue scope:
 
 Term: a structured public `codex-claim` comment is a GitHub issue/PR comment
-containing a `codex-claim` JSON block in the "Public claim comment" format from
+containing a `codex-claim` HTML comment (`<!-- codex-claim v1 ... -->`) with
+key/value fields in the "Public claim comment" format from
 `.agents/workflows/pr-processing.md`.
 
 When this repository includes `.agents/skills/post-merge-audit/bin/post-merge-audit-scope`, run it first:
@@ -63,6 +64,10 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    parked, or done-unmerged lanes before reducing scope to merged PRs. Keep
    advisory rows marked `UNKNOWN` as needed, and do not infer confirmed
    completeness from merged PRs.
+   When the batch/run id itself is unknown, scope that advisory scan to issues
+   and open PRs active within the audit time window; use each claim's `batch:`
+   field to surface candidate batch ids, not to filter as confirmed scope until
+   the user confirms the id.
 
    If `agent-coord doctor` and `agent-coord status` both succeed but the named
    batch entry contains no worked issues or lanes, record
@@ -187,8 +192,11 @@ The audit should usually produce an issue plan for non-OK findings, but not crea
   issue): per `AGENTS.md` → _Tracking Issues And Handoffs_, the audit report is
   a point-in-time snapshot. For release-gate audits, append that snapshot to the
   standing release audit ledger in place and include the ledger comment URL in
-  every approved parent or child issue created from the audit. For non-release
-  audits with no release-gate ledger, record
+  every approved parent or child issue created from the audit. Locate the ledger
+  with the release-mode preflight search: open issues with the `release` and
+  `TRACKING` labels, plus `Release gate:` title matches. If no release-gate
+  ledger exists for a release audit, surface that absence as a blocker before
+  creating follow-up issues. For non-release audits with no release-gate ledger, record
   `Audit ledger: not applicable (non-release audit)` in every approved parent or
   child issue. Genuine non-OK findings still become real child issues; only the
   snapshot/report is what goes to the ledger instead of a new issue.

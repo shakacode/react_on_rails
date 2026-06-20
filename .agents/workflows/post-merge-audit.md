@@ -41,9 +41,12 @@ self-contained. Keep state-machine changes mirrored across this workflow,
   record `worked_issue_scope: UNKNOWN (setup)` or
   `worked_issue_scope: UNKNOWN (access)` with the exact command/error. Use
   structured public `codex-claim` comments (GitHub comments containing a
-  `codex-claim` JSON block in the "Public claim comment" format from
-  `.agents/workflows/pr-processing.md`) as advisory recovery evidence when
-  available before reducing unknown scope to merged PRs.
+  `codex-claim` HTML comment with key/value fields in the "Public claim
+  comment" format from `.agents/workflows/pr-processing.md`) as advisory
+  recovery evidence when available before reducing unknown scope to merged PRs.
+  If the batch id itself is unknown, scope advisory public-claim discovery to
+  issues and open PRs active within the audit time window; use claim `batch:`
+  fields to surface candidate ids until the user confirms one.
 - For private coordination backend setup and CLI discovery, see
   `internal/contributor-info/agent-coordination-backend.md`.
 
@@ -307,7 +310,8 @@ Return:
 6. reconciled worked-issue coverage table with issue number, coordination
    lane/branch, linked PR or no-PR/blocker evidence, final state,
    intent-achievement classification, and any unresolved `UNKNOWN` facts
-7. recommended next actions
+7. recommended next actions, including a coordinator resume/reassign/drop
+   decision for `stalled` lanes instead of defaulting to issue creation
 
 Do not create issues or PRs yet.
 ```

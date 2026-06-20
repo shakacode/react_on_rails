@@ -39,7 +39,8 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      checked, report private state as `UNKNOWN` and use structured public
      `codex-claim` comments as an advisory fallback. A structured public
      `codex-claim` comment is a GitHub issue/PR comment containing a
-     `codex-claim` JSON block; see the "Public claim comment" format below.
+     `codex-claim` HTML comment (`<!-- codex-claim v1 ... -->`) with key/value
+     fields; see the "Public claim comment" format below.
    - For lanes declared in `batches/<batch-id>.json` with `depends_on`, run
      `agent-coord status` at lane start and before rebase or push. If the lane
      shows unmet `blocked_on` refs, set that lane's heartbeat status to
@@ -554,7 +555,11 @@ Before merge or final readiness, scan the PR description for the decision log an
 > And Handoffs_: record the handoff below on the relevant parent tracking issue
 > (or the agent-coordination repo if one is in use), or in the batch's own PR
 > comment/description when there is no parent umbrella; and append point-in-time
-> audits to the standing release audit ledger in place. Never spawn a standalone
+> audits to the standing release audit ledger in place. Locate that ledger with
+> the release-mode preflight search: open issues with the `release` and
+> `TRACKING` labels, plus `Release gate:` title matches; if no release-gate
+> ledger exists for a release audit, surface that absence before creating
+> follow-up issues. Never spawn a standalone
 > `Handoff: ...` or `Post-rc.N audit` issue. Close superseded process issues on
 > sight; closure follows the work, not whoever opened the tracker.
 
@@ -1164,6 +1169,9 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    `UNKNOWN` as needed, and report the command, permission, or batch id
    confirmation needed to recover the worked issue list instead of identifying a
    confirmed batch subset from PR links or heuristics.
+   If the batch id itself is unknown, scope advisory public-claim discovery to
+   issues and open PRs active within the audit time window, and use each claim's
+   `batch:` field only to surface candidate ids until the user confirms one.
 
    If `agent-coord doctor` and `agent-coord status` both succeed but the named
    batch entry contains no worked issues or lanes, record
@@ -1178,6 +1186,10 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    `worked_issue_scope: UNKNOWN (empty batch, lanes expected)`, collect a manual
    lane list from the user or advisory `codex-claim` comments, and keep
    recovered rows advisory `UNKNOWN` until coordination state is corrected.
+
+   Sync note: this scope algorithm is intentionally mirrored in
+   `.agents/skills/post-merge-audit/SKILL.md` and
+   `.agents/workflows/post-merge-audit.md`; update all copies together.
 
 3. List every PR merged in the range. When `worked_issue_scope` is verified
    from coordination state, identify the batch subset by coordination state,
