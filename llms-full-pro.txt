@@ -5976,6 +5976,9 @@ RSC CSS Module — scope every rule to a class. Keep global resets like `html { 
 dedicated global stylesheet loaded through the Rails layout, not in a CSS Module that rides along
 with a `'use client'` reference.
 
+For automated enforcement, scope a `stylelint` rule such as `selector-max-type: [0]` to
+`*.module.css` files so CI catches bare element selectors before they reach production.
+
 ```css
 /* ProductCard.module.css -- CORRECT: class-scoped rules only */
 .card {

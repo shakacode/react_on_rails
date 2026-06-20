@@ -27884,7 +27884,7 @@ override globals once their stylesheet is delivered. See [CSS cascade guidance](
 for the full explanation and the cautionary `html { font-size }` example.
 
 See [React Performance Tracks and Profiling](../building-features/performance-tracks-and-profiling.md)
-to measure the render-blocking and cascade impact of these links.
+to measure the end-to-end performance impact of RSC changes with a paired A/B comparison.
 
 ## Accidental Client Components
 
