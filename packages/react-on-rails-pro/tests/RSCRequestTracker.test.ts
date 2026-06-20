@@ -26,7 +26,7 @@ const HIGHWATER_MARK = 16 * 1024; // Node.js default PassThrough highWaterMark: 
 
 const createTracker = () => {
   const railsContext = {} as RailsContextWithServerComponentMetadata;
-  return new RSCRequestTracker(railsContext);
+  return new RSCRequestTracker(railsContext, (globalThis as any).generateRSCPayload);
 };
 
 // Helper: create a PassThrough that we control manually as the "source" RSC stream.
@@ -208,7 +208,7 @@ describe('RSCRequestTracker', () => {
   describe('captured RSC diagnostics (#3475)', () => {
     it('starts with no captured diagnostics', () => {
       const tracker = createTracker();
-      expect(tracker.getCapturedRSCDiagnostics()).toEqual([]);
+      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([]);
     });
 
     it('records diagnostics keyed by component name and returns a copy', () => {
@@ -219,7 +219,7 @@ describe('RSCRequestTracker', () => {
       tracker.recordRSCDiagnostic('CommentsToggle', firstError);
       tracker.recordRSCDiagnostic('PostsPage', secondError);
 
-      const captured = tracker.getCapturedRSCDiagnostics();
+      const captured = tracker.getCapturedRSCDiagnosticsForTesting();
       expect(captured).toEqual([
         { componentName: 'CommentsToggle', diagnosticError: firstError },
         { componentName: 'PostsPage', diagnosticError: secondError },
@@ -227,16 +227,16 @@ describe('RSCRequestTracker', () => {
 
       // Returned array is a copy — mutating it must not affect the tracker.
       captured.push({ componentName: 'Injected', diagnosticError: new Error('nope') });
-      expect(tracker.getCapturedRSCDiagnostics()).toHaveLength(2);
+      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toHaveLength(2);
     });
 
     it('clears captured diagnostics on clear()', () => {
       const tracker = createTracker();
       tracker.recordRSCDiagnostic('CommentsToggle', new Error('boom'));
-      expect(tracker.getCapturedRSCDiagnostics()).toHaveLength(1);
+      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toHaveLength(1);
 
       tracker.clear();
-      expect(tracker.getCapturedRSCDiagnostics()).toEqual([]);
+      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([]);
     });
 
     it('suppresses a true duplicate (same component name AND same message) recorded twice', () => {
@@ -250,7 +250,7 @@ describe('RSCRequestTracker', () => {
       tracker.recordRSCDiagnostic('CommentsToggle', firstError);
       tracker.recordRSCDiagnostic('CommentsToggle', duplicateError);
 
-      expect(tracker.getCapturedRSCDiagnostics()).toEqual([
+      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([
         { componentName: 'CommentsToggle', diagnosticError: firstError },
       ]);
     });
@@ -266,7 +266,7 @@ describe('RSCRequestTracker', () => {
       tracker.recordRSCDiagnostic('CommentsToggle', firstError);
       tracker.recordRSCDiagnostic('CommentsToggle', secondError);
 
-      expect(tracker.getCapturedRSCDiagnostics()).toEqual([
+      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([
         { componentName: 'CommentsToggle', diagnosticError: firstError },
         { componentName: 'CommentsToggle', diagnosticError: secondError },
       ]);
@@ -283,7 +283,7 @@ describe('RSCRequestTracker', () => {
       // After consumption a second consumer (e.g. an unrelated later error) finds nothing to merge,
       // so the stale diagnostic cannot be reattached — this is the codex P2 fix (#3475).
       expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([]);
-      expect(tracker.getCapturedRSCDiagnostics()).toEqual([]);
+      expect(tracker.getCapturedRSCDiagnosticsForTesting()).toEqual([]);
     });
   });
 

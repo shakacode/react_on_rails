@@ -185,7 +185,9 @@ const streamRenderReactComponent = (
           if (augmentedStack) {
             error.stack = augmentedStack;
           }
-          sendErrorHtml(error);
+          sendErrorHtml(
+            renderState.error instanceof Error ? renderState.error : enrichWithCapturedRSCDiagnostics(error),
+          );
         },
         onShellReady() {
           renderState.isShellReady = true;

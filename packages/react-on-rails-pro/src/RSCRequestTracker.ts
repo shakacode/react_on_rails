@@ -162,7 +162,7 @@ class RSCRequestTracker {
    *
    * @returns A copy of the captured diagnostics to prevent external mutation
    */
-  getCapturedRSCDiagnostics(): CapturedRSCDiagnostic[] {
+  getCapturedRSCDiagnosticsForTesting(): CapturedRSCDiagnostic[] {
     return [...this.capturedRSCDiagnostics];
   }
 

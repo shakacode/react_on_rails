@@ -429,6 +429,60 @@ describe('streamServerRenderedReactComponent', () => {
     return renderResult;
   };
 
+  const setupRejectedRenderFunctionRSCDiagnosticStreamTest = () => {
+    const renderFunction = (_props, railsContext) => {
+      const diagnosticError = new Error(
+        `[ReactOnRails] RSC bundle rendering failed.\n` +
+          `Component: RejectedPromiseComponent\n` +
+          `Module: /app/components/RejectedPromiseComponent.jsx\n` +
+          `Original error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`,
+      );
+      diagnosticError.name = 'ReactOnRailsRSCStreamError';
+      railsContext.recordRSCDiagnostic('RejectedPromiseComponent', diagnosticError);
+      return Promise.reject(new Error(GENERIC_RSC_DEFERRED_ERROR_MESSAGE));
+    };
+
+    ReactOnRails.register({ RejectedPromiseComponent: renderFunction });
+
+    return streamServerRenderedReactComponent({
+      name: 'RejectedPromiseComponent',
+      domNodeId: 'rejectedPromiseComponentDomId',
+      trace: false,
+      throwJsErrors: true,
+      railsContext: testingRailsContext,
+      generateRSCPayload: jest.fn(),
+    });
+  };
+
+  const setupShellErrorRSCDiagnosticStreamTest = () => {
+    const ShellErrorComponent = () => {
+      throw new Error(GENERIC_RSC_DEFERRED_ERROR_MESSAGE);
+    };
+
+    const renderFunction = (_props, railsContext) => {
+      const diagnosticError = new Error(
+        `[ReactOnRails] RSC bundle rendering failed.\n` +
+          `Component: ShellErrorComponent\n` +
+          `Module: /app/components/ShellErrorComponent.jsx\n` +
+          `Original error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`,
+      );
+      diagnosticError.name = 'ReactOnRailsRSCStreamError';
+      railsContext.recordRSCDiagnostic('ShellErrorComponent', diagnosticError);
+      return ShellErrorComponent;
+    };
+
+    ReactOnRails.register({ ShellErrorComponent: renderFunction });
+
+    return streamServerRenderedReactComponent({
+      name: 'ShellErrorComponent',
+      domNodeId: 'shellErrorComponentDomId',
+      trace: false,
+      throwJsErrors: true,
+      railsContext: testingRailsContext,
+      generateRSCPayload: jest.fn(),
+    });
+  };
+
   // Collects every emitted `error` event into an array so a render that surfaces multiple errors
   // (e.g. two failing Suspense boundaries) does not silently drop all but the last.
   //
@@ -504,6 +558,35 @@ describe('streamServerRenderedReactComponent', () => {
     expect(emittedError.message).toContain('Component: CommentsToggle');
     expect(emittedError.message).toContain('Component: PostsPage');
     expect(emittedError.message).toContain(`React stream error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`);
+  });
+
+  it('enriches a direct render-function rejection with captured RSC diagnostics (#3475)', async () => {
+    const renderResult = setupRejectedRenderFunctionRSCDiagnosticStreamTest();
+    const { chunks, errors } = await collectStreamResult(renderResult);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('RSC bundle rendering failed');
+    expect(errors[0].message).toContain('Component: RejectedPromiseComponent');
+    expect(errors[0].message).toContain(`React stream error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].html).toContain('RSC bundle rendering failed');
+    expect(chunks[0].html).toContain('Component: RejectedPromiseComponent');
+    expect(chunks[0].hasErrors).toBe(true);
+    expect(chunks[0].isShellReady).toBe(false);
+  });
+
+  it('enriches shell-error HTML with captured RSC diagnostics (#3475)', async () => {
+    const renderResult = setupShellErrorRSCDiagnosticStreamTest();
+    const { chunks, errors } = await collectStreamResult(renderResult);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('RSC bundle rendering failed');
+    expect(errors[0].message).toContain('Component: ShellErrorComponent');
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].html).toContain('RSC bundle rendering failed');
+    expect(chunks[0].html).toContain('Component: ShellErrorComponent');
+    expect(chunks[0].hasErrors).toBe(true);
+    expect(chunks[0].isShellReady).toBe(false);
   });
 
   // Misattribution guard (codex P2 #3475): with exactly one captured RSC diagnostic and TWO
@@ -713,30 +796,50 @@ describe('streamServerRenderedReactComponent', () => {
 
   it('runs post-SSR hooks once for unexpected nested Suspense errors', async () => {
     const onPostSSRHook = jest.fn();
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const renderResult = setupUnexpectedNestedSuspenseErrorStreamTest({ onPostSSRHook });
 
-    const { chunks, errors } = await collectStreamResult(renderResult);
+    try {
+      const { chunks, errors } = await collectStreamResult(renderResult);
 
-    expect(errors).toHaveLength(0);
-    expect(onPostSSRHook).toHaveBeenCalledTimes(1);
-    expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
+      expect(errors).toHaveLength(0);
+      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+      // In this React version, onAllReady fires once for this deferred nested-Suspense error path,
+      // so notifySSREnd is called once and the duplicate-call diagnostic should stay quiet.
+      expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('notifySSREnd() called multiple times'),
+      );
+      expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
+    } finally {
+      consoleWarnSpy.mockRestore();
+    }
   });
 
   it('runs post-SSR hooks once when a real error occurs with an RSCRoute ssr=false bailout', async () => {
     const onPostSSRHook = jest.fn();
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { renderResult, generateRSCPayload } = setupMixedRSCRouteBailoutAndNestedSuspenseErrorStreamTest({
       onPostSSRHook,
     });
 
-    const { chunks, errors } = await collectStreamResult(renderResult);
-    const html = chunks.map((chunk) => chunk.html).join('');
+    try {
+      const { chunks, errors } = await collectStreamResult(renderResult);
+      const html = chunks.map((chunk) => chunk.html).join('');
 
-    expect(errors).toHaveLength(0);
-    expect(generateRSCPayload).not.toHaveBeenCalled();
-    expect(onPostSSRHook).toHaveBeenCalledTimes(1);
-    expect(html).toContain('Loading skipped route...');
-    expect(html).toContain('Loading errored boundary...');
-    expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
+      expect(errors).toHaveLength(0);
+      expect(generateRSCPayload).not.toHaveBeenCalled();
+      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+      // React reaches onAllReady once for this mixed bailout+real-error path, so the post-SSR
+      // hook cleanup is single-shot and should not warn about a duplicate notifySSREnd call.
+      expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('notifySSREnd() called multiple times'),
+      );
+      expect(html).toContain('Loading skipped route...');
+      expect(html).toContain('Loading errored boundary...');
+      expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
+    } finally {
+      consoleWarnSpy.mockRestore();
+    }
   });
 
   it('streamServerRenderedReactComponent streams the rendered component', async () => {
