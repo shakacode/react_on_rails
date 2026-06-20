@@ -158,3 +158,122 @@ Return:
 
 Do not create issues, comments, labels, fixes, or PRs.
 ```
+
+## High-Risk Mode
+
+Use this stricter mode when a PR touches release-sensitive surfaces:
+release-candidate or version-bump changes, SSR/RSC/hydration behavior, streaming
+or asset-timing, CI/workflow/build-config, generated output, benchmark-sensitive
+code, Pro/core boundaries, or concurrent batch work. It does not replace the
+steps above; it adds proof-of-bug, simplicity, and merge-gate-clarity demands so
+a strong-looking handoff cannot hide an unsatisfied gate.
+
+For high-risk or concurrent-batch PRs, this review is required before readiness
+only in the sense that its `BLOCKING` and `DISCUSS` findings must be fixed,
+explicitly decided, or waived. It remains report-only; it is not a GitHub
+approval object and does not replace maintainer review or branch protection.
+
+### Extra Steps
+
+1. **Prove the bug without the fix.** When feasible, reproduce the reported
+   failure against a merge-base/base checkout, or against a verified
+   test-only/pre-fix fixture commit that is known not to contain the fix, using
+   the same repro, test, or script the PR adds, and capture the failing evidence.
+   Then confirm it passes on the current PR head. If the bug cannot be
+   reproduced, say so and downgrade confidence — a fix for an unprovable bug is
+   itself a `DISCUSS`.
+   Accepted infeasibility reasons are limited to missing historical repro
+   artifacts, a base that cannot build/run after reasonable setup, external
+   secrets or prod-only systems, destructive/unsafe operations, or cost/time
+   beyond the lane budget. Name the reason, evidence, and confidence impact.
+2. **Verify the fix is correct and minimal.** Check that it waits for the
+   _minimum_ required condition (not an over-broad wait that masks races), that
+   the invariant lives in the simplest single place rather than being duplicated
+   across layers, and that it does not regress app-authored behavior (for FOUC/RSC
+   work: preload/style attributes, split stream chunks, encoding boundaries).
+3. **Separate implementation confidence from merge-gate readiness, and report the
+   three approval concepts distinctly** (see Approval And Merge-Gate Clarity).
+
+### Approval And Merge-Gate Clarity
+
+The #4047/#4045 closeout was confusing because three similar-looking concepts
+were conflated. Always report them separately for a high-risk PR:
+
+- **Maintainer approval comment** — a human comment in the PR discussion. It is
+  evidence of intent, but it is _not_ a formal GitHub review object and does not
+  populate `reviewDecision`.
+- **GitHub `reviewDecision`** — the formal review-object state
+  (`APPROVED` / `CHANGES_REQUESTED` / `REVIEW_REQUIRED` / null). This is the only
+  thing branch protection enforces.
+- **`script/pr-merge-ledger <PR> --strict`** — the local mechanical gate; check
+  whether it currently returns `complete_allowed: true` for the current head SHA.
+
+Then classify every remaining blocker by _type_ so the reader knows who/what
+clears it:
+
+- **policy gate** — repo policy requires a formal review object for this PR/lane.
+- **GitHub API state** — e.g. `reviewDecision` is null or stale vs the head SHA.
+- **CI/check failure** — a required or configured check is failing or pending.
+- **real code concern** — a `BLOCKING`/`DISCUSS` finding from this review.
+
+If a plain maintainer comment is intended to be sufficient for a specific lane,
+that waiver/decision must be stated explicitly in the handoff and reflected in
+whatever policy or ledger input supports it. Never silently treat an "approved"
+comment and a formal GitHub review object as the same thing.
+
+### Suggested Adversarial Questions
+
+Seed the review with questions such as:
+
+- Can we prove the bug exists without the fix using the same repro or test?
+- Does the fix wait for the minimum required thing, or accidentally wait for too
+  much?
+- What happens on timeout, missing assets, malformed streams, split chunks, or
+  encoding boundaries?
+- Does this preserve app-authored preload/style behavior?
+- Are review-agent results current-head evidence or stale advisory history?
+- Are benchmarks required because the change touches streaming, hydration, SSR,
+  or asset timing?
+- Is there a simpler location to enforce the invariant without duplicating policy
+  across layers?
+- What is the failure mode if inferred metadata is absent or wrong?
+- Are we conflating human confidence, GitHub review state, and local ledger state?
+
+### Dashboard-Friendly Pending-Action Block
+
+End a high-risk report with a stable block an agent-coordination dashboard can
+parse. Emit exactly one `state` from the allowed set so the dashboard can route
+the PR. Use `state: ready_to_merge` only when no maintainer action, CI, review
+agent, or code change remains.
+
+Allowed `state` values are `waiting_maintainer_review`, `waiting_ci`,
+`waiting_review_agent`, `waiting_code_change`, and `ready_to_merge`.
+
+```yaml
+pending_maintainer_action:
+  required: true # false only when state is ready_to_merge
+  state: waiting_maintainer_review # | waiting_ci | waiting_review_agent | waiting_code_change | ready_to_merge
+  owner: maintainer # who must act: maintainer | author | review-agent | none
+  action: 'Submit formal GitHub review for current head'
+  reason: 'reviewDecision is null'
+  blocks_merge: true
+  evidence:
+    pr: <PR_NUMBER>
+    head_sha: '<sha>'
+    review_decision: null # APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | null
+    maintainer_approval_comment: true # a human comment exists, but is not a review object
+    ledger_complete_allowed: false # script/pr-merge-ledger <PR> --strict
+    ci_readiness: NOT_READY # from pr-ci-readiness: READY | NOT_READY | UNKNOWN
+```
+
+### Retrospective Fixture: #4047
+
+`#4047` (Fix Pro FOUC reveal gating, merged 2026-06-16) is the canonical replay
+fixture for this mode — it touches FOUC/RSC streaming, hydration, benchmarks, and
+formal review state. Replaying it should surface: (a) the proof-before/after via
+its FOUC Playwright coverage, (b) the simplicity question about _where_ stylesheet
+readiness is gated, and (c) a pending-action block that distinguished a maintainer
+approval comment from a populated `reviewDecision` and from the ledger's
+`complete_allowed` — the exact conflation that motivated this mode. Use it to
+sanity-check that a new high-risk report keeps those three approval concepts
+separate.
