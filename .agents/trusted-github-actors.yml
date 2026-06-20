@@ -1,0 +1,18 @@
+# GitHub actors whose public issue/PR/review comments may be acted on by
+# PR-batch automation. Keep this list deliberately strict: unknown actors are
+# queued for maintainer triage, not interpreted as instructions.
+#
+# `trusted_teams` entries are GitHub team slugs under the repo owner org. They
+# are optional and require the local GitHub token to read team membership.
+trusted_users:
+  - justin808
+
+trusted_bots:
+  - chatgpt-codex-connector
+  - claude
+  - coderabbitai
+  - cursor
+  - dependabot
+  - greptile-apps
+
+trusted_teams: []
