@@ -5941,11 +5941,15 @@ output.
 
 ### RSC stylesheet cascade order (end-of-`<head>` precedence)
 
+This pitfall applies to React 19+ installations, where React manages stylesheet precedence groups
+via the `data-precedence` attribute. React 18 does not hoist these stylesheet groups.
+
 Each `'use client'` reference's CSS is emitted as a
 `<link rel="stylesheet" data-precedence="rsc-css">` tag. React places every
 `data-precedence="rsc-css"` link at the **end** of `<head>`, after framework and vendor CSS, so
-these stylesheets win source-order ties against precedence-less stylesheets — including the
-Rails-layout `stylesheet_pack_tag` links that have no `data-precedence` attribute.
+when specificity is equal, these stylesheets win source-order ties against precedence-less
+stylesheets — including the Rails-layout `stylesheet_pack_tag` links that have no `data-precedence`
+attribute.
 
 This matters when an RSC CSS Module contains a **bare element selector**. CSS Module _class names_
 are scoped, but bare element selectors (`html`, `body`, `a:focus`, and so on) still apply globally.
@@ -5955,7 +5959,8 @@ override your global styles unexpectedly once that stylesheet is delivered:
 ```css
 /* WRONG: a Bootstrap-style bare element selector inside an RSC CSS Module.
    It is NOT scoped, and the rsc-css group lands at the end of <head>, so this
-   wins source-order ties and resets the root font-size site-wide. */
+   can win source-order ties against a global html rule and reset the root
+   font-size site-wide. */
 html {
   font-size: 14px;
 }
@@ -5971,10 +5976,24 @@ RSC CSS Module — scope every rule to a class. Keep global resets like `html { 
 dedicated global stylesheet loaded through the Rails layout, not in a CSS Module that rides along
 with a `'use client'` reference.
 
-For the render-blocking and per-reference injection behavior behind these links, see
-[RSC Stylesheet Injection: Render-Blocking Links and Cascade Order](../../oss/migrating/rsc-troubleshooting.md#rsc-stylesheet-injection-render-blocking-links-and-cascade-order)
-in the RSC troubleshooting guide. To measure the cascade and load impact, see
-[React Performance Tracks and Profiling](../../oss/building-features/performance-tracks-and-profiling.md).
+```css
+/* ProductCard.module.css -- CORRECT: class-scoped rules only */
+.card {
+  font-size: 0.875rem;
+  padding: 1rem;
+}
+```
+
+```css
+/* application.css -- CORRECT: global reset loaded through the Rails layout */
+html {
+  font-size: 14px;
+}
+```
+
+See [RSC stylesheet injection troubleshooting](../../oss/migrating/rsc-troubleshooting.md#rsc-stylesheet-injection-render-blocking-links-and-cascade-order)
+for the render-blocking and per-reference injection behavior behind these links. See [React Performance Tracks and Profiling](../../oss/building-features/performance-tracks-and-profiling.md)
+to measure the cascade and load impact.
 
 ## Known limitations
 

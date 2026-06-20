@@ -27847,7 +27847,10 @@ The RSC path uses `InteractiveWidgetsClient` (thin wrapper) to keep ProductCard'
 
 ## RSC Stylesheet Injection: Render-Blocking Links and Cascade Order
 
-This section documents the current RSC stylesheet injection behavior so you know what to expect in the page source — it is not an open defect.
+This section documents the current RSC stylesheet injection behavior so you know what to expect in
+the page source — it is not an open defect. It applies to React 19+ installations; earlier React
+versions do not support the `data-precedence` stylesheet groups used for this hoisting and
+render-blocking behavior.
 
 For RSC pages, React on Rails Pro injects one `<link rel="stylesheet" data-precedence="rsc-css">` per `'use client'` reference's CSS. These links are **render-blocking** for the streamed RSC tree: React delays committing the streamed content until the referenced stylesheets are ready, which prevents a flash of unstyled content (FOUC) as the tree streams in.
 
@@ -27859,15 +27862,28 @@ Earlier versions re-broadcast shared vendor and common CSS _per client reference
 - [react_on_rails_rsc#110](https://github.com/shakacode/react_on_rails_rsc/pull/110)
 - [react_on_rails_rsc#113](https://github.com/shakacode/react_on_rails_rsc/pull/113)
 
-If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, upgrade to a `react-on-rails-rsc` version that includes the fix (**>= 19.2.0-rc.3**). Do not bump `react-on-rails-rsc` on its own: it must be upgraded together with a compatible React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check can fail at startup. Follow the coordinated version matrix in [Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md). On a supported, coordinated version set this is resolved — the shared CSS is emitted once.
+If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, upgrade to a
+coordinated React 19.2-compatible set that includes a `react-on-rails-rsc` version with the fix
+(**>= 19.2.0-rc.3**, or the stable `19.2.x` release when available). Do not bump
+`react-on-rails-rsc` on its own: it must be upgraded together with a compatible React, React DOM, and
+React on Rails Pro set, or the Pro node renderer's peer-compatibility check can fail at startup. Do
+not use the default React 19.0.x generator pin from
+[Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md) for
+this duplicate-CSS fix; that guide remains the baseline 19.0.x RSC setup path. Use the release notes
+or maintainer-provided 19.2 compatibility guidance for the exact React, React DOM, React on Rails
+Pro, and `react-on-rails-rsc` versions. On a supported, coordinated version set this is resolved —
+the shared CSS is emitted once.
 
 ### Cascade order
 
-The `data-precedence="rsc-css"` group lands at the **end** of `<head>`, after precedence-less stylesheets such as the Rails-layout `stylesheet_pack_tag` links. This means rsc-css links win source-order ties, and bare element selectors inside RSC CSS Modules can override globals once their stylesheet is delivered. For the full explanation and the cautionary `html { font-size }` example, see
-[CSS and styling — RSC stylesheet cascade order](../../pro/react-server-components/css-and-styling.md#rsc-stylesheet-cascade-order-end-of-head-precedence).
+The `data-precedence="rsc-css"` group lands at the **end** of `<head>`, after precedence-less
+stylesheets such as the Rails-layout `stylesheet_pack_tag` links. This means rsc-css links win
+source-order ties when specificity is equal, and bare element selectors inside RSC CSS Modules can
+override globals once their stylesheet is delivered. See [CSS cascade guidance](../../pro/react-server-components/css-and-styling.md#rsc-stylesheet-cascade-order-end-of-head-precedence)
+for the full explanation and the cautionary `html { font-size }` example.
 
-To measure the render-blocking and cascade impact of these links, see
-[React Performance Tracks and Profiling](../building-features/performance-tracks-and-profiling.md).
+See [React Performance Tracks and Profiling](../building-features/performance-tracks-and-profiling.md)
+to measure the render-blocking and cascade impact of these links.
 
 ## Accidental Client Components
 
