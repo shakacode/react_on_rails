@@ -177,7 +177,7 @@ class AsyncPropsManager {
     this.propNameToPromiseController.forEach((controller, propName) => {
       if (!controller.resolved && !controller.pullRequested && !this.isPushProp(propName)) {
         if (propName.length > MAX_PULL_PROP_NAME_LENGTH) {
-          void AsyncPropsManager.rejectOversizedPullPropRequest(propName, controller);
+          AsyncPropsManager.rejectOversizedPullPropRequestInPlace(propName, controller);
           return;
         }
         // eslint-disable-next-line no-param-reassign
@@ -237,11 +237,18 @@ class AsyncPropsManager {
   }
 
   private static rejectOversizedPullPropRequest(propName: string, promiseController: PromiseController) {
+    AsyncPropsManager.rejectOversizedPullPropRequestInPlace(propName, promiseController);
+    return promiseController.promise;
+  }
+
+  private static rejectOversizedPullPropRequestInPlace(
+    propName: string,
+    promiseController: PromiseController,
+  ) {
     promiseController.promise.catch(() => {});
     promiseController.reject(AsyncPropsManager.getOversizedPropNameError(propName));
     // eslint-disable-next-line no-param-reassign
     promiseController.resolved = true;
-    return promiseController.promise;
   }
 
   private getOrCreatePromiseController(propName: string) {

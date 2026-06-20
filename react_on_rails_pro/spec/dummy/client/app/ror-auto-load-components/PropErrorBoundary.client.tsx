@@ -17,6 +17,8 @@
 
 import * as React from 'react';
 
+const rejectedByServerPrefix = (propName: string) => `Prop "${propName}" rejected by server: `;
+
 class PropErrorBoundary extends React.Component<
   { propName: string; children: React.ReactNode },
   { error: Error | null }
@@ -32,9 +34,11 @@ class PropErrorBoundary extends React.Component<
 
   render() {
     if (this.state.error) {
+      const message = this.state.error.message.replace(rejectedByServerPrefix(this.props.propName), '');
+
       return (
         <div data-testid={`${this.props.propName}-error`} className="prop-error">
-          Error loading {this.props.propName}: {this.state.error.message}
+          Error loading {this.props.propName}: {message}
         </div>
       );
     }

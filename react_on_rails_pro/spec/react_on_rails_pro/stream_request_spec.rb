@@ -56,6 +56,25 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
   end
 
+  describe "#normalize_executor_result" do
+    subject(:request) { described_class.send(:new) { nil } }
+
+    it "unpacks only explicit pull renderer results" do
+      response = mock_ok_response(to_length_prefixed("chunk"))
+      emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
+
+      expect(
+        request.send(:normalize_executor_result, { pull_result: true, response:, emitter: })
+      ).to eq([response, emitter])
+    end
+
+    it "treats response-shaped hashes without the pull sentinel as bare responses" do
+      response_hash = { response: :ordinary_hash_payload }
+
+      expect(request.send(:normalize_executor_result, response_hash)).to eq([response_hash, nil])
+    end
+  end
+
   describe "#process_response_chunks" do
     subject(:request) { described_class.send(:new) { nil } }
 
@@ -326,7 +345,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
       response = mock_ok_response("malformed\n")
       stream = described_class.create(pull_enabled: true) do |_send_bundle, _tasks|
-        { response:, emitter: }
+        { pull_result: true, response:, emitter: }
       end
 
       expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRails::Error, /missing tab separator/)
@@ -420,7 +439,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
           else
             mock_ok_response(to_length_prefixed("ok"))
           end
-        { response:, emitter: }
+        { pull_result: true, response:, emitter: }
       end
 
       chunks = []

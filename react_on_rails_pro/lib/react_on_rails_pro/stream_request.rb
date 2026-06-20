@@ -109,11 +109,10 @@ module ReactOnRailsPro
     end
   end
 
-  STREAM_CONTROL_MESSAGE_TYPES = %w[propRequest renderComplete].freeze
-  private_constant :STREAM_CONTROL_MESSAGE_TYPES
-
   class StreamRequest
     MAX_PULL_PROP_NAME_LENGTH = 256
+    CONTROL_MESSAGE_TYPES = %w[propRequest renderComplete].freeze
+    private_constant :CONTROL_MESSAGE_TYPES
 
     def http_status = @status
 
@@ -210,12 +209,12 @@ module ReactOnRailsPro
     end
 
     # Expected shapes from callers:
-    #   render_code_with_incremental_updates => { response:, emitter: }
+    #   render_code_with_incremental_updates => { pull_result: true, response:, emitter: }
     #   render_code_as_stream                => bare response object (pre-pull mode)
     def normalize_executor_result(result)
       # Incremental rendering returns a named result so unrelated Array-like responses are never
       # mistaken for [response, emitter]. Older renderers still return only response.
-      return result.values_at(:response, :emitter) if result.is_a?(Hash) && result.key?(:response)
+      return result.values_at(:response, :emitter) if result.is_a?(Hash) && result[:pull_result] == true
 
       [result, nil]
     end
@@ -230,7 +229,7 @@ module ReactOnRailsPro
     def parse_and_route_chunk(parser, chunk, &)
       yielded_content = false
       parser.feed(chunk) do |parsed|
-        next route_control_message(parsed) if STREAM_CONTROL_MESSAGE_TYPES.include?(parsed["messageType"])
+        next route_control_message(parsed) if CONTROL_MESSAGE_TYPES.include?(parsed["messageType"])
 
         yield parsed
         yielded_content = true
