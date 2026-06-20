@@ -431,7 +431,9 @@ release-affecting, developer-workflow-affecting, or otherwise covered by the req
 QA may be recorded as `not required` with a one-line rationale instead of spawning a separate worker.
 
 For mixed batches, apply QA to any subset that would individually qualify as release-affecting or
-workflow-affecting, even when the remaining targets would be low-risk on their own.
+workflow-affecting, even when the remaining targets would be low-risk on their own. Record that
+qualifying subset in the QA Evidence `Scope checked` field and, when the coordination backend has a
+supported lane note or metadata field, in the final lane state; do not invent new backend schema.
 
 Coordinate QA with the same primitives as other batch lanes:
 
@@ -459,7 +461,8 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 - Automated checks: <commands, CI links, or "covered by worker validation: ...">
 - Manual checks: <workflow/app smoke checks, screenshots, or "not applicable: ...">
 - Findings: <none, fixed in PR(s), waived with link, or follow-up recommended>
-- Release-blocking status: <clear | blocked | waived | not required with rationale>
+- QA lane status: <required | not required with rationale>
+- Release-blocking status: <clear | blocked | waived | not applicable>
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable; use not
   applicable when QA found no recurring process miss; see Process Gap Disposition under Batch Handoff
   Format for value definitions>
@@ -1380,7 +1383,9 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
 
    Sync note: this scope algorithm is intentionally mirrored in
    `.agents/skills/post-merge-audit/SKILL.md` and
-   `.agents/workflows/post-merge-audit.md`; update all copies together.
+   `.agents/workflows/post-merge-audit.md`; QA lane planning and handoff
+   touchpoints are also mirrored in `.agents/skills/pr-batch/SKILL.md`; update
+   all copies together.
 
    After the scope algorithm identifies the batch or reports an `UNKNOWN` scope,
    collect any QA lane and QA Evidence block for that batch. Do not use missing
