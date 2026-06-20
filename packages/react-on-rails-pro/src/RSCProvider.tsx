@@ -56,6 +56,16 @@ type RSCContextType = {
 
 const RSCContext = createContext<RSCContextType | undefined>(undefined);
 
+const dropVersionStateKey = (prev: Record<string, number>, key: string) => {
+  if (!(key in prev)) {
+    return prev;
+  }
+  const next = { ...prev };
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete next[key];
+  return next;
+};
+
 /**
  * Creates a provider context for React Server Components.
  *
@@ -182,10 +192,7 @@ export const createRSCProvider = ({
                 ) {
                   return prev;
                 }
-                const next = { ...prev };
-                // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-                delete next[evictedKey];
-                return next;
+                return dropVersionStateKey(prev, evictedKey);
               };
               setVersions(dropVersionState);
               setSuccessfulVersions(dropVersionState);
@@ -198,13 +205,7 @@ export const createRSCProvider = ({
 
     const dropVersionStateForKey = useCallback((key: string) => {
       const dropVersionState = (prev: Record<string, number>) => {
-        if (!(key in prev)) {
-          return prev;
-        }
-        const next = { ...prev };
-        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-        delete next[key];
-        return next;
+        return dropVersionStateKey(prev, key);
       };
 
       setVersions(dropVersionState);
@@ -311,7 +312,7 @@ export const createRSCProvider = ({
               // replacements cannot have piled up because later callers reuse
               // the cached promise, while stale refetch races are guarded
               // separately.
-              evictedSuccessfulPayloadKeys.delete(key);
+              evictedSuccessfulPayloadKeys.deleteWithoutEvict(key);
               inFlightEvictedSuccessfulPayloadCounts.delete(key);
             }
           }
@@ -418,7 +419,7 @@ export const createRSCProvider = ({
                 // Delete the entire count: a winning refetch supersedes
                 // replacement-load latches for this key, so stale replacements
                 // should not re-notify when their `.finally()` handlers run.
-                evictedSuccessfulPayloadKeys.delete(key);
+                evictedSuccessfulPayloadKeys.deleteWithoutEvict(key);
                 inFlightEvictedSuccessfulPayloadCounts.delete(key);
               }
               return payload;

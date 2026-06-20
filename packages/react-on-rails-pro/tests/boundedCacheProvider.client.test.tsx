@@ -135,10 +135,10 @@ describe('BoundedLRU', () => {
     expect(has(lru, 'x')).toBe(false);
   });
 
-  it('delete() drops the value and its pin state together', () => {
+  it('deleteWithoutEvict() drops the value and its pin state together', () => {
     const { lru } = makeLRU(2);
     lru.setPinned('a', 'A');
-    lru.delete('a');
+    lru.deleteWithoutEvict('a');
     expect(has(lru, 'a')).toBe(false);
     // Re-adding 'a' must not be protected by a stale pin from before delete.
     lru.set('a', 'A2');
@@ -147,12 +147,12 @@ describe('BoundedLRU', () => {
     expect(has(lru, 'a')).toBe(false);
   });
 
-  it('delete(key, true) keeps outstanding same-key pins intact', () => {
+  it('deleteWithoutEvict(key, true) keeps outstanding same-key pins intact', () => {
     const { lru, evicted } = makeLRU(1);
 
     lru.setPinned('k', 'old request'); // older request pin
     lru.setPinned('k', 'failed request'); // failed request pin
-    lru.delete('k', true); // failed request removes only its value
+    lru.deleteWithoutEvict('k', true); // failed request removes only its value
     lru.setPinned('k', 'retry request'); // newer retry pin
 
     // Stale finally handlers from the failed and older requests settle after
@@ -232,7 +232,7 @@ describe('BoundedLRU', () => {
 
     lru.setPinned('restored', 'failed refetch');
     lru.setPinned('other inflight', 'I');
-    lru.delete('restored', true);
+    lru.deleteWithoutEvict('restored', true);
     lru.setPinned('restored', 'R');
 
     expect(has(lru, 'other inflight')).toBe(true);

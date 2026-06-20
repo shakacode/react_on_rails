@@ -136,8 +136,8 @@ export class BoundedLRU<V> {
     this.evictIfNeeded();
   }
 
-  delete(key: string, preservePins = false): void {
-    this.assertNotEvicting('delete');
+  deleteWithoutEvict(key: string, preservePins = false): void {
+    this.assertNotEvicting('deleteWithoutEvict');
     // Intentionally does not call `onEvict`: current callers handle companion
     // state before deleting/restoring a key. Future callers that need eviction
     // cleanup should use an eviction path, not this raw delete. The default also
@@ -150,7 +150,7 @@ export class BoundedLRU<V> {
   }
 
   deletePreservingPins(key: string): void {
-    this.delete(key, true);
+    this.deleteWithoutEvict(key, true);
   }
 
   unpin(key: string): void {
@@ -169,6 +169,8 @@ export class BoundedLRU<V> {
     // now the most-recently-used. `get` promotes only when the key is still
     // present; a key already deleted, e.g. by `restoreLastSuccessfulPromise`,
     // stays absent.
+    // Promote to MRU: the just-settled key should not be the immediate
+    // eviction victim; later sets/unpins evict genuinely colder entries.
     this.get(key);
     // Reconcile any pin-induced over-cap overflow, but protect the just-settled
     // key from being evicted by its own `unpin`. Without this, when a burst of
