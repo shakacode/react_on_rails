@@ -27845,6 +27845,30 @@ The RSC path uses `InteractiveWidgetsClient` (thin wrapper) to keep ProductCard'
 
 > **When to apply this:** Check the manifest or Network tab after building. If an RSC page downloads chunks larger than expected, start with a thin wrapper. If contamination persists because the component is shared across RSC and non-RSC entry points, use prop injection to remove the shared import edge.
 
+## RSC Stylesheet Injection: Render-Blocking Links and Cascade Order
+
+This section documents the current RSC stylesheet injection behavior so you know what to expect in the page source — it is not an open defect.
+
+For RSC pages, React on Rails Pro injects one `<link rel="stylesheet" data-precedence="rsc-css">` per `'use client'` reference's CSS. These links are **render-blocking** for the streamed RSC tree: React delays committing the streamed content until the referenced stylesheets are ready, which prevents a flash of unstyled content (FOUC) as the tree streams in.
+
+### Per-reference broadcast multiplication (fixed in 19.2.0-rc.3)
+
+Earlier versions re-broadcast shared vendor and common CSS _per client reference_, multiplying the same `<link>` tag across every reference that depended on it. This was fixed upstream in `react-on-rails-rsc` 19.2.0-rc.3 via:
+
+- [react_on_rails_rsc#108](https://github.com/shakacode/react_on_rails_rsc/pull/108)
+- [react_on_rails_rsc#110](https://github.com/shakacode/react_on_rails_rsc/pull/110)
+- [react_on_rails_rsc#113](https://github.com/shakacode/react_on_rails_rsc/pull/113)
+
+If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, upgrade to a `react-on-rails-rsc` version that includes the fix (**>= 19.2.0-rc.3**). Do not bump `react-on-rails-rsc` on its own: it must be upgraded together with a compatible React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check can fail at startup. Follow the coordinated version matrix in [Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md). On a supported, coordinated version set this is resolved — the shared CSS is emitted once.
+
+### Cascade order
+
+The `data-precedence="rsc-css"` group lands at the **end** of `<head>`, after precedence-less stylesheets such as the Rails-layout `stylesheet_pack_tag` links. This means rsc-css links win source-order ties, and bare element selectors inside RSC CSS Modules can override globals once their stylesheet is delivered. For the full explanation and the cautionary `html { font-size }` example, see
+[CSS and styling — RSC stylesheet cascade order](../../pro/react-server-components/css-and-styling.md#rsc-stylesheet-cascade-order-end-of-head-precedence).
+
+To measure the render-blocking and cascade impact of these links, see
+[React Performance Tracks and Profiling](../building-features/performance-tracks-and-profiling.md).
+
 ## Accidental Client Components
 
 A component that should be a Server Component becomes a Client Component because it's imported by a `'use client'` file.
