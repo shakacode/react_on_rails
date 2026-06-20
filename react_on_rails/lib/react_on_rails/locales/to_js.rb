@@ -10,12 +10,6 @@ module ReactOnRails
       def file_format
         "js"
       end
-
-      def template_translations
-        <<~JS
-          export const translations = #{@translations};
-        JS
-      end
     end
   end
 end
