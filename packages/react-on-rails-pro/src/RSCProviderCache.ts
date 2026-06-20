@@ -42,10 +42,11 @@ export const RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES = RSC_PAYLOAD_CACHE_MAX_ENTR
 
 /**
  * A tiny insertion-ordered LRU over a `Map`. `get` and `set` move the key to
- * the most-recently-used position (end of the Map), while `has` and
- * `get(key, false)` are recency-neutral reads. When `set` pushes the size past
- * `maxEntries`, the least-recently-used key (front of the Map) is evicted and passed to
- * `onEvict` so callers can drop companion state keyed by the same payload key.
+ * the most-recently-used position (end of the Map), while `get(key, false)` is
+ * a recency-neutral read. Values must not be `undefined`; `undefined` is the
+ * cache-miss sentinel. When `set` pushes the size past `maxEntries`, the
+ * least-recently-used key (front of the Map) is evicted and passed to `onEvict`
+ * so callers can drop companion state keyed by the same payload key.
  *
  * A key can be `pin`-ned to prevent eviction while it is in-flight. Pins are
  * REF-COUNTED: each `pin` increments and each `unpin` decrements a per-key
@@ -77,22 +78,18 @@ export const RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES = RSC_PAYLOAD_CACHE_MAX_ENTR
 export class BoundedLRU<V> {
   private map = new Map<string, V>();
 
-  private pinCounts = new Map<string, number>();
+  private pins = new Map<string, number>();
 
   constructor(
     private readonly maxEntries: number,
     private readonly onEvict: (key: string) => void,
   ) {}
 
-  has(key: string): boolean {
-    return this.map.has(key);
-  }
-
   get(key: string, promote = true): V | undefined {
-    if (!this.map.has(key)) {
+    const value = this.map.get(key);
+    if (value === undefined) {
       return undefined;
     }
-    const value = this.map.get(key) as V;
     if (!promote) {
       return value;
     }
@@ -126,7 +123,7 @@ export class BoundedLRU<V> {
     this.map.delete(key);
     this.map.set(key, value);
     // Pin before eviction so the new key cannot be the eviction victim.
-    this.pin(key);
+    this.pins.set(key, (this.pins.get(key) ?? 0) + 1);
     this.evictIfNeeded();
   }
 
@@ -136,38 +133,26 @@ export class BoundedLRU<V> {
     // cleanup should use an eviction path, not this raw delete.
     this.map.delete(key);
     if (!preservePins) {
-      this.pinCounts.delete(key);
+      this.pins.delete(key);
     }
   }
 
-  /**
-   * Prevent `key` from being evicted until a matching `unpin` runs. Ref-counted:
-   * overlapping in-flight refetches for the same key each add a pin.
-   */
-  pin(key: string): void {
-    this.pinCounts.set(key, (this.pinCounts.get(key) ?? 0) + 1);
-  }
-
   unpin(key: string): void {
-    const count = this.pinCounts.get(key);
+    const count = this.pins.get(key);
     if (count === undefined) {
       return;
     }
     if (count > 1) {
-      this.pinCounts.set(key, count - 1);
+      this.pins.set(key, count - 1);
       return;
     }
 
-    this.pinCounts.delete(key);
+    this.pins.delete(key);
     // The in-flight operation that held this pin just settled, so the key is
-    // now the most-recently-used. Promote it to the MRU position (only when
-    // still present; a key already deleted, e.g. by
-    // `restoreLastSuccessfulPromise`, stays absent).
-    if (this.map.has(key)) {
-      const value = this.map.get(key) as V;
-      this.map.delete(key);
-      this.map.set(key, value);
-    }
+    // now the most-recently-used. `get` promotes only when the key is still
+    // present; a key already deleted, e.g. by `restoreLastSuccessfulPromise`,
+    // stays absent.
+    this.get(key);
     // Reconcile any pin-induced over-cap overflow, but protect the just-settled
     // key from being evicted by its own `unpin`. Without this, when a burst of
     // concurrent in-flight initial loads pushed the cache past `maxEntries` and
@@ -180,10 +165,6 @@ export class BoundedLRU<V> {
     this.evictIfNeeded(key);
   }
 
-  private isPinned(key: string): boolean {
-    return (this.pinCounts.get(key) ?? 0) > 0;
-  }
-
   /**
    * Evict least-recently-used unpinned keys until the map is back within
    * `maxEntries`. `preventEvictingKey`, when given, is treated as un-evictable
@@ -194,22 +175,17 @@ export class BoundedLRU<V> {
    * reconciliation.
    */
   private evictIfNeeded(preventEvictingKey?: string): void {
-    while (this.map.size > this.maxEntries) {
-      let evicted: string | undefined;
-      for (const candidate of this.map.keys()) {
-        if (candidate !== preventEvictingKey && !this.isPinned(candidate)) {
-          evicted = candidate;
-          break;
-        }
-      }
-      // Every remaining key is pinned (in-flight) or protected; stop and let a
-      // later set/unpin reconcile once a colder key becomes evictable.
-      if (evicted === undefined) {
+    for (const candidate of this.map.keys()) {
+      if (this.map.size <= this.maxEntries) {
         return;
       }
-      this.map.delete(evicted);
-      this.pinCounts.delete(evicted);
-      this.onEvict(evicted);
+      if (candidate !== preventEvictingKey && !this.pins.has(candidate)) {
+        this.map.delete(candidate);
+        this.pins.delete(candidate);
+        this.onEvict(candidate);
+      }
     }
+    // Every remaining key is pinned (in-flight) or protected; stop and let a
+    // later set/unpin reconcile once a colder key becomes evictable.
   }
 }

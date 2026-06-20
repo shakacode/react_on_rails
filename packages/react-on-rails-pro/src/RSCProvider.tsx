@@ -153,7 +153,7 @@ export const createRSCProvider = ({
             // state for the re-entered key.
             if (
               refetchVersionsRef.current[evictedKey] !== undefined ||
-              fetchRSCPromisesRef.current?.has(evictedKey)
+              fetchRSCPromisesRef.current?.get(evictedKey, false) !== undefined
             ) {
               return;
             }
@@ -166,7 +166,7 @@ export const createRSCProvider = ({
                 // between the outer check and this setState commit.
                 if (
                   refetchVersionsRef.current[evictedKey] !== undefined ||
-                  fetchRSCPromisesRef.current?.has(evictedKey)
+                  fetchRSCPromisesRef.current?.get(evictedKey, false) !== undefined
                 ) {
                   return prev;
                 }
@@ -240,13 +240,6 @@ export const createRSCProvider = ({
         // `restoreLastSuccessfulPromise` closure before assigning `promise`).
         let promise!: Promise<ReactNode>;
         let payloadSucceeded = false;
-        const hasInFlightEvictedSuccessLatch = () =>
-          (inFlightEvictedSuccessfulPayloadPromises.get(key)?.size ?? 0) > 0;
-        const addInFlightEvictedSuccessLatch = () => {
-          const promises = inFlightEvictedSuccessfulPayloadPromises.get(key) ?? new Set<Promise<ReactNode>>();
-          promises.add(promise);
-          inFlightEvictedSuccessfulPayloadPromises.set(key, promises);
-        };
         const removeInFlightEvictedSuccessLatch = () => {
           const promises = inFlightEvictedSuccessfulPayloadPromises.get(key);
           if (!promises?.delete(promise)) {
@@ -258,10 +251,8 @@ export const createRSCProvider = ({
           return true;
         };
         const notifyRoutesOnSuccess =
-          evictedSuccessfulPayloadKeys.has(key) || hasInFlightEvictedSuccessLatch();
-        const keepEvictedSuccessMarker = () => {
-          evictedSuccessfulPayloadKeys.set(key, true);
-        };
+          evictedSuccessfulPayloadKeys.get(key, false) !== undefined ||
+          (inFlightEvictedSuccessfulPayloadPromises.get(key)?.size ?? 0) > 0;
         const markPayloadIfSuccessful = (payload: ReactNode) => {
           if (!(payload instanceof Error)) {
             payloadSucceeded = markSuccessfulPromise(key, promise, notifyRoutesOnSuccess);
@@ -277,7 +268,7 @@ export const createRSCProvider = ({
           serverComponentPromise = getServerComponent({ componentName, componentProps });
         } catch (error) {
           if (notifyRoutesOnSuccess) {
-            keepEvictedSuccessMarker();
+            evictedSuccessfulPayloadKeys.set(key, true);
           }
           throw error;
         }
@@ -285,11 +276,13 @@ export const createRSCProvider = ({
         promise = serverComponentPromise.then(markPayloadIfSuccessful).finally(() => {
           fetchRSCPromises.unpin(key);
           if (notifyRoutesOnSuccess && !payloadSucceeded && removeInFlightEvictedSuccessLatch()) {
-            keepEvictedSuccessMarker();
+            evictedSuccessfulPayloadKeys.set(key, true);
           }
         });
         if (notifyRoutesOnSuccess) {
-          addInFlightEvictedSuccessLatch();
+          const promises = inFlightEvictedSuccessfulPayloadPromises.get(key) ?? new Set<Promise<ReactNode>>();
+          promises.add(promise);
+          inFlightEvictedSuccessfulPayloadPromises.set(key, promises);
         }
         fetchRSCPromises.setPinned(key, promise);
         return promise;

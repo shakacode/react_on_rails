@@ -65,6 +65,7 @@ describe('BoundedLRU', () => {
     const lru = new BoundedLRU<string>(cap, (key) => evicted.push(key));
     return { lru, evicted };
   };
+  const has = (lru: BoundedLRU<string>, key: string) => lru.get(key, false) !== undefined;
 
   it('evicts the least-recently-used key past the cap', () => {
     const { lru, evicted } = makeLRU(2);
@@ -72,87 +73,78 @@ describe('BoundedLRU', () => {
     lru.set('b', 'B');
     lru.set('c', 'C'); // pushes past cap -> evicts 'a'
     expect(evicted).toEqual(['a']);
-    expect(lru.has('a')).toBe(false);
-    expect(lru.has('b')).toBe(true);
-    expect(lru.has('c')).toBe(true);
+    expect(has(lru, 'a')).toBe(false);
+    expect(has(lru, 'b')).toBe(true);
+    expect(has(lru, 'c')).toBe(true);
   });
 
-  it('get() promotes a key to most-recently-used; has()/get(key, false) do not', () => {
+  it('get() promotes a key to most-recently-used; get(key, false) does not', () => {
     const { lru, evicted } = makeLRU(2);
     lru.set('a', 'A');
     lru.set('b', 'B');
     // Recency-neutral reads leave 'a' as the LRU.
-    expect(lru.has('a')).toBe(true);
+    expect(has(lru, 'a')).toBe(true);
     expect(lru.get('a', false)).toBe('A');
     // Promote 'a' so 'b' becomes the LRU victim.
     expect(lru.get('a')).toBe('A');
     lru.set('c', 'C');
     expect(evicted).toEqual(['b']);
-    expect(lru.has('a')).toBe(true);
+    expect(has(lru, 'a')).toBe(true);
   });
 
-  it('get() returns undefined for a missing key but handles a stored undefined value', () => {
+  it('get() returns undefined for a missing key', () => {
     const { lru } = makeLRU(2);
-    const undefinedLru = new BoundedLRU<string | undefined>(2, () => {});
     expect(lru.get('missing')).toBeUndefined();
     expect(lru.get('missing', false)).toBeUndefined();
-    undefinedLru.set('u', undefined);
-    expect(undefinedLru.has('u')).toBe(true);
-    // A stored `undefined` is a real hit, not treated as absent.
-    expect(undefinedLru.get('u')).toBeUndefined();
-    expect(undefinedLru.get('u', false)).toBeUndefined();
   });
 
   it('REF-COUNTED pins: a key survives until every pin is released', () => {
     const { lru, evicted } = makeLRU(1);
-    lru.set('keep', 'KEEP');
     // Two overlapping holders pin the same key.
-    lru.pin('keep');
-    lru.pin('keep');
+    lru.setPinned('keep', 'KEEP');
+    lru.setPinned('keep', 'KEEP');
 
     // Cold traffic that would normally evict 'keep' (cap is 1) cannot, because
     // it is pinned.
     lru.set('cold1', 'C1');
     lru.set('cold2', 'C2');
-    expect(lru.has('keep')).toBe(true);
+    expect(has(lru, 'keep')).toBe(true);
     expect(evicted).not.toContain('keep');
 
     // First release: with a plain Set this would clear the pin and 'keep' would
     // become evictable. Ref-counting keeps it protected (count 2 -> 1).
     lru.unpin('keep');
     lru.set('cold3', 'C3');
-    expect(lru.has('keep')).toBe(true);
+    expect(has(lru, 'keep')).toBe(true);
     expect(evicted).not.toContain('keep');
 
     // Final release: count -> 0, now 'keep' is evictable.
     lru.unpin('keep');
     lru.set('cold4', 'C4');
-    expect(lru.has('keep')).toBe(false);
+    expect(has(lru, 'keep')).toBe(false);
     expect(evicted).toContain('keep');
   });
 
   it('unpin past zero is a no-op and does not underflow into a permanent pin', () => {
     const { lru } = makeLRU(1);
-    lru.set('x', 'X');
-    lru.pin('x');
+    lru.setPinned('x', 'X');
     lru.unpin('x');
     lru.unpin('x'); // extra unpin must not make the count negative
     lru.unpin('missing'); // unpinning an unknown key is harmless
     lru.set('y', 'Y'); // 'x' is unpinned -> evictable
-    expect(lru.has('x')).toBe(false);
+    expect(has(lru, 'x')).toBe(false);
   });
 
   it('delete() drops the value and its pin state together', () => {
     const { lru } = makeLRU(2);
-    lru.set('a', 'A');
-    lru.pin('a');
+    lru.setPinned('a', 'A');
     lru.delete('a');
-    expect(lru.has('a')).toBe(false);
+    expect(has(lru, 'a')).toBe(false);
     // Re-adding 'a' must not be protected by a stale pin from before delete.
     lru.set('a', 'A2');
     lru.set('b', 'B');
     lru.set('c', 'C'); // cap 2 -> evicts LRU; 'a' is no longer pinned
-    expect(lru.has('a')).toBe(false);
+    expect(has(lru, 'a')).toBe(false);
   });
 
   it('delete(key, true) keeps outstanding same-key pins intact', () => {
@@ -169,12 +161,12 @@ describe('BoundedLRU', () => {
     lru.unpin('k');
 
     lru.set('cold', 'COLD');
-    expect(lru.has('k')).toBe(true);
+    expect(has(lru, 'k')).toBe(true);
     expect(evicted).toEqual(['cold']);
 
     lru.unpin('k');
     lru.set('next cold', 'NEXT');
-    expect(lru.has('k')).toBe(false);
+    expect(has(lru, 'k')).toBe(false);
   });
 
   it('setPinned: a new key inserted into an all-pinned full cache is not self-evicted', () => {
@@ -190,31 +182,31 @@ describe('BoundedLRU', () => {
     for (let i = 0; i < cap; i += 1) {
       lru.setPinned(`p${i}`, `P${i}`);
     }
-    expect(lru.has('p0')).toBe(true);
-    expect(lru.has('p1')).toBe(true);
-    expect(lru.has('p2')).toBe(true);
+    expect(has(lru, 'p0')).toBe(true);
+    expect(has(lru, 'p1')).toBe(true);
+    expect(has(lru, 'p2')).toBe(true);
 
     // Insert a (cap+1)-th in-flight key. With the old set+pin order this key
     // would be evicted immediately; with setPinned it must survive and the
     // map is allowed to temporarily exceed the cap.
     lru.setPinned('p3', 'P3');
-    expect(lru.has('p3')).toBe(true);
+    expect(has(lru, 'p3')).toBe(true);
     expect(evicted).not.toContain('p3');
 
     // Releasing the FIRST pin while every other entry is still pinned does NOT
     // evict that just-unpinned key (it just settled — see the dedicated P2 test
     // below). The cache stays temporarily over cap.
     lru.unpin('p0');
-    expect(lru.has('p0')).toBe(true);
+    expect(has(lru, 'p0')).toBe(true);
     expect(evicted).not.toContain('p0');
 
     // Releasing a SECOND pin now exposes a genuinely colder unpinned key, so
     // reconciliation evicts the least-recently-used unpinned entry (p0) and
     // the still-pinned newest key (p3) is never the victim.
     lru.unpin('p1');
-    expect(lru.has('p0')).toBe(false);
+    expect(has(lru, 'p0')).toBe(false);
     expect(evicted).toContain('p0');
-    expect(lru.has('p3')).toBe(true);
+    expect(has(lru, 'p3')).toBe(true);
   });
 
   it('set(..., true) keeps a restored key when all other over-cap entries are pinned', () => {
@@ -224,14 +216,14 @@ describe('BoundedLRU', () => {
     lru.setPinned('other inflight', 'I');
     lru.set('restored', 'R', true);
 
-    expect(lru.has('other inflight')).toBe(true);
-    expect(lru.has('restored')).toBe(true);
+    expect(has(lru, 'other inflight')).toBe(true);
+    expect(has(lru, 'restored')).toBe(true);
     expect(evicted).toEqual([]);
 
     lru.unpin('restored');
 
-    expect(lru.has('other inflight')).toBe(true);
-    expect(lru.has('restored')).toBe(true);
+    expect(has(lru, 'other inflight')).toBe(true);
+    expect(has(lru, 'restored')).toBe(true);
     expect(evicted).toEqual([]);
   });
 
@@ -254,17 +246,17 @@ describe('BoundedLRU', () => {
     // 'a' settles first and unpins. It must NOT evict itself even though it is
     // the only unpinned key and the LRU by insertion order.
     lru.unpin('a');
-    expect(lru.has('a')).toBe(true);
+    expect(has(lru, 'a')).toBe(true);
     expect(evicted).not.toContain('a');
 
     // When 'b' later settles, there are now two unpinned keys (a, b). The
     // genuinely colder one — 'a' (LRU among unpinned) — is evicted, 'c'
     // (still pinned) survives, and the cache reconciles back to the cap.
     lru.unpin('b');
-    expect(lru.has('a')).toBe(false);
+    expect(has(lru, 'a')).toBe(false);
     expect(evicted).toContain('a');
-    expect(lru.has('b')).toBe(true);
-    expect(lru.has('c')).toBe(true);
+    expect(has(lru, 'b')).toBe(true);
+    expect(has(lru, 'c')).toBe(true);
   });
 
   it('setPinned keeps pin and map in sync: no orphan pin when the key is absent', () => {
@@ -274,7 +266,7 @@ describe('BoundedLRU', () => {
     lru.setPinned('a', 'A');
     lru.unpin('a'); // count -> 0, 'a' no longer protected
     lru.set('b', 'B'); // cap 1 -> 'a' is evictable now
-    expect(lru.has('a')).toBe(false);
+    expect(has(lru, 'a')).toBe(false);
     expect(evicted).toContain('a');
   });
 });
