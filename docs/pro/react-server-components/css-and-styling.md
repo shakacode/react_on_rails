@@ -716,6 +716,43 @@ global CSS files. CSS imports in the server bundle resolve to empty modules or c
 mappings. Importing Tailwind's CSS in the server entry wastes build time without producing usable
 output.
 
+### RSC stylesheet cascade order (end-of-`<head>` precedence)
+
+Each `'use client'` reference's CSS is emitted as a
+`<link rel="stylesheet" data-precedence="rsc-css">` tag. React places every
+`data-precedence="rsc-css"` link at the **end** of `<head>`, after framework and vendor CSS, so
+these stylesheets win source-order ties against precedence-less stylesheets — including the
+Rails-layout `stylesheet_pack_tag` links that have no `data-precedence` attribute.
+
+This matters when an RSC CSS Module contains a **bare element selector**. CSS Module _class names_
+are scoped, but bare element selectors (`html`, `body`, `a:focus`, and so on) still apply globally.
+Because the `data-precedence="rsc-css"` group lands last, a bare selector inside a CSS Module can
+override your global styles unexpectedly once that stylesheet is delivered:
+
+```css
+/* WRONG: a Bootstrap-style bare element selector inside an RSC CSS Module.
+   It is NOT scoped, and the rsc-css group lands at the end of <head>, so this
+   wins source-order ties and resets the root font-size site-wide. */
+html {
+  font-size: 14px;
+}
+
+.card {
+  /* scoped class names are fine */
+  padding: 1rem;
+}
+```
+
+Defensive-specificity guidance: never put bare element selectors at the top of (or anywhere in) an
+RSC CSS Module — scope every rule to a class. Keep global resets like `html { font-size }` in a
+dedicated global stylesheet loaded through the Rails layout, not in a CSS Module that rides along
+with a `'use client'` reference.
+
+For the render-blocking and per-reference injection behavior behind these links, see
+[RSC Stylesheet Injection: Render-Blocking Links and Cascade Order](../../oss/migrating/rsc-troubleshooting.md#rsc-stylesheet-injection-render-blocking-links-and-cascade-order)
+in the RSC troubleshooting guide. To measure the cascade and load impact, see
+[React Performance Tracks and Profiling](../../oss/building-features/performance-tracks-and-profiling.md).
+
 ## Known limitations
 
 - RSC stylesheet links are derived from the full client manifest, not filtered to the specific
