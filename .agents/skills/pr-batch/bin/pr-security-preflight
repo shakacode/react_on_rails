@@ -14,36 +14,31 @@ require "yaml"
 options = {
   repo: nil,
   fail_on_high_risk_files: false,
+  include_reactions: false,
   trust_config: ".agents/trusted-github-actors.yml"
 }
 
 GH_TIMEOUT_SECONDS = Integer(ENV.fetch("PR_SECURITY_PREFLIGHT_GH_TIMEOUT_SECONDS", "60"))
 
-KNOWN_BOT_LOGINS = Set.new(%w[
-                             chatgpt-codex-connector
-                             claude
-                             coderabbitai
-                             cursor
-                             dependabot
-                             greptile-apps
-                           ]).freeze
-
-SUSPICIOUS_PATTERN = /
+BLOCKING_SUSPICIOUS_PATTERN = /
   ignore\s+(all|previous|above|system|developer)|
   system\s+prompt|
   developer\s+message|
   prompt\s+injection|
   reveal\s+(secret|token|prompt|instruction)|
   exfiltrat|
-  GITHUB_TOKEN|
-  private\s+key|
   seed\s+phrase|
   (crypto|web3)[^\n]{0,40}wallet|
   wallet[^\n]{0,40}(seed|private|key|secret)|
+  rm\s+-rf|
+  base64\s+-d
+/ix
+
+WARNING_SUSPICIOUS_PATTERN = /
+  GITHUB_TOKEN|
+  private\s+key|
   \bcurl\s|
   \bwget\s|
-  rm\s+-rf|
-  base64\s+-d|
   \beval\s*\(|
   \bexec\s*\(|
   sudo\s|
@@ -51,9 +46,13 @@ SUSPICIOUS_PATTERN = /
 /ix
 
 parser = OptionParser.new do |opts|
-  opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--fail-on-high-risk-files] NUMBER [...]"
+  opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--include-reactions] " \
+                "[--fail-on-high-risk-files] NUMBER [...]"
   opts.on("--repo OWNER/REPO", "GitHub repository, defaulting to gh repo view") { |repo| options[:repo] = repo }
   opts.on("--trust-config PATH", "Trusted GitHub actor allowlist") { |path| options[:trust_config] = path }
+  opts.on("--include-reactions", "Fetch reaction users as visible actors; costs extra GitHub API calls") do
+    options[:include_reactions] = true
+  end
   opts.on("--fail-on-high-risk-files", "Exit non-zero when high-risk surfaces changed") do
     options[:fail_on_high_risk_files] = true
   end
@@ -104,7 +103,7 @@ def visible_actor_logins(node, graph_field)
   target = node.fetch("data").fetch("repository").fetch(graph_field)
   actors << target.dig("author", "login")
 
-  target.dig("timelineItems", "nodes").each do |item|
+  Array(target.dig("timelineItems", "nodes")).each do |item|
     actors << item.dig("author", "login")
     actors << item.dig("actor", "login")
 
@@ -118,29 +117,34 @@ def visible_actor_logins(node, graph_field)
 end
 
 def normalized_login(login)
-  login.to_s.delete_prefix("@").delete_suffix("[bot]").downcase
+  login.to_s.delete_prefix("@").downcase
+end
+
+def normalized_bot_login(login)
+  normalized_login(login).delete_suffix("[bot]")
 end
 
 def load_trust_config(path)
   data = File.exist?(path) ? YAML.safe_load_file(path, aliases: false) || {} : {}
-  configured_bots = Array(data["trusted_bots"]).map { |login| normalized_login(login) }
-  trusted_bots = KNOWN_BOT_LOGINS.map { |login| normalized_login(login) } + configured_bots
 
   {
     path:,
-    trusted_bots: trusted_bots.to_set,
+    trusted_bots: Array(data["trusted_bots"]).to_set { |login| normalized_bot_login(login) },
     trusted_teams: Array(data["trusted_teams"]).map(&:to_s),
     trusted_users: Array(data["trusted_users"]).to_set { |login| normalized_login(login) }
   }
 end
 
 def trusted_bot?(login, trust_config)
-  trust_config.fetch(:trusted_bots).include?(normalized_login(login))
+  normalized = normalized_login(login)
+
+  normalized.end_with?("[bot]") && trust_config.fetch(:trusted_bots).include?(normalized_bot_login(normalized))
 end
 
 def collaborator_permission(repo, login)
   JSON.parse(run_gh("api", "repos/#{repo}/collaborators/#{login}/permission")).fetch("permission")
-rescue StandardError
+rescue StandardError => e
+  warn "WARN: could not fetch collaborator permission for #{login}: #{e.message.lines.first&.strip}"
   "none"
 end
 
@@ -216,7 +220,8 @@ def comment_reaction_users(repo, comments, reaction_endpoint)
 end
 
 def reaction_users(repo, number, rest_context:, include_pull_comments:)
-  users = paginated_reaction_users(repo, "issues/#{number}/reactions")
+  users = Set.new
+  users.merge(paginated_reaction_users(repo, "issues/#{number}/reactions"))
   users.merge(comment_reaction_users(repo, rest_context.fetch(:issue_comments), "issues/comments"))
 
   if include_pull_comments
@@ -228,33 +233,36 @@ def reaction_users(repo, number, rest_context:, include_pull_comments:)
 rescue StandardError => e
   warn "WARN: could not fetch all reaction users for ##{number}: #{e.message.lines.first&.strip}"
   users.delete(nil)
-  users
+  users || Set.new
 end
 
-def suspicious_added_lines(repo, pr_number)
+def suspicious_added_lines(repo, pr_number, pattern:)
   diff = run_gh("pr", "diff", pr_number.to_s, "--repo", repo)
+  current_file = nil
 
   diff.lines.filter_map.with_index(1) do |line, index|
+    current_file = line.delete_prefix("+++ b/").chomp if line.start_with?("+++ b/")
     next unless line.start_with?("+") && !line.start_with?("+++")
-    next unless line.match?(SUSPICIOUS_PATTERN)
+    next unless line.match?(pattern)
 
-    { location: "diff line #{index}" }
+    location = current_file ? "#{current_file}:diff line #{index}" : "diff line #{index}"
+    { location: }
   end
 end
 
-def suspicious_issue_text(rest_context, repo, trust_config:, team_cache:)
+def suspicious_issue_text(rest_context, repo, trust_config:, team_cache:, pattern:)
   findings = []
   issue = rest_context.fetch(:issue)
 
   issue_author = issue.dig("user", "login")
-  if trusted_actor?(repo, issue_author, trust_config, team_cache) && (issue["body"] || "").match?(SUSPICIOUS_PATTERN)
+  if trusted_actor?(repo, issue_author, trust_config, team_cache) && (issue["body"] || "").match?(pattern)
     findings << { location: "issue body", author: issue_author, url: issue.fetch("html_url") }
   end
 
   rest_context.fetch(:issue_comments).each do |comment|
     author = comment.dig("user", "login")
     next unless trusted_actor?(repo, author, trust_config, team_cache)
-    next unless (comment["body"] || "").match?(SUSPICIOUS_PATTERN)
+    next unless (comment["body"] || "").match?(pattern)
 
     findings << {
       location: "issue comment #{comment.fetch('id')}",
@@ -266,13 +274,13 @@ def suspicious_issue_text(rest_context, repo, trust_config:, team_cache:)
   findings
 end
 
-def suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:)
+def suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:, pattern:)
   findings = []
 
   rest_context.fetch(:review_comments).each do |comment|
     author = comment.dig("user", "login")
     next unless trusted_actor?(repo, author, trust_config, team_cache)
-    next unless (comment["body"] || "").match?(SUSPICIOUS_PATTERN)
+    next unless (comment["body"] || "").match?(pattern)
 
     findings << {
       location: "review comment #{comment.fetch('id')}",
@@ -284,13 +292,13 @@ def suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:
   findings
 end
 
-def suspicious_pr_reviews(rest_context, repo, trust_config:, team_cache:)
+def suspicious_pr_reviews(rest_context, repo, trust_config:, team_cache:, pattern:)
   findings = []
 
   rest_context.fetch(:reviews).each do |review|
     author = review.dig("user", "login")
     next unless trusted_actor?(repo, author, trust_config, team_cache)
-    next unless (review["body"] || "").match?(SUSPICIOUS_PATTERN)
+    next unless (review["body"] || "").match?(pattern)
 
     findings << {
       location: "pull request review #{review.fetch('id')}",
@@ -302,9 +310,40 @@ def suspicious_pr_reviews(rest_context, repo, trust_config:, team_cache:)
   findings
 end
 
-def suspicious_pr_review_text(rest_context, repo, trust_config:, team_cache:)
-  suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:) +
-    suspicious_pr_reviews(rest_context, repo, trust_config:, team_cache:)
+def suspicious_pr_review_text(rest_context, repo, trust_config:, team_cache:, pattern:)
+  suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:, pattern:) +
+    suspicious_pr_reviews(rest_context, repo, trust_config:, team_cache:, pattern:)
+end
+
+def suspicious_text_findings(repo:, number:, rest:, target_is_pr:, trust_config:, team_cache:, pattern:)
+  findings = suspicious_issue_text(rest, repo, trust_config:, team_cache:, pattern:)
+  return findings unless target_is_pr
+
+  findings.concat(suspicious_pr_review_text(rest, repo, trust_config:, team_cache:, pattern:))
+  findings.concat(suspicious_added_lines(repo, number, pattern:))
+end
+
+def suspicious_findings_for_target(repo:, number:, rest:, target_is_pr:, trust_config:, team_cache:)
+  {
+    suspicious: suspicious_text_findings(
+      repo:,
+      number:,
+      rest:,
+      target_is_pr:,
+      trust_config:,
+      team_cache:,
+      pattern: BLOCKING_SUSPICIOUS_PATTERN
+    ),
+    suspicious_warnings: suspicious_text_findings(
+      repo:,
+      number:,
+      rest:,
+      target_is_pr:,
+      trust_config:,
+      team_cache:,
+      pattern: WARNING_SUSPICIOUS_PATTERN
+    )
+  }
 end
 
 def untrusted_interaction_findings(rest_context, repo, include_pull_comments:, trust_config:, team_cache:)
@@ -395,23 +434,28 @@ def graph_coverage_findings(target)
 end
 
 def participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:)
-  participants = target.dig("participants", "nodes").to_set { |participant| participant.fetch("login") }
-  untrusted_participants = participants.reject { |login| trusted_actor?(repo, login, trust_config, team_cache) }
+  participants = Array(target.dig("participants", "nodes")).to_set { |participant| participant.fetch("login") }
 
-  untrusted_participants.filter_map do |login|
-    permission = permission_cache[login] ||= collaborator_permission(repo, login)
+  participants.filter_map do |login|
+    next if trusted_bot?(login, trust_config)
+
+    trusted = trusted_actor?(repo, login, trust_config, team_cache)
     hidden = !visible.include?(login)
+    next unless hidden || !trusted
+
+    permission = permission_cache[login] ||= collaborator_permission(repo, login)
 
     {
       login:,
       permission:,
       hidden:,
-      untrusted: true
+      untrusted: !trusted
     }
   end
 end
 
-def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, permission_cache:, trust_config:, team_cache:)
+def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_reactions:, permission_cache:,
+                trust_config:, team_cache:)
   issue = issue_payload(repo, number)
   target_is_pr = issue.key?("pull_request")
   graph_field = target_is_pr ? "pullRequest" : "issue"
@@ -421,11 +465,11 @@ def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, permissi
   rest = rest_context(repo, number, include_pull_comments: target_is_pr, issue:)
   visible = visible_actor_logins(graph, graph_field)
   visible.merge(visible_rest_actor_logins(rest))
-  visible.merge(reaction_users(repo, number, rest_context: rest, include_pull_comments: target_is_pr))
+  if include_reactions
+    visible.merge(reaction_users(repo, number, rest_context: rest, include_pull_comments: target_is_pr))
+  end
   files = target_is_pr ? changed_files(repo, number) : []
-  suspicious = suspicious_issue_text(rest, repo, trust_config:, team_cache:)
-  suspicious.concat(suspicious_pr_review_text(rest, repo, trust_config:, team_cache:)) if target_is_pr
-  suspicious.concat(suspicious_added_lines(repo, number)) if target_is_pr
+  suspicious_findings = suspicious_findings_for_target(repo:, number:, rest:, target_is_pr:, trust_config:, team_cache:)
   untrusted_interactions = untrusted_interaction_findings(
     rest,
     repo,
@@ -440,7 +484,8 @@ def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, permissi
     graph_coverage_findings: graph_coverage_findings(target),
     participant_findings: participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:),
     risky_files: high_risk_files(files),
-    suspicious:,
+    suspicious: suspicious_findings.fetch(:suspicious),
+    suspicious_warnings: suspicious_findings.fetch(:suspicious_warnings),
     target:,
     target_is_pr:,
     untrusted_interactions:
@@ -515,6 +560,22 @@ def record_blockers(result, overall_blockers, fail_on_high_risk_files:)
   overall_blockers << "##{number}: high-risk files changed"
 end
 
+def print_suspicious_warning_findings(findings)
+  if findings.empty?
+    puts "  Suspicious text warnings: none"
+    return
+  end
+
+  puts "  Suspicious text warnings:"
+  findings.first(10).each do |finding|
+    detail = "    - #{finding.fetch(:location)}"
+    detail += " by #{finding.fetch(:author)}" if finding[:author]
+    detail += " (#{finding.fetch(:url)})" if finding[:url]
+    puts detail
+  end
+  puts "    - ... #{findings.size - 10} more" if findings.size > 10
+end
+
 def print_file_findings(result)
   files = result.fetch(:files)
   puts "  Changed files: #{files.empty? ? 'none' : files.join(', ')}"
@@ -530,13 +591,14 @@ def print_scan_result(result, overall_blockers, fail_on_high_risk_files:)
   target_label = result.fetch(:target_is_pr) ? "PR" : "Issue"
   target = result.fetch(:target)
 
-  puts "#{target_label} ##{result.fetch(:number)}: #{target.fetch('title')}"
+  puts "#{target_label} ##{result.fetch(:number)}"
   puts "  URL: #{target.fetch('url')}"
   puts "  Head: #{target.fetch('headRefOid')}" if result.fetch(:target_is_pr)
   print_graph_coverage_findings(result.fetch(:graph_coverage_findings))
   print_participant_findings(result.fetch(:participant_findings))
   print_untrusted_interactions(result.fetch(:untrusted_interactions))
   print_suspicious_findings(result.fetch(:suspicious))
+  print_suspicious_warning_findings(result.fetch(:suspicious_warnings))
   print_file_findings(result)
   record_blockers(result, overall_blockers, fail_on_high_risk_files:)
 
@@ -545,7 +607,7 @@ end
 
 repo = options[:repo] || current_repo
 owner, name = repo.split("/", 2)
-abort "Repository must be OWNER/REPO, got #{repo.inspect}" unless owner && name
+abort "Repository must be OWNER/REPO, got #{repo.inspect}" unless owner && name && !owner.empty? && !name.empty?
 
 pr_query = <<~GRAPHQL
   query($owner:String!, $name:String!, $number:Int!) {
@@ -634,6 +696,7 @@ ARGV.each do |arg|
     number:,
     pr_query:,
     issue_query:,
+    include_reactions: options[:include_reactions],
     permission_cache:,
     trust_config:,
     team_cache:
