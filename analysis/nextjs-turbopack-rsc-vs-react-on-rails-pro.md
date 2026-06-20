@@ -930,21 +930,24 @@ Given React's warning, the separate package is the compatibility adapter. In oth
 
 Next turns RSC into a route protocol. React on Rails Pro turns RSC into a component protocol inside Rails.
 
-```mermaid
-flowchart TD
-    subgraph Next["Next.js"]
-      URL["URL"] --> RouteTree["App Router tree"]
-      RouteTree --> RSC1["RSC payload"]
-      RSC1 --> Patch["router state patch"]
-      Patch --> SegmentCache["segment cache"]
-    end
+Next.js route protocol:
 
-    subgraph RORP["React on Rails Pro"]
-      RailsURL["Rails URL"] --> View["ERB/view/helper"]
-      View --> Component["registered component"]
-      Component --> RSC2["RSC payload"]
-      RSC2 --> ReactNode["React node under RSCRoute"]
-    end
+```mermaid
+flowchart LR
+    URL["URL"] --> RouteTree["App Router tree"]
+    RouteTree --> RSC1["RSC payload"]
+    RSC1 --> Patch["router state patch"]
+    Patch --> SegmentCache["segment cache"]
+```
+
+React on Rails Pro component protocol:
+
+```mermaid
+flowchart LR
+    RailsURL["Rails URL"] --> View["ERB/view/helper"]
+    View --> Component["registered component"]
+    Component --> RSC2["RSC payload"]
+    RSC2 --> ReactNode["React node under RSCRoute"]
 ```
 
 This explains almost every downstream difference:
