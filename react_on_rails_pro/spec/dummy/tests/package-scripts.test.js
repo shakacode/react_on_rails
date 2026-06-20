@@ -33,9 +33,12 @@ describe('package scripts', () => {
 
   it.each(['build:test', 'build:test:rspack'])('%s prepares the generated i18n directory', (scriptName) => {
     const script = packageJson.scripts[scriptName];
+    const prepareIndex = script.indexOf('pnpm run prepare:i18n');
+    const precompileIndex = script.indexOf('bin/shakapacker-precompile-hook');
 
     expect(packageJson.scripts['prepare:i18n']).toBe('mkdir -p client/app/i18n/generated');
-    expect(script).toContain('pnpm run prepare:i18n');
+    expect(prepareIndex).toBeGreaterThanOrEqual(0);
+    expect(precompileIndex).toBeGreaterThan(prepareIndex);
   });
 
   it('has a focused RSC Playwright script for bundler runtime gates', () => {
