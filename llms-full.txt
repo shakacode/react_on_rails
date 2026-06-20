@@ -27629,29 +27629,36 @@ When a component with `'use client'` is statically imported by both a small RSC 
 
 ### How to Detect It
 
-After building, inspect your `react-client-manifest.json`. Each `'use client'` module has a `chunks` array listing the JS files the browser must download. If you see large vendor chunks listed for a small component, you have contamination:
+After building, inspect your `react-client-manifest.json`. Each `'use client'` module has a `chunks`
+array listing the JS files the browser must download. Pro RSC manifests can also include a `css`
+array listing stylesheet files that React on Rails Pro injects as render-blocking
+`<link rel="stylesheet" data-precedence="rsc-css">` resources. If you see large vendor chunks or
+unrelated page-specific CSS listed for a small component, you have contamination:
 
 ```json
 {
   "file:///app/components/HelloWorldHooks.jsx": {
     "id": "./components/HelloWorldHooks.jsx",
     "chunks": ["2", "2-b77936c4.js", "rsc-PostsPage", "rsc-PostsPage-d655b05a.js"],
+    "css": ["css/client-PostsPage-d655b05a.css"],
     "name": "*"
   }
 }
 ```
 
-In this example, `HelloWorldHooks` (a tiny component) picks up PostsPage chunks, including a 375 KB vendor chunk containing lodash and moment. The browser downloads all of it.
+In this example, `HelloWorldHooks` (a tiny component) picks up PostsPage chunks, including a 375 KB vendor chunk containing lodash and moment. The browser downloads all of it. If the same contaminated mapping includes `css` entries, the browser can also wait on CSS that the current RSC page does not visually need.
 
-You can also check the browser DevTools **Network** tab: load your RSC page, filter to JS files, and look for unexpectedly large downloads that contain unrelated libraries. Tools like **webpack-bundle-analyzer** can help visualize which modules ended up in which chunks.
+You can also check the browser DevTools **Network** tab: load your RSC page, filter to JS and CSS
+files, and look for unexpectedly large downloads that contain unrelated libraries or page styles.
+Tools like **webpack-bundle-analyzer** can help visualize which modules ended up in which chunks.
 
 ### Why It Happens
 
-The RSC client manifest maps each `'use client'` module to the JS chunks the browser needs to download. When a `'use client'` module is imported by multiple entry points (for example, both an RSC page and a heavy SSR/client page), its mapping can include chunks that originate from both paths.
+The RSC client manifest maps each `'use client'` module to the JS chunks the browser needs to download and, in Pro builds with CSS manifest support, the CSS files React links as render-blocking stylesheets for that client boundary. When a `'use client'` module is imported by multiple entry points (for example, both an RSC page and a heavy SSR/client page), its mapping can include chunks and CSS that originate from both paths.
 
 When `PostsPage.jsx` (`'use client'`) statically imports `HelloWorldHooks.jsx` along with heavy dependencies (lodash, moment), `HelloWorldHooks.jsx` can inherit chunks from that heavier path. The result is chunk contamination: one small component ends up carrying unrelated chunks because it appears in multiple chunk groups.
 
-Redundant `'use client'` directives increase the risk. If a component is already imported by a `'use client'` parent, adding `'use client'` to it too creates extra manifest entries and extra opportunities to accumulate unrelated chunks. Keep `'use client'` only on files that must be server/client boundaries.
+Redundant `'use client'` directives increase the risk. If a component is already imported by a `'use client'` parent, adding `'use client'` to it too creates extra manifest entries and extra opportunities to accumulate unrelated chunks and stylesheet links. Keep `'use client'` only on files that must be server/client boundaries.
 
 ### How to Fix It
 
@@ -27684,6 +27691,16 @@ export default function RSCPage() {
 ```
 
 The wrapper file doesn't appear in PostsPage's import tree, so it avoids inheriting PostsPage's heavier chunk groups and usually stays mapped to a much smaller chunk footprint.
+
+If the contamination is CSS-specific, keep page-specific global CSS out of broad client components.
+Use CSS Modules, Tailwind utilities, or a route/layout stylesheet for styles that are meant to be
+shared, and let the thin wrapper import only the CSS needed by that RSC boundary.
+
+Also watch for cascade changes. React inserts the `data-precedence="rsc-css"` stylesheet group after
+precedence-less stylesheets already in `<head>`, such as links emitted by Rails layouts, so
+contaminated framework or page CSS can win source-order ties on unrelated pages. CSS Modules scope
+class names, but bare element selectors such as `html`, `body`, or `a:focus` still apply globally
+once their stylesheet is delivered.
 
 ### When the Wrapper Isn't Enough: Prop Injection
 
