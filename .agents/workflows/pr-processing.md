@@ -692,7 +692,7 @@ Do not put hosted-CI uncertainty in Immediate at final readiness after local
 validation and the final push. Request hosted CI and log it in FYI.
 Do not report a PR/target as `complete` while `script/pr-merge-ledger <PR>
 --strict` reports `UNKNOWN` fields, review-thread/review-object violations, or
-`complete_allowed: false`. Do not report a release-affecting batch ready while
+`complete_allowed: false`. Do not report any batch that requires QA ready while
 required QA evidence is missing, marked `blocked`, or still `UNKNOWN`.
 
 ### Coordination State
@@ -1401,9 +1401,9 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    Use advisory public `codex-claim` rows from step 2 for possible no-PR,
    blocked, parked, and done-unmerged lanes, but keep those rows marked
    `UNKNOWN` until coordination state is recovered.
-4. Ask for confirmation of included and excluded worked issues, advisory public
-   `codex-claim` rows, and the PR range before deep audit unless the user
-   explicitly says to proceed. When the scope is
+4. Ask for confirmation of included and excluded worked issues, collected QA
+   lanes and QA Evidence blocks, advisory public `codex-claim` rows, and the PR
+   range before deep audit unless the user explicitly says to proceed. When the scope is
    `UNKNOWN (needs batch confirmation)`, ask the user to choose the candidate
    batch/run id before any confirmed worked-issue audit.
 5. For each known worked issue, QA lane, or advisory public `codex-claim` row,

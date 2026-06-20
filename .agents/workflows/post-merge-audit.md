@@ -176,10 +176,11 @@ collect any QA lane and QA Evidence block for that batch. Do not use missing QA
 state to shrink the worked-issue scope; report it as a QA coverage finding or
 `UNKNOWN` fact instead.
 
-Ask me to confirm the included/excluded worked issues, advisory `codex-claim`
-rows, and PR range before deep audit unless I explicitly say to proceed. When
-the scope is `UNKNOWN (needs batch confirmation)`, ask me to choose the
-candidate batch/run id before any confirmed worked-issue audit.
+Ask me to confirm the included/excluded worked issues, collected QA lanes and QA
+Evidence blocks, advisory `codex-claim` rows, and PR range before deep audit
+unless I explicitly say to proceed. When the scope is
+`UNKNOWN (needs batch confirmation)`, ask me to choose the candidate batch/run id
+before any confirmed worked-issue audit.
 
 After confirmation, audit each known worked issue, QA lane, or advisory
 `codex-claim` row for:
