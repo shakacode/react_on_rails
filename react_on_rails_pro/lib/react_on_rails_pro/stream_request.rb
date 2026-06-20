@@ -16,8 +16,6 @@
 require "async"
 
 module ReactOnRailsPro
-  MAX_PULL_PROP_NAME_LENGTH = 256
-
   class StreamDecorator
     def initialize(component)
       @component = component
@@ -112,6 +110,8 @@ module ReactOnRailsPro
   end
 
   class StreamRequest
+    MAX_PULL_PROP_NAME_LENGTH = 256
+
     def http_status
       @status
     end

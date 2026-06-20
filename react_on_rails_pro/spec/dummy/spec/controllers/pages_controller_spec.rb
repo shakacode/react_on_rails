@@ -16,6 +16,23 @@
 require "rails_helper"
 
 RSpec.describe PagesController do
+  describe "#read_async_props_from_redis" do
+    it "keeps push-mode Redis reads blocking indefinitely" do
+      request_id = "push-props-request"
+      stream_id = "stream:#{request_id}"
+      messages = [["1-0", [%w[end true]]]]
+      redis = instance_double(Redis, xread: { stream_id => messages })
+      emitter = instance_spy(ReactOnRailsPro::AsyncPropsEmitter)
+
+      allow(Redis).to receive(:new).and_return(redis)
+      allow(controller).to receive(:params).and_return(ActionController::Parameters.new(request_id:))
+
+      controller.send(:read_async_props_from_redis, emitter)
+
+      expect(redis).to have_received(:xread).with(stream_id, "0-0", block: 0)
+    end
+  end
+
   describe "#read_lazy_props_from_redis" do
     it "ignores normal prop entries that do not use the ':' prefix" do
       request_id = "lazy-props-request"
@@ -42,6 +59,7 @@ RSpec.describe PagesController do
 
       expect(emitter).to have_received(:call).once.with("users", [{ "name" => "Ada" }])
       expect(emitter).to have_received(:reject).once.with("notifications", "denied")
+      expect(redis).to have_received(:xread).with(stream_id, "0-0", block: 30_000)
       expect(Rails.logger).to have_received(:warn).with(
         "[ReactOnRailsPro] Ignoring Redis async prop entry with unsupported prefix: %ignored"
       )

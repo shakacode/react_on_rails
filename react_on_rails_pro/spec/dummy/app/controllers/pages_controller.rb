@@ -460,7 +460,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     last_received_id = "0-0"
     stream_id = "stream:#{request_id}"
     until ended
-      received_messages = redis_stream_messages(redis, stream_id, last_received_id)
+      received_messages = redis_stream_messages(redis, stream_id, last_received_id, block: 30_000)
 
       received_messages.each do |message_id, message_entries|
         last_received_id = message_id
@@ -478,8 +478,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     redis&.close
   end
 
-  def redis_stream_messages(redis, stream_id, last_received_id)
-    redis.xread(stream_id, last_received_id, block: 30_000)&.dig(stream_id) || []
+  def redis_stream_messages(redis, stream_id, last_received_id, block: 0)
+    redis.xread(stream_id, last_received_id, block:)&.dig(stream_id) || []
   end
 
   def route_lazy_prop_entry(emitter, message_key, message_value)

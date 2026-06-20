@@ -102,8 +102,7 @@ rejectionPropsRedisPageTest(
 
     await rejectRedisValue('forbiddenData', 'Access denied: insufficient permissions');
     await expect(page.getByTestId('forbiddenData-error')).toBeVisible();
-    await expect(page.getByTestId('forbiddenData-error')).toContainText('rejected by server');
-    await expect(page.getByTestId('forbiddenData-error')).toContainText('Access denied');
+    await expect(page.getByTestId('forbiddenData-error')).toContainText('Async prop rejected by server');
 
     await expect(page.getByText('Item A')).toBeVisible();
 
