@@ -98,7 +98,23 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
         expect(output).to end_with("\n")
         parsed = JSON.parse(output.chomp)
         expect(parsed["bundleTimestamp"]).to eq(bundle_timestamp)
-        expect(parsed["updateChunk"]).to include('rejectProp("secretData", "Access denied")')
+        expect(parsed["updateChunk"]).to include(
+          'rejectProp("secretData", "Async prop rejected by server")'
+        )
+        expect(parsed["updateChunk"]).not_to include("Access denied")
+      end
+    end
+
+    it "redacts internal rejection details from browser-visible chunks" do
+      allow(request_stream).to receive(:<<)
+
+      emitter.reject("secretData", "PG::ConnectionBad password=swordfish")
+
+      expect(request_stream).to have_received(:<<) do |output|
+        parsed = JSON.parse(output.chomp)
+        expect(parsed["updateChunk"]).to include("Async prop rejected by server")
+        expect(parsed["updateChunk"]).not_to include("PG::ConnectionBad")
+        expect(parsed["updateChunk"]).not_to include("swordfish")
       end
     end
 

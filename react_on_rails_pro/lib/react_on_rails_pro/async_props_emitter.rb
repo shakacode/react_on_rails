@@ -48,6 +48,8 @@ module ReactOnRailsPro
   #     end
   #   end
   class AsyncPropsEmitter
+    SANITIZED_REJECTION_REASON = "Async prop rejected by server"
+
     attr_reader :pull_requests
 
     def initialize(bundle_timestamp, request_stream, pull_enabled: false)
@@ -70,6 +72,8 @@ module ReactOnRailsPro
       @pushed_props.add(prop_name)
       @request_stream << "#{update_chunk.to_json}\n"
     rescue StandardError => e
+      # Continue streaming: one failed async prop write should not abort the
+      # entire render, and pull-mode retry filtering already recorded the prop.
       Rails.logger.error do
         backtrace = e.backtrace&.first(5)&.join("\n")
         "[ReactOnRailsPro::AsyncProps] Failed to send async prop '#{prop_name}': " \
@@ -135,9 +139,13 @@ module ReactOnRailsPro
       <<~JS.strip
         (function(){
           var asyncPropsManager = ReactOnRails.getOrCreateAsyncPropsManager(sharedExecutionContext);
-          asyncPropsManager.rejectProp(#{prop_name.to_json}, #{reason.to_json});
+          asyncPropsManager.rejectProp(#{prop_name.to_json}, #{sanitized_rejection_reason(reason).to_json});
         })()
       JS
+    end
+
+    def sanitized_rejection_reason(_reason)
+      SANITIZED_REJECTION_REASON
     end
 
     def generate_end_stream_js

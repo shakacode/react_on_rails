@@ -239,8 +239,9 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
       invalid_missing_name = to_length_prefixed("", "messageType" => "propRequest")
       invalid_empty_name = to_length_prefixed("", "messageType" => "propRequest", "propName" => "")
+      invalid_long_name = to_length_prefixed("", "messageType" => "propRequest", "propName" => "x" * 257)
       valid_request = to_length_prefixed("", "messageType" => "propRequest", "propName" => "users")
-      response = mock_ok_response(invalid_missing_name + invalid_empty_name + valid_request)
+      response = mock_ok_response(invalid_missing_name + invalid_empty_name + invalid_long_name + valid_request)
       request.instance_variable_set(:@emitter, emitter)
 
       request.send(:process_response_chunks, response) { |_| nil }
@@ -388,6 +389,31 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         /Connection error while server side render streaming a component/
       )
       expect(call_count).to eq(1)
+    end
+
+    it "retries transport errors after control-only chunks before any content is yielded" do
+      call_count = 0
+      stream = described_class.create(pull_enabled: true) do |_send_bundle, _tasks|
+        call_count += 1
+        emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
+        response =
+          if call_count == 1
+            ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner|
+              status_assigner.call(200)
+              yielder.call(to_length_prefixed("", "messageType" => "propRequest", "propName" => "users"))
+              raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection reset"
+            end
+          else
+            mock_ok_response(to_length_prefixed("ok"))
+          end
+        [response, emitter]
+      end
+
+      chunks = []
+      stream.each_chunk { |chunk| chunks << chunk }
+
+      expect(call_count).to eq(2)
+      expect(chunks.first).to include("html" => "ok")
     end
 
     it "retries transport error then succeeds" do

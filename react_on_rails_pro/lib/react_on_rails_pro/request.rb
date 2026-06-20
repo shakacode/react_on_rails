@@ -57,7 +57,7 @@ module ReactOnRailsPro
           end
 
           form = form_with_code(js_code, false)
-          perform_request(path, form:, stream: true)
+          [perform_request(path, form:, stream: true), nil]
         end
       end
 
@@ -87,11 +87,13 @@ module ReactOnRailsPro
       # - When the block finishes, we close the output (END_STREAM flag)
       # - Node's handleRequestClosed then calls asyncPropsManager.endStream()
       #
-      def render_code_with_incremental_updates(path, js_code, async_props_block:, push_props: nil)
+      def render_code_with_incremental_updates(path, js_code, async_props_block:, pull_enabled: false, push_props: nil)
         Rails.logger.info { "[ReactOnRailsPro] Perform incremental rendering request #{path}" }
 
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-        pull_enabled = !push_props.nil?
+        if !push_props.nil? && !pull_enabled
+          raise ArgumentError, "push_props can only be provided when pull_enabled is true"
+        end
 
         warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
         ReactOnRailsPro::StreamRequest.create(
@@ -132,7 +134,7 @@ module ReactOnRailsPro
             output.close
           end)
 
-          pull_enabled ? [response, emitter] : response
+          [response, pull_enabled ? emitter : nil]
         end
       end
 

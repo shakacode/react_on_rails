@@ -179,7 +179,21 @@ module ReactOnRailsPro
             expect(described_class).to have_received(:prepare_incremental_render_path)
               .with(js_code, render_options)
             expect(ReactOnRailsPro::Request).to have_received(:render_code_with_incremental_updates)
-              .with(expected_path, js_code, async_props_block:, push_props: nil)
+              .with(expected_path, js_code, async_props_block:, pull_enabled: false, push_props: nil)
+          end
+
+          it "enables pull mode when push_props is provided" do
+            expected_path = "/bundles/server123/incremental-render/abc123"
+            allow(render_options).to receive(:internal_option).with(:push_props).and_return([])
+            allow(described_class).to receive(:prepare_incremental_render_path)
+              .with(js_code, render_options)
+              .and_return(expected_path)
+            allow(ReactOnRailsPro::Request).to receive(:render_code_with_incremental_updates)
+
+            described_class.eval_streaming_js(js_code, render_options)
+
+            expect(ReactOnRailsPro::Request).to have_received(:render_code_with_incremental_updates)
+              .with(expected_path, js_code, async_props_block:, pull_enabled: true, push_props: [])
           end
         end
 

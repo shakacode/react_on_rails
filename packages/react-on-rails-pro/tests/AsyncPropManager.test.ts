@@ -326,6 +326,17 @@ describe('rejectProp', () => {
 
     expect(() => manager.rejectProp('endedProp', 'fetch failed')).not.toThrow();
   });
+
+  it('rejectProp after endStream does not change the endStream rejection reason', async () => {
+    const manager = new AsyncPropsManager();
+    const promise = manager.getProp('foo');
+
+    manager.endStream();
+    manager.rejectProp('foo', 'late rejection');
+
+    await expect(promise).rejects.toThrow(/The async prop "foo" is not received/);
+    await expect(promise).rejects.not.toThrow(/late rejection/);
+  });
 });
 
 describe('Pull mode propRequest emission', () => {
@@ -383,6 +394,30 @@ describe('Pull mode propRequest emission', () => {
     bufferedManager.flushPendingPullRequests();
 
     expect(propRequestEmitter).toHaveBeenCalledWith('buffered');
+  });
+
+  it('caps buffered propRequests when the emitter is never installed', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const bufferedContext = new Map<string, unknown>([
+      [PULL_ENABLED_KEY, true],
+      [PUSH_PROPS_KEY, new Set(['pushProp'])],
+    ]);
+    const bufferedManager = getOrCreateAsyncPropsManager(bufferedContext);
+
+    try {
+      Array.from({ length: 501 }, (_, i) => `buffered-${i}`).forEach((propName) => {
+        bufferedManager.getProp(propName);
+      });
+
+      bufferedContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
+      bufferedManager.flushPendingPullRequests();
+
+      expect(propRequestEmitter).toHaveBeenCalledTimes(500);
+      expect(propRequestEmitter).not.toHaveBeenCalledWith('buffered-500');
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('buffered propRequest cap reached'));
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('emitPendingPullRequests emits for props requested before pull mode was enabled', () => {

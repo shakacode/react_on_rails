@@ -65,6 +65,8 @@ const PUSH_PROPS_KEY = 'pushProps';
 const PROP_REQUEST_EMITTER_KEY = 'propRequestEmitter';
 
 class AsyncPropsManager {
+  private static readonly MAX_BUFFERED_REQUESTS = 500;
+
   private isClosed: boolean = false;
 
   private propNameToPromiseController = new Map<string, PromiseController>();
@@ -150,6 +152,8 @@ class AsyncPropsManager {
   /**
    * Flushes propRequests that were buffered before the emitter was available.
    * Called by the node renderer after setting propRequestEmitter on sharedExecutionContext.
+   * These requests already have `pullRequested = true`, so this must run before
+   * `emitPendingPullRequests()` and must not toggle that flag again.
    */
   flushPendingPullRequests() {
     const emitter = this.getPropRequestEmitter();
@@ -165,6 +169,8 @@ class AsyncPropsManager {
    * Emits propRequests for props that were requested (via getProp) before pull mode
    * was enabled on sharedExecutionContext. During the initial render, isPullEnabled()
    * returns false so getProp skips emitting; this method catches up afterward.
+   * It only emits controllers whose `pullRequested` flag is still false, so it
+   * does not duplicate requests already buffered by `flushPendingPullRequests()`.
    */
   emitPendingPullRequests() {
     if (!this.isPullEnabled()) return;
@@ -196,6 +202,16 @@ class AsyncPropsManager {
     if (emitter) {
       emitter(propName);
     } else {
+      if (this.bufferedPropRequests.length >= AsyncPropsManager.MAX_BUFFERED_REQUESTS) {
+        console.warn(
+          `AsyncPropsManager buffered propRequest cap reached; dropping request for "${propName}". ` +
+            'The prop request emitter may not have been installed.',
+        );
+        return;
+      }
+      // Marking `pullRequested` happens before this call, so buffered requests
+      // will not be re-emitted by `emitPendingPullRequests()` after the emitter
+      // is installed.
       this.bufferedPropRequests.push(propName);
     }
   }

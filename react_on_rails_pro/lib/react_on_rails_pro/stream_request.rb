@@ -16,6 +16,8 @@
 require "async"
 
 module ReactOnRailsPro
+  MAX_PULL_PROP_NAME_LENGTH = 256
+
   class StreamDecorator
     def initialize(component)
       @component = component
@@ -153,13 +155,7 @@ module ReactOnRailsPro
           # response attempt.
           reset_response_status
           @received_first_chunk = false
-          result = @request_executor.call(send_bundle, tasks)
-
-          if @pull_enabled
-            stream_response, @emitter = result
-          else
-            stream_response = result
-          end
+          stream_response, @emitter = normalize_executor_result(@request_executor.call(send_bundle, tasks))
 
           begin
             process_response_chunks(stream_response, &block)
@@ -196,8 +192,8 @@ module ReactOnRailsPro
         record_status(stream_response) unless @status_recorded
         next if stream_response.error?
 
-        record_first_chunk(request_start_time)
-        parse_and_route_chunk(parser, chunk, &block)
+        yielded_content = parse_and_route_chunk(parser, chunk, &block)
+        record_first_chunk(request_start_time) if yielded_content
       end
       record_status(stream_response) unless @status_recorded
       parser.flush
@@ -209,6 +205,10 @@ module ReactOnRailsPro
       raise
     end
 
+    def normalize_executor_result(result)
+      result.is_a?(Array) ? result : [result, nil]
+    end
+
     def record_first_chunk(request_start_time)
       return if @received_first_chunk
 
@@ -217,13 +217,14 @@ module ReactOnRailsPro
     end
 
     def parse_and_route_chunk(parser, chunk, &)
+      yielded_content = false
       parser.feed(chunk) do |parsed|
-        if parsed.key?("messageType")
-          route_control_message(parsed)
-        else
-          yield parsed
-        end
+        next route_control_message(parsed) if parsed.key?("messageType")
+
+        yield parsed
+        yielded_content = true
       end
+      yielded_content
     end
 
     def route_control_message(parsed)
@@ -232,7 +233,9 @@ module ReactOnRailsPro
       case parsed["messageType"]
       when "propRequest"
         prop_name = parsed["propName"]
-        @emitter.pull_requests&.enqueue(prop_name) if prop_name.is_a?(String) && !prop_name.empty?
+        @emitter.pull_requests&.enqueue(prop_name) if prop_name.is_a?(String) &&
+                                                      !prop_name.empty? &&
+                                                      prop_name.length <= MAX_PULL_PROP_NAME_LENGTH
       when "renderComplete"
         @emitter.render_complete!
       end

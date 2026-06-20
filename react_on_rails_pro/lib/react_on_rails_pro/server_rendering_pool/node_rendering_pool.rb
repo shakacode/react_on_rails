@@ -73,10 +73,12 @@ module ReactOnRailsPro
             # Use incremental rendering when async props block is provided
             path = prepare_incremental_render_path(js_code, render_options)
             push_props = render_options.internal_option(:push_props)
+            pull_enabled = !push_props.nil?
             ReactOnRailsPro::Request.render_code_with_incremental_updates(
               path,
               js_code,
               async_props_block:,
+              pull_enabled:,
               push_props:
             )
           else

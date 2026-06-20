@@ -428,10 +428,11 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     last_received_id = "0-0"
     stream_id = "stream:#{request_id}"
     until ended
-      received_messages = redis.xread(stream_id, last_received_id, block: 0)[stream_id]
+      received_messages = redis_stream_messages(redis, stream_id, last_received_id)
+
       # receive_messages are like [[msg1_id, [**msg_entries]], [msg2_id, [**msg_entries]]]
-      last_received_id = received_messages.last.first
-      received_messages.each do |_message_id, message_entries| # rubocop:disable Style/HashEachMethods
+      received_messages.each do |message_id, message_entries|
+        last_received_id = message_id
         message_entries.each do |message_key, message_value|
           if message_key == "end"
             ended = true
@@ -459,9 +460,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     last_received_id = "0-0"
     stream_id = "stream:#{request_id}"
     until ended
-      received_messages = redis.xread(stream_id, last_received_id, block: 0)[stream_id]
-      last_received_id = received_messages.last.first
-      received_messages.each do |_message_id, message_entries| # rubocop:disable Style/HashEachMethods
+      received_messages = redis_stream_messages(redis, stream_id, last_received_id)
+
+      received_messages.each do |message_id, message_entries|
+        last_received_id = message_id
         message_entries.each do |message_key, message_value|
           if message_key == "end"
             ended = true
@@ -474,6 +476,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     end
   ensure
     redis&.close
+  end
+
+  def redis_stream_messages(redis, stream_id, last_received_id)
+    redis.xread(stream_id, last_received_id, block: 30_000)&.dig(stream_id) || []
   end
 
   def route_lazy_prop_entry(emitter, message_key, message_value)
