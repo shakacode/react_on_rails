@@ -186,8 +186,8 @@ export async function handleIncrementalRenderRequest(
       response.stream.on('end', () => {
         try {
           injectableStream.write(formatRenderCompleteChunk());
-        } catch {
-          // Stream may already be closed
+        } catch (err) {
+          log.warn({ msg: 'Failed to write renderComplete chunk', err });
         }
         injectableStream.end();
       });

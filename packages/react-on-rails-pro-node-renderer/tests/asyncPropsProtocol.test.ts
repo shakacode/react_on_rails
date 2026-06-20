@@ -30,6 +30,8 @@ import {
 
 describe('async props protocol constants', () => {
   it('keeps node renderer sharedExecutionContext keys in sync with AsyncPropsManager', () => {
+    // Ruby's StreamRequest::MAX_PULL_PROP_NAME_LENGTH mirrors this prop-name
+    // limit and should be updated with these TS constants.
     expect({
       ASYNC_PROPS_MANAGER_KEY,
       PROP_REQUEST_EMITTER_KEY,

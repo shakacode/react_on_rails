@@ -206,9 +206,9 @@ module ReactOnRailsPro
     end
 
     def normalize_executor_result(result)
-      # Node incremental rendering returns [response, emitter] for pull mode.
+      # Node incremental rendering returns exactly [response, emitter] for pull mode.
       # Older renderers still return only response, so normalize at this private boundary.
-      result.is_a?(Array) ? result : [result, nil]
+      result.is_a?(Array) && result.size == 2 ? result : [result, nil]
     end
 
     def record_first_chunk(request_start_time)

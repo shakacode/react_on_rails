@@ -225,6 +225,7 @@ class AsyncPropsManager {
   }
 
   private static rejectOversizedPullPropRequest(propName: string, promiseController: PromiseController) {
+    promiseController.promise.catch(() => {});
     promiseController.reject(AsyncPropsManager.getOversizedPropNameError(propName));
     // eslint-disable-next-line no-param-reassign
     promiseController.resolved = true;
