@@ -448,7 +448,7 @@ describe('RSCRequestTracker', () => {
       const resultStream = injectRSCPayload(htmlStream, tracker, 'blog-node');
 
       // Push 128KB as 1KB chunks
-      const totalBytes = pushLengthPrefixedChunks(source, HIGHWATER_MARK * 8);
+      pushLengthPrefixedChunks(source, HIGHWATER_MARK * 8);
 
       const result = (await collectStreamData(resultStream)).toString();
 
