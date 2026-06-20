@@ -52,9 +52,10 @@ FOUC prevention pipeline:
 3. **Stream injection:** `proRSC.ts` wraps the rendered RSC tree with
    `<link rel="stylesheet" href="..." data-precedence="rsc-css">` elements for each collected CSS href.
 
-4. **Browser behavior:** React 19 hoists stylesheet `<link>` elements with `data-precedence` into
-   `<head>`, deduplicates them across the RSC stream, and blocks tree commit until the stylesheets
-   load. This prevents the styled Client Component from painting before its CSS is available.
+4. **Browser behavior:** React 19 hoists `<link rel="stylesheet" data-precedence="...">` elements
+   into `<head>`, deduplicates them across the RSC stream, and blocks tree commit until the
+   stylesheets load. This prevents the styled Client Component from painting before its CSS is
+   available.
 
 > [!NOTE]
 > The manifest CSS hrefs are collected manifest-wide, not per-request. This means CSS for all

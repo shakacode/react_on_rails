@@ -212,7 +212,7 @@ Tools like **webpack-bundle-analyzer** can help visualize which modules ended up
 
 ### Why It Happens
 
-The RSC client manifest maps each `'use client'` module to the JS chunks the browser needs to download and, in Pro builds with CSS manifest support, the CSS files React should preload for that client boundary. When a `'use client'` module is imported by multiple entry points (for example, both an RSC page and a heavy SSR/client page), its mapping can include chunks and CSS that originate from both paths.
+The RSC client manifest maps each `'use client'` module to the JS chunks the browser needs to download and, in Pro builds with CSS manifest support, the CSS files React links as render-blocking stylesheets for that client boundary. When a `'use client'` module is imported by multiple entry points (for example, both an RSC page and a heavy SSR/client page), its mapping can include chunks and CSS that originate from both paths.
 
 When `PostsPage.jsx` (`'use client'`) statically imports `HelloWorldHooks.jsx` along with heavy dependencies (lodash, moment), `HelloWorldHooks.jsx` can inherit chunks from that heavier path. The result is chunk contamination: one small component ends up carrying unrelated chunks because it appears in multiple chunk groups.
 
@@ -254,10 +254,11 @@ If the contamination is CSS-specific, keep page-specific global CSS out of broad
 Use CSS Modules, Tailwind utilities, or a route/layout stylesheet for styles that are meant to be
 shared, and let the thin wrapper import only the CSS needed by that RSC boundary.
 
-Also watch for cascade changes. RSC stylesheet links may be hoisted after earlier Rails layout
-styles, so contaminated framework or page CSS can win source-order ties on unrelated pages. CSS
-Modules scope class names, but bare element selectors such as `html`, `body`, or `a:focus` still
-apply globally once their stylesheet is delivered.
+Also watch for cascade changes. React inserts the `data-precedence="rsc-css"` stylesheet group after
+precedence-less stylesheets already in `<head>`, such as links emitted by Rails layouts, so
+contaminated framework or page CSS can win source-order ties on unrelated pages. CSS Modules scope
+class names, but bare element selectors such as `html`, `body`, or `a:focus` still apply globally
+once their stylesheet is delivered.
 
 ### When the Wrapper Isn't Enough: Prop Injection
 
