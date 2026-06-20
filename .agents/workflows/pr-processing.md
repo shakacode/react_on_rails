@@ -428,6 +428,7 @@ runtime behavior changes, and any batch where the coordinator cannot tell from w
 whether the intended surfaces were exercised. For docs-only, no-code process, no-PR evidence, and other
 low-risk batches, QA may be recorded as `not required` with a one-line rationale instead of spawning a
 separate worker.
+
 For mixed batches, apply QA to any subset that would individually qualify as release-affecting or
 workflow-affecting, even when the remaining targets would be low-risk on their own.
 
