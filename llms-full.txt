@@ -27864,16 +27864,21 @@ Earlier versions re-broadcast shared vendor and common CSS _per client reference
 
 If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, upgrade to a
 coordinated React 19.2-compatible release set that includes a stable `react-on-rails-rsc` 19.2.x
-version with the fix. Do not install the 19.2.0-rc.3 prerelease in a Pro app unless its release notes
-also name a matching React on Rails Pro package or peer range: prereleases are not accepted by the
-current stable Pro peer metadata. Do not bump `react-on-rails-rsc` on its own: it must be upgraded
-together with a compatible React, React DOM, and React on Rails Pro set, or the Pro node renderer's
-peer-compatibility check can fail at startup. Do not use the default React 19.0.x generator pin from
-[Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md) for
-this duplicate-CSS fix; that guide remains the baseline 19.0.x RSC setup path. Use the release notes
-or maintainer-provided 19.2 compatibility guidance for the exact React, React DOM, React on Rails
-Pro, and `react-on-rails-rsc` versions. On a supported, coordinated version set this is resolved —
-the shared CSS is emitted once.
+version with the fix. Key constraints:
+
+- **Do not** install the `react-on-rails-rsc` 19.2.0-rc.3 prerelease unless its
+  release notes name a matching React on Rails Pro package or peer range; prereleases are not accepted
+  by the current stable Pro peer metadata.
+- **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
+  React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
+  can fail at startup.
+- **Do not** use the default React 19.0.x generator pin from
+  [Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md)
+  for this duplicate-CSS fix; that guide remains the baseline 19.0.x RSC setup path.
+- Use release notes or maintainer-provided 19.2 compatibility guidance for the exact React, React
+  DOM, React on Rails Pro, and `react-on-rails-rsc` versions.
+
+On a supported, coordinated version set this is resolved — the shared CSS is emitted once.
 
 ### Cascade order
 
@@ -27883,7 +27888,7 @@ source-order ties when specificity is equal, and bare element selectors inside R
 override globals once their stylesheet is delivered. See [CSS cascade guidance](../../pro/react-server-components/css-and-styling.md#rsc-stylesheet-cascade-order-end-of-head-precedence)
 for the full explanation and the cautionary `html { font-size }` example.
 
-See [React Performance Tracks and Profiling](../building-features/performance-tracks-and-profiling.md)
+See [React Performance Tracks and Profiling](../building-features/performance-tracks-and-profiling.md#measuring-an-rsc-conversion-with-a-paired-ab)
 to measure the end-to-end performance impact of RSC changes with a paired A/B comparison.
 
 ## Accidental Client Components

@@ -5976,8 +5976,23 @@ RSC CSS Module — scope every rule to a class. Keep global resets like `html { 
 dedicated global stylesheet loaded through the Rails layout, not in a CSS Module that rides along
 with a `'use client'` reference.
 
-For automated enforcement, scope a `stylelint` rule such as `selector-max-type: [0]` to
-`*.module.css` files so CI catches bare element selectors before they reach production.
+For strict automated enforcement, add a per-file override so CI catches bare element selectors in CSS
+Modules before they reach production:
+
+```json
+{
+  "overrides": [
+    {
+      "files": ["**/*.module.css"],
+      "rules": { "selector-max-type": 0 }
+    }
+  ]
+}
+```
+
+If your CSS Module convention intentionally permits scoped descendants such as `.card a`, use a
+custom rule or a tested `selector-max-type` configuration with `ignore` options rather than allowing
+bare `html` or `body` selectors.
 
 ```css
 /* ProductCard.module.css -- CORRECT: class-scoped rules only */
@@ -5995,8 +6010,10 @@ html {
 ```
 
 See [RSC stylesheet injection troubleshooting](../../oss/migrating/rsc-troubleshooting.md#rsc-stylesheet-injection-render-blocking-links-and-cascade-order)
-for the render-blocking and per-reference injection behavior behind these links. See [React Performance Tracks and Profiling](../../oss/building-features/performance-tracks-and-profiling.md)
-to measure the cascade and load impact.
+for the render-blocking and per-reference injection behavior behind these links.
+
+See [React Performance Tracks and Profiling](../../oss/building-features/performance-tracks-and-profiling.md#measuring-an-rsc-conversion-with-a-paired-ab)
+to measure the end-to-end performance impact of RSC changes with a paired A/B comparison.
 
 ## Known limitations
 
