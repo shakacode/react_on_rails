@@ -155,12 +155,14 @@ class AsyncPropsManager {
   }
 
   /**
-   * Flushes propRequests that were buffered before the emitter was available.
-   * Called by the node renderer after setting propRequestEmitter on sharedExecutionContext.
-   * These requests already have `pullRequested = true`, so this must run before
-   * `emitPendingPullRequests()` and must not toggle that flag again.
+   * Called by the node renderer after installing propRequestEmitter on sharedExecutionContext.
+   *
+   * The order is intentional: buffered requests were already marked `pullRequested`
+   * while no emitter was installed, then never-flagged controllers are caught up.
+   * Keeping this as one method prevents callers from reversing the order and
+   * duplicating buffered requests.
    */
-  flushPendingPullRequests() {
+  catchUpPropRequests() {
     const emitter = this.getPropRequestEmitter();
     if (!emitter) return;
 
@@ -168,16 +170,7 @@ class AsyncPropsManager {
       emitter(propName);
     }
     this.bufferedPropRequests = [];
-  }
 
-  /**
-   * Emits propRequests for props that were requested (via getProp) before pull mode
-   * was enabled on sharedExecutionContext. During the initial render, isPullEnabled()
-   * returns false so getProp skips emitting; this method catches up afterward.
-   * It only emits controllers whose `pullRequested` flag is still false, so it
-   * does not duplicate requests already buffered by `flushPendingPullRequests()`.
-   */
-  emitPendingPullRequests() {
     if (!this.isPullEnabled()) return;
 
     this.propNameToPromiseController.forEach((controller, propName) => {
@@ -191,6 +184,20 @@ class AsyncPropsManager {
         this.emitPropRequest(propName);
       }
     });
+  }
+
+  /**
+   * @deprecated Kept for older node renderers during mixed-version deploys.
+   */
+  flushPendingPullRequests() {
+    this.catchUpPropRequests();
+  }
+
+  /**
+   * @deprecated Kept for older node renderers during mixed-version deploys.
+   */
+  emitPendingPullRequests() {
+    this.catchUpPropRequests();
   }
 
   private isPullEnabled(): boolean {
@@ -219,7 +226,7 @@ class AsyncPropsManager {
         return;
       }
       // Marking `pullRequested` happens before this call, so buffered requests
-      // will not be re-emitted by `emitPendingPullRequests()` after the emitter
+      // will not be re-emitted by `catchUpPropRequests()` after the emitter
       // is installed.
       this.bufferedPropRequests.push(propName);
     }

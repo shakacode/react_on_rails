@@ -412,9 +412,11 @@ describe('Pull mode propRequest emission', () => {
     expect(() => bufferedManager.getProp('buffered')).not.toThrow();
 
     bufferedContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
-    bufferedManager.flushPendingPullRequests();
+    bufferedManager.catchUpPropRequests();
+    bufferedManager.catchUpPropRequests();
 
     expect(propRequestEmitter).toHaveBeenCalledWith('buffered');
+    expect(propRequestEmitter).toHaveBeenCalledTimes(1);
   });
 
   it('caps buffered propRequests when the emitter is never installed', () => {
@@ -431,7 +433,7 @@ describe('Pull mode propRequest emission', () => {
       });
 
       bufferedContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
-      bufferedManager.flushPendingPullRequests();
+      bufferedManager.catchUpPropRequests();
 
       expect(propRequestEmitter).toHaveBeenCalledTimes(500);
       expect(propRequestEmitter).not.toHaveBeenCalledWith('buffered-500');
@@ -441,7 +443,7 @@ describe('Pull mode propRequest emission', () => {
     }
   });
 
-  it('emitPendingPullRequests emits for props requested before pull mode was enabled', () => {
+  it('catchUpPropRequests emits for props requested before pull mode was enabled', () => {
     const delayedContext = new Map<string, unknown>();
     const delayedManager = getOrCreateAsyncPropsManager(delayedContext);
 
@@ -450,8 +452,24 @@ describe('Pull mode propRequest emission', () => {
     delayedContext.set(PULL_ENABLED_KEY, true);
     delayedContext.set(PUSH_PROPS_KEY, new Set(['pushProp']));
     delayedContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
-    delayedManager.emitPendingPullRequests();
+    delayedManager.catchUpPropRequests();
 
     expect(propRequestEmitter).toHaveBeenCalledWith('early');
+  });
+
+  it('keeps legacy pull catch-up methods for older node renderers', () => {
+    const legacyContext = new Map<string, unknown>();
+    const legacyManager = getOrCreateAsyncPropsManager(legacyContext);
+
+    legacyManager.getProp('early');
+
+    legacyContext.set(PULL_ENABLED_KEY, true);
+    legacyContext.set(PUSH_PROPS_KEY, new Set(['pushProp']));
+    legacyContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
+    legacyManager.flushPendingPullRequests();
+    legacyManager.emitPendingPullRequests();
+
+    expect(propRequestEmitter).toHaveBeenCalledWith('early');
+    expect(propRequestEmitter).toHaveBeenCalledTimes(1);
   });
 });

@@ -73,7 +73,7 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       end
     end
 
-    it "marks the prop as pushed before writing so pull retries are filtered on write failure" do
+    it "leaves the prop retryable when the write fails before Node receives it" do
       mock_logger = instance_double(Logger)
       pull_emitter = described_class.new(bundle_timestamp, request_stream, pull_enabled: true)
       allow(Rails).to receive(:logger).and_return(mock_logger)
@@ -84,6 +84,7 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       pull_emitter.pull_requests.enqueue("books")
       pull_emitter.pull_requests.close
 
+      expect(pull_emitter.pull_requests.dequeue).to eq("books")
       expect(pull_emitter.pull_requests.dequeue).to be_nil
     end
   end
@@ -134,7 +135,7 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       end
     end
 
-    it "does not add the prop to pushed_props" do
+    it "marks rejected props as settled after writing the reject chunk" do
       allow(request_stream).to receive(:<<)
 
       emitter.call("pushedProp", "value")
@@ -149,7 +150,6 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       pull_emitter.pull_requests.enqueue("rejectedProp")
       pull_emitter.pull_requests.close
 
-      expect(pull_emitter.pull_requests.dequeue).to eq("rejectedProp")
       expect(pull_emitter.pull_requests.dequeue).to be_nil
     end
   end

@@ -15,6 +15,7 @@
 
 function formatControlMessageChunk(metadata: Record<string, string>): Buffer {
   const serializedMetadata = JSON.stringify(metadata);
+  // Length field is 8-char zero-padded hex; control messages have no body so length = 0.
   const header = `${serializedMetadata}\t${'0'.padStart(8, '0')}\n`;
   return Buffer.from(header);
 }

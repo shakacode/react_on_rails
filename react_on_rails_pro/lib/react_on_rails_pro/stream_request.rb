@@ -109,6 +109,7 @@ module ReactOnRailsPro
     end
   end
 
+  # Protocol constant; parity is covered by asyncPropsProtocol.test.ts.
   class StreamRequest
     MAX_PULL_PROP_NAME_LENGTH = 256
 

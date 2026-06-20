@@ -43,6 +43,10 @@ export type UpdateChunk = {
 };
 
 type AsyncPropsManagerPullBridge = {
+  catchUpPropRequests: () => void;
+};
+
+type LegacyAsyncPropsManagerPullBridge = {
   flushPendingPullRequests: () => void;
   emitPendingPullRequests: () => void;
 };
@@ -73,10 +77,35 @@ function isAsyncPropsManagerPullBridge(value: unknown): value is AsyncPropsManag
   }
 
   const candidate = value as Partial<AsyncPropsManagerPullBridge>;
+  return typeof candidate.catchUpPropRequests === 'function';
+}
+
+function isLegacyAsyncPropsManagerPullBridge(value: unknown): value is LegacyAsyncPropsManagerPullBridge {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<LegacyAsyncPropsManagerPullBridge>;
   return (
     typeof candidate.flushPendingPullRequests === 'function' &&
     typeof candidate.emitPendingPullRequests === 'function'
   );
+}
+
+/** @internal Used by protocol regression tests. */
+export function catchUpAsyncPropsManagerPullBridge(value: unknown): boolean {
+  if (isAsyncPropsManagerPullBridge(value)) {
+    value.catchUpPropRequests();
+    return true;
+  }
+
+  if (isLegacyAsyncPropsManagerPullBridge(value)) {
+    value.flushPendingPullRequests();
+    value.emitPendingPullRequests();
+    return true;
+  }
+
+  return false;
 }
 
 export type IncrementalRenderInitialRequest = {
@@ -180,16 +209,24 @@ export async function handleIncrementalRenderRequest(
       // Create injectable PassThrough — sits after the length-prefixed transform.
       // Both HTML chunks (from React) and propRequest chunks (from us) flow through it.
       const injectableStream = new PassThrough();
-
-      // Register event handlers BEFORE pipe() to guarantee we catch 'end'
-      // even if the source stream has already buffered all its data.
-      response.stream.on('end', () => {
+      const writeRenderCompleteAndEnd = () => {
+        if (injectableStream.destroyed || injectableStream.writableEnded) return;
         try {
           injectableStream.write(formatRenderCompleteChunk());
         } catch (err) {
           log.warn({ msg: 'Failed to write renderComplete chunk', err });
         }
         injectableStream.end();
+      };
+
+      // Register event handlers BEFORE pipe() to guarantee we catch 'end'
+      // even if the source stream has already buffered all its data.
+      response.stream.on('end', () => {
+        if (injectableStream.writableNeedDrain) {
+          injectableStream.once('drain', writeRenderCompleteAndEnd);
+          return;
+        }
+        writeRenderCompleteAndEnd();
       });
       response.stream.on('error', (err) => {
         injectableStream.destroy(err);
@@ -221,12 +258,7 @@ export async function handleIncrementalRenderRequest(
       });
 
       const manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY);
-      // Flush requests buffered while pull mode was already enabled but before this emitter existed.
-      if (isAsyncPropsManagerPullBridge(manager)) {
-        manager.flushPendingPullRequests();
-        // Emit requests for getProp() calls made before pull mode was enabled in sharedExecutionContext.
-        manager.emitPendingPullRequests();
-      }
+      catchUpAsyncPropsManagerPullBridge(manager);
 
       finalResponse = { ...response, stream: injectableStream };
     }
