@@ -64,7 +64,8 @@ export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamEr
   const originalErrorLine = diagnosticError.message
     .split('\n')
     .find((line) => line.startsWith(ORIGINAL_ERROR_PREFIX));
-  return originalErrorLine === `${ORIGINAL_ERROR_PREFIX}${streamMessage}`;
+  const streamFirstLine = streamMessage.split('\n')[0];
+  return originalErrorLine === `${ORIGINAL_ERROR_PREFIX}${streamFirstLine}`;
 };
 
 // Bundler/framework frames point at library code rather than the failing component, so they

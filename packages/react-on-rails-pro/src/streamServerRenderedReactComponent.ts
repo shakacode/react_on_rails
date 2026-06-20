@@ -135,10 +135,9 @@ const streamRenderReactComponent = (
     }
     restoreCapturedRSCDiagnostics(captured.filter((entry) => !matchingCaptured.includes(entry)));
 
-    const diagnosticError =
-      matchingCaptured.length === 1
-        ? matchingCaptured[0].diagnosticError
-        : combineRSCStreamDiagnosticErrors(matchingCaptured.map((entry) => entry.diagnosticError));
+    const diagnosticError = combineRSCStreamDiagnosticErrors(
+      matchingCaptured.map((entry) => entry.diagnosticError),
+    );
     if (!diagnosticError) {
       return error;
     }
