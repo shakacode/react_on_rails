@@ -244,9 +244,41 @@ rescue StandardError => e
   exit 1
 end
 
+# Generate i18n locale files if configured
+def generate_locales_if_needed
+  rails_root = find_rails_root
+  return unless rails_root
+
+  initializer_path = File.join(rails_root, "config", "initializers", "react_on_rails.rb")
+  return unless File.exist?(initializer_path)
+
+  # Check if i18n_dir is configured (not commented out)
+  # Read as UTF-8 explicitly: under a C/POSIX locale (no LANG/LC_ALL), Encoding.default_external
+  # is US-ASCII and non-ASCII content would raise when regex-matched.
+  initializer_content = File.read(initializer_path, mode: "r:bom|utf-8")
+  return unless initializer_content.match?(/^\s*config\.i18n_dir\s*=/)
+
+  puts "🌐 Generating i18n locale files..."
+
+  Dir.chdir(rails_root) do
+    # Run locale generation (idempotent - skips if up-to-date)
+    # Pass env to subprocess only, not globally
+    system(
+      { "REACT_ON_RAILS_SKIP_VALIDATION" => "true" },
+      "bundle", "exec", "rake", "react_on_rails:locale",
+      exception: true
+    )
+    puts "✅ Locale generation completed successfully"
+  end
+rescue StandardError => e
+  warn "❌ Locale generation failed: #{e.message}"
+  exit 1
+end
+
 # Main execution (only if run directly, not when required)
 def run_precompile_tasks
   build_rescript_if_needed
+  generate_locales_if_needed
   generate_packs_if_needed
   generate_rsc_manifest_client_references_if_needed
 end

@@ -6,6 +6,12 @@ require "open3"
 require "optparse"
 require "time"
 
+# Pipes and File.read inherit the default external encoding at creation time, so
+# this must run before any Open3 call or file read. Without it, a non-UTF-8
+# locale (e.g. LANG/LC_ALL unset) leaves GitHub's UTF-8 bytes tagged US-ASCII and
+# JSON.parse raises on the first multibyte sequence.
+Encoding.default_external = Encoding::UTF_8
+
 # rubocop:disable Metrics/ClassLength
 class PrMergeLedger
   SCHEMA_VERSION = "pr-merge-ledger/v1"
@@ -20,7 +26,15 @@ class PrMergeLedger
     not_user_visible
   ].freeze
   DISPOSITIONS = %w[fixed explicitly_waived follow_up_issue not_applicable].freeze
-  REVIEW_DECISION_STATES = %w[APPROVED CHANGES_REQUESTED].freeze
+  REVIEW_OBJECT_DECISION_STATES = %w[APPROVED CHANGES_REQUESTED].freeze
+  NON_BLOCKING_REVIEW_DECISION_STATES = %w[APPROVED NOT_REQUIRED].freeze
+  BLOCKING_REVIEW_DECISION_VIOLATIONS = {
+    "CHANGES_REQUESTED" => ["review_decision_changes_requested", "GitHub reviewDecision is CHANGES_REQUESTED"],
+    "REVIEW_REQUIRED" => ["review_decision_review_required", "GitHub reviewDecision is REVIEW_REQUIRED"]
+  }.freeze
+  BLOCKING_REVIEW_DECISION_STATES = BLOCKING_REVIEW_DECISION_VIOLATIONS.keys.freeze
+  KNOWN_REVIEW_DECISION_STATES = (NON_BLOCKING_REVIEW_DECISION_STATES + BLOCKING_REVIEW_DECISION_STATES).freeze
+  INTERNAL_REVIEW_DECISION_RAW_KEY = "review_decision_raw"
   FINDING_REVIEW_STATES = %w[APPROVED CHANGES_REQUESTED COMMENTED].freeze
   LOCKFILE_BASENAMES = %w[
     Gemfile.lock
@@ -369,7 +383,7 @@ class PrMergeLedger
     lockfile = lockfile_diff(files)
 
     ledger = {
-      "pr" => pull_request,
+      "pr" => pull_request.except(INTERNAL_REVIEW_DECISION_RAW_KEY),
       "unresolved_current_head_review_threads" => {
         "status" => "known",
         "count" => unresolved_threads.length,
@@ -427,12 +441,32 @@ class PrMergeLedger
       "head_ref" => raw_pr["headRefName"],
       "head_sha" => blank_to_unknown(raw_pr["headRefOid"]),
       "merged_at" => raw_pr["mergedAt"],
-      "review_decision" => blank_to_unknown(raw_pr["reviewDecision"])
+      # Internal-only diagnostic source for unknown_fields; stripped before output.
+      INTERNAL_REVIEW_DECISION_RAW_KEY => raw_review_decision(raw_pr),
+      "review_decision" => normalize_review_decision(raw_pr)
     }
   end
 
   def blank_to_unknown(value)
     value.nil? || value.to_s.empty? ? UNKNOWN : value
+  end
+
+  def raw_review_decision(raw_pr)
+    # A present blank value is UNKNOWN here only for unsupported-value diagnostics;
+    # normalize_review_decision maps it to the known NOT_REQUIRED state, so
+    # pull_request_unknown_fields never reads this raw key for blank inputs.
+    return UNKNOWN unless raw_pr.key?("reviewDecision")
+
+    blank_to_unknown(raw_pr["reviewDecision"])
+  end
+
+  def normalize_review_decision(raw_pr)
+    return UNKNOWN unless raw_pr.key?("reviewDecision")
+
+    decision = raw_pr["reviewDecision"]
+    return "NOT_REQUIRED" if decision.nil? || decision.to_s.empty?
+
+    KNOWN_REVIEW_DECISION_STATES.include?(decision) ? decision : UNKNOWN
   end
 
   def normalize_review_thread(thread, pull_request)
@@ -545,12 +579,15 @@ class PrMergeLedger
   end
 
   def latest_current_decision_reviews_by_reviewer(reviews)
-    reviews.select { |review| review.fetch("current_head") && REVIEW_DECISION_STATES.include?(review.fetch("state")) }
-           .group_by { |review| review.fetch("reviewer") }
-           .values
-           .map do |reviewer_reviews|
-             latest_review_by_timestamp_and_order(reviewer_reviews)
-           end
+    decision_reviews = reviews.select do |review|
+      review.fetch("current_head") && REVIEW_OBJECT_DECISION_STATES.include?(review.fetch("state"))
+    end
+
+    decision_reviews.group_by { |review| review.fetch("reviewer") }
+                    .values
+                    .map do |reviewer_reviews|
+                      latest_review_by_timestamp_and_order(reviewer_reviews)
+                    end
   end
 
   def current_thread_evidence(thread, comments, pull_request)
@@ -964,6 +1001,8 @@ class PrMergeLedger
   end
 
   def unknown_fields_for(pull_request, review_threads, finding_dispositions, changelog, lockfile)
+    # pull_request must be the pre-output object so INTERNAL_REVIEW_DECISION_RAW_KEY
+    # remains available for specific unsupported reviewDecision diagnostics.
     unknowns = pull_request_unknown_fields(pull_request)
 
     review_threads.each do |thread|
@@ -1026,9 +1065,19 @@ class PrMergeLedger
 
   def pull_request_unknown_fields(pull_request)
     unknowns = []
-    if pull_request.fetch("review_decision") == UNKNOWN
-      unknowns << unknown_field(pull_request, "pr.review_decision", "GitHub reviewDecision is UNKNOWN")
+    review_decision = pull_request.fetch("review_decision")
+    unless KNOWN_REVIEW_DECISION_STATES.include?(review_decision)
+      raw_review_decision = pull_request[INTERNAL_REVIEW_DECISION_RAW_KEY] || UNKNOWN
+      message =
+        if raw_review_decision == UNKNOWN
+          "GitHub reviewDecision is UNKNOWN"
+        else
+          "GitHub reviewDecision is unsupported: #{raw_review_decision}"
+        end
+
+      unknowns << unknown_field(pull_request, "pr.review_decision", message)
     end
+
     if pull_request["head_sha"].to_s.empty? || pull_request["head_sha"] == UNKNOWN
       unknowns << unknown_field(pull_request, "pr.head_sha", "GitHub headRefOid is UNKNOWN")
     end
@@ -1058,22 +1107,10 @@ class PrMergeLedger
   end
 
   def review_decision_violation(pull_request)
-    case pull_request.fetch("review_decision")
-    when "CHANGES_REQUESTED"
-      violation(
-        pull_request,
-        "review_decision_changes_requested",
-        "GitHub reviewDecision is CHANGES_REQUESTED",
-        pull_request["url"]
-      )
-    when "REVIEW_REQUIRED"
-      violation(
-        pull_request,
-        "review_decision_review_required",
-        "GitHub reviewDecision is REVIEW_REQUIRED",
-        pull_request["url"]
-      )
-    end
+    code, message = BLOCKING_REVIEW_DECISION_VIOLATIONS[pull_request.fetch("review_decision")]
+    return unless code
+
+    violation(pull_request, code, message, pull_request["url"])
   end
 
   def draft_pr_violation(pull_request)
@@ -1162,6 +1199,8 @@ class PrMergeLedger
     when /\Apr\.head_sha/
       "unknown_head_sha"
     when /\Apr\.review_decision/
+      # Missing and unsupported reviewDecision values share this gate code;
+      # unknown_fields[].message carries the precise diagnostic.
       "unknown_review_decision"
     else
       "unknown_ledger_field"

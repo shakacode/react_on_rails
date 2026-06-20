@@ -53,6 +53,25 @@ const pushChunks = (stream: PassThrough, totalBytes: number, chunkSize = 1024) =
   return count * chunkSize;
 };
 
+const toLengthPrefixedPayload = (content: string): Buffer => {
+  const contentBuffer = Buffer.from(content, 'utf8');
+  const metadata = JSON.stringify({ consoleReplayScript: '', hasErrors: false, isShellReady: true });
+  return Buffer.concat([
+    Buffer.from(`${metadata}\t${contentBuffer.length.toString(16).padStart(8, '0')}\n`, 'utf8'),
+    contentBuffer,
+  ]);
+};
+
+const pushLengthPrefixedChunks = (stream: PassThrough, totalBytes: number, chunkSize = 1024) => {
+  const chunk = toLengthPrefixedPayload('a'.repeat(chunkSize));
+  const count = Math.ceil(totalBytes / chunkSize);
+  for (let i = 0; i < count; i++) {
+    stream.push(chunk);
+  }
+  stream.push(null);
+  return count * chunk.length;
+};
+
 const collectStreamData = async (stream: NodeJS.ReadableStream): Promise<Buffer> => {
   const chunks: Buffer[] = [];
   for await (const chunk of stream as AsyncIterable<Buffer>) {
@@ -314,9 +333,9 @@ describe('RSCRequestTracker', () => {
       // It waits for the first HTML chunk, then starts consuming stream2 (from tracker).
       const resultStream = injectRSCPayload(htmlStream, tracker, 'app-node');
 
-      // Push a small RSC payload (under 16KB) — no backpressure risk
+      // Push a small length-prefixed RSC payload (under 16KB) — no backpressure risk
       const payload = '{"type":"div","props":{"children":"hello"}}';
-      source.push(payload);
+      source.push(toLengthPrefixedPayload(payload));
       source.push(null);
 
       const result = (await collectStreamData(resultStream)).toString();
@@ -344,7 +363,7 @@ describe('RSCRequestTracker', () => {
       // This exceeds the default 16KB highWaterMark.
       const chunkCount = 64;
       const chunkSize = 1024;
-      const chunk = 'z'.repeat(chunkSize);
+      const chunk = toLengthPrefixedPayload('z'.repeat(chunkSize));
       for (let i = 0; i < chunkCount; i++) {
         source.push(chunk);
       }
@@ -373,7 +392,7 @@ describe('RSCRequestTracker', () => {
       // Drip-feed 32KB over 32ms — simulates a real RSC stream producing chunks over time
       const chunkSize = 1024;
       const chunkCount = 32;
-      const chunk = 'q'.repeat(chunkSize);
+      const chunk = toLengthPrefixedPayload('q'.repeat(chunkSize));
       let pushed = 0;
       const pushInterval = setInterval(() => {
         if (pushed >= chunkCount) {
@@ -429,7 +448,7 @@ describe('RSCRequestTracker', () => {
       const resultStream = injectRSCPayload(htmlStream, tracker, 'blog-node');
 
       // Push 128KB as 1KB chunks
-      const totalBytes = pushChunks(source, HIGHWATER_MARK * 8);
+      const totalBytes = pushLengthPrefixedChunks(source, HIGHWATER_MARK * 8);
 
       const result = (await collectStreamData(resultStream)).toString();
 
@@ -453,7 +472,7 @@ describe('RSCRequestTracker', () => {
       // Drip-feed 128KB over ~128ms
       const chunkSize = 1024;
       const chunkCount = 128;
-      const chunk = 'r'.repeat(chunkSize);
+      const chunk = toLengthPrefixedPayload('r'.repeat(chunkSize));
       let pushed = 0;
       const pushInterval = setInterval(() => {
         if (pushed >= chunkCount) {

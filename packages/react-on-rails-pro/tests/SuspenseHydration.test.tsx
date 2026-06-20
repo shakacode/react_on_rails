@@ -15,7 +15,7 @@
 
 import * as React from 'react';
 import { Suspense } from 'react';
-import { renderToReadableStream } from 'react-dom/server';
+import { renderToReadableStream } from 'react-dom/server.browser';
 import { hydrateRoot } from 'react-dom/client';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - TypeScript error can be ignored because:
@@ -23,7 +23,7 @@ import { hydrateRoot } from 'react-dom/client';
 // 2. The package is guaranteed to be available at runtime in Node 18+ environments
 import { screen, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { getNodeVersion } from './testUtils.js';
+import { getNodeVersion } from './testUtils';
 
 /**
  * Tests React's Suspense hydration behavior for async components
@@ -135,18 +135,27 @@ async function renderAndHydrate() {
     );
 
   const reader = stream.getReader();
+  const readNextChunk = async () => {
+    const { done, value } = await reader.read();
+    if (done) {
+      throw new Error('Expected another streamed HTML chunk before the stream ended.');
+    }
+
+    return new TextDecoder().decode(value);
+  };
+
   const writeFirstChunk = async () => {
-    const result = await reader.read();
-    const decoded = new TextDecoder().decode(result.value as Buffer);
+    const decoded = await readNextChunk();
     container.innerHTML = decoded;
     return decoded;
   };
 
   const writeSecondChunk = async () => {
+    // Assert at least one more chunk exists, then drain any remaining chunks.
+    let decoded = await readNextChunk();
     let { done, value } = await reader.read();
-    let decoded = '';
     while (!done) {
-      decoded += new TextDecoder().decode(value as Buffer);
+      decoded += new TextDecoder().decode(value);
       // eslint-disable-next-line no-await-in-loop
       ({ done, value } = await reader.read());
     }
@@ -166,8 +175,8 @@ async function renderAndHydrate() {
   };
 }
 
-// React Server Components tests require React 19 and only run with Node version 18 (`newest` in our CI matrix)
-(getNodeVersion() >= 18 ? describe : describe.skip)('RSCClientRoot', () => {
+// The package `test:streaming` script skips React < 19; this guard also skips older Node CI lanes.
+(getNodeVersion() >= 18 ? describe : describe.skip)('SuspenseHydration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     document.body.innerHTML = '';

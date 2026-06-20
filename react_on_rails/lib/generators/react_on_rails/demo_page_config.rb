@@ -15,13 +15,13 @@ module ReactOnRails
         }
       end
 
-      def build_hello_server_view_config(landing_page:, redux_demo:)
+      def build_hello_server_view_config(landing_page:, redux_demo:, source_path:)
         {
           title: "React Server Components Demo",
           intro: "This route shows the Pro React Server Components flow: Rails streams an async server " \
                  "component response while only client islands ship JavaScript to the browser.",
           highlights: hello_server_highlights,
-          file_hints: hello_server_file_hints,
+          file_hints: hello_server_file_hints(source_path:),
           quick_links: hello_server_quick_links(landing_page:, redux_demo:),
           learning_links: hello_server_learning_links
         }
@@ -167,10 +167,10 @@ module ReactOnRails
         ]
       end
 
-      def hello_server_file_hints
+      def hello_server_file_hints(source_path:)
         [
           {
-            path: "app/javascript/src/HelloServer/",
+            path: source_path,
             description: "Source for the generated server component example and client island."
           },
           {

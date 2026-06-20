@@ -12,9 +12,22 @@ this elsewhere, STOP and warn the user that this is licensed software.
 For licensing terms:
 https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 -%>
-<h1>React Intl RSC Demo</h1>
+<h1><%= t('page.title') %></h1>
 <p>This page demonstrates i18n in React Server Components using <code>React.cache()</code> and <code>react-intl/server</code>.</p>
 <p>The language switcher below triggers a new RSC payload request for each locale change.</p>
+
+<%# Demonstrate that the same YAML translations work in Rails views.
+    Note: Only plain-string keys work here; ICU-format messages (plurals, select)
+    are React Intl–only since Rails i18n doesn't parse ICU syntax. %>
+<div style="background: #f0fdf4; padding: 12px 16px; border-radius: 8px; border: 1px solid #86efac; margin: 16px 0;">
+  <strong>Rails-rendered translations (from same YAML source):</strong>
+  <ul style="margin: 8px 0 0 0;">
+    <li><code>page.title</code>: <%= t('page.title') %></li>
+    <li><code>greeting</code>: <%= t('greeting') %></li>
+    <li><code>product.badge.new</code>: <%= t('product.badge.new') %></li>
+  </ul>
+</div>
+
 <hr/>
 
 <%= stream_react_component("ReactIntlRscDemoPage",

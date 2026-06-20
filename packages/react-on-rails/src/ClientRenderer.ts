@@ -17,6 +17,7 @@ import { onPageUnloaded } from './pageLifecycle.ts';
 import { supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 import { isRendererTeardownResult } from './rendererTeardown.ts';
 import { buildRootErrorCallbackOptions } from './rootErrorHandlers.ts';
+import { convertToError } from './errorUtils.ts';
 import { isThenable } from './isThenable.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
@@ -221,16 +222,23 @@ function scheduleHydration(hydrateOn: HydrateOnMode, domNode: Element, callback:
   return () => {};
 }
 
-// Logs the original error (preserving its untouched message and stack), then mutates and returns it
-// with a ReactOnRails-prefixed message that points readers at the just-logged original. The original
-// error is logged exactly once here so callers must NOT log the returned error again — doing so would
-// emit a second, redundant entry holding the same (now-mutated) reference. `raiseRenderError` throws
-// the returned error (its message references the logged original); `reportRenderError` only relies on
-// this single log.
+type ErrorWithCause = Error & { cause?: unknown };
+
+// Logs a normalized copy of the original thrown value, then returns a fresh ReactOnRails-prefixed
+// error for callers to throw/report. This must not mutate the original value: user code can throw
+// strings, null, cross-realm errors, or frozen Error instances, and delayed hydration catches run
+// inside scheduler callbacks where an error reporter that throws would escape the callback.
 function prepareRenderError(componentName: string, error: unknown): Error {
-  const renderError = error as Error;
-  console.error(renderError);
-  renderError.message = `ReactOnRails encountered an error while rendering component: ${componentName}. See above error message.`;
+  const originalError = convertToError(error);
+  console.error(originalError);
+
+  const renderError = new Error(
+    `ReactOnRails encountered an error while rendering component: ${componentName}. See above error message.`,
+  ) as ErrorWithCause;
+  renderError.cause = originalError;
+  if (typeof originalError.stack === 'string') {
+    renderError.stack = originalError.stack;
+  }
   return renderError;
 }
 

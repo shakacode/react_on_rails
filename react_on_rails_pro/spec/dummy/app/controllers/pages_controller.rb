@@ -43,7 +43,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     rsc_component_error non_existing_react_component
     non_existing_stream_react_component non_existing_rsc_payload
     stream_error_demo stream_shell_error_demo
-    server_side_log_throw server_router
+    server_side_log_throw source_mapped_prerender_error_probe server_router
   ]
 
   before_action :data
@@ -101,6 +101,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def non_existing_rsc_payload
     stream_view_containing_react_components(template: "/pages/non_existing_rsc_payload")
+  end
+
+  def source_mapped_prerender_error_probe
+    render "/pages/source_mapped_prerender_error_probe"
   end
 
   def stream_error_demo

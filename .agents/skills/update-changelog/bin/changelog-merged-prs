@@ -177,9 +177,12 @@ module ChangelogMergedPrs
       range
     end
 
+    # Strict OWNER/REPO: non-empty owner and name, exactly one slash, no spaces.
+    REPO_FORMAT = %r{\A[^/\s]+/[^/\s]+\z}
+
     def resolve_repo!(repo)
       repo ||= capture!("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip
-      raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.include?("/")
+      raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.match?(REPO_FORMAT)
 
       repo
     end

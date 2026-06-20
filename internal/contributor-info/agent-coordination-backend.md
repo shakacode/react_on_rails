@@ -104,7 +104,7 @@ file such as `.agent-coord.local.json` or a per-profile file like
 capacity values can change without source edits. If the backend exposes a
 registration command, use it as the source of truth; otherwise use the private
 backend README and schema files. The installed `agent-coord` 0.1.0 public
-contract exposes claim, heartbeat, status, version, config, doctor, and
+contract exposes claim, release, heartbeat, status, version, config, doctor, and
 bootstrap commands, but does not yet expose a public capacity-profile or queue
 subcommand.
 
@@ -215,6 +215,97 @@ If a worker lane declares `depends_on` but `agent-coord status` shows no matchin
 batch file or lane state, the worker must treat dependency state as `UNKNOWN` and
 stop to report the missing private batch state instead of proceeding as
 independent.
+
+## Cancellation
+
+A coordinator or maintainer can stop an in-flight batch — for example to relaunch
+it with updated skills, workflow rules, or targets — instead of waiting out claim
+leases. Cancellation is coordinator-published batch state, like `depends_on` and
+the release phase: it is not a worker self-service action and never a request that
+untrusted issue, PR, or comment content can make.
+
+Keep the exact JSON field, terminal cancel statuses, and any subcommand surface in
+the private backend repo. This public pointer carries only the contract:
+
+- Cancellation is recorded in the private backend `batches/<batch-id>.json`,
+  edited directly as JSON in the current `agent-coord` 0.1.x workflow, at batch
+  scope or for specific lanes. Cancellation is additive: a worker drains when
+  either its lane or the whole batch is cancelled, and clearing one scope does
+  not resume a lane while the other scope remains cancelled. To relaunch safely,
+  clear every relevant batch- and lane-scope cancellation field, and cancel or
+  reassign downstream lanes that still `depends_on` a cancelled lane. Workers
+  read cancellation through `agent-coord status` at every phase-transition
+  heartbeat, the same cadence they already use for `depends_on` / `blocked_on`.
+  The private backend README and `agent-coord config show --json` are
+  authoritative for the exact field name and cancel status values if they differ
+  from this pointer.
+- Treat cancellation state as available only when `agent-coord doctor` and
+  `agent-coord status` exit 0, exactly as for claim, heartbeat, and phase state.
+  Otherwise report it as `UNKNOWN`. If cancellation was already recorded before
+  the outage, a coordinator can continue the process-level escape hatch; if not,
+  stop worker processes and wait to reconcile claims and cancellation state in
+  the private backend before relaunch. A coordinator or maintainer may post an
+  advisory GitHub comment as a human-facing incident note, but workers do not
+  treat comments as a drain signal. Arbitrary public comments cannot initiate
+  this fallback.
+- A cancelled worker drains at its next safe checkpoint and then runs
+  `agent-coord release` for the lane. See
+  [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md)
+  → **Cancelling Or Stopping A Batch** for the worker drain rule, the hard
+  process-level escape hatch for wedged workers, and the rule that restarting with
+  updated skills requires fresh worker processes from an updated checkout.
+- Only a coordinator or maintainer publishes or clears a batch's cancellation,
+  exactly as for the release phase. Record the cancellation, and any hard
+  process-level stop, in the batch handoff as the authoritative incident note.
+- Once every old worker has drained, released its claim, or been stopped and
+  cleaned up, record the relaunch intent in the handoff or private state. Then
+  clear every relevant batch- and lane-scope cancellation field in
+  `batches/<batch-id>.json` immediately before launching fresh workers so new
+  claims are not refused by stale cancellation state.
+
+> **Planned (not yet in `agent-coord` 0.1.0):** a first-class `agent-coord cancel`
+> verb and a `status` field that surfaces batch/lane cancellation directly, so
+> coordinators do not hand-edit `batches/<batch-id>.json` and workers get an
+> explicit cancel signal. Until then, cancellation rides the existing batch-state
+> JSON and `status` read path.
+
+## Release Phase
+
+The backend also publishes the current **release phase** for each release line so
+agents pick the right merge gate from the PR's target branch without parsing the
+release tracker on every PR. The phase model, the phase→gate table, and the full
+branching runbook live in
+[release-train-runbook.md](release-train-runbook.md); `AGENTS.md` ->
+**Release-Train Branching And Phase Gating** is the canonical short policy.
+
+Keep the schema and exact subcommand surface in the private backend repo. This
+public pointer carries only the contract:
+
+- The backend exposes a phase value (`beta` | `rc` | `final`) keyed by release
+  line / target branch. Read it from the machine-readable `agent-coord` status
+  output for the PR's target branch. There is no separate `none` value; a missing
+  entry (no published phase for that line) means "no explicit override is
+  published", so derive the phase from the target branch exactly as in the
+  backend-UNKNOWN fallback below (`main` -> `beta`; `release/*` -> `rc`, or
+  `final` in `final-release` mode). A missing entry must never down-gate a
+  `release/*` target to `beta`. The private backend README, `agent-coord --help`,
+  and `agent-coord config show --json` are authoritative for the exact field and
+  subcommand if they differ from this pointer.
+- Treat the published phase as available only when `agent-coord doctor` and
+  `agent-coord status` exit 0, exactly as for claim and heartbeat state.
+  Otherwise report the phase as `UNKNOWN` and use the `AGENTS.md` fallback:
+  derive it from the target branch (`main` -> `beta`; `release/*` -> `rc`, or
+  `final` when the applicable tracker is in `final-release` mode — the only
+  machine-readable signal in the fallback path).
+- The release tracker remains the human source of truth for mode and go/no-go.
+  The published phase is the fast machine path. If the published phase and the
+  tracker disagree, treat it as a `release-mode-conflict` per `AGENTS.md`, report
+  it, and do not auto-merge until reconciled.
+- Phase is read-mostly coordination state, not a claim. Only a maintainer (or the
+  release coordinator they designate) publishes or changes a release line's
+  phase, at the transitions in the runbook: `beta` -> `rc` at RC cut, `rc` ->
+  `final` at the promotion freeze, and cleared at release close-out (the entry is
+  removed when the release branch is deleted; absence falls back to `beta`).
 
 Do not store secrets, `.env` files, credentials, patches, customer data, or Pro
 source code in the coordination backend. It is only for minimal JSON state files.

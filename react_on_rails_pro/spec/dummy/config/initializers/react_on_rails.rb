@@ -50,6 +50,19 @@ ReactOnRails.configure do |config|
   config.auto_load_bundle = true
 
   ################################################################################
+  # i18n Configuration (React Intl RSC Demo)
+  ################################################################################
+  # Output directory for compiled translations (translations.js, default.js)
+  config.i18n_dir = Rails.root.join("client", "app", "i18n", "generated")
+
+  # Source directory for YAML locale files
+  # Uses a subdirectory to avoid picking up Rails/gem locale files from config/locales/
+  config.i18n_yml_dir = Rails.root.join("config", "locales", "react_intl_demo")
+
+  # Output format: "js" generates ES modules with defineMessages for type safety
+  config.i18n_output_format = "js"
+
+  ################################################################################
   # Pro Feature Testing: Server Bundle Security
   ################################################################################
   # Testing private server bundle enforcement (recommended for production)

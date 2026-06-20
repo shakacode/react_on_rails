@@ -74,13 +74,12 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(violation_codes).not_to include("changes_requested_review_object")
   end
 
-  it "blocks UNKNOWN review decisions in strict mode" do
+  it "blocks missing review decisions in strict mode" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
       "pull_request" => {
         "number" => 1,
-        "headRefOid" => "abc123",
-        "reviewDecision" => nil
+        "headRefOid" => "abc123"
       },
       "files" => [],
       "review_threads" => [],
@@ -112,6 +111,90 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
         "unknown_review_decision"
       )
+    end
+  end
+
+  it "blocks missing review decisions and current changes-requested reviews in strict mode" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 1,
+        "headRefOid" => "abc123"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "review-1",
+          "state" => "CHANGES_REQUESTED",
+          "submittedAt" => "2026-06-19T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/review-1",
+          "body" => "Please fix this before merge."
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-unknown-review-decision-change-request", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_review_decision",
+        "changes_requested_review_object"
+      )
+    end
+  end
+
+  it "treats null review decisions as not required when no review blockers remain" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 1,
+        "headRefOid" => "abc123",
+        "reviewDecision" => nil
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-null-review-decision", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.dig("pull_requests", 0, "pr", "review_decision")).to eq("NOT_REQUIRED")
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(report.fetch("unknown_fields")).to be_empty
+      expect(report.fetch("violations")).to be_empty
     end
   end
 
@@ -159,7 +242,7 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
-  it "blocks blank review decisions in strict mode" do
+  it "treats blank review decisions as not required when no review blockers remain" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
       "pull_request" => {
@@ -186,13 +269,105 @@ RSpec.describe "script/pr-merge-ledger" do
         chdir: repo_root
       )
 
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.dig("pull_requests", 0, "pr", "review_decision")).to eq("NOT_REQUIRED")
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(report.fetch("violations")).to be_empty
+    end
+  end
+
+  it "blocks current changes-requested reviews when aggregate review decision is not required" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 1,
+        "headRefOid" => "abc123",
+        "reviewDecision" => nil
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "review-1",
+          "state" => "CHANGES_REQUESTED",
+          "submittedAt" => "2026-06-19T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/review-1",
+          "body" => "Please fix this before merge."
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-null-review-decision-change-request", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
       expect(status).not_to be_success, stderr
 
       report = JSON.parse(stdout)
-      expect(report.dig("pull_requests", 0, "pr", "review_decision")).to eq("UNKNOWN")
-      expect(report.fetch("complete_allowed")).to be(false)
+      expect(report.dig("pull_requests", 0, "pr", "review_decision")).to eq("NOT_REQUIRED")
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
-        "unknown_review_decision"
+        "changes_requested_review_object"
+      )
+    end
+  end
+
+  it "blocks current changes-requested reviews when aggregate review decision is blank" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 1,
+        "headRefOid" => "abc123",
+        "reviewDecision" => ""
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [
+        {
+          "id" => "review-1",
+          "state" => "CHANGES_REQUESTED",
+          "submittedAt" => "2026-06-19T00:00:00Z",
+          "author" => { "login" => "reviewer" },
+          "commit" => { "oid" => "abc123" },
+          "url" => "https://example.com/review-1",
+          "body" => "Please fix this before merge."
+        }
+      ]
+    }
+
+    Tempfile.create(["pr-merge-ledger-blank-review-decision-change-request", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.dig("pull_requests", 0, "pr", "review_decision")).to eq("NOT_REQUIRED")
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "changes_requested_review_object"
       )
     end
   end
@@ -230,6 +405,48 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(report.fetch("complete_allowed")).to be(false)
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
         "review_decision_review_required"
+      )
+    end
+  end
+
+  it "normalizes unsupported review decisions to UNKNOWN so output stays schema-valid" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 1,
+        "headRefOid" => "abc123",
+        "reviewDecision" => "REVIEW_BYPASSED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-unsupported-review-decision", ".json"]) do |file|
+      file.write(JSON.generate(fixture))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.dig("pull_requests", 0, "pr", "review_decision")).to eq("UNKNOWN")
+      expect(report.dig("pull_requests", 0, "pr")).not_to have_key("review_decision_raw")
+      expect(report.fetch("unknown_fields").first).to include(
+        "field" => "pr.review_decision",
+        "message" => "GitHub reviewDecision is unsupported: REVIEW_BYPASSED"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_review_decision"
       )
     end
   end
@@ -4909,6 +5126,168 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  # Regression: GitHub review/comment bodies from bot reviewers (coderabbitai,
+  # codex) routinely contain UTF-8 such as em-dashes and emoji. The script is a
+  # standalone tool run outside any bundle, so it resolves the Ruby-shipped json
+  # gem. Modern json (>= ~2.8) raises Encoding::InvalidByteSequenceError ("\xE2"
+  # on US-ASCII) when JSON.parse receives UTF-8 bytes tagged US-ASCII -- which is
+  # what happens under a non-UTF-8 locale (LANG/LC_ALL unset). The script must
+  # pin UTF-8 regardless of locale.
+  #
+  # These tests deliberately run the script with Bundler.with_unbundled_env so it
+  # uses the system json (the strict one users hit), not this suite's pinned json
+  # 2.7.2, which silently tolerates the mistagged bytes and would mask the bug.
+  # When the unbundled json is too old to be strict, the regression cannot be
+  # reproduced, so the test skips rather than passing as a no-op.
+  def ascii_locale_env
+    {
+      "LANG" => "C",
+      "LC_ALL" => "C",
+      "LC_CTYPE" => nil
+    }.freeze
+  end
+
+  def with_unbundled_env(&)
+    require "bundler"
+    Bundler.with_unbundled_env(&)
+  end
+
+  def unbundled_json_rejects_mistagged_utf8?
+    # The probe result is process-wide (it only depends on the system json gem),
+    # so spawn at most one subprocess per suite run. RSpec runs each example in a
+    # fresh instance, so memoize on the example-group class -- which is shared --
+    # rather than an instance variable, which would not persist across examples.
+    memo = self.class.instance_variable_get(:@unbundled_json_rejects_mistagged_utf8)
+    # Three-state: nil = not probed yet, false = tolerant json, true = strict json.
+    return memo unless memo.nil?
+
+    # {"k":"<em-dash>"} as raw UTF-8 bytes, deliberately mislabeled US-ASCII.
+    probe = <<~RUBY
+      require "json"
+      bytes = [0x7b, 0x22, 0x6b, 0x22, 0x3a, 0x22, 0xe2, 0x80, 0x94, 0x22, 0x7d]
+      mistagged = bytes.pack("C*").force_encoding("US-ASCII")
+      begin
+        JSON.parse(mistagged)
+        print "tolerant"
+      rescue EncodingError
+        print "strict"
+      end
+    RUBY
+    result = with_unbundled_env do
+      out, = Open3.capture2(ascii_locale_env, "ruby", "-e", probe)
+      out == "strict"
+    end
+    self.class.instance_variable_set(:@unbundled_json_rejects_mistagged_utf8, result)
+  end
+
+  it "parses non-ASCII GraphQL review-thread bodies under a US-ASCII locale" do
+    skip "system json tolerates mistagged UTF-8; cannot reproduce" unless unbundled_json_rejects_mistagged_utf8?
+
+    fake_gh = <<~SH
+      #!/bin/sh
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              query=*) query=${1#query=} ;;
+            esac
+            ;;
+        esac
+        shift
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"PR 1","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-1","headRefOid":"head-1","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"thread-1","isResolved":false,"isOutdated":false,"path":"script/pr-merge-ledger","line":1,"comments":{"nodes":[{"id":"comment-1","databaseId":1,"body":"Consider this — it has an em-dash and an emoji 🎉 from coderabbitai.","author":{"login":"coderabbitai"},"url":"https://example.com/comment-1","path":"script/pr-merge-ledger","line":1,"createdAt":"2026-06-01T00:00:00Z","outdated":false,"commit":{"oid":"head-1"},"pullRequestReview":{"id":"review-1","state":"COMMENTED","submittedAt":"2026-06-01T00:00:00Z","commit":{"oid":"head-1"},"author":{"login":"coderabbitai"}}}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+
+    with_unbundled_env do
+      with_fake_gh(fake_gh) do |env|
+        stdout, stderr, status = Open3.capture3(
+          env.merge(ascii_locale_env),
+          script_path,
+          "1",
+          "--repo",
+          "shakacode/react_on_rails",
+          "--changelog-classification",
+          "not_user_visible",
+          chdir: repo_root
+        )
+
+        expect(status).to be_success, stderr
+        expect(stderr).not_to include("InvalidByteSequenceError")
+
+        report = JSON.parse(stdout)
+        excerpt = report.dig(
+          "pull_requests", 0, "unresolved_current_head_review_threads", "threads", 0, "body_excerpt"
+        )
+        expect(excerpt).to include("em-dash")
+        expect(excerpt).to include("—")
+        expect(excerpt).to include("🎉")
+      end
+    end
+  end
+
+  it "parses non-ASCII fixture bodies under a US-ASCII locale" do
+    skip "system json tolerates mistagged UTF-8; cannot reproduce" unless unbundled_json_rejects_mistagged_utf8?
+
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 4106,
+        "title" => "Wrap generated demo file paths — with em-dash 🎉",
+        "headRefOid" => "abc123",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-non-ascii", ".json"]) do |file|
+      file.binmode
+      file.write(JSON.generate(fixture).b)
+      file.flush
+
+      stdout, stderr, status = with_unbundled_env do
+        Open3.capture3(
+          ascii_locale_env,
+          script_path,
+          "--fixture",
+          file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--strict",
+          chdir: repo_root
+        )
+      end
+
+      expect(status).to be_success, stderr
+      expect(stderr).not_to include("InvalidByteSequenceError")
+
+      report = JSON.parse(stdout)
+      expect(report.dig("pull_requests", 0, "pr", "title")).to include("—")
+      expect(report.dig("pull_requests", 0, "pr", "title")).to include("🎉")
+    end
+  end
+
   it "prints the fixed JSON schema" do
     stdout, stderr, status = Open3.capture3(script_path, "--schema", chdir: repo_root)
 
@@ -4925,8 +5304,16 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(schema.fetch("required")).to include("pull_requests", "violations", "complete_allowed")
     expect(schema.dig("$defs", "pull_request_ledger", "additionalProperties")).to be(false)
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "pr", "additionalProperties")).to be(false)
-    expect(schema.dig("$defs", "pull_request_ledger", "properties", "pr", "properties", "review_decision",
-                      "enum")).to eq(%w[APPROVED CHANGES_REQUESTED REVIEW_REQUIRED UNKNOWN])
+    expected_review_decision_enum = %w[APPROVED CHANGES_REQUESTED REVIEW_REQUIRED NOT_REQUIRED UNKNOWN]
+    pr_review_decision_enum = schema.dig(
+      "$defs", "pull_request_ledger", "properties", "pr", "properties", "review_decision", "enum"
+    )
+    review_objects_decision_enum = schema.dig(
+      "$defs", "pull_request_ledger", "properties", "review_objects", "properties", "review_decision", "enum"
+    )
+
+    expect(pr_review_decision_enum).to eq(expected_review_decision_enum)
+    expect(review_objects_decision_enum).to eq(expected_review_decision_enum)
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "lockfile_diff", "properties",
                       "has_lockfile_diff")).to eq("enum" => [true, false, "UNKNOWN"])
     expect(schema.dig("$defs", "pull_request_ledger", "required")).to include("issue_comments")

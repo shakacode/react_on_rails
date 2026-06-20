@@ -47,11 +47,15 @@ spec:
         - number: 3800
           protocol: http
   defaultOptions:
-    # Start out like this for "test apps"
+    # Public/staging test apps keep one warm replica while Capacity AI right-sizes both workload
+    # containers (rails and node-renderer).
+    # Capacity AI may restart that replica when applying resource changes.
+    # For production or high-availability staging, increase maxScale and review Capacity AI suitability.
     autoscaling:
-      # Max of 1 effectively disables autoscaling, so a like a Heroku dyno count of 1
+      metric: disabled
+      minScale: 1
       maxScale: 1
-    capacityAI: false
+    capacityAI: true
   firewallConfig:
     external:
       # Default to allow public access to Rails server

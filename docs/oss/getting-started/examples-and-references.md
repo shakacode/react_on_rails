@@ -38,6 +38,8 @@ source, while others require React on Rails Pro.
 - Upstream branch testing: the starter documents how to validate unreleased
   `react_on_rails` and `react_on_rails_rsc` branches in
   [Testing Upstream Branches](https://github.com/shakacode/react-on-rails-starter-tanstack/blob/main/docs/12-upstream-branch-testing.md).
+  For the general gem/npm recipes, see
+  [Consuming an Unreleased Build](./consuming-an-unreleased-build.md).
 - Note: this repo uses React on Rails Pro. See [OSS vs Pro](./oss-vs-pro.md)
   for evaluation guidance.
 

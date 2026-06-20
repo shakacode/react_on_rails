@@ -198,11 +198,16 @@ module PrFileTouchMap
     false
   end
 
+  # Try the head repo's branch (only when the branch name validates), then a
+  # reachable-SHA fetch of headRefOid. The OID fetch does NOT depend on branch
+  # validity: an invalid/missing head branch must not gate the SHA fallback, and
+  # the 40-hex SHA is itself the only untrusted input it consumes.
   def fetch_head_from_repo(meta, head_tmp)
-    return false unless valid_branch?(meta[:head_ref])
-
     head_url = "https://github.com/#{meta[:head_repo]}.git"
-    return true if system_quiet("git", "fetch", head_url, "refs/heads/#{meta[:head_ref]}:#{head_tmp}")
+    if valid_branch?(meta[:head_ref]) &&
+       system_quiet("git", "fetch", head_url, "refs/heads/#{meta[:head_ref]}:#{head_tmp}")
+      return true
+    end
 
     # Reachable-SHA fetch; rejection is an expected portability outcome.
     meta[:head_oid].match?(/\A[0-9a-f]{40}\z/) &&
@@ -389,14 +394,17 @@ module PrFileTouchMap
     end
 
     def validate_pr!(pr_number)
-      raise Error, "a positive integer PR number is required\n\n#{USAGE}" unless pr_number.to_s.match?(/\A\d+\z/)
+      raise Error, "a positive integer PR number is required\n\n#{USAGE}" unless pr_number.to_s.match?(/\A[1-9]\d*\z/)
 
       pr_number
     end
 
+    # Strict OWNER/REPO: non-empty owner and name, exactly one slash, no spaces.
+    REPO_FORMAT = %r{\A[^/\s]+/[^/\s]+\z}
+
     def resolve_repo!(repo)
       repo ||= capture!("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip
-      raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.include?("/")
+      raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.match?(REPO_FORMAT)
 
       repo
     end
