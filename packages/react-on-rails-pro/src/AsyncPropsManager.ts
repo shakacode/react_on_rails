@@ -60,6 +60,7 @@ type PromiseController = {
  */
 type PropRequestEmitter = (propName: string) => void;
 
+const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
 const PULL_ENABLED_KEY = 'pullEnabled';
 const PUSH_PROPS_KEY = 'pushProps';
 const PROP_REQUEST_EMITTER_KEY = 'propRequestEmitter';
@@ -274,8 +275,6 @@ class AsyncPropsManager {
     );
   }
 }
-
-const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
 
 /**
  * Gets or creates an AsyncPropsManager from the shared execution context.

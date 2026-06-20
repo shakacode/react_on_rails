@@ -147,7 +147,8 @@ module ReactOnRailsPro
     # Always return the generic message regardless of the internal reason. Raw
     # Rails-side details such as SQL errors, file paths, or credentials must not
     # reach the browser.
-    def sanitized_rejection_reason(_reason)
+    def sanitized_rejection_reason(reason)
+      Rails.logger.debug { "[ReactOnRailsPro::AsyncProps] Prop rejected (internal reason): #{reason}" }
       SANITIZED_REJECTION_REASON
     end
 

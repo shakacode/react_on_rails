@@ -26,10 +26,13 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   POSTS_PAGE_DEFAULT_POSTS_COUNT = 2
   POSTS_PAGE_MAX_ARTIFICIAL_DELAY = 10_000
   POSTS_PAGE_MAX_POSTS_COUNT = 100
+  LAZY_PROP_REDIS_BLOCK_MS = 30_000
   MAX_LAZY_PROP_REDIS_EMPTY_READS = 10
+  LAZY_PROP_REDIS_STALL_WARN_READS = 3
   private_constant :POSTS_PAGE_DEFAULT_ARTIFICIAL_DELAY, :POSTS_PAGE_DEFAULT_POSTS_COUNT,
                    :POSTS_PAGE_MAX_ARTIFICIAL_DELAY, :POSTS_PAGE_MAX_POSTS_COUNT,
-                   :MAX_LAZY_PROP_REDIS_EMPTY_READS
+                   :LAZY_PROP_REDIS_BLOCK_MS, :MAX_LAZY_PROP_REDIS_EMPTY_READS,
+                   :LAZY_PROP_REDIS_STALL_WARN_READS
   APP_PROPS_SERVER_RENDER = {
     helloWorldData: {
       name: PROPS_NAME
@@ -461,8 +464,9 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     empty_reads = 0
     last_received_id = "0-0"
     stream_id = "stream:#{request_id}"
+    # Test-only safety bound: 10 empty reads * 30s XREAD block = 5 minutes before timeout.
     until ended
-      received_messages = redis_stream_messages(redis, stream_id, last_received_id, block: 30_000)
+      received_messages = redis_stream_messages(redis, stream_id, last_received_id, block: LAZY_PROP_REDIS_BLOCK_MS)
       if received_messages.empty?
         empty_reads = increment_lazy_prop_empty_reads(empty_reads, stream_id)
         next
@@ -492,6 +496,12 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def increment_lazy_prop_empty_reads(empty_reads, stream_id)
     next_empty_reads = empty_reads + 1
+    if next_empty_reads == LAZY_PROP_REDIS_STALL_WARN_READS
+      Rails.logger.warn(
+        "[ReactOnRailsPro] Async props stream #{stream_id} has #{next_empty_reads} empty Redis reads; " \
+        "stream may be stalled"
+      )
+    end
     raise "Timed out waiting for async props stream #{stream_id}" if next_empty_reads >= MAX_LAZY_PROP_REDIS_EMPTY_READS
 
     next_empty_reads

@@ -127,7 +127,8 @@ module ReactOnRails
       raw_content = @buf.byteslice(0, @content_len).force_encoding(Encoding::UTF_8)
       @buf = @buf.byteslice(@content_len, @buf.bytesize - @content_len)
 
-      # Control messages (propRequest, renderComplete) have no HTML payload.
+      # Control messages (propRequest, renderComplete) have no HTML payload;
+      # raw_content is therefore empty and intentionally unused.
       # Yield metadata as-is so the consumer can route on messageType.
       if @metadata.key?("messageType")
         @metadata.delete("payloadType")

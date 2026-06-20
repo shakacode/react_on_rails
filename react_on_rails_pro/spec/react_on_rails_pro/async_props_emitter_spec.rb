@@ -122,6 +122,7 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       mock_logger = instance_double(Logger)
       allow(Rails).to receive(:logger).and_return(mock_logger)
       allow(request_stream).to receive(:<<).and_raise(StandardError.new("Connection lost"))
+      allow(mock_logger).to receive(:debug)
       allow(mock_logger).to receive(:error)
 
       expect { emitter.reject("secretData", "forbidden") }.not_to raise_error

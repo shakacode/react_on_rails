@@ -73,6 +73,8 @@ module ReactOnRailsPro
             # Use incremental rendering when async props block is provided
             path = prepare_incremental_render_path(js_code, render_options)
             push_props = render_options.internal_option(:push_props)
+            # Pull mode is enabled whenever push_props is set, including [] for pure pull.
+            # nil means push-only mode with no bidirectional prop-request channel.
             pull_enabled = !push_props.nil?
             ReactOnRailsPro::Request.render_code_with_incremental_updates(
               path,

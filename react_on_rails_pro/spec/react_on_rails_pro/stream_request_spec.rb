@@ -312,7 +312,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
       response = mock_ok_response("malformed\n")
       stream = described_class.create(pull_enabled: true) do |_send_bundle, _tasks|
-        [response, emitter]
+        { response:, emitter: }
       end
 
       expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRails::Error, /missing tab separator/)
@@ -406,7 +406,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
           else
             mock_ok_response(to_length_prefixed("ok"))
           end
-        [response, emitter]
+        { response:, emitter: }
       end
 
       chunks = []

@@ -57,7 +57,7 @@ module ReactOnRailsPro
           end
 
           form = form_with_code(js_code, false)
-          [perform_request(path, form:, stream: true), nil]
+          { response: perform_request(path, form:, stream: true), emitter: nil }
         end
       end
 
@@ -134,7 +134,7 @@ module ReactOnRailsPro
             output.close
           end)
 
-          [response, pull_enabled ? emitter : nil]
+          { response:, emitter: pull_enabled ? emitter : nil }
         end
       end
 
