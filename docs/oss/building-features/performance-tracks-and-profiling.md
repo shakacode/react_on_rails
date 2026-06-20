@@ -119,7 +119,7 @@ Then:
 1. Build both variants in production mode on the same data and configuration.
 2. Drive both with the **same throttled Lighthouse config** (Slow 4G + 4x CPU).
 3. Collect at least **6 paired samples** per page so the comparison has enough power.
-4. Report a **Wilcoxon signed-rank p-value** so you can tell a real shift from noise.
+4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as a confirmed shift when the paired samples consistently move in the same direction.
 
 We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
 
@@ -127,11 +127,13 @@ We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it bring
 
 Do not just stare at LCP. Decompose the metrics, because the fix depends on which ones moved:
 
-| Signal                                | Likely cause                                                                                                 | Where to look                                                                                                 |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| **FCP and TBT both high**             | JS-bundle / hydration bound — the `'use client'` tail is shipping and executing too much                     | Reduce client boundaries. See [Chunk Contamination](../migrating/rsc-troubleshooting.md#chunk-contamination). |
-| **LCP pinned near the load-wait cap** | The largest element (often a hero image) cannot paint because first render is late, and/or a slow asset host | Fix the asset host; LCP usually follows once FCP drops.                                                       |
-| **CLS and Lighthouse score**          | Corroboration                                                                                                | Use as secondary confirmation, not as the primary signal.                                                     |
+| Signal                                    | Likely cause                                                                              | Where to look                                                                                                           |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **FCP and TBT both high**                 | JS-bundle / hydration bound — the `'use client'` tail is shipping and executing too much  | Reduce client boundaries. See [Chunk Contamination](../migrating/rsc-troubleshooting.md#chunk-contamination).           |
+| **LCP high while FCP is also high**       | LCP is gated on late FCP; the largest element may be healthy but cannot paint yet         | Fix FCP first by reducing client JS boundaries; LCP usually follows.                                                    |
+| **LCP high while FCP is healthy**         | The LCP element or its asset delivery is slow                                             | Inspect the hero/image resource, asset host, CDN cache headers, preload/fetch priority, and responsive image selection. |
+| **INP high in RUM or interaction traces** | Long client tasks delay input responsiveness, often from the same JS tail that raises TBT | Follow the FCP/TBT path, then verify the affected interactions with RUM or browser traces.                              |
+| **CLS and Lighthouse score**              | Corroboration                                                                             | Use as secondary confirmation, not as the primary signal.                                                               |
 
 A high FCP that drags LCP behind it is the common RSC-conversion pattern: the largest element is healthy, it simply cannot paint until the late first render lets it. Fix FCP first and LCP usually follows.
 
@@ -150,12 +152,12 @@ Because the control never moves, every change has a defensible before/after inst
 
 A real RSC conversion of the HiChee `home` and `faq` pages, measured with a paired ShakaPerf A/B under Slow 4G + 4x CPU (p ≈ 0.03):
 
-| Page     | FCP          | LCP          | TBT       | Lighthouse |
-| -------- | ------------ | ------------ | --------- | ---------- |
-| **Home** | 2.0s → 9.3s  | 2.1s → 21.1s | 0 → 928ms | 79 → 8.5   |
-| **FAQ**  | 2.0s → 15.9s | 2.2s → 20.5s | —         | —          |
+| Page     | FCP          | LCP          | TBT                | Lighthouse         |
+| -------- | ------------ | ------------ | ------------------ | ------------------ |
+| **Home** | 2.0s → 9.3s  | 2.1s → 21.1s | 0 → 928ms          | 79 → 8.5           |
+| **FAQ**  | 2.0s → 15.9s | 2.2s → 20.5s | — (`not captured`) | — (`not captured`) |
 
-The decomposition pointed straight at the `'use client'` JS tail: FCP and TBT both blew up, and LCP was pinned near the load-wait cap because first render arrived far too late, not because the hero element itself was slow.
+The FAQ run did not capture TBT or Lighthouse score. The captured signals pointed straight at the `'use client'` JS tail: FCP regressed on both pages, Home TBT blew up, and LCP was gated on late FCP because first render arrived far too late, not because the hero element itself was slow.
 
 A CSS broadcast fix (react_on_rails_rsc [#108](https://github.com/shakacode/react_on_rails_rsc/pull/108) → [#110](https://github.com/shakacode/react_on_rails_rsc/pull/110) / [#113](https://github.com/shakacode/react_on_rails_rsc/pull/113), shipped in `react-on-rails-rsc` 19.2.0-rc.3) was correct, but it was a **second-order** effect. The dominant driver was the client JS tail, not CSS delivery. Chasing the CSS fix first would have spent effort without moving the metrics that mattered.
 
