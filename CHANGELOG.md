@@ -26,6 +26,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Deferred hydration error reporting handles non-Error thrown values**: Delayed `hydrate_on` renders now normalize strings, `null`, and frozen `Error` instances before logging, so reporting the failure does not throw again or mutate user errors. [PR 4120](https://github.com/shakacode/react_on_rails/pull/4120) by [ihabadham](https://github.com/ihabadham).
+
 - **Explicit Webpack installs now pass the resolved bundler to Shakapacker.** `rails generate react_on_rails:install --no-rspack` and `--webpack` now set `SHAKAPACKER_ASSETS_BUNDLER=webpack` before running `shakapacker:install`, so Shakapacker installs Webpack dependencies instead of falling back to its default bundler. Fixes [Issue 4108](https://github.com/shakacode/react_on_rails/issues/4108). [PR 4109](https://github.com/shakacode/react_on_rails/pull/4109) by [ihabadham](https://github.com/ihabadham).
 
 - **Generated demo paths now honor custom Shakapacker source roots.** The install generator resolves demo components, entrypoints, stylesheets, TypeScript includes, Tailwind imports, and RSC hints from the app's Shakapacker `source_path` / `source_entry_path` settings, including slash entry roots, while wrapping long source hints in the generated demo views. Fixes [Issue 4062](https://github.com/shakacode/react_on_rails/issues/4062). [PR 4130](https://github.com/shakacode/react_on_rails/pull/4130) by [justin808](https://github.com/justin808).
