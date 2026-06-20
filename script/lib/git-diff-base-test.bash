@@ -660,7 +660,10 @@ test_resolve_logs_deepen_progress() {
   # is not opaque between the initial fetch and the eventual unshallow. This
   # checks each deepen depth in the 2 -> 4 -> 8 sequence and verifies the
   # fallback still fires after the deepen budget is exhausted.
-  setup_repo_fixture shallow 1 20
+  # Keep the merge base far enough behind the main tip that Git versions which
+  # deepen repository history more aggressively still exhaust this small
+  # 2 -> 4 -> 8 test budget before resolving it.
+  setup_repo_fixture shallow 1 60
   local err_file
   err_file="$(mktemp resolve-err.XXXXXX)"
   if ! GIT_DIFF_BASE_FETCH_DEPTH=2 GIT_DIFF_BASE_MAX_ATTEMPTS=3 \
