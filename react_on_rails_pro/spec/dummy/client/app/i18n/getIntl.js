@@ -20,8 +20,7 @@ import { createIntl } from 'react-intl/server';
 import { translations } from './generated/translations';
 
 // Default locale - must match first locale in YAML files
-// Note: Don't import from ./generated/default.js as it uses defineMessages
-// which requires client-side React hooks not available in RSC context
+// Keep this literal in sync with generated/default.js when locale files change.
 const DEFAULT_LOCALE = 'en';
 
 /**
