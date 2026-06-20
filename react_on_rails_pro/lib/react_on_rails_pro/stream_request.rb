@@ -109,7 +109,9 @@ module ReactOnRailsPro
     end
   end
 
-  # Protocol constant; parity is covered by asyncPropsProtocol.test.ts.
+  STREAM_CONTROL_MESSAGE_TYPES = %w[propRequest renderComplete].freeze
+  private_constant :STREAM_CONTROL_MESSAGE_TYPES
+
   class StreamRequest
     MAX_PULL_PROP_NAME_LENGTH = 256
 
@@ -230,7 +232,7 @@ module ReactOnRailsPro
     def parse_and_route_chunk(parser, chunk, &)
       yielded_content = false
       parser.feed(chunk) do |parsed|
-        next route_control_message(parsed) if parsed.key?("messageType")
+        next route_control_message(parsed) if STREAM_CONTROL_MESSAGE_TYPES.include?(parsed["messageType"])
 
         yield parsed
         yielded_content = true

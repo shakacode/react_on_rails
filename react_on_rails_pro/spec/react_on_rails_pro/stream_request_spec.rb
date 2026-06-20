@@ -250,6 +250,20 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(emitter.pull_requests.dequeue).to eq("users")
       expect(emitter.pull_requests.dequeue).to be_nil
     end
+
+    it "yields ordinary chunks with non-control messageType metadata" do
+      response = mock_ok_response(to_length_prefixed("<div>traceable</div>", "messageType" => "trace"))
+
+      yielded = []
+      request.send(:process_response_chunks, response) { |chunk| yielded << chunk }
+
+      expect(yielded).to contain_exactly(
+        include(
+          "messageType" => "trace",
+          "html" => "<div>traceable</div>"
+        )
+      )
+    end
   end
 
   describe "#each_chunk with tasks" do

@@ -281,6 +281,24 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
           expect(queue).to be_closed
         end
       end
+
+      it "leaves failed closes retryable" do
+        close_calls = 0
+        queue_double = instance_double(Async::Queue)
+        allow(queue_double).to receive(:close) do
+          close_calls += 1
+          raise StandardError, "close failed" if close_calls == 1
+        end
+        queue.instance_variable_set(:@queue, queue_double)
+
+        expect { queue.close }.to raise_error(StandardError, "close failed")
+        expect(queue).not_to be_closed
+
+        queue.close
+
+        expect(queue).to be_closed
+        expect(close_calls).to eq(2)
+      end
     end
 
     describe "#closed?" do

@@ -141,6 +141,18 @@ function assertFirstIncrementalRenderRequestChunk(
   if ('onRequestClosedUpdateChunk' in chunk && chunk.onRequestClosedUpdateChunk) {
     assertIsUpdateChunk(chunk.onRequestClosedUpdateChunk);
   }
+
+  if ('pullEnabled' in chunk && chunk.pullEnabled !== undefined && typeof chunk.pullEnabled !== 'boolean') {
+    throw new Error('Invalid first incremental render request chunk: pullEnabled must be a boolean');
+  }
+
+  if (
+    'pushProps' in chunk &&
+    chunk.pushProps !== undefined &&
+    (!Array.isArray(chunk.pushProps) || chunk.pushProps.some((propName) => typeof propName !== 'string'))
+  ) {
+    throw new Error('Invalid first incremental render request chunk: pushProps must be a string array');
+  }
 }
 
 export type IncrementalRenderResult = {

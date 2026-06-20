@@ -478,6 +478,9 @@ describe('Pull mode propRequest emission', () => {
     legacyContext.set(PUSH_PROPS_KEY, new Set(['pushProp']));
     legacyContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
     legacyManager.flushPendingPullRequests();
+    expect(propRequestEmitter).toHaveBeenCalledWith('early');
+    expect(propRequestEmitter).toHaveBeenCalledTimes(1);
+
     legacyManager.emitPendingPullRequests();
 
     expect(propRequestEmitter).toHaveBeenCalledWith('early');
