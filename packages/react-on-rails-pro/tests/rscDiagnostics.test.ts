@@ -27,6 +27,7 @@ import {
   extractModulePathFromStack,
   mergeRSCStreamDiagnosticError,
   MERGED_DIAGNOSTIC_FLAG,
+  REACT_STREAM_ERROR_SEPARATOR,
   RSC_STREAM_DIAGNOSTIC_ERROR_NAME,
   rscStreamDiagnosticMatchesError,
 } from '../src/rscDiagnostics.ts';
@@ -91,7 +92,7 @@ describe('RSC diagnostics', () => {
     expect(mergedError.name).toBe('ReactOnRailsRSCStreamError');
     expect(mergedError.message).toContain('Original error: useState is not a function');
     expect(mergedError.message).toContain(
-      'React stream error: An error occurred in the Server Components render.',
+      `${REACT_STREAM_ERROR_SEPARATOR} An error occurred in the Server Components render.`,
     );
     expect(mergedError.stack).toContain('CommentsToggle.jsx:12:15');
   });
@@ -326,6 +327,28 @@ describe('RSC diagnostics', () => {
       );
     });
 
+    it('drops already-merged diagnostics in production before combining candidates', () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      process.env.NODE_ENV = 'production';
+      try {
+        const diagnostic = makeDiagnostic('CommentsToggle');
+        const merged = mergeRSCStreamDiagnosticError(
+          new Error('An error occurred in the Server Components render.'),
+          diagnostic,
+        );
+        const otherDiagnostic = makeDiagnostic('PostsPage');
+
+        expect(combineRSCStreamDiagnosticErrors([merged, otherDiagnostic])).toBe(otherDiagnostic);
+        expect(consoleError).toHaveBeenCalledWith(
+          '[ReactOnRails] combineRSCStreamDiagnosticErrors: received an already-merged error as input; pass only raw diagnostics from buildRSCStreamDiagnosticError',
+        );
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+        consoleError.mockRestore();
+      }
+    });
+
     it('lists every captured component as a candidate when two or more are provided', () => {
       const combined = combineRSCStreamDiagnosticErrors([
         makeDiagnostic('CommentsToggle'),
@@ -367,7 +390,7 @@ describe('RSC diagnostics', () => {
 
       expect(merged.message).toContain('one of these 2 RSC components failed');
       expect(merged.message).toContain(
-        'React stream error: An error occurred in the Server Components render.',
+        `${REACT_STREAM_ERROR_SEPARATOR} An error occurred in the Server Components render.`,
       );
     });
   });

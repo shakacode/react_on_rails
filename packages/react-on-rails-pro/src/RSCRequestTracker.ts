@@ -192,6 +192,8 @@ class RSCRequestTracker {
    * `recordRSCDiagnostic`'s dedup filter. Push them back directly to preserve the exact consumed
    * set without re-running deduplication during restore.
    *
+   * @internal Only restore arrays previously returned by `consumeCapturedRSCDiagnostics`.
+   *
    * @param captured - Previously consumed diagnostics to make available for a later surfaced error
    */
   restoreCapturedRSCDiagnostics(captured: CapturedRSCDiagnostic[]): void {

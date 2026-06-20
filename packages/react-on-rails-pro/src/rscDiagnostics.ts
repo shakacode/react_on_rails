@@ -32,6 +32,7 @@ type RenderingErrorMetadata = {
 export const RSC_STREAM_DIAGNOSTIC_ERROR_NAME = 'ReactOnRailsRSCStreamError';
 // Exported so tests reference the marker by constant rather than a duplicated string literal.
 export const MERGED_DIAGNOSTIC_FLAG = '__rorRSCDiagMerged';
+export const REACT_STREAM_ERROR_SEPARATOR = '\nReact stream error:';
 
 type RSCStreamDiagnosticError = Error & {
   [MERGED_DIAGNOSTIC_FLAG]?: true;
@@ -48,7 +49,8 @@ const nonEmptyString = (value: unknown) => {
 
 const ORIGINAL_ERROR_PREFIX = 'Original error: ';
 // Stable prefix of React's generic Server Components render error.
-// Source: packages/react-dom/src/server/ReactFizzServer.js (React 18.x-19.x).
+// Source: packages/react-dom/src/server/ReactFizzServer.js — search for:
+//   "An error occurred in the Server Components render"
 // If React renames this string, deferred-render enrichment degrades to the
 // generic React error. Verify this prefix when upgrading React.
 const GENERIC_RSC_STREAM_ERROR_PREFIXES = ['An error occurred in the Server Components render.'];
@@ -161,31 +163,40 @@ export const buildRSCStreamDiagnosticError = (
  *
  * Precondition: every entry must be a raw diagnostic from `buildRSCStreamDiagnosticError`, never an
  * already-merged error. Passing a merged error would embed its full prior-merged text into a
- * candidate block, producing garbled output with no runtime warning.
+ * candidate block. Dev/test throws on that precondition failure; production logs and drops the
+ * invalid merged entries before building a combined candidate message.
  *
  * @param diagnosticErrors - Diagnostics built by `buildRSCStreamDiagnosticError` (0, 1, or more)
  */
 export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Error | undefined => {
   if (diagnosticErrors.length === 0) return undefined;
+  let candidateDiagnosticErrors = diagnosticErrors;
+  const hasMergedInput = diagnosticErrors.some(
+    (error) => (error as RSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG],
+  );
   if (process.env.NODE_ENV !== 'production') {
-    if (diagnosticErrors.some((error) => (error as RSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG])) {
+    if (hasMergedInput) {
       throw new Error(
         '[ReactOnRails] combineRSCStreamDiagnosticErrors: received an already-merged error as input; pass only raw diagnostics from buildRSCStreamDiagnosticError',
       );
     }
-  } else if (diagnosticErrors.some((error) => (error as RSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG])) {
+  } else if (hasMergedInput) {
     console.error(
       '[ReactOnRails] combineRSCStreamDiagnosticErrors: received an already-merged error as input; pass only raw diagnostics from buildRSCStreamDiagnosticError',
     );
+    candidateDiagnosticErrors = diagnosticErrors.filter(
+      (error) => !(error as RSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG],
+    );
+    if (candidateDiagnosticErrors.length === 0) return undefined;
   }
-  if (diagnosticErrors.length === 1) return diagnosticErrors[0];
+  if (candidateDiagnosticErrors.length === 1) return candidateDiagnosticErrors[0];
 
-  const candidateBlocks = diagnosticErrors
+  const candidateBlocks = candidateDiagnosticErrors
     .map((error, index) => `Candidate ${index + 1}:\n${error.message}`)
     .join('\n\n');
   const message = [
     '[ReactOnRails] RSC bundle rendering failed during the deferred render phase.',
-    `React surfaced the failure without a component key, so one of these ${diagnosticErrors.length} RSC components failed (exact component unknown):`,
+    `React surfaced the failure without a component key, so one of these ${candidateDiagnosticErrors.length} RSC components failed (exact component unknown):`,
     candidateBlocks,
   ].join('\n\n');
 
@@ -195,7 +206,7 @@ export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Err
   // diagnostics module and mislead error monitors (same reasoning as buildRSCStreamDiagnosticError).
   // Each candidate's own stack is preserved below (labeled), so the real failing frames survive
   // without the synthetic combiner frames.
-  const candidateStacks = diagnosticErrors
+  const candidateStacks = candidateDiagnosticErrors
     .map((error, index) => error.stack && `Candidate ${index + 1} stack:\n${error.stack}`)
     .filter((line): line is string => Boolean(line));
   combinedError.stack = [`${combinedError.name}: ${message}`, ...candidateStacks].join('\n');
@@ -218,7 +229,7 @@ export const mergeRSCStreamDiagnosticError = (error: unknown, diagnosticError?: 
     error instanceof Error ? error : new Error(extractErrorMessage(error));
   if (!diagnosticError || streamError[MERGED_DIAGNOSTIC_FLAG]) return streamError;
 
-  const message = `${diagnosticError.message}\nReact stream error: ${streamError.message}`;
+  const message = `${diagnosticError.message}${REACT_STREAM_ERROR_SEPARATOR} ${streamError.message}`;
   const mergedError: RSCStreamDiagnosticError = new Error(message);
   mergedError.name = RSC_STREAM_DIAGNOSTIC_ERROR_NAME;
   mergedError.cause = streamError;
