@@ -80,6 +80,8 @@ export class BoundedLRU<V> {
 
   private pins = new Map<string, number>();
 
+  private evicting = false;
+
   constructor(
     private readonly maxEntries: number,
     private readonly onEvict: (key: string) => void,
@@ -93,6 +95,7 @@ export class BoundedLRU<V> {
     if (!promote) {
       return value;
     }
+    this.assertNotEvicting('get');
     // Re-insert to mark most-recently-used.
     this.map.delete(key);
     this.map.set(key, value);
@@ -100,6 +103,7 @@ export class BoundedLRU<V> {
   }
 
   set(key: string, value: V): void {
+    this.assertNotEvicting('set');
     // Re-insert so an existing key moves to most-recently-used.
     this.map.delete(key);
     this.map.set(key, value);
@@ -119,6 +123,7 @@ export class BoundedLRU<V> {
    * outlive an absent map entry.
    */
   setPinned(key: string, value: V): void {
+    this.assertNotEvicting('setPinned');
     // Re-insert so an existing key moves to most-recently-used.
     this.map.delete(key);
     this.map.set(key, value);
@@ -128,6 +133,7 @@ export class BoundedLRU<V> {
   }
 
   delete(key: string, preservePins = false): void {
+    this.assertNotEvicting('delete');
     // Intentionally does not call `onEvict`: current callers handle companion
     // state before deleting/restoring a key. Future callers that need eviction
     // cleanup should use an eviction path, not this raw delete. The default also
@@ -140,6 +146,7 @@ export class BoundedLRU<V> {
   }
 
   unpin(key: string): void {
+    this.assertNotEvicting('unpin');
     const count = this.pins.get(key);
     if (count === undefined) {
       return;
@@ -177,9 +184,10 @@ export class BoundedLRU<V> {
    * reconciliation.
    */
   private evictIfNeeded(preventEvictingKey?: string): void {
-    // INVARIANT: onEvict must not call set/setPinned/delete on this same
-    // BoundedLRU during this loop. Map iteration is live in JS, and re-entrant
-    // insertion here would be skipped by the active iterator.
+    // INVARIANT: onEvict must not call mutating methods on this same BoundedLRU
+    // during this loop. Map iteration is live in JS, and re-entrant insertion
+    // here would be skipped by the active iterator, so mutators throw while the
+    // eviction callback is running.
     for (const candidate of this.map.keys()) {
       if (this.map.size <= this.maxEntries) {
         return;
@@ -187,12 +195,23 @@ export class BoundedLRU<V> {
       if (candidate !== preventEvictingKey && !this.pins.has(candidate)) {
         this.map.delete(candidate);
         this.pins.delete(candidate);
-        this.onEvict(candidate);
+        this.evicting = true;
+        try {
+          this.onEvict(candidate);
+        } finally {
+          this.evicting = false;
+        }
       }
     }
     // Every remaining key is pinned (in-flight) or protected by
     // `preventEvictingKey`: this is expected when the cache is temporarily
     // over-cap due to concurrent in-flight loads. A later set/unpin reconciles
     // once a colder key becomes evictable.
+  }
+
+  private assertNotEvicting(operation: string): void {
+    if (this.evicting) {
+      throw new Error(`BoundedLRU.${operation} must not run re-entrantly from onEvict`);
+    }
   }
 }

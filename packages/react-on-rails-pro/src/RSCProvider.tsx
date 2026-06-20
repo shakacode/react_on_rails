@@ -324,6 +324,9 @@ export const createRSCProvider = ({
         });
         fetchRSCPromises.setPinned(key, promise);
         if (notifyRoutesOnSuccess) {
+          // Ordering matters with the synchronous getServerComponent call above:
+          // the catch path restores the evicted marker without decrementing this
+          // latch because the count is only incremented after the promise exists.
           inFlightEvictedSuccessfulPayloadCounts.set(
             key,
             (inFlightEvictedSuccessfulPayloadCounts.get(key) ?? 0) + 1,

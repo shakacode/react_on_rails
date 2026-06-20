@@ -169,6 +169,24 @@ describe('BoundedLRU', () => {
     expect(has(lru, 'k')).toBe(false);
   });
 
+  it('throws when onEvict mutates the same LRU during eviction', () => {
+    let lru!: BoundedLRU<string>;
+    const evicted: string[] = [];
+    lru = new BoundedLRU<string>(1, (key) => {
+      evicted.push(key);
+      expect(() => lru.set('nested', 'NESTED')).toThrow(
+        'BoundedLRU.set must not run re-entrantly from onEvict',
+      );
+    });
+
+    lru.set('a', 'A');
+    lru.set('b', 'B');
+
+    expect(evicted).toEqual(['a']);
+    expect(has(lru, 'b')).toBe(true);
+    expect(has(lru, 'nested')).toBe(false);
+  });
+
   it('setPinned: a new key inserted into an all-pinned full cache is not self-evicted', () => {
     // Regression guard for the pin-before-evict race: with a plain `set` then
     // `pin`, inserting a key into a cache whose every entry is already pinned
