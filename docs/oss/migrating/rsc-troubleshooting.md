@@ -198,6 +198,7 @@ unrelated page-specific CSS listed for a small component, you have contamination
   "file:///app/components/HelloWorldHooks.jsx": {
     "id": "./components/HelloWorldHooks.jsx",
     "chunks": ["2", "2-b77936c4.js", "rsc-PostsPage", "rsc-PostsPage-d655b05a.js"],
+    "css": ["css/client-PostsPage-d655b05a.css"],
     "name": "*"
   }
 }
@@ -205,7 +206,9 @@ unrelated page-specific CSS listed for a small component, you have contamination
 
 In this example, `HelloWorldHooks` (a tiny component) picks up PostsPage chunks, including a 375 KB vendor chunk containing lodash and moment. The browser downloads all of it. If the same contaminated mapping includes `css` entries, the browser can also wait on CSS that the current RSC page does not visually need.
 
-You can also check the browser DevTools **Network** tab: load your RSC page, filter to JS files, and look for unexpectedly large downloads that contain unrelated libraries. Tools like **webpack-bundle-analyzer** can help visualize which modules ended up in which chunks.
+You can also check the browser DevTools **Network** tab: load your RSC page, filter to JS and CSS
+files, and look for unexpectedly large downloads that contain unrelated libraries or page styles.
+Tools like **webpack-bundle-analyzer** can help visualize which modules ended up in which chunks.
 
 ### Why It Happens
 

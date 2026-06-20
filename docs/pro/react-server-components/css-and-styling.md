@@ -52,9 +52,9 @@ FOUC prevention pipeline:
 3. **Stream injection:** `proRSC.ts` wraps the rendered RSC tree with
    `<link rel="stylesheet" href="..." data-precedence="rsc-css">` elements for each collected CSS href.
 
-4. **Browser behavior:** React 19 hoists stylesheet `<link>` elements into `<head>`, deduplicates
-   them across the RSC stream, and blocks tree commit until the stylesheets load. This prevents the
-   styled Client Component from painting before its CSS is available.
+4. **Browser behavior:** React 19 hoists stylesheet `<link>` elements with `data-precedence` into
+   `<head>`, deduplicates them across the RSC stream, and blocks tree commit until the stylesheets
+   load. This prevents the styled Client Component from painting before its CSS is available.
 
 > [!NOTE]
 > The manifest CSS hrefs are collected manifest-wide, not per-request. This means CSS for all
@@ -66,6 +66,7 @@ FOUC prevention pipeline:
 > page-specific global CSS can make unrelated RSC pages wait on that CSS even when they do not
 > visually need it. Prefer thin client wrappers, CSS Modules, Tailwind utilities, or layout-level
 > global CSS for styles that are truly shared across pages.
+>
 > Contaminated global CSS can also win source-order ties if React hoists the RSC stylesheet links
 > after earlier Rails layout styles. Avoid bare element selectors in component stylesheets; if app
 > globals must override framework CSS, make that specificity explicit in the app's global stylesheet.
