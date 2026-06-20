@@ -111,9 +111,9 @@ const streamRenderReactComponent = (
       // The only current pre-merge path is the synchronous reject in
       // getReactServerComponent.server.ts, which merges a single diagnostic; its extracted
       // message matches one captured entry and removes that entry from the restore set. If a future
-      // path pre-merges a combined diagnostic, revisit this filter: the combined message will not
-      // equal any individual captured entry and could leave diagnostics available for an unrelated
-      // later error.
+      // path pre-merges a combined diagnostic, revisit this filter and remove each represented raw
+      // diagnostic: the combined message will not equal any individual captured entry and could
+      // leave diagnostics available for an unrelated later error.
       const mergedDiagnosticMessage = extractMergedRSCStreamDiagnosticMessage(error);
       streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(
         captured.filter((entry) => entry.diagnosticError.message !== mergedDiagnosticMessage),

@@ -78,6 +78,9 @@ export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamEr
   const originalErrorLine = diagnosticError.message
     .split('\n')
     .find((line) => line.startsWith(ORIGINAL_ERROR_PREFIX));
+  // Coupled to buildRSCStreamDiagnosticError's `Original error:` line. If several raw diagnostics
+  // share this first-line message, they all match and the caller builds a combined candidate error
+  // rather than guessing which component failed.
   // React puts the original exception message on line 1 of its re-thrown stream error; multi-line
   // messages intentionally match on that first line only.
   const streamFirstLine = streamMessage.split('\n')[0];
