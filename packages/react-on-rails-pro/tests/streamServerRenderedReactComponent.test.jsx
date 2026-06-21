@@ -707,8 +707,8 @@ describe('streamServerRenderedReactComponent', () => {
     const enrichedErrors = emittedErrors.filter((error) =>
       error.message.includes('RSC bundle rendering failed'),
     );
-    // Exactly one error carries the RSC diagnostic — the captured diagnostic is consumed on first
-    // use and cannot be reattached to the second, unrelated failure.
+    // Exactly one error carries the RSC diagnostic. The second failure is not a generic RSC stream
+    // error, so the restored captured diagnostic does not match it and is not attached to it.
     expect(enrichedErrors).toHaveLength(1);
     expect(enrichedErrors[0].message).toContain('Component: CommentsToggle');
 

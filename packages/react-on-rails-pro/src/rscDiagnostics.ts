@@ -64,7 +64,7 @@ const isGenericRSCStreamError = (message: string) =>
     return nextCharacter === undefined || /\s/.test(nextCharacter);
   });
 
-export const rscStreamDiagnosticMatchesError = (_diagnosticError: Error, streamError: Error) => {
+export const rscStreamDiagnosticMatchesError = (streamError: Error) => {
   const streamMessage = nonBlankString(streamError.message);
   if (!streamMessage) return false;
   // React can hide the underlying Server Component failure behind this generic message. If a

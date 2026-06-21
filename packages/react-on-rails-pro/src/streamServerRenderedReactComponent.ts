@@ -126,9 +126,7 @@ const streamRenderReactComponent = (
       return error;
     }
 
-    const matchingCaptured = captured.filter((entry) =>
-      rscStreamDiagnosticMatchesError(entry.diagnosticError, error),
-    );
+    const matchingCaptured = rscStreamDiagnosticMatchesError(error) ? captured : [];
     if (matchingCaptured.length === 0) {
       streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(captured);
       return error;
