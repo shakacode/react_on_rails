@@ -11,6 +11,32 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
 - When the user asks to address PR review comments outside Claude slash commands, follow `.agents/workflows/address-review.md`
 
+## External Flagship Demo Coordination
+
+The public [`shakacode/react-on-rails-demo-flagship`](https://github.com/shakacode/react-on-rails-demo-flagship)
+repo is the single clone-and-run flagship example for React on Rails Pro, React Server Components, React 19,
+streaming SSR, the Node renderer, Shakapacker, and Rspack.
+
+Update that demo repo when changes in this monorepo affect the recommended user-facing Pro/RSC path, including:
+
+- React on Rails Pro or RSC generator output (`--pro`, `--rsc`, `react_on_rails:pro`, `react_on_rails:rsc`)
+- Pro installation, licensing, or "license optional for evaluation/demo/non-production" messaging
+- React, React DOM, `react-on-rails-rsc`, Shakapacker, Rspack, or Node renderer version pins/defaults
+- Auto-bundling behavior for `.client.` / `.server.` files or the `'use client'` directive
+- Streaming SSR/RSC helper usage, Node renderer configuration, smoke checks, Docker, or deployment defaults
+
+Why: the flagship demo is the external proof that the Pro/RSC happy path works in a real Rails app. If this monorepo
+changes the recommended path but the demo stays stale, agents and users will copy the wrong setup.
+
+Keep one flagship demo for now. Do not create a separate OSS-only flagship unless the user explicitly asks. The demo's
+README should document how to turn Pro/RSC off for comparison, but the default app should remain Pro + RSC.
+Additional examples are valuable when they teach distinct repo-generation patterns, but they should not dilute or
+compete with the flagship Pro/RSC path.
+
+When updating the demo, make the change in a separate checkout/branch of `react-on-rails-demo-flagship`, keep its lockfiles
+in sync, and run its focused validation (`bundle install`, `npm install` or `npm ci`, asset build, and `bin/smoke` or
+Docker smoke as appropriate). Do not mix demo repo commits into this monorepo.
+
 ## Canonical Agent Policy
 
 `AGENTS.md` is the canonical source for repository-wide agent rules:

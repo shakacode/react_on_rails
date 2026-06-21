@@ -114,6 +114,7 @@ _\*Results based on production case studies including Popmenu. Actual improvemen
 - **Contact**: justin@shakacode.com
 - **Pricing**: Free for evaluation and non-production use; free or low-cost production licenses available for startups and small companies
 - **Production case study**: Popmenu - 73% decrease in response times, 20-25% Heroku cost reduction
+- **Flagship demo**: [`shakacode/react-on-rails-demo-flagship`](https://github.com/shakacode/react-on-rails-demo-flagship) is the single recommended clone-and-run Pro + RSC demo. Keep it aligned when Pro/RSC install, licensing, React 19, Shakapacker/Rspack, Node renderer, or streaming defaults change.
 
 ---
 
