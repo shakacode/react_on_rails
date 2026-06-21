@@ -89,6 +89,8 @@ The Organization may not remove or obfuscate this attribution.
 
 ## 7. Fees; Term; Termination
 
+Paid subscriptions may be purchased or renewed at [pro.reactonrails.com](https://pro.reactonrails.com/) or through another ShakaCode-approved order channel.
+
 Fees and billing terms are as agreed in the applicable order (e.g., GitHub Sponsors subscription or annual invoice).  
 For paid subscriptions, the license remains active only while fees are paid. ShakaCode may suspend or terminate for non-payment or material breach. Complimentary OSS Licenses remain active for the term specified in the grant, subject to the revocation terms in Section 4.1.  
 Upon termination, lapse, or revocation, the Organization must immediately cease use and remove the Software (including derivatives) from all Production systems and repositories, except for (a) non-commercial uses explicitly permitted in Section 4, or (b) Complimentary OSS Licenses revoked under Section 4.1(ii) for eligibility changes, in which case the Organization has thirty (30) days from written notice to comply.
