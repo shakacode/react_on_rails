@@ -27,6 +27,7 @@ module AgentWorkflowSeamDoctor
     "Approval-exempt change categories",
     "Coordination backend"
   ].freeze
+  CONFIG_KEY_PATTERN = /^\s*-\s+\*\*(.+?)\*\*:\s*(.*)$/
 
   SEAM_PLACEHOLDER = %r{
     <[^>\n]*
@@ -86,7 +87,7 @@ module AgentWorkflowSeamDoctor
     current_key = nil
 
     section.each_line do |line|
-      if (match = line.match(/^\s*-\s+\*\*(.+?)\*\*:\s*(.*)$/))
+      if (match = line.match(CONFIG_KEY_PATTERN))
         current_key = match[1].strip
         config[current_key] = match[2].strip
         next
@@ -103,11 +104,11 @@ module AgentWorkflowSeamDoctor
   end
 
   def config_continuation?(line, current_key)
-    current_key && line.match?(/^\s{2,}\S/) && !line.match?(/^\s*-\s+/)
+    current_key && line.match?(/^\s{2,}\S/) && !line.match?(CONFIG_KEY_PATTERN)
   end
 
   def config_key_finished?(line)
-    !line.strip.empty? || line.empty?
+    line.strip.empty? || !line.match?(/^\s{2,}\S/)
   end
 
   def extract_section(text)
@@ -230,10 +231,8 @@ module AgentWorkflowSeamDoctor
   end
 
   def format_json(issues)
-    "#{JSON.pretty_generate({
-                              'status' => issues.empty? ? 'PASS' : 'FAIL',
-                              'issues' => issues
-                            })}\n"
+    payload = { "status" => issues.empty? ? "PASS" : "FAIL", "issues" => issues }
+    "#{JSON.pretty_generate(payload)}\n"
   end
 end
 # rubocop:enable Metrics/ModuleLength

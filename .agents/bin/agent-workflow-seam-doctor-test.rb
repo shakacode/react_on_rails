@@ -122,6 +122,64 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
       assert_includes out, "PASS"
     end
   end
+
+  def test_nested_bullet_seam_values_pass
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge(
+        "Tests" => "\n  - unit: `bundle exec rake run_rspec:gem`\n  - e2e: `pnpm test:e2e`"
+      )
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
+  def test_blank_separator_stops_wrapped_seam_value
+    with_repo do |root|
+      write_agents(root)
+      agents_path = File.join(root, "AGENTS.md")
+      body = File.read(agents_path)
+      body.sub!(
+        "- **Tests**: configured tests.\n",
+        "- **Tests**: configured tests.\n\n  orphaned indentation after the key.\n"
+      )
+      File.write(agents_path, body)
+      write_skill(root, "No commands here.\n")
+
+      config = AgentWorkflowSeamDoctor.parse_config(File.read(agents_path))
+
+      assert_equal "configured tests.", config.fetch("Tests")
+    end
+  end
+
+  def test_json_output_format
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root, "--json")
+
+      assert status.success?, out
+      parsed = JSON.parse(out)
+      assert_equal "PASS", parsed.fetch("status")
+      assert_empty parsed.fetch("issues")
+    end
+  end
+
+  def test_not_applicable_seam_value_passes
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge("Coordination backend" => "n/a")
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
 end
 
 class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
@@ -236,6 +294,31 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
 
         refute status.success?
         assert_includes out, "skills/shared/SKILL.md"
+      end
+    end
+  end
+
+  def test_multiple_shared_roots_are_scanned
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "No commands here.\n")
+
+      Dir.mktmpdir("agent-workflow-shared-root-a") do |shared_root_a|
+        Dir.mktmpdir("agent-workflow-shared-root-b") do |shared_root_b|
+          FileUtils.mkdir_p(File.join(shared_root_a, "skills/clean"))
+          FileUtils.mkdir_p(File.join(shared_root_b, "skills/failing"))
+          File.write(File.join(shared_root_a, "skills/clean/SKILL.md"), "Clean shared skill.\n")
+          File.write(File.join(shared_root_b, "skills/failing/SKILL.md"), <<~MARKDOWN)
+            ```bash
+            gh issue create --title "<follow-up prefix> Review"
+            ```
+          MARKDOWN
+
+          out, status = run_doctor(root, "--shared", shared_root_a, "--shared", shared_root_b)
+
+          refute status.success?
+          assert_includes out, "skills/failing/SKILL.md"
+        end
       end
     end
   end

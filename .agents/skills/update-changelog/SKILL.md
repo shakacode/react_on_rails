@@ -272,7 +272,7 @@ After adding an entry to the `### [Unreleased]` section, ensure the version diff
 The format at the bottom should be:
 
 ```markdown
-[unreleased]: https://github.com/<owner>/<repo>/compare/v16.2.0.beta.19...BASE_BRANCH
+[unreleased]: https://github.com/<owner>/<repo>/compare/v16.2.0.beta.19...${BASE_BRANCH}
 [16.2.0.beta.19]: https://github.com/<owner>/<repo>/compare/v16.1.1...v16.2.0.beta.19
 ```
 
@@ -431,7 +431,7 @@ When the user passes `rc` or `beta` as an argument:
 
 ...
 
-[unreleased]: https://github.com/<owner>/<repo>/compare/v16.5.0.rc.1...main
+[unreleased]: https://github.com/<owner>/<repo>/compare/v16.5.0.rc.1...${BASE_BRANCH}
 [16.5.0.rc.1]: https://github.com/<owner>/<repo>/compare/v16.5.0.rc.0...v16.5.0.rc.1
 [16.5.0.rc.0]: https://github.com/<owner>/<repo>/compare/v16.4.0...v16.5.0.rc.0
 [16.4.0]: https://github.com/<owner>/<repo>/compare/v16.3.0...v16.4.0

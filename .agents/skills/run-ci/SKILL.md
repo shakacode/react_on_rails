@@ -15,6 +15,12 @@ Configuration**) auto-detects the current PR base branch and falls back to the b
 branch. Do not pass a base-ref argument to it. Use the repo's CI change detector only
 when you need to inspect the routing decision directly.
 
+Before running commands, resolve these values from `AGENTS.md` → **Agent Workflow
+Configuration**:
+
+- Pre-push local validation command, including default, changed-files, broad, and fast modes
+- CI change detector command
+
 ## Instructions
 
 1. First, run the repo's CI change detector to inspect what changed when the user asks for the routing details; otherwise use the local validation command directly

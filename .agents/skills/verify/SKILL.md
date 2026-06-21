@@ -13,8 +13,9 @@ Use `/verify` for local pre-PR checks. Use `/run-ci` when you need the repo's CI
 ## Instructions
 
 1. Read `AGENTS.md` first. It is the canonical source for required commands, formatting, boundaries, and repository safety rules.
-2. Inspect the current branch diff with `git status --short`, `git diff --name-only origin/main...HEAD`, and
-   `git diff --stat origin/main...HEAD`.
+2. Resolve `BASE_BRANCH` from `AGENTS.md` -> **Agent Workflow Configuration**, then inspect the current branch diff
+   with `git status --short`, `git diff --name-only "origin/${BASE_BRANCH}...HEAD"`, and
+   `git diff --stat "origin/${BASE_BRANCH}...HEAD"`.
 3. Decide the required verification set that covers the changed surface area using the **Scope Guide** below. Always
    include the repo's mandatory pre-commit lint gate (see `AGENTS.md` → **Agent Workflow Configuration**) before
    creating a commit, even when the changed surface is documentation-only, because that gate can scan all files of its
@@ -38,7 +39,7 @@ Use `/verify` for local pre-PR checks. Use `/run-ci` when you need the repo's CI
 Use this order unless the changed files make a narrower or broader set clearly appropriate:
 
 1. Formatting and whitespace:
-   - `git diff --check origin/main...HEAD` for committed branch content before creating or updating a PR; detects trailing whitespace and conflict markers, not source formatting
+   - `git diff --check "origin/${BASE_BRANCH}...HEAD"` for committed branch content before creating or updating a PR; detects trailing whitespace and conflict markers, not source formatting
    - the repo's formatter check (see `AGENTS.md` → **Agent Workflow Configuration**)
 2. Mandatory pre-commit gate:
    - the repo's mandatory pre-commit lint gate - **mandatory gate before every commit**; see Instructions step 3 for why this still applies to documentation-only commits; it lints the source languages it covers, not Markdown or YAML
@@ -87,7 +88,7 @@ Use this concise summary:
 
 ```text
 Verification:
-- PASS git diff --check origin/main...HEAD
+- PASS git diff --check "origin/${BASE_BRANCH}...HEAD"
 - FAIL <repo formatter check>
 
 Next fix:

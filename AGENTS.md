@@ -74,8 +74,11 @@ After fetching, verify the `## Agent Workflow Configuration` seam before relying
 on installed/shared skills for issue, PR, or batch work:
 
 ```bash
-.agents/bin/agent-workflow-seam-doctor --shared .agents
+.agents/bin/agent-workflow-seam-doctor
 ```
+
+When checking user-installed shared skills outside this checkout, add
+`--shared <installed-skill-root>`.
 
 If a workflow explicitly needs a repo-local `.agents/skills/...` or
 `.agents/workflows/...` file and that file is missing in the checkout but present
@@ -91,8 +94,8 @@ the workflow logic but defer every repo-specific command, branch, label, path,
 and policy to this section. When a skill says "run the repo's local validation"
 or "use the hosted-CI trigger," the concrete value is here. Adopting repos
 replace these values with their own and validate the seam with
-`.agents/bin/agent-workflow-seam-doctor --shared .agents` or the installed
-checker with `--shared <installed-skill-root>` (see
+`.agents/bin/agent-workflow-seam-doctor`, plus `--shared <installed-skill-root>`
+when checking user-installed shared skills outside the checkout (see
 [`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md)).
 
 - **Base branch**: `main` (fetch and compare via `origin/main`).
