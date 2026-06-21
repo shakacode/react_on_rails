@@ -464,7 +464,7 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 - Findings: <none, fixed in PR(s), waived with link, or follow-up recommended with tracking outcome/link>
 - QA required: <yes | no>
 - QA required rationale: <one-line reason for the decision and selected QA depth>
-- QA lane status: <clear | done | blocked | waived | in_progress | UNKNOWN | not applicable; use not applicable when QA required is no>
+- QA lane status: <satisfied | blocked | waived | in_progress | unknown | not applicable; use not applicable when QA required is no>
 - Release-blocking status: <clear | blocked | waived | not applicable; use not applicable when QA required is no>
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable; use not
   applicable when QA found no recurring process miss; see the top-level Process Gap Disposition
@@ -668,8 +668,8 @@ Split batch handoffs into two sections:
   unresolved `DISCUSS` feedback, or a merge/release-mode conflict.
 - **FYI / decisions made**: no-PR rationales, non-blocking decisions, hosted CI
   requested because the coordinator was unsure at readiness time, validation
-  evidence, QA Evidence blocks that include `Tested at`, `QA required`, `QA
-required rationale`, and the operational QA lane status, review churn notes,
+  evidence, QA Evidence blocks that include `Tested at`, the QA required
+  decision and rationale, QA lane status, review churn notes,
   autonomous nit outcomes, confidence notes, decision-point counts per PR,
   already-answered questions, and a per-PR merge-ledger table or JSON artifact
   path.

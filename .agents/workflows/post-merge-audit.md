@@ -82,7 +82,7 @@ List any QA lane or intentionally omitted QA lane, with:
 - QA lane id/owner, claim status, and last heartbeat status
 - QA Evidence block URL or copied contents
 - `Tested at` head(s) or audited range
-- `QA required`, QA required rationale, and operational QA lane status
+- `QA required`, QA required rationale, and QA lane status / coverage result
 - release-blocking status and any findings
 
 If you do not know or cannot verify an item from GitHub/local git, say UNKNOWN rather than guessing.

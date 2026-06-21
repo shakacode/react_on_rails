@@ -318,8 +318,8 @@ Use the canonical Batch Handoff Format in
 **FYI / decisions made** for decisions, validations, review state, hosted-CI
 requests already handled, no-PR rationales, autonomous nit outcomes,
 confidence notes, decision-point counts per PR, QA Evidence blocks that include
-`Tested at`, `QA required`, QA required rationale, and operational QA lane
-status, and per-PR merge-ledger summaries.
+`Tested at`, the QA required decision and rationale, QA lane status, and per-PR
+merge-ledger summaries.
 Do not call a target `complete` while its ledger has `UNKNOWN` fields or
 `complete_allowed: false`.
 Do not report a batch that requires QA ready while required QA coverage/scope

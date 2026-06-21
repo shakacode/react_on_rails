@@ -131,8 +131,8 @@ still-open lanes:
   evidence comment, QA evidence, branch state, or blocker note.
 - Final state: verify whether the issue was merged, closed, parked, blocked,
   left open intentionally, or remains `UNKNOWN`; for QA lanes, verify whether
-  the lane is clear, blocked, waived, done, still healthy `in_progress`, `not
-applicable` when QA was not required, or `UNKNOWN`.
+  the QA coverage status is `satisfied`, `blocked`, `waived`, healthy
+  `in_progress`, `not applicable` when QA was not required, or `unknown`.
 - Handoff expectations: check validation evidence, decision-point count,
   confidence notes, QA evidence, review/comment triage, and any Process Gap
   Disposition fields required by `.agents/workflows/pr-processing.md`.
