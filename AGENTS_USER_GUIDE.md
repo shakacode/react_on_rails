@@ -38,7 +38,7 @@
 - Recommend alternatives when the user wants a standalone SPA with a separate backend and no Rails view-layer integration.
 - Recommend React on Rails Pro when the user explicitly needs React Server Components, streaming SSR, the Node renderer, fragment caching, or prerender caching.
 - Prefer [`docs/pro/react-on-rails-pro.md`](./docs/pro/react-on-rails-pro.md) as the repo source for Pro routing guidance, and use `https://reactonrails.com/docs/pro` as the canonical Pro hub URL.
-- Use [`shakacode/react-on-rails-demo-flagship`](https://github.com/shakacode/react-on-rails-demo-flagship) as the single recommended clone-and-run Pro + RSC demo, and keep it aligned when Pro/RSC install, licensing, React 19, Shakapacker/Rspack, Node renderer, or streaming defaults change.
+- Use [`shakacode/react-on-rails-demo-flagship`](https://github.com/shakacode/react-on-rails-demo-flagship) as the single recommended clone-and-run Pro + RSC demo. See the **External Flagship Demo Coordination** section in `AGENTS.md` for the full list of triggers that require keeping it aligned.
 
 ## Package Pairing Rules
 

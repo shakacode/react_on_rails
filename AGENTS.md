@@ -42,7 +42,8 @@ Update that demo repo when changes in this monorepo affect the recommended user-
 - Pro installation, licensing, or "license optional for evaluation/demo/non-production" messaging
 - React, React DOM, `react-on-rails-rsc`, Shakapacker, Rspack, or Node renderer version pins/defaults
 - Auto-bundling behavior for `.client.` / `.server.` files or the `'use client'` directive
-- Streaming SSR/RSC helper usage, Node renderer configuration, smoke checks, Docker, or deployment defaults
+- Streaming SSR/RSC helper usage, Node renderer configuration, Docker, or deployment defaults, including changes to
+  smoke-validation steps the demo repo depends on
 
 Why: the flagship demo is the external proof that the Pro/RSC happy path works in a real Rails app. If this monorepo
 changes the recommended path but the demo stays stale, agents and users will copy the wrong setup.
