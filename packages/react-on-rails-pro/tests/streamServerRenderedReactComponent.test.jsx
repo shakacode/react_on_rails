@@ -140,7 +140,7 @@ const makeDeferredThrower = (message, delayMs) => async () => {
   throw new Error(message);
 };
 
-const FIRST_DEFERRED_FAILURE_MESSAGE = 'First deferred failure (correlated)';
+const FIRST_DIAGNOSTIC_ORIGINAL_ERROR = 'First deferred failure (correlated)';
 const FirstDeferredThrow = makeDeferredThrower(GENERIC_RSC_DEFERRED_ERROR_MESSAGE, 10);
 const SECOND_DEFERRED_FAILURE_MESSAGE = 'Second deferred failure (unrelated)';
 const SecondDeferredThrow = makeDeferredThrower(SECOND_DEFERRED_FAILURE_MESSAGE, 30);
@@ -675,7 +675,7 @@ describe('streamServerRenderedReactComponent', () => {
         `[ReactOnRails] RSC bundle rendering failed.\n` +
           `Component: CommentsToggle\n` +
           `Module: /app/components/CommentsToggle.jsx\n` +
-          `Original error: ${FIRST_DEFERRED_FAILURE_MESSAGE}`,
+          `Original error: ${FIRST_DIAGNOSTIC_ORIGINAL_ERROR}`,
       );
       diagnosticError.name = 'ReactOnRailsRSCStreamError';
       railsContext.recordRSCDiagnostic('CommentsToggle', diagnosticError);

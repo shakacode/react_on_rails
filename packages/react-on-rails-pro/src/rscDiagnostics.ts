@@ -177,6 +177,7 @@ export const buildRSCStreamDiagnosticError = (
  */
 export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Error | undefined => {
   if (diagnosticErrors.length === 0) return undefined;
+  // This may be reassigned below after production-only filtering of invalid merged inputs.
   let candidateDiagnosticErrors = diagnosticErrors;
   const hasMergedInput = diagnosticErrors.some(
     (error) => (error as RSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG],
