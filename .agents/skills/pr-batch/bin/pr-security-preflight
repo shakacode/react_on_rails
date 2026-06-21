@@ -34,6 +34,8 @@ BLOCKING_SUSPICIOUS_PATTERN = /
   base64\s+-d
 /ix
 
+# These terms can appear in legitimate trusted CI/docs discussion, so comments
+# only warn; newly added PR diff lines still treat them as blocking.
 WARNING_SUSPICIOUS_PATTERN = /
   GITHUB_TOKEN|
   private\s+key|
@@ -44,6 +46,8 @@ WARNING_SUSPICIOUS_PATTERN = /
   sudo\s|
   ssh-key
 /ix
+
+DIFF_BLOCKING_SUSPICIOUS_PATTERN = Regexp.union(BLOCKING_SUSPICIOUS_PATTERN, WARNING_SUSPICIOUS_PATTERN)
 
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--include-reactions] " \
@@ -233,11 +237,10 @@ def reaction_users(repo, number, rest_context:, include_pull_comments:)
 rescue StandardError => e
   warn "WARN: could not fetch all reaction users for ##{number}: #{e.message.lines.first&.strip}"
   users.delete(nil)
-  users || Set.new
+  users
 end
 
-def suspicious_added_lines(repo, pr_number, pattern:)
-  diff = run_gh("pr", "diff", pr_number.to_s, "--repo", repo)
+def suspicious_added_lines(diff, pattern:)
   current_file = nil
 
   diff.lines.filter_map.with_index(1) do |line, index|
@@ -315,35 +318,37 @@ def suspicious_pr_review_text(rest_context, repo, trust_config:, team_cache:, pa
     suspicious_pr_reviews(rest_context, repo, trust_config:, team_cache:, pattern:)
 end
 
-def suspicious_text_findings(repo:, number:, rest:, target_is_pr:, trust_config:, team_cache:, pattern:)
+def suspicious_text_findings(rest:, target_is_pr:, repo:, trust_config:, team_cache:, pattern:)
   findings = suspicious_issue_text(rest, repo, trust_config:, team_cache:, pattern:)
   return findings unless target_is_pr
 
   findings.concat(suspicious_pr_review_text(rest, repo, trust_config:, team_cache:, pattern:))
-  findings.concat(suspicious_added_lines(repo, number, pattern:))
 end
 
 def suspicious_findings_for_target(repo:, number:, rest:, target_is_pr:, trust_config:, team_cache:)
-  {
-    suspicious: suspicious_text_findings(
-      repo:,
-      number:,
-      rest:,
-      target_is_pr:,
-      trust_config:,
-      team_cache:,
-      pattern: BLOCKING_SUSPICIOUS_PATTERN
-    ),
-    suspicious_warnings: suspicious_text_findings(
-      repo:,
-      number:,
-      rest:,
-      target_is_pr:,
-      trust_config:,
-      team_cache:,
-      pattern: WARNING_SUSPICIOUS_PATTERN
-    )
-  }
+  suspicious = suspicious_text_findings(
+    rest:,
+    target_is_pr:,
+    repo:,
+    trust_config:,
+    team_cache:,
+    pattern: BLOCKING_SUSPICIOUS_PATTERN
+  )
+  suspicious_warnings = suspicious_text_findings(
+    rest:,
+    target_is_pr:,
+    repo:,
+    trust_config:,
+    team_cache:,
+    pattern: WARNING_SUSPICIOUS_PATTERN
+  )
+
+  if target_is_pr
+    diff = run_gh("pr", "diff", number.to_s, "--repo", repo)
+    suspicious.concat(suspicious_added_lines(diff, pattern: DIFF_BLOCKING_SUSPICIOUS_PATTERN))
+  end
+
+  { suspicious:, suspicious_warnings: }
 end
 
 def untrusted_interaction_findings(rest_context, repo, include_pull_comments:, trust_config:, team_cache:)
@@ -507,11 +512,11 @@ end
 
 def print_participant_findings(findings)
   if findings.empty?
-    puts "  Untrusted participant finding: none"
+    puts "  Untrusted or hidden participant finding: none"
     return
   end
 
-  puts "  Untrusted participant findings:"
+  puts "  Untrusted or hidden participant findings:"
   findings.each do |finding|
     reasons = []
     reasons << "no visible comment/review/commit/reaction trail" if finding.fetch(:hidden)
@@ -533,13 +538,13 @@ def print_untrusted_interactions(findings)
   puts "    - ... #{findings.size - 10} more" if findings.size > 10
 end
 
-def print_suspicious_findings(findings)
+def print_findings_list(findings, label)
   if findings.empty?
-    puts "  Suspicious text findings: none"
+    puts "  #{label}: none"
     return
   end
 
-  puts "  Suspicious text findings:"
+  puts "  #{label}:"
   findings.first(10).each do |finding|
     detail = "    - #{finding.fetch(:location)}"
     detail += " by #{finding.fetch(:author)}" if finding[:author]
@@ -547,6 +552,10 @@ def print_suspicious_findings(findings)
     puts detail
   end
   puts "    - ... #{findings.size - 10} more" if findings.size > 10
+end
+
+def print_suspicious_findings(findings)
+  print_findings_list(findings, "Suspicious text findings")
 end
 
 def record_blockers(result, overall_blockers, fail_on_high_risk_files:)
@@ -561,19 +570,7 @@ def record_blockers(result, overall_blockers, fail_on_high_risk_files:)
 end
 
 def print_suspicious_warning_findings(findings)
-  if findings.empty?
-    puts "  Suspicious text warnings: none"
-    return
-  end
-
-  puts "  Suspicious text warnings:"
-  findings.first(10).each do |finding|
-    detail = "    - #{finding.fetch(:location)}"
-    detail += " by #{finding.fetch(:author)}" if finding[:author]
-    detail += " (#{finding.fetch(:url)})" if finding[:url]
-    puts detail
-  end
-  puts "    - ... #{findings.size - 10} more" if findings.size > 10
+  print_findings_list(findings, "Suspicious text warnings")
 end
 
 def print_file_findings(result)
