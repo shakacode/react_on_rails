@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>React on Rails</title>
+    <%= csrf_meta_tags %>
+
+    <!-- React on Rails injects generated packs here. Tailwind is layout-owned. -->
+    <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+    <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+    <%= javascript_pack_tag %>
+  </head>
+
+  <body>
+    <%= yield %>
+  </body>
+</html>

@@ -133,8 +133,22 @@ module ReactOnRails
         %w[webpack.config.js]).freeze
       DOCS_REFERENCE_MESSAGE = "// The source code including full typescript support is available at:"
       TEMPLATE_RENDER_FAILED = Object.new.freeze # unique sentinel compared by identity via .equal?
+      REACT_ON_RAILS_DEFAULT_LAYOUT_PATH = "app/views/layouts/react_on_rails_default.html.erb"
+      TAILWIND_LAYOUT_HELPER_LINES = [
+        "<!-- React on Rails injects generated packs here. Tailwind is layout-owned. -->",
+        '<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>',
+        '<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>',
+        "<%= javascript_pack_tag %>"
+      ].freeze
+      DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN = %r{
+        (?<indent>^[ \t]*)
+        (?:<!--\s*Empty\ pack\ tags\ -\ React\ on\ Rails\ injects\ component\ CSS/JS\ here\s*-->\r?\n\k<indent>)?
+        <%=\s*stylesheet_pack_tag\s*%>\r?\n
+        \k<indent><%=\s*javascript_pack_tag\s*%>
+      }x
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
-                       :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED
+                       :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED, :REACT_ON_RAILS_DEFAULT_LAYOUT_PATH,
+                       :TAILWIND_LAYOUT_HELPER_LINES, :DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN
 
       def add_root_route
         return unless options.new_app?
@@ -241,16 +255,13 @@ module ReactOnRails
                         .env.example
                         bin/shakapacker-precompile-hook]
 
-        # react_on_rails_default layout provides empty pack tags so React on Rails can
-        # inject generated packs without requiring a hardcoded application.js pack entry.
-        base_files << "app/views/layouts/react_on_rails_default.html.erb"
-
         # HelloWorld controller only when not using RSC (RSC uses HelloServer)
         # Exception: Redux still needs the HelloWorld controller even with RSC
         base_files << "app/controllers/hello_world_controller.rb" unless use_rsc? && !options.redux?
         base_files << "app/controllers/home_controller.rb" if generate_new_app_home_page?
         base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        copy_react_on_rails_default_layout(base_path)
         base_templates.each do |file|
           template("#{base_path}/#{file}.tt", file)
         end
@@ -309,8 +320,10 @@ module ReactOnRails
         return unless use_tailwind?
 
         base_path = "base/tailwind/"
-        copy_file("#{base_path}app/javascript/stylesheets/application.css",
-                  shakapacker_stylesheet_path("application.css"))
+        template("#{base_path}app/javascript/stylesheets/application.css.tt",
+                 tailwind_stylesheet_path)
+        template("#{base_path}app/javascript/packs/react_on_rails_tailwind.js.tt",
+                 tailwind_pack_path)
       end
 
       def add_base_gems_to_gemfile
@@ -372,6 +385,76 @@ module ReactOnRails
 
       def generated_build_test_command
         shakapacker_build_command(env: "RAILS_ENV=test NODE_ENV=test", environment: "test")
+      end
+
+      def copy_react_on_rails_default_layout(base_path)
+        # react_on_rails_default layout provides pack tags so React on Rails can
+        # inject generated packs without requiring a hardcoded application.js pack entry.
+        if use_tailwind?
+          copy_or_update_tailwind_layout
+        else
+          copy_file("#{base_path}#{REACT_ON_RAILS_DEFAULT_LAYOUT_PATH}", REACT_ON_RAILS_DEFAULT_LAYOUT_PATH)
+        end
+      end
+
+      def copy_or_update_tailwind_layout
+        tailwind_layout_template = "base/tailwind/#{REACT_ON_RAILS_DEFAULT_LAYOUT_PATH}"
+        layout_full_path = File.join(destination_root, REACT_ON_RAILS_DEFAULT_LAYOUT_PATH)
+
+        unless File.exist?(layout_full_path)
+          copy_file(tailwind_layout_template, REACT_ON_RAILS_DEFAULT_LAYOUT_PATH)
+          return
+        end
+
+        if options[:force]
+          copy_file(tailwind_layout_template, REACT_ON_RAILS_DEFAULT_LAYOUT_PATH, force: true)
+          return
+        end
+
+        content = File.read(layout_full_path)
+        if content.include?(tailwind_pack_name)
+          say_status :skip, "#{REACT_ON_RAILS_DEFAULT_LAYOUT_PATH} already links #{tailwind_pack_name}", :yellow
+          return
+        end
+
+        if options[:skip]
+          warn_tailwind_layout_manual_step(
+            REACT_ON_RAILS_DEFAULT_LAYOUT_PATH,
+            reason: "file exists and --skip was used"
+          )
+          return
+        end
+
+        unless content.match?(DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN)
+          warn_tailwind_layout_manual_step(REACT_ON_RAILS_DEFAULT_LAYOUT_PATH, reason: "layout is customized")
+          return
+        end
+
+        if options[:pretend]
+          say_status :pretend,
+                     "Would update #{REACT_ON_RAILS_DEFAULT_LAYOUT_PATH} to link #{tailwind_pack_name}",
+                     :yellow
+          return
+        end
+
+        updated_content = content.sub(DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN) do
+          tailwind_layout_helper_block(Regexp.last_match[:indent])
+        end
+        File.write(layout_full_path, updated_content)
+        say_status :update, REACT_ON_RAILS_DEFAULT_LAYOUT_PATH
+      end
+
+      def tailwind_layout_helper_block(indent = "")
+        TAILWIND_LAYOUT_HELPER_LINES.map { |line| "#{indent}#{line}" }.join("\n")
+      end
+
+      def warn_tailwind_layout_manual_step(layout_path, reason:)
+        say_status :warning, "Could not update #{layout_path}: #{reason}.", :yellow
+        say <<~MSG, :yellow
+          Add this block to the layout head before the final javascript_pack_tag call:
+
+          #{tailwind_layout_helper_block}
+        MSG
       end
 
       def generate_new_app_home_page?

@@ -67,19 +67,9 @@ module ReactOnRails
                     "#{component_dir}/components/HelloWorld.module.css")
         end
 
-        return unless use_tailwind?
+        return unless use_tailwind? && options[:pretend]
 
-        ror_client_file = "#{component_dir}/ror_components/HelloWorldApp.client.#{ext}"
-        if options[:pretend]
-          say_status :pretend, "Would add Tailwind stylesheet import to #{ror_client_file}", :yellow
-          return
-        end
-
-        stylesheet_import = "import '#{relative_stylesheet_import_path(ror_client_file)}';\n"
-        ror_client_file_path = File.join(destination_root, ror_client_file)
-        return if File.read(ror_client_file_path).include?(stylesheet_import)
-
-        prepend_to_file(ror_client_file, stylesheet_import)
+        say_status :pretend, "Tailwind stylesheet is linked from the React on Rails layout", :yellow
       end
 
       def copy_base_redux_files
