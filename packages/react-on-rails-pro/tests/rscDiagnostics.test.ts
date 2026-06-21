@@ -432,6 +432,7 @@ describe('RSC diagnostics', () => {
       expect(combined.stack?.split('\n')[0]).toBe(`${combined.name}: ${combined.message.split('\n')[0]}`);
       expect(combined.stack).not.toContain('rscDiagnostics');
       // Candidate stacks are preserved for debugging.
+      expect(combined.stack).toContain('\n\nCandidate 1 stack:');
       expect(combined.stack).toContain('Candidate 1 stack:');
       expect(combined.stack).toContain('Candidate 2 stack:');
     });

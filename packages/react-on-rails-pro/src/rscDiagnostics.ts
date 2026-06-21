@@ -228,7 +228,7 @@ export const combineRSCStreamDiagnosticErrors = (diagnosticErrors: Error[]): Err
   // candidate. Tools that expect a single-line header will show the full candidate block as the
   // header; that is preferable to losing candidate details. Same pattern as
   // buildRSCStreamDiagnosticError.
-  combinedError.stack = [`${combinedError.name}: ${message}`, ...candidateStacks].join('\n');
+  combinedError.stack = [`${combinedError.name}: ${message}`, ...candidateStacks].join('\n\n');
   return combinedError;
 };
 
