@@ -239,12 +239,16 @@ Execution flow when terminal access is available:
    - **`a` — Apply, stage, and recommend**: Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or automatically when `autopilot` was requested at initiation. Run relevant checks and the self-review gate. Stage only the intended changed files with explicit `git add` paths instead of committing them. Do **not** commit, push, post GitHub replies, resolve review threads, create follow-up issues, or post the PR summary checkpoint. Return a local summary with: fixed `MUST-FIX` items, fixed `OPTIONAL` items, staged files, validation commands/results, unresolved/skipped items, and detailed `DISCUSS` recommendations. Each `DISCUSS` recommendation must include the reviewer/comment link, recommended decision (`fix now`, `defer`, `decline`, or `ask user`), rationale/evidence, risk/tradeoff, and concrete next step. If validation fails after reasonable local repair, still report the staged-file state clearly and mark the PR as not ready for commit/push.
    - **`f`**:
      Pre-reply subflow: steps 1-7 below end at the commit/push-before-reply gate.
-     1. Fix all must-fix items. If none exist, continue directly to autonomous
-        optional handling.
-     2. Before the commit/push gate, autonomously handle `OPTIONAL` nits that
+     1. Fix all must-fix items. If none exist, continue to autonomous optional
+        handling only when `RELEASE_PHASE=beta`; otherwise skip to the
+        reply/resolve steps.
+     2. **Only when `RELEASE_PHASE=beta`** (Step 2.5): before the commit/push
+        gate, autonomously handle `OPTIONAL` nits that
         are behavior-preserving, low-risk, in scope, and before the
         final-candidate debounce point: apply straightforward fixes inline, or
-        record them as deferred/declined with rationale. For
+        record them as deferred/declined with rationale. When `RELEASE_PHASE` is
+        `rc`, `final`, or `unknown`, skip this step — `OPTIONAL` items require
+        explicit selection. For
         behavior-preserving optional nits found at or after the final-candidate
         debounce point, do not fix them in `f`; record the deferred/declined
         rationale and carry that recorded outcome to the reply/resolve step

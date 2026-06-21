@@ -89,10 +89,11 @@ Every subsequent snippet uses `${REPO}`, `${PR_NUMBER}`, `${COMMENT_ID}`, `${REV
 The merge gate is a function of the PR target branch's **release phase** (`beta` / `rc` / `final`); see
 `AGENTS.md` → _Release-Train Branching And Phase Gating_ and
 [`internal/contributor-info/release-train-runbook.md`](../../../internal/contributor-info/release-train-runbook.md).
-A direct `/address-review <PR>` invocation may have no orchestrator to inject the phase. Resolve `main`
-to beta from the PR's base branch, but do not guess whether a `release/*` base is `rc` or `final` from
-the branch name alone: use an injected/published `RELEASE_PHASE` or fail closed and ask for confirmation
-(PR #4018 thread Kr6wb).
+A direct `/address-review <PR>` invocation may have no orchestrator to inject the phase. When the base
+branch resolves to `main`, derive `beta`; do not guess whether a `release/*` base is `rc` or `final` from
+the branch name alone — use an injected/published `RELEASE_PHASE` or fail closed and ask for confirmation.
+If the `gh pr view` lookup itself fails (auth, network, wrong repo), do **not** fall back to `beta`: stop
+and ask the user to confirm the base branch / phase before continuing (PR #4018 thread Kr6wb).
 
 ```bash
 if ! BASE_REF=$(gh pr view "${PR_NUMBER}" --repo "${REPO}" --json baseRefName -q .baseRefName 2>/dev/null); then
@@ -354,11 +355,15 @@ The first items below are the **pre-reply subflow**, ending at the
 commit/push-before-reply gate. The later items are the post-push
 reply/resolve steps.
 
-1. Address all `MUST-FIX` items (make code changes, run checks). If there are no `MUST-FIX` items, continue to autonomous optional handling.
-2. Autonomously handle `OPTIONAL` nits that are behavior-preserving, low-risk,
+1. Address all `MUST-FIX` items (make code changes, run checks). If there are no `MUST-FIX` items, continue to autonomous optional handling **only when `RELEASE_PHASE=beta`** (Step 2.5); otherwise skip straight to the reply/resolve steps.
+2. **Only when `RELEASE_PHASE=beta`** (Step 2.5): autonomously handle `OPTIONAL`
+   nits that are behavior-preserving, low-risk,
    in scope, and before the final-candidate debounce point. Apply them inline
    when the fix is straightforward; otherwise record them as deferred or
-   declined with rationale. Do not ask the user to approve those nits. This
+   declined with rationale. Do not ask the user to approve those nits. When
+   `RELEASE_PHASE` is `rc`, `final`, or `unknown`, skip this step entirely —
+   `OPTIONAL` items then require explicit selection (`f+o`, `o <nums>`,
+   `all optional`). This
    replaces the old explicit opt-in gate for low-risk optionals; broader
    optional work still requires `a`, `f+o`, `f+i`, `m`, explicit `o <nums>` /
    `all optional`, or direct selection of those optional items. For

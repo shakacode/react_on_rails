@@ -983,6 +983,28 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to output(%r{Checking CI status on origin/release/17.0.0}).to_stdout
       end
+
+      it "evaluates only required checks for an RC cut (prerelease) from the release branch" do
+        # RC cut: is_prerelease true + a release/* ci_branch. The required-only
+        # filter must apply against the release branch tip, so a failing
+        # non-required check is advisory and does not block the RC.
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "release/17.0.0")
+          .and_return(sha:, check_runs: [passing_run("Lint"), failing_run("Benchmark Workflow")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, ci_branch: "release/17.0.0")
+          .and_return(required_checks(checks: [required_check("Lint")]))
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            ci_branch: "release/17.0.0"
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
+      end
     end
 
     context "when a check has failed on a stable release" do

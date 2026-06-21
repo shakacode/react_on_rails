@@ -1028,6 +1028,9 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
 
   # Only thread the branch onward when it differs from the default so the
   # `main` path keeps its exact call signature (and existing stubs/tests).
+  # This relies on `fetch_main_ci_checks` and `required_check_names_for_main`
+  # both defaulting `ci_branch:` to "main"; keep those defaults in sync with the
+  # default here if it ever changes.
   branch_kwargs = ci_branch == "main" ? {} : { ci_branch: }
 
   data = fetch_main_ci_checks(monorepo_root:, allow_override:, dry_run:, **branch_kwargs)
