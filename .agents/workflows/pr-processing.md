@@ -467,10 +467,44 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 - QA required: <yes | no>
 - QA required rationale: <one-line reason for the decision and selected QA depth>
 - QA lane status: <satisfied | blocked | waived | in_progress | unknown | not applicable; use not applicable when QA required is no>
-- Release-blocking status: <clear | blocked | waived | not applicable; use not applicable when QA required is no and keep it aligned with QA lane status>
+- Release-blocking status: <clear | blocked | waived | not applicable; use not applicable when QA required is no; map QA lane status satisfied->clear, blocked->blocked, waived->waived, and in_progress/unknown->blocked>
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable (no recurring process miss found); use not
   applicable when QA found no recurring process miss; see the top-level Process Gap Disposition
   section for value definitions>
+```
+
+Examples:
+
+```markdown
+### QA Evidence
+
+- QA lane: codex-qa, branch qa/batch-release, claim active, heartbeat done
+- Scope checked: release-affecting generator output and release runbook changes for PRs #1 and #2
+- Tested at: PR #1 abc1234 and PR #2 def5678
+- Automated checks: worker validation plus `pnpm start format.listDifferent`
+- Manual checks: generated-example smoke notes in PR #2
+- Findings: none
+- QA required: yes
+- QA required rationale: release-affecting generated output needed independent coverage
+- QA lane status: satisfied
+- Release-blocking status: clear
+- Process-gap disposition: not applicable (no recurring process miss found)
+```
+
+```markdown
+### QA Evidence
+
+- QA lane: not applicable: QA not required
+- Scope checked: docs-only typo fixes with no workflow, release, generated-output, or runtime behavior changes
+- Tested at: not applicable: no PR/code changes requiring QA
+- Automated checks: covered by worker validation: markdown format/link checks
+- Manual checks: not applicable: docs-only internal copy update
+- Findings: none
+- QA required: no
+- QA required rationale: low-risk docs-only batch outside required QA categories
+- QA lane status: not applicable
+- Release-blocking status: not applicable
+- Process-gap disposition: not applicable (no recurring process miss found)
 ```
 
 ### Plan To Goal Handoff
