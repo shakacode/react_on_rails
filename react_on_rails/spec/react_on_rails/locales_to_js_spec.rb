@@ -23,7 +23,7 @@ module ReactOnRails
           default = File.read(default_path)
           expect(translations).to include('{"hello":"Hello world"')
           expect(translations).to include('{"hello":"Hallo welt"')
-          expect(default).to include("const defaultLocale = 'en';")
+          expect(default).to include('const defaultLocale = "en";')
           expect(default).not_to include("react-intl")
           expect(default).not_to include("defineMessages")
           expect(default).to include('const defaultMessages = {"hello":{"id":"hello","defaultMessage":"Hello world"}')
