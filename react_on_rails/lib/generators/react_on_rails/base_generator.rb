@@ -146,9 +146,16 @@ module ReactOnRails
         <%=\s*stylesheet_pack_tag\s*%>\r?\n
         \k<indent><%=\s*javascript_pack_tag\s*%>
       }x
+      TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN = /
+        <%\s*prepend_javascript_pack_tag(?:\s|\()\s*["']react_on_rails_tailwind["']
+      /x
+      TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN = /
+        <%=\s*stylesheet_pack_tag(?:\s|\()\s*["']react_on_rails_tailwind["']
+      /x
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED, :REACT_ON_RAILS_DEFAULT_LAYOUT_PATH,
-                       :TAILWIND_LAYOUT_HELPER_LINES, :DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN
+                       :TAILWIND_LAYOUT_HELPER_LINES, :DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN,
+                       :TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN, :TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN
 
       def add_root_route
         return unless options.new_app?
@@ -412,7 +419,7 @@ module ReactOnRails
         end
 
         content = File.read(layout_full_path)
-        if content.include?(tailwind_pack_name)
+        if layout_links_tailwind_pack?(content)
           say_status :skip, "#{REACT_ON_RAILS_DEFAULT_LAYOUT_PATH} already links #{tailwind_pack_name}", :yellow
           return
         end
@@ -446,6 +453,11 @@ module ReactOnRails
 
       def tailwind_layout_helper_block(indent = "")
         TAILWIND_LAYOUT_HELPER_LINES.map { |line| "#{indent}#{line}" }.join("\n")
+      end
+
+      def layout_links_tailwind_pack?(content)
+        content.match?(TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN) &&
+          content.match?(TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN)
       end
 
       def warn_tailwind_layout_manual_step(layout_path, reason:)

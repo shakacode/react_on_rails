@@ -972,6 +972,31 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "does not treat comments mentioning the Tailwind pack as existing wiring" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!-- TODO: add react_on_rails_tailwind when Tailwind is enabled -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        expect(content).to include("TODO: add react_on_rails_tailwind")
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+        expect(content).to include("<%= javascript_pack_tag %>")
+      end
+    end
+
     it "does not rewrite customized layouts without --force" do
       original_layout = <<~ERB
         <!DOCTYPE html>
