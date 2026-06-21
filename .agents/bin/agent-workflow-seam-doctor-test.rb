@@ -234,6 +234,22 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
     end
   end
 
+  def test_inline_code_in_executable_fence_is_not_reported_twice
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ```bash
+        `gh issue create --title "<follow-up prefix> Review"`
+        ```
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_equal 1, out.scan("unresolved executable placeholder").length
+    end
+  end
+
   def test_non_executable_fence_placeholder_is_allowed
     with_repo do |root|
       write_agents(root)

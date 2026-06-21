@@ -107,7 +107,7 @@ Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to th
 
 ```bash
 BASE_REF="${BASE_REF:?set BASE_REF, e.g. v17.0.0.rc.1}"
-BASE_BRANCH="${BASE_BRANCH:-main}" # Resolve from AGENTS.md -> Agent Workflow Configuration.
+BASE_BRANCH="${BASE_BRANCH:?set BASE_BRANCH from AGENTS.md -> Agent Workflow Configuration}"
 TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/${BASE_BRANCH}}"
 UPDATE_CHANGELOG_SKILL_DIR="${UPDATE_CHANGELOG_SKILL_DIR:-.agents/skills/update-changelog}"
 

@@ -194,6 +194,7 @@ module AgentWorkflowSeamDoctor
     placeholders.concat(line.scan(SEAM_PLACEHOLDER)) if in_fence && executable_fence && executable_line?(line)
 
     inline_code_snippets(line).each do |snippet|
+      next if in_fence
       next unless command_like?(snippet)
 
       placeholders.concat(snippet.scan(SEAM_PLACEHOLDER))
