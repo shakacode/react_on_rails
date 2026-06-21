@@ -273,22 +273,16 @@ describe('html streaming', () => {
       const chunksWithError = jsonChunks.filter((chunk) => chunk.hasErrors);
       expect(chunksWithError).toHaveLength(1);
       expect(chunksWithError[0].isShellReady).toBeTruthy();
-      // The error message is enriched by the RSC bundle diagnostic: it includes the original
-      // error message plus context (component name, module path, etc.) from rscDiagnostics.ts.
       expect(chunksWithError[0].renderingError).toMatchObject({
         message: expect.stringContaining('Async error from AsyncHelloWorldHooks'),
         stack: expect.stringMatching(
           /Error: Async error from AsyncHelloWorldHooks\s*at AsyncHelloWorldHooks/,
         ),
       });
-      // Assert the enrichment actually added the bundle-diagnostic context (not just the bare error):
-      // the diagnostic header, the failing component name, and a module path. This proves the
-      // deferred-render diagnostic (#3475) is wired through to renderingError, not just that the
-      // original message survives.
-      const { message: enrichedMessage } = chunksWithError[0].renderingError;
-      expect(enrichedMessage).toContain('[ReactOnRails] RSC bundle rendering failed.');
-      expect(enrichedMessage).toContain('Component: AsyncComponentsTreeForTesting');
-      expect(enrichedMessage).toMatch(/Module: \S+/);
+      // Component-specific async errors stay un-enriched to avoid matching unrelated RSC diagnostics.
+      // Generic React RSC stream-error enrichment is covered in streamServerRenderedReactComponent tests.
+      const { message: renderingErrorMessage } = chunksWithError[0].renderingError;
+      expect(renderingErrorMessage).not.toContain('[ReactOnRails] RSC bundle rendering failed.');
       expect(jsonChunks.filter((chunk) => chunk.renderingError)).toHaveLength(1);
     },
     10000,
