@@ -9195,6 +9195,14 @@ Both systems run the identical five-step flow. The names differ; the shape does 
 5. **Refetch on navigation.** Later navigations fetch **only a new payload** for what changed — not a
    whole new page.
 
+<p align="center">
+  <img src="images/rsc-end-to-end-flow.png" alt="End-to-end React Server Components flow shared by React on Rails Pro and Next.js: source files (Server Components plus 'use client' Client Components) build into multiple bundles using the react-server condition; an RSC render produces a Flight payload with client components left as references; an SSR render turns that payload into HTML while the same payload is inlined into the HTML as script data pushes; the HTML and payload stream to the browser, which hydrates; and a client navigation fetches only a new Flight payload for what changed. The bottom rows list the equivalent React on Rails Pro and Next.js function names." width="840" />
+</p>
+
+_The shared end-to-end shape, with React on Rails Pro and Next.js function names side by side. The Flight-payload and inlined-`<script>` boxes are simplified pseudocode, not the literal wire format; the function names are illustrative as of Next.js 16.x (2026)._
+
+The same five steps, with each system's function names in two columns:
+
 ```
               REACT ON RAILS PRO                         NEXT.JS (App Router)
   ────────────────────────────────────────  ────────────────────────────────────────
