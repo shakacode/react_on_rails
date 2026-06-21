@@ -118,7 +118,7 @@ Then:
 
 1. Build both variants in production mode on the same data and configuration.
 2. Drive both with the **same throttled Lighthouse config** (Slow 4G + 4x CPU).
-3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six paired samples is the practical floor for the Wilcoxon signed-rank test; 10 to 15 gives reliable power across the range of effect sizes you will encounter.
+3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six samples is the Wilcoxon floor: at n=6, p < 0.05 requires near-unanimous directional agreement (T <= 2 in the signed-rank test means at most one pair may go the opposite direction, and only if it has the second-smallest magnitude).
 4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as strong directional evidence of a real shift when the paired samples consistently move in the same direction.
 
 We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
