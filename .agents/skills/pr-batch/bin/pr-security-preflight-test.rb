@@ -33,7 +33,7 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
       assert_equal 2, status.exitstatus
       assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
       assert_includes out, "- #123: suspicious text"
-      assert_includes out, ".github/workflows/test.yml:diff line"
+      assert_includes out, ".github/workflows/test.yml:diff output line"
       assert_includes out, "Suspicious text warnings: none"
       assert_equal 1, full_diff_call_count(log_path)
     end
@@ -100,6 +100,25 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
       assert_includes out_with_reactions, "SECURITY_PREFLIGHT_OK"
       assert_includes out_with_reactions, "Untrusted or hidden participant findings: none"
       assert_equal 1, reaction_api_call_count(log_path)
+    end
+  end
+
+  def test_repo_option_requires_owner_and_name
+    with_fake_gh("warning-issue") do |env, trust_config_path, _log_path|
+      ["owner/", "/repo"].each do |invalid_repo|
+        out, status = run_script(
+          env,
+          "--repo",
+          invalid_repo,
+          "--trust-config",
+          trust_config_path,
+          "123"
+        )
+
+        refute status.success?, out
+        assert_equal 1, status.exitstatus
+        assert_includes out, "Repository must be OWNER/REPO, got #{invalid_repo.inspect}"
+      end
     end
   end
 

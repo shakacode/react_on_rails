@@ -248,7 +248,7 @@ def suspicious_added_lines(diff, pattern:)
     next unless line.start_with?("+") && !line.start_with?("+++")
     next unless line.match?(pattern)
 
-    location = current_file ? "#{current_file}:diff line #{index}" : "diff line #{index}"
+    location = current_file ? "#{current_file}:diff output line #{index}" : "diff output line #{index}"
     { location: }
   end
 end
