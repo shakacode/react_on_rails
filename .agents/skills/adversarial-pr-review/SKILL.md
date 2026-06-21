@@ -1,7 +1,7 @@
 ---
 name: adversarial-pr-review
 description: Use when a PR needs skeptical pre-merge or post-merge risk review, especially after concurrent agent work, before merge readiness, before a release candidate, or when Codex or Claude should red-team correctness, security, compatibility, changelog, validation, and review-gate risks.
-argument-hint: '[PR URL or number]'
+argument-hint: '[PR URL or number; defaults to current branch]'
 ---
 
 # Adversarial PR Review
@@ -21,6 +21,15 @@ handoffs, Codex/Claude comparison, and output templates.
 - Treat AI review systems such as CodeRabbit.ai, Claude, Cursor Bugbot, Greptile, and Codex review as advisory unless they identify a confirmed blocker: correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval. Positive AI issue comments and AI approval review objects are evidence, not required maintainer approvals.
 - If a Claude CLI invocation must be private/report-only, restrict tools at invocation time. Skill `allowed-tools` can grant tools; it is not the same as a write-prevention policy.
 - Always identify the PR number, base branch, head SHA, merge state, and whether the PR is already merged.
+
+## Target Resolution
+
+- If the user supplies a PR URL, number, or branch, review that target.
+- If the user does not supply a target, do not stop to ask for a PR number. Resolve the PR from the current checkout first:
+  1. Run `gh pr view --json number,url,headRefName,headRefOid,baseRefName,state,isDraft,mergeStateStatus,reviewDecision,mergedAt`.
+  2. If that fails, run `git branch --show-current`, then search all PR states with `gh pr list --head <branch> --state all --limit 20 --json number,url,headRefName,headRefOid,baseRefName,state,isDraft,mergedAt`.
+  3. Use the single exact head-branch match if one exists.
+  4. Ask for a PR URL or number only after those lookups fail or return ambiguous matches; report the failed commands and branch name.
 
 ## Review Steps
 
