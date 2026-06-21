@@ -56,7 +56,8 @@ parser = OptionParser.new do |opts|
   opts.on("--repo OWNER/REPO", "GitHub repository, defaulting to gh repo view") { |repo| options[:repo] = repo }
   opts.on("--trust-config PATH", "Trusted GitHub actor allowlist") { |path| options[:trust_config] = path }
   include_reactions_help = "Fetch reaction users as visible actors (extra GitHub API calls). " \
-                           "Without this flag, reaction-only users appear as hidden participants and block the batch."
+                           "Without this flag, reaction-only users already present in GitHub participants " \
+                           "appear as hidden participants and block the batch."
   opts.on("--include-reactions", include_reactions_help) do
     options[:include_reactions] = true
   end
@@ -453,6 +454,8 @@ def participant_logins_and_unknown_count(target)
   participant_connection = target.fetch("participants")
   participant_nodes = participant_connection["nodes"]
   unless participant_nodes.is_a?(Array)
+    # A missing/null nodes array means participant coverage is unknown; fail closed
+    # with at least one unknown participant even when totalCount is absent.
     missing_count = [participant_connection["totalCount"].to_i, 1].max
     return { participants: Set.new, unknown_count: missing_count }
   end
@@ -479,7 +482,7 @@ def unknown_participant_findings(unknown_count)
     login: "(unknown/deleted participant)",
     permission: "unknown",
     reason: "#{unknown_count} participant node(s) unavailable or missing GitHub login",
-    untrusted: true
+    untrusted: false
   }]
 end
 

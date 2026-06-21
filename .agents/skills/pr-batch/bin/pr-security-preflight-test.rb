@@ -84,6 +84,9 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
       assert_includes out, "(unknown/deleted participant):"
       assert_includes out, "participant node(s) unavailable or missing GitHub login"
       refute_includes out, "(unknown/deleted participant): no visible comment/review/commit/reaction trail"
+      unknown_reason = "(unknown/deleted participant): " \
+                       "1 participant node(s) unavailable or missing GitHub login; not in trusted actor allowlist"
+      refute_includes out, unknown_reason
     end
   end
 
@@ -96,6 +99,7 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
       assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
       assert_includes out, "(unknown/deleted participant):"
       assert_includes out, "3 participant node(s) unavailable or missing GitHub login"
+      refute_includes out, "3 participant node(s) unavailable or missing GitHub login; not in trusted actor allowlist"
     end
   end
 
