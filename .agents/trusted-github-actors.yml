@@ -1,9 +1,6 @@
 # GitHub actors whose public issue/PR/review comments may be acted on by
 # PR-batch automation. Keep this list deliberately strict: unknown actors are
 # queued for maintainer triage, not interpreted as instructions.
-#
-# `trusted_teams` entries are GitHub team slugs under the repo owner org. They
-# are optional and require the local GitHub token to read team membership.
 trusted_users:
   - justin808
 
@@ -15,4 +12,9 @@ trusted_bots:
   - dependabot
   - greptile-apps
 
-trusted_teams: []
+# Team entries are GitHub team slugs under the repository owner org. For
+# `shakacode/react_on_rails`, `shakacode` resolves to
+# https://github.com/orgs/shakacode/teams/shakacode. Reading team membership
+# requires the local GitHub token to have org access.
+trusted_teams:
+  - shakacode
