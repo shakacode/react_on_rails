@@ -81,8 +81,8 @@ List every issue/PR you worked on in this batch, with:
 List any QA lane or intentionally omitted QA lane, with:
 - QA lane id/owner, claim status, and last heartbeat status
 - QA Evidence block URL or copied contents
-- evidence head(s) or audited range
-- QA lane status and rationale
+- `Tested at` head(s) or audited range
+- `QA required`, QA required rationale, and operational QA lane status
 - release-blocking status and any findings
 
 If you do not know or cannot verify an item from GitHub/local git, say UNKNOWN rather than guessing.
@@ -196,21 +196,27 @@ After confirmation, audit each known worked issue, QA lane, or advisory
 - whether the final issue state is correct: merged, closed, still open,
   parked, blocked, no-PR, done-unmerged, or UNKNOWN
 - for QA lanes, whether the final lane state is correct: clear, blocked,
-  waived, not required, done, still healthy `in_progress`, or UNKNOWN
+  waived, done, still healthy `in_progress`, `not applicable` when QA was not
+  required, or UNKNOWN
 - whether review comments, handoff expectations, confidence notes, validation
   evidence, QA evidence, decision-point count, and Process Gap Disposition
   fields were handled when required
 - classify each worked issue as `in_progress`, `realized`, `partial`,
   `missed`, `regressed`, `stalled`, or `unknown`, using
   `.agents/workflows/continuous-evaluation-loop.md` for the intent-achievement
-  definitions
-- for healthy `in_progress` lanes and evidenced `realized` outcomes, record no
-  action in the worked-issue table; for `stalled` lanes, recommend resume,
-  reassign, or drop unless the user explicitly approves tracking the stalled
-  lane as an issue; for any other non-OK worked-issue class (`partial`,
-  `missed`, `regressed`, or `unknown`), merged or not, prepare a post-merge
-  audit issue-plan entry or an explicit coordinator action naming the missing
-  evidence or decision
+  definitions; classify QA lanes with the QA-coverage result `satisfied`,
+  `blocked`, `waived`, `in_progress`, `not applicable`, or `unknown`. Use
+  `not applicable` when QA was correctly omitted with `QA required: no` and a
+  documented rationale
+- for healthy `in_progress` worked-issue lanes, evidenced `realized` outcomes,
+  evidenced `satisfied` or `waived` QA lanes, and evidenced `not applicable` QA
+  omissions, record no action in the worked-issue/QA table; treat required QA
+  lanes still `in_progress` during readiness/release audits as QA coverage
+  findings; for `stalled` lanes, recommend resume, reassign, or drop unless the
+  user explicitly approves tracking the stalled lane as an issue; for any other
+  non-OK worked-issue class (`partial`, `missed`, `regressed`, or `unknown`),
+  merged or not, prepare a post-merge audit issue-plan entry or an explicit
+  coordinator action naming the missing evidence or decision
 
 Also audit each included merged PR for:
 - risky behavior change
@@ -267,7 +273,7 @@ permission needed to resolve them. Do not make code changes, comments, labels,
 issues, reverts, or PRs without approval.
 The worked-issue/QA-lane coverage table must include issue number or QA lane id,
 coordination lane/branch, linked PR or no-PR/blocker/QA evidence, final state,
-intent-achievement classification, and `UNKNOWN` facts.
+issue intent-achievement or QA-coverage classification, and `UNKNOWN` facts.
 
 Example worked-issue coverage table (`batch-abc` and issue numbers are
 placeholders; replace them with the real batch id and issues):
@@ -278,7 +284,7 @@ placeholders; replace them with the real batch id and issues):
 | #1236 | batch-abc:issue-1236 / codex/partial-example | PR #2346 merged | merged | partial | acceptance criteria C not addressed |
 | #1237 | UNKNOWN (advisory) / no coord data | codex-claim comment URL (advisory) | UNKNOWN | unknown | coordination state needed to confirm |
 | #1238 | batch-abc:issue-1238 / codex/done-no-merge | no-PR evidence comment URL | done-unmerged | realized | none |
-| qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | done | realized | none |
+| qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | done | satisfied | none |
 ```
 
 ## Comparison Prompt
@@ -316,7 +322,8 @@ Pay special attention to disagreements:
     needed before any confirmed worked-issue audit can proceed; continue
     auditing advisory `codex-claim` rows alongside the merged PR range, keeping
     those rows marked `UNKNOWN`
-- different intent-achievement classifications for the same worked issue
+- different intent-achievement classifications for the same worked issue or
+  QA-coverage classifications for the same QA lane
 - different PR inclusion lists
 - different release-candidate base
 - different interpretation of validation evidence
@@ -333,7 +340,8 @@ Return:
 6. deduped issue plan
 7. reconciled worked-issue/QA-lane coverage table with issue number or QA lane
    id, coordination lane/branch, linked PR or no-PR/blocker/QA evidence, final
-   state, intent-achievement classification, and any unresolved `UNKNOWN` facts
+   state, issue intent-achievement or QA-coverage classification, and any
+   unresolved `UNKNOWN` facts
 8. recommended next actions, including a coordinator resume/reassign/drop
    decision for `stalled` lanes instead of defaulting to issue creation
 

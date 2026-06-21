@@ -318,10 +318,14 @@ Use the canonical Batch Handoff Format in
 **FYI / decisions made** for decisions, validations, review state, hosted-CI
 requests already handled, no-PR rationales, autonomous nit outcomes,
 confidence notes, decision-point counts per PR, QA Evidence blocks that include
-the evidence head(s), QA lane status, and QA lane rationale, and per-PR
-merge-ledger summaries.
+`Tested at`, `QA required`, QA required rationale, and operational QA lane
+status, and per-PR merge-ledger summaries.
 Do not call a target `complete` while its ledger has `UNKNOWN` fields or
 `complete_allowed: false`.
+Do not report a batch that requires QA ready while required QA coverage/scope
+evidence is missing, `blocked`, `in_progress`, or still `UNKNOWN`; the only
+allowed fallback is a QA lane whose private coordination claim/heartbeat is
+`UNKNOWN` while documented QA evidence is otherwise complete.
 Record the selected `merge_authority` value in the handoff and use the canonical
 split final states from `.agents/workflows/pr-processing.md`.
 For release-affecting, workflow/build/tooling, generated-output, broad runtime,

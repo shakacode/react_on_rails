@@ -458,13 +458,14 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 
 - QA lane: <agent id, branch/worktree, claim status, last heartbeat status or UNKNOWN>
 - Scope checked: <changed areas, PRs, release phase, and why this QA depth was enough>
-- Evidence head(s): <PR/head SHA(s), audited range, or "not applicable: no PR/code changes">
+- Tested at: <PR/head SHA(s), audited range, or "not applicable: no PR/code changes">
 - Automated checks: <commands, CI links, or "covered by worker validation: ...">
 - Manual checks: <workflow/app smoke checks, screenshots, or "not applicable: ...">
-- Findings: <none, fixed in PR(s), waived with link, or follow-up recommended>
-- QA lane status: <required | not required>
-- QA lane rationale: <one-line reason for the status and selected QA depth>
-- Release-blocking status: <clear | blocked | waived | not applicable>
+- Findings: <none, fixed in PR(s), waived with link, or follow-up recommended with tracking outcome/link>
+- QA required: <yes | no>
+- QA required rationale: <one-line reason for the decision and selected QA depth>
+- QA lane status: <clear | done | blocked | waived | in_progress | UNKNOWN | not applicable; use not applicable when QA required is no>
+- Release-blocking status: <clear | blocked | waived | not applicable; use not applicable when QA required is no>
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable; use not
   applicable when QA found no recurring process miss; see the top-level Process Gap Disposition
   section for value definitions>
@@ -667,10 +668,11 @@ Split batch handoffs into two sections:
   unresolved `DISCUSS` feedback, or a merge/release-mode conflict.
 - **FYI / decisions made**: no-PR rationales, non-blocking decisions, hosted CI
   requested because the coordinator was unsure at readiness time, validation
-  evidence, QA Evidence blocks that include the evidence head(s), QA lane status,
-  and QA lane rationale, review churn notes, autonomous nit outcomes, confidence
-  notes, decision-point counts per PR, already-answered questions, and a per-PR
-  merge-ledger table or JSON artifact path.
+  evidence, QA Evidence blocks that include `Tested at`, `QA required`, `QA
+required rationale`, and the operational QA lane status, review churn notes,
+  autonomous nit outcomes, confidence notes, decision-point counts per PR,
+  already-answered questions, and a per-PR merge-ledger table or JSON artifact
+  path.
 
 Every target must use one explicit final state:
 
@@ -698,9 +700,9 @@ validation and the final push. Request hosted CI and log it in FYI.
 Do not report a PR/target as `complete` while `script/pr-merge-ledger <PR>
 --strict` reports `UNKNOWN` fields, review-thread/review-object violations, or
 `complete_allowed: false`. Do not report any batch that requires QA ready while
-required QA coverage/scope evidence is missing, marked `blocked`, or still
-`UNKNOWN`; a QA lane whose only `UNKNOWN` is private coordination
-claim/heartbeat state may use the documented fallback evidence.
+required QA coverage/scope evidence is missing, marked `blocked` or
+`in_progress`, or still `UNKNOWN`; a QA lane whose only `UNKNOWN` is private
+coordination claim/heartbeat state may use the documented fallback evidence.
 
 ### Coordination State
 
@@ -897,10 +899,10 @@ The closeout lane is:
 6. Verify the batch QA evidence when the Batch QA Lane section requires QA, or
    verify the `not required` rationale for low-risk batches. Audit and release
    decisions must treat missing, stale, insufficiently scoped, blocked,
-   surface-mismatched, or still-`UNKNOWN` QA coverage/scope evidence as a
-   readiness blocker until fixed, waived, or carried as an explicit blocker. A
-   QA lane whose only `UNKNOWN` is private coordination claim/heartbeat state may
-   use the documented fallback evidence.
+   `in_progress`, surface-mismatched, or still-`UNKNOWN` QA coverage/scope
+   evidence as a readiness blocker until fixed, waived, or carried as an explicit
+   blocker. A QA lane whose only `UNKNOWN` is private coordination
+   claim/heartbeat state may use the documented fallback evidence.
 7. Refresh stale release-mode classification from the release tracker when
    needed. For accelerated-RC merge readiness, refresh the latest finalized
    PR-body `Agent Merge Confidence` block required by `AGENTS.md`; keep this
@@ -1418,12 +1420,16 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
 5. For each known worked issue, QA lane, or advisory public `codex-claim` row,
    evaluate whether the implementation, no-PR evidence, QA evidence, blocker, or
    parked disposition satisfied the issue or batch intent; verify the final
-   state; and classify it as
-   `in_progress`, `realized`, `partial`, `missed`, `regressed`, `stalled`, or
-   `unknown` using
-   `.agents/workflows/continuous-evaluation-loop.md`. Treat healthy active/live
-   lanes as `in_progress` no-action items unless they have a stalled, regressed,
-   partial, missed, or unknown signal.
+   state; classify worked issues as `in_progress`, `realized`, `partial`,
+   `missed`, `regressed`, `stalled`, or `unknown` using
+   `.agents/workflows/continuous-evaluation-loop.md`; and classify QA lanes with
+   the QA-coverage result `satisfied`, `blocked`, `waived`, `in_progress`,
+   `not applicable`, or `unknown`. Use `not applicable` when QA was correctly
+   omitted with `QA required: no` and a documented rationale. Treat healthy
+   active/live worked-issue lanes as `in_progress` no-action items unless they
+   have a stalled, regressed, partial, missed, or unknown signal; treat required
+   QA lanes still `in_progress` during readiness/release audits as QA coverage
+   findings and readiness blockers.
 6. For each included merged PR, inspect reviews, comments, checks, merge time,
    changed files, validation evidence, QA evidence, changelog coverage, and
    cross-PR interactions.
@@ -1440,12 +1446,13 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
 8. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
 9. Produce a deduped issue plan for non-OK findings:
    - no issue for OK, duplicates, fully resolved findings, evidenced `realized`
-     lanes, or healthy `in_progress` lanes
+     worked-issue lanes, evidenced `satisfied` or `waived` QA lanes, evidenced
+     `not applicable` QA omissions, or healthy `in_progress` worked-issue lanes
    - one bundled changelog issue or a `/update-changelog` recommendation for missing changelog entries
    - one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task
    - one parent issue when there are two or more related child issues from the same audit
-   - include healthy `in_progress` lanes in the worked-issue coverage table so
-     the coordinator can verify complete coverage
+   - include healthy `in_progress` worked-issue lanes in the worked-issue
+     coverage table so the coordinator can verify complete coverage
    - a coordinator action entry, not a follow-up issue, for each `stalled` lane
      that needs a resume/reassign/drop decision unless the user explicitly
      approves tracking it as an issue
@@ -1467,8 +1474,8 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
     findings, missing changelog candidates, cross-PR risks, the issue plan, a
     worked-issue/QA-lane coverage table (issue number or QA lane id,
     coordination lane/branch, linked PR or no-PR/blocker/QA evidence, final
-    state, intent-achievement classification, `UNKNOWN` facts), a PR-by-PR
-    table, and exact commands/data sources.
+    state, issue intent-achievement or QA-coverage classification, `UNKNOWN`
+    facts), a PR-by-PR table, and exact commands/data sources.
 
 Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs
 until the user approves the audit report and issue plan. For release-gate
