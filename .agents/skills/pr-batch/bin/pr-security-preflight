@@ -329,6 +329,11 @@ def suspicious_text_findings(rest:, target_is_pr:, repo:, trust_config:, team_ca
   findings.concat(suspicious_pr_review_text(rest, repo, trust_config:, team_cache:, pattern:))
 end
 
+def warnings_not_already_blocking(suspicious_warnings, suspicious)
+  blocking_locations = suspicious.to_set { |finding| finding.fetch(:location) }
+  suspicious_warnings.reject { |finding| blocking_locations.include?(finding.fetch(:location)) }
+end
+
 def suspicious_findings_for_target(repo:, number:, rest:, target_is_pr:, trust_config:, team_cache:)
   suspicious = suspicious_text_findings(
     rest:,
@@ -351,6 +356,8 @@ def suspicious_findings_for_target(repo:, number:, rest:, target_is_pr:, trust_c
     diff = run_gh("pr", "diff", number.to_s, "--repo", repo)
     suspicious.concat(suspicious_added_lines(diff, pattern: DIFF_SUSPICIOUS_PATTERN))
   end
+
+  suspicious_warnings = warnings_not_already_blocking(suspicious_warnings, suspicious)
 
   { suspicious:, suspicious_warnings: }
 end
@@ -480,6 +487,8 @@ def participant_findings(repo:, target:, visible:, permission_cache:, trust_conf
 
     trusted = trusted_actor?(repo, login, trust_config, team_cache)
     hidden = !visible.include?(login)
+    # Flag hidden participants, because trusted humans may have deleted content,
+    # and any untrusted participant whether visible or hidden.
     next unless hidden || !trusted
 
     permission = permission_cache[login] ||= collaborator_permission(repo, login)
@@ -601,7 +610,9 @@ end
 def record_blockers(result, overall_blockers, fail_on_high_risk_files:)
   number = result.fetch(:number)
   overall_blockers << "##{number}: GitHub API coverage truncated" if result.fetch(:graph_coverage_findings).any?
-  overall_blockers << "##{number}: untrusted or hidden human participant(s)" if result.fetch(:participant_findings).any?
+  if result.fetch(:participant_findings).any?
+    overall_blockers << "##{number}: untrusted, hidden, or unidentifiable participant(s)"
+  end
   overall_blockers << "##{number}: untrusted comment/review author(s)" if result.fetch(:untrusted_interactions).any?
   overall_blockers << "##{number}: suspicious text" if result.fetch(:suspicious).any?
   return if result.fetch(:risky_files).empty? || !fail_on_high_risk_files
