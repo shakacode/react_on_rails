@@ -1,5 +1,9 @@
-# Audited intentional growth for PR #3933 (rootErrorHandlers feature, +0.75KB gzip client):
-# 91% of the module-level delta is the new feature module; no accidental imports.
-# Audit evidence: https://github.com/shakacode/react_on_rails/pull/3933#issuecomment-4688270487
+# Audited intentional growth for PR #4097 (RSCProvider bounded LRU cache):
+# The direct RSC client entrypoints exceed the dynamic base+512 B budget by small
+# margins after source-level trims; growth is from the bounded provider cache
+# needed for #3564 rather than an accidental dependency import.
+# Local audit evidence: dynamic size-limit reproduced the hosted failure; after
+# trims, remaining misses were registerServerComponent +92 B gzip/+141 B brotli
+# and wrapServerComponentRenderer +54 B gzip/+20 B brotli.
 # Clear this file in a follow-up after the PR merges.
-jg/3892-react19-root-error-callbacks
+jg/3564-rscroute-bounded-lru
