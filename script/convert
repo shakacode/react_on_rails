@@ -113,9 +113,9 @@ Dir.glob(File.expand_path("../react_on_rails/spec/dummy/client/**/*.{js,jsx,ts,t
   File.binwrite(file, content)
 end
 
-# Pro package: Skip RSC tests on React 18 since RSC requires React 19.
+# Pro package: Skip RSC and streaming tests on React 18 since those paths require React 19.
 # The minimum dependency conversion also removes testing-library packages above,
-# so exclude RSC/client tests that need React.use or testing-library helpers.
+# so exclude RSC/streaming/client tests that need React.use or testing-library helpers.
 minimum_pro_non_rsc_ignored_tests = %w[
   RSC
   stream
@@ -128,7 +128,7 @@ minimum_pro_non_rsc_ignored_tests = %w[
   wrapServerComponentRenderer[.]client[.]test
 ].join("|")
 minimum_pro_non_rsc_script = [
-  '"test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(',
+  '"test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(',
   minimum_pro_non_rsc_ignored_tests,
   ').*\"",'
 ].join

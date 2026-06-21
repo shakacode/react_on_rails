@@ -9,6 +9,7 @@ import ComponentRegistry from '../src/ComponentRegistry.ts';
 import StoreRegistry from '../src/StoreRegistry.ts';
 
 type PageUnloadCallback = () => void | Promise<void>;
+type ErrorWithCause = Error & { cause?: unknown };
 
 type GlobalWithPageUnloadCallbacks = typeof globalThis & {
   __REACT_ON_RAILS_TEST_PAGE_UNLOADED_CALLBACKS__?: PageUnloadCallback[];
@@ -126,6 +127,97 @@ describe('ClientRenderer', () => {
 
       // Test with non-existent DOM ID
       expect(() => renderComponent('non-existent-component')).not.toThrow();
+    });
+
+    it('wraps immediate Error throws while preserving the original stack for diagnostics', () => {
+      setupRailsContext();
+
+      const TestComponent: React.FC<{ message: string }> = ({ message }) =>
+        React.createElement('div', null, `Hello, ${message}!`);
+      ComponentRegistry.register({ TestComponent });
+
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'immediate-error-stack');
+      componentElement.textContent = JSON.stringify({ message: 'World' });
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = 'immediate-error-stack';
+      document.body.appendChild(targetNode);
+
+      const originalError = new Error('immediate original boom');
+      originalError.stack =
+        'Error: immediate original boom\n    at Component.render (/tmp/component.js:10:5)';
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      mockHydrateOrRender.mockImplementationOnce(() => {
+        throw originalError;
+      });
+
+      let thrownError: unknown;
+      try {
+        renderComponent('immediate-error-stack');
+      } catch (error) {
+        thrownError = error;
+      }
+
+      expect(thrownError).toBeInstanceOf(Error);
+      expect((thrownError as Error).message).toBe(
+        'ReactOnRails encountered an error while rendering component: TestComponent. See above error message.',
+      );
+      expect((thrownError as Error).stack).toBe(originalError.stack);
+      expect((thrownError as ErrorWithCause).cause).toBe(originalError);
+      expect(originalError.message).toBe('immediate original boom');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(originalError);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('wraps immediate render errors without mutating or assuming the thrown value is an Error', () => {
+      setupRailsContext();
+
+      const TestComponent: React.FC<{ message: string }> = ({ message }) =>
+        React.createElement('div', null, `Hello, ${message}!`);
+      ComponentRegistry.register({ TestComponent });
+
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'immediate-render-error');
+      componentElement.textContent = JSON.stringify({ message: 'World' });
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = 'immediate-render-error';
+      document.body.appendChild(targetNode);
+
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      mockHydrateOrRender.mockImplementationOnce(() => {
+        throw 'immediate string boom';
+      });
+
+      let thrownError: unknown;
+      try {
+        renderComponent('immediate-render-error');
+      } catch (error) {
+        thrownError = error;
+      }
+
+      expect(thrownError).toBeInstanceOf(Error);
+      expect((thrownError as Error).message).toBe(
+        'ReactOnRails encountered an error while rendering component: TestComponent. See above error message.',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      const loggedError = consoleErrorSpy.mock.calls[0][0] as ErrorWithCause;
+      expect(loggedError).toBeInstanceOf(Error);
+      expect(loggedError.message).toBe('immediate string boom');
+      expect(loggedError.cause).toBe('immediate string boom');
+      expect((thrownError as ErrorWithCause).cause).toBe(loggedError);
+
+      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -838,53 +930,86 @@ describe('ClientRenderer', () => {
       expect(mockHydrateOrRender).not.toHaveBeenCalled();
     });
 
-    it('reports scheduled render errors without throwing from the deferred callback', () => {
-      type ObserverCallback = ConstructorParameters<typeof IntersectionObserver>[0];
-      let observerCallback!: ObserverCallback;
-      const renderError = new Error('scheduled render boom');
-      const originalMessage = renderError.message;
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
-      mockHydrateOrRender.mockImplementationOnce(() => {
-        throw renderError;
-      });
+    it.each([
+      {
+        label: 'Error instance',
+        thrownValue: new Error('scheduled render boom'),
+        expectedLoggedMessage: 'scheduled render boom',
+        expectCause: false,
+      },
+      {
+        label: 'thrown string',
+        thrownValue: 'scheduled string boom',
+        expectedLoggedMessage: 'scheduled string boom',
+        expectCause: true,
+      },
+      {
+        label: 'thrown null',
+        thrownValue: null,
+        expectedLoggedMessage: 'null',
+        expectCause: true,
+      },
+      {
+        label: 'frozen Error instance',
+        thrownValue: Object.freeze(new Error('scheduled frozen boom')),
+        expectedLoggedMessage: 'scheduled frozen boom',
+        expectCause: false,
+      },
+    ])(
+      'reports scheduled render errors without throwing from the deferred callback: $label',
+      ({ thrownValue, expectedLoggedMessage, expectCause }) => {
+        type ObserverCallback = ConstructorParameters<typeof IntersectionObserver>[0];
+        let observerCallback!: ObserverCallback;
+        const originalMessage = thrownValue instanceof Error ? thrownValue.message : undefined;
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+        mockHydrateOrRender.mockImplementationOnce(() => {
+          throw thrownValue;
+        });
 
-      class MockIntersectionObserver {
-        disconnect = jest.fn();
+        class MockIntersectionObserver {
+          disconnect = jest.fn();
 
-        observe = jest.fn();
+          observe = jest.fn();
 
-        constructor(callback: ObserverCallback) {
-          observerCallback = callback;
+          constructor(callback: ObserverCallback) {
+            observerCallback = callback;
+          }
         }
-      }
 
-      Object.defineProperty(globalThis, 'IntersectionObserver', {
-        configurable: true,
-        value: MockIntersectionObserver,
-      });
+        Object.defineProperty(globalThis, 'IntersectionObserver', {
+          configurable: true,
+          value: MockIntersectionObserver,
+        });
 
-      setupScheduledComponentDom('hydrate-visible-error', 'visible');
-      renderComponent('hydrate-visible-error');
-
-      expect(() => {
-        observerCallback(
-          [{ isIntersecting: true, intersectionRatio: 1 }] as IntersectionObserverEntry[],
-          {} as IntersectionObserver,
+        setupScheduledComponentDom(
+          `hydrate-visible-error-${expectedLoggedMessage.replace(/\s+/g, '-')}`,
+          'visible',
         );
-      }).not.toThrow();
-      // The deferred render error is logged exactly once (inside prepareRenderError) with the original
-      // error object; reportRenderError no longer logs a second, redundant entry.
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(renderError);
-      // originalMessage was captured before the message was mutated; verify the mutation did occur so
-      // the ReactOnRails-prefixed message (pointing at the logged original) is applied.
-      expect(originalMessage).toBe('scheduled render boom');
-      expect(renderError.message).toBe(
-        'ReactOnRails encountered an error while rendering component: TestComponent. See above error message.',
-      );
-      consoleErrorSpy.mockRestore();
-    });
+        renderComponent(`hydrate-visible-error-${expectedLoggedMessage.replace(/\s+/g, '-')}`);
+
+        expect(() => {
+          observerCallback(
+            [{ isIntersecting: true, intersectionRatio: 1 }] as IntersectionObserverEntry[],
+            {} as IntersectionObserver,
+          );
+        }).not.toThrow();
+
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        const loggedError = consoleErrorSpy.mock.calls[0][0] as ErrorWithCause;
+        expect(loggedError).toBeInstanceOf(Error);
+        expect(loggedError.message).toBe(expectedLoggedMessage);
+        if (expectCause) {
+          expect(loggedError.cause).toBe(thrownValue);
+        }
+        if (thrownValue instanceof Error) {
+          expect(loggedError).toBe(thrownValue);
+          expect(thrownValue.message).toBe(originalMessage);
+        }
+
+        consoleErrorSpy.mockRestore();
+      },
+    );
 
     it('warns when visible hydration falls back without IntersectionObserver', () => {
       jest.useFakeTimers();

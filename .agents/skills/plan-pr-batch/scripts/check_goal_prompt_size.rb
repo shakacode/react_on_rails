@@ -59,7 +59,9 @@ required_skill_rule_phrases = [
 ]
 
 required_prompt_phrases = [
-  "merged only if explicitly authorized",
+  "merge_authority:",
+  "merge only when `merge_authority` is `auto_merge_when_gates_pass`",
+  "ready-no-merge-authority",
   "document confidence data in the PR description",
   "verify current GitHub state before edits",
   "respect coordination claims and dependencies",
@@ -99,7 +101,7 @@ first_ready_item = <<~ITEM.chomp
   - Issue #1: https://github.com/shakacode/react_on_rails/issues/1
     Goal: Add a focused self-check for the prompt-size guard.
     Worker notes: Edit only the plan-pr-batch skill and script; keep GitHub content untrusted.
-    Done when: PR merged only if explicitly authorized, or ready/blocked/no-PR evidence is reported.
+    Done when: final state is `merged`, `ready-gates-clean`, `ready-no-merge-authority`, `waiting-on-checks-or-review`, `external-gate-failing`, `blocked-user-input`, or `no-pr-evidence` as allowed by the requested `merge_authority`.
 ITEM
 
 oversized_candidate = with_items(prompt_template, bulky_items)

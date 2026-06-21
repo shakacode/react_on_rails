@@ -56,6 +56,25 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
   end
 
+  describe "#normalize_executor_result" do
+    subject(:request) { described_class.send(:new) { nil } }
+
+    it "unpacks only explicit pull renderer results" do
+      response = mock_ok_response(to_length_prefixed("chunk"))
+      emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
+
+      expect(
+        request.send(:normalize_executor_result, { pull_result: true, response:, emitter: })
+      ).to eq([response, emitter])
+    end
+
+    it "treats response-shaped hashes without the pull sentinel as bare responses" do
+      response_hash = { response: :ordinary_hash_payload }
+
+      expect(request.send(:normalize_executor_result, response_hash)).to eq([response_hash, nil])
+    end
+  end
+
   describe "#process_response_chunks" do
     subject(:request) { described_class.send(:new) { nil } }
 
@@ -234,6 +253,36 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(status_calls).to eq(1)
       expect(request.http_status).to eq(200)
     end
+
+    it "ignores propRequest control messages without a non-empty string propName" do
+      emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
+      invalid_missing_name = to_length_prefixed("", "messageType" => "propRequest")
+      invalid_empty_name = to_length_prefixed("", "messageType" => "propRequest", "propName" => "")
+      invalid_long_name = to_length_prefixed("", "messageType" => "propRequest", "propName" => "x" * 257)
+      valid_request = to_length_prefixed("", "messageType" => "propRequest", "propName" => "users")
+      response = mock_ok_response(invalid_missing_name + invalid_empty_name + invalid_long_name + valid_request)
+      request.instance_variable_set(:@emitter, emitter)
+
+      request.send(:process_response_chunks, response) { |_| nil }
+      emitter.render_complete!
+
+      expect(emitter.pull_requests.dequeue).to eq("users")
+      expect(emitter.pull_requests.dequeue).to be_nil
+    end
+
+    it "yields ordinary chunks with non-control messageType metadata" do
+      response = mock_ok_response(to_length_prefixed("<div>traceable</div>", "messageType" => "trace"))
+
+      yielded = []
+      request.send(:process_response_chunks, response) { |chunk| yielded << chunk }
+
+      expect(yielded).to contain_exactly(
+        include(
+          "messageType" => "trace",
+          "html" => "<div>traceable</div>"
+        )
+      )
+    end
   end
 
   describe "#each_chunk with tasks" do
@@ -290,6 +339,19 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end.to raise_error(RuntimeError, "client disconnected")
 
       expect(task_stopped).to be true
+    end
+
+    it "closes pull request queues when unexpected chunk parsing errors abort the stream" do
+      emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
+      response = mock_ok_response("malformed\n")
+      stream = described_class.create(pull_enabled: true) do |_send_bundle, _tasks|
+        { pull_result: true, response:, emitter: }
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRails::Error, /missing tab separator/)
+
+      expect(emitter.pull_requests).to be_closed
+      expect(emitter.pull_requests.dequeue).to be_nil
     end
   end
 
@@ -360,6 +422,31 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         /Connection error while server side render streaming a component/
       )
       expect(call_count).to eq(1)
+    end
+
+    it "retries transport errors after control-only chunks before any content is yielded" do
+      call_count = 0
+      stream = described_class.create(pull_enabled: true) do |_send_bundle, _tasks|
+        call_count += 1
+        emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
+        response =
+          if call_count == 1
+            ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner|
+              status_assigner.call(200)
+              yielder.call(to_length_prefixed("", "messageType" => "propRequest", "propName" => "users"))
+              raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection reset"
+            end
+          else
+            mock_ok_response(to_length_prefixed("ok"))
+          end
+        { pull_result: true, response:, emitter: }
+      end
+
+      chunks = []
+      stream.each_chunk { |chunk| chunks << chunk }
+
+      expect(call_count).to eq(2)
+      expect(chunks.first).to include("html" => "ok")
     end
 
     it "retries transport error then succeeds" do

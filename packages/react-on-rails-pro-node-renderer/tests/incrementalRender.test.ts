@@ -644,6 +644,22 @@ describe('incremental render NDJSON endpoint', () => {
     }
   });
 
+  test.each([
+    [{ renderingRequest: 'ReactOnRails.dummy', pullEnabled: 'true' }, 'pullEnabled must be a boolean'],
+    [{ renderingRequest: 'ReactOnRails.dummy', pushProps: 'stats' }, 'pushProps must be a string array'],
+    [
+      { renderingRequest: 'ReactOnRails.dummy', pushProps: ['stats', 42] },
+      'pushProps must be a string array',
+    ],
+  ])('rejects invalid first-chunk async props metadata %#', async (firstRequestChunk, errorMessage) => {
+    await expect(
+      incremental.handleIncrementalRenderRequest({
+        firstRequestChunk,
+        bundleTimestamp: BUNDLE_TIMESTAMP,
+      }),
+    ).rejects.toThrow(errorMessage);
+  });
+
   test('handles empty lines gracefully in the stream', async () => {
     // Create a bundle for this test
     await createVmBundle(TEST_NAME);

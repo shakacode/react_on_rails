@@ -187,7 +187,7 @@ it('raises an error if a specific async prop is not sent', async () => {
 
   request.end();
   await expect(getNextChunk(request)).resolves.toContain(
-    'The async prop \\"researches\\" is not received. Ensure to send the async prop from ruby side',
+    'The async prop \\"researches\\" was not received. Make sure you send it from the Rails side',
   );
 
   await expect(getNextChunk(request)).rejects.toThrow('Stream Closed');
