@@ -430,10 +430,12 @@ exceptions. For docs-only, no-code process, no-PR evidence, and other low-risk b
 release-affecting, developer-workflow-affecting, or otherwise covered by the required categories above,
 QA may be recorded as `not required` with a one-line rationale instead of spawning a separate worker.
 
-For mixed batches, apply QA to any subset that would individually qualify as release-affecting or
-workflow-affecting, even when the remaining targets would be low-risk on their own. Record that
-qualifying subset in the QA Evidence `Scope checked` field and, when the coordination backend has a
-supported lane note or metadata field, in the final lane state; do not invent new backend schema.
+For mixed batches, apply QA to any subset that would individually qualify under the required-QA
+categories above, including release-affecting, workflow/build/tooling, generated-output,
+developer-workflow, or broad runtime changes, even when the remaining targets would be low-risk on
+their own. Record that qualifying subset in the QA Evidence `Scope checked` field and, when the
+coordination backend has a supported lane note or metadata field, in the final lane state; do not
+invent new backend schema.
 
 Coordinate QA with the same primitives as other batch lanes:
 
@@ -465,7 +467,7 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 - QA required: <yes | no>
 - QA required rationale: <one-line reason for the decision and selected QA depth>
 - QA lane status: <satisfied | blocked | waived | in_progress | unknown | not applicable; use not applicable when QA required is no>
-- Release-blocking status: <clear | blocked | waived | not applicable; use not applicable when QA required is no>
+- Release-blocking status: <clear | blocked | waived | not applicable; use not applicable when QA required is no and keep it aligned with QA lane status>
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable; use not
   applicable when QA found no recurring process miss; see the top-level Process Gap Disposition
   section for value definitions>
