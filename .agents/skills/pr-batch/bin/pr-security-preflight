@@ -439,7 +439,7 @@ def graph_coverage_findings(target)
 end
 
 def participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:)
-  participants = Array(target.dig("participants", "nodes")).to_set { |participant| participant.fetch("login") }
+  participants = Array(target.dig("participants", "nodes")).filter_map { |participant| participant&.[]("login") }.to_set
 
   participants.filter_map do |login|
     next if trusted_bot?(login, trust_config)
@@ -471,6 +471,9 @@ def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_
   visible = visible_actor_logins(graph, graph_field)
   visible.merge(visible_rest_actor_logins(rest))
   if include_reactions
+    # Without --include-reactions, reaction-only users remain absent from `visible`
+    # and surface as hidden participants. That fail-closed default avoids extra
+    # GitHub API calls unless the operator explicitly needs reaction attribution.
     visible.merge(reaction_users(repo, number, rest_context: rest, include_pull_comments: target_is_pr))
   end
   files = target_is_pr ? changed_files(repo, number) : []
@@ -512,7 +515,7 @@ end
 
 def print_participant_findings(findings)
   if findings.empty?
-    puts "  Untrusted or hidden participant finding: none"
+    puts "  Untrusted or hidden participant findings: none"
     return
   end
 

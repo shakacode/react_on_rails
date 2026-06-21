@@ -12,7 +12,7 @@ require "tmpdir"
 
 SCRIPT = File.expand_path("pr-security-preflight", __dir__)
 
-class PrSecurityPreflightTest < Minitest::Test
+class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLength
   def test_warning_terms_in_trusted_issue_text_do_not_block
     with_fake_gh("warning-issue") do |env, trust_config_path, _log_path|
       out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
@@ -47,6 +47,27 @@ class PrSecurityPreflightTest < Minitest::Test
       assert_equal 2, status.exitstatus
       assert_includes out, "Untrusted or hidden participant findings:"
       assert_includes out, "unknown-user"
+    end
+  end
+
+  def test_trusted_hidden_participant_blocks
+    with_fake_gh("trusted-hidden-participant") do |env, trust_config_path, _log_path|
+      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "Untrusted or hidden participant findings:"
+      assert_includes out, "justin808: no visible comment/review/commit/reaction trail; permission=admin"
+    end
+  end
+
+  def test_deleted_account_participant_login_is_ignored
+    with_fake_gh("deleted-account-participant") do |env, trust_config_path, _log_path|
+      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      assert status.success?, out
+      assert_includes out, "SECURITY_PREFLIGHT_OK"
+      assert_includes out, "Untrusted or hidden participant findings: none"
     end
   end
 
@@ -115,6 +136,14 @@ class PrSecurityPreflightTest < Minitest::Test
           cat <<'JSON'
       {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"justin808"},"participants":{"totalCount":2,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"},{"login":"unknown-user","url":"https://github.com/unknown-user","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
       JSON
+        elif [ "$mode" = "trusted-hidden-participant" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      JSON
+        elif [ "$mode" = "deleted-account-participant" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"justin808"},"participants":{"totalCount":2,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"},{"login":null,"url":"https://github.com/ghost","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      JSON
         else
           cat <<'JSON'
       {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"justin808"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
@@ -140,6 +169,11 @@ class PrSecurityPreflightTest < Minitest::Test
 
       if [ "$1" = "api" ] && [ "$2" = "repos/owner/repo/collaborators/unknown-user/permission" ]; then
         printf '{"permission":"none"}'
+        exit 0
+      fi
+
+      if [ "$1" = "api" ] && [ "$2" = "repos/owner/repo/collaborators/justin808/permission" ]; then
+        printf '{"permission":"admin"}'
         exit 0
       fi
 
