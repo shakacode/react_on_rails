@@ -181,6 +181,18 @@ const TwoDeferredThrowShell = () => (
   </main>
 );
 
+const TwoGenericDeferredThrowShell = () => (
+  <main>
+    <h1>Header In The Shell</h1>
+    <React.Suspense fallback={<div>Loading first RSC error...</div>}>
+      <FirstDeferredThrow />
+    </React.Suspense>
+    <React.Suspense fallback={<div>Loading second RSC error...</div>}>
+      <CorrelatedSecondDeferredThrow />
+    </React.Suspense>
+  </main>
+);
+
 const UnrelatedThenCorrelatedThrowShell = () => (
   <main>
     <h1>Header In The Shell</h1>
@@ -576,6 +588,52 @@ describe('streamServerRenderedReactComponent', () => {
     expect(emittedError.message).toContain('Component: CommentsToggle');
     expect(emittedError.message).toContain('Component: PostsPage');
     expect(emittedError.message).toContain(`React stream error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`);
+  });
+
+  const setupTwoGenericDeferredRSCDiagnosticStreamTest = () => {
+    const renderFunction = (_props, railsContext) => {
+      ['CommentsToggle', 'PostsPage'].forEach((componentName) => {
+        const diagnosticError = new Error(
+          `[ReactOnRails] RSC bundle rendering failed.\n` +
+            `Component: ${componentName}\n` +
+            `Module: /app/components/${componentName}.jsx\n` +
+            `Original error: boom in ${componentName}`,
+        );
+        diagnosticError.name = 'ReactOnRailsRSCStreamError';
+        railsContext.recordRSCDiagnostic(componentName, diagnosticError);
+      });
+      return TwoGenericDeferredThrowShell;
+    };
+
+    ReactOnRails.register({
+      TwoGenericDeferredThrowShell: wrapServerComponentRenderer(
+        renderFunction,
+        'TwoGenericDeferredThrowShell',
+      ),
+    });
+
+    return streamServerRenderedReactComponent({
+      name: 'TwoGenericDeferredThrowShell',
+      domNodeId: 'twoGenericDeferredThrowDomId',
+      trace: false,
+      throwJsErrors: true,
+      railsContext: testingRailsContext,
+      generateRSCPayload: jest.fn(),
+    });
+  };
+
+  it('keeps combined diagnostics available across multiple generic deferred-render errors (#3475)', async () => {
+    const renderResult = setupTwoGenericDeferredRSCDiagnosticStreamTest();
+    const emittedErrors = await collectEmittedErrors(renderResult);
+
+    expect(emittedErrors).toHaveLength(2);
+    emittedErrors.forEach((emittedError) => {
+      expect(emittedError.name).toBe('ReactOnRailsRSCStreamError');
+      expect(emittedError.message).toContain('one of these 2 RSC components failed');
+      expect(emittedError.message).toContain('Component: CommentsToggle');
+      expect(emittedError.message).toContain('Component: PostsPage');
+      expect(emittedError.message).toContain(`React stream error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`);
+    });
   });
 
   it('enriches a direct render-function rejection with captured RSC diagnostics (#3475)', async () => {

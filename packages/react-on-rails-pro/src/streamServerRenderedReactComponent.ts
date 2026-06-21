@@ -88,7 +88,8 @@ const streamRenderReactComponent = (
   // RSC bundle diagnostic(s) captured this render — the deferred-render-phase half of #3475. React's
   // onError carries no component key, so the matching rule resolves the ambiguity conservatively:
   //   - 0 diagnostics captured -> no enrichment (return the error unchanged).
-  //   - generic React RSC stream error -> merge all captured diagnostics as candidates.
+  //   - generic React RSC stream error -> merge all captured diagnostics as candidates and restore
+  //     them, so later generic callbacks in the same render are still enriched.
   //   - ordinary React errors -> no enrichment; restore captured diagnostics for a later RSC error.
   //   - 2+ diagnostics on the generic path -> merge a COMBINED diagnostic listing all candidates,
   //                                          never a single false pinpoint.
@@ -132,11 +133,11 @@ const streamRenderReactComponent = (
       streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(captured);
       return error;
     }
-    streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(
-      // Reference equality is intentional: matching entries are the same objects consumed from
-      // `captured`, not separately reconstructed diagnostics with matching component names.
-      captured.filter((entry) => !matchingCaptured.includes(entry)),
-    );
+    // Current matching is all-or-none: a generic React RSC stream error is the correlation signal
+    // and every captured diagnostic is a candidate. Keep those candidates available for subsequent
+    // generic callbacks in the same render; otherwise a later generic error could become the final
+    // Rails-facing renderingError with no diagnostic context.
+    streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(captured);
 
     const diagnosticError = combineRSCStreamDiagnosticErrors(
       matchingCaptured.map((entry) => entry.diagnosticError),
