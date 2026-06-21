@@ -1,4 +1,4 @@
-<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/serverWebpackConfig.js") %>
+<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/serverWebpackConfig.js") %>
 
 const { merge, config } = require('shakapacker');
 const commonWebpackConfig = require('./commonWebpackConfig');
@@ -7,7 +7,14 @@ const bundler = config.assets_bundler === 'rspack'
   ? require('@rspack/core')
   : require('webpack');
 <% if use_rsc? -%>
-const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+const { resolve } = require('path');
+const { <%= rsc_plugin_class_name %> } = require('<%= rsc_plugin_import_path %>');
+
+const rscClientReferences = {
+  directory: resolve(config.source_path),
+  recursive: true,
+  include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
+};
 <% end -%>
 
 <% if use_pro? -%>
@@ -26,7 +33,7 @@ function extractLoader(rule, loaderName) {
 
 <% end -%>
 <% if use_rsc? -%>
-// rscBundle parameter: when true, skips RSCWebpackPlugin (RSC bundle doesn't need it)
+// rscBundle parameter: when true, skips <%= rsc_plugin_class_name %> (RSC bundle doesn't need it)
 const configureServer = (rscBundle = false) => {
 <% else -%>
 const configureServer = () => {
@@ -44,7 +51,7 @@ const configureServer = () => {
 
   if (!serverEntry['server-bundle']) {
     throw new Error(
-      "Create a pack with the file name 'server-bundle.js' containing all the server rendering files",
+      "Create a pack named 'server-bundle' containing all the server rendering files, for example 'server-bundle.js' or 'server-bundle.ts'",
     );
   }
 
@@ -76,9 +83,11 @@ const configureServer = () => {
   };
 <% if use_rsc? -%>
   // Add RSC plugin for server bundle (handles client component references)
-  // Skip for RSC bundle - it doesn't need RSCWebpackPlugin
+  // Skip for RSC bundle - it doesn't need <%= rsc_plugin_class_name %>
   if (!rscBundle) {
-    serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+    serverWebpackConfig.plugins.push(
+      new <%= rsc_plugin_class_name %>({ isServer: true, clientReferences: rscClientReferences }),
+    );
   }
 <% end -%>
   serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
@@ -197,10 +206,11 @@ const configureServer = () => {
     }
   });
 
-  // eval works well for the SSR bundle because it's the fastest and shows
-  // lines in the server bundle which is good for debugging SSR
-  // The default of cheap-module-source-map is slow and provides poor info.
-  serverWebpackConfig.devtool = 'eval';
+  // Avoid the webpack eval devtool, which triggers a webpack 5.106+ regression
+  // with ESM default exports (ReferenceError: __WEBPACK_DEFAULT_EXPORT__ is not defined).
+  // In development, cheap-module-source-map provides original line numbers in SSR error traces.
+  // In production, devtool is disabled to avoid generating .map files.
+  serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? false : 'cheap-module-source-map';
 
 <% if use_pro? -%>
   // React on Rails Pro uses Node renderer, so target must be 'node'
@@ -209,6 +219,22 @@ const configureServer = () => {
 
   // Disable Node.js polyfills - not needed when targeting Node
   serverWebpackConfig.node = false;
+
+  // Source-mapped SSR stack traces in production:
+  // The Pro Node renderer can remap bundled stack frames back to your original
+  // source files (see docs/oss/building-features/node-renderer/debugging.md). This
+  // needs source maps in the *production* server bundle, which the default above
+  // disables (`devtool: false`). To opt in, replace only the `serverWebpackConfig.devtool`
+  // assignment above (keep the eval-devtool note) with a production-aware variant so
+  // development is unaffected. Both examples below use non-`eval` devtools, satisfying
+  // that constraint. E.g.:
+  //   serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? 'source-map' : 'cheap-module-source-map';
+  //     // 'source-map' — external .map (smaller bundle; stage the .map next to the uploaded bundle)
+  //   serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? 'inline-source-map' : 'cheap-module-source-map';
+  //     // 'inline-source-map' — simplest; map travels inside the bundle (larger file)
+  // The server bundle is never served to browsers; still, never expose
+  // server-bundle source maps publicly.
+
 <% else -%>
   // If using the default 'web', then libraries like Emotion and loadable-components
   // break with SSR. The fix is to use a node renderer and change the target.

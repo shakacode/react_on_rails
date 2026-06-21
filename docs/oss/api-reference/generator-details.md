@@ -1,6 +1,6 @@
 # Generator Details
 
-The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating Webpack with Rails. Defaults for options are such that the default is for the flag to be off. For example, the default for `-R` is that `redux` is off.
+The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off — for example, the default for `-R` is that `redux` is off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` (or its alias `--webpack`) if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
@@ -11,7 +11,9 @@ Usage:
 Options:
   -R, [--redux], [--no-redux]                      # Install Redux package and Redux version of Hello World Example. Default: false
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
-      [--rspack], [--no-rspack]                    # Use Rspack instead of Webpack as the bundler. Default: false
+      [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
+      [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack)
+      [--tailwind], [--no-tailwind]                # Install Tailwind CSS v4 and style the generated SSR example. Default: false
       [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer. Default: false
       [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro). Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
@@ -38,19 +40,27 @@ can pass the redux option if you'd like to have redux setup for you automaticall
     Passing the --typescript generator option generates TypeScript files (.tsx)
     instead of JavaScript files (.jsx) and sets up TypeScript configuration.
 
-* Rspack
+* Tailwind CSS v4
 
-    Passing the --rspack generator option uses Rspack instead of Webpack as the
-    bundler, providing significantly faster builds (~20x improvement with SWC).
-    Includes unified configuration that works with both bundlers and a
-    bin/switch-bundler utility to switch between bundlers post-installation.
+    Passing the --tailwind generator option installs Tailwind CSS v4,
+    configures `@tailwindcss/postcss` for Webpack or Rspack, and styles the
+    generated SSR HelloWorld page. See
+    [Styling with Tailwind CSS v4](../building-features/styling-with-tailwind.md).
+
+* Rspack (default)
+
+    Rspack is the default bundler for fresh installs, providing significantly
+    faster builds (~20x improvement with SWC). Pass --no-rspack (or its alias
+    --webpack) to use Webpack instead. Either way you get a unified
+    configuration that works with both bundlers and a bin/switch-bundler
+    utility to switch between them post-installation.
 
 * Pro
 
     Passing the --pro generator option sets up React on Rails Pro with Node
     server rendering, fragment caching, and code-splitting support.
     Requires the react_on_rails_pro gem (add it to your Gemfile first).
-    Creates the Pro initializer, node-renderer.js, and adds the Node Renderer
+    Creates the Pro initializer, renderer/node-renderer.js, and adds the Node Renderer
     process to Procfile.dev.
 
 * RSC (React Server Components)
@@ -58,7 +68,7 @@ can pass the redux option if you'd like to have redux setup for you automaticall
     Passing the --rsc generator option sets up React Server Components support.
     This automatically includes Pro setup (--rsc implies --pro). Creates RSC
     webpack configuration, a HelloServer example component, and RSC routes.
-    Requires React 19.0.x.
+    Requires React 19 with a compatible `react-on-rails-rsc` version.
 
 *******************************************************************************
 
@@ -139,11 +149,17 @@ This creates `.tsx` files instead of `.jsx` and adds TypeScript configuration.
 
 ### Rspack Support
 
-The generator supports a `--rspack` option for using Rspack instead of Webpack as the bundler:
+Rspack is the default bundler for fresh installs, so a plain install gives you Rspack:
 
 ```bash
-rails generate react_on_rails:install --rspack
+# Rspack (default)
+rails generate react_on_rails:install
+
+# Webpack instead (--webpack is an alias for --no-rspack)
+rails generate react_on_rails:install --no-rspack
 ```
+
+The default applies only to fresh installs. If `config/shakapacker.yml` already declares an `assets_bundler`, the generator keeps your existing choice. An explicit `--rspack` / `--no-rspack` (or its `--webpack` alias) always wins. (Rspack requires Shakapacker 9.0+; on older Shakapacker the generator falls back to Webpack.)
 
 **Benefits:**
 
@@ -187,13 +203,13 @@ For apps with custom webpack configurations, review the generated config templat
 **Combining with other options:**
 
 ```bash
-# Rspack with TypeScript
-rails generate react_on_rails:install --rspack --typescript
+# Rspack (default) with TypeScript
+rails generate react_on_rails:install --typescript
 
-# Rspack with Redux
-rails generate react_on_rails:install --rspack --redux
+# Webpack with Redux
+rails generate react_on_rails:install --no-rspack --redux
 
-# All options combined
+# Explicit Rspack with TypeScript and Redux
 rails generate react_on_rails:install --rspack --typescript --redux
 ```
 
@@ -209,19 +225,20 @@ rails generate react_on_rails:install --pro
 
 **Prerequisites:**
 
-- Add `gem 'react_on_rails_pro', '>= 16.3.0'` to your Gemfile and run `bundle install`
-- Contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license
+- Add `gem 'react_on_rails_pro'` to your Gemfile and run `bundle install` (check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest version)
+- Under the friendly license model, no token is needed for evaluation, development, test, CI/CD, or staging
+- For production, get a license from [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com)
 
 **What gets created:**
 
 - `config/initializers/react_on_rails_pro.rb` - Pro configuration with Node Renderer settings
-- `client/node-renderer.js` - Node Renderer bootstrap file
+- `renderer/node-renderer.js` - Node Renderer bootstrap file
 - Node Renderer process added to `Procfile.dev`
 - Pro npm packages (`react-on-rails-pro`, `react-on-rails-pro-node-renderer`)
 
 **After installation:**
 
-Configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md) for all options.
+For production, configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md) for all options.
 
 **Combining with other options:**
 
@@ -261,7 +278,7 @@ rails generate react_on_rails:install --rsc
 **Prerequisites:**
 
 - React on Rails Pro gem installed (see Pro prerequisites above)
-- React 19.0.x (RSC is not yet supported on React 19.1.x or later)
+- React 19 with a compatible `react-on-rails-rsc` version
 
 RSC builds on React on Rails Pro's Node rendering infrastructure. The generator adds a separate webpack entry point for server components, configures the `RSCWebpackPlugin` in both client and server webpack configs, and sets up the `RSC_BUNDLE_ONLY` environment variable handling in `ServerClientOrBoth.js` for independent RSC bundle compilation.
 

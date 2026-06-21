@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "16.4.0",
+  "version": "17.0.0-rc.5",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
@@ -15,7 +15,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shakacode/react_on_rails.git"
+    "url": "git+https://github.com/shakacode/react_on_rails.git",
+    "directory": "packages/react-on-rails"
   },
   "keywords": [
     "react",
@@ -38,21 +39,34 @@
     "./createReactOutput": "./lib/createReactOutput.js",
     "./isServerRenderResult": "./lib/isServerRenderResult.js",
     "./reactApis": "./lib/reactApis.cjs",
+    "./webpackHelpers": "./lib/webpackHelpers.cjs",
     "./reactHydrateOrRender": "./lib/reactHydrateOrRender.js",
+    "./useRailsForm": "./lib/useRailsForm.js",
     "./turbolinksUtils": "./lib/turbolinksUtils.js",
     "./isRenderFunction": "./lib/isRenderFunction.js",
     "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
     "./handleError": "./lib/handleError.js",
     "./generateRenderingErrorMessage": "./lib/generateRenderingErrorMessage.js",
+    "./captureReactOwnerStack": "./lib/captureReactOwnerStack.js",
     "./serverRenderUtils": "./lib/serverRenderUtils.js",
     "./buildConsoleReplay": "./lib/buildConsoleReplay.js",
     "./ReactDOMServer": "./lib/ReactDOMServer.cjs",
     "./serverRenderReactComponent": "./lib/serverRenderReactComponent.js",
+    "./@internal/sanitizeNonce": "./lib/sanitizeNonce.js",
+    "./@internal/rendererTeardown": "./lib/rendererTeardown.js",
+    "./@internal/rootErrorHandlers": "./lib/rootErrorHandlers.js",
+    "./@internal/isThenable": "./lib/isThenable.js",
     "./@internal/base/client": "./lib/base/client.js",
     "./@internal/base/full": {
       "react-server": "./lib/base/full.rsc.js",
       "default": "./lib/base/full.js"
+    },
+    "./@internal/createReactOnRails": "./lib/createReactOnRails.js",
+    "./@internal/capabilities/core": "./lib/capabilities/core.js",
+    "./@internal/capabilities/ssr": {
+      "react-server": "./lib/capabilities/ssr.rsc.js",
+      "default": "./lib/capabilities/ssr.js"
     }
   },
   "peerDependencies": {
@@ -64,10 +78,15 @@
     "lib/**/*.js",
     "lib/**/*.cjs",
     "lib/**/*.mjs",
-    "lib/**/*.d.ts"
+    "lib/**/*.d.ts",
+    "lib/**/*.d.cts"
   ],
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails#readme"
+  "homepage": "https://reactonrails.com/docs/",
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.2.0"
+  }
 }

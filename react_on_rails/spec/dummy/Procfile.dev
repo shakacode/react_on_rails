@@ -1,8 +1,13 @@
 # Procfile for development
 # You can run these commands in separate shells
-rails: bundle exec rails s -p 3000
+#
+# PORT, SHAKAPACKER_DEV_SERVER_PORT, and renderer ports are set automatically by
+# bin/dev when REACT_ON_RAILS_BASE_PORT (or CONDUCTOR_PORT) is present, so
+# concurrent worktrees get distinct ports without manual .env edits.
+# For manual worktree setup (no base-port tool), see .env.example.
+rails: bundle exec rails s -p ${PORT:-3000}
 dev-server: bin/shakapacker-dev-server
-server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
+server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker-watch --watch
 
 # Bundle ReScript .res files
 rescript: pnpm build:rescript:dev

@@ -1,8 +1,16 @@
-<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/clientWebpackConfig.js") %>
+<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/clientWebpackConfig.js") %>
 
 const commonWebpackConfig = require('./commonWebpackConfig');
 <% if use_rsc? -%>
-const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+const { config } = require('shakapacker');
+const { resolve } = require('path');
+const { <%= rsc_plugin_class_name %> } = require('<%= rsc_plugin_import_path %>');
+
+const rscClientReferences = {
+  directory: resolve(config.source_path),
+  recursive: true,
+  include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
+};
 <% end -%>
 
 const configureClient = () => {
@@ -16,7 +24,9 @@ const configureClient = () => {
 
 <% if use_rsc? -%>
   // Add React Server Components plugin for client bundle
-  clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+  clientConfig.plugins.push(
+    new <%= rsc_plugin_class_name %>({ isServer: false, clientReferences: rscClientReferences }),
+  );
 
 <% end -%>
   return clientConfig;

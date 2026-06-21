@@ -4,6 +4,7 @@ require "erb"
 require "open3"
 require "yaml"
 require_relative "config_path_resolver"
+require_relative "shakapacker_config_helpers"
 
 module ReactOnRails
   # SystemChecker provides validation methods for React on Rails setup
@@ -11,10 +12,12 @@ module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class SystemChecker
     include ConfigPathResolver
+    include ShakapackerConfigHelpers
 
     attr_reader :messages
 
-    SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
+    SUPPORTED_ASSETS_BUNDLERS = ShakapackerConfigHelpers::SUPPORTED_ASSETS_BUNDLERS
+    PackageManagerDetection = Struct.new(:manager, :lockfile_scan_blocked, keyword_init: true)
 
     def initialize
       @messages = []
@@ -115,7 +118,8 @@ module ReactOnRails
       end
 
       # Detect which package manager is actually being used
-      used_manager = detect_used_package_manager
+      package_manager_detection = detect_package_manager_from_lockfile
+      used_manager = package_manager_detection.manager
       if used_manager
         version_info = get_package_manager_version(used_manager)
         deprecation_note = get_deprecation_note(used_manager, version_info)
@@ -124,7 +128,9 @@ module ReactOnRails
         add_success(message)
       else
         add_success("✅ Package managers available: #{available_managers.join(', ')}")
-        add_info("ℹ️  No lock file detected - run npm/yarn/pnpm install to establish which manager is used")
+        unless package_manager_detection.lockfile_scan_blocked
+          add_info("ℹ️  No lock file detected - run npm/yarn/pnpm install to establish which manager is used")
+        end
       end
       true
     end
@@ -141,6 +147,7 @@ module ReactOnRails
           • config/shakapacker.yml
           • config/webpack/webpack.config.{js,ts}
           • config/rspack/rspack.config.{js,ts}
+          • assets_bundler_config_path target declared by Shakapacker (when configured)
 
           Run: bundle exec rails shakapacker:install
         MSG
@@ -168,11 +175,12 @@ module ReactOnRails
     end
 
     # React on Rails package validation
+    # NOTE: Wildcard/non-exact version checks (Gemfile and npm) are handled by
+    # Doctor#check_version_wildcards to avoid duplicate error messages.
     def check_react_on_rails_packages
       check_react_on_rails_gem
       check_react_on_rails_npm_package
       check_package_version_sync
-      check_gemfile_version_patterns
     end
 
     def check_react_on_rails_gem
@@ -190,8 +198,8 @@ module ReactOnRails
     end
 
     def check_react_on_rails_npm_package
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("react-on-rails npm package")
+      return unless package_json_path
 
       package_json = JSON.parse(File.read(package_json_path))
       package_name, npm_version = react_on_rails_npm_package_details(package_json)
@@ -211,14 +219,20 @@ module ReactOnRails
     end
 
     def check_package_version_sync
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("React on Rails package version sync")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
         package_name, npm_version = react_on_rails_npm_package_details(package_json)
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
+
+        # Skip workspace/local-link specs and non-exact range specs silently.
+        # Non-exact version checks are handled by Doctor#check_version_wildcards
+        # to avoid duplicate diagnostics.
+        return if npm_version.match?(/\A(?:workspace:|file:|link:|npm:)/)
+        return if non_exact_range_spec?(npm_version)
 
         # Normalize NPM version format to Ruby gem format for comparison
         # Uses existing VersionSyntaxConverter to handle dash/dot differences
@@ -229,30 +243,8 @@ module ReactOnRails
 
         if normalized_npm_version == gem_version
           add_success("✅ React on Rails gem and #{package_name} NPM package versions match (#{gem_version})")
-          check_version_patterns(npm_version, gem_version)
         else
-          # Check for major version differences
-          gem_major = gem_version.split(".")[0].to_i
-          npm_major = normalized_npm_version.split(".")[0].to_i
-
-          if gem_major != npm_major # rubocop:disable Style/NegatedIfElseCondition
-            add_error(<<~MSG.strip)
-              🚫 Major version mismatch detected:
-              • Gem version: #{gem_version} (major: #{gem_major})
-              • #{package_name} version: #{npm_version} (major: #{npm_major})
-
-              Major version differences can cause serious compatibility issues.
-              Update both packages to use the same major version immediately.
-            MSG
-          else
-            add_warning(<<~MSG.strip)
-              ⚠️  Version mismatch detected:
-              • Gem version: #{gem_version}
-              • #{package_name} version: #{npm_version}
-
-              Consider updating to exact, fixed matching versions of gem and npm package for best compatibility.
-            MSG
-          end
+          report_version_mismatch(package_name, npm_version, normalized_npm_version, gem_version)
         end
       rescue JSON::ParserError
         # Ignore parsing errors, already handled elsewhere
@@ -261,11 +253,45 @@ module ReactOnRails
       end
     end
 
+    def non_exact_range_spec?(npm_version)
+      npm_version.match?(/\A[\^~><*]/) || npm_version.include?(" ")
+    end
+
+    def report_version_mismatch(package_name, npm_version, normalized_npm_version, gem_version)
+      gem_major = gem_version.split(".")[0].to_i
+      npm_major = normalized_npm_version.split(".")[0].to_i
+
+      if gem_major != npm_major # rubocop:disable Style/NegatedIfElseCondition
+        add_error(<<~MSG.strip)
+          🚫 Major version mismatch detected:
+          • Gem version: #{gem_version} (major: #{gem_major})
+          • #{package_name} version: #{npm_version} (major: #{npm_major})
+
+          Major version differences can cause serious compatibility issues.
+          Update both packages to use the same major version immediately.
+
+          Fix: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      else
+        add_error(<<~MSG.strip)
+          🚫 Version mismatch detected:
+          • Gem version: #{gem_version}
+          • #{package_name} version: #{npm_version}
+
+          The gem and npm package versions must match exactly. Mismatched versions
+          will cause a runtime error on app startup.
+
+          Fix: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      end
+    end
+
     # React dependencies validation
     def check_react_dependencies
-      return unless File.exist?(resolved_package_json_path)
+      package_json_path = package_json_path_for("React dependencies")
+      return unless package_json_path
 
-      package_json = parse_package_json
+      package_json = parse_package_json(package_json_path)
       return unless package_json
 
       # Check core React dependencies
@@ -278,6 +304,7 @@ module ReactOnRails
 
       # Report versions
       report_dependency_versions(package_json)
+      report_bundler_version
     end
 
     # Rails integration validation
@@ -308,40 +335,29 @@ module ReactOnRails
           🚫 Bundler configuration not found.
 
           Expected one of: config/webpack/webpack.config.{js,ts} or config/rspack/rspack.config.{js,ts}
+          Also checks Shakapacker's configured assets_bundler_config_path when available.
           Run: rails generate react_on_rails:install
         MSG
       end
     end
 
     def detect_bundler_config_path
-      paths_by_bundler = {
-        "rspack" => existing_bundler_config_paths("rspack"),
-        "webpack" => existing_bundler_config_paths("webpack")
-      }
+      resolved_config_path = resolved_webpack_config_path
+      return nil unless resolved_config_path
+      # Explicit shakapacker assets_bundler_config_path matches are treated as
+      # authoritative and intentionally bypass cross-bundler ambiguity warnings.
+      return resolved_config_path if explicit_shakapacker_bundler_config_path?(resolved_config_path)
 
-      present_paths = paths_by_bundler.select { |_bundler, paths| paths.any? }
-      return nil if present_paths.empty?
-      return present_paths.values.first.first if present_paths.one?
-
-      configured_bundler = configured_assets_bundler
-      if configured_bundler && paths_by_bundler[configured_bundler].any?
-        add_warning(
-          "⚠️  Found both webpack and rspack configs. Using #{configured_bundler} from config/shakapacker.yml."
-        )
-        return paths_by_bundler[configured_bundler].first
-      end
-
-      # Default to webpack when shakapacker.yml doesn't declare assets_bundler.
-      # Webpack is the longer-established default; rspack users typically set
-      # assets_bundler explicitly in shakapacker.yml.
-      add_warning(
-        "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to webpack."
-      )
-      paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first
+      # Re-scan candidate configs by bundler so we can emit clear warnings when
+      # both webpack and rspack configs exist in the project. If a future
+      # candidate falls outside the `<bundler>.config.*` naming convention used
+      # by `existing_bundler_config_paths`, fall back to the originally
+      # discovered file.
+      resolve_default_bundler_config_path || resolved_config_path
     end
 
     def suggest_webpack_inspection(config_path)
-      bundler_name = config_path.include?("rspack") ? "rspack" : "webpack"
+      bundler_name = bundler_name_for_config_path(config_path)
       export_style = config_path.end_with?(".ts") ? "export default" : "module.exports"
 
       add_info("💡 To debug #{bundler_name} builds:")
@@ -393,7 +409,7 @@ module ReactOnRails
 
     def check_webpack_config_content(config_path)
       content = File.read(config_path)
-      bundler_name = config_path.include?("rspack") ? "rspack" : "webpack"
+      bundler_name = bundler_name_for_config_path(config_path)
 
       if react_on_rails_config?(content)
         add_success("✅ #{bundler_name.capitalize} config includes React on Rails environment configuration")
@@ -436,17 +452,33 @@ module ReactOnRails
       status.success?
     end
 
-    def detect_used_package_manager
-      # Check for lock files to determine which package manager is being used
-      if File.exist?("yarn.lock")
-        "yarn"
-      elsif File.exist?("pnpm-lock.yaml")
-        "pnpm"
-      elsif File.exist?("bun.lock") || File.exist?("bun.lockb")
-        "bun"
-      elsif File.exist?("package-lock.json")
-        "npm"
-      end
+    def detect_package_manager_from_lockfile
+      # Check for lock files next to the configured package.json to support
+      # legacy apps that keep their JS package tree under client/.
+      package_root = resolved_package_root
+      package_json_path = package_json_path_for(
+        "package manager",
+        package_root
+      )
+      # If package.json cannot be read, the configured package root is broken
+      # enough that detecting a stray lockfile would be misleading. Block the
+      # scan so check_package_manager does not suggest installing lockfiles.
+      # Covers both cases handled by package_json_path_for: a missing package
+      # root directory and an existing directory without a package.json.
+      return PackageManagerDetection.new(manager: nil, lockfile_scan_blocked: true) unless package_json_path
+
+      manager = if File.exist?(File.join(package_root, "yarn.lock"))
+                  "yarn"
+                elsif File.exist?(File.join(package_root, "pnpm-lock.yaml"))
+                  "pnpm"
+                elsif File.exist?(File.join(package_root, "bun.lock")) ||
+                      File.exist?(File.join(package_root, "bun.lockb"))
+                  "bun"
+                elsif File.exist?(File.join(package_root, "package-lock.json"))
+                  "npm"
+                end
+
+      PackageManagerDetection.new(manager:, lockfile_scan_blocked: false)
     end
 
     def get_package_manager_version(manager)
@@ -474,10 +506,12 @@ module ReactOnRails
     end
 
     def bundler_config_file_exists?
-      File.exist?("config/webpack/webpack.config.js") ||
-        File.exist?("config/webpack/webpack.config.ts") ||
-        File.exist?("config/rspack/rspack.config.js") ||
-        File.exist?("config/rspack/rspack.config.ts")
+      # Fast path for common generator-default layouts (.js/.ts only). If none
+      # of these paths exist, we fall back to full candidate probing, which can
+      # include .cjs/.mjs variants in shakapacker-derived directories.
+      return true if ALL_DEFAULT_CONFIG_CANDIDATES.any? { |path| File.file?(path) }
+
+      !resolved_webpack_config_path.nil?
     end
 
     def shakapacker_in_gemfile?
@@ -514,41 +548,83 @@ module ReactOnRails
              .strip
     end
 
+    def resolve_default_bundler_config_path
+      paths_by_bundler = {
+        "rspack" => existing_bundler_config_paths("rspack"),
+        "webpack" => existing_bundler_config_paths("webpack")
+      }
+
+      present_paths = paths_by_bundler.select { |_bundler, paths| paths.any? }
+      return nil if present_paths.empty?
+      return present_paths.values.first.first if present_paths.one?
+
+      configured_bundler = configured_assets_bundler
+      if configured_bundler && paths_by_bundler[configured_bundler].any?
+        return warn_and_pick_configured_bundler_path(paths_by_bundler, configured_bundler)
+      end
+
+      # Default to webpack when shakapacker.yml doesn't declare assets_bundler.
+      # Webpack is the longer-established default; rspack users typically set
+      # assets_bundler explicitly in shakapacker.yml.
+      add_warning(
+        "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to webpack."
+      )
+      paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first
+    end
+
+    def warn_and_pick_configured_bundler_path(paths_by_bundler, configured_bundler)
+      add_warning(
+        "⚠️  Found both webpack and rspack configs. Using #{configured_bundler} from config/shakapacker.yml."
+      )
+      paths_by_bundler[configured_bundler].first
+    end
+
     def existing_bundler_config_paths(bundler)
-      candidate_paths = if bundler == "rspack"
-                          %w[
-                            config/rspack/rspack.config.ts
-                            config/rspack/rspack.config.js
-                          ]
-                        else
-                          %w[
-                            config/webpack/webpack.config.ts
-                            config/webpack/webpack.config.js
-                          ]
-                        end
-      candidate_paths.select { |path| File.exist?(path) }
+      # This runs only after detect_bundler_config_path has ruled out an exact
+      # explicit shakapacker path match, so directory-derived fallback
+      # candidates are intentionally considered here.
+      # Custom shakapacker config paths (non-standard basenames) are handled
+      # earlier via explicit_shakapacker_bundler_config_path? and intentionally
+      # excluded from this `<bundler>.config.*` classifier.
+      # webpack_config_candidates may consult Shakapacker config paths, but that
+      # lookup is memoized by shakapacker_assets_bundler_config_path.
+      bundler_prefix = "#{bundler}.config."
+      webpack_config_candidates.select do |path|
+        next false unless File.file?(path)
+
+        File.basename(path).start_with?(bundler_prefix)
+      end
     end
 
-    def configured_assets_bundler
-      config = parsed_shakapacker_config
-      return nil unless config
+    def bundler_name_for_config_path(config_path)
+      return inferred_bundler_name(config_path) unless explicit_shakapacker_bundler_config_path?(config_path)
 
-      rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
-      bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
-    rescue StandardError, ScriptError
-      nil
+      configured_bundler = configured_assets_bundler
+      return configured_bundler if configured_bundler
+
+      # For explicit custom shakapacker paths without assets_bundler in
+      # shakapacker.yml, fallback inference uses path heuristics and can
+      # misclassify non-standard filenames.
+      add_inferred_bundler_notice_once
+      inferred_bundler_name(config_path)
     end
 
-    def bundler_from_shakapacker_section(config, section_name)
-      section = config[section_name] || config[section_name.to_sym]
-      return nil unless section.is_a?(Hash)
-
-      normalize_assets_bundler(section["assets_bundler"] || section[:assets_bundler])
+    def inferred_bundler_name(config_path)
+      # Heuristic only: paths containing "rspack" are treated as rspack and all
+      # others as webpack. This is accurate for standard generator-created paths.
+      config_path.include?("rspack") ? "rspack" : "webpack"
     end
 
-    def normalize_assets_bundler(value)
-      normalized = value.to_s.strip.downcase
-      SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
+    def explicit_shakapacker_bundler_config_path?(resolved_config_path)
+      shakapacker_path = shakapacker_assets_bundler_config_path
+      !shakapacker_path.nil? && shakapacker_path == resolved_config_path
+    end
+
+    def add_inferred_bundler_notice_once
+      return if @inferred_bundler_notice_shown
+
+      add_info("ℹ️  assets_bundler not set in config/shakapacker.yml; inferring bundler from config path name.")
+      @inferred_bundler_notice_shown = true
     end
 
     def required_react_dependencies
@@ -571,8 +647,9 @@ module ReactOnRails
     def detected_javascript_transpiler
       config = parsed_shakapacker_config
       unless config
-        if File.exist?("config/shakapacker.yml")
-          add_info("ℹ️  Unable to parse config/shakapacker.yml — defaulting to Babel assumption")
+        shakapacker_config_path = shakapacker_config_path()
+        if File.exist?(shakapacker_config_path)
+          add_info("ℹ️  Unable to parse #{shakapacker_config_path} — defaulting to Babel assumption")
         end
         return nil
       end
@@ -584,33 +661,32 @@ module ReactOnRails
       normalize_transpiler_value(transpiler)
     end
 
-    def parsed_shakapacker_config
-      shakapacker_config_path = "config/shakapacker.yml"
-      return nil unless File.exist?(shakapacker_config_path)
-
-      raw_content = File.read(shakapacker_config_path)
-      rendered_content = ERB.new(raw_content).result
-      parsed = YAML.safe_load(rendered_content, aliases: true)
-      parsed.is_a?(Hash) ? parsed : nil
-    rescue StandardError, ScriptError
-      nil
-    end
-
     def normalize_transpiler_value(transpiler)
       normalized = transpiler.to_s.strip.downcase
       normalized.empty? ? nil : normalized
     end
 
     def additional_build_dependencies
-      {
-        "webpack" => "Webpack bundler",
+      bundler_deps = if active_assets_bundler == "rspack"
+                       {
+                         "@rspack/core" => "Rspack bundler",
+                         "css-loader" => "CSS loader",
+                         "style-loader" => "Style loader"
+                       }
+                     else
+                       {
+                         "webpack" => "Webpack bundler",
+                         "css-loader" => "CSS loader for Webpack",
+                         "style-loader" => "Style loader for Webpack",
+                         "webpack-dev-server" => "Webpack development server",
+                         "mini-css-extract-plugin" => "CSS extraction plugin for Webpack"
+                       }
+                     end
+
+      bundler_deps.merge(
         "@babel/core" => "Babel compiler core",
-        "@babel/preset-env" => "Babel environment preset",
-        "css-loader" => "CSS loader for Webpack",
-        "style-loader" => "Style loader for Webpack",
-        "mini-css-extract-plugin" => "CSS extraction plugin",
-        "webpack-dev-server" => "Webpack development server"
-      }
+        "@babel/preset-env" => "Babel environment preset"
+      )
     end
 
     # rubocop:disable Metrics/CyclomaticComplexity
@@ -643,8 +719,8 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/CyclomaticComplexity
 
-    def parse_package_json
-      JSON.parse(File.read(resolved_package_json_path))
+    def parse_package_json(package_json_path)
+      JSON.parse(File.read(package_json_path))
     rescue Errno::ENOENT, JSON::ParserError
       add_warning("⚠️  Could not parse package.json to check React dependencies")
       nil
@@ -670,50 +746,6 @@ module ReactOnRails
         Install them with:
         npm install #{missing_deps.join(' ')}
       MSG
-    end
-
-    def check_version_patterns(npm_version, gem_version)
-      # Check for version range patterns in package.json
-      return unless /^[\^~]/.match?(npm_version)
-
-      pattern_type = npm_version[0] == "^" ? "caret (^)" : "tilde (~)"
-      add_warning(<<~MSG.strip)
-        ⚠️  NPM package uses #{pattern_type} version pattern: #{npm_version}
-
-        While versions match, consider using exact version "#{gem_version}" in package.json
-        for guaranteed compatibility with the React on Rails gem.
-      MSG
-    end
-
-    def check_gemfile_version_patterns
-      gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-      return unless File.exist?(gemfile_path)
-
-      begin
-        gemfile_content = File.read(gemfile_path)
-        react_on_rails_line = gemfile_content.lines.find { |line| line.match(/^\s*gem\s+['"]react_on_rails['"]/) }
-
-        return unless react_on_rails_line
-
-        # Check for version patterns in Gemfile
-        if /['"][~]/.match?(react_on_rails_line)
-          add_warning(<<~MSG.strip)
-            ⚠️  Gemfile uses version pattern for react_on_rails gem.
-
-            Consider using exact version in Gemfile for guaranteed compatibility:
-            gem 'react_on_rails', '#{ReactOnRails::VERSION}'
-          MSG
-        elsif />=\s*/.match?(react_on_rails_line)
-          add_warning(<<~MSG.strip)
-            ⚠️  Gemfile uses version range (>=) for react_on_rails gem.
-
-            Consider using exact version in Gemfile for guaranteed compatibility:
-            gem 'react_on_rails', '#{ReactOnRails::VERSION}'
-          MSG
-        end
-      rescue StandardError
-        # Ignore errors reading Gemfile
-      end
     end
 
     def report_dependency_versions(package_json)
@@ -783,16 +815,18 @@ module ReactOnRails
       end
     end
 
-    def report_webpack_version
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+    def report_bundler_version
+      bundler = active_assets_bundler
+      bundler_label = bundler.capitalize
+      package_json_path = package_json_path_for("#{bundler_label} version")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
-        webpack_version = all_deps["webpack"]
-        add_info("📦 Webpack version: #{webpack_version}") if webpack_version
+        bundler_version = bundler == "rspack" ? all_deps["@rspack/core"] || all_deps["rspack"] : all_deps["webpack"]
+        add_info("📦 #{bundler_label} version: #{bundler_version}") if bundler_version
       rescue JSON::ParserError
         # Handle JSON parsing errors
       rescue StandardError

@@ -60,6 +60,8 @@ module ReactOnRails
 
           Or if using React on Rails Pro:
           Run: #{pro_install_cmd}
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
     end
 
@@ -97,6 +99,8 @@ module ReactOnRails
           Run: #{pro_install_cmd}
 
         #{package_json_location}
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
     end
 
@@ -117,6 +121,8 @@ module ReactOnRails
           3. Keep only: react-on-rails-pro
 
         #{package_json_location}
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
     end
 
@@ -143,6 +149,8 @@ module ReactOnRails
           2. Install the Pro package: #{install_cmd}
 
         #{package_json_location}
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
     end
 
@@ -169,6 +177,8 @@ module ReactOnRails
           2. Install the base package: #{install_base_cmd}
 
         #{package_json_location}
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
     end
 
@@ -194,8 +204,11 @@ module ReactOnRails
 
         Fix:
           Run: #{install_cmd}
+          Or run: bundle exec rake react_on_rails:sync_versions WRITE=true
 
         #{package_json_location}
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
     end
 
@@ -220,8 +233,11 @@ module ReactOnRails
 
         Fix:
           Run: #{install_cmd}
+          Or run: bundle exec rake react_on_rails:sync_versions WRITE=true
 
         #{package_json_location}
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
     end
 
@@ -372,7 +388,9 @@ module ReactOnRails
 
         match = raw.match(VERSION_PARTS_REGEX)
         unless match
-          raise ReactOnRails::Error, "Cannot parse version number '#{raw}' (only exact versions are supported)"
+          raise ReactOnRails::Error,
+                "Cannot parse version number '#{raw}' (only exact versions are supported). " \
+                "#{ReactOnRails::DOCTOR_RECOMMENDATION}"
         end
 
         match.captures.compact
@@ -507,6 +525,8 @@ module ReactOnRails
               - Unquoted keys or values
               - Trailing commas (not allowed in JSON)
               - Comments (not allowed in standard JSON)
+
+            #{ReactOnRails::DOCTOR_RECOMMENDATION}
           MSG
         end
       end

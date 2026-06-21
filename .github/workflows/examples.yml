@@ -1,18 +1,23 @@
 name: Generator tests # TODO needs to be duplicated for RoR Pro
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event.pull_request.number && format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) || format('{0}-{1}', github.workflow, github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches:
       - 'main'
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -22,39 +27,49 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_lint: ${{ steps.detect.outputs.run_lint }}
       run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
+      should_use_full_matrix: ${{ steps.hosted-ci.outputs.should_use_full_matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
           # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
           fetch-depth: 50
           persist-credentials: false
-      - name: Check for full-ci label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR full-ci label is present, run everything
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_lint=true" >> "$GITHUB_OUTPUT"
-            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_generators=true" >> "$GITHUB_OUTPUT"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
+            {
+              echo "run_lint=true"
+              echo "run_js_tests=true"
+              echo "run_ruby_tests=true"
+              echo "run_dummy_tests=true"
+              echo "run_generators=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Guard docs-only main pushes
@@ -70,57 +85,76 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - id: set-matrix
+        env:
+          SHOULD_USE_FULL_MATRIX: ${{ needs.detect-changes.outputs.should_use_full_matrix }}
+          LATEST_RUBY_VERSION: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+          MINIMUM_RUBY_VERSION: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
         run: |
-          # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label)
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
-             [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             [[ "${{ inputs.force_run }}" == "true" ]] || \
-             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
+          latest_ruby_version="$LATEST_RUBY_VERSION"
+          minimum_ruby_version="$MINIMUM_RUBY_VERSION"
+
+          # Full matrices run only on main, merge queue, release targets, or
+          # explicit force-full hosted CI. Normal hosted PR CI stays optimized.
+          if [[ "$SHOULD_USE_FULL_MATRIX" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
+            matrix="$(jq -nc \
+              --arg latest_ruby_version "$latest_ruby_version" \
+              --arg minimum_ruby_version "$minimum_ruby_version" \
+              '{
+                "include": [
+                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest"},
+                  {"ruby-version": $minimum_ruby_version, "dependency-level": "minimum"}
+                ]
+              }')"
           else
             # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
+            matrix="$(jq -nc \
+              --arg latest_ruby_version "$latest_ruby_version" \
+              '{"include": [{"ruby-version": $latest_ruby_version, "dependency-level": "latest"}]}')"
           fi
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
   examples:
     needs: [detect-changes, setup-matrix]
-    # Run on main, workflow_dispatch, OR when generators needed
+    # Run hosted generator tests only when hosted CI is allowed and generator paths changed.
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_generators == 'true'
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_generators == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
-    env:
-      BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ matrix.ruby-version }}
-          bundler: 2.5.9
       - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # All example lanes test on the minimum Shakapacker Node floor from
+          # .minimum.tool-versions; example tests exercise Ruby/gem compatibility,
+          # not Node version compatibility.
+          node-version: ${{ steps.tool-versions.outputs.minimum-node-version }}
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
       - name: Setup pnpm cache
         uses: actions/cache@v4
         with:
@@ -140,11 +174,6 @@ jobs:
       - name: Run conversion script for older Node compatibility
         if: matrix.dependency-level == 'minimum'
         run: script/convert
-      - name: Save root ruby gems to cache
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails/vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Install Node modules with pnpm
@@ -154,12 +183,14 @@ jobs:
         run: pnpm run build
 
       - name: Install Ruby Gems for package
-        run: |
-          cd react_on_rails
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-          fi
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails
+          ruby-version: ${{ matrix.ruby-version }}
+          # Minimum-dependency legs intentionally install with frozen=false after script/convert,
+          # matching the historical bundle install behavior for converted dependency files.
+          frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
+          install-libyaml: 'false'
       - name: Ensure minimum required Chrome version
         run: |
           echo -e "Already installed $(google-chrome --version)\n"
@@ -176,7 +207,7 @@ jobs:
         run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
       - name: Set packer version environment variable
         run: |
-          echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> $GITHUB_ENV
+          echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> "$GITHUB_ENV"
       - name: Verify rake tasks exist
         run: |
           cd react_on_rails

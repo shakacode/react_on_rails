@@ -23,6 +23,34 @@ Consider this approach if you:
 
 ## Implementation
 
+### Migration Checklist
+
+If you have not already completed Sections 1–4 below (start at [Section 1](#1-customize-bindev)), do that first so
+`bin/dev`, `config/shakapacker.yml`, your Procfiles, and your build commands are in place before you start removing
+duplicates.
+
+When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice. The checklist uses letters (A–E) so the steps are easy to distinguish from the numbered Implementation sections referenced above.
+
+A. Add (or uncomment, if already present) custom one-time tasks to the `run_precompile_tasks` method in `bin/dev`
+(see [Section 1](#1-customize-bindev) for the generator-provided template).
+
+B. Ensure `build_test_command` and `build_production_command` each include every one-time build task those lifecycles
+need, such as ReScript builds, TypeScript checks or compilation, and locale generation. `bin/dev` is not invoked in
+CI or production, so these commands are the only mechanism those lifecycles have.
+
+C. After verifying the updated commands work locally, remove one-time build commands from individual Procfile process
+entries. If those same commands appear as standalone steps in CI/CD pipeline scripts, remove those duplicate
+invocations too. For example, remove a bare `yarn res:build` GitHub Actions step only after `build_test_command` or
+`build_production_command` includes it. Do not delete entire `.github/workflows`, `.circleci/config.yml`, or Heroku
+`app.json` files unless they exist solely for the migrated build step.
+
+D. Confirm `precompile_hook` has been removed from `config/shakapacker.yml` (per
+[Section 2](#2-configure-shakapackeryml)) so the same task does not also run during webpack compiles.
+
+E. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
+
+The goal is one owner per lifecycle: `bin/dev` owns development startup, Procfile processes own long-running watchers, and React on Rails build commands own test and production compilation.
+
 ### 1. Customize bin/dev
 
 The React on Rails generator creates a `bin/dev` script with an extensible precompile pattern. Uncomment and customize the `run_precompile_tasks` method:
@@ -79,7 +107,7 @@ ReactOnRails::Dev::ServerManager.run_from_command_line(argv_with_defaults)
 
 ### 2. Configure shakapacker.yml
 
-Remove or comment out the `precompile_hook` in `config/shakapacker.yml`, since `bin/dev` now handles precompile tasks directly:
+Remove the `precompile_hook` from `config/shakapacker.yml`, since `bin/dev` now handles precompile tasks directly:
 
 **Before (default precompile_hook approach):**
 
@@ -112,7 +140,7 @@ Remove precompile logic from your Procfiles:
 rescript: yarn res:watch
 rails: bundle exec rails server -p 3000
 wp-client: sleep 15 && bundle exec rake react_on_rails:locale && bin/shakapacker-dev-server
-wp-server: SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
+wp-server: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 ```
 
 **After (clean and simple):**
@@ -122,20 +150,149 @@ wp-server: SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
 rescript: yarn res:watch
 rails: bundle exec rails server -p 3000
 wp-client: bin/shakapacker-dev-server
-wp-server: SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
+wp-server: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 ```
 
 ### 4. Configure Build Commands
 
-Handle production builds in `config/initializers/react_on_rails.rb`:
+Handle test and production builds in `config/initializers/react_on_rails.rb`. These commands must include every build step that production deploys and CI test runs require, because `bin/dev` is not part of those lifecycles:
+
+In CI, ReactOnRails::TestHelper runs `build_test_command` when test assets need compilation. See
+[testing configuration](testing-configuration.md#quick-start) for the RSpec/Minitest wiring. During
+`assets:precompile`, React on Rails runs `build_production_command`.
+
+Choose one of the following configuration styles. Use only one: Option A sets the commands directly, while Option B
+points both commands at the helper script.
+
+#### Option A - Inline commands
 
 ```ruby
 ReactOnRails.configure do |config|
-  # Build commands should include all necessary steps
+  # Build commands should include all necessary steps.
+  # Shakapacker auto-derives NODE_ENV from RAILS_ENV, so the test command leaves NODE_ENV implicit.
+  # The production command sets NODE_ENV=production explicitly as a belt-and-suspenders safeguard
+  # against any pre-shakapacker step (e.g. a custom yarn script) that reads NODE_ENV directly.
   config.build_test_command = "yarn res:build && RAILS_ENV=test bin/shakapacker"
   config.build_production_command = "yarn res:build && RAILS_ENV=production NODE_ENV=production bin/shakapacker"
 end
 ```
+
+#### Option B - Script wrapper (recommended for multi-step builds)
+
+If your build needs more than one pre-shakapacker step, such as a TypeScript check and a ReScript compile, prefer a small
+Ruby script over a very long command string. Create `bin/build-react-on-rails`:
+
+```ruby
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "rbconfig"
+
+# Pin the working directory to the Rails application root so the relative paths below resolve correctly even when
+# `config.node_modules_location` is a subdirectory. React on Rails prepends `cd "<node_modules_location>"` to
+# `build_test_command` and `build_production_command`, which would otherwise leave the script looking for
+# `bin/shakapacker` under that subdirectory. See the note under the configuration example below for invoking the
+# wrapper itself from a custom `node_modules_location`.
+Dir.chdir(File.expand_path("..", __dir__))
+
+mode = ARGV.first
+
+unless %w[test production].include?(mode)
+  abort "Usage: bin/build-react-on-rails test|production\nGot: #{mode.inspect}"
+end
+
+# Add your app's pre-build step(s) here. They run for both test and production.
+# Leave this section empty if shakapacker is the only build step.
+# If a pre-build command needs env vars, pass them via a hash:
+#   system({ "SOME_VAR" => "value" }, "yarn", "custom:build") || abort("custom:build failed")
+# The mode-specific env hashes below are intentionally scoped to each shakapacker call.
+# For example, to run TypeScript then ReScript:
+#   # --noEmit type-checks only; ts-loader/babel-loader handle transpilation during webpack bundling.
+#   system("yarn", "tsc", "--noEmit") || abort("tsc type-check failed")
+#   system("yarn", "res:build")       || abort("res:build failed")
+
+# Mode-specific invocation below. `RbConfig.ruby` runs shakapacker with the same Ruby interpreter that launched this
+# wrapper, and the `Dir.chdir` above keeps `bin/shakapacker` resolvable from the Rails application root. The
+# shakapacker binstub is a Ruby file by convention, so passing it to `RbConfig.ruby` is portable; if your project
+# replaces `bin/shakapacker` with a shell wrapper, drop `RbConfig.ruby` and invoke the binstub directly (after
+# ensuring the right Ruby is on `PATH`). Add shared steps above, not inside the case blocks.
+case mode
+when "test"
+  env = { "RAILS_ENV" => "test" }
+  system(env, RbConfig.ruby, "bin/shakapacker") || abort("shakapacker (test) failed")
+when "production"
+  env = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }
+  system(env, RbConfig.ruby, "bin/shakapacker") || abort("shakapacker (production) failed")
+end
+```
+
+On Unix-like filesystems, make the script executable so it can run locally, then stage the file so Git records the
+executable bit for CI and other checkouts:
+
+```bash
+chmod +x bin/build-react-on-rails
+git add bin/build-react-on-rails
+```
+
+`git add --chmod=+x bin/build-react-on-rails` (Git 2.9 or newer) is a useful shortcut, but it only updates the
+executable bit in Git's index — the file mode on disk is left unchanged. The script will still not be runnable from
+this checkout until `chmod +x` is also applied. Use the shortcut when CI is the only consumer that needs the
+executable bit; otherwise keep the two-step `chmod +x` then `git add` so the file is executable both locally and in
+committed history.
+
+<details>
+<summary>Windows and Docker bind mounts</summary>
+
+On Windows or Docker bind mounts backed by a Windows filesystem, the filesystem may not preserve Unix modes, so `chmod`
+may not make the current checkout runnable. Record the executable bit in Git for CI and other checkouts, and invoke the
+script through Ruby when running it from that local filesystem:
+
+```bash
+git update-index --chmod=+x bin/build-react-on-rails
+ruby bin/build-react-on-rails test
+```
+
+If the file has not been staged yet, use `git update-index --add --chmod=+x bin/build-react-on-rails` instead. Use
+`production` instead of `test` for the production build command. The `git update-index` command only updates Git metadata;
+it does not change the current working-tree file mode.
+
+Configure `react_on_rails.rb` once. Prefix the helper with `ruby` so the same commands work on Unix, macOS, CI, and
+Windows or Windows-backed Docker bind-mount checkouts without relying on the current filesystem's executable bit.
+The outer `ruby` is resolved via `PATH` when Rails runs the build command, which works under rbenv/asdf/mise and
+standard CI images. For hermetic environments where `PATH` may not select the project's interpreter (e.g. some Docker
+base images without active version-manager shims), invoke through Bundler or substitute an absolute Ruby path — for
+example `bundle exec ruby bin/build-react-on-rails test` or `$(rbenv which ruby) bin/build-react-on-rails test`.
+Inside the script, `RbConfig.ruby` already pins shakapacker to the same interpreter that launched the wrapper.
+
+</details>
+
+```ruby
+# config/initializers/react_on_rails.rb
+ReactOnRails.configure do |config|
+  config.build_test_command = "ruby bin/build-react-on-rails test"
+  config.build_production_command = "ruby bin/build-react-on-rails production"
+end
+```
+
+> **If you set `config.node_modules_location`:** React on Rails prepends `cd "<node_modules_location>"` to both
+> build commands, so the bare `ruby bin/build-react-on-rails …` invocation above will not find the wrapper from a
+> subdirectory. Interpolate an absolute path from `Rails.root` so the script is locatable regardless of the
+> prepended `cd`. React on Rails passes these command strings to a shell, so escape the interpolated path with
+> `Shellwords.escape` (Ruby stdlib) — a bare `#{wrapper}` would break on any `Rails.root` containing spaces or
+> other shell metacharacters (e.g. `/Users/jane doe/my app`):
+>
+> ```ruby
+> require "shellwords"
+>
+> wrapper = Shellwords.escape(Rails.root.join("bin", "build-react-on-rails").to_s)
+> config.build_test_command       = "ruby #{wrapper} test"
+> config.build_production_command = "ruby #{wrapper} production"
+> ```
+>
+> The `Dir.chdir` inside the wrapper then re-pins the working directory to the Rails root for the inner
+> `bin/shakapacker` call.
+
+This keeps the migration reviewable and avoids duplicating custom build logic across `bin/dev`, Procfiles, and deploy scripts.
 
 ## Direct Ruby API Reference
 
@@ -230,7 +387,7 @@ The extensible pattern adds configuration overhead that isn't justified for simp
 
 ## Compatibility
 
-This pattern requires **React on Rails 16.2+** and works with any version of Shakapacker. The `ReactOnRails::Locales.compile` API has been available since React on Rails introduced i18n support and is the same method used internally by the `react_on_rails:locale` rake task.
+This pattern requires **React on Rails 16.4.0+** and works with any version of Shakapacker. The `ReactOnRails::Locales.compile` API has been available since React on Rails introduced i18n support and is the same method used internally by the `react_on_rails:locale` rake task.
 
 ## See Also
 

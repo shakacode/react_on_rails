@@ -5,8 +5,14 @@ const config: KnipConfig = {
   workspaces: {
     // Root workspace - manages the monorepo and global tooling
     '.': {
-      entry: ['eslint.config.ts', 'jest.config.base.js', 'benchmarks/k6.ts'],
-      project: ['*.{js,mjs,ts}'],
+      entry: [
+        'eslint.config.ts',
+        'jest.config.base.js',
+        'benchmarks/k6.ts',
+        '.github/workflows/shakaperf-release-gates.yml',
+        'test/shakaperf/**/*.ts',
+      ],
+      project: ['*.{js,mjs,ts}', 'test/shakaperf/**/*.ts'],
       ignoreBinaries: [
         // Has to be installed globally
         'yalc',
@@ -37,6 +43,10 @@ const config: KnipConfig = {
         // This is an optional peer dependency because users without RSC don't need it
         // but Knip doesn't like such dependencies to be referenced directly in code
         'react-on-rails-rsc',
+        // Optional peer dependency: only apps using the TanStack Router adapter need it.
+        // It is pinned as a devDependency in packages/react-on-rails-pro for tests,
+        // but Knip still flags optional peers referenced in code.
+        '@tanstack/react-router',
         // SWC transpiler dependencies used by Shakapacker in dummy apps
         '@swc/core',
         'swc-loader',
@@ -45,7 +55,17 @@ const config: KnipConfig = {
         // Used for package validation but not directly imported
         '@arethetypeswrong/cli',
         'publint',
+        // Used by the release gate workflow via `pnpm exec shaka-perf`; Knip does
+        // not detect that CLI usage from the GitHub Actions shell command.
+        'shaka-perf',
       ],
+    },
+
+    // Create React on Rails app package workspace
+    'packages/create-react-on-rails-app': {
+      entry: ['bin/create-react-on-rails-app.js!', 'src/index.ts!'],
+      project: ['src/**/*.ts', 'tests/**/*.ts', 'jest.config.js'],
+      ignore: ['lib/**', 'node_modules/**'],
     },
 
     // React on Rails core package workspace
@@ -54,6 +74,7 @@ const config: KnipConfig = {
         'src/ReactOnRails.full.ts!',
         'src/ReactOnRails.client.ts!',
         'src/base/full.rsc.ts!',
+        'src/capabilities/ssr.rsc.ts!',
         'src/context.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
@@ -86,10 +107,20 @@ const config: KnipConfig = {
         // Test helper utilities
         'tests/helper.ts',
         'tests/httpRequestUtils.ts',
+        'src/testUtils/opentelemetry.ts',
       ],
       ignoreDependencies: [
         // Optional dependencies used in integrations
         '@honeybadger-io/js',
+        '@fastify/otel',
+        '@opentelemetry/api',
+        '@opentelemetry/exporter-trace-otlp-http',
+        '@opentelemetry/instrumentation',
+        '@opentelemetry/instrumentation-http',
+        '@opentelemetry/resources',
+        '@opentelemetry/sdk-trace-base',
+        '@opentelemetry/sdk-trace-node',
+        '@opentelemetry/semantic-conventions',
         '@sentry/*',
         // Jest reporter used in CI
         'jest-junit',
@@ -113,6 +144,13 @@ const config: KnipConfig = {
         'src/getReactServerComponent.server.ts!',
         'src/transformRSCNodeStream.ts!',
         'src/tanstack-router.ts!',
+        'src/cache/index.stub.ts!',
+        'src/registerDefaultRSCProvider.client.tsx!',
+      ],
+      ignoreDependencies: [
+        // Optional peer dependency: only apps using the Redis cache handler need it.
+        // Knip flags optional peers referenced in code via lazy require().
+        'ioredis',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
@@ -120,6 +158,8 @@ const config: KnipConfig = {
         // Jest setup and test utilities - not detected by Jest plugin in workspace setup
         'tests/jest.setup.js',
         'tests/utils/removeRSCStackFromAllChunks.ts',
+        // Test fixtures referenced dynamically (e.g. via webpack NormalModuleReplacementPlugin)
+        'tests/fixtures/**',
         // Build output directories that should be ignored
         'lib/**',
         // Pro features exported for external consumption
@@ -133,12 +173,13 @@ const config: KnipConfig = {
     'react_on_rails/spec/dummy': {
       entry: [
         'app/assets/config/manifest.js!',
-        'client/app/packs/**/*.js!',
-        // Not sure why this isn't detected as a dependency of client/app/packs/server-bundle.js
+        'client/app/packs/**/*.{js,jsx,ts,tsx}!',
+        // Not sure why this isn't detected as a dependency of client/app/packs/server-bundle.ts
         'client/app/generated/server-bundle-generated.js!',
         'config/webpack/{production,development,test}.js',
         // Declaring this as webpack.config instead doesn't work correctly
         'config/webpack/webpack.config.js',
+        'config/rspack/rspack.config.js',
         // SWC configuration for Shakapacker
         'config/swc.config.js',
         // Playwright E2E test configuration and tests
@@ -165,7 +206,7 @@ const config: KnipConfig = {
         'client/app/startup/**',
         'client/app/store/**',
         // ReScript entry files that import compiled .res.js files (compiled at build time)
-        'client/app/packs/rescript-components.js',
+        'client/app/packs/rescript-components.ts',
       ],
       project: ['**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}!', 'config/webpack/*.js'],
       paths: {
@@ -182,12 +223,22 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
+        // Loaded only when REACT_COMPILER=1 in babel.config.js (which Knip ignores above), so
+        // it is never seen as used by static analysis. See docs/oss/building-features/react-compiler.md.
+        'babel-plugin-react-compiler',
         // Required by @babel/plugin-transform-runtime for polyfills (used by webpack)
         '@babel/runtime',
         // Used in webpack server config for CSS extraction
         'mini-css-extract-plugin',
         // Webpack config merge helper is used in the dummy app config, but not detected reliably by Knip.
         'webpack-merge',
+        // Shakapacker adapter package is selected by the dummy app's package/config tooling, not imported directly.
+        'shakapacker-webpack',
+        // Used by dynamically registered dummy app components, which are intentionally ignored above.
+        '@dr.pogodin/react-helmet',
+        'create-react-class',
+        'react-redux',
+        'react-router-dom',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',
@@ -200,8 +251,15 @@ const config: KnipConfig = {
         'sass-resources-loader',
         'style-loader',
         'url-loader',
+        // Loaded indirectly by Shakapacker when assets_bundler is rspack.
+        'shakapacker-rspack',
       ],
     },
+  },
+  ignoreIssues: {
+    'packages/react-on-rails-pro-node-renderer/src/shared/tracing.ts': ['exports'],
+    'packages/react-on-rails-pro-node-renderer/src/worker/fastifyConfig.ts': ['exports'],
+    'packages/react-on-rails-pro-node-renderer/src/worker/shutdownHooks.ts': ['exports'],
   },
   ignoreExportsUsedInFile: true,
 };

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "GitHub CLI is required: brew install gh"
+  exit 1
+fi
+
+pr_number="${1:-}"
+
+if [ -z "$pr_number" ]; then
+  pr_number="$(gh pr view --json number --jq .number)"
+fi
+
+if ! gh label list --limit 1000 --json name --jq '.[].name' | grep -qx 'ready-for-hosted-ci'; then
+  gh label create ready-for-hosted-ci \
+    --description "Run optimized hosted GitHub CI for this PR" \
+    --color 0E8A16
+fi
+
+gh pr edit "$pr_number" --add-label "ready-for-hosted-ci"
+echo "Requested optimized hosted CI for PR #$pr_number"

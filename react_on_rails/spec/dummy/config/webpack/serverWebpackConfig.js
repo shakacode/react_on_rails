@@ -1,6 +1,14 @@
 const { config } = require('shakapacker');
-const webpack = require('webpack');
 const commonWebpackConfig = require('./commonWebpackConfig');
+
+const usingRspack = config.assets_bundler === 'rspack';
+const bundler = usingRspack ? require('@rspack/core') : require('webpack');
+const { RspackManifestPlugin } = usingRspack ? require('rspack-manifest-plugin') : {};
+
+const isRspackClientOnlyPlugin = (plugin) =>
+  usingRspack &&
+  ((RspackManifestPlugin && plugin instanceof RspackManifestPlugin) ||
+    (bundler.CssExtractRspackPlugin && plugin instanceof bundler.CssExtractRspackPlugin));
 
 const configureServer = () => {
   // We need to use "merge" because the clientConfigObject, EVEN after running
@@ -16,7 +24,7 @@ const configureServer = () => {
 
   if (!serverEntry['server-bundle']) {
     throw new Error(
-      "Create a pack with the file name 'server-bundle.js' containing all the server rendering files",
+      "Create a pack named 'server-bundle' containing all the server rendering files, for example 'server-bundle.js' or 'server-bundle.ts'",
     );
   }
 
@@ -47,7 +55,7 @@ const configureServer = () => {
   serverWebpackConfig.optimization = {
     minimize: false,
   };
-  serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+  serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
 
   // Custom output for the server-bundle that matches the config in
   // config/initializers/react_on_rails.rb
@@ -65,6 +73,7 @@ const configureServer = () => {
   // And no need for the MiniCssExtractPlugin
   serverWebpackConfig.plugins = serverWebpackConfig.plugins.filter(
     (plugin) =>
+      !isRspackClientOnlyPlugin(plugin) &&
       plugin.constructor.name !== 'WebpackAssetsManifest' &&
       plugin.constructor.name !== 'MiniCssExtractPlugin' &&
       plugin.constructor.name !== 'ForkTsCheckerWebpackPlugin',
@@ -116,10 +125,11 @@ const configureServer = () => {
     }
   });
 
-  // eval works well for the SSR bundle because it's the fastest and shows
-  // lines in the server bundle which is good for debugging SSR
-  // The default of cheap-module-source-map is slow and provides poor info.
-  serverWebpackConfig.devtool = 'eval';
+  // Avoid the webpack eval devtool, which triggers a webpack 5.106+ regression
+  // with ESM default exports (ReferenceError: __WEBPACK_DEFAULT_EXPORT__ is not defined).
+  // In development, cheap-module-source-map provides original line numbers in SSR error traces.
+  // In production, devtool is disabled to avoid generating .map files.
+  serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? false : 'cheap-module-source-map';
 
   // If using the default 'web', then libraries like Emotion and loadable-components
   // break with SSR. The fix is to use a node renderer and change the target.

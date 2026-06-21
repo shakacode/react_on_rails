@@ -10,21 +10,32 @@ To use Server Components in your React on Rails Pro project, you need to follow 
 
 1. Install the latest version of React on Rails and React on Rails Pro:
 
-Note: These versions are not released yet, they are still in development. But they will have these versions when released.
-
 ```bash
-yarn add react-on-rails@15.0.0-alpha.2 react-on-rails-pro@4.0.0
-bundle add react_on_rails@15.0.0.alpha.2 react_on_rails_pro@4.0.0
+# Pick one JS package manager command (Pro includes all base package functionality).
+# Replace VERSION with the latest from the CHANGELOG:
+# https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md
+yarn add --exact react-on-rails-pro@VERSION
+# npm install --save-exact react-on-rails-pro@VERSION
+# pnpm add --save-exact react-on-rails-pro@VERSION
+# bun add --exact react-on-rails-pro@VERSION
+
+# Then add the Ruby gem (react_on_rails_pro depends on react_on_rails, so one gem is enough):
+bundle add react_on_rails_pro --version="= VERSION"
 ```
 
-Also, install version 19 of React, React DOM, and `react-on-rails-rsc`:
+Also, install React 19.0.x, React DOM 19.0.x, and the exact `react-on-rails-rsc` release currently used by the generator:
 
 ```bash
-yarn add react@19.0.0 react-dom@19.0.0 react-on-rails-rsc@19.0.0
+yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+# bun add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
 ```
 
 > [!NOTE]
-> While React Server Components in React 19 are stable, the underlying APIs used to implement React Server Components bundlers may break between minor versions (19.x). According to the [React Documentation](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components). React on Rails Pro currently only supports React 19.0.x.
+> React on Rails Pro RSC currently supports React 19.0.x with patch >= 19.0.4. Do not upgrade generated RSC apps to React 19.1 or 19.2 just because those versions are newer on npm; the RSC bundler APIs used internally can change between React minor versions. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
+>
+> The generator pins `react-on-rails-rsc` to exactly `19.0.5` (no `^` or `~`), matching the generator default. Because the RSC bundler APIs are version-coupled, manual installers should record `react-on-rails-rsc` as exactly `19.0.5` in `package.json` rather than the default caret range; `react` and `react-dom` stay on `~19.0.4`.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
 
@@ -65,7 +76,21 @@ Create a new file `config/webpack/rscWebpackConfig.js`:
 
 ```js
 // use the same config as serverWebpackConfig.js but add the RSC loader
+const { existsSync } = require('fs');
+const { dirname, resolve } = require('path');
 const serverWebpackConfig = require('./serverWebpackConfig');
+const reactPackageRoot = dirname(require.resolve('react/package.json'));
+// React 19+ ships these react-server entry files alongside the standard entries.
+const resolveReactServerEntry = (entryFilename) => {
+  const entryPath = resolve(reactPackageRoot, entryFilename);
+  if (!existsSync(entryPath)) {
+    throw new Error(
+      `Expected React server entry "${entryFilename}" at "${entryPath}". ` +
+        'React package layout changed; update the RSC webpack aliases.',
+    );
+  }
+  return entryPath;
+};
 
 // Function that extracts a specific loader from a webpack rule
 function extractLoader(rule, loaderName) {
@@ -106,12 +131,33 @@ const configureRsc = () => {
     }
   });
 
-  // Add the `react-server` condition to the resolve config
-  // This condition is used by React and React on Rails to know that this bundle is a React Server Component bundle
-  // The `...` tells webpack to retain the default Webpack conditions (In this case will keep the `node` condition because the bundle targets node)
+  // Add the `react-server` condition to the resolve config.
+  // This condition is used by React and React on Rails to identify RSC bundles.
+  // The `...` tells webpack to retain default conditions such as `node`.
+  const rscAliases = { ...(rscConfig.resolve?.alias || {}) };
+  delete rscAliases.react;
+  delete rscAliases['react$'];
+  delete rscAliases['react/jsx-runtime'];
+  delete rscAliases['react/jsx-runtime$'];
+  delete rscAliases['react/jsx-dev-runtime'];
+  delete rscAliases['react/jsx-dev-runtime$'];
+  delete rscAliases['react-dom/server'];
+  delete rscAliases['react-dom/server$'];
+
   rscConfig.resolve = {
     ...rscConfig.resolve,
     conditionNames: ['react-server', '...'],
+    alias: {
+      ...rscAliases,
+      // Keep the RSC renderer and app Server Components on the same React
+      // server package instance so React.cache() sees the active dispatcher.
+      react$: resolveReactServerEntry('react.react-server.js'),
+      'react/jsx-runtime$': resolveReactServerEntry('jsx-runtime.react-server.js'),
+      'react/jsx-dev-runtime$': resolveReactServerEntry('jsx-dev-runtime.react-server.js'),
+      // RSC payload generation does not use react-dom/server.
+      // Prefix-match false covers both exact and subpath imports; no $-variant is needed.
+      'react-dom/server': false,
+    },
   };
 
   // Update the output bundle name to be `rsc-bundle.js` instead of `server-bundle.js`
@@ -153,7 +199,7 @@ Finally, update `Procfile.dev` to generate the RSC bundle when running the devel
 # Procfile.dev
 # existing code...
 
-rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 
 ```
 
@@ -216,11 +262,13 @@ import React from 'react';
 import moment from 'moment';
 import lodash from 'lodash';
 
-// Server components can use Node.js modules, access the server files, make database queries, etc.
+// Server components can use Node.js modules and server-only libraries (here, the `os` module).
+// Note: the Node renderer has no Rails models or database connection — database access lives in
+// your Rails controller, which passes the results to the component as props (see note below).
 import os from 'os';
 
-// This async component demonstrates server-side functionality
-async function ReactServerComponent() {
+// This component demonstrates server-side functionality
+function ReactServerComponent() {
   console.log('Hello from ReactServerComponent');
 
   // Using moment.js for complex date calculations
@@ -290,6 +338,8 @@ async function ReactServerComponent() {
 export default ReactServerComponent;
 ```
 
+> **React on Rails note:** This demo uses the `os` module to show that server-only code stays on the server and never ships to the client. Real application data is different: in React on Rails, Rails is the backend, so your controller loads the data (with its authorization and caching) and passes it to the component as props via `stream_react_component` — the component should not reach into a database or call `fetch` itself. See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md), and [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) for streaming slow data.
+
 ## Create a React Server Component Page
 
 Create a new file `app/javascript/packs/components/ReactServerComponentPage.jsx`:
@@ -331,23 +381,15 @@ registerServerComponent({
 // client/app/packs/client-bundle.js
 import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
-registerServerComponent({ rscPayloadGenerationUrlPath: 'rsc_payload/' }, 'ReactServerComponentPage');
+registerServerComponent('ReactServerComponentPage');
 ```
 
-As you can see, server components are not registered using the `ReactOnRails.register` function. Instead, we use the `registerServerComponent` function to register the server component. Also, `registerServerComponent` has different options for the client bundle and the server bundle.
+Server components are not registered using `ReactOnRails.register`. Instead, use `registerServerComponent`, which has different signatures for each bundle:
 
-- For the server bundle, the component itself is passed to the `registerServerComponent` function, so the component is bundled into the server bundle.
-- For the client bundle, we pass the component name as an argument to the `registerServerComponent` function, so the component is not bundled into the client bundle.
+- **Server bundle**: Takes an object with the actual component references (e.g., `{ ReactServerComponentPage }`), so the component code is bundled into the server bundle.
+- **Client bundle**: Takes component names as strings (e.g., `'ReactServerComponentPage'`). The actual component code is **not** included in the client bundle. Instead, when the component needs to render, the client fetches the RSC payload from the server. If the page was server-rendered, the RSC payload is already embedded in the HTML, so no extra request is needed.
 
-As you can see at [How React Server Components work](how-react-server-components-work.md):
-
-- Server components are rendered on the client using the rsc payload not the component itself.
-
-And as you can see at [React Server Components Rendering Flow](./rendering-flow.md):
-
-- In the future, the server bundle will use the RSC payload to render the server component on the server side as well.
-
-The `rscPayloadGenerationUrlPath` option will be explained in detail later in this document. For now, just know that it specifies the base URL path for React Server Component requests.
+See [How React Server Components work](how-react-server-components-work.md) and [React Server Components Rendering Flow](./rendering-flow.md) for more details on how RSC payloads are generated and consumed.
 
 ## Add the React Server Component Rendering URL Path to the Rails Routes
 
@@ -387,6 +429,8 @@ Create a new file `app/views/pages/react_server_component_without_ssr.html.erb`:
 
 <h1>React Server Component without SSR</h1>
 ```
+
+> **Note:** This tutorial uses `react_component` with `prerender: false` for client-side-only rendering. To enable server-side rendering with streaming, use `stream_react_component` instead. See [Server-Side Rendering](./server-side-rendering.md) for details.
 
 ## Run the Development Server
 

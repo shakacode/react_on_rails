@@ -1,0 +1,17 @@
+<h1>React Compiler Example</h1>
+
+<p>
+  This page server-renders (<code>prerender: true</code>) and then hydrates the
+  <code>ReactCompilerExample</code> component. The
+  <a href="https://react.dev/learn/react-compiler">React Compiler</a> is
+  <strong>opt-in</strong>: it only compiles this component when the dummy app is built with
+  <code>REACT_COMPILER=1</code> (the Babel path), scoped to just this component's file via the
+  <code>sources</code> filter in <code>babel.config.js</code>. The default build uses SWC with the
+  compiler off, so by default this renders uncompiled. See
+  <code>docs/oss/building-features/react-compiler.md</code>.
+</p>
+
+<%= react_component("ReactCompilerExample",
+  props: { initialCount: 3 },
+  prerender: true,
+  id: "ReactCompilerExample-react-component-0") %>

@@ -1,7 +1,10 @@
 # React Server Components in React on Rails Pro
 
-> **Pro Feature** — React Server Components require [React on Rails Pro](https://pro.reactonrails.com/) 4+ with the node renderer.
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — React Server Components require [React on Rails Pro](../react-on-rails-pro.md) with the node renderer.
+> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../upgrading-to-pro.md#try-pro-risk-free)
+
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user explicitly wants React Server Components or an RSC migration path. It routes to the tutorial, deep dives, and migration guides. Treat RSC as a Pro-only feature that runs with the Node renderer.
 
 ## What Are React Server Components?
 
@@ -28,13 +31,42 @@ Combined with streaming SSR, RSC sends the initial HTML shell immediately while 
 
 React's selective hydration allows client components to become interactive independently as their code loads, rather than waiting for the entire page's JavaScript to execute. Components that users interact with get priority hydration.
 
-### Direct Data Access
+### Server-Prepared Data, No Client Fetching
 
-Server components can access databases, file systems, and internal APIs directly without exposing endpoints to the client. This simplifies data fetching and eliminates the need for client-side data fetching libraries in many cases.
+In React on Rails, Rails is the backend: your controller owns database access, authorization, and caching, then passes data to the component tree as props (or streams slow data as [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently)). Server components render from that data without exposing API endpoints to the client or shipping client-side data-fetching libraries. Unlike Next.js-style RSC, components don't fetch their own data — see [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
+
+### Real-World Results
+
+Teams adopting RSC have reported dramatic wins — BlogHunch's 30% server-cost reduction, Frigade's 62% client-bundle reduction, and Mux's 50,000-line incremental migration — all documented in [Migration Success Stories](./success-stories.md). DoorDash's 65% LCP improvement from an earlier Next.js SSR migration is included as a useful server-rendering baseline.
+
+The Marketplace demo below shows how these ideas look in an inspectable React on Rails Pro application.
+
+## Live Demo and Evidence {#live-demo-and-evidence}
+
+The public [Marketplace demo](https://rsc.reactonrails.com/) shows the
+same marketplace-style surfaces rendered with traditional SSR, client rendering,
+and React Server Components. Use this canonical link list when you want
+inspectable proof instead of a static claim:
+
+- [RSC performance showcase](https://rsc.reactonrails.com/search-performance) —
+  Lighthouse scores, transfer deltas, bootup time, and report links for each
+  measured page family
+- [Bundle-size evidence](https://rsc.reactonrails.com/lighthouse-reports/bundle-sizes.html) —
+  per-route resource and chunk breakdowns
+- [Raw Lighthouse reports](https://rsc.reactonrails.com/lighthouse-reports/index.html) —
+  the underlying Lighthouse artifacts
+- [Why RSC](https://rsc.reactonrails.com/why-rsc) — a non-framework-specific
+  walkthrough of why server-only dependencies stay off the browser
+- [Demo source](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc) —
+  Rails + React on Rails Pro implementation code
+
+> [!NOTE]
+> Treat these public measurements as directional evidence, not a universal
+> performance guarantee for every app.
 
 ## Current Support Status
 
-React on Rails Pro 4+ provides full RSC support with:
+Current React on Rails Pro releases provide full RSC support with:
 
 - RSC webpack loader (`react-on-rails-rsc/WebpackLoader`) for server/client component separation
 - RSC webpack plugin (`react-on-rails-rsc/WebpackPlugin`) for client manifest generation
@@ -44,9 +76,9 @@ React on Rails Pro 4+ provides full RSC support with:
 
 ### Requirements
 
-- React on Rails Pro v4.0.0 or higher
-- React 19.0.x (19.1.x and later are not yet supported)
-- React on Rails v16.0.0 or higher
+- React on Rails Pro v16.4.0 or higher
+- React on Rails v16.4.0 or higher
+- React 19 with a compatible `react-on-rails-rsc` version
 - Node renderer — installed separately via `react-on-rails-pro-node-renderer` npm package (see [Pro Installation](../installation.md#install-react-on-rails-pro-node-renderer))
 - Shakapacker or Rspack for bundling
 
@@ -63,7 +95,11 @@ Start with the tutorial series, which builds from basics to advanced features:
 
 See the full [RSC tutorial](./tutorial.md) for the complete learning path.
 
-### Migrating an Existing App?
+### Upgrading an Existing Pro App?
+
+See [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md) for the generator-based runbook: prerequisites, `rails g react_on_rails:rsc` usage, legacy webpack compatibility, and a verification checklist.
+
+### Migrating Your React Components?
 
 The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to incrementally adopt RSC in an existing React on Rails application, including:
 
@@ -80,7 +116,9 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 - [RSC Rendering Flow](./rendering-flow.md) — detailed rendering lifecycle, bundle types, and architecture
 - [Flight Protocol Syntax](./flight-protocol-syntax.md) — the wire format for streaming RSC data
 - [RSC Inside Client Components](./inside-client-components.md) — composing server and client components
+- [RSC Payloads as Route Data](./rsc-payload-route-data.md) — browser helper for client router loaders
 - [Purpose and Benefits](./purpose-and-benefits.md) — waterfall loading patterns, bundle size, and selective hydration
+- [Migration Success Stories](./success-stories.md) — reported results from DoorDash, Mux, Frigade, BlogHunch, and Developerway's independent analysis
 
 ## Related Documentation
 

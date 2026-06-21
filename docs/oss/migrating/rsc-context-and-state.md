@@ -95,7 +95,9 @@ export default function Providers({ children, user }) {
 <%# ERB view — Rails passes the data as props %>
 <%= stream_react_component("ProductPage",
       props: { user: current_user.as_json(only: [:id, :name]),
-               product: @product.as_json(include: [:specs, :reviews]) }) %>
+               product: @product.as_json(
+                          include: { specs: { only: [:id, :label, :value] },
+                                     reviews: { only: [:id, :text, :rating] } }) }) %>
 ```
 
 ```jsx
@@ -120,20 +122,22 @@ export default function ProductPage({ user, product }) {
 
 **Key insight:** Components that don't need context (static header, footer) stay **outside** the provider wrapper, keeping them as Server Components with zero JavaScript cost.
 
-## Pattern 3: Streaming Slow Data
+## Pattern 3: Streaming HTML Delivery
 
 > **Note:** This section covers a cross-cutting concern (data fetching via `stream_react_component`) that affects how you structure context and state. For the full treatment of data fetching patterns, see [Data Fetching Migration](rsc-data-fetching.md).
 
-In React on Rails, data comes from Rails as props. Rails fetches all data in the controller and passes it to `stream_react_component`, which uses React's streaming SSR to deliver the rendered HTML progressively.
+In React on Rails, data comes from Rails as props. Rails loads all data synchronously in the controller and passes it to `stream_react_component`, which streams the rendered HTML to the browser as React processes the component tree.
 
 ```erb
 <%= stream_react_component("ProductPage",
       props: { name: product.name, price: product.price,
-               reviews: product.reviews.includes(:author).as_json,
-               recommendations: RecommendationService.for(product).as_json }) %>
+               reviews: product.reviews
+                          .as_json(only: [:id, :text, :rating]),
+               recommendations: RecommendationService.for(product)
+                          .as_json(only: [:id, :name, :price]) }) %>
 ```
 
-The component renders with all data available as props. `stream_react_component` uses React's streaming SSR to deliver the HTML progressively:
+The component renders with all data available as props. `stream_react_component` streams the HTML to the browser as React processes the component tree:
 
 ```jsx
 // ProductPage.jsx -- Server Component
@@ -160,7 +164,7 @@ function ReviewList({ reviews }) {
 }
 ```
 
-All props are available immediately in the component. `stream_react_component` handles progressive HTML delivery via React's `renderToPipeableStream`.
+All data is loaded in Rails before rendering begins. `stream_react_component` then streams the rendered HTML to the browser via React's `renderToPipeableStream`. For slow Rails data that should not block the initial shell, use `stream_react_component_with_async_props` instead; see [Data Fetching in React on Rails Pro](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
 > **Note:** `React.cache()` is only available in React Server Component environments. It is not available in client components or non-RSC server rendering (e.g., `renderToString`).
 
@@ -268,13 +272,13 @@ Zustand and Jotai follow the same pattern as Redux: keep all store access in Cli
 
 RSC reduces the need for global state libraries because data fetching moves to the server:
 
-| Use Case                                                        | Recommended Approach                                                                                |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Server data (read-only display)                                 | Rails controller props → Server Component renders directly                                          |
-| Server data (slow, shouldn't block the shell)                   | [Streaming](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with `stream_react_component` |
-| Server data (with client cache/revalidation)                    | TanStack Query with prefetch + hydrate                                                              |
-| Client UI state (modals, forms, selections)                     | `useState` / Context in Client Components                                                           |
-| Complex client state (undo/redo, shared across many components) | Redux Toolkit in Client Components                                                                  |
+| Use Case                                                        | Recommended Approach                                                                                                   |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Server data (read-only display)                                 | Rails controller props → Server Component renders directly                                                             |
+| Server data (slow, shouldn't block the shell)                   | [Async props](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with `stream_react_component_with_async_props` |
+| Server data (with client cache/revalidation)                    | TanStack Query with prefetch + hydrate                                                                                 |
+| Client UI state (modals, forms, selections)                     | `useState` / Context in Client Components                                                                              |
+| Complex client state (undo/redo, shared across many components) | Redux Toolkit in Client Components                                                                                     |
 
 ## Specific Provider Patterns
 
@@ -349,7 +353,11 @@ If your React components also need the theme value, pass it as a prop:
 
 ### i18n Provider
 
-Internationalization in React on Rails typically uses Rails I18n on the server side and a client-side library (like `react-intl` or `i18next`) for Client Components. Pass translations from Rails as props:
+Internationalization in React on Rails typically uses Rails I18n on the server side and `react-intl` for Client Components. The challenge with RSC is that `react-intl`'s `useIntl()` hook and `<FormattedMessage>` component require React Context, which is unavailable in Server Components.
+
+> **Two i18n systems:** React on Rails has a [build-time locale system](../building-features/i18n.md) (`config.i18n_dir`) that compiles Rails YAML translations into JSON/JS files with flat dot-separated keys (e.g., `"product.title"`). The controller-props approach below passes translations at request time with whatever key structure you choose. Both are valid — see the comparison below.
+
+#### Passing translations from Rails
 
 ```ruby
 # app/controllers/application_controller.rb
@@ -364,6 +372,60 @@ def i18n_props
   }
 end
 ```
+
+#### Server Components: plain string lookup (limited)
+
+The simplest approach is to read translation values directly from the messages object:
+
+```jsx
+// ProductPage.jsx -- Server Component
+export default function ProductPage({ locale, messages, ...props }) {
+  const title = messages['title'];
+
+  return <h1>{title}</h1>;
+}
+```
+
+> **Limitation:** This only works for **plain strings** — text with no interpolation, pluralization, or number/date formatting. React on Rails' build-time locale system converts Rails `%{variable}` placeholders to ICU `{variable}` syntax, so `messages['greeting']` would render the literal text `{name}` instead of a substituted value. For anything beyond plain strings, use `createIntl` from `react-intl/server` (described below).
+
+#### Server Components: `createIntl` from `react-intl/server` (recommended)
+
+Import `createIntl` from `react-intl/server` — the official server-safe subpath export (added in react-intl v8.2.0) that provides full interpolation, pluralization, and date/number formatting without the `'use client'` directive. This is the recommended approach for i18n in Server Components.
+
+> [!TIP]
+> When multiple Server Components need the same intl instance, wrap `createIntl` in `React.cache()` to avoid recreating it in every component. See [Sharing Per-Request Data in Server Components](../../pro/react-server-components/per-request-data.md) for the complete pattern with `React.cache()`, including i18n, auth, feature flags, and other per-request scenarios.
+
+```jsx
+// ProductPage.jsx -- Server Component
+import { createIntl, createIntlCache } from 'react-intl/server';
+import I18nProvider from './I18nProvider';
+
+// Module-level cache — safe because it only caches Intl constructors, not request data
+const cache = createIntlCache();
+
+export default function ProductPage({ locale, messages, ...props }) {
+  const intl = createIntl({ locale, messages }, cache);
+
+  return (
+    <div>
+      {/* Full formatting works in Server Components */}
+      <h1>{intl.formatMessage({ id: 'greeting' }, { name: props.userName })}</h1>
+      <p>{intl.formatNumber(props.price, { style: 'currency', currency: 'USD' })}</p>
+      <p>{intl.formatMessage({ id: 'items_count' }, { count: props.itemCount })}</p>
+
+      <I18nProvider locale={locale} messages={messages}>
+        <InteractiveFilters /> {/* Client Component can use useIntl() */}
+      </I18nProvider>
+    </div>
+  );
+}
+```
+
+> **Note:** `createIntl` is a plain function call — no hooks, no Context, no `'use client'` needed. The `createIntlCache()` call avoids recreating expensive `Intl.NumberFormat` / `Intl.DateTimeFormat` instances on every request. The cache stores only `Intl` constructor instances keyed by format options — no locale data, messages, or user-specific information — so it is safe to share at module scope across all concurrent requests for the lifetime of the Node.js process.
+
+#### Client Components: `IntlProvider` + `useIntl()`
+
+Client Components use the standard `react-intl` Context pattern:
 
 ```jsx
 // I18nProvider.jsx
@@ -381,25 +443,6 @@ export default function I18nProvider({ locale, messages, children }) {
 ```
 
 ```jsx
-// ProductPage.jsx -- Server Component
-import I18nProvider from './I18nProvider';
-
-export default function ProductPage({ locale, messages, ...props }) {
-  // Server Components can use the translations object directly
-  const title = messages['title'];
-
-  return (
-    <div>
-      <h1>{title}</h1>
-      <I18nProvider locale={locale} messages={messages}>
-        <InteractiveFilters /> {/* Client Component can use useIntl() */}
-      </I18nProvider>
-    </div>
-  );
-}
-```
-
-```jsx
 // InteractiveFilters.jsx -- Client Component
 'use client';
 
@@ -408,6 +451,120 @@ import { useIntl } from 'react-intl';
 export default function InteractiveFilters() {
   const intl = useIntl();
   return <button>{intl.formatMessage({ id: 'filters.apply' })}</button>;
+}
+```
+
+#### Build-time vs controller-props: when to use each
+
+| Approach                       | Source                     | Key format                      | Best for                                                                                |
+| ------------------------------ | -------------------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
+| Build-time (`config.i18n_dir`) | YAML → compiled JSON/JS    | Flat: `"product.title"`         | Static translations shared across pages; client-side `react-intl` with `defineMessages` |
+| Controller-props (`I18n.t`)    | Rails I18n at request time | Flat (required by `createIntl`) | Page-specific translations; RSC `createIntl` with `React.cache()`                       |
+
+Both can be used together — for example, build-time translations for the client bundle and controller-props for Server Component content. See the [Internationalization guide](../building-features/i18n.md) for build-time setup details.
+
+## Common Mistakes
+
+### Mistake 1: Wrapping the entire tree in providers unnecessarily
+
+Wrapping the entire component tree in a `'use client'` provider works correctly -- children passed from a Server Component remain Server Components (this is the "children as props" pattern). However, wrapping more than necessary has real costs:
+
+- Every child that **consumes** the context (via `useContext`) must be a Client Component
+- Provider scope is broader than needed, making refactoring harder
+- Context value changes trigger re-renders across a wider subtree
+
+Narrow the provider scope to only the subtree that actually needs the context:
+
+```jsx
+// WIDER THAN NEEDED: Header and Footer don't use this context,
+// but they're inside the provider scope unnecessarily
+export default function ProductPage({ user, product }) {
+  return (
+    <Providers user={user}>
+      <Header />
+      <ProductDetails product={product} />
+      <Footer />
+    </Providers>
+  );
+}
+```
+
+```jsx
+// BETTER: Only wrap components that actually need context
+export default function ProductPage({ user, product }) {
+  return (
+    <div>
+      <Header /> {/* Server Component -- outside provider scope */}
+      <Providers user={user}>
+        <ProductDetails product={product} />
+      </Providers>
+      <Footer /> {/* Server Component -- outside provider scope */}
+    </div>
+  );
+}
+```
+
+### Mistake 2: Passing the entire I18n translation tree
+
+`I18n.t('.')` returns every translation key for the locale, which can be thousands of entries. Serializing this into props bloats the HTML page and the RSC payload:
+
+```ruby
+# BAD: Sends the entire translation tree (potentially hundreds of KB)
+messages: I18n.t('.').deep_stringify_keys
+
+# GOOD: Send only the subset this page needs
+messages: I18n.t('product_page').deep_stringify_keys
+```
+
+### Mistake 3: Using `messages['key']` for translations with placeholders
+
+The build-time locale system converts Rails `%{variable}` placeholders to ICU `{variable}` syntax. Reading these directly from the messages object renders the literal placeholder text:
+
+```jsx
+// BAD: Renders "Hello, {name}" as literal text
+const greeting = messages['greeting'];
+```
+
+```jsx
+// GOOD: Use createIntl to format with variable substitution
+import { createIntl, createIntlCache } from 'react-intl/server';
+const cache = createIntlCache();
+const intl = createIntl({ locale, messages }, cache);
+const greeting = intl.formatMessage({ id: 'greeting' }, { name: 'John' });
+```
+
+### Mistake 4: Reading Redux store in Server Components
+
+Server Components render once on the server and never re-render. They cannot subscribe to store changes:
+
+```jsx
+// BAD: useSelector is a hook -- breaks in Server Components
+export default function Dashboard({ user }) {
+  const theme = useSelector((state) => state.theme); // ERROR
+  return <div className={theme}>...</div>;
+}
+```
+
+**Fix:** Keep the component as a Client Component (add `'use client'`), or pass the value from Rails as a prop to a Server Component that doesn't need the Redux store.
+
+### Mistake 5: Creating new QueryClient on every render
+
+If the `QueryClient` is created without `useState`, React creates a new instance on every render, losing the cache:
+
+```jsx
+// BAD: New QueryClient on every render -- cache is lost
+'use client';
+export default function QueryProvider({ children }) {
+  const queryClient = new QueryClient(); // Re-created each render!
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+
+// GOOD: useState ensures single instance
+'use client';
+import { useState } from 'react';
+export default function QueryProvider({ children }) {
+  const [queryClient] = useState(() => new QueryClient());
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 ```
 

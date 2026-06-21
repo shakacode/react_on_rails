@@ -16,12 +16,9 @@ This means the placement of `'use client'` directly determines your bundle size.
 
 A common misconception is that every component using hooks or browser APIs needs `'use client'`. It doesn't. You only need the directive at the **boundary** — the file where code transitions from server to client. Everything imported below that boundary is automatically client code:
 
-```text
-ServerPage.jsx (Server Component)
-└── imports SearchBar.jsx ('use client')   ← boundary — needs the directive
-    └── imports SearchInput.jsx            ← automatically client, NO directive needed
-    └── imports SearchResults.jsx          ← automatically client, NO directive needed
-```
+<p align="center">
+  <img src="images/use-client-module-boundary.svg" alt="Static diagram showing how the 'use client' directive works at the module (file) level. Once a file has the directive, all its imports automatically become client code — no additional directive needed in child modules." width="840" />
+</p>
 
 `SearchInput` and `SearchResults` use hooks and event handlers, but they don't need `'use client'` because `SearchBar` already established the boundary. Adding it would be redundant.
 
@@ -30,7 +27,7 @@ ServerPage.jsx (Server Component)
 Start from the top of each component tree and work downward:
 
 <p align="center">
-  <img src="images/top-down-migration.svg" alt="Animated diagram showing the three phases of top-down RSC migration: Phase 1 marks the root as client, Phase 2 pushes the client boundary down to leaf components, and Phase 3 splits mixed components into server and client parts." width="840" />
+  <img src="images/top-down-migration.svg" alt="Animated three-phase diagram showing RSC migration strategy: Phase 1 marks the root as 'use client' (100% client bundle), Phase 2 pushes the boundary down to child components (~40% client), Phase 3 splits mixed components into server+client leaves (~15% client). Each phase reveals progressively with staggered animation." width="840" />
 </p>
 
 > **React on Rails multi-root note:** Unlike single-page apps with one root component, React on Rails renders multiple independent component trees on a page -- each `stream_react_component` call in your view is a separate root. This is actually an advantage for migration: you can migrate **one registered component at a time**, leaving the rest untouched.
@@ -47,7 +44,7 @@ Choose one registered component to migrate. The ideal first candidate is a compo
 
 **Step 2: Update the registration.** When a component loses its `'use client'` directive, its registration must change:
 
-- **With `auto_load_bundle`:** This happens automatically. The generated pack switches from `ReactOnRails.register` to `registerServerComponent` based on whether the file has `'use client'`.
+- **With `auto_load_bundle`:** This happens automatically. The generated pack switches from `ReactOnRails.register` to `registerServerComponent` based on whether the file has `'use client'`. For the full details on how auto-bundling classifies and registers RSC components, see [Auto-Bundling with React Server Components](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#auto-bundling-with-react-server-components).
 - **With manual registration:** The `registerServerComponent` API uses different import paths per bundle (`/server` vs `/client`). How you update registration depends on your current setup:
 
   **If you have a single bundle file** (e.g., `server-bundle.js` that imports and registers all components):
@@ -102,25 +99,9 @@ Choose one registered component to migrate. The ideal first candidate is a compo
 
 **Step 3: Push `'use client'` down to interactive children.** Identify child components that don't use hooks or browser APIs. Those can stay as server-rendered. Add `'use client'` only to the children that need interactivity.
 
-```text
-Before (all client):
-ProductPage ('use client')       <-- Entry point, registered with ReactOnRails.register
-├── ProductHeader
-│   ├── ProductImage
-│   └── ShareButton
-├── ProductSpecs
-├── ReviewList
-└── AddToCartButton
-
-After (migrated):
-ProductPage                      <-- Server Component, registered with registerServerComponent
-├── ProductHeader                <-- Server Component (no hooks)
-│   ├── ProductImage             <-- Server Component (display only)
-│   └── ShareButton ('use client')  <-- Needs onClick handler
-├── ProductSpecs                 <-- Server Component (display only)
-├── ReviewList                   <-- Server Component (display only)
-└── AddToCartButton ('use client')  <-- Needs useState + onClick
-```
+<p align="center">
+  <img src="images/push-boundary-down.svg" alt="Static before-and-after diagram showing how to migrate a React component tree by pushing the 'use client' directive from the root down to only the leaf components that truly need interactivity. Before: the entire tree is client code. After: only interactive leaves are client components." width="840" />
+</p>
 
 Repeat for each registered component you want to migrate.
 
@@ -169,7 +150,9 @@ export default function ProductPage({ productId }) {
 ```erb
 <%# ERB view — Rails passes the data as props %>
 <%= stream_react_component("ProductPage",
-      props: { product: @product.as_json(include: [:specs, :reviews]) }) %>
+      props: { product: @product.as_json(
+                 include: { specs: { only: [:id, :label, :value] },
+                            reviews: { only: [:id, :text, :rating] } }) }) %>
 ```
 
 ```jsx
@@ -331,7 +314,7 @@ export default function Homepage() {
 
 ## Pattern 4: Streaming with `stream_react_component`
 
-In React on Rails, `stream_react_component` uses React's streaming SSR (`renderToPipeableStream`) to deliver HTML progressively. Rails passes all data as props, and the streaming infrastructure delivers the rendered output efficiently:
+In React on Rails, `stream_react_component` uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree. Rails loads all data synchronously and passes it as props:
 
 ```erb
 <%# ERB view — Rails passes all data as props %>
@@ -366,7 +349,7 @@ export default function Stats({ stats }) {
 }
 ```
 
-`stream_react_component` streams the rendered HTML progressively to the browser. All data is available as props -- no client-side fetching or loading states needed.
+Rails loads all data as props before rendering begins. `stream_react_component` then streams the rendered HTML to the browser as React processes the component tree — no client-side fetching or loading states needed. For slow Rails data that should not block the initial shell, use `stream_react_component_with_async_props`; see [Data Fetching in React on Rails Pro](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
 ## Pattern 5: Server Data to Interactive Client Components
 
@@ -431,9 +414,11 @@ export default function Comments({ comments }) {
 | `window`, `document`, `localStorage`              | Client         | Browser APIs                          |
 | Custom hooks using the above                      | Client         | Transitively client                   |
 | Data fetching (database, API)                     | Server         | Direct backend access, no bundle cost |
-| Rendering static/display-only content             | Server         | No JavaScript shipped                 |
+| Rendering static/display-only content             | Server\*       | No JavaScript shipped                 |
 | Using server-only secrets (API keys)              | Server         | Never exposed to client               |
 | Heavy dependencies (Markdown parsers, formatters) | Server         | Dependencies stay off client bundle   |
+
+_\*For components repeated many times with verbose markup (e.g., Tailwind utility classes), Server Component rendering can inflate the Flight payload. In those cases, a Client Component may produce a smaller page. See [Flight Payload Optimization](rsc-flight-payload.md) for details._
 
 ## Common Mistakes
 

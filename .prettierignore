@@ -2,8 +2,6 @@ node_modules/
 package.json
 # pnpm config file (INI format, not parseable by prettier)
 .npmrc
-# Exclude pro package (has its own formatting)
-react_on_rails_pro/
 packages/react-on-rails-pro-node-renderer/tests/fixtures/projects
 tmp/
 coverage/
@@ -14,7 +12,9 @@ spec/react_on_rails/dummy-for-generators/app/javascript/bundles/HelloWorld/*
 bundle/
 react_on_rails/spec/dummy/lib/bs/**
 react_on_rails/spec/dummy/public
+react_on_rails_pro/**/public
 **/.yalc/**
+**/.node-renderer-bundles
 **/*generated*
 *.res.js
 **/vendor
@@ -27,3 +27,6 @@ spec/react_on_rails/fixtures/i18n/locales_symbols/
 
 # Internal documentation - ignore formatting
 CLAUDE.md
+
+# Generated ShakaPerf investigation reports; keep the archived HTML untouched.
+internal/analysis/rsc-fouc-shakaperf-artifacts/reports/**/*.html

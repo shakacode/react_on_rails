@@ -1,6 +1,6 @@
 /// <reference types="react/experimental" />
 
-import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
+import type { ReactElement, ReactNode, Component, ComponentType, ExoticComponent } from 'react';
 import type { PipeableStream } from 'react-dom/server';
 import type { Readable } from 'stream';
 
@@ -15,7 +15,7 @@ type Store = {
   getState(): unknown;
 };
 
-type ReactComponent = ComponentType<any> | string;
+type ReactComponent = ComponentType<any> | ExoticComponent<any> | string;
 
 // Keep these in sync with method lib/react_on_rails/helper.rb#rails_context
 export type RailsContext = {
@@ -147,7 +147,96 @@ type RenderFunctionAsyncResult = Promise<
 
 type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult;
 
+type ReactComponentRenderFunctionResult = ReactComponent | Promise<ReactComponent>;
+
+/**
+ * Optional cleanup callback that a renderer function (the 3-argument form
+ * `(props, railsContext, domNodeId) => …`) may return inside a {@link RendererTeardownResult}.
+ * React on Rails invokes it when the mount is torn down — on Turbo/Turbolinks navigation (the
+ * framework's soft-navigation page swap, not a native browser unload) and when the same `domNodeId`
+ * node is replaced — so renderer-managed React roots, event listeners, and subscriptions are released
+ * instead of leaked. May be synchronous or asynchronous.
+ *
+ * @see RenderFunction
+ */
+type RendererTeardownReturn = void | Promise<void>;
+
+type RendererTeardown = () => RendererTeardownReturn;
+
+/**
+ * Object wrapper returned by a 3-argument renderer to opt into cleanup. The wrapper keeps teardown
+ * detection unambiguous: legacy renderers may have returned function components before this contract
+ * existed, so a bare function return is treated as no teardown.
+ */
+type RendererTeardownResult = {
+  teardown: RendererTeardown;
+};
+
+/**
+ * What the 3-argument renderer form may return for cleanup: nothing, or a
+ * {@link RendererTeardownResult}. Runtime cleanup only recognizes this explicit wrapper; legacy
+ * component/server-result returns from 3-argument renderers are ignored.
+ *
+ * Consumers discriminate this union at runtime by an object with a `teardown` function vs. a thenable
+ * (an async renderer, awaited/adopted before re-checking) vs. anything else (no teardown). The
+ * `void` arm is therefore treated as "no teardown," same as `undefined`.
+ */
+// `void` (not `undefined`) is required for the opt-out case: a renderer that returns nothing has
+// type `(...) => void`, and that stays assignable to `RendererFunction` only while `void` is part of
+// this union. Switching to `undefined` breaks backward compatibility for every existing
+// nothing-returning renderer. The no-invalid-void-type rule is disabled because this `void` is a
+// deliberate "may return nothing" marker in a return-position union, exactly the case it over-flags.
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- renderer functions may return nothing
+type RendererResult = void | RendererTeardownResult | Promise<void | RendererTeardownResult>;
+
+// Renderer functions historically ignored any non-teardown return value. Keeping the legacy
+// RenderFunctionResult arm preserves existing 3-argument renderers that returned a component/server
+// result only to satisfy the old RenderFunction type; runtime cleanup still only recognizes the
+// explicit `{ teardown }` wrapper.
+type RendererFunctionResult = RendererResult | RenderFunctionResult;
+
+interface RenderFunctionMarker {
+  // We allow specifying that the function is RenderFunction and not a React Function Component
+  // by setting this property
+  renderFunction?: true;
+}
+
+/**
+ * The precise call signature of the 3-argument "renderer" form `(props, railsContext, domNodeId) =>
+ * …`. A renderer owns its own mount and may return nothing or a {@link RendererTeardownResult}
+ * (possibly async) to opt into cleanup. It also accepts the legacy {@link RenderFunctionResult}
+ * return shapes because older 3-argument renderers sometimes returned a component only to satisfy
+ * the old `RenderFunction` type; those non-teardown values are ignored at runtime. Shared by the
+ * core and Pro client renderers so the two cannot drift.
+ *
+ * @returns New renderer code should return `void` or `{ teardown }`. The broader legacy return
+ * shapes stay accepted only so existing 3-argument renderers remain type-compatible.
+ */
+interface RendererFunction extends RenderFunctionMarker {
+  (props?: Record<string, unknown>, railsContext?: RailsContext, domNodeId?: string): RendererFunctionResult;
+}
+
+/**
+ * A render function variant for APIs that require a React component result, such as
+ * Pro server-component wrappers. Unlike {@link RenderFunction}, this does not allow
+ * server-render hashes/HTML, and unlike {@link RendererFunction}, this does not allow
+ * renderer teardown results.
+ *
+ * Runtime render-function detection still follows the regular React on Rails
+ * convention: declare at least two parameters, or set `renderFunction = true`
+ * on one-argument functions.
+ */
+interface ReactComponentRenderFunction<Props = any> extends RenderFunctionMarker {
+  (props?: Props, railsContext?: RailsContext, domNodeId?: string): ReactComponentRenderFunctionResult;
+}
+
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
+
+type AsyncPropsManager = {
+  getProp: (propName: string) => Promise<unknown>;
+  setProp: (propName: string, propValue: unknown) => void;
+  endStream: () => void;
+};
 
 /**
  * Render-functions are used to create dynamic React components or server-rendered HTML with side effects.
@@ -172,24 +261,51 @@ type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
  * // Option 2: Using renderFunction property
  * const anotherRenderFunction = (props) => { ... };
  * anotherRenderFunction.renderFunction = true;
+ *
+ * @remarks
+ * `RenderFunction` is exactly this 2-argument server/client render-function form. The 3-argument
+ * "renderer" form `(props, railsContext, domNodeId)` owns its own DOM rendering/hydration and is a
+ * distinct role: type those functions {@link RendererFunction} (they return nothing or an optional
+ * `{ teardown }` wrapper for cleanup). For `RenderFunction`, this makes the illegal combination —
+ * a server render-function "returning" a teardown — unrepresentable instead of merely discouraged.
+ * (`RendererFunction` still accepts legacy {@link RenderFunctionResult} return shapes for backward
+ * compatibility with old 3-argument renderers; those values are ignored at runtime.)
+ *
+ * The doc block above describes {@link RenderFunction}, the public alias for this interface. Prefer
+ * `RenderFunction` in public-facing annotations; `ServerRenderFunction` is the concrete interface
+ * behind it (exported mainly so call sites can narrow to the precise role after runtime guards).
  */
-interface RenderFunction {
-  (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
-  // We allow specifying that the function is RenderFunction and not a React Function Component
-  // by setting this property
-  renderFunction?: true;
+interface ServerRenderFunction extends RenderFunctionMarker {
+  (props?: any, railsContext?: RailsContext): RenderFunctionResult;
 }
 
-type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
+/**
+ * The public name for the 2-argument server/client render-function form
+ * `(props, railsContext) => RenderFunctionResult`. Alias of {@link ServerRenderFunction}; prefer
+ * `RenderFunction` in public-facing annotations. See {@link ServerRenderFunction} for the full
+ * render-function vs. renderer role explanation.
+ */
+type RenderFunction = ServerRenderFunction;
+
+type ReactComponentOrRenderFunction = ReactComponent | RenderFunction | RendererFunction;
+// Plain-object modules registered via server_render_js: no render function and no React component.
+type RegisteredComponentValue = ReactComponentOrRenderFunction | Record<string, unknown>;
 
 type PipeableOrReadableStream = PipeableStream | NodeJS.ReadableStream;
 
 export type {
   ReactComponentOrRenderFunction,
+  RegisteredComponentValue,
   ReactComponent,
+  ReactComponentRenderFunction,
   AuthenticityHeaders,
   RenderFunction,
+  ServerRenderFunction,
+  RendererTeardown,
+  RendererTeardownResult,
+  RendererFunction,
   RenderFunctionResult,
+  RendererFunctionResult,
   Store,
   StoreGenerator,
   CreateReactOutputResult,
@@ -199,13 +315,22 @@ export type {
   CreateReactOutputAsyncResult,
   RenderFunctionSyncResult,
   RenderFunctionAsyncResult,
+  ReactComponentRenderFunctionResult,
   StreamableComponentResult,
   PipeableOrReadableStream,
 };
 
-export interface RegisteredComponent {
+/**
+ * The generic defaults to the pre-object-registration component type so existing consumers that
+ * read `registeredComponent.component` stay source-compatible. Use
+ * `RegisteredComponent<RegisteredComponentValue>` when handling plain-object server_render_js
+ * registrations.
+ */
+export interface RegisteredComponent<
+  ComponentValue extends RegisteredComponentValue = ReactComponentOrRenderFunction,
+> {
   name: string;
-  component: ReactComponentOrRenderFunction;
+  component: ComponentValue;
   /**
    * Indicates if the registered component is a RenderFunction
    * @see RenderFunction for more details on its behavior and usage.
@@ -220,11 +345,18 @@ export interface RegisteredComponent {
 
 export type ItemRegistrationCallback<T> = (component: T) => void;
 
+export type GenerateRSCPayloadFunction = (
+  componentName: string,
+  props: unknown,
+  railsContext: RailsContextWithServerComponentMetadata,
+) => Promise<NodeJS.ReadableStream>;
+
 interface Params {
   props?: Record<string, unknown>;
   railsContext?: RailsContext;
   domNodeId?: string;
   trace?: boolean;
+  generateRSCPayload?: GenerateRSCPayloadFunction;
 }
 
 export interface RenderParams extends Params {
@@ -238,7 +370,7 @@ export interface RSCRenderParams extends Omit<RenderParams, 'railsContext'> {
 }
 
 export interface CreateParams extends Params {
-  componentObj: RegisteredComponent;
+  componentObj: RegisteredComponent<RegisteredComponentValue>;
   shouldHydrate?: boolean;
 }
 
@@ -277,6 +409,43 @@ export interface Root {
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- inherited from React 16/17, can't avoid here
 export type RenderReturnType = void | Element | Component | Root;
 
+/** Extra context React on Rails adds when invoking registered root error callbacks. */
+export interface RootErrorContext {
+  /** Name of the registered component rendered into the affected React root, when known. */
+  componentName?: string;
+  /** DOM id of the element the affected React root was mounted in, when known. */
+  domNodeId?: string;
+}
+
+/**
+ * A root error callback registered through `ReactOnRails.setOptions({ rootErrorHandlers })`.
+ * Receives React's original `(error, errorInfo)` arguments plus React on Rails context about the
+ * affected root. `errorInfo` typically contains `componentStack` (see the `react-dom/client`
+ * `createRoot`/`hydrateRoot` option docs for the exact per-callback shape).
+ */
+export type RootErrorHandler = (error: unknown, errorInfo: unknown, context: RootErrorContext) => void;
+
+/**
+ * User-registered React root error callbacks, applied to every React root that React on Rails
+ * creates via `hydrateRoot`/`createRoot`. Register them before your components render (typically
+ * in the same pack file where you call `ReactOnRails.register`); each root captures the callbacks
+ * registered at the moment it is created. Partial updates merge per key: a later
+ * `setOptions({ rootErrorHandlers })` call that sets only one callback keeps the others; pass an
+ * explicit `undefined` for a key to clear just that callback. Passing `null` is invalid and
+ * throws at runtime; use `undefined` to deregister.
+ */
+export interface RootErrorHandlers {
+  /**
+   * Called when React automatically recovers from an error, e.g. a hydration mismatch.
+   * Requires React 18+.
+   */
+  onRecoverableError?: RootErrorHandler;
+  /** Called for errors caught by an error boundary. Requires React 19+. */
+  onCaughtError?: RootErrorHandler;
+  /** Called for errors not caught by any error boundary. Requires React 19+. */
+  onUncaughtError?: RootErrorHandler;
+}
+
 export interface ReactOnRailsOptions {
   /** Gives you debugging messages on Turbolinks events. */
   traceTurbolinks?: boolean;
@@ -286,6 +455,12 @@ export interface ReactOnRailsOptions {
   debugMode?: boolean;
   /** Log component registration details including timing and size information. */
   logComponentRegistration?: boolean;
+  /**
+   * React root error callbacks (`onRecoverableError`, `onCaughtError`, `onUncaughtError`)
+   * applied to every React root created by React on Rails.
+   * @see {RootErrorHandlers}
+   */
+  rootErrorHandlers?: RootErrorHandlers;
 }
 
 export interface ReactOnRails {
@@ -294,7 +469,7 @@ export interface ReactOnRails {
    * find you components for rendering.
    * @param components keys are component names, values are components
    */
-  register(components: Record<string, ReactComponentOrRenderFunction>): void;
+  register(components: Record<string, RegisteredComponentValue>): void;
   /** @deprecated Use registerStoreGenerators instead */
   registerStore(stores: Record<string, StoreGenerator>): void;
   /**
@@ -366,6 +541,15 @@ export type RSCPayloadStreamInfo = {
 
 export type RSCPayloadCallback = (streamInfo: RSCPayloadStreamInfo) => void;
 
+export type WithAsyncProps<
+  AsyncPropsType extends Record<string, unknown>,
+  PropsType extends Record<string, unknown>,
+> = PropsType & {
+  getReactOnRailsAsyncProp: <PropName extends keyof AsyncPropsType>(
+    propName: PropName,
+  ) => Promise<AsyncPropsType[PropName]>;
+};
+
 /** Contains the parts of the `ReactOnRails` API intended for internal use only. */
 export interface ReactOnRailsInternal extends ReactOnRails {
   /**
@@ -411,6 +595,17 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * ```
    * under React 18+.
    *
+   * @remarks
+   * **Cleanup is the caller's responsibility.** Unlike the components React on Rails mounts itself
+   * (which are unmounted automatically on Turbo/Turbolinks navigation and same-id node replacement),
+   * a root created by this imperative API is **not** tracked internally. The returned root is handed
+   * back to you, and you must call `unmount()` on it yourself — e.g. on a Turbo `turbo:before-render`
+   * / Turbolinks `turbolinks:before-render` event, or in your framework's teardown hook — to avoid
+   * leaking the root (and any subscriptions or timers it holds) across navigations. If you want
+   * automatic cleanup instead, register a renderer function (the 3-argument render-function form) and
+   * return a {@link RendererTeardownResult}; React on Rails tracks those mounts and runs the teardown for
+   * you.
+   *
    * @param name Name of your registered component
    * @param props Props to pass to your component
    * @param domNodeId HTML ID of the node the component will be rendered at
@@ -419,21 +614,26 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    *   (see "What is a root?" in https://github.com/reactwg/react-18/discussions/5).
    *   Under React 16/17: Reference to your component's backing instance or `null` for stateless components.
    */
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate?: boolean): RenderReturnType;
+  render(
+    name: string,
+    props: Record<string, unknown>,
+    domNodeId: string,
+    hydrate?: boolean,
+  ): RenderReturnType;
   /**
    * Get the component that you registered
    * @returns {name, component, renderFunction, isRenderer}
    */
-  getComponent(name: string): RegisteredComponent;
+  getComponent(name: string): RegisteredComponent<RegisteredComponentValue>;
   /**
    * Get the component that you registered, or wait for it to be registered
    * @returns {name, component, renderFunction, isRenderer}
    */
-  getOrWaitForComponent(name: string): Promise<RegisteredComponent>;
+  getOrWaitForComponent(name: string): Promise<RegisteredComponent<RegisteredComponentValue>>;
   /**
    * Used by server rendering by Rails
    */
-  serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
+  serverRenderReactComponent(options: RenderParams): null | string | Promise<string>;
   /**
    * Used by server rendering by Rails
    */
@@ -447,6 +647,16 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    */
   handleError(options: ErrorOptions): string | undefined;
   /**
+   * Prepares a rendering result in the length-prefixed wire format for transport to Ruby.
+   * Used by the server_render_js Rails helper to format arbitrary JS evaluation results.
+   */
+  prepareRenderResult(
+    html: string,
+    consoleReplayScript: string,
+    hasErrors: boolean,
+    renderingError: RenderingError | null,
+  ): string;
+  /**
    * Used by Rails server rendering to replay console messages.
    * Returns the console replay script wrapped in script tags.
    */
@@ -459,7 +669,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   /**
    * Get a Map containing all registered components. Useful for debugging.
    */
-  registeredComponents(): Map<string, RegisteredComponent>;
+  registeredComponents(): Map<string, RegisteredComponent<RegisteredComponentValue>>;
   /**
    * Get a Map containing all registered store generators. Useful for debugging.
    */
@@ -480,6 +690,33 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Indicates if the RSC bundle is being used.
    */
   isRSCBundle: boolean;
+  /**
+   * Adds the getAsyncProp function to the component props object.
+   * Uses getOrCreateAsyncPropsManager internally to handle race conditions
+   * between initial render and update chunks.
+   *
+   * @param props - The component props to enhance
+   * @param sharedExecutionContext - Map scoped to the current HTTP request
+   * @returns An object containing the component props with getReactOnRailsAsyncProp added
+   */
+  addAsyncPropsCapabilityToComponentProps: <
+    AsyncPropsType extends Record<string, unknown>,
+    PropsType extends Record<string, unknown>,
+  >(
+    props: PropsType,
+    sharedExecutionContext: Map<string, unknown>,
+  ) => {
+    props: WithAsyncProps<AsyncPropsType, PropsType>;
+  };
+  /**
+   * Gets or creates an AsyncPropsManager from the shared execution context.
+   * Implements lazy initialization to handle race conditions between
+   * the initial render request and update chunks.
+   *
+   * @param sharedExecutionContext - Map scoped to the current HTTP request
+   * @returns The AsyncPropsManager instance (existing or newly created)
+   */
+  getOrCreateAsyncPropsManager: (sharedExecutionContext: Map<string, unknown>) => AsyncPropsManager;
 }
 
 export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult | ServerRenderResult>;

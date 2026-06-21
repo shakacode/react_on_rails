@@ -1,7 +1,7 @@
 # Code Splitting with Loadable Components
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — Available with [React on Rails Pro](../../pro/react-on-rails-pro.md).
+> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 ## Introduction
 
@@ -252,7 +252,7 @@ in your webpack configuration. That turns off the polyfills for things like `__d
 
 ### Node Renderer
 
-In your `node-renderer.js` file which runs node renderer, you need to specify `supportModules` options as follows:
+In your `renderer/node-renderer.js` file which runs node renderer, you need to specify `supportModules` options as follows:
 
 ```js
 const path = require('path');

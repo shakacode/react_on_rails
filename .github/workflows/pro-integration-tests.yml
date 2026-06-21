@@ -1,21 +1,20 @@
 name: React on Rails Pro - Integration Tests
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
       - 'main'
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'react_on_rails/lib/**'
-      - 'react_on_rails/spec/**'
-      - 'packages/react_on_rails/**'
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -26,36 +25,50 @@ defaults:
 
 jobs:
   detect-changes:
+    # Skip Dependabot PRs — they can't access the Pro license secret.
+    # Scoped to pull_request so push-to-main after merge still runs Pro CI.
+    if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_pro_lint: ${{ steps.detect.outputs.run_pro_lint }}
       run_pro_tests: ${{ steps.detect.outputs.run_pro_tests }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      run_pro_dummy_tests: ${{ steps.detect.outputs.run_pro_dummy_tests }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check for full-ci label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         working-directory: .
         run: |
-          # If force_run is true OR full-ci label is present, run everything
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_pro_lint=true" >> "$GITHUB_OUTPUT"
-            echo "run_pro_tests=true" >> "$GITHUB_OUTPUT"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
+            {
+              echo "run_pro_lint=true"
+              echo "run_pro_tests=true"
+              echo "run_pro_dummy_tests=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Guard docs-only main pushes
@@ -69,15 +82,8 @@ jobs:
   build-dummy-app-webpack-test-bundles:
     needs: detect-changes
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_tests == 'true'
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
@@ -85,26 +91,33 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: 3.3.7
-          bundler: 2.5.4
+          # Pro CI pins the exact minimum patch for reproducible licensed dummy-app runs.
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          bundler-version: 2.5.4
 
       - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
+        uses: actions/setup-node@v4
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # Pro CI stays on minimum Ruby for gem compatibility but uses latest Node from
+          # .tool-versions. This is the same deliberate min-Ruby x latest-Node
+          # cross-profile used by benchmark-suite.
+          # The Node pin stays below the startup regression until the LTS fix lands:
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.11.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -124,12 +137,6 @@ jobs:
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
 
-      - name: Cache Pro dummy app Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
-
       - name: Install Node modules with pnpm
         working-directory: .
         run: pnpm install --frozen-lockfile
@@ -145,11 +152,11 @@ jobs:
         run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
 
       - name: Install Ruby Gems for Pro dummy app
-        run: |
-          gem install bundler -v "2.5.4"
-          cd spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          install-libyaml: 'false'
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
@@ -176,42 +183,49 @@ jobs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_tests == 'true'
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+    # Redis backs streamed RSC fixtures covered by the request specs.
+    services:
+      redis:
+        image: public.ecr.aws/docker/library/redis:6.2.6
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: 3.3.7
-          bundler: 2.5.4
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          bundler-version: 2.5.4
 
       - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
+        uses: actions/setup-node@v4
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.11.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -231,18 +245,6 @@ jobs:
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
 
-      - name: Cache Pro package Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/vendor/bundle
-          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
-
-      - name: Cache Pro dummy app Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
-
       - name: Remove old webpack bundles
         run: |
           rm -rf spec/dummy/public/webpack
@@ -260,11 +262,11 @@ jobs:
           key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
 
       - name: Install Ruby Gems for Pro dummy app
-        run: |
-          gem install bundler -v "2.5.4"
-          cd spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          install-libyaml: 'false'
 
       - name: Install Node modules with pnpm
         working-directory: .
@@ -298,7 +300,7 @@ jobs:
       - name: Run Rails server in background
         run: |
           cd spec/dummy
-          RAILS_ENV="test" rails server &
+          RAILS_ENV="test" bundle exec rails server &
 
       - name: Wait for Rails server to start
         run: |
@@ -365,22 +367,15 @@ jobs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_tests == 'true'
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     # Redis service container
     services:
       redis:
-        image: cimg/redis:6.2.6
+        image: public.ecr.aws/docker/library/redis:6.2.6
         ports:
           - 6379:6379
         options: >-
@@ -392,26 +387,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: 3.3.7
-          bundler: 2.5.4
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          bundler-version: 2.5.4
 
       - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
+        uses: actions/setup-node@v4
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.11.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -431,18 +429,6 @@ jobs:
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
 
-      - name: Cache Pro package Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/vendor/bundle
-          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
-
-      - name: Cache Pro dummy app Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
-
       - name: Remove old webpack bundles
         run: |
           rm -rf spec/dummy/public/webpack
@@ -460,11 +446,11 @@ jobs:
           key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
 
       - name: Install Ruby Gems for Pro dummy app
-        run: |
-          gem install bundler -v "2.5.4"
-          cd spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          install-libyaml: 'false'
 
       - name: Install Node modules with pnpm
         working-directory: .
@@ -498,7 +484,7 @@ jobs:
       - name: Run Rails server in background
         run: |
           cd spec/dummy
-          RAILS_ENV="test" rails server &
+          RAILS_ENV="test" bundle exec rails server &
 
       - name: Wait for Rails server to start
         run: |
@@ -533,3 +519,412 @@ jobs:
         with:
           name: pro-playwright-report
           path: react_on_rails_pro/spec/dummy/playwright-report
+
+  # Layer 2 Rspack + RSC runtime gate: build client/server/RSC bundles, boot Rails
+  # and the Pro Node renderer, then prove RSC client-boundary routes hydrate.
+  dummy-app-rspack-rsc-runtime-gate:
+    needs:
+      - detect-changes
+    if: |
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      # Pin Rails and the renderer to the same IPv4 loopback endpoint.
+      REACT_RENDERER_URL: http://127.0.0.1:3800
+      RENDERER_HOST: 127.0.0.1
+      SHAKAPACKER_ASSETS_BUNDLER: rspack
+    services:
+      redis:
+        image: public.ecr.aws/docker/library/redis:6.2.6
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          bundler-version: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
+          # https://github.com/nodejs/node/issues/56010
+          node-version-file: .tool-versions
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "pnpm version: "; pnpm --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Install Ruby Gems for Pro dummy app
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          install-libyaml: 'false'
+
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
+
+      - name: Ensure minimum required Chrome version
+        run: |
+          echo -e "Installed $(google-chrome --version)\n"
+          MINIMUM_REQUIRED_CHROME_VERSION=75
+          INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
+          if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+            sudo apt-get update
+            sudo apt-get install google-chrome-stable
+            echo -e "\nInstalled $(google-chrome --version)"
+          fi
+
+      - name: Generate file-system based entrypoints
+        run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Build Rspack RSC test bundles for Pro dummy app
+        run: cd spec/dummy && pnpm run build:test:rspack
+
+      - name: Run Pro Node renderer in background
+        run: |
+          cd spec/dummy
+          pnpm run node-renderer &
+
+      - name: Run Rails server in background
+        run: |
+          cd spec/dummy
+          RAILS_ENV="test" bundle exec rails server &
+
+      - name: Wait for Rails server and Node renderer to start
+        run: |
+          wait_for_service() {
+            name="$1"
+            shift 1
+            timeout=300
+            start=$SECONDS
+
+            while true; do
+              for url in "$@"; do
+                curl --fail --silent --max-time 5 "$url" > /dev/null && {
+                  elapsed=$((SECONDS - start))
+                  echo "${name} started at ${url} after ${elapsed}s"
+                  return 0
+                }
+              done
+
+              sleep 1
+              elapsed=$((SECONDS - start))
+              if [ $elapsed -ge $timeout ]; then
+                echo "Timeout waiting for ${name} to start after ${timeout}s"
+                exit 1
+              fi
+            done
+          }
+
+          wait_for_h2c_service() {
+            name="$1"
+            path="$2"
+            shift 2
+            timeout=300
+            start=$SECONDS
+
+            while true; do
+              for authority in "$@"; do
+                if node - "$authority" "$path" <<'NODE'
+          const http2 = require('node:http2');
+
+          const [authority, path] = process.argv.slice(2);
+          const client = http2.connect(authority);
+          const request = client.request({ ':method': 'GET', ':path': path });
+          let status;
+          let timeout;
+          let completed = false;
+
+          const finish = (exitCode, destroyClient = false) => {
+            if (completed) return;
+            completed = true;
+            clearTimeout(timeout);
+            if (destroyClient) {
+              client.destroy();
+            } else {
+              client.close();
+            }
+            process.exit(exitCode);
+          };
+
+          const fail = () => finish(1, true);
+
+          client.on('error', fail);
+          request.on('error', fail);
+          request.on('response', (headers) => {
+            status = headers[':status'];
+          });
+          request.on('data', () => {});
+          request.on('end', () => {
+            finish(status >= 200 && status < 300 ? 0 : 1);
+          });
+          request.end();
+          timeout = setTimeout(fail, 10000);
+          NODE
+                then
+                  elapsed=$((SECONDS - start))
+                  echo "${name} started at ${authority}${path} after ${elapsed}s"
+                  return 0
+                fi
+              done
+
+              sleep 1
+              elapsed=$((SECONDS - start))
+              if [ $elapsed -ge $timeout ]; then
+                echo "Timeout waiting for ${name} to start after ${timeout}s"
+                echo "::group::${name} h2c readiness diagnostics"
+                for authority in "$@"; do
+                  echo "GET ${authority}${path}"
+                  node - "$authority" "$path" <<'NODE' || true
+          const http2 = require('node:http2');
+
+          const [authority, path] = process.argv.slice(2);
+          const client = http2.connect(authority);
+          let body = '';
+          const timeout = setTimeout(() => {
+            console.error('diagnostic timeout without response');
+            client.destroy();
+            process.exit(1);
+          }, 5000);
+
+          const finish = (exitCode) => {
+            clearTimeout(timeout);
+            client.close();
+            process.exit(exitCode);
+          };
+
+          client.on('error', (error) => {
+            console.error(`connect error: ${error.message}`);
+            finish(1);
+          });
+          const request = client.request({ ':method': 'GET', ':path': path });
+          request.on('response', (headers) => {
+            console.log(`response headers: ${JSON.stringify(headers)}`);
+          });
+          request.on('data', (chunk) => {
+            body += chunk.toString();
+            body = body.slice(0, 500);
+          });
+          request.on('end', () => {
+            if (body) console.log(`response body: ${body}`);
+            finish(0);
+          });
+          request.on('error', (error) => {
+            console.error(`request error: ${error.message}`);
+            finish(1);
+          });
+          request.end();
+          NODE
+                done
+                echo "::endgroup::"
+                exit 1
+              fi
+            done
+          }
+
+          # Both processes are already running; sequential waits keep the logs easier
+          # to read while the renderer can continue booting during the Rails poll.
+          wait_for_service "Rails server" "http://127.0.0.1:3000/empty"
+          # Single IPv4 authority is intentional: RENDERER_HOST binds h2c to
+          # 127.0.0.1. Add ::1 here only if the renderer binding changes.
+          wait_for_h2c_service "Node renderer" "/info" "http://127.0.0.1:3800"
+
+      - name: Install Playwright dependencies
+        run: cd spec/dummy && npx playwright install --with-deps
+
+      - name: Run RSC Playwright E2E tests for Pro dummy app
+        run: cd spec/dummy && pnpm e2e-test:rsc
+
+      - name: Store test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspack-rsc-playwright-test-results
+          path: react_on_rails_pro/spec/dummy/test-results/results.xml
+
+      - name: Store Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspack-rsc-playwright-report
+          path: react_on_rails_pro/spec/dummy/playwright-report
+
+  # Additive Rspack coverage for the ExecJS-compatible Pro dummy (#4091).
+  #
+  # This fixture already carries Rspack peer deps (@rspack/cli, @rspack/core,
+  # shakapacker-rspack) and a config/rspack/rspack.config.js, but nothing in CI
+  # ever compiled it with Rspack -- config/shakapacker.yml hardcodes
+  # `assets_bundler: webpack`, so Rspack regressions in this fixture went
+  # undetected. This job compiles the fixture's test bundles with Rspack by
+  # setting SHAKAPACKER_ASSETS_BUNDLER=rspack on the build step (no shakapacker.yml
+  # edit needed: the env var wins over the YAML default, exactly as the OSS bundler
+  # matrix and the Pro rspack-rsc runtime gate already do). It is a new, additive
+  # leg and is not a required-status gate, so the existing webpack path is
+  # unaffected. It gates on run_pro_dummy_tests like the other Pro dummy jobs in
+  # this workflow, so it runs for changes to the execjs-compatible-dummy fixture
+  # (categorized as PRO_DUMMY_CHANGED), which is exactly what it must validate.
+  build-execjs-dummy-rspack-bundles:
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          bundler-version: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
+          # https://github.com/nodejs/node/issues/56010
+          node-version-file: .tool-versions
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "pnpm version: "; pnpm --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
+
+      - name: Verify React 18 resolution for ExecJS-compatible dummy
+        working-directory: .
+        run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
+
+      - name: Install Ruby Gems for ExecJS-compatible dummy app
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/execjs-compatible-dummy
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          install-libyaml: 'false'
+
+      - name: Build ExecJS-compatible dummy test bundles with Rspack
+        # shell: bash gives `bash -eo pipefail`; set -o pipefail is explicit belt-and-suspenders so a
+        # nonzero bin/shakapacker exit is not masked by the `tee` pipe. SHAKAPACKER_ASSETS_BUNDLER=rspack
+        # is scoped to this step (mirrors dummy-app-bundler-tests.yml): it overrides
+        # config/shakapacker.yml's webpack default and selects config/rspack/rspack.config.js.
+        shell: bash
+        env:
+          SHAKAPACKER_ASSETS_BUNDLER: rspack
+        run: |
+          set -o pipefail
+          cd spec/execjs-compatible-dummy
+          rm -rf public/packs-test
+          RAILS_ENV="test" NODE_ENV="test" ./bin/shakapacker 2>&1 | tee "$RUNNER_TEMP/execjs-rspack-build.log"
+
+      - name: Verify ExecJS-compatible dummy bundles were built with Rspack
+        # Guard against a silent bundler fallback. Shakapacker logs
+        # "[Shakapacker] Completed <bundler> build" based on the resolved bundler, which is driven by
+        # SHAKAPACKER_ASSETS_BUNDLER. Matching the rspack log line confirms the leg actually compiled with
+        # Rspack rather than silently falling back to webpack and still going green. Mirrors the OSS
+        # dummy-app-bundler-tests.yml guard. (The build step's set -o pipefail handles compile failure.)
+        run: |
+          log="$RUNNER_TEMP/execjs-rspack-build.log"
+          if [ ! -s "$log" ]; then
+            echo "::error::Build log $log is missing or empty - the build step did not produce a log."
+            exit 1
+          fi
+          if ! grep -qF "[Shakapacker] Completed rspack build" "$log"; then
+            echo "::error::Expected an 'rspack' build, but Shakapacker did not report completing one. The leg may have silently used a different bundler."
+            exit 1
+          fi
+          echo "Confirmed: ExecJS-compatible dummy test bundles built with rspack."
+
+      - name: Verify Rspack test bundles were emitted
+        run: test -s spec/execjs-compatible-dummy/public/packs-test/manifest.json
+
+      - name: Upload Rspack build log on failure
+        # Placed after the verification steps so `if: failure()` captures a failure from any prior step
+        # in this job -- not only the build step, but also the bundler/manifest verification steps below.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: execjs-rspack-build-log
+          path: ${{ runner.temp }}/execjs-rspack-build.log
+          if-no-files-found: ignore

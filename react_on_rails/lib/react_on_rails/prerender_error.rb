@@ -34,11 +34,11 @@ module ReactOnRails
 
     def to_error_context
       result = {
-        component_name: component_name,
-        err: err,
-        props: props,
-        js_code: js_code,
-        console_messages: console_messages
+        component_name:,
+        err:,
+        props:,
+        js_code:,
+        console_messages:
       }
 
       result.merge!(err.to_error_context) if err.respond_to?(:to_error_context)
@@ -61,12 +61,7 @@ module ReactOnRails
 
         MSG
 
-        backtrace = if Utils.full_text_errors_enabled?
-                      err.backtrace.join("\n")
-                    else
-                      "#{Rails.backtrace_cleaner.clean(err.backtrace).join("\n")}\n" +
-                        Rainbow("💡 Tip: Set FULL_TEXT_ERRORS=true to see the full backtrace").yellow
-                    end
+        backtrace = formatted_backtrace(err)
       else
         backtrace = nil
       end
@@ -93,6 +88,19 @@ module ReactOnRails
 
       [backtrace, message]
       # rubocop:enable Metrics/AbcSize
+    end
+
+    # Formats `err.backtrace` for display, or returns nil when there are no frames.
+    def formatted_backtrace(err)
+      error_backtrace = err.backtrace
+      # JS-originated errors (e.g. an RSC renderingError carrying a message but no parseable
+      # stack) have no Ruby backtrace. Skip it rather than crashing on `nil.join` /
+      # `Rails.backtrace_cleaner.clean(nil)`.
+      return nil if error_backtrace.nil? || error_backtrace.empty?
+      return error_backtrace.join("\n") if Utils.full_text_errors_enabled?
+
+      "#{Rails.backtrace_cleaner.clean(error_backtrace).join("\n")}\n" +
+        Rainbow("💡 Tip: Set FULL_TEXT_ERRORS=true to see the full backtrace").yellow
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity

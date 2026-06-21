@@ -1,4 +1,4 @@
-<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/babel.config.js") %>
+<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/babel.config.js") %>
 
 module.exports = function (api) {
   const defaultConfigFunc = require('shakapacker/package/babel/preset.js')

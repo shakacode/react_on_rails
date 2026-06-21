@@ -28,7 +28,7 @@ React Server Components significantly reduce client-side JavaScript by:
 
 1. **Server-Only Code Elimination:**
    - Dependencies used only in server components never ship to the client
-   - Database queries, API calls, and their libraries stay server-side
+   - Data-access and API-client libraries stay server-side — in React on Rails, Rails runs the queries and passes results to components as props
    - Heavy data processing utilities remain on the server
    - Server-only NPM packages don't impact client bundle
 
@@ -53,6 +53,10 @@ import numeral from 'numeral'; // ~25KB
 ```
 
 ### [Selective Hydration](https://github.com/reactwg/react-18/discussions/37) Benefits
+
+<p align="center">
+  <img src="images/selective-hydration-timeline.svg" alt="Animated timeline showing how selective hydration works with streamed RSC components. With async script loading, components hydrate independently as they stream in — the page becomes interactive before slow components finish loading. Compares defer (all-or-nothing) vs async (progressive) loading strategies." width="840" />
+</p>
 
 React's selective hydration is a powerful feature that significantly improves page interactivity by:
 
@@ -135,44 +139,16 @@ For a deeper dive into selective hydration, see our [Selective Hydration in Stre
 
 ## Migration Guide
 
-### 1. Enable RSC Support
+Before following the component migration patterns below, complete the infrastructure setup with the
+current generator-based runbook:
 
-Add to your Rails initializer, it makes the magic happen 🪄:
+1. Install and configure the Node Renderer. See [Pro Installation](../installation.md#install-react-on-rails-pro-node-renderer) and [Node Renderer basics](../../oss/building-features/node-renderer/basics.md).
+2. Run `bundle exec rails generate react_on_rails:rsc` (or `--typescript`) to enable `config.enable_rsc_support`, add the RSC webpack bundle, and generate the example files.
+3. Use [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md) for the full checklist, legacy webpack compatibility notes, and verification steps.
 
-```ruby
-# config/initializers/react_on_rails_pro.rb
-ReactOnRailsPro.configure do |config|
-  config.enable_rsc_support = true
-end
-```
+Once that infrastructure is in place, migrate components incrementally.
 
-### 2. Update Webpack Configuration
-
-Create RSC bundle and make it use the RSC loader:
-
-```javascript
-// config/webpack/rscWebpackConfig.mjs
-const rscConfig = serverWebpackConfig();
-
-// Configure RSC entry point
-rscConfig.entry = {
-  'rsc-bundle': rscConfig.entry['server-bundle'],
-};
-
-// Add RSC loader
-rules.forEach((rule) => {
-  if (Array.isArray(rule.use)) {
-    const babelLoader = extractLoader(rule, 'babel-loader');
-    if (babelLoader) {
-      rule.use.push({
-        loader: 'react-on-rails-rsc/WebpackLoader',
-      });
-    }
-  }
-});
-```
-
-### 3. Gradual Component Migration
+### Gradual Component Migration
 
 #### 1. Mark Entry Points as Client Components
 
@@ -190,7 +166,7 @@ export default function App() {
 
 #### 2. Identify Server Component Candidates:
 
-- Data fetching components
+- Components that currently fetch read-only data on the client (e.g. `useEffect` + `fetch`, React Query) — convert them to receive that data as Rails props instead (see [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md))
 - Non-interactive UI
 - Static content sections
 - Layout components
@@ -232,9 +208,8 @@ export default function InteractiveWidget() {
 ```jsx
 // app/components/LazyLoadedSection.jsx
 // Remove lazy loading wrapper
-// Convert to async server component
-async function LazyLoadedSection() {
-  const data = await fetchData();
+// Convert to a server component that receives its data as props from Rails
+function LazyLoadedSection({ data }) {
   return (
     <div>
       <ServerContent data={data} />
@@ -243,6 +218,8 @@ async function LazyLoadedSection() {
   );
 }
 ```
+
+> **React on Rails note:** When converting a lazy-loaded component, the new server component receives its `data` as a prop — don't move the old client-side fetch into the component body. In React on Rails, Rails is the backend: prepare the data in your controller and pass it via `stream_react_component`. The Node renderer has no Rails models or database connection, and an in-component fetch bypasses Rails' authorization and caching. For data that's slow to compute, stream it with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 This migration approach allows you to:
 

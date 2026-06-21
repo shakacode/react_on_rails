@@ -15,6 +15,20 @@ RSpec.configure do |config|
   end
 end
 
+RSpec.shared_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env" do
+  around do |example|
+    original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
+    ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+    example.run
+  ensure
+    if original
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original
+    else
+      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+    end
+  end
+end
+
 def simulate_existing_rails_files(options)
   simulate_existing_file(".gitignore") if options.fetch(:gitignore, true)
   if options.fetch(:hello_world_file, false)
@@ -27,6 +41,10 @@ def simulate_existing_rails_files(options)
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
   simulate_existing_file("config/application.rb",
                          "module Gentest\nclass Application < Rails::Application\nend\nend)")
+  # Shared baseline: database.yml is present by default so has_active_record == true and the
+  # generated CI workflow includes db:prepare. Contexts that need Active Record to be absent
+  # must remove this file explicitly (see "Active Record is absent" context).
+  simulate_existing_file("config/database.yml", "test:\n  adapter: sqlite3\n  database: db/test.sqlite3\n")
 
   return unless options.fetch(:spec, true)
 
@@ -60,14 +78,17 @@ end
 
 # Expects an array of strings, such as "--redux"
 def run_generator_test_with_args(args, options = {})
+  force = options.delete(:force) { true }
   prepare_destination # this completely wipes the `destination` directory
   simulate_existing_rails_files(options)
   simulate_npm_files(options)
   yield if block_given?
 
+  extra_args = ["--ignore-warnings"]
+  extra_args << (force ? "--force" : "--skip")
   Dir.chdir(destination_root) do
     # WARNING: std out is swallowed from running the generator during tests
-    run_generator(args + ["--ignore-warnings", "--force"])
+    run_generator(args + extra_args)
   end
 end
 
@@ -290,7 +311,7 @@ def base_server_webpack_content
         }
       });
 
-      serverWebpackConfig.devtool = 'eval';
+      serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? false : 'cheap-module-source-map';
 
       // If using the default 'web', then libraries like Emotion and loadable-components
       // break with SSR. The fix is to use a node renderer and change the target.

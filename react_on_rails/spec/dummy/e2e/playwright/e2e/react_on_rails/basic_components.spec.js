@@ -108,8 +108,7 @@ test.describe('React on Rails Basic Components', () => {
         const text = message.text();
         if (
           !text.includes('Download the React DevTools') &&
-          !text.includes('SharedArrayBuffer will require cross-origin isolation') &&
-          !text.includes('immediate_hydration')
+          !text.includes('SharedArrayBuffer will require cross-origin isolation')
         ) {
           consoleErrors.push(text);
         }

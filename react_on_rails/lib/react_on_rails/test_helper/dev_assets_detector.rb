@@ -7,10 +7,10 @@ require "pathname"
 
 module ReactOnRails
   module TestHelper
-    # Detects whether development webpack assets can be reused for tests,
+    # Detects whether development build assets can be reused for tests,
     # avoiding redundant compilation when `bin/dev static` is already running.
     #
-    # When `bin/dev static` runs webpack in watch mode, it writes compiled assets
+    # When `bin/dev static` runs the bundler in watch mode, it writes compiled assets
     # to the development output directory (e.g., public/packs). If those assets
     # are fresh (newer than all source files) and not HMR artifacts, tests can
     # reuse them instead of running a separate build_test_command.
@@ -18,6 +18,10 @@ module ReactOnRails
     # This makes `bundle exec rspec` "just work" when `bin/dev static` is running,
     # with no environment variables or extra commands needed.
     class DevAssetsDetector
+      HMR_WARNING_PRINTED = :@hmr_warning_printed
+      HMR_HINT = 'Set config.build_test_command = "<your-build-command>" in config/initializers/react_on_rails.rb'
+      private_constant :HMR_WARNING_PRINTED, :HMR_HINT
+
       class << self
         # Attempts to detect and activate development assets for test use.
         #
@@ -77,7 +81,7 @@ module ReactOnRails
           puts <<~MSG
 
             ====> React on Rails: Reusing development assets from #{result[:dev_output_relative]}
-                  (detected fresh static-mode webpack output, skipping test compilation)
+                  (detected fresh static-mode asset output, skipping test compilation)
 
           MSG
         end
@@ -107,7 +111,7 @@ module ReactOnRails
         manifest_path = dev_output[:dev_full_path].join("manifest.json")
         return nil unless manifest_usable?(manifest_path)
 
-        dev_output.merge(manifest_path: manifest_path)
+        dev_output.merge(manifest_path:)
       end
 
       private
@@ -137,9 +141,9 @@ module ReactOnRails
         return nil if dev_full_path == test_full_path
 
         {
-          dev_output_relative: dev_output_relative,
-          dev_public_root_relative: dev_public_root_relative,
-          dev_full_path: dev_full_path
+          dev_output_relative:,
+          dev_public_root_relative:,
+          dev_full_path:
         }
       end
 
@@ -154,23 +158,28 @@ module ReactOnRails
         assets_fresh?(manifest_path)
       end
 
-      HMR_WARNING_PRINTED = :@hmr_warning_printed
-
       def print_hmr_warning
         # Only print once per process
         return if self.class.instance_variable_get(HMR_WARNING_PRINTED)
 
         self.class.instance_variable_set(HMR_WARNING_PRINTED, true)
+        manual_compile_command = ReactOnRails.configuration.build_test_command.to_s.strip
+        manual_compile_guidance =
+          if manual_compile_command.empty?
+            "\nNo build_test_command is configured yet. To add one:\n  #{HMR_HINT}\n"
+          else
+            "  • #{manual_compile_command}\n"
+          end
 
         warn <<~MSG
 
           React on Rails: Development assets use HMR (manifest contains http:// URLs).
-          HMR assets cannot be reused for tests — they exist in webpack-dev-server memory, not on disk.
+          HMR assets cannot be reused for tests — they exist in your bundler's dev server memory, not on disk.
 
           To provide test assets, use one of:
             • bin/dev static       (writes files to disk, auto-reused by tests)
             • bin/dev test-watch   (keeps test assets fresh alongside HMR)
-            • RAILS_ENV=test bin/shakapacker  (compile once manually)
+          #{manual_compile_guidance}
 
           If using Capybara with run_server = false, HMR works — the browser connects
           to your running dev server directly.
@@ -188,16 +197,12 @@ module ReactOnRails
       end
 
       def project_root
-        @project_root ||= if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
-                            Rails.root
-                          else
-                            Pathname.new(Dir.pwd)
-                          end
+        @project_root ||= (defined?(Rails) && Rails.respond_to?(:root) && Rails.root) || Pathname.new(Dir.pwd)
       end
 
       # HMR manifests contain URLs (http://localhost:3035/packs/...) instead of
       # relative paths (/packs/...). Tests can't use HMR assets because they're
-      # served from webpack-dev-server's memory, not the filesystem.
+      # served from the dev server's memory, not the filesystem.
       def hmr_manifest?(manifest_path)
         manifest = JSON.parse(File.read(manifest_path))
         hmr_url_present?(manifest)
@@ -227,10 +232,7 @@ module ReactOnRails
         # No source files = nothing to compare against, consider fresh
         return true if source_files.empty?
 
-        most_recent_source = source_files.map { |f| File.mtime(f) }.max
-        manifest_mtime = File.mtime(manifest_path)
-
-        manifest_mtime >= most_recent_source
+        File.mtime(manifest_path) >= source_files.map { |f| File.mtime(f) }.max
       end
 
       def make_source_file_list(source_path)

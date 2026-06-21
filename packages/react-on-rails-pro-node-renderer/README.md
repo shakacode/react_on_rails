@@ -18,7 +18,7 @@ pnpm add react-on-rails-pro-node-renderer
 
 ### 1. Create the Node Renderer entry file
 
-Create `node-renderer.js` in your project root:
+Create `renderer/node-renderer.js` in your project root:
 
 ```js
 const path = require('path');
@@ -53,7 +53,7 @@ reactOnRailsProNodeRenderer({
 ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
   config.renderer_url = ENV.fetch("REACT_RENDERER_URL", "http://localhost:3800")
-  config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
+  config.renderer_password = ENV["RENDERER_PASSWORD"]
 end
 ```
 
@@ -72,13 +72,13 @@ libraryTarget: 'commonjs2',
 ### 4. Start the renderer
 
 ```bash
-node node-renderer.js
+node renderer/node-renderer.js
 ```
 
 Or add to your `Procfile.dev`:
 
 ```text
-node-renderer: node node-renderer.js
+node-renderer: node renderer/node-renderer.js
 ```
 
 ## Generator (Recommended)

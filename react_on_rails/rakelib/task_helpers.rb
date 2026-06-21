@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "bundler" # Provides Bundler.with_unbundled_env for child bundle commands.
 require "English"
 
 module ReactOnRails
@@ -109,10 +110,6 @@ module ReactOnRails
     end
 
     public
-
-    def bundle_install_in_no_turbolinks(dir)
-      sh_in_dir(dir, "DISABLE_TURBOLINKS=TRUE bundle install")
-    end
 
     # Runs bundle exec using that directory's Gemfile
     def bundle_exec(dir: nil, args: nil, env_vars: "")

@@ -3,11 +3,13 @@
 require "rails/generators"
 require_relative "generator_helper"
 require_relative "generator_messages"
+require_relative "demo_page_config"
 
 module ReactOnRails
   module Generators
     class ReactWithReduxGenerator < Rails::Generators::Base
       include GeneratorHelper
+      include DemoPageConfig
 
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
@@ -23,59 +25,98 @@ module ReactOnRails
                    default: false,
                    hide: true
 
+      class_option :new_app,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
+      class_option :rsc,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
+      class_option :tailwind,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       def create_redux_directories
+        component_dir = example_component_source_directory("HelloWorldApp")
+
         # Create auto-bundling directory structure for Redux
-        empty_directory("app/javascript/src/HelloWorldApp/ror_components")
+        empty_directory("#{component_dir}/ror_components")
 
         # Create Redux support directories within the component directory
         dirs = %w[actions constants containers reducers store components]
-        dirs.each { |name| empty_directory("app/javascript/src/HelloWorldApp/#{name}") }
+        dirs.each { |name| empty_directory("#{component_dir}/#{name}") }
       end
 
       def copy_base_files
         base_js_path = "redux/base"
         ext = component_extension(options)
+        component_dir = example_component_source_directory("HelloWorldApp")
 
         # Copy Redux-connected component to auto-bundling structure
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.client.#{ext}",
-                  "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{ext}")
+                  "#{component_dir}/ror_components/HelloWorldApp.client.#{ext}")
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.#{ext}",
-                  "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.#{ext}")
-        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
-                  "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css")
+                  "#{component_dir}/ror_components/HelloWorldApp.server.#{ext}")
 
-        # Update import paths in client component
-        ror_client_file = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{ext}"
-        gsub_file(ror_client_file, "../store/helloWorldStore", "../store/helloWorldStore")
-        gsub_file(ror_client_file, "../containers/HelloWorldContainer",
-                  "../containers/HelloWorldContainer")
+        unless use_tailwind?
+          copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
+                    "#{component_dir}/components/HelloWorld.module.css")
+        end
+
+        return unless use_tailwind?
+
+        ror_client_file = "#{component_dir}/ror_components/HelloWorldApp.client.#{ext}"
+        if options[:pretend]
+          say_status :pretend, "Would add Tailwind stylesheet import to #{ror_client_file}", :yellow
+          return
+        end
+
+        stylesheet_import = "import '#{relative_stylesheet_import_path(ror_client_file)}';\n"
+        ror_client_file_path = File.join(destination_root, ror_client_file)
+        return if File.read(ror_client_file_path).include?(stylesheet_import)
+
+        prepend_to_file(ror_client_file, stylesheet_import)
       end
 
       def copy_base_redux_files
         base_hello_world_path = "redux/base/app/javascript/bundles/HelloWorld"
+        tailwind_hello_world_path = "redux/tailwind/app/javascript/bundles/HelloWorld"
         redux_extension = options.typescript? ? "ts" : "js"
+        component_dir = example_component_source_directory("HelloWorldApp")
 
         # Copy Redux infrastructure files with appropriate extension
         %W[actions/helloWorldActionCreators.#{redux_extension}
            containers/HelloWorldContainer.#{redux_extension}
            constants/helloWorldConstants.#{redux_extension}
            reducers/helloWorldReducer.#{redux_extension}
-           store/helloWorldStore.#{redux_extension}
-           components/HelloWorld.#{component_extension(options)}].each do |file|
+           store/helloWorldStore.#{redux_extension}].each do |file|
              copy_file("#{base_hello_world_path}/#{file}",
-                       "app/javascript/src/HelloWorldApp/#{file}")
+                       "#{component_dir}/#{file}")
            end
+
+        component_file = "components/HelloWorld.#{component_extension(options)}"
+        component_source_path = use_tailwind? ? tailwind_hello_world_path : base_hello_world_path
+        copy_file("#{component_source_path}/#{component_file}",
+                  "#{component_dir}/#{component_file}")
       end
 
       def create_appropriate_templates
         base_path = "base/base"
-        config = {
-          component_name: "HelloWorldApp"
-        }
 
         # Only create the view template - no manual bundle needed for auto-bundling
         template("#{base_path}/app/views/hello_world/index.html.erb.tt",
-                 "app/views/hello_world/index.html.erb", config)
+                 "app/views/hello_world/index.html.erb",
+                 build_hello_world_view_config(
+                   component_name: "HelloWorldApp",
+                   source_path: example_component_source_path("HelloWorldApp"),
+                   landing_page: new_app_landing_page_available?,
+                   redux: true,
+                   rsc_demo: options[:rsc]
+                 ))
       end
 
       def add_redux_npm_dependencies
@@ -88,10 +129,10 @@ module ReactOnRails
         # Fallback to package manager detection if GeneratorHelper fails
         return if success
 
-        package_manager = GeneratorMessages.detect_package_manager
+        package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
         return unless package_manager
 
-        install_packages_with_fallback(regular_packages, dev: false, package_manager: package_manager)
+        install_packages_with_fallback(regular_packages, dev: false, package_manager:)
       end
 
       def add_redux_specific_messages
@@ -100,7 +141,8 @@ module ReactOnRails
         # Append Redux-specific post-install instructions
         GeneratorMessages.add_info(
           GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world",
-                                                               pro: Gem.loaded_specs.key?("react_on_rails_pro"))
+                                                               pro: Gem.loaded_specs.key?("react_on_rails_pro"),
+                                                               app_root: destination_root)
         )
       end
 

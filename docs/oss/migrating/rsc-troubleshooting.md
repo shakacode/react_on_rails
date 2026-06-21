@@ -2,7 +2,27 @@
 
 This guide covers the most common problems you'll encounter when migrating to React Server Components, with concrete solutions for each. Use it as a reference when you hit errors or unexpected behavior.
 
-> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Third-Party Library Compatibility](rsc-third-party-libs.md)
+> **Part 7 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Third-Party Library Compatibility](rsc-third-party-libs.md) | Next: [Flight Payload Optimization](rsc-flight-payload.md)
+
+## Diagnostic Quick-Reference
+
+When something goes wrong during RSC migration, start here. This table maps symptoms to the most likely cause and the relevant section in this guide:
+
+| Symptom                                                                                                        | Most Likely Cause                                                                            | Section                                                                           |
+| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Build error: _"cannot be passed directly to Client Components"_                                                | Passing functions or class instances across the server-client boundary                       | [Serialization Boundary Issues](#serialization-boundary-issues)                   |
+| Build error: _"needs useState/useEffect"_                                                                      | Using hooks in a Server Component file                                                       | [Error Message Catalog](#error-message-catalog)                                   |
+| RSC page downloads unexpectedly large JS chunks                                                                | Chunk contamination from shared `'use client'` modules                                       | [Chunk Contamination](#chunk-contamination)                                       |
+| Component stays a Client Component after removing `'use client'`                                               | Imported by another `'use client'` file, or RSC bundle not rebuilding                        | [Accidental Client Components](#accidental-client-components)                     |
+| Hydration mismatch warnings in console                                                                         | Server/client render output differs (timestamps, browser APIs, invalid HTML)                 | [Hydration Mismatches](#hydration-mismatches)                                     |
+| `ReferenceError: performance is not defined`                                                                   | Node renderer VM context missing globals                                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
+| `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                               | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
+| `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback) |
+| `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                 | [MessageChannel Not Defined](#messagechannel-not-defined)                         |
+| SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                     |
+| Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)     |
+| 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)  |
+| Page is blank until all data loads                                                                             | Missing `stream_react_component` or Suspense boundaries                                      | [Performance Pitfalls](#performance-pitfalls)                                     |
 
 ## Serialization Boundary Issues
 
@@ -85,6 +105,25 @@ export default function ClientForm() {
 <%= stream_react_component("ClientForm") %>
 ```
 
+### Common Error: railsContext Contains Functions
+
+When using React on Rails Pro with RSC, the `railsContext` object includes non-serializable functions (`addPostSSRHook`, `getRSCPayloadStream`). Passing the entire `railsContext` to a Client Component causes:
+
+```
+Functions cannot be passed directly to Client Components
+unless you explicitly expose it by marking it with "use server".
+```
+
+**Fix:** Strip non-serializable properties before passing to Client Components:
+
+```jsx
+// Server Component (render function)
+const MyPage = (props, railsContext) => {
+  const { addPostSSRHook, getRSCPayloadStream, ...serializableContext } = railsContext;
+  return () => <ClientComponent {...props} railsContext={serializableContext} />;
+};
+```
+
 > **Note:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controller endpoints for all mutations.
 
 ### Common Error: Passing Class Instances
@@ -113,13 +152,9 @@ The `'use client'` directive operates at the **module level**. Once a file is ma
 
 ### The Problem
 
-```text
-ClientComponent.jsx ('use client')
-├── imports utils.js          → becomes client code
-│   └── imports heavy-lib.js  → becomes client code (100KB wasted)
-├── imports helpers.js        → becomes client code
-│   └── imports db-utils.js   → becomes client code (SECURITY RISK)
-```
+<p align="center">
+  <img src="images/import-chain-contamination.svg" alt="Static diagram showing how a small 'use client' component can inherit large chunk groups from heavier import paths, and the fix using a thin wrapper file to isolate the dependency tree." width="840" />
+</p>
 
 ### How to Detect It
 
@@ -146,31 +181,42 @@ If someone imports `db-utils.js` from a Client Component (directly or transitive
 
 When a component with `'use client'` is statically imported by both a small RSC path and a heavier client path, the RSC page can inherit chunks from both paths. The impact can be severe (for example, 382 KB instead of 8 KB).
 
+<p align="center">
+  <img src="images/chunk-contamination-fix.svg" alt="Animated before/after showing how a shared import between a heavy page and a small component drags vendor chunks into the RSC page bundle, and the fix that shrinks it by isolating the import." width="840" />
+</p>
+
 ### How to Detect It
 
-After building, inspect your `react-client-manifest.json`. Each `'use client'` module has a `chunks` array listing the JS files the browser must download. If you see large vendor chunks listed for a small component, you have contamination:
+After building, inspect your `react-client-manifest.json`. Each `'use client'` module has a `chunks`
+array listing the JS files the browser must download. Pro RSC manifests can also include a `css`
+array listing stylesheet files that React on Rails Pro injects as render-blocking
+`<link rel="stylesheet" data-precedence="rsc-css">` resources. If you see large vendor chunks or
+unrelated page-specific CSS listed for a small component, you have contamination:
 
 ```json
 {
   "file:///app/components/HelloWorldHooks.jsx": {
     "id": "./components/HelloWorldHooks.jsx",
     "chunks": ["2", "2-b77936c4.js", "rsc-PostsPage", "rsc-PostsPage-d655b05a.js"],
+    "css": ["css/client-PostsPage-d655b05a.css"],
     "name": "*"
   }
 }
 ```
 
-In this example, `HelloWorldHooks` (a tiny component) picks up PostsPage chunks, including a 375 KB vendor chunk containing lodash and moment. The browser downloads all of it.
+In this example, `HelloWorldHooks` (a tiny component) picks up PostsPage chunks, including a 375 KB vendor chunk containing lodash and moment. The browser downloads all of it. If the same contaminated mapping includes `css` entries, the browser can also wait on CSS that the current RSC page does not visually need.
 
-You can also check the browser DevTools **Network** tab: load your RSC page, filter to JS files, and look for unexpectedly large downloads that contain unrelated libraries. Tools like **webpack-bundle-analyzer** can help visualize which modules ended up in which chunks.
+You can also check the browser DevTools **Network** tab: load your RSC page, filter to JS and CSS
+files, and look for unexpectedly large downloads that contain unrelated libraries or page styles.
+Tools like **webpack-bundle-analyzer** can help visualize which modules ended up in which chunks.
 
 ### Why It Happens
 
-The RSC client manifest maps each `'use client'` module to the JS chunks the browser needs to download. When a `'use client'` module is imported by multiple entry points (for example, both an RSC page and a heavy SSR/client page), its mapping can include chunks that originate from both paths.
+The RSC client manifest maps each `'use client'` module to the JS chunks the browser needs to download and, in Pro builds with CSS manifest support, the CSS files React links as render-blocking stylesheets for that client boundary. When a `'use client'` module is imported by multiple entry points (for example, both an RSC page and a heavy SSR/client page), its mapping can include chunks and CSS that originate from both paths.
 
 When `PostsPage.jsx` (`'use client'`) statically imports `HelloWorldHooks.jsx` along with heavy dependencies (lodash, moment), `HelloWorldHooks.jsx` can inherit chunks from that heavier path. The result is chunk contamination: one small component ends up carrying unrelated chunks because it appears in multiple chunk groups.
 
-Redundant `'use client'` directives increase the risk. If a component is already imported by a `'use client'` parent, adding `'use client'` to it too creates extra manifest entries and extra opportunities to accumulate unrelated chunks. Keep `'use client'` only on files that must be server/client boundaries.
+Redundant `'use client'` directives increase the risk. If a component is already imported by a `'use client'` parent, adding `'use client'` to it too creates extra manifest entries and extra opportunities to accumulate unrelated chunks and stylesheet links. Keep `'use client'` only on files that must be server/client boundaries.
 
 ### How to Fix It
 
@@ -203,6 +249,16 @@ export default function RSCPage() {
 ```
 
 The wrapper file doesn't appear in PostsPage's import tree, so it avoids inheriting PostsPage's heavier chunk groups and usually stays mapped to a much smaller chunk footprint.
+
+If the contamination is CSS-specific, keep page-specific global CSS out of broad client components.
+Use CSS Modules, Tailwind utilities, or a route/layout stylesheet for styles that are meant to be
+shared, and let the thin wrapper import only the CSS needed by that RSC boundary.
+
+Also watch for cascade changes. React inserts the `data-precedence="rsc-css"` stylesheet group after
+precedence-less stylesheets already in `<head>`, such as links emitted by Rails layouts, so
+contaminated framework or page CSS can win source-order ties on unrelated pages. CSS Modules scope
+class names, but bare element selectors such as `html`, `body`, or `a:focus` still apply globally
+once their stylesheet is delivered.
 
 ### When the Wrapper Isn't Enough: Prop Injection
 
@@ -368,7 +424,8 @@ For elements that intentionally differ between server and client:
 
 This suppresses the warning for **this element only** (not its descendants) and does not fix the mismatch -- use it only for non-critical content. If child elements also differ, each needs its own `suppressHydrationWarning`.
 
-> **Warning:** The `if (!mounted) return null` pattern causes **Cumulative Layout Shift (CLS)** -- the element occupies no space on first paint, then pops in after hydration. Only use it for small, positionally stable UI elements (icon buttons, toggles). For anything that affects page layout, read the preference from a server-readable cookie to render the correct value on first paint (see the [Theme Provider](rsc-context-and-state.md#theme-provider-no-flash-of-wrong-theme) section), or use `suppressHydrationWarning` on non-layout-critical elements.
+> [!WARNING]
+> The `if (!mounted) return null` pattern causes **Cumulative Layout Shift (CLS)** -- the element occupies no space on first paint, then pops in after hydration. Only use it for small, positionally stable UI elements (icon buttons, toggles). For anything that affects page layout, read the preference from a server-readable cookie to render the correct value on first paint (see the [Theme Provider](rsc-context-and-state.md#theme-provider-no-flash-of-wrong-theme) section), or use `suppressHydrationWarning` on non-layout-critical elements.
 
 ## Error Boundary Limitations
 
@@ -440,6 +497,8 @@ export default function PageErrorBoundary({ children }) {
 ```
 
 `refetchComponent` re-fetches the RSC payload for the named component with `enforceRefetch: true`, bypassing any cached promise. This is the React on Rails equivalent of Next.js's `router.refresh()`.
+
+For refetch triggers that aren't part of an error-recovery flow — a "Refresh" toolbar button, a websocket-driven invalidation, or an inline refresh button rendered by the server component itself — see [Manually refetching a server component](../../pro/react-server-components/inside-client-components.md#manually-refetching-a-server-component) for the `<RSCRoute ref={...}>` and `useCurrentRSCRoute()` APIs that don't require the caller to know the component's name or props.
 
 ## `'use client'` Directive Mistakes
 
@@ -545,7 +604,7 @@ end
                posts: Post.where(user_id: current_user.id).limit(10).as_json }) %>
 ```
 
-See [Data Fetching Migration](rsc-data-fetching.md#avoiding-server-side-waterfalls) for detailed patterns.
+See [Data Fetching Migration](rsc-data-fetching.md#avoiding-server-side-waterfalls) for detailed patterns, including `stream_react_component_with_async_props` when slow Rails props should resolve behind Suspense boundaries.
 
 ### Missing Suspense Boundaries
 
@@ -553,7 +612,11 @@ Without Suspense, Server Components perform similarly to traditional SSR. Benchm
 
 ### RSC Payload Duplication
 
-The RSC payload (a serialized representation of the component tree) is embedded in `<script>` tags alongside the server-rendered HTML. This payload is used by React on the client to reconcile the component tree without re-rendering from scratch. The HTML and the RSC payload are not exact duplicates -- the payload contains component structure and props, not rendered markup -- but they do represent overlapping information, which increases document size. Monitor RSC payload size to ensure it stays reasonable.
+The RSC payload (a serialized representation of the component tree) is embedded in `<script>` tags alongside the server-rendered HTML. This payload is used by React on the client to reconcile the component tree without re-rendering from scratch. The HTML and the RSC payload are not exact duplicates -- the payload contains component structure and props, not rendered markup -- but they do represent overlapping information, which increases document size.
+
+Payload size can grow rapidly when Server Components produce verbose element trees -- particularly with utility-first CSS frameworks like Tailwind, where className strings alone can account for nearly half the payload. Components repeated many times on a page (product cards, review lists, tag grids) amplify this effect. In one benchmark, moving four presentational subtrees from server to client components reduced the raw Flight payload by 42% with only a 2.2 KB client JS increase.
+
+For a detailed analysis, measurement techniques, and the decision flowchart for when to apply this optimization, see [Flight Payload Optimization](rsc-flight-payload.md).
 
 ## Testing Strategies
 
@@ -579,6 +642,8 @@ E2E Tests (Playwright)
 ├── Hydration correctness -- verify interactivity
 └── Full page flows -- navigation, forms, etc.
 ```
+
+For Rails system tests that exercise the node renderer, see [RSC and Node Renderer System Tests](../building-features/testing-configuration.md#rsc-and-node-renderer-system-tests). That guide covers test bundle compilation, renderer process startup/shutdown, bundle-cache isolation, parallel-worker caveats, and stubbing external APIs without bypassing the RSC path.
 
 ### Testing Mutations
 
@@ -659,13 +724,12 @@ end
 
 ## Bundle Analysis Tools
 
-| Tool                                | Purpose                                                          |
-| ----------------------------------- | ---------------------------------------------------------------- |
-| **webpack-bundle-analyzer**         | Analyze client bundle composition and module sizes               |
-| **RSC Devtools** (Chrome extension) | Visualize RSC streaming data, server vs client rendering         |
-| **DevConsole**                      | Color-coded component boundaries (green = client, blue = server) |
-| **RSC Parser**                      | Parse the React Flight wire format to inspect the component tree |
-| **`webpack-stats-explorer`**        | Interactive exploration of webpack stats for chunk analysis      |
+| Tool                                                                                                                          | Purpose                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **[webpack-bundle-analyzer](https://github.com/webpack-contrib/webpack-bundle-analyzer)**                                     | Analyze client bundle composition and module sizes               |
+| **[RSC Devtools](https://chromewebstore.google.com/detail/rsc-devtools/jcejahepddjnppkhomnidalpnnnemomn)** (Chrome extension) | Visualize RSC streaming data, server vs client rendering         |
+| **[RSC Parser](https://rsc-parser.vercel.app/)**                                                                              | Parse the React Flight wire format to inspect the component tree |
+| **[webpack-stats-explorer](https://github.com/erykpiast/webpack-stats-explorer)**                                             | Interactive exploration of webpack stats for chunk analysis      |
 
 ### Key Metrics to Track
 
@@ -691,27 +755,53 @@ end
 | `"Refs cannot be used in Server Components, nor passed to Client Components"`                                                | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type.             | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element.                            |
 | `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"`                                                    | Both packages installed as separate top-level dependencies, often due to yalc link issues                                                                                                          | Ensure only `react-on-rails-pro` is in your `package.json`; the base package is installed automatically as a dependency. See [Duplicate Package Detection](#duplicate-package-detection)                                                                               |
 | `ReferenceError: performance is not defined`                                                                                 | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode                                                                                                 | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                                                                                              |
+| `ReferenceError: require is not defined`                                                                                     | Server or RSC bundle webpack config uses `externals` for Node builtins, generating `require()` calls that fail in VM sandbox                                                                       | Use `resolve.fallback: { path: false, fs: false }` instead of `externals`. See [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)                                                                                                       |
+| `ReferenceError: MessageChannel is not defined`                                                                              | `react-dom/server.browser` instantiates `MessageChannel` at module load time; VM sandbox lacks this global                                                                                         | Inject a `BannerPlugin` polyfill in the server webpack config. See [MessageChannel Not Defined](#messagechannel-not-defined)                                                                                                                                           |
 | `"global object mismatch"`                                                                                                   | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc)                                                                                                      | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch)                                                                                                                           |
 | SSR hangs indefinitely / request timeout on large RSC payloads                                                               | Stream backpressure deadlock when RSC payload exceeds 16 KB                                                                                                                                        | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                                                                                                                                                 |
 | `"The 'react-on-rails' package version does not match the gem version"`                                                      | Gem and npm package installed at different versions                                                                                                                                                | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                   |
 | `"The 'react-on-rails' package version is not an exact version"`                                                             | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json                                                                                                                    | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                    |
+| RSC payload returns `ServerComponentFetchError: Error parsing JSON` or `SyntaxError` in development                          | Rails' `annotate_rendered_view_with_filenames` wraps the RSC payload JSON in `<!-- BEGIN -->` / `<!-- END -->` HTML comments                                                                       | Upgrade to React on Rails Pro 16.4.0+ which renders RSC templates with `formats: [:text]`. For older versions, disable `config.action_view.annotate_rendered_view_with_filenames` for the RSC controller.                                                              |
+| `railsContext` causes "Functions cannot be passed directly to Client Components"                                             | `railsContext` includes non-serializable functions (`addPostSSRHook`, `getRSCPayloadStream`) added by Pro                                                                                          | Destructure and exclude function properties before passing to Client Components. See [railsContext Contains Functions](#common-error-railscontext-contains-functions)                                                                                                  |
 
 ## Environment Variable Access
 
 ### Server Components
 
-Server Components run on the server (in the node renderer), so they have access to **all** environment variables available to the Node.js process:
+Server Components run on the server (in the node renderer). When the launcher sets `supportModules: true`, `process` is injected into the VM context, so Server Components can read environment variables via `process.env`:
 
 ```jsx
-// Server Component -- full access to Node.js process.env
-async function DBComponent() {
-  // WARNING: If INTERNAL_API_URL points back to the same Rails server,
-  // this creates a circular request (Node renderer → Rails → Node renderer).
-  // Use a direct database call or internal service URL that bypasses Rails routing.
-  const data = await fetch(process.env.INTERNAL_API_URL); // Works if this env var holds an HTTP(S) URL
-  const dbUrl = process.env.DATABASE_URL; // Works
+// Server Component -- this file is bundled by webpack/esbuild into the server/RSC bundle,
+// not the launcher file. The launcher file (`node-renderer.js`) is separate and stays plain
+// CommonJS with `require()`. In component files, webpack/esbuild normalize CJS interop:
+// node-fetch v2 is a CJS module, module.exports is treated as the default import, and
+// node-fetch v2 exports the fetch function that way.
+import nodeFetch from 'node-fetch';
+
+async function InternalDataComponent() {
+  // Requires `supportModules: true` in the launcher config so `process` is injected
+  // into the VM context. Without it, these reads throw `ReferenceError: process is not defined`.
+  const serviceUrl = process.env.INTERNAL_SERVICE_URL; // Works
   const secret = process.env.API_SECRET; // Works
+
+  if (!serviceUrl || !secret) {
+    throw new Error('INTERNAL_SERVICE_URL and API_SECRET must be set.');
+  }
+
+  // Use env vars with server-only data access, a bundled HTTP client, or fetch
+  // injected via additionalContext. Avoid URLs that route back through the same
+  // Rails app, which can create a Node renderer -> Rails -> Node renderer loop.
+  // This example uses node-fetch v2 bundled in the server/RSC bundle.
+  const response = await nodeFetch(serviceUrl, {
+    headers: { Authorization: `Bearer ${secret}` },
+  });
+  if (!response.ok) throw new Error(`HTTP error fetching data: ${response.status}`);
+  const data = await response.json();
+
+  return <pre>{JSON.stringify(data)}</pre>;
 }
+
+export default InternalDataComponent;
 ```
 
 ### Client Components
@@ -760,17 +850,21 @@ for the current recommendation. See also
 
 ### Node Renderer VM Context -- Missing Globals
 
-**Symptoms:** Cryptic errors like `ReferenceError: performance is not defined` when rendering Server Components. Often triggered by `React.lazy()` which calls `performance.now()` internally in development mode.
+**Symptoms:** Cryptic errors like `ReferenceError: performance is not defined`, `ReferenceError: fetch is not defined`, or `ReferenceError: require is not defined` when rendering Server Components. Often triggered by code that assumes the renderer VM inherits every global from the host Node.js process.
 
-**Root cause:** The node renderer runs your JavaScript in an isolated V8 VM context (`vm.createContext`). By default, the VM context only includes basic globals. Node.js-specific globals like `performance`, `Buffer`, `TextDecoder`, etc. must be explicitly added.
+**Root cause:** The node renderer runs uploaded bundles in isolated V8 VM contexts (`vm.createContext`). By default, each VM context only includes basic globals. Node.js-specific globals like `performance`, `Buffer`, `TextDecoder`, etc. must be explicitly added. Critically, `require()` is also not available in the VM sandbox.
+
+> **Important:** This VM global constraint applies to the **server bundle** (SSR) and to the **RSC bundle** when the node renderer executes it to generate an RSC payload. See the [Bundle Architecture Reference](../../pro/react-server-components/rendering-flow.md#bundle-architecture-reference) for a comparison.
+
+> **Migration note:** If you relied on earlier docs that said the RSC bundle runs in full Node.js, and your Server Components call `fetch()` directly (or use `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`), the renderer VM will not have those globals. Bundle an HTTP client into the RSC/server bundle or inject the fetch globals through `additionalContext`. See [Node Renderer Runtime Globals for SSR and RSC](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc) for guarded startup examples.
 
 **Fix:** Enable `supportModules` in your node renderer configuration to inject common Node.js globals:
 
 ```js
-// node-renderer.js (or wherever you configure the renderer)
+// renderer/node-renderer.js (or wherever you configure the renderer)
 module.exports = {
   supportModules: true, // Injects: Buffer, TextDecoder, TextEncoder,
-  // URLSearchParams, ReadableStream, process,
+  // URLSearchParams, ReadableStream, process, performance,
   // setTimeout, setInterval, setImmediate,
   // clearTimeout, clearInterval, clearImmediate,
   // queueMicrotask
@@ -783,16 +877,111 @@ Or set the environment variable:
 RENDERER_SUPPORT_MODULES=true
 ```
 
-For globals not covered by `supportModules` (e.g., `performance`), use `additionalContext`:
+For globals not covered by `supportModules`, use `additionalContext`. For `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal`, see [Node Renderer JavaScript Configuration](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc) for guarded startup examples that fail fast when a required global is missing. If your Node.js runtime does not provide the fetch globals, use a bundled HTTP client such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici` from the component code, or pass a fetch implementation through `additionalContext`.
+
+For other globals, inject them directly. For example, to provide a deterministic `performance` stub for byte-stable SSR:
 
 ```js
 module.exports = {
   supportModules: true,
   additionalContext: {
-    performance: require('perf_hooks').performance,
+    performance: { now: () => 0 },
   },
 };
 ```
+
+#### Handling Node Builtins -- `externals` vs `resolve.fallback`
+
+A common mistake when configuring the server bundle is using webpack `externals` to handle Node builtins like `path`, `fs`, and `stream`. This generates `require('path')` calls in the output -- but the VM sandbox has **no `require` function** by default, causing `ReferenceError: require is not defined` at runtime.
+
+> **Note:** If you have `supportModules` or `additionalContext` enabled in your renderer configuration, the renderer wraps the bundle in a module wrapper and injects `require` into the VM. In that case, `externals` will work. The guidance below applies to the default configuration without these options.
+
+**Wrong approach (causes `require is not defined`):**
+
+```js
+// DON'T do this in serverWebpackConfig.js
+externals: {
+  path: 'commonjs path',
+  fs: 'commonjs fs',
+  stream: 'commonjs stream',
+}
+```
+
+**Correct approach:**
+
+```js
+// In serverWebpackConfig.js -- tells webpack not to polyfill these modules (imports resolve to nothing; no shim bundled)
+resolve: {
+  fallback: {
+    path: false,
+    fs: false,
+    stream: false,
+  },
+}
+```
+
+`resolve.fallback: false` tells webpack not to provide a polyfill for the module — the import resolves to an empty module at build time and no fallback shim is bundled. Apply the same rule to the RSC bundle when the node renderer executes it: the RSC bundle also runs in a VM context without host `require()` by default, so unresolved externals can crash at render time as well.
+
+### MessageChannel Not Defined
+
+**Symptoms:** `ReferenceError: MessageChannel is not defined` when the server bundle loads. This typically crashes during module initialization, not during rendering.
+
+**Root cause:** `react-dom/server.browser.js` (used for SSR streaming) instantiates `MessageChannel` at **module load time** for React's internal scheduler. The VM sandbox does not provide `MessageChannel` as a global, and `supportModules` does not include it.
+
+**Fix (recommended):** Use `additionalContext` in the node renderer config to inject Node.js' native `MessageChannel` into the VM sandbox. Node.js has had a native `MessageChannel` since Node 15, and passing it through `additionalContext` gives React's scheduler correct async scheduling (macrotask delivery), which is what it depends on:
+
+```js
+// In your node-renderer.js config
+const { MessageChannel } = require('node:worker_threads');
+
+const config = {
+  // ... other options
+  additionalContext: { MessageChannel },
+};
+
+module.exports = config; // export from node-renderer.js
+```
+
+See the [node renderer JS configuration reference](../building-features/node-renderer/js-configuration.md) for where `config` is consumed.
+
+**Fallback:** If you cannot change the renderer config (e.g., a build-only setup without renderer config control), inject a minimal `MessageChannel` polyfill at the top of the server bundle using webpack's `BannerPlugin`. The polyfill only needs to support `port2.postMessage` triggering `port1.onmessage`, which is all React's scheduler requires:
+
+```js
+// In serverWebpackConfig.js
+const webpack = require('webpack');
+
+const messageChannelPolyfill = `
+if (typeof MessageChannel === 'undefined') {
+  globalThis.MessageChannel = class MessageChannel {
+    constructor() {
+      this.port1 = { onmessage: null };
+      this.port2 = {
+        postMessage: (msg) => {
+          if (this.port1.onmessage) {
+            this.port1.onmessage({ data: msg });
+          }
+        },
+      };
+    }
+  };
+}
+`;
+
+// Add to plugins array
+plugins: [
+  new webpack.BannerPlugin({
+    banner: messageChannelPolyfill,
+    raw: true,
+  }),
+  // ... other plugins
+];
+```
+
+This injects the polyfill as raw JavaScript at the top of the bundle output, ensuring `MessageChannel` is defined before any module code executes. Note: this polyfill delivers messages synchronously, which works for current SSR streaming scenarios but may cause subtle rendering bugs if React yields mid-render and re-enters the scheduler. Prefer the `additionalContext` approach above whenever possible.
+
+> **When to use the `BannerPlugin` polyfill:** Use it only when the renderer config's `additionalContext` is not accessible (e.g., in a build-only setup without renderer config control). If you encounter recursive stack-overflow errors or unexpected rendering behavior with the synchronous polyfill, switch to the `additionalContext` approach.
+
+> **Note:** This usually affects the server bundle because SSR streaming loads `react-dom/server.browser`. The RSC bundle still follows the node renderer VM global rules, so inject or bundle `MessageChannel` there too if RSC code or its dependencies require it. The client bundle runs in the browser, which has native `MessageChannel`.
 
 ### Version Mismatch -- "Global Object Mismatch"
 
@@ -867,18 +1056,18 @@ Package: 16.3.0
 
 This happens when you upgrade the gem (e.g., `bundle update react_on_rails`) without upgrading the npm package, or vice versa. Both must be the same version.
 
-**Fix:** Install the npm package version that matches your gem:
+**Fix:** Install the npm package version that matches your gem. Replace `VERSION` with the version shown in the error message (e.g., the `Gem:` line):
 
 ```bash
 # Check your gem version
 bundle show react_on_rails
 
 # Install the matching npm package (use your package manager)
-yarn add react-on-rails@16.4.0 --exact
+yarn add react-on-rails@VERSION --exact
 # or
-pnpm add react-on-rails@16.4.0 --save-exact
+pnpm add react-on-rails@VERSION --save-exact
 # or
-npm install react-on-rails@16.4.0 --save-exact
+npm install react-on-rails@VERSION --save-exact
 ```
 
 **Symptom 2 -- Non-exact version:**
@@ -892,12 +1081,12 @@ Detected: ^16.4.0
 
 React on Rails does not allow semver ranges (`^`, `~`, `>`, `<`, `*`) or special tags (`latest`, `next`, `beta`) in `package.json`. The version must be an exact match.
 
-**Fix:** Remove the range operator and pin to the exact version:
+**Fix:** Remove the range operator and pin to the exact version shown in the `Gem:` line:
 
 ```json
 {
   "dependencies": {
-    "react-on-rails": "16.4.0"
+    "react-on-rails": "VERSION"
   }
 }
 ```
@@ -910,10 +1099,10 @@ React on Rails does not allow semver ranges (`^`, `~`, `>`, `<`, `*`) or special
 
 If you have the `react_on_rails_pro` gem in your Gemfile, you must use the `react-on-rails-pro` npm package, not `react-on-rails`.
 
-**Fix:** Replace the base package with the Pro package:
+**Fix:** Replace the base package with the Pro package. Replace `VERSION` with the gem version from the `Gem:` line in the error message:
 
 ```bash
-yarn remove react-on-rails && yarn add react-on-rails-pro@16.4.0 --exact
+yarn remove react-on-rails && yarn add react-on-rails-pro@VERSION --exact
 ```
 
 **Symptom 4 -- Pro package without Pro gem:**
@@ -943,4 +1132,5 @@ For these cases, keep components as Client Components and adopt Server Component
 - [Component Tree Restructuring Patterns](rsc-component-patterns.md) -- how to restructure your component tree
 - [Context, Providers, and State Management](rsc-context-and-state.md) -- how to handle Context and global state
 - [Data Fetching Migration](rsc-data-fetching.md) -- migrating from useEffect to server-side fetching
+- [HTTP Response Ownership](rsc-http-response-patterns.md) -- status codes, redirects, and cache headers
 - [Third-Party Library Compatibility](rsc-third-party-libs.md) -- dealing with incompatible libraries

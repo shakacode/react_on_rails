@@ -14,23 +14,34 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 ### Connection refused to renderer
 
-**Symptom**: `Errno::ECONNREFUSED` or timeout errors when Rails tries to reach the node renderer.
+**Symptom**: `Errno::ECONNREFUSED` or timeout errors when Rails tries to reach the node renderer. In tests, this often surfaces as a generic **server-rendering error** — the actual root cause is that the renderer was unavailable when Rails connected to `REACT_RENDERER_URL`, not a webpack or bundle misconfiguration.
 
 **Fixes**:
 
-- Verify the renderer is running: `curl http://localhost:3800/`
+- Verify the renderer is running: `curl http://127.0.0.1:3800/`
 - Check that `config.renderer_url` in `config/initializers/react_on_rails_pro.rb` matches the renderer's actual port
+- Use the **same host literal** on both sides — prefer `127.0.0.1` over `localhost`. `RENDERER_HOST` defaults to `localhost`, which can resolve to IPv6 (`::1`) or IPv4 (`127.0.0.1`) depending on the machine's name-resolution order; if the renderer binds to one family and Rails dials the other, the connection is refused even though the renderer is running.
+- In CI, make sure the renderer stays alive for the entire Rails test process — start it, wait for its port, run the tests, and clean up in the same step. See [Running Rails Tests Against the Node Renderer in CI](./node-renderer.md#running-rails-tests-against-the-node-renderer-in-ci).
 - On Heroku, ensure the renderer is started via `Procfile.web` (see [Heroku deployment](../oss/building-features/node-renderer/heroku.md))
 
 ### Workers crashing with memory leaks
 
-**Symptom**: Node renderer workers restart frequently or OOM.
+**Symptom**: Node renderer workers restart frequently or OOM. Memory grows monotonically over time.
 
-**Fixes**:
+**Root cause**: The Node Renderer reuses V8 VM contexts across requests. Any module-level state in your server bundle (caches, Sets, memoized functions) persists across all requests and can grow unboundedly. This is the most common cause of OOM in the Node Renderer.
 
-- Enable rolling restarts with `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts` — use high values to avoid all workers being down simultaneously
-- Profile memory using `node --inspect` (see [Profiling guide](./profiling-server-side-rendering-code.md))
-- Check for global state leaks and use `config.ssr_pre_hook_js` to clear them
+**Immediate mitigations**:
+
+- Set `NODE_OPTIONS=--max-old-space-size=<MB>` to cap V8 heap size and force more aggressive garbage collection
+- Enable rolling restarts with `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts` — these periodically kill and restart workers, reclaiming all accumulated memory
+
+**Investigation**:
+
+- Capture heap snapshots with `NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2"` — send `kill -USR2 <worker-pid>` at different times and compare in Chrome DevTools (see [Debugging guide](../oss/building-features/node-renderer/debugging.md#debugging-memory-leaks))
+- Profile memory using `node --inspect` and Chrome DevTools (see [Profiling guide](./profiling-server-side-rendering-code.md))
+- Search your server bundle code for module-level `Map`, `Set`, `{}` caches, and `_.memoize` calls — these are the most common leak sources
+- Use `config.ssr_pre_hook_js` to run cleanup code before each render (e.g., clearing global state)
+- See the [Memory Leaks guide](./js-memory-leaks.md) for detailed patterns, an audit checklist, and fixes
 
 ### Workers killed during streaming
 
@@ -58,16 +69,16 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 ## License
 
-### License validation fails on startup
+### License validation warnings on startup
 
-**Symptom**: `ReactOnRailsPro::LicenseError` on Rails boot.
+**Symptom**: Rails logs a React on Rails Pro license warning or informational message on boot.
 
 **Fixes**:
 
 - In production, ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set
 - Run `bundle exec rake react_on_rails_pro:verify_license` to check license status (use `FORMAT=json` for CI/CD)
-- Check that the license key is not expired — contact [justin@shakacode.com](mailto:justin@shakacode.com) for renewal
-- For evaluation/non-production use, no license token is required — the app runs in unlicensed mode
+- Check that the license key is not expired — use [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com) for renewal
+- Under the friendly license model, no token is required for evaluation or non-production use; the app runs in unlicensed mode
 
 ## React Server Components
 
@@ -88,5 +99,4 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 **Fixes**:
 
 - Check that client-side JavaScript bundles are loaded (no 404s in browser console)
-- Verify `immediate_hydration` option — set to `true` for immediate hydration
 - Ensure client components have the `'use client'` directive

@@ -22,14 +22,17 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 
 ### Evaluating Rails + React options
 
-- [Examples and migration references](https://reactonrails.com/examples)
-- [Compare with alternatives](./oss/getting-started/comparison-with-alternatives.md)
+- [Examples and migration references](./oss/getting-started/examples-and-references.md) — maintained starters, migration repos, and Pro + RSC demos
+- [Example migrations](./oss/migrating/example-migrations.md) — curated migration references and proof criteria
+- [Examples gallery](https://reactonrails.com/examples) — reactonrails.com showcase apps
+- [Compare with alternatives](./oss/getting-started/comparing-react-on-rails-to-alternatives.md) — decision guide covering Hotwire, Inertia, Next.js, and more
 - [Migrate from react-rails](./oss/migrating/migrating-from-react-rails.md)
 
 ## Dive deeper when you need it
 
 - [Introduction](./oss/introduction.md)
 - [Core Concepts](./oss/core-concepts/how-react-on-rails-works.md)
+- [Accessibility (a11y)](./oss/building-features/accessibility.md) — WCAG AA practices for SSR, hydration, and RSC-streamed UI
 - [API Reference](./oss/api-reference/view-helpers-api.md)
 - [Deployment and troubleshooting](./oss/deployment/README.md)
 - [Configuration](./oss/configuration/README.md)
@@ -37,10 +40,15 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 
 ## Pro features
 
-- [React Server Components](./pro/react-server-components/tutorial.md) - RSC with Rails
-- [Streaming SSR](./oss/building-features/streaming-server-rendering.md) - Progressive server rendering
-- [Node Renderer](./oss/building-features/node-renderer/basics.md) - Dedicated Node.js rendering server
+Start at [React on Rails Pro](./pro/react-on-rails-pro.md) for the canonical Pro route map, then choose the feature family you need:
+
+- [React Server Components](./pro/react-server-components/index.md) - RSC overview and public demo evidence
+- [Streaming SSR](./pro/streaming-ssr.md) - Progressive server rendering
+- [Node Renderer](./pro/node-renderer.md) - Dedicated Node.js rendering server
+- [Pro Review App Security](./pro/deployment/review-app-security.md) - Safe review-app defaults for public repositories
+- [Fragment Caching](./pro/fragment-caching.md) - Cache rendered components
 - [Upgrading to Pro](./pro/upgrading-to-pro.md) - Switch from OSS to Pro in three steps
+- [Node Renderer: Container Deployment](./oss/building-features/node-renderer/container-deployment.md) (Pro) - Sidecar vs. separate workloads, memory tuning, troubleshooting
 
 ## Friendly evaluation policy
 

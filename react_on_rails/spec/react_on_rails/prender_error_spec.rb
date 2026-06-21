@@ -27,7 +27,7 @@ module ReactOnRails
     let(:expected_error_info) do
       {
         component_name: "component_name",
-        err: err,
+        err:,
         props: { a: 1, b: 2 },
         js_code: "console.log('foobar')",
         console_messages: "console_messages"

@@ -7,6 +7,9 @@ import ReactOnRails from 'react-on-rails/client';
 import ReactDOM from 'react-dom';
 
 import HelloWorldContainer from '../../app/components/HelloWorldContainer';
+// Intentional cross-tree import: the React 16 dummy entries reuse the StrictMode helper from the
+// React 19 `app/` tree. Keep the import path in sync if `app/strictModeSupport` is moved.
+import { wrapElementInStrictMode } from '../../app/strictModeSupport';
 
 /*
  *  Export a function that returns a ReactComponent, depending on a store named SharedReduxStore.
@@ -14,9 +17,16 @@ import HelloWorldContainer from '../../app/components/HelloWorldContainer';
  *  React will see that the state is the same and not do anything.
  */
 export default (props, _railsContext, domNodeId) => {
-  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
-  // eslint-disable-next-line no-param-reassign
-  delete props.prerender;
+  const { prerender } = props;
+  const render = prerender ? ReactDOM.hydrate : ReactDOM.render;
+
+  const domNode = document.getElementById(domNodeId);
+  if (!domNode) {
+    const renderMode = prerender ? 'hydrate' : 'render';
+    throw new Error(
+      `Cannot ${renderMode} ReduxSharedStoreApp because DOM element with id "${domNodeId}" was not found.`,
+    );
+  }
 
   // This is where we get the existing store.
   const store = ReactOnRails.getStore('SharedReduxStore');
@@ -26,13 +36,15 @@ export default (props, _railsContext, domNodeId) => {
 
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
+  // The React 16/17 API re-renders into the same container idempotently, so hot reload reuses the
+  // existing tree (no separate root to unmount first).
   const renderApp = (Component) => {
-    const element = (
+    const element = wrapElementInStrictMode(
       <Provider store={store}>
         <Component />
-      </Provider>
+      </Provider>,
     );
-    render(element, document.getElementById(domNodeId));
+    render(element, domNode);
   };
 
   renderApp(HelloWorldContainer);
@@ -42,4 +54,9 @@ export default (props, _railsContext, domNodeId) => {
       renderApp(HelloWorldContainer);
     });
   }
+
+  // Return a teardown wrapper so React on Rails unmounts this tree on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it. The React 16/17 API unmounts
+  // by container node rather than via a root handle.
+  return { teardown: () => ReactDOM.unmountComponentAtNode(domNode) };
 };

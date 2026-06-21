@@ -9,7 +9,7 @@ shared_examples "pro_common_files" do
   end
 
   it "creates node-renderer.js bootstrap file" do
-    assert_file "client/node-renderer.js" do |content|
+    assert_file "renderer/node-renderer.js" do |content|
       expect(content).to include("reactOnRailsProNodeRenderer")
     end
   end
@@ -17,7 +17,17 @@ shared_examples "pro_common_files" do
   it "adds node-renderer process to Procfile.dev" do
     assert_file "Procfile.dev" do |content|
       expect(content).to include("node-renderer:")
-      expect(content).to include("RENDERER_PORT=3800")
+      expect(content).to include("RENDERER_PORT=${RENDERER_PORT:-3800}")
+    end
+  end
+
+  it "adds node-renderer process to every bin/dev Procfile that can serve SSR pages" do
+    %w[Procfile.dev Procfile.dev-static-assets Procfile.dev-prod-assets].each do |procfile|
+      assert_file procfile do |content|
+        expect(content).to include("node-renderer:")
+        expect(content).to include("RENDERER_PORT=${RENDERER_PORT:-3800}")
+        expect(content).to include("node renderer/node-renderer.js")
+      end
     end
   end
 end

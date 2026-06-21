@@ -1,8 +1,11 @@
 {
   "name": "react-on-rails-pro-node-renderer",
-  "version": "16.4.0",
+  "version": "17.0.0-rc.5",
   "protocolVersion": "2.0.0",
   "description": "React on Rails Pro Node Renderer for server-side rendering",
+  "engines": {
+    "node": ">=18.19.0"
+  },
   "main": "lib/ReactOnRailsProNodeRenderer.js",
   "directories": {
     "doc": "docs"
@@ -26,14 +29,19 @@
     },
     "./package.json": "./package.json"
   },
+  "files": [
+    "README.md",
+    "lib/**/*.js",
+    "lib/**/*.d.ts"
+  ],
   "dependencies": {
     "@fastify/formbody": "^7.4.0 || ^8.0.2",
     "@fastify/multipart": "^8.3.1 || ^9.0.3",
-    "fastify": "^5.8.1",
+    "fastify": "^5.8.5",
     "fs-extra": "^11.2.0",
     "jsonwebtoken": "^9.0.3",
     "lockfile": "^1.0.4",
-    "pino": "^9.0.0"
+    "pino": "^9.14.0 || ^10.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.26.10",
@@ -42,6 +50,15 @@
     "@babel/preset-react": "^7.26.3",
     "@babel/preset-typescript": "^7.27.1",
     "@honeybadger-io/js": "^6.10.1",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.214.0",
+    "@fastify/otel": "^0.18.1",
+    "@opentelemetry/instrumentation": "^0.214.0",
+    "@opentelemetry/instrumentation-http": "^0.214.0",
+    "@opentelemetry/resources": "^2.0.1",
+    "@opentelemetry/sdk-trace-base": "^2.0.1",
+    "@opentelemetry/sdk-trace-node": "^2.0.1",
+    "@opentelemetry/semantic-conventions": "^1.36.0",
     "@sentry/node": "^7.120.0",
     "@types/fs-extra": "^11.0.4",
     "@types/jest": "^29.5.12",
@@ -64,11 +81,47 @@
   },
   "peerDependencies": {
     "@honeybadger-io/js": ">=4.0.0",
+    "@opentelemetry/api": ">=1.9.0 <2.0.0",
+    "@opentelemetry/exporter-trace-otlp-http": ">=0.214.0 <1.0.0",
+    "@fastify/otel": ">=0.18.0 <1.0.0",
+    "@opentelemetry/instrumentation": ">=0.214.0 <1.0.0",
+    "@opentelemetry/instrumentation-http": ">=0.214.0 <1.0.0",
+    "@opentelemetry/resources": ">=2.0.0 <3.0.0",
+    "@opentelemetry/sdk-trace-base": ">=2.0.0 <3.0.0",
+    "@opentelemetry/sdk-trace-node": ">=2.0.0 <3.0.0",
+    "@opentelemetry/semantic-conventions": ">=1.36.0 <2.0.0",
     "@sentry/node": ">=5.0.0 <11.0.0",
     "@sentry/tracing": ">=5.0.0"
   },
   "peerDependenciesMeta": {
     "@honeybadger-io/js": {
+      "optional": true
+    },
+    "@opentelemetry/api": {
+      "optional": true
+    },
+    "@opentelemetry/exporter-trace-otlp-http": {
+      "optional": true
+    },
+    "@fastify/otel": {
+      "optional": true
+    },
+    "@opentelemetry/instrumentation": {
+      "optional": true
+    },
+    "@opentelemetry/instrumentation-http": {
+      "optional": true
+    },
+    "@opentelemetry/resources": {
+      "optional": true
+    },
+    "@opentelemetry/sdk-trace-base": {
+      "optional": true
+    },
+    "@opentelemetry/sdk-trace-node": {
+      "optional": true
+    },
+    "@opentelemetry/semantic-conventions": {
       "optional": true
     },
     "@sentry/node": {
@@ -91,7 +144,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shakacode/react_on_rails.git"
+    "url": "git+https://github.com/shakacode/react_on_rails.git",
+    "directory": "packages/react-on-rails-pro-node-renderer"
   },
   "keywords": [
     "react",
@@ -106,7 +160,7 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails/tree/main/packages/react-on-rails-pro-node-renderer#readme",
+  "homepage": "https://reactonrails.com/docs/pro/node-renderer/",
   "jest": {
     "clearMocks": true,
     "moduleNameMapper": {
@@ -124,6 +178,5 @@
     "transform": {
       "^.+\\.[jt]sx?$": "babel-jest"
     }
-  },
-  "packageManager": "pnpm@9.14.2"
+  }
 }

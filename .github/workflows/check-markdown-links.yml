@@ -1,5 +1,8 @@
 name: Check Markdown Links
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -7,11 +10,17 @@ on:
       - '**.md'
       - '.github/workflows/check-markdown-links.yml'
       - '.lychee.toml'
+      - '.prettierignore'
+      - '.prettierrc'
+      - 'pnpm-lock.yaml'
   pull_request:
     paths:
       - '**.md'
       - '.github/workflows/check-markdown-links.yml'
       - '.lychee.toml'
+      - '.prettierignore'
+      - '.prettierrc'
+      - 'pnpm-lock.yaml'
   schedule:
     # Run daily at 3am UTC to catch stale cached links
     # See: https://lychee.cli.rs/github_action_recipes/caching/
@@ -19,6 +28,42 @@ on:
   workflow_dispatch:
 
 jobs:
+  markdown-format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
+          node-version-file: .tool-versions
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter='{.}'
+
+      - name: Check markdown formatting
+        shell: bash
+        run: |
+          markdown_files=()
+          while IFS= read -r -d '' file; do
+            if [ -f "$file" ] && [ ! -L "$file" ]; then
+              markdown_files+=("$file")
+            fi
+          done < <(git ls-files -z -- '*.md' '*.mdx' '*.markdown')
+
+          if [ "${#markdown_files[@]}" -eq 0 ]; then
+            echo "No markdown files to check."
+            exit 0
+          fi
+
+          pnpm exec prettier --check -- "${markdown_files[@]}"
+
   markdown-link-check:
     runs-on: ubuntu-latest
     steps:
@@ -34,5 +79,6 @@ jobs:
       - name: Check markdown links
         uses: lycheeverse/lychee-action@v2
         with:
+          lycheeVersion: v0.23.0
           args: --config .lychee.toml docs/ *.md react_on_rails_pro/*.md
           fail: true

@@ -1,7 +1,7 @@
 # React on Rails Pro Configuration
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — Available with [React on Rails Pro](../../pro/react-on-rails-pro.md).
+> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 For general React on Rails configuration options, see [Configuration](README.md).
 
@@ -68,21 +68,23 @@ ReactOnRailsPro.configure do |config|
   config.throw_js_errors = true
 
   # You may provide a password and/or a port that will be sent to renderer for simple authentication.
-  # `https://:<password>@url:<port>`. For example: https://:myPassword1@renderer:3800. Don't forget
+  # `https://:<password>@url:<port>`. For example: https://:YOUR_SECURE_PASSWORD@renderer:3800. Don't forget
   # the leading `:` before the password. Your password must also not contain certain characters that
   # would break calling URI(config.renderer_url). This includes: `@`, `#`, '/'.
   # **Note:** Don't forget to set up **SSL** connection (https) otherwise password will useless
   # since it will be easy to intercept it.
   # If you provide an ENV value (maybe only for production) and there is no value, then you get the default.
   # Default for `renderer_url` is "http://localhost:3800".
-  config.renderer_url = ENV["RENDERER_URL"]
+  config.renderer_url = ENV["REACT_RENDERER_URL"]
 
   # If you don't want to worry about special characters in your password within the url, use this config value
   # Default for `renderer_password` is nil
   # config.renderer_password = ENV["RENDERER_PASSWORD"]
 
   # Set the `ssr_timeout` configuration so the Rails server will not wait more than this many seconds
-  # for a SSR request to return once issued.
+  # for a SSR request to return once issued. With the async-http renderer client, this is applied as
+  # the per-read socket timeout on the renderer connection. Increase this value for long-running
+  # streaming SSR responses.
   config.ssr_timeout = 5
 
   # If false, then crash if no backup rendering when the remote renderer is not available
@@ -92,19 +94,20 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_use_fallback_exec_js` is true.
   config.renderer_use_fallback_exec_js = false
 
-  # The maximum size of the http connection pool,
-  # Set +pool_size+ to limit the maximum number of connections allowed.
-  # Defaults to 1/4 the number of allowed file handles.  You can have no more
-  # than this many threads with active HTTP transactions.
+  # Currently has no effect. The async-http adapter creates a new client per request,
+  # so this pool limit is never reached. The setting is kept for forward-compatibility
+  # with planned persistent connection support (see issue #3283).
+  # Setting a non-default value emits a warning explaining this.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
 
-  # Seconds to wait for an available connection before a timeout error is raised
+  # TCP connect timeout in seconds. After the socket connects, request processing and streaming
+  # are bounded by `ssr_timeout`.
   # Default for `renderer_http_pool_timeout` is 5
   config.renderer_http_pool_timeout = 5
 
-  # warn_timeout  - Displays an error message if a request takes longer than the given time in seconds
-  # (used to give hints to increase the pool size). Default is 0.25
+  # warn_timeout  - Displays a warning message if a request takes longer than the given time in seconds.
+  # Default is 0.25
   config.renderer_http_pool_warn_timeout = 0.25 # seconds
 
   # Snippet of JavaScript to be run right at the beginning of the server rendering process. The code
@@ -171,5 +174,5 @@ end
 
 ## Need Help?
 
-- **Pro Features:** [React on Rails Pro](https://pro.reactonrails.com/)
+- **Pro Features:** [React on Rails Pro](../../pro/react-on-rails-pro.md)
 - **Consulting:** [justin@shakacode.com](mailto:justin@shakacode.com)

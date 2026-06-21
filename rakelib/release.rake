@@ -1,22 +1,33 @@
 # frozen_string_literal: true
 
 require "bundler"
+require "English"
 require "json"
 require "open3"
 require "rubygems/version"
 require "shellwords"
 require "tempfile"
+require "time"
 require "tmpdir"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
 require_relative "../react_on_rails/lib/react_on_rails/git_utils"
-require_relative "../react_on_rails/lib/react_on_rails/utils"
 
 class RaisingMessageHandler
   def add_error(error)
     raise error
   end
 end
+
+NPM_REGISTRY_URL = "https://registry.npmjs.org/"
+NPM_PUBLISH_VERIFY_ATTEMPTS = 6
+NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
+NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
+SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE = "shakaperf-release-gates.yml"
+SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 600
+SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
+SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
+SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 50 * 60
 
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
@@ -25,9 +36,14 @@ def current_monorepo_root
   File.expand_path("..", __dir__)
 end
 
+def release_truthy?(value)
+  # Includes "t" to preserve the former ReactOnRails::Utils.object_to_boolean contract.
+  [true, "true", "yes", 1, "1", "t"].include?(value.instance_of?(String) ? value.downcase : value)
+end
+
 def release_paths(monorepo_root)
   {
-    monorepo_root: monorepo_root,
+    monorepo_root:,
     gem_root: File.join(monorepo_root, "react_on_rails"),
     pro_gem_root: File.join(monorepo_root, "react_on_rails_pro"),
     dummy_app_dir: File.join(monorepo_root, "react_on_rails", "spec", "dummy"),
@@ -60,12 +76,43 @@ def unbundled_sh_in_dir_for_release(dir, *shell_commands)
   end
 end
 
-def prompt_for_otp(service_name)
-  print "\n🔑 Enter OTP code for #{service_name}: "
+def prompt_for_otp(service_name, allow_blank: false, hint: nil)
+  print "\n🔑 Enter OTP code for #{service_name}#{hint ? " (#{hint})" : ''}: "
   $stdout.flush
   otp = $stdin.gets&.strip
-  abort "\n❌ No OTP provided. Aborting." if otp.nil? || otp.empty?
-  normalize_otp_code(otp, service_name: service_name)
+  if otp.nil? || otp.empty?
+    return nil if allow_blank
+
+    abort "\n❌ No OTP provided. Aborting."
+  end
+  normalize_otp_code(otp, service_name:)
+end
+
+# Resolve the RubyGems OTP to reuse for BOTH gem pushes (react_on_rails and
+# react_on_rails_pro). When the operator does not supply RUBYGEMS_OTP, prompt
+# once here and capture the code so it can be forwarded to both pushes via
+# GEM_HOST_OTP_CODE. Without this up-front prompt, `gem push` prompts separately
+# for each gem — the code typed into that subprocess is never captured by this
+# script, so the operator ends up entering an OTP twice. RubyGems accepts the
+# same TOTP for both pushes within its validity window; if it expires between
+# gems, publish_gem_with_retry prompts for a fresh code.
+def resolve_rubygems_otp_for_publish(provided_otp)
+  normalized = normalize_otp_code(provided_otp, service_name: "RubyGems")
+  if normalized
+    puts "Using provided RubyGems OTP for gem publications..."
+    return normalized
+  end
+
+  unless $stdin.tty?
+    puts "\nNOTE: You will be prompted for RubyGems OTP code if needed."
+    puts "TIP: Set RUBYGEMS_OTP environment variable to provide OTP upfront."
+    return nil
+  end
+
+  # Pressing Enter without a code falls back to legacy per-gem prompting handled
+  # by `gem push` itself (e.g. accounts without RubyGems 2FA enabled).
+  puts "\nThe same RubyGems OTP is reused for both gems (react_on_rails and react_on_rails_pro)."
+  prompt_for_otp("RubyGems", allow_blank: true, hint: "press Enter to be prompted per gem")
 end
 
 def normalize_otp_code(otp, service_name:)
@@ -117,10 +164,75 @@ def github_repo_slug(monorepo_root)
   match[:repo]
 end
 
-def capture_gh_output(*args)
-  Open3.capture2e("gh", *args)
+def capture_gh_output(*)
+  Open3.capture2e("gh", *)
 rescue Errno::ENOENT
   abort "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry."
+end
+
+def read_output_from_io(reader)
+  Thread.new do
+    reader.read
+  rescue IOError
+    ""
+  end
+end
+
+def stop_output_reader(output_reader)
+  return unless output_reader&.alive?
+
+  output_reader.join(0.5)
+  output_reader.kill if output_reader.alive?
+end
+
+def capture_gh_output_with_timeout(*, timeout_seconds:)
+  reader, writer = IO.pipe
+  pid = Process.spawn("gh", *, out: writer, err: writer)
+  writer.close
+  output_reader = read_output_from_io(reader)
+  status = nil
+  timed_out = false
+  deadline = Time.now + timeout_seconds
+
+  loop do
+    waited_pid, status = Process.waitpid2(pid, Process::WNOHANG)
+    break if waited_pid
+
+    if Time.now >= deadline
+      timed_out = true
+      status = terminate_process(pid)
+      break
+    end
+
+    sleep 0.2
+  end
+
+  [output_reader.value, status, timed_out]
+rescue Errno::ENOENT
+  abort "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry."
+ensure
+  writer&.close unless writer&.closed?
+  stop_output_reader(output_reader)
+  reader&.close unless reader&.closed?
+end
+
+def terminate_process(pid)
+  Process.kill("TERM", pid)
+  deadline = Time.now + 5
+
+  loop do
+    waited_pid, status = Process.waitpid2(pid, Process::WNOHANG)
+    return status if waited_pid
+    break if Time.now >= deadline
+
+    sleep 0.1
+  end
+
+  Process.kill("KILL", pid)
+  _waited_pid, status = Process.waitpid2(pid)
+  status
+rescue Errno::ESRCH
+  nil
 end
 
 def verify_gh_auth(monorepo_root:)
@@ -141,14 +253,163 @@ def verify_gh_auth(monorepo_root:)
   puts "✓ GitHub CLI authenticated with write access to #{repo_slug}"
 end
 
+def current_git_sha!(monorepo_root)
+  output, status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
+  abort "❌ Unable to resolve current git SHA.\n\n#{output}" unless status.success?
+
+  output.strip
+end
+
+def handle_shakaperf_release_gate_violation!(message:)
+  abort <<~ERROR
+    #{message}
+
+    The version-bump commit may already be pushed to the remote without a tag or published packages.
+    For a transient gate failure, retry the release from that same commit; the version bump is already present.
+    If the gate should not be retried, push a revert commit before retrying the release.
+
+    To override this release gate (use only for an urgent release when ShakaPerf is known-unrelated):
+      RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
+      # or pass override_ci_status as the 4th positional argument:
+      bundle exec rake "release[VERSION,false,false,true]"
+  ERROR
+end
+
+def fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
+  output, status = capture_gh_output(
+    "run", "list",
+    "--repo", repo_slug,
+    "--workflow", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+    "--branch", ref,
+    "--event", "workflow_dispatch",
+    "--json", "createdAt,databaseId,headSha,status,conclusion,url",
+    "--limit", SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT.to_s
+  )
+
+  unless status.success?
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Unable to list ShakaPerf release gate workflow runs.\n\n#{output}"
+    )
+  end
+
+  JSON.parse(output)
+rescue JSON::ParserError => e
+  handle_shakaperf_release_gate_violation!(
+    message: "❌ Failed to parse ShakaPerf release gate workflow runs: #{e.message}\n\nOutput:\n#{output}"
+  )
+end
+
+def shakaperf_release_gate_dispatch_started_at
+  Time.at(Time.now.to_i).utc
+end
+
+def shakaperf_release_gate_run_created_after?(run, earliest_created_at)
+  return true unless earliest_created_at
+
+  created_at = run["createdAt"]
+  return false unless created_at
+
+  Time.iso8601(created_at) >= earliest_created_at
+rescue ArgumentError
+  false
+end
+
+def wait_for_shakaperf_release_gate_run!(repo_slug:, ref:, head_sha:, ignored_run_ids: [], earliest_created_at: nil)
+  deadline = Time.now + SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS
+  ignored_run_ids = ignored_run_ids.map(&:to_s)
+
+  loop do
+    runs = fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
+    matching_run = runs.find do |run|
+      run["headSha"] == head_sha &&
+        !ignored_run_ids.include?(run["databaseId"].to_s) &&
+        shakaperf_release_gate_run_created_after?(run, earliest_created_at)
+    end
+    return matching_run if matching_run
+
+    break if Time.now >= deadline
+
+    sleep SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS
+  end
+
+  handle_shakaperf_release_gate_violation!(
+    message: "❌ Timed out waiting for ShakaPerf release gate workflow to start for #{head_sha[0, 8]}."
+  )
+end
+
+def watch_shakaperf_release_gate_run!(repo_slug:, run:)
+  run_id = run.fetch("databaseId").to_s
+  run_url = run["url"] || "https://github.com/#{repo_slug}/actions/runs/#{run_id}"
+
+  output, status, timed_out = capture_gh_output_with_timeout(
+    "run", "watch", run_id, "--repo", repo_slug, "--exit-status",
+    timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+  )
+
+  if timed_out
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Timed out watching ShakaPerf release gate run #{run_id}.\n\nRun: #{run_url}"
+    )
+  end
+
+  return if status.success?
+
+  handle_shakaperf_release_gate_violation!(
+    message: "❌ ShakaPerf release gate failed.\n\nRun: #{run_url}\n\n#{output}"
+  )
+end
+
+def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:, dry_run:)
+  if dry_run
+    puts "⚠️ DRY RUN: Would run ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before publishing."
+    return
+  end
+
+  if allow_override
+    puts "⚠️ CI STATUS OVERRIDE enabled — skipping ShakaPerf release gate."
+    return
+  end
+
+  repo_slug = github_repo_slug(monorepo_root)
+  puts "\nRunning ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before tagging and publishing..."
+  existing_run_ids = fetch_shakaperf_release_gate_runs(repo_slug:, ref:).map do |run|
+    run["databaseId"].to_s
+  end
+  dispatch_started_at = shakaperf_release_gate_dispatch_started_at
+  output, status = capture_gh_output(
+    "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE, "--repo", repo_slug, "--ref", ref
+  )
+
+  unless status.success?
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Unable to dispatch ShakaPerf release gate workflow.\n\n#{output}"
+    )
+  end
+
+  run = wait_for_shakaperf_release_gate_run!(
+    repo_slug:,
+    ref:,
+    head_sha:,
+    ignored_run_ids: existing_run_ids,
+    earliest_created_at: dispatch_started_at
+  )
+  watch_shakaperf_release_gate_run!(repo_slug:, run:)
+
+  puts "✓ ShakaPerf release gate passed: #{run['url'] || "GitHub Actions run #{run.fetch('databaseId')}"}"
+end
+
 def run_release_preflight_checks!(monorepo_root:, dry_run:)
+  # The main-CI status check (`validate_main_ci_status!`) is intentionally
+  # NOT in this function — it runs inside `with_release_checkout` (after
+  # `git pull --rebase` but before tagging) so it still fires under
+  # `dry_run: true` and surfaces the warning operators need to see.
   return if dry_run
 
   puts "\n#{'=' * 80}"
   puts "PRE-FLIGHT CHECKS"
   puts "=" * 80
   verify_npm_auth
-  verify_gh_auth(monorepo_root: monorepo_root)
+  verify_gh_auth(monorepo_root:)
 end
 
 def current_gem_version(monorepo_root)
@@ -208,10 +469,21 @@ def compute_target_gem_version(current_gem_version:, version_input:)
   version = parse_gem_version_components(current_gem_version)
   case version_input.to_s.strip.downcase
   when "patch"
-    "#{version[:major]}.#{version[:minor]}.#{version[:patch] + 1}"
+    if version[:prerelease_type]
+      # Pre-release → stable: strip the pre-release suffix (e.g., 16.5.0.rc.0 → 16.5.0).
+      # This matches `gem bump --version patch` behavior from the gem-release gem.
+      "#{version[:major]}.#{version[:minor]}.#{version[:patch]}"
+    else
+      "#{version[:major]}.#{version[:minor]}.#{version[:patch] + 1}"
+    end
   when "minor"
+    # NOTE: From a pre-release (e.g., 16.5.0.rc.0), this produces 16.6.0, not 16.5.0.
+    # To promote a pre-release to its stable version, use "patch" instead.
+    # This matches `gem bump --version minor` behavior from the gem-release gem.
     "#{version[:major]}.#{version[:minor] + 1}.0"
   when "major"
+    # NOTE: From a pre-release (e.g., 16.5.0.rc.0), this produces 17.0.0.
+    # To promote a pre-release to its stable version, use "patch" instead.
     "#{version[:major] + 1}.0.0"
   else
     abort "❌ Unsupported semver bump keyword #{version_input.inspect}"
@@ -268,9 +540,646 @@ def expected_bump_type_from_changelog_section(changelog_section)
 end
 
 def version_policy_override_enabled?(override_flag)
-  ReactOnRails::Utils.object_to_boolean(override_flag) ||
-    ReactOnRails::Utils.object_to_boolean(ENV.fetch("RELEASE_VERSION_POLICY_OVERRIDE", nil))
+  release_truthy?(override_flag) || release_truthy?(ENV.fetch("RELEASE_VERSION_POLICY_OVERRIDE", nil))
 end
+
+def ci_status_override_enabled?(override_flag)
+  release_truthy?(override_flag) || release_truthy?(ENV.fetch("RELEASE_CI_STATUS_OVERRIDE", nil))
+end
+
+# Escape hatch: force the CI gate to evaluate origin/main HEAD verbatim instead
+# of walking back over non-runtime-only commits (see `main_ci_evaluation_sha`).
+def ci_evaluate_head_only?
+  release_truthy?(ENV.fetch("RELEASE_CI_EVALUATE_HEAD", nil))
+end
+
+# Statuses considered "incomplete" — anything not yet a finalized conclusion.
+CI_INCOMPLETE_STATUSES = %w[in_progress queued waiting requested pending].freeze
+# Conclusions considered acceptable. `skipped`/`neutral` are not failures (e.g. docs-only
+# paths-ignore skips, or workflows that intentionally short-circuit).
+CI_PASSING_CONCLUSIONS = %w[success skipped neutral].freeze
+
+# Upper bound on how many consecutive non-runtime-only commits the CI gate will
+# walk past when choosing which origin/main commit to evaluate. Bounds the git
+# work and guards against an unbounded walk; beyond this we evaluate wherever we
+# stopped. A real chain of docs/changelog commits is far shorter than this.
+MAIN_CI_NONRUNTIME_WALK_LIMIT = 25
+
+# rubocop:disable Metrics/MethodLength
+def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
+  fetch_output, fetch_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet"
+  )
+  unless fetch_status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to fetch origin/main for CI status check.\n\n#{fetch_output}",
+      allow_override:,
+      dry_run:
+    )
+    return nil
+  end
+
+  sha_output, sha_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "origin/main")
+  unless sha_status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to resolve origin/main HEAD.\n\n#{sha_output}",
+      allow_override:,
+      dry_run:
+    )
+    return nil
+  end
+  # Evaluate the most recent commit that actually ran the full suite. When HEAD
+  # is changelog/docs/comment-only (e.g. the pre-release `update-changelog`
+  # commit), CI path-skips the runtime suite there, so its checks tell us
+  # nothing about release health — walk back to the last runtime-bearing commit.
+  sha = main_ci_evaluation_sha(monorepo_root:, head_sha: sha_output.strip)
+
+  repo_slug = github_repo_slug(monorepo_root)
+  api_path = "repos/#{repo_slug}/commits/#{sha}/check-runs"
+
+  # `--paginate --jq '.check_runs[]'` flattens paginated responses into JSONL.
+  # Each non-empty line is one check_run object. We invoke `gh` directly here
+  # (rather than via `capture_gh_output`) so that a missing binary routes
+  # through `handle_main_ci_status_violation!` — same as a git fetch failure —
+  # instead of aborting unconditionally. This keeps `dry_run` / `allow_override`
+  # symmetric across every fetch step.
+  begin
+    output, status = Open3.capture2e(
+      "gh", "api", "--paginate", "--jq", ".check_runs[]", api_path
+    )
+  rescue Errno::ENOENT
+    # validate_main_ci_status! normally checks `gh` first, but keep this helper
+    # defensive for direct calls and focused tests.
+    handle_main_ci_status_violation!(
+      message: "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry.",
+      allow_override:,
+      dry_run:
+    )
+    # Only reached in override/dry-run mode; strict mode aborts above.
+    return nil
+  end
+
+  unless status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to query GitHub Checks API for #{sha}.\n\n#{output}",
+      allow_override:,
+      dry_run:
+    )
+    # Only reached in override/dry-run mode; strict mode aborts above.
+    return nil
+  end
+
+  begin
+    check_runs = parse_gh_jsonl(output)
+  rescue JSON::ParserError => e
+    handle_main_ci_status_violation!(
+      message: "❌ Failed to parse check_runs response from gh: #{e.message}\n\nOutput:\n#{output}",
+      allow_override:,
+      dry_run:
+    )
+    return nil
+  end
+
+  { sha:, repo_slug:, check_runs: }
+end
+# rubocop:enable Metrics/MethodLength
+
+def parse_gh_jsonl(output)
+  output.lines.reject { |line| line.strip.empty? }.map do |line|
+    JSON.parse(line)
+  end
+end
+
+# Choose which origin/main commit the CI gate should evaluate. Starting at
+# `head_sha`, walk back over commits that `script/ci-changes-detector` classifies
+# as non-runtime-only (changelog/docs/source-comment changes — exactly the
+# commits on which CI path-skips the runtime suite) and return the first commit
+# that ran the full suite. The walk stops at HEAD when a commit isn't provably
+# non-runtime-only, so the behavior degrades to the original "evaluate HEAD" gate.
+def main_ci_evaluation_sha(monorepo_root:, head_sha:)
+  return head_sha if ci_evaluate_head_only?
+
+  current = head_sha
+  skipped = []
+  MAIN_CI_NONRUNTIME_WALK_LIMIT.times do
+    break unless commit_non_runtime_only?(monorepo_root:, sha: current)
+
+    parent = git_parent_sha(monorepo_root:, sha: current)
+    break if parent.nil?
+
+    skipped << current
+    current = parent
+  end
+
+  log_main_ci_walkback(head_sha:, evaluated_sha: current, skipped:) unless skipped.empty?
+  current
+end
+
+def log_main_ci_walkback(head_sha:, evaluated_sha:, skipped:)
+  puts "ℹ️ origin/main HEAD #{head_sha[0, 8]} is non-runtime-only " \
+       "(changelog/docs/comments); CI path-skips the full suite on such commits."
+  puts "   Skipped #{skipped.length} non-runtime commit(s): #{skipped.map { |s| s[0, 8] }.join(', ')}"
+  puts "   Evaluating main CI on #{evaluated_sha[0, 8]} — the most recent commit that ran the full suite."
+  puts "   (Set RELEASE_CI_EVALUATE_HEAD=true to force strict HEAD evaluation.)"
+end
+
+# Whether `sha`'s changes are *provably* non-runtime-only per the canonical CI
+# detector. Returns true only when the detector positively reports
+# `non_runtime_only=true`; every other outcome (script missing, git/detector
+# failure, unparseable output, or an explicit `false`) returns false. Conflating
+# "unknown" with "runtime-bearing" is the safe direction for a release gate: the
+# walk stops and the current commit is evaluated rather than skipped on a guess.
+def commit_non_runtime_only?(monorepo_root:, sha:)
+  detector = File.join(monorepo_root, "script", "ci-changes-detector")
+  return false unless File.executable?(detector)
+
+  Dir.mktmpdir("ror-ci-detector") do |dir|
+    output_file = File.join(dir, "github_output")
+    File.write(output_file, "")
+    # The detector writes `non_runtime_only=true|false` to $GITHUB_OUTPUT — the
+    # same machine interface CI consumes — so we reuse its path classification
+    # instead of re-deriving paths-ignore rules here. `<sha>^ <sha>` diffs just
+    # that commit; a non-HEAD current ref means no uncommitted folding.
+    _stdout, status = Open3.capture2e(
+      { "GITHUB_OUTPUT" => output_file }, detector, "#{sha}^", sha, chdir: monorepo_root
+    )
+    return false unless status.success?
+
+    flag = File.read(output_file).lines.reverse.find { |line| line.start_with?("non_runtime_only=") }
+    return false if flag.nil?
+
+    flag.split("=", 2).last.strip == "true"
+  end
+rescue StandardError
+  false
+end
+
+# First parent of `sha`, or nil at a root commit (or on any git failure) so the
+# walk terminates cleanly.
+def git_parent_sha(monorepo_root:, sha:)
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "#{sha}^"
+  )
+  return nil unless status.success?
+
+  parent = output.strip
+  parent.empty? ? nil : parent
+end
+
+def fetch_main_commit_statuses(repo_slug:, sha:, allow_override:, dry_run:)
+  api_path = "repos/#{repo_slug}/commits/#{sha}/statuses"
+
+  begin
+    output, status = Open3.capture2e(
+      "gh", "api", "--paginate", "--jq", ".[]", api_path
+    )
+  rescue Errno::ENOENT
+    handle_main_ci_status_violation!(
+      message: "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry.",
+      allow_override:,
+      dry_run:
+    )
+    return nil
+  end
+
+  unless status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to query GitHub Statuses API for #{sha}.\n\n#{output}",
+      allow_override:,
+      dry_run:
+    )
+    return nil
+  end
+
+  begin
+    parse_gh_jsonl(output)
+  rescue JSON::ParserError => e
+    handle_main_ci_status_violation!(
+      message: "❌ Failed to parse statuses response from gh: #{e.message}\n\nOutput:\n#{output}",
+      allow_override:,
+      dry_run:
+    )
+    # Only reached in override/dry-run mode; strict mode aborts above.
+    nil
+  end
+end
+
+def normalize_status_as_check_run(status)
+  state = status["state"]
+  conclusion = normalize_status_conclusion(state)
+  {
+    "id" => status["id"],
+    "name" => status["context"],
+    # `pending` must stay in CI_INCOMPLETE_STATUSES so commit statuses still block as in-progress.
+    "status" => conclusion.nil? ? "pending" : "completed",
+    "conclusion" => conclusion,
+    "html_url" => status["target_url"]
+  }
+end
+
+def normalize_status_conclusion(state)
+  case state
+  when "success"
+    "success"
+  when "pending"
+    nil
+  when "failure", "error"
+    state
+  else
+    # GitHub documents error/failure/pending/success; unknown values should block.
+    "error"
+  end
+end
+
+def latest_commit_statuses(statuses)
+  statuses
+    .group_by { |status| status["context"] }
+    .map do |_context, context_statuses|
+      # GitHub emits ISO 8601 UTC `created_at` values, which sort chronologically as strings.
+      context_statuses.max_by { |status| [status["created_at"].to_s, status["id"].to_i] }
+    end
+end
+
+def normalize_required_check_entries(checks)
+  Array(checks).filter_map do |check|
+    context = check["context"].to_s
+    next if context.empty?
+
+    { context:, app_id: check["app_id"]&.to_i }
+  end.uniq
+end
+
+def normalize_required_checks_payload(parsed)
+  return nil unless parsed.is_a?(Hash)
+
+  checks = normalize_required_check_entries(parsed["checks"])
+  check_contexts = checks.map { |check| check[:context] }
+  # GitHub mirrors required status-check names into both `contexts` and `checks`.
+  # Keep the modern `checks` entry when names overlap so one required gate is
+  # evaluated once, with its app pin preserved.
+  contexts = Array(parsed["contexts"]).map(&:to_s).reject(&:empty?).uniq - check_contexts
+
+  # No required names parseable is treated the same as "no branch protection
+  # visible" — fail-safe to evaluating every check run.
+  contexts.empty? && checks.empty? ? nil : { contexts:, checks: }
+end
+
+def required_check_names_for_main(monorepo_root:, repo_slug: nil)
+  repo_slug ||= github_repo_slug(monorepo_root)
+  api_path = "repos/#{repo_slug}/branches/main/protection/required_status_checks"
+  # Keep legacy `contexts` separate from modern `checks` entries. Modern
+  # required checks can be pinned to a GitHub App via `app_id`; legacy contexts
+  # may be satisfied by either a Checks API run or a commit-status context.
+  jq_query = "{contexts: (.contexts // []), checks: (.checks // [] | map({context, app_id}))}"
+  # Precondition: `fetch_main_ci_checks` already verified `gh` is installed
+  # before `validate_main_ci_status!` calls this helper. The remaining failure
+  # mode here is "branch protection unknown", which returns nil so the caller
+  # fail-safes to evaluating every visible check_run.
+  output, status = capture_gh_output("api", "--jq", jq_query, api_path)
+  # If branch protection isn't configured, isn't queryable with current token scope, or the
+  # endpoint returns 404, fall through to nil so the caller treats all checks as required
+  # (fail-safe).
+  return nil unless status.success?
+
+  begin
+    parsed = JSON.parse(output)
+    normalize_required_checks_payload(parsed)
+  rescue JSON::ParserError
+    nil
+  end
+end
+
+def check_run_app_id(run)
+  app_id = run.dig("app", "id")
+  # nil is the branch-protection wildcard; GitHub check-run app IDs are integers.
+  app_id&.to_i
+end
+
+def required_check_app_wildcard?(app_id)
+  app_id.nil? || app_id == -1
+end
+
+def required_check_matches_run?(required_check, run)
+  required_check[:context] == run["name"] &&
+    (required_check_app_wildcard?(required_check[:app_id]) || required_check[:app_id] == check_run_app_id(run))
+end
+
+def required_check_present?(required_check:, check_runs:, legacy_status_runs:)
+  check_runs.any? { |run| required_check_matches_run?(required_check, run) } ||
+    (required_check_app_wildcard?(required_check[:app_id]) &&
+      legacy_status_runs.any? { |run| run["name"] == required_check[:context] })
+end
+
+def legacy_context_present?(context:, check_runs:, legacy_status_runs:)
+  matching_check_run = check_runs.any? do |run|
+    run["name"] == context
+  end
+
+  matching_check_run || legacy_status_runs.any? { |run| run["name"] == context }
+end
+
+def required_check_label(required_check)
+  return required_check[:context] if required_check_app_wildcard?(required_check[:app_id])
+
+  "#{required_check[:context]} (app_id: #{required_check[:app_id]})"
+end
+
+def format_required_check_labels(labels)
+  labels.tally.map { |label, count| count > 1 ? "#{label} (#{count} gates)" : label }
+end
+
+def required_check_labels(required_checks)
+  labels = required_checks[:contexts] + required_checks[:checks].map { |check| required_check_label(check) }
+  format_required_check_labels(labels)
+end
+
+def required_check_count(required_checks)
+  required_checks[:contexts].length + required_checks[:checks].length
+end
+
+def missing_required_checks(required_checks:, check_runs:, legacy_status_runs:)
+  missing_modern = required_checks[:checks].reject do |required_check|
+    required_check_present?(
+      required_check:,
+      check_runs:,
+      legacy_status_runs:
+    )
+  end
+  missing_legacy = required_checks[:contexts].reject do |context|
+    legacy_context_present?(
+      context:,
+      check_runs:,
+      legacy_status_runs:
+    )
+  end
+
+  # Keep the raw count separate from display labels for deliberately duplicated
+  # names; mirrored branch-protection contexts are removed during normalization.
+  {
+    count: missing_legacy.length + missing_modern.length,
+    labels: format_required_check_labels(missing_legacy + missing_modern.map { |check| required_check_label(check) })
+  }
+end
+
+def legacy_status_contexts_for_required_checks(required_checks)
+  wildcard_check_contexts = required_checks[:checks]
+                            .select { |check| required_check_app_wildcard?(check[:app_id]) }
+                            .map { |check| check[:context] }
+
+  (
+    required_checks[:contexts] +
+    wildcard_check_contexts
+  ).uniq
+end
+
+def legacy_status_runs_for_required_contexts(required_checks:, statuses:)
+  status_contexts = legacy_status_contexts_for_required_checks(required_checks)
+
+  # App-wildcard required checks can be satisfied by either Checks API runs or
+  # legacy commit statuses. App-pinned checks still require a matching check run.
+  statuses
+    .select { |status| status_contexts.include?(status["context"]) }
+    .then { |relevant_statuses| latest_commit_statuses(relevant_statuses) }
+    .map { |status| normalize_status_as_check_run(status) }
+end
+
+def format_ci_status_run_line(run, kind:)
+  icon = kind == :in_progress ? "⏳" : "❌"
+  detail = kind == :in_progress ? (run["status"] || "in_progress") : (run["conclusion"] || "incomplete")
+  url = run["html_url"].to_s
+  url.strip.empty? ? "  #{icon} #{detail}: #{run['name']}" : "  #{icon} #{detail}: #{run['name']}\n      #{url}"
+end
+
+def format_main_ci_status_violation(kind:, short_sha:, runs:) # rubocop:disable Metrics/CyclomaticComplexity
+  header = case kind
+           when :in_progress
+             "⏳ CI is still in progress on origin/main (commit #{short_sha})."
+           when :no_checks
+             "❌ No CI check runs visible on origin/main (commit #{short_sha}). " \
+             "CI may not have started yet, or the GitHub Checks API is unavailable."
+           when :no_required_checks
+             "❌ No required CI check runs found on origin/main (commit #{short_sha})."
+           when :missing_required_checks
+             "❌ Some required CI checks are missing on origin/main (commit #{short_sha}). " \
+             "Branch protection would refuse this merge."
+           when :failed
+             "❌ CI on origin/main is not healthy (commit #{short_sha})."
+           when :unknown_status
+             "❌ Check run(s) with unrecognized status on origin/main (commit #{short_sha})."
+           else
+             raise ArgumentError, "Unknown CI violation kind: #{kind.inspect}"
+           end
+  return header if runs.nil? || runs.empty?
+
+  lines = runs.map { |run| format_ci_status_run_line(run, kind:) }
+  "#{header}\n\n#{lines.join("\n")}"
+end
+
+def handle_main_ci_status_violation!(message:, allow_override:, dry_run:)
+  if dry_run
+    puts message.lines.map { |line| "⚠️ DRY RUN: #{line}" }.join
+    puts "⚠️ DRY RUN: Real release would block. Use RELEASE_CI_STATUS_OVERRIDE=true to bypass."
+    return
+  end
+
+  if allow_override
+    puts "⚠️ CI STATUS OVERRIDE enabled — proceeding despite the following:"
+    puts message.lines.map { |line| "  #{line}" }.join
+    return
+  end
+
+  abort <<~ERROR
+    #{message}
+
+    To override (use only if the failures are known-unrelated to this release):
+      RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
+      # or pass override_ci_status as the 4th positional argument:
+      bundle exec rake "release[VERSION,false,false,true]"
+  ERROR
+end
+
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:)
+  puts "\nChecking CI status on origin/main..."
+
+  data = fetch_main_ci_checks(monorepo_root:, allow_override:, dry_run:)
+  # `fetch_main_ci_checks` returns nil when it surfaced a violation through
+  # `handle_main_ci_status_violation!` (dry-run or override path). In that case
+  # the warning has already been printed and we should not continue.
+  return if data.nil?
+
+  sha = data[:sha]
+  short_sha = sha[0, 8]
+  repo_slug = data[:repo_slug]
+  check_runs = data[:check_runs]
+
+  # Collapse multiple runs per (check_suite_id, name) to the most recent
+  # attempt (highest check_run id). The key intentionally includes
+  # check_suite_id so we only collapse *true* reruns (same workflow run,
+  # same job name) and not unrelated workflows that happen to share a job
+  # name. For example, this repo has multiple workflows that each define a
+  # `detect-changes` job; without the suite_id in the key, a passing run
+  # from one workflow could mask a failing run from another. `id` is
+  # monotonically increasing per check run, so `max_by { id }` reliably
+  # selects the latest attempt within a suite.
+  # When `check_suite` is absent (rare — third-party integrations that don't
+  # attach to a suite), fall back to the run's own `id` for the group key so
+  # each nil-suite run sits in its own group and is never collapsed with
+  # another. The GitHub Actions Checks API always populates `check_suite`,
+  # so this only matters for external check integrations.
+  check_runs = check_runs
+               .group_by { |run| [run.dig("check_suite", "id") || run["id"], run["name"], check_run_app_id(run)] }
+               .map { |_key, runs| runs.max_by { |run| run["id"].to_i } }
+
+  # Always query branch-protection required checks (when configured) so the
+  # missing-required-check gate applies to both stable and prerelease.
+  # `evaluated` then differs by mode:
+  #   - prerelease: only the required subset (narrower filter; non-required failures are advisory)
+  #   - stable:     every check_run on the commit (broader filter; any failure blocks)
+  required_args = { monorepo_root: }
+  required_args[:repo_slug] = repo_slug if repo_slug
+  required_names = required_check_names_for_main(**required_args)
+  required_status_contexts = required_names ? legacy_status_contexts_for_required_checks(required_names) : []
+  legacy_status_runs = []
+  legacy_status_fetch_unknown = false
+  if required_status_contexts.any?
+    statuses = fetch_main_commit_statuses(
+      repo_slug: repo_slug || github_repo_slug(monorepo_root),
+      sha:,
+      allow_override:,
+      dry_run:
+    )
+    if statuses.nil?
+      unless allow_override || dry_run
+        handle_main_ci_status_violation!(
+          message: "❌ Internal error: legacy status fetch returned nil unexpectedly in strict mode.",
+          allow_override:,
+          dry_run:
+        )
+        return
+      end
+
+      # Only dry-run/override mode reaches the fallback; strict mode aborts inside
+      # the fetch helper after surfacing the violation.
+      legacy_status_fetch_unknown = true
+      statuses = []
+    end
+
+    legacy_status_runs = legacy_status_runs_for_required_contexts(
+      required_checks: required_names,
+      statuses:
+    )
+  end
+
+  if check_runs.empty? && legacy_status_runs.empty?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :no_checks, short_sha:, runs: nil),
+      allow_override:,
+      dry_run:
+    )
+    return
+  end
+
+  evaluated = if is_prerelease && required_names
+                check_runs.select do |run|
+                  required_names[:contexts].include?(run["name"]) ||
+                    required_names[:checks].any? { |required_check| required_check_matches_run?(required_check, run) }
+                end + legacy_status_runs
+              else
+                check_runs + legacy_status_runs
+              end
+
+  # Report visible failures before missing/in-progress runs. If both are
+  # present, the operator needs to know about the failure right away; this also
+  # prevents same-label legacy/modern required checks from hiding a failed
+  # legacy status behind a "missing required" message.
+  failed = evaluated.select do |run|
+    run["status"] == "completed" && !CI_PASSING_CONCLUSIONS.include?(run["conclusion"])
+  end
+  if failed.any?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :failed, short_sha:, runs: failed),
+      allow_override:,
+      dry_run:
+    )
+    return
+  end
+
+  # When branch protection lists required checks, treat any missing required
+  # check as blocking — for stable AND prerelease. Branch protection would
+  # refuse the merge in this state, so a release that ignored the gap would
+  # ship against a commit GitHub itself considers unverified.
+  # `:no_required_checks` covers the all-missing case (typically: CI hasn't
+  # started yet); `:missing_required_checks` covers the partial case (some
+  # required workflows ran, others never registered — usually a renamed or
+  # deleted workflow that branch protection still requires).
+  unless required_names.nil?
+    required_labels = required_check_labels(required_names)
+    missing_required = missing_required_checks(
+      required_checks: required_names,
+      check_runs:,
+      legacy_status_runs:
+    )
+    missing_names = missing_required[:labels]
+    if missing_required[:count] == required_check_count(required_names)
+      handle_main_ci_status_violation!(
+        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha:, runs: nil) +
+                 "\nRequired: #{required_labels.join(', ')}",
+        allow_override:,
+        dry_run:
+      )
+      return
+    elsif missing_names.any?
+      handle_main_ci_status_violation!(
+        message: format_main_ci_status_violation(kind: :missing_required_checks, short_sha:, runs: nil) +
+                 "\nRequired: #{required_labels.join(', ')}\nMissing: #{missing_names.join(', ')}",
+        allow_override:,
+        dry_run:
+      )
+      return
+    end
+  end
+
+  in_progress = evaluated.select { |run| CI_INCOMPLETE_STATUSES.include?(run["status"]) }
+  if in_progress.any?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :in_progress, short_sha:, runs: in_progress),
+      allow_override:,
+      dry_run:
+    )
+    return
+  end
+
+  # Catch any run whose status falls outside both the "completed" and
+  # `CI_INCOMPLETE_STATUSES` buckets — e.g. a new GitHub status value we
+  # don't yet know about, or a `nil` from a malformed response. Treat the
+  # ambiguity as a failure rather than letting it slip through as green;
+  # the release gate is supposed to be the last-line check.
+  unknown = evaluated.reject do |run|
+    run["status"] == "completed" || CI_INCOMPLETE_STATUSES.include?(run["status"])
+  end
+  if unknown.any?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :unknown_status, short_sha:, runs: unknown),
+      allow_override:,
+      dry_run:
+    )
+    return
+  end
+
+  # The fetch helper already warned in dry-run/override mode. Do not print a
+  # green status when required legacy status data was unavailable.
+  return if legacy_status_fetch_unknown
+
+  # Stable releases still evaluated every visible run above for failures, but
+  # when branch protection is visible the success count should report required
+  # gates so mirrored Checks/Statuses API entries are not counted twice.
+  qualifier = is_prerelease && required_names ? "required " : ""
+  healthy_count = required_names ? required_check_count(required_names) : evaluated.length
+  noun = healthy_count == 1 ? "check" : "checks"
+  puts "✓ Main CI is healthy on #{short_sha} (#{healthy_count} #{qualifier}#{noun})"
+end
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
 def handle_version_policy_violation!(message:, allow_override:)
   if allow_override
@@ -290,19 +1199,22 @@ def extract_changelog_section(changelog_path:, version:)
 
   end_index = ((start_index + 1)...lines.length).find { |idx| lines[idx].start_with?("### [") } || lines.length
   # Skip the version header line itself; GitHub release title already contains the version.
-  lines[(start_index + 1)...end_index].join.strip
+  content = lines[(start_index + 1)...end_index].join.strip
+  return nil if content.empty?
+
+  content
 end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_override:, fetch_tags: true)
-  tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags: fetch_tags)
+  tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags:)
   latest_tagged_version = tagged_versions.max_by { |version| Gem::Version.new(version) }
 
   if latest_tagged_version && Gem::Version.new(target_gem_version) <= Gem::Version.new(latest_tagged_version)
     handle_version_policy_violation!(
       message: "❌ Requested version #{target_gem_version} " \
                "must be greater than latest tagged version #{latest_tagged_version}.",
-      allow_override: allow_override
+      allow_override:
     )
   end
 
@@ -326,12 +1238,12 @@ def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_
   return unless latest_stable_version
 
   actual_bump_type = version_bump_type(previous_stable_gem_version: latest_stable_version,
-                                       target_gem_version: target_gem_version)
+                                       target_gem_version:)
   if actual_bump_type == :none
     handle_version_policy_violation!(
       message: "❌ Requested version #{target_gem_version} is not a major/minor/patch bump " \
                "over latest stable #{latest_stable_version}.",
-      allow_override: allow_override
+      allow_override:
     )
     return if allow_override
   end
@@ -342,7 +1254,7 @@ def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_
   end
 
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
-  changelog_section = extract_changelog_section(changelog_path: changelog_path, version: target_gem_version)
+  changelog_section = extract_changelog_section(changelog_path:, version: target_gem_version)
   unless changelog_section
     puts "ℹ️ VERSION POLICY: No changelog content found for #{target_gem_version}; " \
          "skipping changelog bump-consistency check."
@@ -359,7 +1271,7 @@ def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_
   handle_version_policy_violation!(
     message: "❌ Version bump mismatch for #{target_gem_version}: CHANGELOG implies #{expected_bump_type}, " \
              "but version bump is #{actual_bump_type} from #{latest_stable_version}.",
-    allow_override: allow_override
+    allow_override:
   )
 end
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
@@ -381,16 +1293,26 @@ def extract_latest_changelog_version(monorepo_root:)
   nil
 end
 
-def warn_changelog_missing(monorepo_root:, version:)
+def confirm_release!(version:, monorepo_root:)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
-  section = extract_changelog_section(changelog_path: changelog_path, version: version)
-  return if section
+  has_changelog = extract_changelog_section(changelog_path:, version:)
 
+  puts ""
   puts "################################################################################"
-  puts "WARNING: No CHANGELOG.md section found for #{version}."
-  puts "Consider running /update-changelog to add entries before releasing."
-  puts "sync_github_release will fail without a matching changelog section."
+  puts "RELEASE CONFIRMATION"
   puts "################################################################################"
+  puts "  Version:   #{version}"
+  if has_changelog
+    puts "  Changelog: ✓ section found"
+  else
+    puts "  Changelog: ✗ MISSING — no GitHub release will be created"
+    puts "             Run /update-changelog to add entries before releasing."
+  end
+  puts "################################################################################"
+  print "Proceed with release? [y/N] "
+  $stdout.flush
+  answer = $stdin.gets&.strip&.downcase
+  abort "Release aborted." unless answer == "y"
 end
 
 def changelog_dirty?(monorepo_root:)
@@ -401,7 +1323,7 @@ def changelog_dirty?(monorepo_root:)
 end
 
 def ensure_changelog_committed!(monorepo_root:)
-  return unless changelog_dirty?(monorepo_root: monorepo_root)
+  return unless changelog_dirty?(monorepo_root:)
 
   abort "❌ CHANGELOG.md has uncommitted changes. Commit or stash CHANGELOG.md before running sync_github_release."
 end
@@ -424,12 +1346,12 @@ end
 def prepare_github_release_context(monorepo_root:, gem_version:)
   prerelease = release_prerelease_version?(gem_version)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
-  notes = extract_changelog_section(changelog_path: changelog_path, version: gem_version)
+  notes = extract_changelog_section(changelog_path:, version: gem_version)
   abort "❌ Could not find `### [#{gem_version}]` in CHANGELOG.md. Add that section and retry." unless notes
 
   {
-    notes: notes,
-    prerelease: prerelease,
+    notes:,
+    prerelease:,
     tag: "v#{gem_version}",
     title: "v#{gem_version}"
   }
@@ -437,7 +1359,7 @@ end
 
 # rubocop:disable Metrics/AbcSize
 def publish_or_update_github_release(monorepo_root:, release_context:, dry_run:)
-  ensure_git_tag_exists!(monorepo_root: monorepo_root, tag: release_context[:tag])
+  ensure_git_tag_exists!(monorepo_root:, tag: release_context[:tag])
 
   if dry_run
     puts "DRY RUN: Would create or update GitHub release #{release_context[:tag]}" \
@@ -474,7 +1396,7 @@ end
 
 def sync_github_release_after_publish(monorepo_root:, gem_version:, dry_run:)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
-  section = extract_changelog_section(changelog_path: changelog_path, version: gem_version)
+  section = extract_changelog_section(changelog_path:, version: gem_version)
   unless section
     puts "################################################################################"
     puts "Skipping GitHub release: no CHANGELOG.md section for #{gem_version}."
@@ -484,9 +1406,9 @@ def sync_github_release_after_publish(monorepo_root:, gem_version:, dry_run:)
     return
   end
 
-  verify_gh_auth(monorepo_root: monorepo_root)
-  release_context = prepare_github_release_context(monorepo_root: monorepo_root, gem_version: gem_version)
-  publish_or_update_github_release(monorepo_root: monorepo_root, release_context: release_context, dry_run: dry_run)
+  verify_gh_auth(monorepo_root:)
+  release_context = prepare_github_release_context(monorepo_root:, gem_version:)
+  publish_or_update_github_release(monorepo_root:, release_context:, dry_run:)
 end
 
 def with_release_checkout(monorepo_root:, dry_run:)
@@ -510,15 +1432,30 @@ def with_release_checkout(monorepo_root:, dry_run:)
   end
 end
 
+def version_tagged?(monorepo_root, version)
+  tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags: true)
+  tagged_versions.include?(version)
+end
+
 def resolve_version_input(version_input, monorepo_root)
   stripped = version_input.to_s.strip
   return stripped unless stripped.empty?
 
-  changelog_version = extract_latest_changelog_version(monorepo_root: monorepo_root)
+  changelog_version = extract_latest_changelog_version(monorepo_root:)
   current_version = current_gem_version(monorepo_root)
 
   if changelog_version && Gem::Version.new(changelog_version) > Gem::Version.new(current_version)
     puts "Found CHANGELOG.md version: #{changelog_version} (current: #{current_version})"
+    return changelog_version
+  end
+
+  # If the latest changelog version matches the current version but hasn't been
+  # tagged yet, use it. This handles the case where the changelog was updated
+  # and the version bumped in a prior step (e.g., RC → stable promotion).
+  if changelog_version &&
+     Gem::Version.new(changelog_version) == Gem::Version.new(current_version) &&
+     !version_tagged?(monorepo_root, changelog_version)
+    puts "Found untagged CHANGELOG.md version: #{changelog_version} (current: #{current_version})"
     return changelog_version
   end
 
@@ -571,10 +1508,205 @@ def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_
   current_otp
 end
 
+def parse_npm_package_ref(package_ref)
+  match = package_ref.to_s.match(%r{\A(?<name>@[^/]+/[^@]+|[^@]+)@(?<version>.+)\z})
+  abort "❌ Invalid npm package ref for release verification: #{package_ref.inspect}" unless match
+
+  [match[:name], match[:version]]
+end
+
+def workspace_protocol_dependencies(metadata)
+  return [] unless metadata.is_a?(Hash)
+
+  NPM_INSTALL_DEPENDENCY_FIELDS.flat_map do |field|
+    dependencies = metadata[field]
+    next [] unless dependencies.is_a?(Hash)
+
+    dependencies.filter_map do |dependency_name, dependency_version|
+      next unless dependency_version.to_s.start_with?("workspace:")
+
+      "#{field}.#{dependency_name}=#{dependency_version}"
+    end
+  end
+end
+
+def publish_dependency_version_for_workspace_protocol(dependency_version, package_version)
+  workspace_range = dependency_version.to_s.delete_prefix("workspace:")
+
+  case workspace_range
+  when "*", ""
+    package_version
+  when "^", "~"
+    "#{workspace_range}#{package_version}"
+  else
+    workspace_range
+  end
+end
+
+def replace_workspace_protocol_dependencies_for_publish!(package_json, package_version)
+  changed = false
+
+  NPM_INSTALL_DEPENDENCY_FIELDS.each do |field|
+    dependencies = package_json[field]
+    next unless dependencies.is_a?(Hash)
+
+    dependencies.each do |dependency_name, dependency_version|
+      next unless dependency_version.to_s.start_with?("workspace:")
+
+      dependencies[dependency_name] =
+        publish_dependency_version_for_workspace_protocol(dependency_version, package_version)
+      changed = true
+    end
+  end
+
+  changed
+end
+
+def write_publishable_package_json(package_json_path, package_json)
+  tmp = Tempfile.create(["package-json-", ".json"], File.dirname(package_json_path))
+  tmp_path = tmp.path
+  renamed = false
+
+  begin
+    tmp.write("#{JSON.pretty_generate(package_json)}\n")
+    tmp.chmod(File.stat(package_json_path).mode & 0o777)
+    tmp.close
+    File.rename(tmp_path, package_json_path)
+    renamed = true
+  ensure
+    tmp.close unless tmp.closed?
+    File.unlink(tmp_path) if !renamed && File.exist?(tmp_path)
+  end
+end
+
+def with_publishable_package_json(dir, package_version)
+  package_json_path = File.join(dir, "package.json")
+  changed = false
+  original_content = File.read(package_json_path)
+  package_json = JSON.parse(original_content)
+
+  if replace_workspace_protocol_dependencies_for_publish!(package_json, package_version)
+    write_publishable_package_json(package_json_path, package_json)
+    # Only flip `changed` after the atomic same-directory rename succeeds so the `ensure`
+    # restore runs only after package.json was actually replaced.
+    changed = true
+  end
+
+  yield
+ensure
+  original_error = $ERROR_INFO
+
+  begin
+    File.write(package_json_path, original_content) if changed
+  rescue StandardError => e
+    warn "⚠️  Failed to restore #{package_json_path}: #{e.message}"
+    raise e unless original_error
+  end
+end
+
+def fetch_npm_package_metadata(package_ref, registry_url:)
+  output, status = Open3.capture2e(
+    "npm",
+    "view",
+    package_ref,
+    "version",
+    "dependencies",
+    "optionalDependencies",
+    "peerDependencies",
+    "--json",
+    "--registry",
+    registry_url
+  )
+  [output, status]
+end
+
+def fetch_npm_package_metadata_with_retries(package_ref, registry_url:, attempts:, retry_delay_seconds:)
+  last_output = nil
+  last_status = nil
+
+  attempts.times do |attempt|
+    output, status = fetch_npm_package_metadata(package_ref, registry_url:)
+    return [output, status] if status.success?
+
+    last_output = output
+    last_status = status
+    unless attempt == attempts - 1
+      puts "npm did not return #{package_ref} yet; retrying in #{retry_delay_seconds} seconds..."
+      sleep retry_delay_seconds
+    end
+  end
+
+  [last_output, last_status]
+end
+
+def parse_npm_package_metadata(package_ref, output)
+  JSON.parse(output)
+rescue JSON::ParserError => e
+  abort <<~ERROR
+    ❌ Unable to parse npm metadata for #{package_ref}.
+
+    Error: #{e.message}
+    Output:
+    #{output}
+  ERROR
+end
+
+def verify_npm_package_published!(
+  package_name,
+  expected_version,
+  registry_url: NPM_REGISTRY_URL,
+  attempts: NPM_PUBLISH_VERIFY_ATTEMPTS,
+  retry_delay_seconds: NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS
+)
+  package_ref = "#{package_name}@#{expected_version}"
+  output, status = fetch_npm_package_metadata_with_retries(
+    package_ref,
+    registry_url:,
+    attempts:,
+    retry_delay_seconds:
+  )
+  unless status.success?
+    abort <<~ERROR
+      ❌ #{package_ref} is not visible on npm after publish.
+
+      The release cannot continue because npm did not confirm the published package.
+
+      Technical details:
+      #{output.strip}
+    ERROR
+  end
+
+  metadata = parse_npm_package_metadata(package_ref, output)
+  actual_version = metadata.is_a?(Hash) ? metadata["version"] : metadata.to_s
+  unless actual_version == expected_version
+    abort <<~ERROR
+      ❌ npm returned #{actual_version.inspect} for #{package_ref}; expected #{expected_version.inspect}.
+
+      The release cannot continue because npm did not confirm the exact published version.
+    ERROR
+  end
+
+  workspace_dependencies = workspace_protocol_dependencies(metadata)
+  unless workspace_dependencies.empty?
+    abort <<~ERROR
+      ❌ #{package_ref} was published with workspace protocol dependencies.
+
+      Published packages must not contain workspace:* install-time dependencies because external package managers
+      cannot resolve them from npm.
+
+      Offending dependencies:
+      #{workspace_dependencies.map { |dependency| "  - #{dependency}" }.join("\n")}
+    ERROR
+  end
+
+  puts "✓ Verified npm package #{package_ref}"
+end
+
 def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, max_retries: 3)
   puts "\nPublishing #{package_name}..."
   current_otp = normalize_otp_code(otp, service_name: "NPM")
   publish_args = Array(base_args)
+  npm_package_name, npm_package_version = parse_npm_package_ref(package_name)
 
   retry_count = 0
   success = false
@@ -583,7 +1715,10 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, max_retri
     begin
       command_args = ["pnpm", "publish", *publish_args]
       command_args += ["--otp", current_otp] if current_otp
-      sh_args_in_dir_for_release(dir, *command_args)
+      with_publishable_package_json(dir, npm_package_version) do
+        sh_args_in_dir_for_release(dir, *command_args)
+      end
+      verify_npm_package_published!(npm_package_name, npm_package_version)
       success = true
     rescue RuntimeError => e
       retry_count += 1
@@ -637,12 +1772,33 @@ This will update and release:
   - empty (auto): use latest CHANGELOG.md version if newer, else patch bump
 2nd argument: Dry run (true/false, default: false)
 3rd argument: Override version policy checks (true/false, default: false)
+4th argument: Override release CI gates (true/false, default: false)
+
+Release CI policy:
+  Before releasing, the script checks CI status on origin/main.
+  - It evaluates the most recent commit that ran the full suite: if HEAD is
+    changelog/docs/comment-only (e.g. the pre-release `update-changelog`
+    commit), CI path-skips the runtime suite there, so the gate walks back to
+    the last runtime-bearing commit instead of waiting on meaningless checks.
+    Set RELEASE_CI_EVALUATE_HEAD=true to force strict HEAD evaluation.
+  - Stable releases require every check run on the commit to have succeeded.
+  - Pre-releases require only the GitHub-branch-protection-required checks
+    to have succeeded.
+  After pushing the version bump commit, the script runs the ShakaPerf RSC FOUC
+  workflow_dispatch gate and waits for it before creating/pushing the tag and
+  publishing npm packages or Ruby gems.
+  If that gate fails, the remote branch has the version-bump commit but no release
+  tag or published packages; retry from that commit or push a revert commit first.
+  In-progress checks and failing gates block the release until they pass, or until you
+  explicitly override via the 4th argument or RELEASE_CI_STATUS_OVERRIDE=true.
 
 Environment variables:
   VERBOSE=1                    # Enable verbose logging (shows all output)
   NPM_OTP=<code>               # Provide NPM one-time password (reused for all NPM publishes)
   RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
   RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
+  RELEASE_CI_STATUS_OVERRIDE=true      # Override release CI gates
+  RELEASE_CI_EVALUATE_HEAD=true        # Evaluate origin/main HEAD verbatim (skip the non-runtime walk-back)
   GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 
 Examples:
@@ -655,14 +1811,15 @@ Examples:
   rake release[patch,true]                      # Dry run
   VERBOSE=1 rake release[patch]                 # Release with verbose logging
   NPM_OTP=123456 RUBYGEMS_OTP=789012 rake release[patch]  # Skip OTP prompts")
-task :release, %i[version dry_run override_version_policy] do |_t, args|
+task :release, %i[version dry_run override_version_policy override_ci_status] do |_t, args|
   monorepo_root = current_monorepo_root
 
   args_hash = args.to_hash
 
-  is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
+  is_dry_run = release_truthy?(args_hash[:dry_run])
   is_verbose = ENV["VERBOSE"] == "1"
   allow_version_policy_override = version_policy_override_enabled?(args_hash[:override_version_policy])
+  allow_ci_status_override = ci_status_override_enabled?(args_hash[:override_ci_status])
   npm_otp = ENV.fetch("NPM_OTP", nil)
   rubygems_otp = ENV.fetch("RUBYGEMS_OTP", nil)
 
@@ -678,12 +1835,12 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
   # Configure output verbosity
   verbose(is_verbose)
 
-  run_release_preflight_checks!(monorepo_root: monorepo_root, dry_run: is_dry_run)
+  run_release_preflight_checks!(monorepo_root:, dry_run: is_dry_run)
 
   released_gem_version = nil
   released_npm_version = nil
 
-  with_release_checkout(monorepo_root: monorepo_root, dry_run: is_dry_run) do |release_root|
+  with_release_checkout(monorepo_root:, dry_run: is_dry_run) do |release_root|
     release_paths_hash = release_paths(release_root)
     sh_in_dir_for_release(release_root, "git pull --rebase") unless is_dry_run
 
@@ -693,7 +1850,7 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
     current_checkout_version = current_gem_version(release_root)
     resolved_target_gem_version = compute_target_gem_version(
       current_gem_version: current_checkout_version,
-      version_input: version_input
+      version_input:
     )
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
 
@@ -711,13 +1868,21 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
       ERROR
     end
 
-    warn_changelog_missing(monorepo_root: release_root, version: resolved_target_gem_version)
+    validate_main_ci_status!(
+      monorepo_root: release_root,
+      is_prerelease:,
+      allow_override: allow_ci_status_override,
+      dry_run: is_dry_run
+    )
+
     validate_release_version_policy!(
       monorepo_root: release_root,
       target_gem_version: resolved_target_gem_version,
       allow_override: allow_version_policy_override,
       fetch_tags: true
     )
+
+    confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root) unless is_dry_run
 
     # Having generated examples in-tree can interfere with publishing.
     sh_in_dir_for_release(release_root, "rm -rf gen-examples/examples")
@@ -769,6 +1934,7 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
 
     puts "\nUpdating Gemfile.lock files..."
     bundle_quiet_flag = is_verbose ? "" : " --quiet"
+    unbundled_sh_in_dir_for_release(release_paths_hash[:monorepo_root], "bundle install#{bundle_quiet_flag}")
     unbundled_sh_in_dir_for_release(release_paths_hash[:gem_root], "bundle install#{bundle_quiet_flag}")
     unbundled_sh_in_dir_for_release(release_paths_hash[:dummy_app_dir], "bundle install#{bundle_quiet_flag}")
 
@@ -798,6 +1964,16 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
         sh_in_dir_for_release(release_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
       end
 
+      # Push the version-bump commit first so the workflow_dispatch run can be matched by headSha.
+      sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push")
+      run_shakaperf_release_gate!(
+        monorepo_root: release_root,
+        ref: current_branch,
+        head_sha: current_git_sha!(release_root),
+        allow_override: allow_ci_status_override,
+        dry_run: is_dry_run
+      )
+
       tag_name = "v#{actual_gem_version}"
       tag_exists = system("git", "-C", release_root, "rev-parse", "--verify", "--quiet", "refs/tags/#{tag_name}",
                           out: File::NULL, err: File::NULL)
@@ -807,7 +1983,6 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
         sh_in_dir_for_release(release_root, "git tag #{tag_name}")
       end
 
-      sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push")
       sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push --tags")
 
       puts "\n#{'=' * 80}"
@@ -869,13 +2044,7 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
       puts "Publishing PUBLIC Ruby gems..."
       puts "=" * 80
 
-      current_rubygems_otp = rubygems_otp
-      if current_rubygems_otp
-        puts "Using provided RubyGems OTP for gem publications..."
-      else
-        puts "\nNOTE: You will be prompted for RubyGems OTP code if needed."
-        puts "TIP: Set RUBYGEMS_OTP environment variable to provide OTP upfront."
-      end
+      current_rubygems_otp = resolve_rubygems_otp_for_publish(rubygems_otp)
 
       current_rubygems_otp = publish_gem_with_retry(
         release_paths_hash[:gem_root],
@@ -909,10 +2078,10 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
     puts "  - react_on_rails_pro/react_on_rails_pro.gemspec (uses ReactOnRails::VERSION)"
     puts "\nTo actually release, run: rake release[#{released_gem_version}]"
   else
-    sync_github_release_after_publish(monorepo_root: monorepo_root, gem_version: released_gem_version, dry_run: false)
+    sync_github_release_after_publish(monorepo_root:, gem_version: released_gem_version, dry_run: false)
 
     changelog_path = File.join(monorepo_root, "CHANGELOG.md")
-    has_changelog_section = extract_changelog_section(changelog_path: changelog_path, version: released_gem_version)
+    has_changelog_section = extract_changelog_section(changelog_path:, version: released_gem_version)
 
     puts "\n#{'=' * 80}"
     puts "RELEASE COMPLETE!"
@@ -958,7 +2127,7 @@ Examples:
 task :sync_github_release, %i[gem_version dry_run] do |_t, args|
   monorepo_root = current_monorepo_root
   args_hash = args.to_hash
-  is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
+  is_dry_run = release_truthy?(args_hash[:dry_run])
 
   requested_gem_version = args_hash[:gem_version].to_s.strip
   if requested_gem_version.empty?
@@ -970,17 +2139,17 @@ task :sync_github_release, %i[gem_version dry_run] do |_t, args|
   puts "ℹ️ sync_github_release reads local committed CHANGELOG.md; " \
        "run `git pull --rebase` first for latest remote notes."
   if is_dry_run
-    if changelog_dirty?(monorepo_root: monorepo_root)
+    if changelog_dirty?(monorepo_root:)
       abort "❌ DRY RUN: CHANGELOG.md has uncommitted changes. " \
             "Commit or stash CHANGELOG.md before running sync_github_release."
     end
     puts "DRY RUN: Validating CHANGELOG.md section exists for #{requested_gem_version}..."
   else
-    ensure_changelog_committed!(monorepo_root: monorepo_root)
+    ensure_changelog_committed!(monorepo_root:)
   end
 
-  verify_gh_auth(monorepo_root: monorepo_root)
-  release_context = prepare_github_release_context(monorepo_root: monorepo_root, gem_version: requested_gem_version)
-  publish_or_update_github_release(monorepo_root: monorepo_root, release_context: release_context, dry_run: is_dry_run)
+  verify_gh_auth(monorepo_root:)
+  release_context = prepare_github_release_context(monorepo_root:, gem_version: requested_gem_version)
+  publish_or_update_github_release(monorepo_root:, release_context:, dry_run: is_dry_run)
 end
 # rubocop:enable Metrics/BlockLength

@@ -2,7 +2,7 @@
 
 Most third-party React libraries were built before Server Components existed. Many rely on hooks, Context, or browser APIs that are unavailable in Server Components. This guide covers how to identify incompatible libraries, create wrapper patterns, and choose RSC-compatible alternatives.
 
-> **Part 5 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Data Fetching Migration](rsc-data-fetching.md) | Next: [Troubleshooting](rsc-troubleshooting.md)
+> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [HTTP Response Ownership](rsc-http-response-patterns.md) | Next: [Troubleshooting](rsc-troubleshooting.md)
 
 ## Why Libraries Break in Server Components
 
@@ -91,6 +91,8 @@ export default function QueryProvider({ children }) {
 ## CSS-in-JS Libraries
 
 CSS-in-JS is the most impactful compatibility challenge for RSC migration. Runtime CSS-in-JS libraries depend on React Context and re-rendering, which Server Components fundamentally lack.
+
+For React on Rails Pro bundle and asset-loading patterns, see [CSS and Styling with React Server Components](../../pro/react-server-components/css-and-styling.md).
 
 ### Runtime CSS-in-JS (Problematic)
 
@@ -242,19 +244,19 @@ All major date libraries work in Server Components since they are pure utility f
 
 ## Data Fetching Libraries
 
-| Library                          | RSC Pattern                                                                                        | Notes                                                                                                |
-| -------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **React on Rails Pro streaming** | Recommended for React on Rails. Rails streams components via `stream_react_component`.             | See [Data Fetching Migration](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for details. |
-| **TanStack Query**               | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`. | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
-| **Apollo Client**                | Server-side queries in Server Components, `ApolloProvider` for client queries.                     | Requires `'use client'` wrapper for provider.                                                        |
-| **SWR**                          | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props.           | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
+| Library                          | RSC Pattern                                                                                                                                                 | Notes                                                                                                |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **React on Rails Pro streaming** | Recommended for React on Rails. Rails streams components via `stream_react_component`, or slow emitted props via `stream_react_component_with_async_props`. | See [Data Fetching Migration](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for details. |
+| **TanStack Query**               | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`.                                                          | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
+| **Apollo Client**                | Server-side queries in Server Components, `ApolloProvider` for client queries.                                                                              | Requires `'use client'` wrapper for provider.                                                        |
+| **SWR**                          | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props.                                                                    | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
 
 ## Internationalization
 
-| Library                     | RSC Pattern                                                                                                                                                     | Notes                                                                                        |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| **Rails I18n + react-intl** | Pass translations from Rails controller as props. Server Components use the translations object directly; Client Components use `<IntlProvider>` + `useIntl()`. | Recommended for React on Rails. See [Context guide](rsc-context-and-state.md#i18n-provider). |
-| **i18next / react-i18next** | Requires `'use client'` for hook-based usage. Server Components can use `i18next` directly (no hooks).                                                          | Framework-agnostic alternative.                                                              |
+| Library                     | RSC Pattern                                                                                                                                                                                                                                            | Notes                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| **Rails I18n + react-intl** | Pass translations from Rails controller as props. Server Components use `createIntl` from `react-intl/server` for full formatting (interpolation, pluralization, dates); Client Components use `<IntlProvider>` + `useIntl()`.                         | Recommended for React on Rails. See [Context guide](rsc-context-and-state.md#i18n-provider). |
+| **i18next / react-i18next** | `react-i18next` hooks (`useTranslation`) require `'use client'`. For Server Components, `i18next` can be initialized per-request via `i18next.createInstance()` and used without hooks — but you must manage locale/namespace initialization yourself. | Requires per-request setup; not used in this codebase.                                       |
 
 ## Authentication
 
@@ -310,14 +312,9 @@ For third-party packages, check if the library provides direct import paths (mos
 
 Avoid creating barrel files that mix server and client components. If you must use a barrel file, keep separate barrels for server and client exports:
 
-```text
-components/
-├── server/index.js    # Only server components
-├── client/index.js    # Only 'use client' components
-├── ServerHeader.jsx
-├── ClientSearch.jsx
-└── ...
-```
+<p align="center">
+  <img src="images/barrel-file-contamination.svg" alt="Static diagram showing how a single barrel file (index.js) with 'use client' contaminates all re-exports, and the fix using separate server/client barrels to keep imports isolated." width="840" />
+</p>
 
 ## The `server-only` and `client-only` Packages
 
@@ -332,6 +329,8 @@ export async function getUser(id) {
 }
 ```
 
+> **React on Rails note:** The example above illustrates `server-only` in a generic RSC context. In React on Rails, the Node renderer has no database connection — database access stays in Rails controllers, which pass the results to components as props or [async props](rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). See [RSC Data Fetching Patterns](rsc-data-fetching.md).
+
 ```jsx
 // lib/analytics.js
 import 'client-only'; // Build error if imported in a Server Component
@@ -343,9 +342,9 @@ export function trackEvent(event) {
 
 Use `server-only` for:
 
-- Database access modules
 - Modules that use API keys or secrets
 - Server-side utility functions
+- Database access modules (in frameworks where the server runtime has DB access — **not** React on Rails, where Rails controllers handle data access)
 
 Use `client-only` for:
 
@@ -355,20 +354,72 @@ Use `client-only` for:
 
 ## Library Compatibility Decision Matrix
 
-| Category          | RSC-Native Choices                                                | Requires `'use client'` Wrapper              | Avoid / Migrate Away From                          |
-| ----------------- | ----------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
-| **Styling**       | Tailwind, CSS Modules, Panda CSS                                  | vanilla-extract (with workaround)            | styled-components (maintenance mode), Emotion      |
-| **UI Components** | shadcn/ui, Radix (non-interactive)                                | MUI, Chakra, Mantine, Radix (interactive)    | CSS-in-JS-dependent UI libs without migration path |
-| **Forms**         | Rails controller endpoints + standard forms                       | React Hook Form, TanStack Form               | Formik (less maintained)                           |
-| **Animation**     | CSS animations, Tailwind animate                                  | Framer Motion/Motion, React Spring           | --                                                 |
-| **Charts**        | Nivo (SSR support)                                                | Recharts, Tremor, Chart.js                   | --                                                 |
-| **Data Fetching** | React on Rails Pro streaming, native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | --                                                 |
-| **State**         | Server Component props, `React.cache`                             | Zustand, Jotai (v2.6+), Redux Toolkit        | Recoil (discontinued)                              |
-| **i18n**          | Rails I18n + react-intl                                           | react-i18next, i18next                       | --                                                 |
-| **Auth**          | Rails auth (Devise, etc.) via controller props                    | --                                           | --                                                 |
-| **Date Utils**    | date-fns, dayjs (pure functions)                                  | --                                           | Moment.js (not tree-shakable)                      |
+| Category          | RSC-Native Choices                                                 | Requires `'use client'` Wrapper              | Avoid / Migrate Away From                          |
+| ----------------- | ------------------------------------------------------------------ | -------------------------------------------- | -------------------------------------------------- |
+| **Styling**       | Tailwind, CSS Modules, Panda CSS                                   | vanilla-extract (with workaround)            | styled-components (maintenance mode), Emotion      |
+| **UI Components** | shadcn/ui, Radix (non-interactive)                                 | MUI, Chakra, Mantine, Radix (interactive)    | CSS-in-JS-dependent UI libs without migration path |
+| **Forms**         | Rails controller endpoints + standard forms                        | React Hook Form, TanStack Form               | Formik (less maintained)                           |
+| **Animation**     | CSS animations, Tailwind animate                                   | Framer Motion/Motion, React Spring           | --                                                 |
+| **Charts**        | Nivo (SSR support)                                                 | Recharts, Tremor, Chart.js                   | --                                                 |
+| **Data Fetching** | React on Rails Pro streaming, bundled or injected HTTP clients     | TanStack Query (with hydration), Apollo, SWR | --                                                 |
+| **State**         | Server Component props, `React.cache`                              | Zustand, Jotai (v2.6+), Redux Toolkit        | Recoil (discontinued)                              |
+| **i18n**          | Rails I18n + `react-intl/server` (Server), `IntlProvider` (Client) | react-i18next (hooks require `'use client'`) | --                                                 |
+| **Auth**          | Rails auth (Devise, etc.) via controller props                     | --                                           | --                                                 |
+| **Date Utils**    | date-fns, dayjs (pure functions)                                   | --                                           | Moment.js (not tree-shakable)                      |
+
+## Common Mistakes
+
+### Mistake 1: Adding `'use client'` to a barrel file
+
+Marking a barrel file (e.g., `components/index.js`) with `'use client'` forces every export into the client bundle, even components that could be Server Components:
+
+```jsx
+// BAD: All 50 exported components become Client Components
+'use client';
+export { Header } from './Header';
+export { Footer } from './Footer';
+export { ProductCard } from './ProductCard';
+// ... 47 more
+```
+
+**Fix:** Add `'use client'` only to individual component files that actually need it. Better yet, avoid barrel files entirely and use direct imports.
+
+### Mistake 2: Not checking library RSC compatibility before migrating
+
+Starting a component migration only to discover that a deeply nested dependency uses hooks wastes significant time.
+
+**Fix:** Before removing `'use client'` from a component, audit its import tree. Run a build with the change and look for errors like _"You're importing a component that needs useState."_ The [React Working Group compatibility list](https://github.com/reactwg/server-components/discussions/6) tracks library status.
+
+### Mistake 3: Using barrel imports across `'use client'` boundaries
+
+In standard (non-RSC) builds, modern bundlers tree-shake barrel imports effectively -- `import { Button } from '@mui/material'` produces roughly the same output as the direct path import. However, **at `'use client'` boundaries**, the full transitive import graph is included in the client bundle because webpack must serialize the entire module for the RSC manifest. This makes import granularity matter specifically in RSC:
+
+```jsx
+// AVOID at 'use client' boundaries: pulls in the full import graph
+import { Button } from '@mui/material';
+
+// PREFER: direct import keeps the client boundary small
+import Button from '@mui/material/Button';
+```
+
+```jsx
+// AVOID at 'use client' boundaries
+import { debounce } from 'lodash';
+
+// PREFER: imports only what's needed
+import debounce from 'lodash-es/debounce';
+```
+
+> **Note:** Outside of `'use client'` files, barrel imports are generally fine with modern bundlers. This advice is specific to files that form RSC client boundaries.
+
+### Mistake 4: Continuing to use runtime CSS-in-JS without a plan
+
+Styled-components and Emotion work inside `'use client'` boundaries, but they prevent those components from ever becoming Server Components. If your migration goal includes reducing JavaScript bundle size, CSS-in-JS will be the bottleneck.
+
+**Fix:** For new components, use Tailwind CSS, CSS Modules, or another zero-runtime solution. For existing styled-components/Emotion code, create a migration plan or accept that those components will remain Client Components.
 
 ## Next Steps
 
 - [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md) -- debugging and avoiding problems
 - [Data Fetching Migration](rsc-data-fetching.md) -- migrating from useEffect to server-side fetching
+- [HTTP Response Ownership](rsc-http-response-patterns.md) -- status codes, redirects, and cache headers

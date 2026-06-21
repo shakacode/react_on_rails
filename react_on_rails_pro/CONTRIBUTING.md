@@ -46,7 +46,7 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 
 ## Doc Changes
 
-When making doc changes, we want the change to work on both [the React on Rails docs site](https://reactonrails.com/docs/pro) and when browsing the GitHub repo.
+When making doc changes, we want the change to work on both [the React on Rails docs site](https://reactonrails.com/docs/pro/) and when browsing the GitHub repo.
 For links from docs pages to non-doc files, use full GitHub URLs so links resolve correctly in both contexts.
 
 ### Links to other docs:
@@ -55,7 +55,7 @@ For links from docs pages to non-doc files, use full GitHub URLs so links resolv
   `[Installation Guide](../docs/pro/installation.md)`
 
 - When making references to source code files, use a full url path like:
-  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails.rb)`
+  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails.rb)`
 
 ## To run tests:
 
@@ -347,7 +347,7 @@ bundle exec rspec
 
 If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
 
-After running a test, you can view the coverage results in SimpleCov reports by opening `coverage/index.html`.
+If you run tests with `COVERAGE=true`, you can view the SimpleCov report at `coverage/index.html`.
 
 ### Debugging
 

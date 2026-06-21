@@ -4,7 +4,23 @@ require "react_on_rails/utils"
 
 module ReactOnRails
   module ReactComponent
-    # rubocop:disable Metrics/ClassLength
+    HYDRATE_ON_MODES = %i[immediate visible idle].freeze
+
+    def self.normalize_hydrate_on(value)
+      normalized_value = value.is_a?(String) ? value.to_sym : value
+      unless HYDRATE_ON_MODES.include?(normalized_value)
+        raise ArgumentError,
+              "Invalid hydrate_on option: #{value.inspect}. " \
+              "Supported OSS modes are :immediate, :visible, and :idle."
+      end
+
+      return normalized_value if normalized_value == :immediate || !ReactOnRails::Utils.react_on_rails_pro?
+
+      raise ArgumentError,
+            "hydrate_on: #{value.inspect} is only supported by the open-source React on Rails client renderer. " \
+            "React on Rails Pro does not support hydrate_on scheduling yet; use :immediate."
+    end
+
     class RenderOptions
       include Utils::Required
 
@@ -21,7 +37,7 @@ module ReactOnRails
             return cached_override[:value] if cached_override && cached_override[:raw_value] == raw_value
 
             parsed_value = parse_prerender_env_override(raw_value)
-            @prerender_env_override_cache = { raw_value: raw_value, value: parsed_value }
+            @prerender_env_override_cache = { raw_value:, value: parsed_value }
             parsed_value
           end
         end
@@ -55,9 +71,10 @@ module ReactOnRails
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
         @react_component_name = react_component_name.camelize
         @options = options
+        @hydrate_on = ReactComponent.normalize_hydrate_on(options.fetch(:hydrate_on, :immediate))
       end
 
-      attr_reader :react_component_name
+      attr_reader :react_component_name, :hydrate_on
 
       def throw_js_errors
         options.fetch(:throw_js_errors, false)
@@ -138,14 +155,6 @@ module ReactOnRails
         retrieve_configuration_value_for(:logging_on_server)
       end
 
-      def immediate_hydration
-        ReactOnRails::Utils.normalize_immediate_hydration(
-          options[:immediate_hydration],
-          react_component_name,
-          "Component"
-        )
-      end
-
       def to_s
         "{ react_component_name = #{react_component_name}, options = #{options}, request_digest = #{request_digest}"
       end
@@ -220,6 +229,5 @@ module ReactOnRails
         self.class.prerender_env_override
       end
     end
-    # rubocop:enable Metrics/ClassLength
   end
 end

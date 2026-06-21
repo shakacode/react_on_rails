@@ -1,0 +1,245 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 580" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>RSC Rendering Flow Sequence</title>
+  <desc>Animated sequence diagram showing the end-to-end React Server Components rendering flow: Browser requests page from Rails, Rails asks the Node renderer, the server bundle starts the page render, the RSC bundle builds the server component output, and a single streamed response flows back through Node Renderer and Rails to the browser for hydration.</desc>
+  <defs>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CC0000"/><stop offset="100%" stop-color="#990000"/>
+    </linearGradient>
+    <linearGradient id="reactGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#61DAFB"/><stop offset="100%" stop-color="#21A0C8"/>
+    </linearGradient>
+    <linearGradient id="browserGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A90D9"/><stop offset="100%" stop-color="#2E5A8A"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .lane-line { stroke: #E2E8F0; }
+      .phase-bg { fill: #F1F5F9; stroke: #CBD5E1; }
+      .phase-label { fill: #1E293B; }
+      .msg-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .msg-text { fill: #1E40AF; }
+      .ret-box { fill: #ECFDF5; stroke: #86EFAC; }
+      .ret-text { fill: #166534; }
+      .step-box { fill: white; stroke: #E2E8F0; }
+      .step-text { fill: #334155; }
+      .sub-text { fill: #64748B; }
+      .callout-box { fill: #FFFBEB; stroke: #FCD34D; }
+      .callout-title { fill: #92400E; }
+      .callout-text { fill: #78350F; }
+      .arrow-fwd { stroke: #94A3B8; }
+      .arrow-ret { stroke: #22C55E; }
+      .arrow-head-fwd { fill: #94A3B8; }
+      .arrow-head-ret { fill: #22C55E; }
+      .pulse-dot { fill: #22C55E; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .lane-line { stroke: #334155; }
+        .phase-bg { fill: #1E293B; stroke: #475569; }
+        .phase-label { fill: #E2E8F0; }
+        .msg-box { fill: #172554; stroke: #3B82F6; }
+        .msg-text { fill: #93C5FD; }
+        .ret-box { fill: #052E16; stroke: #10B981; }
+        .ret-text { fill: #6EE7B7; }
+        .step-box { fill: #1E293B; stroke: #334155; }
+        .step-text { fill: #CBD5E1; }
+        .sub-text { fill: #94A3B8; }
+        .callout-box { fill: #422006; stroke: #F59E0B; }
+        .callout-title { fill: #FCD34D; }
+        .callout-text { fill: #FDE68A; }
+        .arrow-fwd { stroke: #94A3B8; }
+        .arrow-ret { stroke: #4ADE80; }
+        .arrow-head-fwd { fill: #94A3B8; }
+        .arrow-head-ret { fill: #4ADE80; }
+        .pulse-dot { fill: #4ADE80; }
+      }
+
+      /* Progressive reveal: each step fades in and stays visible until reset */
+      .s1  { opacity:0; animation: reveal 14s ease 0.3s  infinite; }
+      .s2  { opacity:0; animation: reveal 14s ease 1.0s  infinite; }
+      .s3  { opacity:0; animation: reveal 14s ease 1.7s  infinite; }
+      .s4  { opacity:0; animation: reveal 14s ease 2.4s  infinite; }
+      .s5  { opacity:0; animation: reveal 14s ease 3.1s  infinite; }
+      .s6  { opacity:0; animation: reveal 14s ease 3.8s  infinite; }
+      .s7  { opacity:0; animation: reveal 14s ease 4.5s  infinite; }
+      .s8  { opacity:0; animation: reveal 14s ease 5.2s  infinite; }
+      .s9  { opacity:0; animation: reveal 14s ease 5.9s  infinite; }
+      .s10 { opacity:0; animation: reveal 14s ease 6.6s  infinite; }
+      .s11 { opacity:0; animation: reveal 14s ease 7.3s  infinite; }
+
+      .b1 { opacity:0; animation: reveal 14s ease 0.0s  infinite; }
+      .b2 { opacity:0; animation: reveal 14s ease 3.5s  infinite; }
+      .b3 { opacity:0; animation: reveal 14s ease 5.6s  infinite; }
+
+      @keyframes reveal {
+        0%   { opacity: 0; }
+        3%   { opacity: 1; }
+        85%  { opacity: 1; }
+        93%  { opacity: 0; }
+        100% { opacity: 0; }
+      }
+
+      .pulse { animation: pulse 2s ease-in-out infinite; }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 1; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; opacity: 1 !important; }
+      }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="580" class="bg"/>
+
+  <!-- Title -->
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="700" class="title">RSC Rendering Flow: Single Streamed Response</text>
+  <text x="450" y="48" text-anchor="middle" font-size="11" class="subtitle">No extra round-trip — the RSC payload is embedded in the initial HTML response</text>
+
+  <!-- Swim lane headers -->
+  <rect x="22" y="64" width="110" height="30" rx="8" fill="url(#browserGrad)" filter="url(#shadow)"/>
+  <text x="77" y="84" text-anchor="middle" font-size="11" font-weight="600" fill="white">Browser</text>
+
+  <rect x="192" y="64" width="110" height="30" rx="8" fill="url(#railsGrad)" filter="url(#shadow)"/>
+  <text x="247" y="84" text-anchor="middle" font-size="11" font-weight="600" fill="white">Rails</text>
+
+  <rect x="372" y="64" width="130" height="30" rx="8" fill="url(#nodeGrad)" filter="url(#shadow)"/>
+  <text x="437" y="84" text-anchor="middle" font-size="11" font-weight="600" fill="white">Node Renderer</text>
+
+  <rect x="572" y="64" width="110" height="30" rx="8" fill="url(#reactGrad)" filter="url(#shadow)"/>
+  <text x="627" y="84" text-anchor="middle" font-size="11" font-weight="600" fill="white">Server Bundle</text>
+
+  <rect x="752" y="64" width="110" height="30" rx="8" fill="url(#reactGrad)" filter="url(#shadow)"/>
+  <text x="807" y="84" text-anchor="middle" font-size="11" font-weight="600" fill="white">RSC Bundle</text>
+
+  <!-- Swim lane lines -->
+  <line x1="77"  y1="100" x2="77"  y2="540" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="247" y1="100" x2="247" y2="540" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="437" y1="100" x2="437" y2="540" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="627" y1="100" x2="627" y2="540" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="807" y1="100" x2="807" y2="540" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+  <!-- ======== Phase 1: Initial Request ======== -->
+  <g class="b1">
+    <rect x="16" y="106" width="868" height="20" rx="4" class="phase-bg" stroke-width="1"/>
+    <text x="450" y="120" text-anchor="middle" font-size="10" font-weight="600" class="phase-label">1. Initial Request</text>
+  </g>
+
+  <!-- Browser → Rails -->
+  <g class="s1">
+    <line x1="83" y1="142" x2="237" y2="142" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="237,139 244,142 237,145" class="arrow-head-fwd"/>
+    <rect x="112" y="132" width="90" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="157" y="144" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Request page</text>
+  </g>
+
+  <!-- Rails → Node Renderer -->
+  <g class="s2">
+    <line x1="253" y1="170" x2="427" y2="170" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="427,167 434,170 427,173" class="arrow-head-fwd"/>
+    <rect x="292" y="160" width="96" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="340" y="172" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Ask to render</text>
+  </g>
+
+  <!-- Node Renderer → Server Bundle -->
+  <g class="s3">
+    <line x1="443" y1="198" x2="617" y2="198" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="617,195 624,198 617,201" class="arrow-head-fwd"/>
+    <rect x="472" y="188" width="110" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="527" y="200" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Start page render</text>
+  </g>
+
+  <!-- Server Bundle → RSC Bundle -->
+  <g class="s4">
+    <line x1="633" y1="226" x2="797" y2="226" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="797,223 804,226 797,229" class="arrow-head-fwd"/>
+    <rect x="664" y="216" width="96" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="712" y="228" text-anchor="middle" font-size="9" font-weight="500" class="msg-text">Build SC output</text>
+  </g>
+
+  <!-- RSC Bundle → Server Bundle (payload return) -->
+  <g class="s5">
+    <line x1="801" y1="254" x2="637" y2="254" class="arrow-ret" stroke-width="1.5" stroke-dasharray="6 3"/>
+    <polygon points="637,251 630,254 637,257" class="arrow-head-ret"/>
+    <rect x="680" y="244" width="80" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="720" y="256" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">RSC payload</text>
+  </g>
+
+  <!-- ======== Phase 2: Single Streamed Response ======== -->
+  <g class="b2">
+    <rect x="16" y="278" width="868" height="20" rx="4" class="phase-bg" stroke-width="1"/>
+    <text x="450" y="292" text-anchor="middle" font-size="10" font-weight="600" class="phase-label">2. Single Streamed Response</text>
+  </g>
+
+  <!-- Server Bundle → Node Renderer (stream HTML) -->
+  <g class="s6">
+    <line x1="621" y1="314" x2="447" y2="314" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="447,311 440,314 447,317" class="arrow-head-ret"/>
+    <rect x="476" y="302" width="104" height="22" rx="5" class="ret-box" stroke-width="1.5"/>
+    <text x="528" y="317" text-anchor="middle" font-size="9" font-weight="600" class="ret-text">Stream HTML + payload</text>
+  </g>
+
+  <!-- Node Renderer → Rails -->
+  <g class="s7">
+    <line x1="431" y1="344" x2="257" y2="344" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="257,341 250,344 257,347" class="arrow-head-ret"/>
+    <rect x="290" y="334" width="100" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="340" y="346" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">Forward stream</text>
+  </g>
+
+  <!-- Rails → Browser -->
+  <g class="s8">
+    <line x1="241" y1="374" x2="87" y2="374" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="87,371 80,374 87,377" class="arrow-head-ret"/>
+    <rect x="112" y="364" width="106" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="165" y="376" text-anchor="middle" font-size="9" font-weight="500" class="ret-text">Streamed response</text>
+  </g>
+
+  <!-- ======== Phase 3: Client Hydration ======== -->
+  <g class="b3">
+    <rect x="16" y="400" width="868" height="20" rx="4" class="phase-bg" stroke-width="1"/>
+    <text x="450" y="414" text-anchor="middle" font-size="10" font-weight="600" class="phase-label">3. Client Hydration</text>
+  </g>
+
+  <!-- Step: Read embedded payload -->
+  <g class="s9">
+    <rect x="20" y="432" width="148" height="38" rx="8" class="step-box" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="94" y="449" text-anchor="middle" font-size="10" font-weight="600" class="step-text">Read embedded payload</text>
+    <text x="94" y="462" text-anchor="middle" font-size="8" class="sub-text">No extra fetch needed</text>
+  </g>
+
+  <!-- Pulse dot -->
+  <g class="s10">
+    <circle cx="77" cy="476" r="3" class="pulse-dot pulse"/>
+  </g>
+
+  <!-- Step: Hydrate components -->
+  <g class="s10">
+    <rect x="20" y="482" width="148" height="38" rx="8" class="ret-box" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="94" y="499" text-anchor="middle" font-size="10" font-weight="600" class="ret-text">Hydrate components</text>
+    <text x="94" y="512" text-anchor="middle" font-size="8" class="ret-text">Page becomes interactive</text>
+    <path d="M 172 490 C 188 490, 188 510, 172 510" fill="none" class="arrow-fwd" stroke-width="1" stroke-dasharray="3 2"/>
+    <text x="196" y="504" font-size="8" class="sub-text">each component</text>
+  </g>
+
+  <!-- Key Insight callout -->
+  <g class="s11">
+    <rect x="260" y="452" width="600" height="56" rx="10" class="callout-box" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="560" y="474" text-anchor="middle" font-size="12" font-weight="700" class="callout-title">Key Insight: Single Response</text>
+    <text x="560" y="494" text-anchor="middle" font-size="10" class="callout-text">RSC does NOT need a separate round-trip — the payload streams inside the initial HTML</text>
+  </g>
+</svg>

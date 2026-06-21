@@ -71,7 +71,7 @@ module ReactOnRails
             if check_service(name, service_config)
               print_service_ok(name, service_config[CONFIG_KEYS[:description]])
             else
-              failures << { name: name, config: service_config }
+              failures << { name:, config: service_config }
               print_service_failed(name, service_config[CONFIG_KEYS[:description]])
             end
           end

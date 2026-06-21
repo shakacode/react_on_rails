@@ -1,0 +1,24 @@
+<h1>React Root Error Callbacks (rootErrorHandlers)</h1>
+<p>
+  Exercises the global root error callbacks registered via
+  <code>ReactOnRails.setOptions({ rootErrorHandlers })</code> in
+  <code>spec/dummy/client/app/packs/client-bundle.ts</code> (issue #3892).
+  Recorded callback events are exposed on <code>window.__ROOT_ERROR_CALLBACK_EVENTS__</code>
+  for the Playwright e2e assertions.
+</p>
+
+<hr/>
+<h2>Server-rendered component with a forced hydration mismatch (onRecoverableError)</h2>
+<%= react_component("HydrationMismatchComponent", prerender: true, id: "HydrationMismatchComponent-react-component-0") %>
+
+<hr/>
+<h2>Client-rendered component that throws on demand (onUncaughtError)</h2>
+<%= react_component("RootErrorThrower", prerender: false, id: "RootErrorThrower-react-component-0") %>
+
+<hr/>
+<h2>Client-rendered component caught by an error boundary (onCaughtError)</h2>
+<%= react_component("RootErrorBoundaryThrower", prerender: false, id: "RootErrorBoundaryThrower-react-component-0") %>
+
+<hr/>
+<h2>Client-rendered nested component that throws, exercising owner stacks (issue #3887)</h2>
+<%= react_component("OwnerStackThrower", prerender: false, id: "OwnerStackThrower-react-component-0") %>

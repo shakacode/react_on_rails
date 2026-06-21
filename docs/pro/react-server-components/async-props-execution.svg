@@ -1,0 +1,412 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 580" role="img" aria-labelledby="async-props-execution-title">
+  <title id="async-props-execution-title">How React on Rails async props stream from Rails to Suspense boundaries</title>
+  <defs>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#CC0000"/>
+      <stop offset="100%" style="stop-color:#990000"/>
+    </linearGradient>
+    <linearGradient id="reactGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#61DAFB"/>
+      <stop offset="100%" style="stop-color:#21A0C8"/>
+    </linearGradient>
+    <linearGradient id="browserGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90D9"/>
+      <stop offset="100%" style="stop-color:#2E5A8A"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="3" stdDeviation="4" flood-opacity="0.12"/>
+    </filter>
+
+    <style>
+      /* Theme colors */
+      .bg { fill: #F8FAFC; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .card-inner { fill: #F1F5F9; }
+      .code-bg { fill: #1E293B; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .card-inner { fill: #0F172A; }
+        .code-bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+      }
+
+      /* 10-second animation cycle */
+      .phase-1 { opacity: 1; animation: p1 10s ease infinite; }
+      .phase-2 { opacity: 0; animation: p2 10s ease infinite; }
+      .phase-3 { opacity: 0; animation: p3 10s ease infinite; }
+      .phase-4 { opacity: 0; animation: p4 10s ease infinite; }
+
+      @keyframes p1 { 0%, 15% { opacity: 1; } 16%, 100% { opacity: 0; } }
+      @keyframes p2 { 0%, 15% { opacity: 0; } 16%, 45% { opacity: 1; } 46%, 100% { opacity: 0; } }
+      @keyframes p3 { 0%, 45% { opacity: 0; } 46%, 75% { opacity: 1; } 76%, 100% { opacity: 0; } }
+      @keyframes p4 { 0%, 75% { opacity: 0; } 76%, 100% { opacity: 1; } }
+
+      /* Pointer pulse */
+      .pointer { animation: pulse 0.8s ease-in-out infinite; }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+      /* Rails code highlights */
+      .rails-hl-1 { opacity: 0; animation: rh1 10s infinite; }
+      .rails-hl-2 { opacity: 0; animation: rh2 10s infinite; }
+      @keyframes rh1 { 0%, 15% { opacity: 0; } 16%, 45% { opacity: 1; } 46%, 100% { opacity: 0; } }
+      @keyframes rh2 { 0%, 45% { opacity: 0; } 46%, 75% { opacity: 1; } 76%, 100% { opacity: 0; } }
+
+      /* React code highlights */
+      .react-hl-1 { opacity: 0; animation: rcth1 10s infinite; }
+      .react-hl-2 { opacity: 0; animation: rcth2 10s infinite; }
+      @keyframes rcth1 { 0%, 15% { opacity: 0; } 16%, 45% { opacity: 1; } 46%, 100% { opacity: 0; } }
+      @keyframes rcth2 { 0%, 75% { opacity: 0; } 76%, 100% { opacity: 1; } }
+
+      /* Step pills */
+      .step-1 { animation: s1 10s ease infinite; }
+      .step-2 { animation: s2 10s ease infinite; }
+      .step-3 { animation: s3 10s ease infinite; }
+      .step-4 { animation: s4 10s ease infinite; }
+      @keyframes s1 { 0%, 15% { fill: #3B82F6; } 16%, 100% { fill: #E2E8F0; } }
+      @keyframes s2 { 0%, 15% { fill: #E2E8F0; } 16%, 45% { fill: #3B82F6; } 46%, 100% { fill: #E2E8F0; } }
+      @keyframes s3 { 0%, 45% { fill: #E2E8F0; } 46%, 75% { fill: #3B82F6; } 76%, 100% { fill: #E2E8F0; } }
+      @keyframes s4 { 0%, 75% { fill: #E2E8F0; } 76%, 100% { fill: #3B82F6; } }
+
+      /* Spinner */
+      .spinner {
+        animation: spin 1s linear infinite;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      @media (prefers-reduced-motion: reduce) {
+        .phase-1, .phase-2, .phase-3,
+        .rails-hl-1, .rails-hl-2,
+        .react-hl-1, .react-hl-2,
+        .spinner, .pointer {
+          animation: none;
+          opacity: 0;
+        }
+
+        .phase-4 {
+          animation: none;
+          opacity: 1;
+        }
+
+        .step-1, .step-2, .step-3 {
+          animation: none;
+          fill: #E2E8F0;
+        }
+
+        .step-4 {
+          animation: none;
+          fill: #3B82F6;
+        }
+      }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="580" class="bg"/>
+
+  <!-- Title -->
+  <text x="550" y="28" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" class="title">Async Props: Independent Streaming</text>
+  <text x="550" y="48" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" class="subtitle">Watch the pointers move through Rails → React → Browser</text>
+
+  <!-- Phase pills -->
+  <g transform="translate(350, 62)">
+    <rect x="0" y="0" width="70" height="22" rx="11" class="step-1"/>
+    <text x="35" y="15" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="500" fill="#1E293B">Start</text>
+    <rect x="85" y="0" width="70" height="22" rx="11" class="step-2"/>
+    <text x="120" y="15" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="500" fill="#1E293B">Loading</text>
+    <rect x="170" y="0" width="70" height="22" rx="11" class="step-3"/>
+    <text x="205" y="15" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="500" fill="#1E293B">Partial</text>
+    <rect x="255" y="0" width="70" height="22" rx="11" class="step-4"/>
+    <text x="290" y="15" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="500" fill="#1E293B">Complete</text>
+  </g>
+
+  <!-- === RAILS CODE PANEL === -->
+  <g transform="translate(15, 95)">
+    <rect x="0" y="0" width="350" height="220" rx="10" class="card" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="350" height="32" rx="10" fill="url(#railsGrad)"/>
+    <rect x="0" y="22" width="350" height="10" fill="url(#railsGrad)"/>
+    <text x="175" y="21" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="white">Rails View</text>
+
+    <!-- Code block -->
+    <rect x="8" y="40" width="334" height="172" rx="6" class="code-bg"/>
+
+    <!-- Rails code -->
+    <g transform="translate(16, 56)">
+      <text x="0" y="0" font-family="ui-monospace, monospace" font-size="10" fill="#94A3B8">stream_react_component_with_async_props(</text>
+      <text x="10" y="14" font-family="ui-monospace, monospace" font-size="10" fill="#FCD34D">props:</text>
+      <text x="50" y="14" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">{ </text>
+      <text x="60" y="14" font-family="ui-monospace, monospace" font-size="10" fill="#7DD3FC">title:</text>
+      <text x="100" y="14" font-family="ui-monospace, monospace" font-size="10" fill="#86EFAC">"Header"</text>
+      <text x="160" y="14" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">}</text>
+      <text x="175" y="14" font-family="ui-monospace, monospace" font-size="9" fill="#22C55E">← instant</text>
+      <text x="0" y="28" font-family="ui-monospace, monospace" font-size="10" fill="#94A3B8">) { |emit|</text>
+
+      <!-- emit reviews -->
+      <text x="10" y="50" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">emit.call(</text>
+      <text x="75" y="50" font-family="ui-monospace, monospace" font-size="10" fill="#86EFAC">"reviews"</text>
+      <text x="135" y="50" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">, data)</text>
+      <text x="175" y="50" font-family="ui-monospace, monospace" font-size="9" fill="#64748B">// 1s</text>
+
+      <!-- emit recs -->
+      <text x="10" y="66" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">emit.call(</text>
+      <text x="75" y="66" font-family="ui-monospace, monospace" font-size="10" fill="#86EFAC">"recs"</text>
+      <text x="110" y="66" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">, data)</text>
+      <text x="175" y="66" font-family="ui-monospace, monospace" font-size="9" fill="#64748B">// 3s</text>
+
+      <text x="0" y="80" font-family="ui-monospace, monospace" font-size="10" fill="#94A3B8">}</text>
+
+      <!-- Animated highlight for emit reviews -->
+      <rect x="-4" y="40" width="220" height="16" rx="3" fill="none" stroke="#22C55E" stroke-width="2" class="rails-hl-1"/>
+      <g class="rails-hl-1">
+        <polygon points="-12,48 -4,44 -4,52" fill="#22C55E" class="pointer"/>
+      </g>
+
+      <!-- Animated highlight for emit recs -->
+      <rect x="-4" y="56" width="200" height="16" rx="3" fill="none" stroke="#0891B2" stroke-width="2" class="rails-hl-2"/>
+      <g class="rails-hl-2">
+        <polygon points="-12,64 -4,60 -4,68" fill="#0891B2" class="pointer"/>
+      </g>
+    </g>
+
+  </g>
+
+  <!-- === REACT CODE PANEL === -->
+  <g transform="translate(380, 95)">
+    <rect x="0" y="0" width="350" height="220" rx="10" class="card" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="350" height="32" rx="10" fill="url(#reactGrad)"/>
+    <rect x="0" y="22" width="350" height="10" fill="url(#reactGrad)"/>
+    <text x="175" y="21" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="white">React Component</text>
+
+    <!-- Code block -->
+    <rect x="8" y="40" width="334" height="172" rx="6" class="code-bg"/>
+
+    <!-- React JSX code (condensed line spacing for fit) -->
+    <g transform="translate(16, 54)">
+      <text x="0" y="0" font-family="ui-monospace, monospace" font-size="9" fill="#F472B6">function</text>
+      <text x="50" y="0" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">Page</text>
+      <text x="75" y="0" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">({ title, getReactOnRailsAsyncProp }) {</text>
+
+      <text x="5" y="12" font-family="ui-monospace, monospace" font-size="9" fill="#F472B6">const</text>
+      <text x="35" y="12" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">reviews =</text>
+      <text x="90" y="12" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">getReactOnRailsAsyncProp</text>
+      <text x="215" y="12" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">(</text>
+      <text x="222" y="12" font-family="ui-monospace, monospace" font-size="9" fill="#86EFAC">'reviews'</text>
+      <text x="275" y="12" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">)</text>
+
+      <text x="5" y="24" font-family="ui-monospace, monospace" font-size="9" fill="#F472B6">const</text>
+      <text x="35" y="24" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">recs =</text>
+      <text x="75" y="24" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">getReactOnRailsAsyncProp</text>
+      <text x="200" y="24" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">(</text>
+      <text x="207" y="24" font-family="ui-monospace, monospace" font-size="9" fill="#86EFAC">'recs'</text>
+      <text x="240" y="24" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">)</text>
+
+      <text x="5" y="38" font-family="ui-monospace, monospace" font-size="9" fill="#F472B6">return</text>
+      <text x="40" y="38" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">(</text>
+
+      <text x="10" y="50" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+      <text x="17" y="50" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">h1</text>
+      <text x="30" y="50" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&gt;{title}&lt;/</text>
+      <text x="80" y="50" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">h1</text>
+      <text x="93" y="50" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&gt;</text>
+      <text x="110" y="50" font-family="ui-monospace, monospace" font-size="8" fill="#22C55E">← sync</text>
+
+      <text x="10" y="64" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+      <text x="17" y="64" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+      <text x="65" y="64" font-family="ui-monospace, monospace" font-size="9" fill="#FCD34D">fallback</text>
+      <text x="110" y="64" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">={</text>
+      <text x="122" y="64" font-family="ui-monospace, monospace" font-size="9" fill="#86EFAC">"..."</text>
+      <text x="145" y="64" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">}&gt;</text>
+
+      <text x="15" y="76" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+      <text x="22" y="76" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">Reviews</text>
+      <text x="65" y="76" font-family="ui-monospace, monospace" font-size="9" fill="#FCD34D">data</text>
+      <text x="88" y="76" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">={reviews} /&gt;</text>
+
+      <text x="10" y="88" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&lt;/</text>
+      <text x="22" y="88" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+      <text x="70" y="88" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&gt;</text>
+
+      <text x="10" y="102" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+      <text x="17" y="102" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+      <text x="65" y="102" font-family="ui-monospace, monospace" font-size="9" fill="#FCD34D">fallback</text>
+      <text x="110" y="102" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">={...}&gt;</text>
+
+      <text x="15" y="114" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+      <text x="22" y="114" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">Recs</text>
+      <text x="47" y="114" font-family="ui-monospace, monospace" font-size="9" fill="#FCD34D">data</text>
+      <text x="70" y="114" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">={recs} /&gt;</text>
+
+      <text x="10" y="126" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&lt;/</text>
+      <text x="22" y="126" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+      <text x="70" y="126" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&gt;</text>
+
+      <!-- Parallel await bracket on React side -->
+      <path d="M 170 56 L 178 56 L 178 130 L 170 130" fill="none" stroke="#3B82F6" stroke-width="1.5"/>
+      <text x="185" y="88" font-family="ui-monospace, monospace" font-size="7" fill="#3B82F6">await</text>
+      <text x="185" y="98" font-family="ui-monospace, monospace" font-size="7" fill="#3B82F6">in parallel</text>
+
+      <!-- Animated highlight for first Suspense (Reviews) -->
+      <rect x="-2" y="54" width="168" height="40" rx="3" fill="none" stroke="#61DAFB" stroke-width="2" class="react-hl-1"/>
+      <g class="react-hl-1">
+        <polygon points="-12,74 -4,70 -4,78" fill="#61DAFB" class="pointer"/>
+      </g>
+
+      <!-- Animated highlight for second Suspense (Recs) resolving -->
+      <rect x="-2" y="92" width="168" height="40" rx="3" fill="none" stroke="#22C55E" stroke-width="2" class="react-hl-2"/>
+      <g class="react-hl-2">
+        <polygon points="-12,112 -4,108 -4,116" fill="#22C55E" class="pointer"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- === BROWSER PANEL === -->
+  <g transform="translate(745, 95)">
+    <rect x="0" y="0" width="340" height="220" rx="10" class="card" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="340" height="32" rx="10" fill="url(#browserGrad)"/>
+    <rect x="0" y="22" width="340" height="10" fill="url(#browserGrad)"/>
+    <circle cx="18" cy="16" r="5" fill="#EF4444"/>
+    <circle cx="34" cy="16" r="5" fill="#F59E0B"/>
+    <circle cx="50" cy="16" r="5" fill="#22C55E"/>
+    <text x="170" y="21" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="white">Browser</text>
+
+    <rect x="10" y="40" width="320" height="170" rx="6" class="card-inner"/>
+
+    <!-- Phase 1: Waiting -->
+    <g class="phase-1">
+      <text x="170" y="130" text-anchor="middle" font-family="system-ui" font-size="13" class="subtitle">Waiting for server...</text>
+    </g>
+
+    <!-- Phase 2: Both Loading -->
+    <g class="phase-2">
+      <rect x="18" y="48" width="304" height="26" rx="5" fill="#DBEAFE" stroke="#93C5FD"/>
+      <text x="170" y="66" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" fill="#1E40AF">Header</text>
+      <text x="295" y="66" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
+
+      <rect x="18" y="82" width="304" height="56" rx="5" fill="white" stroke="#FCD34D" stroke-width="2" stroke-dasharray="5 3"/>
+      <text x="145" y="115" text-anchor="middle" font-family="system-ui" font-size="11" fill="#92400E">Reviews</text>
+      <g transform="translate(200, 110)">
+        <circle cx="0" cy="0" r="6" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="12 6" class="spinner"/>
+      </g>
+
+      <rect x="18" y="146" width="304" height="56" rx="5" fill="white" stroke="#FCD34D" stroke-width="2" stroke-dasharray="5 3"/>
+      <text x="145" y="179" text-anchor="middle" font-family="system-ui" font-size="11" fill="#92400E">Recs</text>
+      <g transform="translate(185, 174)">
+        <circle cx="0" cy="0" r="6" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="12 6" class="spinner"/>
+      </g>
+    </g>
+
+    <!-- Phase 3: Reviews loaded -->
+    <g class="phase-3">
+      <rect x="18" y="48" width="304" height="26" rx="5" fill="#DBEAFE" stroke="#93C5FD"/>
+      <text x="170" y="66" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" fill="#1E40AF">Header</text>
+      <text x="295" y="66" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
+
+      <rect x="18" y="82" width="304" height="56" rx="5" fill="#D1FAE5" stroke="#22C55E" stroke-width="2"/>
+      <text x="170" y="108" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" fill="#166534">⭐⭐⭐⭐⭐ Reviews</text>
+      <text x="170" y="124" text-anchor="middle" font-family="system-ui" font-size="9" fill="#15803D">Loaded at 1s</text>
+      <text x="295" y="110" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
+
+      <rect x="18" y="146" width="304" height="56" rx="5" fill="white" stroke="#FCD34D" stroke-width="2" stroke-dasharray="5 3"/>
+      <text x="145" y="179" text-anchor="middle" font-family="system-ui" font-size="11" fill="#92400E">Recs</text>
+      <g transform="translate(185, 174)">
+        <circle cx="0" cy="0" r="6" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="12 6" class="spinner"/>
+      </g>
+    </g>
+
+    <!-- Phase 4: All loaded -->
+    <g class="phase-4">
+      <rect x="18" y="48" width="304" height="26" rx="5" fill="#DBEAFE" stroke="#93C5FD"/>
+      <text x="170" y="66" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" fill="#1E40AF">Header</text>
+      <text x="295" y="66" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
+
+      <rect x="18" y="82" width="304" height="56" rx="5" fill="#D1FAE5" stroke="#22C55E" stroke-width="2"/>
+      <text x="170" y="108" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" fill="#166534">⭐⭐⭐⭐⭐ Reviews</text>
+      <text x="170" y="124" text-anchor="middle" font-family="system-ui" font-size="9" fill="#15803D">Loaded at 1s</text>
+      <text x="295" y="110" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
+
+      <rect x="18" y="146" width="304" height="56" rx="5" fill="#D1FAE5" stroke="#22C55E" stroke-width="2"/>
+      <text x="170" y="172" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" fill="#166534">🎯 Recommendations</text>
+      <text x="170" y="188" text-anchor="middle" font-family="system-ui" font-size="9" fill="#15803D">Loaded at 3s</text>
+      <text x="295" y="174" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
+    </g>
+  </g>
+
+  <!-- === TIMELINE === -->
+  <g transform="translate(15, 330)">
+    <rect x="0" y="0" width="1070" height="235" rx="10" class="card" stroke-width="2" filter="url(#shadow)"/>
+
+    <text x="535" y="26" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="600" class="title">Timeline: What the User Sees</text>
+
+    <g transform="translate(50, 50)">
+      <rect x="0" y="16" width="970" height="8" rx="4" fill="#E2E8F0"/>
+      <rect x="0" y="16" width="60" height="8" rx="4" fill="#FCA5A5"/>
+      <rect x="60" y="16" width="280" height="8" fill="#67E8F9"/>
+      <rect x="340" y="16" width="400" height="8" fill="#FCD34D"/>
+      <rect x="740" y="16" width="230" height="8" rx="4" fill="#86EFAC"/>
+
+      <g transform="translate(0, 0)">
+        <circle cx="0" cy="20" r="8" fill="#DC2626" stroke="white" stroke-width="2"/>
+        <text x="0" y="50" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#475569">0s</text>
+        <text x="0" y="64" text-anchor="middle" font-family="system-ui" font-size="9" fill="#64748B">Start</text>
+      </g>
+
+      <g transform="translate(60, 0)">
+        <circle cx="0" cy="20" r="8" fill="#16A34A" stroke="white" stroke-width="2"/>
+        <text x="0" y="6" text-anchor="middle" font-family="system-ui" font-size="9" fill="#16A34A">Header ✓</text>
+        <text x="0" y="50" text-anchor="middle" font-family="system-ui" font-size="9" fill="#64748B">instant</text>
+      </g>
+
+      <g transform="translate(340, 0)">
+        <circle cx="0" cy="20" r="8" fill="#0891B2" stroke="white" stroke-width="2"/>
+        <text x="0" y="6" text-anchor="middle" font-family="system-ui" font-size="9" fill="#0891B2">Reviews ✓</text>
+        <text x="0" y="50" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#475569">1s</text>
+      </g>
+
+      <g transform="translate(740, 0)">
+        <circle cx="0" cy="20" r="8" fill="#0891B2" stroke="white" stroke-width="2"/>
+        <text x="0" y="6" text-anchor="middle" font-family="system-ui" font-size="9" fill="#0891B2">Recs ✓</text>
+        <text x="0" y="50" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#475569">3s</text>
+      </g>
+    </g>
+
+    <!-- Key benefits -->
+    <g transform="translate(40, 140)">
+      <g>
+        <circle cx="12" cy="12" r="12" fill="#22C55E"/>
+        <text x="12" y="16" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="white">✓</text>
+        <text x="32" y="10" font-family="system-ui" font-size="11" font-weight="600" fill="#1E293B">Rails emits, React awaits</text>
+        <text x="32" y="24" font-family="system-ui" font-size="9" fill="#64748B">emit.call() → getReactOnRailsAsyncProp()</text>
+      </g>
+      <g transform="translate(340, 0)">
+        <circle cx="12" cy="12" r="12" fill="#22C55E"/>
+        <text x="12" y="16" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="white">✓</text>
+        <text x="32" y="10" font-family="system-ui" font-size="11" font-weight="600" fill="#1E293B">Independent Suspense</text>
+        <text x="32" y="24" font-family="system-ui" font-size="10" fill="#64748B">Each boundary fills when its data arrives</text>
+      </g>
+      <g transform="translate(680, 0)">
+        <circle cx="12" cy="12" r="12" fill="#22C55E"/>
+        <text x="12" y="16" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="white">✓</text>
+        <text x="32" y="10" font-family="system-ui" font-size="11" font-weight="600" fill="#1E293B">First Wins</text>
+        <text x="32" y="24" font-family="system-ui" font-size="10" fill="#64748B">No waiting for slowest query</text>
+      </g>
+    </g>
+
+    <!-- Connection arrows showing data flow -->
+    <g transform="translate(40, 185)">
+      <text x="0" y="12" font-family="system-ui" font-size="10" fill="#64748B">Data flow:</text>
+      <text x="70" y="12" font-family="ui-monospace, monospace" font-size="10" fill="#DC2626">Rails emit.call()</text>
+      <text x="175" y="12" font-family="system-ui" font-size="10" fill="#64748B">→</text>
+      <text x="190" y="12" font-family="ui-monospace, monospace" font-size="9" fill="#0891B2">getReactOnRailsAsyncProp()</text>
+      <text x="365" y="12" font-family="system-ui" font-size="10" fill="#64748B">→</text>
+      <text x="380" y="12" font-family="ui-monospace, monospace" font-size="10" fill="#7C3AED">&lt;Suspense&gt;</text>
+      <text x="440" y="12" font-family="system-ui" font-size="10" fill="#64748B">boundary fills</text>
+    </g>
+  </g>
+</svg>

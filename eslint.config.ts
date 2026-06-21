@@ -16,14 +16,32 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 });
 
+// v6.1.1 does not expose a flat preset for these compiler-era Rules-of-React
+// checks. Revisit this explicit list when bumping eslint-plugin-react-hooks.
+const reactCompilerRulesOfReact = {
+  'react-hooks/static-components': 'error',
+  'react-hooks/use-memo': 'error',
+  'react-hooks/component-hook-factories': 'error',
+  'react-hooks/preserve-manual-memoization': 'error',
+  'react-hooks/incompatible-library': 'warn',
+  'react-hooks/immutability': 'error',
+  'react-hooks/globals': 'error',
+  'react-hooks/refs': 'error',
+  'react-hooks/set-state-in-effect': 'error',
+  'react-hooks/error-boundaries': 'error',
+  'react-hooks/purity': 'error',
+  'react-hooks/set-state-in-render': 'error',
+  'react-hooks/unsupported-syntax': 'warn',
+  'react-hooks/config': 'error',
+  'react-hooks/gating': 'error',
+} as const;
+
 const config = defineConfig([
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
   globalIgnores([
     // compiled code
     'packages/*/lib/',
-    // pro package (has its own linting)
-    'react_on_rails_pro/',
     // used for tests only
     'spec/react_on_rails/dummy-for-generators',
     'react_on_rails/spec/dummy-for-generators',
@@ -63,6 +81,10 @@ const config = defineConfig([
     'packages/*/*.test.{js,jsx,ts,tsx}',
     'packages/*/babel.config.js',
     'packages/*/jest.config.js',
+    // ShakaPerf reproduction inputs depend on the external `shaka-shared`
+    // runtime and are committed as investigation artifacts, not repo TS source.
+    'internal/analysis/rsc-fouc-shakaperf-artifacts/setup/ab-tests/**/*.ts',
+    'internal/analysis/rsc-fouc-shakaperf-artifacts/setup/config/**/*.ts',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
@@ -190,10 +212,47 @@ const config = defineConfig([
     },
   },
   {
-    files: ['react_on_rails/spec/dummy/**/*', 'react_on_rails_pro/spec/dummy/**/*'],
+    files: [
+      'react_on_rails/spec/dummy/**/*',
+      'react_on_rails_pro/spec/dummy/**/*',
+      'react_on_rails_pro/spec/execjs-compatible-dummy/**/*',
+    ],
     rules: {
       // The dummy app dependencies are managed separately and may not be installed
       'import/no-unresolved': 'off',
+    },
+  },
+  {
+    // Pro dummy apps were written under a more permissive lint config (see Pro's
+    // pre-unification eslint.config.mjs). Keeping these rules off preserves
+    // behavior; tightening them is out of scope for the lint-config unification.
+    files: ['react_on_rails_pro/spec/dummy/**/*', 'react_on_rails_pro/spec/execjs-compatible-dummy/**/*'],
+    rules: {
+      'import/extensions': 'off',
+      'import/prefer-default-export': 'off',
+      'import/named': 'off',
+      'react/prop-types': 'off',
+      'no-underscore-dangle': 'off',
+      // Pre-existing: a few .server.tsx files have 'use client' directives.
+      // Not a regression introduced by unification; track fixing separately.
+      'react-on-rails/no-use-client-in-server-files': 'off',
+    },
+  },
+  {
+    // Pro node-renderer integrations must only use the public integration API
+    files: ['packages/react-on-rails-pro-node-renderer/src/integrations/**'],
+    ignores: ['packages/react-on-rails-pro-node-renderer/src/integrations/api.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['../*'] }],
+    },
+  },
+  {
+    // Pro Playwright e2e tests: fixtures use empty object patterns,
+    // and Playwright's `test` function false-positives on react-hooks rules
+    files: ['react_on_rails_pro/spec/dummy/e2e-tests/**/*'],
+    rules: {
+      'no-empty-pattern': ['error', { allowObjectPatternsAsParameters: true }],
+      'react-hooks/rules-of-hooks': 'off',
     },
   },
   {
@@ -228,6 +287,7 @@ const config = defineConfig([
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
+          argsIgnorePattern: '^_',
           caughtErrorsIgnorePattern: '^_',
         },
       ],
@@ -279,6 +339,13 @@ const config = defineConfig([
       '@typescript-eslint/no-unsafe-argument': 'off',
       // Allow missing extensions in require() calls - dynamic imports
       'import/extensions': 'off',
+      // FastifyReply is a known-safe floating promise in node-renderer
+      '@typescript-eslint/no-floating-promises': [
+        'error',
+        {
+          allowForKnownSafePromises: [{ from: 'package', package: 'fastify', name: 'FastifyReply' }],
+        },
+      ],
     },
   },
   {
@@ -319,6 +386,12 @@ const config = defineConfig([
       // Some tests validate error conditions without explicit assertions
       'jest/expect-expect': 'off',
     },
+  },
+  {
+    // Mirrors the Babel `sources` predicate in react_on_rails/spec/dummy/babel.config.js.
+    // Keep these two in sync if the component is renamed or moved.
+    files: ['react_on_rails/spec/dummy/client/app/startup/ReactCompilerExample.tsx'],
+    rules: reactCompilerRulesOfReact,
   },
   // must be the last config in the array
   // https://github.com/prettier/eslint-plugin-prettier?tab=readme-ov-file#configuration-new-eslintconfigjs

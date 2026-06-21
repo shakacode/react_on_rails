@@ -1,7 +1,7 @@
 # Error Reporting and Tracing
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
+> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 For versions before 4.0.0, error reporting was configured via `honeybadgerApiKey` and `sentryDsn` options. These options were removed in 4.0.0 and will cause an error if used. See the current integration approach below.
 
@@ -81,7 +81,7 @@ addNotifier((msg) => {
   - `executor` should wrap an async function in the service's unit of work.
   - Since the only units of work we currently track are rendering requests, the options to start them are specified in `startSsrRequestOptions`.
 
-To track requests as [sessions](https://docs.bugsnag.com/platforms/javascript/capturing-sessions/#startsession) in BugSnag 8.x+,
+To track requests as sessions in BugSnag 8.x+,
 the above example becomes
 
 ```js

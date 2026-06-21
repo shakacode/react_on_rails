@@ -225,7 +225,7 @@ bin/ci-switch-config status
 # Switch to minimum (if that's where failure is):
 bin/ci-switch-config minimum
 cd <project-root>  # Reload shell
-ruby --version     # Verify 3.2.x
+ruby --version     # Verify 3.3.x
 node --version     # Verify v20.x
 
 # Run exact failing tests:
@@ -377,8 +377,8 @@ Cannot proceed without manual verification.
 **Workaround:**
 
 ```bash
-# Switch to Ruby 3.2 for system tests:
-mise use ruby@3.2
+# Switch to Ruby 3.3 for system tests:
+mise use ruby@3.3
 bundle install
 cd react_on_rails/spec/dummy
 bundle exec rspec spec/system/integration_spec.rb

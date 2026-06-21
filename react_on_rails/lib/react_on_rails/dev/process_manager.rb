@@ -8,6 +8,36 @@ module ReactOnRails
       # Timeout for version check operations to prevent hanging
       VERSION_CHECK_TIMEOUT = 5
 
+      # Env vars set after Bundler.setup that must survive with_unbundled_env.
+      # with_unbundled_env restores the pre-Bundler env snapshot, so any var
+      # set at runtime (e.g. PORT by PortSelector) is lost. We capture them
+      # before entering the block and pass them explicitly to system().
+      # This follows the same pattern used by Rails' bundle_command (railties),
+      # Spring's process spawning, and this codebase's own PackGenerator.
+      #
+      # REACT_ON_RAILS_BASE_PORT and CONDUCTOR_PORT are intentionally excluded:
+      # by the time sub-processes spawn, configure_ports has already derived
+      # concrete values into PORT / SHAKAPACKER_DEV_SERVER_PORT / RENDERER_PORT /
+      # REACT_RENDERER_URL. Sub-processes should use those fixed ports rather
+      # than re-deriving from the base.
+      # SHAKAPACKER_SKIP_PRECOMPILE_HOOK is also runtime-only and must survive
+      # Bundler's env reset so nested shakapacker commands don't rerun the hook.
+      # RENDERER_URL is the legacy name for REACT_RENDERER_URL; preserved for
+      # mid-migration users (see ServerManager#warn_if_legacy_renderer_url_env_used).
+      # Inclusion here also matters when base-port mode scrubs the legacy var:
+      # `preserve_runtime_env_vars` returns `nil` (not the string "nil") for unset
+      # keys, which `Process.spawn`/`system` use to explicitly unset the variable
+      # in the child — preventing `with_unbundled_env` from resurrecting a stale
+      # pre-Bundler value. See the comment on `preserve_runtime_env_vars` below.
+      ENV_KEYS_TO_PRESERVE = %w[
+        PORT
+        SHAKAPACKER_DEV_SERVER_PORT
+        RENDERER_PORT
+        REACT_RENDERER_URL
+        RENDERER_URL
+        SHAKAPACKER_SKIP_PRECOMPILE_HOOK
+      ].freeze
+
       class << self
         # Check if a process is available and usable in the current execution context
         # This accounts for bundler context where system commands might be intercepted
@@ -97,14 +127,18 @@ module ReactOnRails
 
           # Process not available in either context
           nil
+        rescue Interrupt
+          # Ctrl-C during overmind/foreman shutdown should exit quietly.
+          true
         end
 
         # Run a process outside of bundler context
         # This allows using system-installed processes even when they're not in the Gemfile
         def run_process_outside_bundle(process, args)
           if defined?(Bundler)
+            env_overrides = preserve_runtime_env_vars
             with_unbundled_context do
-              system(process, *args)
+              system(env_overrides, process, *args)
             end
           else
             # Fallback if Bundler is not available
@@ -131,11 +165,11 @@ module ReactOnRails
 
         # DRY helper method for Bundler context switching with API compatibility
         # Supports both new (with_unbundled_env) and legacy (with_clean_env) Bundler APIs
-        def with_unbundled_context(&block)
+        def with_unbundled_context(&)
           if Bundler.respond_to?(:with_unbundled_env)
-            Bundler.with_unbundled_env(&block)
+            Bundler.with_unbundled_env(&)
           elsif Bundler.respond_to?(:with_clean_env)
-            Bundler.with_clean_env(&block)
+            Bundler.with_clean_env(&)
           else
             # Fallback if neither method is available (very old Bundler versions)
             yield
@@ -166,6 +200,17 @@ module ReactOnRails
             After installation, try running this script again.
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           MSG
+        end
+
+        # Always include every key (nil when unset) so Process.spawn/system
+        # explicitly unsets it in the child. A non-nil-only hash would let
+        # `with_unbundled_env` restore a pre-Bundler value the parent had
+        # just deleted — e.g. an invalid `RENDERER_PORT=abc` that
+        # PortSelector scrubbed would resurrect in the renderer child.
+        def preserve_runtime_env_vars
+          ENV_KEYS_TO_PRESERVE.each_with_object({}) do |key, hash|
+            hash[key] = ENV.fetch(key, nil)
+          end
         end
 
         def valid_procfile_path?(procfile)

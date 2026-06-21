@@ -1,0 +1,66 @@
+---
+name: Read tool versions
+description: >-
+  Read committed latest and minimum Ruby/Node runtime versions for jobs that
+  need both runtimes. For Node-only jobs, prefer actions/setup-node with
+  node-version-file: .tool-versions. Requires actions/checkout to have run
+  first.
+
+outputs:
+  ruby-version:
+    description: Latest Ruby patch version from .tool-versions.
+    value: ${{ steps.versions.outputs.ruby-version }}
+  ruby-minor-version:
+    description: Latest Ruby minor version from .tool-versions.
+    value: ${{ steps.versions.outputs.ruby-minor-version }}
+  node-version:
+    description: Latest Node patch version from .tool-versions.
+    value: ${{ steps.versions.outputs.node-version }}
+  node-major-version:
+    description: Latest Node major version from .tool-versions.
+    value: ${{ steps.versions.outputs.node-major-version }}
+  minimum-ruby-version:
+    description: Minimum Ruby patch version from .minimum.tool-versions.
+    value: ${{ steps.versions.outputs.minimum-ruby-version }}
+  minimum-ruby-minor-version:
+    description: Minimum Ruby minor version from .minimum.tool-versions.
+    value: ${{ steps.versions.outputs.minimum-ruby-minor-version }}
+  minimum-node-version:
+    description: Minimum Node patch version from .minimum.tool-versions.
+    value: ${{ steps.versions.outputs.minimum-node-version }}
+  minimum-node-major-version:
+    description: Minimum Node major version from .minimum.tool-versions.
+    value: ${{ steps.versions.outputs.minimum-node-major-version }}
+
+runs:
+  using: composite
+  steps:
+    - id: versions
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+
+        # bin/read-tool-version is the shared parser also sourced by
+        # bin/ci-switch-config, so the workflow action and the local switch
+        # tool cannot drift. The parity is verified by
+        # react_on_rails/spec/react_on_rails/ruby_version_support_spec.rb.
+        latest_ruby_version="$(bin/read-tool-version .tool-versions ruby)"
+        latest_node_version="$(bin/read-tool-version .tool-versions nodejs)"
+        minimum_ruby_version="$(
+          bin/read-tool-version .minimum.tool-versions ruby
+        )"
+        minimum_node_version="$(
+          bin/read-tool-version .minimum.tool-versions nodejs
+        )"
+
+        {
+          echo "ruby-version=$latest_ruby_version"
+          echo "ruby-minor-version=${latest_ruby_version%.*}"
+          echo "node-version=$latest_node_version"
+          echo "node-major-version=${latest_node_version%%.*}"
+          echo "minimum-ruby-version=$minimum_ruby_version"
+          echo "minimum-ruby-minor-version=${minimum_ruby_version%.*}"
+          echo "minimum-node-version=$minimum_node_version"
+          echo "minimum-node-major-version=${minimum_node_version%%.*}"
+        } >> "$GITHUB_OUTPUT"

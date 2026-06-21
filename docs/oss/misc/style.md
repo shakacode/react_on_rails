@@ -22,7 +22,7 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 
 - [ShakaCode Javascript](https://github.com/shakacode/style-guide-javascript)
 - Use the [eslint-config-shakacode](https://github.com/shakacode/style-guide-javascript/tree/master/packages/eslint-config-shakacode) NPM package with ESLint.
-- [JSDoc](http://usejsdoc.org/)
+- [JSDoc](https://jsdoc.app/)
 
 ### Git coding Standards
 
@@ -30,7 +30,7 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 
 ### Sass Coding Standards
 
-- [Sass Guidelines](http://sass-guidelin.es/) by [Hugo Giraudel](http://hugogiraudel.com/)
+- [Sass Guidelines](https://sass-guidelin.es/) by Kitty Giraudel
 - [Github Front End Guidelines](http://primercss.io/guidelines/)
 
 ## Git Usage

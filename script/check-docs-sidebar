@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# Check Docs Sidebar
+# Verifies that newly added published docs have corresponding entries in docs/sidebars.ts.
+# Usage: script/check-docs-sidebar [base-ref] [current-ref]
+#
+# Exit codes:
+#   0 — all new docs have sidebar entries (or no new docs were added)
+#   1 — one or more new docs are missing from sidebars.ts
+#
+# Diff-base logic lives in script/lib/git-diff-base. Run its self-contained
+# tests with: bash script/lib/git-diff-base-test.bash
+# CI invokes the same harness via .github/workflows/git-diff-base-tests.yml.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=script/lib/git-diff-base
+source "$SCRIPT_DIR/lib/git-diff-base"
+
+BASE_REF="$(git_diff_base_normalize_base_ref "${1:-}")"
+CURRENT_REF="$(git_diff_base_normalize_current_ref "${2:-}")"
+
+SIDEBAR_FILE="docs/sidebars.ts"
+EXCLUSIONS_FILE="docs/.sidebar-exclusions"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+if [ ! -f "$SIDEBAR_FILE" ]; then
+  echo -e "${RED}Error: $SIDEBAR_FILE not found${NC}"
+  exit 1
+fi
+
+# Best-effort fetch of a remote base ref, then require a real merge base.
+# The lenient policy is intentionally narrow: it permits continuing past the
+# initial shallow fetch failure and trying cached history, but it is not an
+# offline-safe mode. Missing refs or merge-base failures still fail.
+if ! MERGE_BASE=$(git_diff_base_resolve "$BASE_REF" "$CURRENT_REF" lenient); then
+  exit 1
+fi
+
+# Get newly added or renamed doc files (diff-filter=AR covers both)
+ADDED_FILES=$(git diff --name-only --diff-filter=AR "$MERGE_BASE" "$CURRENT_REF") || {
+  echo -e "${RED}Error: git diff failed for $MERGE_BASE..$CURRENT_REF${NC}" >&2
+  exit 1
+}
+
+# For local development, also include staged new/renamed files so the check catches
+# additions before they are committed.  Only staged files are included — untracked
+# WIP drafts are intentionally excluded to avoid surprising contributors who keep
+# work-in-progress docs in-tree without intending to land them yet.
+if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
+  STAGED_NEW=$(git diff --cached --name-only --diff-filter=AR 2>/dev/null || echo "")
+  ADDED_FILES=$(printf "%s\n%s" "$ADDED_FILES" "$STAGED_NEW" | sort -u | grep -v '^$' || echo "")
+fi
+
+# Filter to published doc files only (docs/oss/** and docs/pro/**)
+DOC_FILES=$(echo "$ADDED_FILES" | grep -E '^docs/(oss|pro)/.*\.(md|mdx)$' || echo "")
+
+if [ -z "$DOC_FILES" ]; then
+  echo -e "${GREEN}✓ No new published doc files detected${NC}"
+  exit 0
+fi
+
+echo "Checking new docs against $SIDEBAR_FILE..."
+echo ""
+
+# Load exclusions into a newline-separated string for grep lookup.
+# Avoids `declare -A` which requires bash 4+ (macOS ships bash 3.2).
+EXCLUSION_LIST=""
+if [ -f "$EXCLUSIONS_FILE" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Strip inline comments, then leading and trailing whitespace.
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    # Skip blank lines
+    [ -z "$line" ] && continue
+    EXCLUSION_LIST="${EXCLUSION_LIST}${line}"$'\n'
+  done < "$EXCLUSIONS_FILE"
+fi
+
+# Read sidebar file once and strip comments so a quoted doc ID inside a comment
+# (e.g. `// TODO: re-add 'foo'` or `'x', // restore 'foo'`) cannot satisfy the
+# grep below.  First remove full-line // comments, then strip inline // tails.
+# Block comments `/* ... */` are not handled; the convention in this file is
+# single-line comments only.
+SIDEBAR_CONTENT=$(grep -v '^[[:space:]]*//' "$SIDEBAR_FILE" | sed 's|[[:space:]]//.*||')
+
+MISSING=()
+CHECKED=0
+EXCLUDED=0
+
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  CHECKED=$((CHECKED + 1))
+
+  # Convert file path to sidebar ID:
+  #   docs/oss/getting-started/quick-start.md  → getting-started/quick-start
+  #   docs/pro/installation.md                 → pro/installation
+  DOC_ID="${file#docs/oss/}"
+  if [ "$DOC_ID" = "$file" ]; then
+    # Not under docs/oss/, must be docs/pro/ — strip only docs/ prefix
+    DOC_ID="${file#docs/}"
+  fi
+  DOC_ID="${DOC_ID%.md}"
+  DOC_ID="${DOC_ID%.mdx}"
+
+  # Check exclusion list
+  if printf '%s' "$EXCLUSION_LIST" | grep -qxF "$DOC_ID"; then
+    EXCLUDED=$((EXCLUDED + 1))
+    echo -e "  ${YELLOW}⊘${NC} $DOC_ID  ${YELLOW}(excluded)${NC}"
+    continue
+  fi
+
+  # Check if the ID appears as a quoted string in sidebars.ts
+  if echo "$SIDEBAR_CONTENT" | grep -qF "'${DOC_ID}'"; then
+    echo -e "  ${GREEN}✓${NC} $DOC_ID"
+  elif echo "$SIDEBAR_CONTENT" | grep -qF "\"${DOC_ID}\""; then
+    echo -e "  ${GREEN}✓${NC} $DOC_ID"
+  else
+    echo -e "  ${RED}✗${NC} $DOC_ID  ${RED}(missing from sidebars.ts)${NC}"
+    MISSING+=("$DOC_ID  ← $file")
+  fi
+done <<< "$DOC_FILES"
+
+echo ""
+
+if [ ${#MISSING[@]} -eq 0 ]; then
+  if [ "$EXCLUDED" -gt 0 ]; then
+    echo -e "${GREEN}✓ All $CHECKED new doc(s) accounted for ($((CHECKED - EXCLUDED)) in sidebar, $EXCLUDED excluded)${NC}"
+  else
+    echo -e "${GREEN}✓ All $CHECKED new doc(s) have sidebar entries${NC}"
+  fi
+  exit 0
+else
+  echo -e "${RED}✗ ${#MISSING[@]} doc(s) missing from docs/sidebars.ts:${NC}"
+  for entry in "${MISSING[@]}"; do
+    echo -e "${RED}    $entry${NC}"
+  done
+  echo ""
+  echo "To fix: add the doc ID to the appropriate section in docs/sidebars.ts"
+  echo "To exclude intentionally: add the doc ID to docs/.sidebar-exclusions with a reason"
+  exit 1
+fi

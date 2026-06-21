@@ -1,6 +1,9 @@
-# This file allows skipping the bundle size CI check for a specific branch.
-# When a branch name in this file matches the PR branch, the size check is skipped.
-#
-# Usage: Run `bin/skip-bundle-size-check` to set the current branch, then commit and push.
-#
-# This is useful when you have an intentional size increase that exceeds the 0.5KB threshold.
+# Audited intentional growth for PR #4097 (RSCProvider bounded LRU cache):
+# The direct RSC client entrypoints exceed the dynamic base+512 B budget by small
+# margins after source-level trims; growth is from the bounded provider cache
+# needed for #3564 rather than an accidental dependency import.
+# Local audit evidence: dynamic size-limit reproduced the hosted failure; after
+# trims, remaining misses were registerServerComponent +92 B gzip/+141 B brotli
+# and wrapServerComponentRenderer +54 B gzip/+20 B brotli.
+# Clear this file in a follow-up after the PR merges.
+jg/3564-rscroute-bounded-lru

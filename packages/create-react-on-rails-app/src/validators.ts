@@ -3,7 +3,7 @@ import { getCommandVersion } from './utils.js';
 
 const MIN_NODE_VERSION = 18;
 const MIN_RUBY_MAJOR = 3;
-const MIN_RUBY_MINOR = 0;
+const MIN_RUBY_MINOR = 3;
 const MIN_RAILS_MAJOR = 7;
 const MIN_RAILS_MINOR = 0;
 
@@ -31,7 +31,7 @@ export function validateRuby(): ValidationResult {
       valid: false,
       message:
         'Ruby is not installed or not found in PATH.\n\n' +
-        'React on Rails requires Ruby 3.0+.\n\n' +
+        `React on Rails requires Ruby ${MIN_RUBY_MAJOR}.${MIN_RUBY_MINOR}+.\n\n` +
         'Popular installation options:\n' +
         '  - mise:   https://mise.jdx.dev/ (recommended)\n' +
         '  - rbenv:  https://github.com/rbenv/rbenv\n' +
@@ -97,6 +97,23 @@ export function validateRails(): ValidationResult {
   return { valid: true, message: firstLine };
 }
 
+export function validateGit(): ValidationResult {
+  const gitVersion = getCommandVersion('git');
+
+  if (!gitVersion) {
+    return {
+      valid: false,
+      message:
+        'git is not installed or not found in PATH.\n\n' +
+        'create-react-on-rails-app now records the generated app as a step-by-step git history.\n' +
+        'Install git, then try again:\n' +
+        '  https://git-scm.com/downloads',
+    };
+  }
+
+  return { valid: true, message: gitVersion.split('\n')[0].trim() };
+}
+
 export function validatePackageManager(pm: 'npm' | 'pnpm'): ValidationResult {
   const version = getCommandVersion(pm);
 
@@ -120,6 +137,7 @@ export function validateAll(packageManager: 'npm' | 'pnpm'): PrerequisiteResults
     { name: 'Node.js', result: validateNode() },
     { name: 'Ruby', result: validateRuby() },
     { name: 'Rails', result: validateRails() },
+    { name: 'git', result: validateGit() },
     { name: 'Package Manager', result: validatePackageManager(packageManager) },
   ];
 

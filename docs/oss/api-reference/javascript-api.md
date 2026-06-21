@@ -23,18 +23,26 @@ The best source of docs is the `interface ReactOnRails` in [types/index.ts](http
 ```js
 /**
  * Main entry point to using the react-on-rails NPM package. This is how Rails will be able to
- * find you components for rendering. Components get called with props, or you may use a
- * "Render-Function" to return a React component or an object with the following shape:
- * { renderedHtml, clientProps?, redirectLocation?, routeError? }.
- * `renderedHtml` may be a String, a React element, or a server-side hash.
- * For server rendering, if you wish to return multiple HTML strings from a Render-Function,
- * you may return an object from your Render-Function with a single top level property of
- * renderedHtml. Inside this object, place a key called componentHtml, along with any other
- * needed keys. This is useful when you using side effects libraries like React Helmet.
- * Your Ruby code with get this object as a Hash containing keys componentHtml and any other
- * custom keys that you added:
- * { renderedHtml: { componentHtml, customKey1, customKey2 } }
- * See the example in https://reactonrails.com/docs/building-features/react-helmet
+ * find your components for rendering.
+ *
+ * Component detection: React on Rails distinguishes between component types by parameter count:
+ * - 0-1 params: Regular React component (function or class)
+ * - 2 params, or any function with `.renderFunction = true`: Render-Function — called with (props, railsContext),
+ *   returns a React component, `{ renderedHtml }` object, or Promise (Pro Node renderer only)
+ * - 3 params: Renderer function — called with (props, railsContext, domNodeId),
+ *   responsible for calling ReactDOM.render/hydrate directly (client-only).
+ *   May optionally return a `{ teardown }` wrapper (or a promise resolving to one); React on Rails
+ *   runs it on Turbo/Turbolinks navigation or same-id node replacement to unmount the renderer's root
+ *   instead of leaking it. See the view-helpers renderer-function docs.
+ *
+ * Render-Functions can return:
+ * - A React component (function or class) — used with `react_component`
+ * - `{ renderedHtml: string }` — raw HTML string, used with `react_component`
+ * - `{ renderedHtml: ReactElement }` — server rendering only, used with `react_component`
+ * - `{ renderedHtml: { componentHtml, ...otherKeys } }` — used with `react_component_hash`
+ * - `{ renderedHtml, clientProps }` — clientProps are merged into client hydration props
+ * - `{ redirectLocation, routeError }` — legacy (React Router v3/v4), see render-functions docs
+ *
  * @param components (key is component name, value is component)
  */
 register(components);
@@ -70,7 +78,18 @@ reactHydrateOrRender(domNode, reactElement, hydrate);
 /**
  * Set options for ReactOnRails, typically before you call ReactOnRails.register
  * Available Options:
- * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+ * `traceTurbolinks: true|false` Gives you debugging messages on Turbolinks events
+ * `rootErrorHandlers: { onRecoverableError, onCaughtError, onUncaughtError }` React root error
+ *   callbacks applied to every React root created by React on Rails. Each callback receives
+ *   React's (error, errorInfo) plus a context object whose componentName and domNodeId fields
+ *   are optional.
+ *   Partial updates merge per key (setting one callback later keeps the others).
+ *   onRecoverableError requires React 18+; onCaughtError/onUncaughtError require React 19.
+ *   Unsupported React versions retain registrations for future upgrades, but the current runtime
+ *   cannot invoke unsupported callbacks and logs a one-time warning.
+ *   On React on Rails Pro RSC hydration roots, onRecoverableError is chained after Pro's
+ *   internal default reporting instead of replacing it; do not report the same error again there.
+ *   See https://reactonrails.com/docs/building-features/debugging-hydration-mismatches
  */
 setOptions(options);
 

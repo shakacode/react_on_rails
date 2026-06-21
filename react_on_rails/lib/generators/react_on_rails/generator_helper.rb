@@ -1,18 +1,29 @@
 # frozen_string_literal: true
 
 require "json"
+require "pathname"
+require_relative "shakapacker_precompile_hook_helper"
 
 # rubocop:disable Metrics/ModuleLength
 module GeneratorHelper
+  include ReactOnRails::Generators::ShakapackerPrecompileHookHelper
+
+  DEFAULT_SHAKAPACKER_SOURCE_PATH = "app/javascript"
+  DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH = "packs"
+  private_constant :DEFAULT_SHAKAPACKER_SOURCE_PATH, :DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH
+
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
 
     require "package_json" unless defined?(PackageJson)
     @package_json ||= PackageJson.read
   rescue LoadError
-    say_status :warning, "package_json gem not available. This is expected before Shakapacker installation.", :yellow
-    say_status :warning, "Dependencies will be installed using the default package manager after Shakapacker setup.",
-               :yellow
+    unless @package_json_unavailable_warned
+      say_status :warning, "package_json gem not available. This is expected before Shakapacker installation.", :yellow
+      say_status :warning, "Dependencies will be installed using the default package manager after Shakapacker setup.",
+                 :yellow
+      @package_json_unavailable_warned = true
+    end
     nil
   rescue StandardError => e
     say_status :warning, "Could not read package.json: #{e.message}", :yellow
@@ -26,67 +37,30 @@ module GeneratorHelper
     return false unless pj
 
     begin
-      if dev
-        pj.manager.add(packages, type: :dev, exact: true)
-      else
-        pj.manager.add(packages, exact: true)
-      end
-      true
+      result = if dev
+                 pj.manager.add(packages, type: :dev, exact: true)
+               else
+                 pj.manager.add(packages, exact: true)
+               end
+      # package_json#add can return nil for successful side-effect operations.
+      result != false
     rescue StandardError => e
       say_status :warning, "Could not add packages via package_json gem: #{e.message}", :yellow
-      say_status :warning, "Will fall back to direct npm commands.", :yellow
+      say_status :warning, "Will fall back to direct package manager commands.", :yellow
       false
     end
   end
 
-  # Takes a relative path from the destination root, such as `.gitignore` or `app/assets/javascripts/application.js`
-  def dest_file_exists?(file)
-    dest_file = File.join(destination_root, file)
-    File.exist?(dest_file) ? dest_file : nil
-  end
+  # Detect whether config/routes.rb defines any non-commented root route.
+  #
+  # @param routes_path [String] absolute path to routes.rb
+  # @return [Boolean] true when a root route exists
+  def root_route_present?(routes_path = File.join(destination_root, "config/routes.rb"))
+    return false unless File.file?(routes_path)
 
-  def dest_dir_exists?(dir)
-    dest_dir = File.join(destination_root, dir)
-    Dir.exist?(dest_dir) ? dest_dir : nil
-  end
-
-  def setup_file_error(file, data)
-    <<~MSG
-      #{file} was not found.
-      Please add the following content to your #{file} file:
-      #{data}
-    MSG
-  end
-
-  def empty_directory_with_keep_file(destination, config = {})
-    empty_directory(destination, config)
-    keep_file(destination)
-  end
-
-  def keep_file(destination)
-    create_file("#{destination}/.keep") unless options[:skip_keeps]
-  end
-
-  # As opposed to Rails::Generators::Testing.create_link, which creates a link pointing to
-  # source_root, this symlinks a file in destination_root to a file also in
-  # destination_root.
-  def symlink_dest_file_to_dest_file(target, link)
-    target_pathname = Pathname.new(File.join(destination_root, target))
-    link_pathname = Pathname.new(File.join(destination_root, link))
-
-    link_directory = link_pathname.dirname
-    link_basename = link_pathname.basename
-    target_relative_path = target_pathname.relative_path_from(link_directory)
-
-    `cd #{link_directory} && ln -s #{target_relative_path} #{link_basename}`
-  end
-
-  def copy_file_and_missing_parent_directories(source_file, destination_file = nil)
-    destination_file ||= source_file
-    destination_path = Pathname.new(destination_file)
-    parent_directories = destination_path.dirname
-    empty_directory(parent_directories) unless dest_dir_exists?(parent_directories)
-    copy_file source_file, destination_file
+    File.foreach(routes_path).any? do |line|
+      !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
+    end
   end
 
   def add_documentation_reference(message, source)
@@ -106,6 +80,108 @@ module GeneratorHelper
     options.typescript? ? "tsx" : "jsx"
   end
 
+  def shakapacker_source_path
+    # These helpers memoize config-backed paths. Install generators must copy or
+    # overwrite config/shakapacker.yml before any path-dependent copy action runs.
+    @shakapacker_source_path ||= configured_shakapacker_relative_path("source_path", DEFAULT_SHAKAPACKER_SOURCE_PATH)
+  end
+
+  def shakapacker_source_entry_path
+    @shakapacker_source_entry_path ||= configured_shakapacker_relative_path(
+      "source_entry_path",
+      DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH,
+      allow_root: true
+    )
+  end
+
+  def shakapacker_entrypoint_path(filename)
+    filename = filename.to_s
+    raise ArgumentError, "filename must be present" if filename.empty?
+
+    entry_dir = shakapacker_source_entry_path # "" means entrypoints live directly under source_path.
+    File.join(*[shakapacker_source_path, entry_dir, filename].reject(&:empty?))
+  end
+
+  def shakapacker_stylesheet_path(filename)
+    # "stylesheets" is a generated demo convention, not a Shakapacker config key.
+    File.join(shakapacker_source_path, "stylesheets", filename)
+  end
+
+  def relative_stylesheet_import_path(entry_path, filename: "application.css")
+    # InstallGenerator copies the final Shakapacker config before path-dependent demo files are generated.
+    safe_entry_path = safe_generator_destination_path(entry_path, default: nil)
+    raise ArgumentError, "entry_path must stay inside the generator destination" if safe_entry_path.nil?
+
+    entry_dir = Pathname.new(File.join(destination_root, safe_entry_path)).dirname
+    stylesheet = Pathname.new(File.join(destination_root, shakapacker_stylesheet_path(filename)))
+
+    stylesheet.relative_path_from(entry_dir).to_s
+  end
+
+  def example_component_source_directory(component_name)
+    File.join(shakapacker_source_path, "src", component_name)
+  end
+
+  def example_component_source_path(component_name)
+    # Trailing slash is intentional: this value is only for generated demo file hints.
+    "#{example_component_source_directory(component_name)}/"
+  end
+
+  def configured_shakapacker_relative_path(config_key, default, allow_root: false)
+    config_path = File.join(destination_root, "config/shakapacker.yml")
+    return default unless File.exist?(config_path)
+
+    config = parse_shakapacker_yml(config_path)
+    configured_path = shakapacker_path_config_value(config, config_key)
+
+    safe_generator_destination_path(configured_path, default:, allow_root:)
+  rescue Psych::SyntaxError
+    default
+  end
+
+  def shakapacker_path_config_value(config, config_key)
+    # Generators run in the development context, so prefer that section before falling back to shared defaults.
+    %w[development default].each do |section_name|
+      section = shakapacker_config_section(config, section_name)
+      value = shakapacker_config_value(section, config_key)
+      return value unless value.to_s.strip.empty?
+    end
+
+    nil
+  end
+
+  def safe_generator_destination_path(path, default:, allow_root: false)
+    candidate = path.to_s.strip
+    return default if candidate.empty?
+
+    pathname = Pathname.new(candidate).cleanpath
+    # Shakapacker uses "/" to mean entrypoints live directly under source_path.
+    return "" if allow_root && pathname.to_s == "/"
+
+    relative_path = if pathname.absolute?
+                      absolute_path_relative_to_destination(pathname)
+                    else
+                      pathname.to_s
+                    end
+
+    return default if unsafe_generator_destination_path?(relative_path)
+
+    relative_path
+  rescue ArgumentError # Pathname.new raises on null bytes in path strings.
+    default
+  end
+
+  def absolute_path_relative_to_destination(pathname)
+    destination = Pathname.new(destination_root).cleanpath
+    pathname.relative_path_from(destination).to_s
+  rescue ArgumentError
+    nil # Signals the caller to fall back to the default path.
+  end
+
+  def unsafe_generator_destination_path?(path)
+    path.nil? || path == "." || path == ".." || path.start_with?("../")
+  end
+
   # Check if a gem is present in Gemfile.lock
   # Always checks the target app's Gemfile.lock, not inherited BUNDLE_GEMFILE
   # See: https://github.com/shakacode/react_on_rails/issues/2287
@@ -119,11 +195,15 @@ module GeneratorHelper
     false
   end
 
-  # Check if React on Rails Pro gem is installed
+  # Check if React on Rails Pro gem is installed (real state — never "scheduled to be installed").
   #
   # Detection priority:
   # 1. Gem.loaded_specs - gem is loaded in current Ruby process (most reliable)
   # 2. Gemfile.lock - gem is resolved and installed
+  #
+  # Use {#pro_gem_install_deferred?} for the broader "present, or will be installed by this
+  # generator run" meaning. Use {#invalidate_pro_gem_installed_cache!} after an operation
+  # that changes real state (e.g., bundle add) so the next call re-reads the lockfile.
   #
   # @return [Boolean] true if react_on_rails_pro gem is installed
   def pro_gem_installed?
@@ -132,24 +212,27 @@ module GeneratorHelper
     @pro_gem_installed = Gem.loaded_specs.key?("react_on_rails_pro") || gem_in_lockfile?("react_on_rails_pro")
   end
 
-  def mark_pro_gem_installed!
-    @pro_gem_installed = true
-  end
-
-  # Check if Pro features should be enabled
-  # Returns true if --pro flag is set OR --rsc flag is set (RSC implies Pro)
+  # Check if Pro features should be enabled.
+  # Returns true if --pro or --rsc is set (RSC implies Pro).
   #
   # @return [Boolean] true if Pro setup should be included
   def use_pro?
     options[:pro] || options[:rsc]
   end
 
-  # Check if RSC (React Server Components) should be enabled
-  # Returns true only if --rsc flag is explicitly set
+  # Check if RSC (React Server Components) should be enabled.
+  # Returns true if --rsc is set.
   #
   # @return [Boolean] true if RSC setup should be included
   def use_rsc?
     options[:rsc]
+  end
+
+  # Check if Tailwind CSS should be installed and wired into the generated example.
+  #
+  # @return [Boolean] true if --tailwind is set
+  def use_tailwind?
+    options[:tailwind]
   end
 
   # Determine if the project is using rspack as the bundler.
@@ -163,11 +246,57 @@ module GeneratorHelper
   def using_rspack?
     return @using_rspack if defined?(@using_rspack)
 
-    # options.key?(:rspack) is true when the generator declares --rspack (e.g. InstallGenerator),
-    # false when it does not (e.g. RscGenerator, ProGenerator). Using .key? rather than .nil?
-    # check on the value makes the intent explicit and avoids relying on Thor returning nil for
-    # undeclared options.
-    @using_rspack = options.key?(:rspack) ? options[:rspack] : rspack_configured_in_project?
+    # An explicit bundler flag always wins. When none was passed (or the generator doesn't
+    # declare the flags, e.g. RscGenerator/ProGenerator), fall back to the bundler default,
+    # which each generator defines for its own context.
+    explicit = explicit_bundler_choice
+    @using_rspack = explicit.nil? ? rspack_bundler_default : explicit
+  end
+
+  # Resolve the explicit bundler flags into a single choice.
+  #
+  # --rspack selects Rspack; --no-rspack and --webpack select Webpack (--webpack is a friendly
+  # alias for --no-rspack, and the auto-generated --no-webpack mirrors --rspack). Returns true
+  # for Rspack, false for Webpack, or nil when no bundler flag was passed (so the caller falls
+  # back to rspack_bundler_default).
+  #
+  # IMPORTANT: this relies on Thor NOT including a nil-defaulted option in the hash when the flag
+  # is absent — options.key?(:rspack)/(:webpack) is true only when the user passed that flag.
+  # Re-adding `default:` to either class_option would make the key always present and break both
+  # the "no flag given" fallback and the conflict detection here.
+  # (Thor's omit-when-no-default behavior verified against Thor 1.5.0; see Gemfile.lock.)
+  #
+  # Passing contradictory flags (e.g. --rspack --webpack) raises a Thor::Error.
+  def explicit_bundler_choice
+    choices = []
+    choices << options[:rspack] if options.key?(:rspack)
+    # --webpack means "use Webpack" (rspack = false); --no-webpack means "use Rspack".
+    # Name the inverted webpack flag so the rspack-boolean intent reads directly.
+    rspack_via_webpack_flag = !options[:webpack]
+    choices << rspack_via_webpack_flag if options.key?(:webpack)
+    return nil if choices.empty?
+
+    if choices.uniq.length > 1
+      raise Thor::Error,
+            "Conflicting bundler flags: pass either Rspack (--rspack) or Webpack " \
+            "(--webpack / --no-rspack), not both."
+    end
+
+    choices.first
+  end
+
+  # True when the user passed any explicit bundler flag
+  # (--rspack/--no-rspack/--webpack/--no-webpack).
+  def bundler_flag_given?
+    options.key?(:rspack) || options.key?(:webpack)
+  end
+
+  # Bundler to use when no explicit bundler flag was passed.
+  # Default (standalone generators like RscGenerator/ProGenerator): respect the existing
+  # project's shakapacker.yml and never impose a bundler. InstallGenerator/BaseGenerator
+  # override this to default fresh installs to Rspack.
+  def rspack_bundler_default
+    rspack_configured_in_project?
   end
 
   # Remap a config path from config/webpack/ to config/rspack/ when using rspack.
@@ -180,6 +309,26 @@ module GeneratorHelper
     return path unless using_rspack?
 
     path.sub(%r{\Aconfig/webpack/}, "config/rspack/")
+  end
+
+  # RSC client-manifest plugin class name for the active bundler.
+  # Rspack uses the native `RSCRspackPlugin`; webpack uses `RSCWebpackPlugin`.
+  # Both expose the same `{ isServer, clientReferences }` API and emit the same
+  # manifest schema, so only the import path and class name differ.
+  # Shared by the base webpack-config templates and the standalone RSC migration
+  # so both paths scaffold the bundler-correct plugin from one source of truth.
+  #
+  # @return [String] "RSCRspackPlugin" when rspack, "RSCWebpackPlugin" otherwise
+  def rsc_plugin_class_name
+    using_rspack? ? "RSCRspackPlugin" : "RSCWebpackPlugin"
+  end
+
+  # `react-on-rails-rsc` subpath that exports {#rsc_plugin_class_name}.
+  #
+  # @return [String] "react-on-rails-rsc/RspackPlugin" when rspack,
+  #   "react-on-rails-rsc/WebpackPlugin" otherwise
+  def rsc_plugin_import_path
+    using_rspack? ? "react-on-rails-rsc/RspackPlugin" : "react-on-rails-rsc/WebpackPlugin"
   end
 
   # Detect the installed React version from package.json
@@ -286,6 +435,42 @@ module GeneratorHelper
 
   private
 
+  # Clear the memoized {#pro_gem_installed?} result so the next call re-checks
+  # Gem.loaded_specs / Gemfile.lock. Call after any operation that may change real state.
+  def invalidate_pro_gem_installed_cache!
+    remove_instance_variable(:@pro_gem_installed) if defined?(@pro_gem_installed)
+  end
+
+  # True when a later step in this generator run will install the Pro gem
+  # (e.g., the Gemfile swap performed by ProGenerator). Distinct from
+  # {#pro_gem_installed?}, which only reports real present state.
+  def pro_gem_install_deferred?
+    @pro_gem_install_deferred == true
+  end
+
+  # Record that a later step in this generator run will install the Pro gem.
+  def defer_pro_gem_install!
+    @pro_gem_install_deferred = true
+  end
+
+  # The other bundler's plugin class name — the one this project should NOT be using.
+  # Used to detect a config left in a mixed state (e.g. a legacy `RSCWebpackPlugin` surviving
+  # in an rspack project) so diagnostics can say "wrong bundler plugin" rather than "missing".
+  #
+  # @return [String] "RSCWebpackPlugin" when rspack, "RSCRspackPlugin" otherwise
+  def inactive_rsc_plugin_class_name
+    using_rspack? ? "RSCWebpackPlugin" : "RSCRspackPlugin"
+  end
+
+  # Import path for the inactive bundler's plugin — the counterpart to {#rsc_plugin_import_path},
+  # used when migrating a legacy config to the active bundler's plugin.
+  #
+  # @return [String] "react-on-rails-rsc/WebpackPlugin" when rspack,
+  #   "react-on-rails-rsc/RspackPlugin" otherwise
+  def inactive_rsc_plugin_import_path
+    using_rspack? ? "react-on-rails-rsc/WebpackPlugin" : "react-on-rails-rsc/RspackPlugin"
+  end
+
   # NOTE: only the `default:` section is inspected — same assumption as
   # rspack_configured_in_project?. Projects that set `javascript_transpiler`
   # only in per-environment sections (without a `default:` block) will not be
@@ -308,25 +493,6 @@ module GeneratorHelper
     shakapacker_version_9_3_or_higher?
   end
 
-  def parse_shakapacker_yml(path)
-    require "yaml"
-    # Use safe_load_file for security (defense-in-depth, even though this is user's own config)
-    # permitted_classes: [Symbol] allows symbol keys which shakapacker.yml may use
-    # aliases: true allows YAML anchors (&default, *default) commonly used in Rails configs
-    YAML.safe_load_file(path, permitted_classes: [Symbol], aliases: true)
-  rescue ArgumentError
-    # Older Psych versions don't support all parameters - try without aliases
-    begin
-      YAML.safe_load_file(path, permitted_classes: [Symbol])
-    rescue ArgumentError
-      # Very old Psych - fall back to safe_load with File.read
-      YAML.safe_load(File.read(path), permitted_classes: [Symbol]) # rubocop:disable Style/YAMLFileRead
-    end
-  rescue StandardError
-    # If we can't parse the file, return empty config
-    {}
-  end
-
   # Check if Shakapacker 9.3.0 or higher is available
   # This version made SWC the default JavaScript transpiler
   def shakapacker_version_9_3_or_higher?
@@ -347,11 +513,34 @@ module GeneratorHelper
   # `assets_bundler` inside the `default: &default` block, and our generator writes
   # it there too via configure_rspack_in_shakapacker.
   def rspack_configured_in_project?
-    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
-    return false unless File.exist?(shakapacker_yml_path)
+    shakapacker_assets_bundler_value == "rspack"
+  end
 
-    config = parse_shakapacker_yml(shakapacker_yml_path)
-    config.dig("default", "assets_bundler") == "rspack"
+  # Fresh-install bundler default used by InstallGenerator/BaseGenerator: prefer Rspack
+  # when Shakapacker supports it (Rspack landed in Shakapacker 9.0), but never override an
+  # existing app's explicit assets_bundler choice. On a brand-new install where Shakapacker
+  # isn't loaded yet, shakapacker_version_9_or_higher? optimistically returns true.
+  def fresh_install_rspack_default
+    return rspack_configured_in_project? if project_declares_assets_bundler?
+
+    shakapacker_version_9_or_higher?
+  end
+
+  # True when config/shakapacker.yml exists and its default: section declares an
+  # assets_bundler (i.e., the project has already made an explicit bundler choice).
+  def project_declares_assets_bundler?
+    !shakapacker_assets_bundler_value.nil?
+  end
+
+  # Single source for the config/shakapacker.yml default-section read shared by
+  # rspack_configured_in_project? and project_declares_assets_bundler?. Returns the
+  # assets_bundler value (e.g. "rspack"), or nil when the file is absent or the key is unset.
+  # Only the default: section is inspected (see rspack_configured_in_project? for the rationale).
+  def shakapacker_assets_bundler_value
+    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
+    return nil unless File.exist?(shakapacker_yml_path)
+
+    parse_shakapacker_yml(shakapacker_yml_path).dig("default", "assets_bundler")
   end
 end
 # rubocop:enable Metrics/ModuleLength

@@ -2,10 +2,10 @@
 
 require_relative "../rails_helper"
 
-describe "Hello World", :js do
+describe "React SSR Demo", :js do
   it "the hello world example works" do
     visit "/hello_world"
-    expect(heading).to have_text("Hello World")
+    expect(heading).to have_text(/(React|Redux) SSR Demo/)
     expect(message).to have_text("Stranger")
     name_input.set("John Doe")
     expect(message).to have_text("John Doe")

@@ -1,3 +1,7 @@
+---
+slug: client-server-files
+---
+
 ## How to use different versions of a file for client and server rendering
 
 > [!NOTE]

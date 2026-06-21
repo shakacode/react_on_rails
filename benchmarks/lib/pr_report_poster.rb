@@ -1,0 +1,140 @@
+# frozen_string_literal: true
+
+require "time"
+
+require_relative "github"
+require_relative "github_cli"
+
+# Posts the per-suite Bencher Markdown report to a pull request and cleans up
+# older comments with the same marker.
+class PrReportPoster
+  REPOSITORY_SLUG_PATTERN = %r{\A[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*\z}
+  private_constant :REPOSITORY_SLUG_PATTERN
+
+  def initialize(repository:, pr_number:, suite_name:, marker:)
+    normalized_repository = repository.to_s
+    # The regex allows ".." within component names, so reject any embedded path traversal.
+    unless normalized_repository.match?(REPOSITORY_SLUG_PATTERN) && !normalized_repository.include?("..")
+      raise ArgumentError, "repository must be in owner/repo format, got: #{normalized_repository.inspect}"
+    end
+
+    normalized_pr_number = pr_number.to_s
+    unless normalized_pr_number.match?(/\A\d+\z/)
+      raise ArgumentError, "pr_number must be numeric, got: #{normalized_pr_number.inspect}"
+    end
+
+    @repository = normalized_repository
+    @pr_number = normalized_pr_number
+    @suite_name = suite_name
+    @marker = marker
+  end
+
+  # GitHub Actions sets GITHUB_REPOSITORY natively. The workflow step must set
+  # PR_NUMBER from the pull request event.
+  def self.from_env(suite_name:, marker:)
+    new(
+      repository: required_repository,
+      pr_number: required_pr_number,
+      suite_name:,
+      marker:
+    )
+  end
+
+  def self.required_repository
+    ENV.fetch("GITHUB_REPOSITORY") do
+      raise KeyError, "GITHUB_REPOSITORY env var is required (set by GitHub Actions)"
+    end
+  end
+  private_class_method :required_repository
+
+  def self.required_pr_number
+    ENV.fetch("PR_NUMBER") do
+      raise KeyError, "PR_NUMBER env var is required (set it from the pull_request event in the workflow step)"
+    end
+  end
+  private_class_method :required_pr_number
+
+  def replace(markdown)
+    # Guard callers that use the poster without the script-level empty-report check.
+    return if markdown.empty?
+
+    # Capture cutoff before posting so the stale-comment sweep only hits pre-existing
+    # comments with the same marker, not the one this run is about to create.
+    cutoff_ts = Time.now.utc.iso8601
+    if post_comment(markdown)
+      delete_stale_comments(before: cutoff_ts)
+    else
+      Github.warning("Failed to post #{suite_name} benchmark report comment; keeping prior comments in place.")
+    end
+  end
+
+  private
+
+  attr_reader :repository, :pr_number, :suite_name, :marker
+
+  def delete_stale_comments(before:)
+    failed = 0
+    stale_comment_ids(before:).each do |comment_id|
+      $stdout.puts "Deleting stale #{suite_name} Bencher report comment #{comment_id}"
+      failed += 1 unless GithubCli.run(
+        "gh", "api", "-X", "DELETE", "repos/#{repository}/issues/comments/#{comment_id}",
+        error_message: "Failed to delete stale #{suite_name} Bencher report comment #{comment_id}"
+      )
+    end
+    return if failed.zero?
+
+    Github.warning(
+      "Failed to delete #{failed} stale #{suite_name} Bencher report comment(s); " \
+      "they may remain visible."
+    )
+  end
+
+  def stale_comment_ids(before:)
+    # Marker + cutoff are passed via env so the jq filter reads them through `env.X`,
+    # avoiding Ruby/JQ escaping mismatches from interpolated strings.
+    stdout, status = GithubCli.capture(
+      "gh", "api", "repos/#{repository}/issues/#{pr_number}/comments",
+      "--paginate",
+      # gh api --paginate applies --jq to each page independently, then concatenates stdout.
+      # GitHub timestamps are fixed-width ISO-8601 strings, so lexical ordering matches time ordering.
+      "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
+      env: { "MARKER" => marker, "CUTOFF_TS" => before }
+    )
+    unless status.success?
+      # Cleanup is best-effort: stale comments should not fail an otherwise valid benchmark job.
+      Github.warning("Failed to list stale #{suite_name} Bencher report comments; skipping cleanup.")
+      return []
+    end
+
+    comment_ids = stdout.lines.map(&:strip).reject(&:empty?)
+    numeric_comment_ids = comment_ids.grep(/\A\d+\z/)
+    non_numeric_comment_ids = comment_ids.grep_v(/\A\d+\z/)
+    if non_numeric_comment_ids.any?
+      if numeric_comment_ids.empty?
+        Github.warning(
+          "Stale #{suite_name} Bencher report comment listing returned no numeric IDs " \
+          "(#{non_numeric_comment_ids.size} non-numeric token(s), " \
+          "e.g. #{non_numeric_comment_ids.first.slice(0, 120).inspect}); skipping cleanup."
+        )
+        return []
+      end
+
+      Github.warning(
+        "Stale #{suite_name} Bencher report comment listing returned " \
+        "#{non_numeric_comment_ids.size} non-numeric ID(s); ignoring those entries."
+      )
+    end
+
+    numeric_comment_ids
+  end
+
+  def post_comment(markdown)
+    # Send the body over stdin (--body-file -) rather than as a CLI argument so a
+    # large report can't hit the OS argument-length limit.
+    GithubCli.run(
+      "gh", "pr", "comment", pr_number, "--repo", repository, "--body-file", "-",
+      error_message: "Failed to post #{suite_name} benchmark report comment",
+      stdin_data: "#{marker}\n#{markdown}"
+    )
+  end
+end

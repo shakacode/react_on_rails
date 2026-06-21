@@ -1,13 +1,35 @@
 import * as React from 'react';
+import { Script } from 'node:vm';
 import serverRenderReactComponent from '../src/serverRenderReactComponent.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import type {
   RenderParams,
-  RenderResult,
   RailsContext,
   RenderFunction,
-  RenderFunctionResult,
+  RendererFunction,
+  RendererFunctionResult,
 } from '../src/types/index.ts';
+// eslint-disable-next-line import/no-relative-packages
+import LengthPrefixedStreamParser from '../../react-on-rails-pro/src/parseLengthPrefixedStream.ts';
+
+const SOURCE_MAPPED_STACK_REMAPPER_KEY = '__reactOnRailsProRemapStackTrace';
+
+type GlobalWithSourceMappedStackRemapper = typeof globalThis & {
+  [SOURCE_MAPPED_STACK_REMAPPER_KEY]?: (stack: unknown) => string | undefined;
+};
+
+// Parses a length-prefixed result string using the production parser.
+const parseLengthPrefixed = (str: string) => {
+  const parser = new LengthPrefixedStreamParser();
+  const results: Array<{ html: string; [key: string]: unknown }> = [];
+  parser.feed(new TextEncoder().encode(str), (content, metadata) => {
+    results.push({ html: new TextDecoder().decode(content), ...metadata });
+  });
+  if (results.length !== 1) {
+    throw new Error(`Expected exactly 1 length-prefixed chunk, got ${results.length}`);
+  }
+  return results[0]!;
+};
 
 const assertIsString: (value: unknown) => asserts value is string = (value: unknown) => {
   if (typeof value !== 'string') {
@@ -31,6 +53,10 @@ describe('serverRenderReactComponent', () => {
     globalThis.ReactOnRails = { getComponent: ComponentRegistry.get } as any;
   });
 
+  afterEach(() => {
+    delete (globalThis as GlobalWithSourceMappedStackRemapper)[SOURCE_MAPPED_STACK_REMAPPER_KEY];
+  });
+
   it('serverRenderReactComponent renders a registered component', () => {
     const X1: React.FC = () => React.createElement('div', null, 'HELLO');
     ComponentRegistry.register({ X1 });
@@ -45,7 +71,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     assertIsString(html);
     const result = html && html.indexOf('>HELLO</div>') > 0;
@@ -70,12 +96,44 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     assertIsString(html);
     const result = html && html.indexOf('XYZ') > 0 && html.indexOf('Exception in rendering!') > 0;
     expect(result).toBeTruthy();
     expect(hasErrors).toBeTruthy();
+  });
+
+  it('applies the optional Pro VM stack remapper to error HTML and metadata', () => {
+    (globalThis as GlobalWithSourceMappedStackRemapper)[SOURCE_MAPPED_STACK_REMAPPER_KEY] = (stack) =>
+      typeof stack === 'string' ? stack.replace('Error: XYZ', 'Error: remapped XYZ') : undefined;
+    const crossRealmError: unknown = new Script(`
+      const error = new Error("XYZ");
+      error.stack = "Error: XYZ\\n    at hostCallback (/tmp/bundle.js:3:1)";
+      error;
+    `).runInNewContext();
+
+    const X2: RenderFunction = () => {
+      throw crossRealmError;
+    };
+    X2.renderFunction = true;
+
+    ComponentRegistry.register({ X2 });
+
+    const renderResult = serverRenderReactComponent({
+      name: 'X2',
+      domNodeId: 'myDomId',
+      trace: false,
+      throwJsErrors: false,
+      renderingReturnsPromises: false,
+    });
+    assertIsString(renderResult);
+    const { html, renderingError } = parseLengthPrefixed(renderResult);
+
+    assertIsString(html);
+    expect(html).toContain('Error: remapped XYZ');
+    expect(renderingError).toMatchObject({ message: 'XYZ' });
+    expect((renderingError as { stack?: string }).stack).toContain('Error: remapped XYZ');
   });
 
   it('serverRenderReactComponent renders html renderedHtml property', () => {
@@ -97,7 +155,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     expect(html).toEqual(expectedHtml);
     expect(hasErrors).toBeFalsy();
@@ -122,7 +180,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: false,
     });
     assertIsString(renderResult);
-    const { html, hasErrors, clientProps }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors, clientProps } = parseLengthPrefixed(renderResult);
 
     expect(html).toEqual('<div>Hello with client props</div>');
     expect(clientProps).toEqual({
@@ -146,7 +204,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: false,
     });
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     expect(html).toContain('Exception in rendering!');
     expect(html).toContain('Element type is invalid');
@@ -179,7 +237,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     // Instead of expecting exact strings, check that it contains key parts of the error
     expect(html).toContain('Exception in rendering!');
@@ -205,10 +263,10 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const html = await renderResult.then((r) => r.html);
+    const parsed = parseLengthPrefixed(await renderResult);
 
-    expect(html).toEqual(expectedHtml);
-    await expect(renderResult.then((r) => r.hasErrors)).resolves.toBeFalsy();
+    expect(parsed.html).toEqual(expectedHtml);
+    expect(parsed.hasErrors).toBeFalsy();
   });
 
   it('serverRenderReactComponent processes async serverRenderHash renderedHtml', async () => {
@@ -228,7 +286,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const result = await renderResult;
+    const result = parseLengthPrefixed(await renderResult);
     expect(result.html).toEqual('<div>Hello</div>');
     expect(result.hasErrors).toBeFalsy();
   });
@@ -251,7 +309,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: true,
     });
     assertIsPromise(renderResult);
-    const result = await renderResult;
+    const result = parseLengthPrefixed(await renderResult);
     expect(result.html).toEqual('<div>Hello with async hash client props</div>');
     expect(result.clientProps).toEqual({
       __tanstackRouterDehydratedState: { url: '/products?category=tools' },
@@ -278,8 +336,9 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const result = await renderResult;
-    expect(result.html).toMatchObject(reactComponentHashResult);
+    const result = parseLengthPrefixed(await renderResult);
+    // html is a JSON-serialized ServerRenderHashRenderedHtml object
+    expect(JSON.parse(result.html as string)).toMatchObject(reactComponentHashResult);
   });
 
   it('serverRenderReactComponent renders async render function that returns react component', async () => {
@@ -296,19 +355,19 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: true,
     });
     assertIsPromise(renderResult);
-    const result = await renderResult;
+    const result = parseLengthPrefixed(await renderResult);
     expect(result.html).toBe('<div>Hello</div>');
   });
 
   it('serverRenderReactComponent renders an error if attempting to render a renderer', () => {
-    const X4: RenderFunction = (
+    const X4: RendererFunction = (
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _props: unknown,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _railsContext?: RailsContext,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _domNodeId?: string,
-    ): RenderFunctionResult => ({ renderedHtml: '' });
+    ): RendererFunctionResult => undefined;
 
     ComponentRegistry.register({ X4 });
 
@@ -322,7 +381,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     assertIsString(html);
     const result = html && html.indexOf('renderer') > 0 && html.indexOf('Exception in rendering!') > 0;

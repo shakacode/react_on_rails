@@ -1,7 +1,7 @@
 # SSR Caching: Prerender Caching and Fragment Caching
 
 :::tip Pro Feature
-Available with [React on Rails Pro](https://pro.reactonrails.com). Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+Available with [React on Rails Pro](../../pro/react-on-rails-pro.md). Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
 :::
 
 Server-side rendering (SSR) is expensive. Every render evaluates JavaScript, assembles props from the database, serializes them to JSON, and produces HTML. React on Rails Pro provides two levels of caching that avoid repeating this work on every request. Both solve the same core problem — **eliminating redundant SSR** — but they operate at different layers and offer different tradeoffs.
@@ -208,6 +208,96 @@ using a separate webpack configuration to generate the server bundle file,
 then you **must not** include the hash in the output filename or else you will
 have a race condition overwriting your `manifest.json`. Regardless of which
 case you have, React on Rails handles it.
+
+---
+
+## Tag-Based Revalidation
+
+Cache keys answer "is this entry still current?" at read time. Tags answer a different question: "delete everything that depends on this data, right now." With `cache_tags:`, you attach declarative invalidation handles to fragment-cached components and bust them all with one call — the React on Rails Pro analog of Next.js `revalidateTag`.
+
+```erb
+<%= cached_react_component("PostShow",
+      cache_key: [@post, I18n.locale],
+      cache_tags: [@post, @post.author],
+      cache_options: { expires_in: 12.hours }) do
+      { post: @post.to_props }
+    end %>
+```
+
+```ruby
+# Anywhere in Ruby — controller, job, service object, console:
+ReactOnRailsPro.revalidate_tag(post) # => number of cache entries deleted
+ReactOnRailsPro.revalidate_tags(post, post.author)
+```
+
+`cache_tags:` is accepted by all four cached helpers — `cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, and `cached_async_react_component` — and is purely additive: `cache_key:` semantics are unchanged, and `cache_key:` is still required.
+
+### Tag forms and normalization
+
+A tag can be:
+
+- a **String** — passed through unchanged (`"post:42"`)
+- a **Symbol or Numeric** — stringified via `.to_s` (`:featured` -> `"featured"`, `42` -> `"42"`)
+- an object responding to **`#cache_key`** (any ActiveRecord model) — ActiveRecord-style records normalize to the stable identity `posts/42` (equal to the version-less `record.cache_key`, and stable even when `cache_versioning` is disabled), so the tag stays valid as the record changes; other objects pass their `#cache_key` through. Objects with both `model_name` and `id` always resolve to `collection/id`; pass an explicit String tag if you want a different key.
+- a **Proc** (arity 0) returning any accepted form
+- an **Array** of any mix of the above
+
+Tags that normalize to blank raise `ReactOnRailsPro::Error`. Tag coarsely (`post:42`, `tenant:7`, `posts:index`) — never per-user or per-request; see the index bounds below.
+
+### Revalidating from the model layer
+
+Include the `Revalidates` concern so the model that owns the data also owns cache invalidation. It runs in `after_commit`, so it never fires for a rolled-back transaction and fires only after the new data is visible to the re-rendering request:
+
+```ruby
+class Post < ApplicationRecord
+  include ReactOnRailsPro::Cache::Revalidates
+
+  revalidates_react_cache # default tag: record.cache_key, e.g. "posts/42"
+  # or custom / additional tags:
+  # revalidates_react_cache { |post| ["post:#{post.id}", "author:#{post.author_id}"] }
+end
+```
+
+This covers create/update/destroy and `touch` — so `belongs_to ..., touch: true` composes for free: touching the parent fires the parent's revalidation. The standard Rails callback caveat applies: `update_column`, `update_all`, `delete_all`, and other callback-skipping writes do not trigger revalidation; call `ReactOnRailsPro.revalidate_tags(record)` yourself after such writes.
+
+One more caveat for custom tag blocks: the block runs in `after_commit` and sees only the record's **new** values. If a custom tag derives from a mutable attribute (e.g. `"author:#{post.author_id}"` and a post moves to a different author), the old grouping's entries are not revalidated — they expire via `expires_in`. Prefer tags derived from the record's own identity, or revalidate the old grouping explicitly (`previous_changes` in `after_commit` has the prior value).
+
+### How it works, and the contract
+
+On every tagged cache write, the final cache key is appended to a per-tag index entry in `Rails.cache` (keyed by a SHA-256 digest under `rorp:tag:v1:` so long tag names and whitespace do not violate cache-store key limits). `revalidate_tag` reads the index, deletes the recorded entries with `delete_multi`, then deletes the index entry. A missing index (never-written tag, evicted entry, `:null_store`) means "nothing to revalidate" — never an error.
+
+**Tag revalidation is best-effort; correctness is bounded by `expires_in`.** `ActiveSupport::Cache` has no atomic set-append, so the index append is a read-modify-write: two processes caching different entries under the same tag at the same moment can race, and one entry can be lost _from the index_ (the cached data itself is never lost). A lost index entry simply survives `revalidate_tag` and expires via its own `expires_in`. The same applies when the index entry itself is LRU-evicted. Therefore:
+
+- **Always set `expires_in` (or `expires_at`) on tagged entries.** It is the upper bound on how long a missed invalidation can serve stale HTML. In development, React on Rails Pro logs a warning when `cache_tags:` is used without an expiry.
+- **Use a shared cache store in production** — Redis or Memcached. With `:memory_store` the index is per-process, so `revalidate_tag` in one process cannot see entries written by another; with `:null_store` tags are inert.
+- **Keep cache deletion failures bounded by expiry.** `revalidate_tag` clears the tag index before deleting the indexed entries to reduce re-registration races. If the cache store raises during deletion, any surviving entries are orphaned from that tag and only expire via their own `expires_in`.
+- **Custom cache stores must honor `namespace: nil` in `delete_multi` and `delete`.** The tag index records the fully namespaced logical keys that Rails wrote, then suppresses the store default namespace at delete time. Stores that ignore `options[:namespace]` can silently miss tag-revalidation deletes.
+
+Two config knobs bound the index (defaults shown):
+
+```ruby
+ReactOnRailsPro.configure do |config|
+  config.cache_tag_index_expires_in = 7.days # index TTL ceiling for entries without expires_in
+  config.cache_tag_index_max_keys = 5_000    # keys recorded per tag; oldest dropped beyond this
+end
+```
+
+When a tagged entry has `expires_in`, the index entry's TTL automatically covers it (plus slack). When a tag exceeds the per-tag key cap, the oldest keys are dropped with a logged warning — those entries fall back to plain TTL expiration.
+
+Note that tags solve **data**-driven invalidation only. Deploy invalidation is already handled by the server-bundle digest in the cache key (see [Cache Warming](#cache-warming)) — a deploy cold-starts prerendered fragment caches regardless of tags.
+
+### Next.js mapping
+
+| Next.js 16 (Cache Components)                       | React on Rails Pro                                                                      |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `'use cache'` on a function/component               | `cached_react_component` / `cached_react_component_hash` / streaming and async variants |
+| `cacheTag('post-42')` inside the cached scope       | `cache_tags: ["post:42"]` helper option                                                 |
+| `revalidateTag('post-42')` in a Server Action       | `ReactOnRailsPro.revalidate_tag("post:42")` — anywhere in Ruby, incl. `after_commit`    |
+| Manually wiring `revalidateTag` into every mutation | `include ReactOnRailsPro::Cache::Revalidates` — invalidation rides the AR transaction   |
+| `cacheLife` profiles                                | `cache_options: { expires_in: ... }`                                                    |
+| `revalidateTag(tag, 'max')` / SWR profiles          | Not yet supported (stale-while-revalidate is a possible future addition)                |
+
+Like Next.js's default `revalidateTag`, revalidation deletes: the next request re-renders and re-registers. There is no background refresh.
 
 ---
 

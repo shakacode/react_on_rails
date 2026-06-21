@@ -2,11 +2,20 @@
 
 require "json"
 require "erb"
+require "stringio"
+require "tempfile"
+require "timeout"
 require "yaml"
 require_relative "utils"
+require_relative "version"
 require_relative "config_path_resolver"
+require_relative "shakapacker_config_helpers"
+require_relative "dev/server_mode"
 require_relative "version_syntax_converter"
+require_relative "version_synchronizer"
 require_relative "system_checker"
+require_relative "pro_migration"
+require_relative "node_renderer_procfile"
 
 begin
   require "rainbow"
@@ -41,6 +50,7 @@ module ReactOnRails
   # rubocop:disable Metrics/ClassLength, Metrics/AbcSize
   class Doctor
     include ConfigPathResolver
+    include ShakapackerConfigHelpers
 
     MESSAGE_COLORS = {
       error: :red,
@@ -52,17 +62,125 @@ module ReactOnRails
     RSPEC_HELPER_FILES = ["spec/rails_helper.rb", "spec/spec_helper.rb"].freeze
     MINITEST_HELPER_FILE = "test/test_helper.rb"
     DEFAULT_BUILD_TEST_COMMAND = 'config.build_test_command = "RAILS_ENV=test bin/shakapacker"'
-    DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
+    SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
+    CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
+    RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
 
-    def initialize(verbose: false, fix: false)
+    # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
+    # look for references to the old pre_stage_bundle_for_node_renderer task in
+    # common deploy-script locations so users on older Procfile/Dockerfile entries
+    # get a migration nudge before the task is removed.
+    DEPRECATED_RENDERER_CACHE_TASK = "pre_stage_bundle_for_node_renderer"
+    # Fixed allowlist of single-file deploy-script paths. Each entry is a literal
+    # path that may host a deploy hook referencing the deprecated task. Directory
+    # globs (e.g., per-stage Capistrano files or per-workflow GitHub Actions YAML)
+    # live in RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS so they stay bounded.
+    RENDERER_CACHE_DEPLOY_SCRIPT_PATHS = [
+      "Procfile",
+      "Procfile.dev",
+      "Procfile.dev-static-assets",
+      "Procfile.production",
+      "Dockerfile",
+      "Dockerfile.production",
+      "Dockerfile.staging",
+      "Dockerfile.review",
+      "docker-compose.yml",
+      "docker-compose.yaml",
+      "compose.yml",
+      "compose.yaml",
+      "bin/deploy",
+      "bin/release",
+      "bin/docker-entrypoint",
+      "config/deploy.rb",
+      "config/deploy/production.rb",
+      "config/deploy/staging.rb",
+      ".kamal/deploy.yml",
+      "scripts/deploy.sh",
+      ".circleci/config.yml",
+      ".gitlab-ci.yml",
+      "bitbucket-pipelines.yml",
+      "Jenkinsfile"
+    ].freeze
+    # Bounded glob allowlist for deploy manifests that live in a known directory
+    # but use per-environment or per-workflow filenames. Each pattern matches
+    # only one directory level (no `**`) so the scan never recurses into the
+    # project tree, and the expansion is capped by
+    # RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES.
+    RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS = [
+      ".github/workflows/*.yml",
+      ".github/workflows/*.yaml",
+      "config/deploy/*.rb"
+    ].freeze
+    # Per-file safety gate to bound IO during the scan, not a meaningful size limit.
+    RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
+    # Defense-in-depth cap on how many files a single glob may contribute.
+    # Realistic repos have a handful of workflow / deploy-stage files; far more
+    # than this is a sign of an unexpectedly broad pattern, not legitimate config.
+    RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES = 100
+
+    # Supported output formats. :text is the human-readable default; :json emits
+    # a machine-readable report (see JSON_SCHEMA_VERSION below).
+    OUTPUT_FORMATS = %i[text json].freeze
+
+    # Version of the machine-readable doctor report schema (FORMAT=json).
+    # Bump ONLY on breaking changes to the shape below. Schema (v1):
+    #
+    #   {
+    #     "schema_version": 1,
+    #     "ror_version": "<ReactOnRails::VERSION>",
+    #     "status": "pass" | "warn" | "fail",          // worst check status
+    #     "checks": [
+    #       {
+    #         "id": "<stable snake_case id from CHECK_SECTIONS>",
+    #         "title": "<human section title>",
+    #         "status": "pass" | "warn" | "fail",
+    #         "message": "<most severe message content, or null>",
+    #         "details": [ { "level": "success|warning|error|info", "content": "..." } ]
+    #       }
+    #     ],
+    #     "summary": { "pass": <count>, "warn": <count>, "fail": <count> }
+    #   }
+    #
+    # No timestamp is included so output is deterministic for a given app state.
+    # Exit code semantics match text mode: 1 if any check fails, else 0.
+    JSON_SCHEMA_VERSION = 1
+
+    # Doctor check sections. The :id values are part of the stable JSON schema
+    # contract (consumed by agents/tooling) — never rename or reuse them; add new
+    # sections with new ids instead.
+    CHECK_SECTIONS = [
+      { id: "environment_prerequisites", title: "Environment Prerequisites", method: :check_environment },
+      { id: "react_on_rails_versions", title: "React on Rails Versions", method: :check_react_on_rails_versions },
+      { id: "react_on_rails_packages", title: "React on Rails Packages", method: :check_packages },
+      { id: "javascript_package_dependencies", title: "JavaScript Package Dependencies",
+        method: :check_dependencies },
+      { id: "key_configuration_files", title: "Key Configuration Files", method: :check_key_files },
+      { id: "configuration_analysis", title: "Configuration Analysis", method: :check_configuration_details },
+      { id: "bin_dev_launcher_setup", title: "bin/dev Launcher Setup", method: :check_bin_dev_launcher },
+      { id: "rails_integration", title: "Rails Integration", method: :check_rails },
+      { id: "bundler_configuration", title: "Bundler Configuration", method: :check_bundler_configuration },
+      { id: "testing_setup", title: "Testing Setup", method: :check_testing_setup },
+      { id: "development_environment", title: "Development Environment", method: :check_development },
+      { id: "react_on_rails_pro_setup", title: "React on Rails Pro Setup", method: :check_pro_setup },
+      { id: "react_server_components", title: "React Server Components", method: :check_rsc_setup }
+    ].freeze
+
+    def initialize(verbose: false, fix: false, format: :text)
       @verbose = verbose
       @fix = fix
+      @format = format.respond_to?(:to_sym) ? format.to_sym : format
+      unless OUTPUT_FORMATS.include?(@format)
+        raise ArgumentError, "Invalid doctor format #{format.inspect}; expected one of #{OUTPUT_FORMATS.join(', ')}"
+      end
+
       @checker = SystemChecker.new
       @test_output_path_strategy = :unknown
       @rails_environment_loaded = false
     end
 
     def run_diagnosis
+      return run_json_diagnosis if format == :json
+
       print_header
       run_all_checks
       print_summary
@@ -73,7 +191,7 @@ module ReactOnRails
 
     private
 
-    attr_reader :verbose, :fix, :checker
+    attr_reader :verbose, :fix, :format, :checker
 
     def print_header
       puts Rainbow("\n#{'=' * 80}").cyan
@@ -94,33 +212,137 @@ module ReactOnRails
     end
 
     def run_all_checks
-      checks = [
-        ["Environment Prerequisites", :check_environment],
-        ["React on Rails Versions", :check_react_on_rails_versions],
-        ["React on Rails Packages", :check_packages],
-        ["JavaScript Package Dependencies", :check_dependencies],
-        ["Key Configuration Files", :check_key_files],
-        ["Configuration Analysis", :check_configuration_details],
-        ["bin/dev Launcher Setup", :check_bin_dev_launcher],
-        ["Rails Integration", :check_rails],
-        ["Webpack Configuration", :check_webpack],
-        ["Testing Setup", :check_testing_setup],
-        ["Development Environment", :check_development],
-        ["React on Rails Pro Setup", :check_pro_setup],
-        ["React Server Components", :check_rsc_setup]
-      ]
-
-      checks.each do |section_name, check_method|
+      CHECK_SECTIONS.each do |section|
         initial_message_count = checker.messages.length
-        send(check_method)
+        send(section[:method])
 
         # Only print header if messages were added
         next unless checker.messages.length > initial_message_count
 
-        print_section_header(section_name)
+        print_section_header(section[:title])
         print_recent_messages(initial_message_count)
         puts
       end
+    end
+
+    # JSON output mode: stdout carries ONLY the JSON report (schema documented
+    # at JSON_SCHEMA_VERSION); any stray output produced by checks is routed to
+    # stderr so the report stays parseable.
+    def run_json_diagnosis
+      results = nil
+      stray_output = capture_stdout { results = collect_check_results }
+      $stderr.print(stray_output) unless stray_output.empty?
+
+      puts JSON.pretty_generate(build_json_report(results))
+      exit(diagnosis_exit_code)
+    end
+
+    def collect_check_results
+      CHECK_SECTIONS.map do |section|
+        initial_message_count = checker.messages.length
+        send(section[:method])
+
+        {
+          id: section[:id],
+          title: section[:title],
+          messages: checker.messages[initial_message_count..]
+        }
+      end
+    end
+
+    # Captures everything written to the stdout file descriptor (fd 1) while the
+    # block runs — including direct STDOUT writes, child processes inheriting
+    # fd 1, and C extensions — not just Ruby-level $stdout. Reassigning $stdout
+    # to a StringIO would miss those, letting stray bytes corrupt the JSON report.
+    #
+    # NOT thread-safe: STDOUT.reopen redirects fd 1 process-wide, so any
+    # concurrent thread writing to stdout is captured too. Doctor runs only as
+    # a single-threaded rake task today; revisit before using in threaded code.
+    # rubocop:disable Style/GlobalStdStream
+    def capture_stdout
+      captured_file = Tempfile.new("react_on_rails_doctor_stdout")
+      original_stdout = $stdout
+      original_fd = STDOUT.dup
+      STDOUT.flush
+      STDOUT.reopen(captured_file.path, "w")
+      $stdout = STDOUT
+      yield
+      STDOUT.flush
+      File.read(captured_file.path)
+    ensure
+      begin
+        STDOUT.flush
+      rescue IOError, SystemCallError
+        nil
+      end
+      if original_fd
+        begin
+          STDOUT.reopen(original_fd)
+        ensure
+          original_fd.close
+        end
+      end
+      $stdout = original_stdout if original_stdout
+      captured_file&.close!
+    end
+    # rubocop:enable Style/GlobalStdStream
+
+    def build_json_report(results)
+      checks = results.map { |result| build_check_entry(result) }
+      statuses = checks.map { |check| check[:status] }
+
+      {
+        schema_version: JSON_SCHEMA_VERSION,
+        ror_version: ReactOnRails::VERSION,
+        status: overall_status(statuses),
+        checks:,
+        summary: {
+          pass: statuses.count("pass"),
+          warn: statuses.count("warn"),
+          fail: statuses.count("fail")
+        }
+      }
+    end
+
+    def build_check_entry(result)
+      messages = result[:messages]
+      status = check_status(messages)
+
+      {
+        id: result[:id],
+        title: result[:title],
+        status:,
+        message: primary_message(messages, status),
+        details: messages.map { |message| { level: message[:type].to_s, content: message[:content] } }
+      }
+    end
+
+    def check_status(messages)
+      if messages.any? { |message| message[:type] == :error }
+        "fail"
+      elsif messages.any? { |message| message[:type] == :warning }
+        "warn"
+      else
+        "pass"
+      end
+    end
+
+    def overall_status(statuses)
+      if statuses.include?("fail")
+        "fail"
+      elsif statuses.include?("warn")
+        "warn"
+      else
+        "pass"
+      end
+    end
+
+    def primary_message(messages, status)
+      severity = { "fail" => :error, "warn" => :warning }[status]
+      return nil unless severity
+
+      message = messages.find { |msg| msg[:type] == severity }
+      message && message[:content]
     end
 
     def print_section_header(section_name)
@@ -141,10 +363,13 @@ module ReactOnRails
     end
 
     def check_react_on_rails_versions
-      # Use system_checker for comprehensive package validation instead of duplicating
+      # Auto-fix first so subsequent checks reflect the repaired state and
+      # don't leave stale errors that cause exit(1) despite a successful fix.
+      auto_fix_versions if fix
+
       checker.check_react_on_rails_packages
-      check_version_wildcards
       check_pro_package_consistency
+      check_version_wildcards
     end
 
     def check_packages
@@ -159,7 +384,7 @@ module ReactOnRails
       checker.check_react_on_rails_initializer
     end
 
-    def check_webpack
+    def check_bundler_configuration
       checker.check_webpack_configuration
     end
 
@@ -175,7 +400,7 @@ module ReactOnRails
 
     def check_bin_dev_launcher
       checker.add_info("🚀 bin/dev Launcher:")
-      check_bin_dev_launcher_setup
+      return unless check_bin_dev_launcher_setup
 
       checker.add_info("\n📄 Launcher Procfiles:")
       check_launcher_procfiles
@@ -198,6 +423,11 @@ module ReactOnRails
     end
 
     def check_javascript_bundles
+      if server_bundle_filename.to_s.strip.empty?
+        checker.add_info("ℹ️  server_bundle_js_file is blank (SSR disabled), skipping SSR bundle existence check")
+        return
+      end
+
       server_bundle_path = determine_server_bundle_path
       if File.exist?(server_bundle_path)
         checker.add_success("✅ Server bundle file exists at #{server_bundle_path}")
@@ -216,14 +446,16 @@ module ReactOnRails
     end
 
     def check_procfiles
+      default_mode = default_dev_server_mode
+      descriptions = procfile_descriptions
       procfiles = {
         "Procfile.dev" => {
-          description: "HMR development with webpack-dev-server",
-          required_for: "bin/dev (default/hmr mode)",
+          description: default_procfile_description(default_mode),
+          required_for: "bin/dev (default mode)",
           should_contain: ["shakapacker-dev-server", "rails server"]
         },
         "Procfile.dev-static-assets" => {
-          description: "Static development with webpack --watch",
+          description: descriptions[:static],
           required_for: "bin/dev static",
           should_contain: ["shakapacker", "rails server"]
         },
@@ -256,13 +488,33 @@ module ReactOnRails
         # Only check for critical missing components, not optional suggestions
         content = File.read(filename)
         if filename == "Procfile.dev" && !content.include?("shakapacker-dev-server")
-          checker.add_warning("  ⚠️  Missing shakapacker-dev-server for HMR development")
+          procfile_description = config[:description]
+          checker.add_warning(
+            "  ⚠️  #{procfile_description} (Procfile.dev) requires shakapacker-dev-server"
+          )
         elsif filename == "Procfile.dev-static-assets" && !content.include?("shakapacker")
           checker.add_warning("  ⚠️  Missing shakapacker for static asset compilation")
         end
       else
         checker.add_info("ℹ️  #{filename} not found (needed for #{config[:required_for]})")
       end
+    end
+
+    def procfile_descriptions
+      {
+        hmr: "#{development_reload_mode_label} development with #{dev_server_label}",
+        static: "Static development with #{static_watch_label}"
+      }
+    end
+
+    def default_procfile_description(default_mode)
+      bundler_aware_dev_server_text(Dev::ServerMode.text(default_mode, :procfile_description))
+    end
+
+    def bundler_aware_dev_server_text(text)
+      return text if active_assets_bundler == "webpack"
+
+      text.gsub("webpack-dev-server", dev_server_label)
     end
 
     def check_bin_dev_script
@@ -273,7 +525,7 @@ module ReactOnRails
       else
         checker.add_warning(<<~MSG.strip)
           ⚠️  bin/dev script missing
-          This script provides an enhanced development workflow with HMR, static, and production modes.
+          This script provides an enhanced development workflow with development-server, static, and production modes.
           Run 'rails generate react_on_rails:install' to generate the script.
         MSG
       end
@@ -386,7 +638,7 @@ module ReactOnRails
         unless File.exist?("bin/dev") && File.read("bin/dev").include?("ReactOnRails::Dev::ServerManager")
           puts "• #{Rainbow('Upgrade to enhanced bin/dev script').yellow}:"
           puts "  - Run #{Rainbow('rails generate react_on_rails:install').cyan} for latest development tools"
-          puts "  - Provides HMR, static, and production-like asset modes"
+          puts "  - Provides development-server, static, and production-like asset modes"
           puts "  - Better error handling and debugging capabilities"
         end
 
@@ -428,7 +680,8 @@ module ReactOnRails
 
       # Enhanced contextual suggestions based on what exists
       if File.exist?("bin/dev") && File.exist?("Procfile.dev")
-        puts "• Start development with HMR: #{Rainbow('./bin/dev').cyan}"
+        puts "• Start development with #{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}: " \
+             "#{Rainbow('./bin/dev').cyan}"
         puts "• Try static mode: #{Rainbow('./bin/dev static').cyan}"
         puts "• Test production assets: #{Rainbow('./bin/dev prod').cyan}"
         puts "• See all options: #{Rainbow('./bin/dev help').cyan}"
@@ -436,7 +689,7 @@ module ReactOnRails
         puts "• Start development with: #{Rainbow('./bin/dev').cyan} (or foreman start -f Procfile.dev)"
       else
         puts "• Start Rails server: bin/rails server"
-        puts "• Start webpack dev server: bin/shakapacker-dev-server (in separate terminal)"
+        puts "• Start #{dev_server_label}: bin/shakapacker-dev-server (in separate terminal)"
       end
 
       # Test suggestions based on what's available
@@ -456,14 +709,30 @@ module ReactOnRails
       puts "• Documentation: https://github.com/shakacode/react_on_rails"
       puts
     end
+
+    def static_watch_label
+      active_assets_bundler == "webpack" ? "webpack --watch" : "#{active_assets_bundler} watch"
+    end
     # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+    # Memoized per Doctor instance (a fresh Doctor runs per `doctor` invocation),
+    # so a single diagnosis reads and parses config/shakapacker.yml at most once
+    # even though several checks consult it. The base implementation lives in
+    # ShakapackerConfigHelpers. ServerManager intentionally does not memoize its
+    # copy because its helpers live on `class << self` and would leak across specs.
+    def parsed_shakapacker_config
+      return @parsed_shakapacker_config if defined?(@parsed_shakapacker_config)
+
+      @parsed_shakapacker_config = super
+    end
 
     def print_test_workflow_next_steps
       case @test_output_path_strategy
       when :shared
         puts "• Shared test/dev output path detected: use static workflow only"
         puts "  - Start app with: ./bin/dev static"
-        puts "  - Avoid ./bin/dev (HMR) with shared output paths"
+        puts "  - Avoid ./bin/dev (#{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}) " \
+             "with shared output paths"
         puts "  - Start test watcher with: ./bin/dev test-watch --test-watch-mode=client-only"
       when :separate
         puts "• Recommended default: keep test output path separate from development"
@@ -479,8 +748,8 @@ module ReactOnRails
     end
 
     def check_npm_package_version
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("react-on-rails npm package version")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
@@ -510,36 +779,109 @@ module ReactOnRails
 
       begin
         content = File.read(gemfile_path)
-        react_line = content.lines.find { |line| line.match(/^\s*gem\s+['"]react_on_rails['"]/) }
-
-        if react_line
-          if /['"][~^]/.match?(react_line)
-            checker.add_warning("⚠️  Gemfile uses wildcard version pattern (~, ^) for react_on_rails")
-          elsif />=\s*/.match?(react_line)
-            checker.add_warning("⚠️  Gemfile uses version range (>=) for react_on_rails")
-          else
-            checker.add_success("✅ Gemfile uses exact version for react_on_rails")
-          end
-        end
+        check_gem_wildcard_for(content, "react_on_rails")
+        check_gem_wildcard_for(content, "react_on_rails_pro") if ReactOnRails::Utils.react_on_rails_pro?
       rescue StandardError
         # Ignore errors reading Gemfile
       end
     end
 
+    def check_gem_wildcard_for(gemfile_content, gem_name)
+      lines = gemfile_content.lines
+      line_index = lines.index { |line| line.match(/^\s*gem\s+['"]#{gem_name}['"]/) }
+      return unless line_index
+
+      react_line = build_gem_declaration_line(lines, line_index)
+
+      # Skip path/git/github gems — these are development configurations where version checks don't apply
+      return if react_line.match?(/\b(?:path|git|github):\s/)
+
+      version_match = react_line.match(/gem\s+['"]#{gem_name}['"]\s*,\s*['"]([^'"]+)['"]/) ||
+                      react_line.match(/gem\s+['"]#{gem_name}['"][^#\n]*\bversion:\s*['"]([^'"]+)['"]/)
+      return report_missing_gem_version(gem_name) unless version_match
+
+      exact = begin
+        Gem::Requirement.new(version_match[1]).exact?
+      rescue Gem::Requirement::BadRequirementError
+        false
+      end
+
+      if exact
+        checker.add_success("✅ Gemfile uses exact version for #{gem_name}")
+      else
+        report_non_exact_gem_version(gem_name)
+      end
+    end
+
+    def build_gem_declaration_line(lines, line_index)
+      declaration = lines[line_index]
+      look_ahead = line_index + 1
+
+      # Keep joining while the previous segment ends with a comma; skip blank/comment-only continuation lines.
+      while declaration.sub(/#[^\n]*\z/, "").rstrip.end_with?(",") && lines[look_ahead]
+        next_line = lines[look_ahead]
+        look_ahead += 1
+        next if next_line.strip.empty? || next_line.strip.start_with?("#")
+
+        declaration = "#{declaration.chomp.sub(/#[^\n]*\z/, '').rstrip} #{next_line.strip}"
+      end
+
+      declaration
+    end
+
+    def report_missing_gem_version(gem_name)
+      version = gem_expected_version(gem_name)
+      checker.add_error(<<~MSG.strip)
+        🚫 Gemfile specifies no version for #{gem_name}.
+
+        React on Rails requires exact version pinning. Without a version constraint,
+        bundler may install any version and it can drift from the npm package.
+
+        Fix: Use an exact version in your Gemfile:
+          gem '#{gem_name}', '#{version}'
+      MSG
+    end
+
+    def report_non_exact_gem_version(gem_name)
+      version = gem_expected_version(gem_name)
+      checker.add_error(<<~MSG.strip)
+        🚫 Gemfile uses a non-exact version constraint for #{gem_name}.
+
+        React on Rails requires exact version matching between the gem and npm package.
+        Non-exact constraints can cause the gem and npm package to drift apart.
+
+        Fix: Use an exact version in your Gemfile:
+          gem '#{gem_name}', '#{version}'
+      MSG
+    end
+
+    def gem_expected_version(gem_name)
+      if gem_name == "react_on_rails_pro"
+        ReactOnRails::Utils.react_on_rails_pro_version
+      else
+        ReactOnRails::VERSION
+      end
+    end
+
     def check_npm_wildcards
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("npm package version constraints")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
-        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+        packages = ["react-on-rails"]
+        if ReactOnRails::Utils.react_on_rails_pro?
+          packages << "react-on-rails-pro"
+          packages << "react-on-rails-pro-node-renderer"
+        end
 
-        npm_version = all_deps["react-on-rails"]
-        if npm_version
-          if /[~^]/.match?(npm_version)
-            checker.add_warning("⚠️  package.json uses wildcard version pattern (~, ^) for react-on-rails")
-          else
-            checker.add_success("✅ package.json uses exact version for react-on-rails")
+        packages.each do |package_name|
+          ReactOnRails::VersionSynchronizer::PACKAGE_SECTIONS.each do |section|
+            deps = package_json[section] || {}
+            next unless deps.key?(package_name)
+
+            check_npm_wildcard_for(deps, package_name)
+            break # only report once per package (avoid duplicates if listed in multiple sections)
           end
         end
       rescue JSON::ParserError
@@ -549,9 +891,140 @@ module ReactOnRails
       end
     end
 
+    def check_npm_wildcard_for(all_deps, package_name)
+      npm_version = all_deps[package_name]
+      return unless npm_version
+
+      # Skip workspace/local-link specs
+      return if npm_version.match?(/\A(?:workspace:|file:|link:)/)
+
+      # Handle npm alias syntax (e.g., npm:@scope/pkg@^16.5.0) — check the embedded version
+      if npm_version.start_with?(ReactOnRails::VersionSynchronizer::NPM_ALIAS_PREFIX)
+        return check_npm_alias_version(npm_version, package_name)
+      end
+
+      if ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(npm_version)
+        checker.add_success("✅ package.json uses exact version for #{package_name}")
+      else
+        install_cmd = install_exact_command_for(package_name)
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json uses a non-exact version for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          Non-exact constraints (~ ^ >= * ranges) will cause a runtime error on app startup.
+
+          Fix: #{install_cmd}
+          Or run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      end
+    end
+
+    def check_npm_alias_version(npm_version, package_name)
+      expected_version = expected_npm_version_for(package_name)
+      install_cmd = install_exact_command_for(package_name)
+      at_index = npm_version.rindex("@")
+      unless at_index && at_index > ReactOnRails::VersionSynchronizer::NPM_ALIAS_PREFIX.length
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json uses an npm alias without a parseable version for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          npm alias specs must include an exact trailing version.
+
+          Fix: #{install_cmd}
+          Run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+        return
+      end
+
+      alias_version = npm_version[(at_index + 1)..]
+      exact_alias = ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(alias_version)
+
+      if exact_alias && alias_version == expected_version
+        checker.add_success("✅ package.json uses exact version for #{package_name}")
+      elsif exact_alias
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json npm alias version mismatch for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          Expected exact version: #{expected_version}
+
+          Fix: #{install_cmd}
+          Run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      else
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json uses a non-exact version in npm alias for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          Non-exact constraints (~ ^ >= * ranges) will cause a runtime error on app startup.
+
+          Fix: #{install_cmd}
+          Run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      end
+    end
+
+    def expected_npm_version_for(package_name)
+      gem_version = if %w[react-on-rails-pro react-on-rails-pro-node-renderer].include?(package_name)
+                      ReactOnRails::Utils.react_on_rails_pro_version
+                    else
+                      ReactOnRails::VERSION
+                    end
+      ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
+    end
+
+    def install_exact_command_for(package_name)
+      ReactOnRails::Utils.package_manager_install_exact_command(package_name, expected_npm_version_for(package_name))
+    end
+
+    def auto_fix_versions
+      package_json_path = package_json_path_for("package version auto-sync")
+      return unless package_json_path
+
+      synchronizer = ReactOnRails::VersionSynchronizer.new(package_json_path:, io: StringIO.new)
+      result = synchronizer.sync(write: true)
+
+      report_sync_changes(result)
+      report_skipped_specs(result)
+      if result.changes.any?
+        checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
+      end
+    rescue StandardError => e
+      checker.add_warning("  ⚠️  FIX=true: Could not auto-sync versions: #{e.message}")
+    end
+
+    def report_sync_changes(result)
+      if result.changes.any?
+        checker.add_success("  ✅ FIX=true: Synced package.json versions (#{result.changes.length} update(s))")
+        result.changes.each do |change|
+          checker.add_info("    #{change[:section]}.#{change[:package]}: #{change[:from]} -> #{change[:to]}")
+        end
+        checker.add_info("  ℹ️  Run your package manager install command to update the lockfile.")
+      elsif result.unsupported_specs.any? || result.missing_source_specs.any?
+        checker.add_warning("  ⚠️  FIX=true: Some package.json specs could not be auto-synced")
+      else
+        checker.add_info("  ℹ️  FIX=true: No package.json version changes needed")
+      end
+    end
+
+    def report_skipped_specs(result)
+      result.unsupported_specs.each do |spec|
+        checker.add_warning(
+          "  ⚠️  FIX=true: Skipped unsupported spec " \
+          "#{spec[:section]}.#{spec[:package]}: #{spec[:version]}"
+        )
+      end
+      result.missing_source_specs.each do |spec|
+        checker.add_warning(
+          "  ⚠️  FIX=true: Skipped #{spec[:section]}.#{spec[:package]} " \
+          "(#{spec[:source]} gem not loaded)"
+        )
+      end
+    end
+
     def check_pro_package_consistency
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("Pro package consistency")
+      return unless package_json_path
 
       package_json = JSON.parse(File.read(package_json_path))
       all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
@@ -628,11 +1101,11 @@ module ReactOnRails
 
       webpack_config_path = resolved_webpack_config_path
       if webpack_config_path
-        checker.add_success("✅ Webpack configuration: #{webpack_config_path}")
+        checker.add_success("✅ Bundler configuration: #{webpack_config_path}")
       else
-        checker.add_warning("⚠️  Missing Webpack configuration: config/webpack/webpack.config.js")
+        checker.add_warning("⚠️  Missing bundler configuration: webpack/rspack config file not found")
         checker.add_info(
-          "ℹ️  If your app uses a custom webpack config location, this warning may be informational."
+          "ℹ️  Checked default config locations and Shakapacker assets_bundler_config_path, if available."
         )
       end
 
@@ -674,16 +1147,18 @@ module ReactOnRails
       checker.add_info("\n🖥️  Server Rendering Engine:")
 
       begin
-        uses_node_renderer = ReactOnRails::Utils.react_on_rails_pro? &&
-                             pro_initializer_has_node_renderer?
+        pro_renderer = resolved_pro_server_renderer
+        uses_node_renderer = pro_renderer == "NodeRenderer"
 
         if uses_node_renderer
           checker.add_info("  Pro uses NodeRenderer for server rendering")
           if defined?(ExecJS) && ExecJS.runtime
             checker.add_info("  ExecJS available as fallback: #{ExecJS.runtime.name}")
-          else
+          elsif pro_execjs_fallback_enabled?
             checker.add_warning("  ⚠️  ExecJS fallback is enabled but ExecJS is not available")
             checker.add_info("  💡 Install mini_racer or set renderer_use_fallback_exec_js = false")
+          else
+            checker.add_info("  ℹ️  ExecJS fallback is disabled (renderer_use_fallback_exec_js = false)")
           end
         elsif defined?(ExecJS)
           runtime_name = ExecJS.runtime.name if ExecJS.runtime
@@ -749,90 +1224,160 @@ module ReactOnRails
 
     def check_react_on_rails_initializer
       config_path = "config/initializers/react_on_rails.rb"
+      runtime_config = react_on_rails_runtime_configuration
+      initializer_exists = File.exist?(config_path)
 
-      unless File.exist?(config_path)
+      unless runtime_config || initializer_exists
         checker.add_warning("⚠️  React on Rails configuration file not found: #{config_path}")
         checker.add_info("💡 Run 'rails generate react_on_rails:install' to create configuration file")
         return
       end
 
+      if !initializer_exists && runtime_config
+        checker.add_info("ℹ️  No config/initializers/react_on_rails.rb found (using runtime configuration)")
+      end
+
       begin
-        content = File.read(config_path)
+        content = initializer_exists ? File.read(config_path) : ""
 
         checker.add_info("📋 React on Rails Configuration:")
-        checker.add_info("📍 Documentation: https://reactonrails.com/docs/guides/configuration/")
+        checker.add_info("📍 Documentation: https://reactonrails.com/docs/configuration/")
+        if runtime_config
+          checker.add_info("ℹ️  Using loaded runtime configuration values")
+        else
+          checker.add_info("ℹ️  Using initializer parsing fallback (Rails environment unavailable)")
+        end
 
         # Analyze configuration settings
-        analyze_server_rendering_config(content)
-        analyze_performance_config(content)
-        analyze_development_config(content)
-        analyze_i18n_config(content)
-        analyze_component_loading_config(content)
-        analyze_custom_extensions(content)
+        analyze_server_rendering_config(content, runtime_config)
+        analyze_performance_config(content, runtime_config)
+        analyze_development_config(content, runtime_config)
+        analyze_i18n_config(content, runtime_config)
+        analyze_component_loading_config(content, runtime_config)
+        analyze_custom_extensions(content, runtime_config)
       rescue StandardError => e
         checker.add_warning("⚠️  Unable to read react_on_rails.rb: #{e.message}")
       end
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity
-    def analyze_server_rendering_config(content)
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    def analyze_server_rendering_config(content, runtime_config = nil)
       checker.add_info("\n🖥️  Server Rendering:")
 
-      # Server bundle file
-      server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
-      if server_bundle_match
-        checker.add_info("  server_bundle_js_file: #{server_bundle_match[1]}")
+      if runtime_config
+        raw_server_bundle_value = runtime_config.server_bundle_js_file
+        server_bundle_value =
+          if raw_server_bundle_value.is_a?(String)
+            raw_server_bundle_value.strip
+          else
+            raw_server_bundle_value
+          end
+        if server_bundle_value.present?
+          checker.add_info("  server_bundle_js_file: #{server_bundle_value}")
+        elsif server_bundle_value.nil?
+          fallback_server_bundle = server_bundle_filename
+          checker.add_info("  server_bundle_js_file: #{fallback_server_bundle} (initializer/default)")
+        else
+          checker.add_info("  server_bundle_js_file: \"\" (disabled)")
+        end
       else
-        checker.add_info("  server_bundle_js_file: server-bundle.js (default)")
+        # Server bundle file
+        server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
+        if server_bundle_match
+          checker.add_info("  server_bundle_js_file: #{server_bundle_match[1]}")
+        else
+          checker.add_info('  server_bundle_js_file: "" (default, SSR disabled)')
+        end
       end
 
       # Server bundle output path
-      server_bundle_path_match = content.match(/config\.server_bundle_output_path\s*=\s*["']([^"']+)["']/)
       default_path = ReactOnRails::DEFAULT_SERVER_BUNDLE_OUTPUT_PATH
-      rails_bundle_path = server_bundle_path_match ? server_bundle_path_match[1] : default_path
+      rails_bundle_path =
+        if runtime_config
+          runtime_config.server_bundle_output_path || default_path
+        else
+          server_bundle_path_match = content.match(/config\.server_bundle_output_path\s*=\s*["']([^"']+)["']/)
+          server_bundle_path_match ? server_bundle_path_match[1] : default_path
+        end
       checker.add_info("  server_bundle_output_path: #{rails_bundle_path}")
 
       # Enforce private server bundles
-      enforce_private_match = content.match(/config\.enforce_private_server_bundles\s*=\s*([^\s\n,]+)/)
-      checker.add_info("  enforce_private_server_bundles: #{enforce_private_match[1]}") if enforce_private_match
+      if runtime_config
+        checker.add_info("  enforce_private_server_bundles: true") if runtime_config.enforce_private_server_bundles
+      else
+        enforce_private_match = content.match(/config\.enforce_private_server_bundles\s*=\s*([^\s\n,]+)/)
+        checker.add_info("  enforce_private_server_bundles: #{enforce_private_match[1]}") if enforce_private_match
+      end
 
       # Check Shakapacker integration and provide recommendations
       check_shakapacker_private_output_path(rails_bundle_path)
 
-      # RSC bundle file (Pro feature)
-      rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
-      if rsc_bundle_match
-        checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_match[1]} (React Server Components - Pro)")
+      # RSC bundle file (Pro feature). Base runtime config does not expose this setting.
+      rsc_bundle_value =
+        if runtime_config && defined?(ReactOnRailsPro)
+          ReactOnRailsPro.configuration.rsc_bundle_js_file
+        else
+          rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
+          rsc_bundle_match ? rsc_bundle_match[1] : nil
+        end
+      if rsc_bundle_value.present?
+        checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_value} (React Server Components - Pro)")
       end
 
       # Prerender setting
-      prerender_match = content.match(/config\.prerender\s*=\s*([^\s\n,]+)/)
-      prerender_value = prerender_match ? prerender_match[1] : "false (default)"
+      prerender_value =
+        if runtime_config
+          runtime_config.prerender
+        else
+          prerender_match = content.match(/config\.prerender\s*=\s*([^\s\n,]+)/)
+          prerender_match ? prerender_match[1] : "false (default)"
+        end
       checker.add_info("  prerender: #{prerender_value}")
 
       # Server renderer pool settings
-      pool_size_match = content.match(/config\.server_renderer_pool_size\s*=\s*([^\s\n,]+)/)
-      checker.add_info("  server_renderer_pool_size: #{pool_size_match[1]}") if pool_size_match
+      if runtime_config
+        # Default is 1; only report explicit non-default override.
+        checker.add_info("  server_renderer_pool_size: #{runtime_config.server_renderer_pool_size}") \
+          if runtime_config.server_renderer_pool_size != ReactOnRails::DEFAULT_SERVER_RENDERER_POOL_SIZE
+      else
+        pool_size_match = content.match(/config\.server_renderer_pool_size\s*=\s*([^\s\n,]+)/)
+        checker.add_info("  server_renderer_pool_size: #{pool_size_match[1]}") if pool_size_match
+      end
 
-      timeout_match = content.match(/config\.server_renderer_timeout\s*=\s*([^\s\n,]+)/)
-      checker.add_info("  server_renderer_timeout: #{timeout_match[1]} seconds") if timeout_match
+      if runtime_config
+        # Default is 20 seconds; only report explicit non-default override.
+        checker.add_info("  server_renderer_timeout: #{runtime_config.server_renderer_timeout} seconds") \
+          if runtime_config.server_renderer_timeout != ReactOnRails::DEFAULT_SERVER_RENDERER_TIMEOUT_SECONDS
+      else
+        timeout_match = content.match(/config\.server_renderer_timeout\s*=\s*([^\s\n,]+)/)
+        checker.add_info("  server_renderer_timeout: #{timeout_match[1]} seconds") if timeout_match
+      end
 
       # Error handling
-      raise_on_error_match = content.match(/config\.raise_on_prerender_error\s*=\s*([^\s\n,]+)/)
-      return unless raise_on_error_match
-
-      checker.add_info("  raise_on_prerender_error: #{raise_on_error_match[1]}")
+      if runtime_config
+        checker.add_info("  raise_on_prerender_error: #{runtime_config.raise_on_prerender_error}") \
+          if runtime_config.raise_on_prerender_error != Rails.env.development?
+      else
+        raise_on_error_match = content.match(/config\.raise_on_prerender_error\s*=\s*([^\s\n,]+)/)
+        checker.add_info("  raise_on_prerender_error: #{raise_on_error_match[1]}") if raise_on_error_match
+      end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
+    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-    # rubocop:disable Metrics/CyclomaticComplexity
-    def analyze_performance_config(content)
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def analyze_performance_config(content, runtime_config = nil)
       checker.add_info("\n⚡ Performance & Loading:")
 
       # Component loading strategy
-      loading_strategy_match = content.match(/config\.generated_component_packs_loading_strategy\s*=\s*:([^\s\n,]+)/)
-      if loading_strategy_match
-        strategy = loading_strategy_match[1]
+      strategy =
+        if runtime_config
+          runtime_config.generated_component_packs_loading_strategy&.to_s
+        else
+          loading_strategy_match =
+            content.match(/config\.generated_component_packs_loading_strategy\s*=\s*:([^\s\n,]+)/)
+          loading_strategy_match&.[](1)
+        end
+      if strategy
         checker.add_info("  generated_component_packs_loading_strategy: :#{strategy}")
 
         case strategy
@@ -853,124 +1398,187 @@ module ReactOnRails
       end
 
       # Auto load bundle
-      auto_load_match = content.match(/config\.auto_load_bundle\s*=\s*([^\s\n,]+)/)
-      checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
-
-      # Deprecated immediate_hydration setting
-      immediate_hydration_match = content.match(/config\.immediate_hydration\s*=\s*([^\s\n,]+)/)
-      if immediate_hydration_match
-        checker.add_warning("  ⚠️  immediate_hydration: #{immediate_hydration_match[1]} (DEPRECATED)")
-        checker.add_info("    💡 This setting is no longer used. Immediate hydration is now automatic for Pro users.")
-        checker.add_info("    💡 Remove this line from your config/initializers/react_on_rails.rb file.")
+      if runtime_config
+        checker.add_info("  auto_load_bundle: true") if runtime_config.auto_load_bundle
+      else
+        auto_load_match = content.match(/config\.auto_load_bundle\s*=\s*([^\s\n,]+)/)
+        checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
       end
 
       # Component registry timeout
-      timeout_match = content.match(/config\.component_registry_timeout\s*=\s*([^\s\n,]+)/)
-      return unless timeout_match
-
-      checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms")
+      if runtime_config
+        # Default is 5000 ms; only report explicit non-default override.
+        checker.add_info("  component_registry_timeout: #{runtime_config.component_registry_timeout}ms") \
+          if runtime_config.component_registry_timeout != ReactOnRails::DEFAULT_COMPONENT_REGISTRY_TIMEOUT
+      else
+        timeout_match = content.match(/config\.component_registry_timeout\s*=\s*([^\s\n,]+)/)
+        checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms") if timeout_match
+      end
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-    # rubocop:disable Metrics/AbcSize
-    def analyze_development_config(content)
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    def analyze_development_config(content, runtime_config = nil)
       checker.add_info("\n🔧 Development & Debugging:")
 
-      # Development mode
-      dev_mode_match = content.match(/config\.development_mode\s*=\s*([^\s\n,]+)/)
-      if dev_mode_match
-        checker.add_info("  development_mode: #{dev_mode_match[1]}")
+      if runtime_config
+        # development_mode/trace default to Rails.env.development?, so only
+        # surface explicit runtime divergence from that environment-driven
+        # default.
+        checker.add_info("  development_mode: #{runtime_config.development_mode}") \
+          if runtime_config.development_mode != Rails.env.development?
+        checker.add_info("  trace: #{runtime_config.trace}") \
+          if runtime_config.trace != Rails.env.development?
+        # logging_on_server/replay_console default to true in all environments,
+        # so any non-truthy runtime value is worth surfacing.
+        unless runtime_config.logging_on_server
+          checker.add_info("  logging_on_server: #{runtime_config.logging_on_server.inspect}")
+        end
+        unless runtime_config.replay_console
+          checker.add_info("  replay_console: #{runtime_config.replay_console.inspect}")
+        end
+        if runtime_config.build_test_command.present?
+          checker.add_info("  build_test_command: #{runtime_config.build_test_command}")
+        end
+        if runtime_config.build_production_command.present?
+          checker.add_info("  build_production_command: #{runtime_config.build_production_command}")
+        end
       else
-        checker.add_info("  development_mode: Rails.env.development? (default)")
+        # Development mode
+        dev_mode_match = content.match(/config\.development_mode\s*=\s*([^\s\n,]+)/)
+        if dev_mode_match
+          checker.add_info("  development_mode: #{dev_mode_match[1]}")
+        else
+          checker.add_info("  development_mode: Rails.env.development? (default)")
+        end
+
+        # Trace setting
+        trace_match = content.match(/config\.trace\s*=\s*([^\s\n,]+)/)
+        if trace_match
+          checker.add_info("  trace: #{trace_match[1]}")
+        else
+          checker.add_info("  trace: Rails.env.development? (default)")
+        end
+
+        # Logging
+        logging_match = content.match(/config\.logging_on_server\s*=\s*([^\s\n,]+)/)
+        logging_value = logging_match ? logging_match[1] : "true (default)"
+        checker.add_info("  logging_on_server: #{logging_value}")
+
+        # Console replay
+        replay_match = content.match(/config\.replay_console\s*=\s*([^\s\n,]+)/)
+        replay_value = replay_match ? replay_match[1] : "true (default)"
+        checker.add_info("  replay_console: #{replay_value}")
+
+        # Build commands
+        build_test_match = content.match(/config\.build_test_command\s*=\s*["']([^"']+)["']/)
+        checker.add_info("  build_test_command: #{build_test_match[1]}") if build_test_match
+
+        build_prod_match = content.match(/config\.build_production_command\s*=\s*["']([^"']+)["']/)
+        checker.add_info("  build_production_command: #{build_prod_match[1]}") if build_prod_match
       end
-
-      # Trace setting
-      trace_match = content.match(/config\.trace\s*=\s*([^\s\n,]+)/)
-      if trace_match
-        checker.add_info("  trace: #{trace_match[1]}")
-      else
-        checker.add_info("  trace: Rails.env.development? (default)")
-      end
-
-      # Logging
-      logging_match = content.match(/config\.logging_on_server\s*=\s*([^\s\n,]+)/)
-      logging_value = logging_match ? logging_match[1] : "true (default)"
-      checker.add_info("  logging_on_server: #{logging_value}")
-
-      # Console replay
-      replay_match = content.match(/config\.replay_console\s*=\s*([^\s\n,]+)/)
-      replay_value = replay_match ? replay_match[1] : "true (default)"
-      checker.add_info("  replay_console: #{replay_value}")
-
-      # Build commands
-      build_test_match = content.match(/config\.build_test_command\s*=\s*["']([^"']+)["']/)
-      checker.add_info("  build_test_command: #{build_test_match[1]}") if build_test_match
-
-      build_prod_match = content.match(/config\.build_production_command\s*=\s*["']([^"']+)["']/)
-      return unless build_prod_match
-
-      checker.add_info("  build_production_command: #{build_prod_match[1]}")
     end
-    # rubocop:enable Metrics/AbcSize
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-    def analyze_i18n_config(content)
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def analyze_i18n_config(content, runtime_config = nil)
       i18n_configs = []
 
-      i18n_dir_match = content.match(/config\.i18n_dir\s*=\s*["']([^"']+)["']/)
-      i18n_configs << "i18n_dir: #{i18n_dir_match[1]}" if i18n_dir_match
+      if runtime_config
+        i18n_configs << "i18n_dir: #{runtime_config.i18n_dir}" if runtime_config.i18n_dir.present?
+        i18n_configs << "i18n_yml_dir: #{runtime_config.i18n_yml_dir}" if runtime_config.i18n_yml_dir.present?
+        if runtime_config.i18n_output_format.present?
+          i18n_configs << "i18n_output_format: #{runtime_config.i18n_output_format}"
+        end
+      else
+        i18n_dir_match = content.match(/config\.i18n_dir\s*=\s*["']([^"']+)["']/)
+        i18n_configs << "i18n_dir: #{i18n_dir_match[1]}" if i18n_dir_match
 
-      i18n_yml_dir_match = content.match(/config\.i18n_yml_dir\s*=\s*["']([^"']+)["']/)
-      i18n_configs << "i18n_yml_dir: #{i18n_yml_dir_match[1]}" if i18n_yml_dir_match
+        i18n_yml_dir_match = content.match(/config\.i18n_yml_dir\s*=\s*["']([^"']+)["']/)
+        i18n_configs << "i18n_yml_dir: #{i18n_yml_dir_match[1]}" if i18n_yml_dir_match
 
-      i18n_format_match = content.match(/config\.i18n_output_format\s*=\s*["']([^"']+)["']/)
-      i18n_configs << "i18n_output_format: #{i18n_format_match[1]}" if i18n_format_match
+        i18n_format_match = content.match(/config\.i18n_output_format\s*=\s*["']([^"']+)["']/)
+        i18n_configs << "i18n_output_format: #{i18n_format_match[1]}" if i18n_format_match
+      end
 
       return unless i18n_configs.any?
 
       checker.add_info("\n🌍 Internationalization:")
       i18n_configs.each { |config| checker.add_info("  #{config}") }
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-    def analyze_component_loading_config(content)
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def analyze_component_loading_config(content, runtime_config = nil)
       component_configs = []
+      filesystem_registry_enabled = false
 
-      components_subdir_match = content.match(/config\.components_subdirectory\s*=\s*["']([^"']+)["']/)
-      if components_subdir_match
-        component_configs << "components_subdirectory: #{components_subdir_match[1]}"
-        checker.add_info("    ℹ️  File-system based component registry enabled")
+      if runtime_config
+        if runtime_config.components_subdirectory.present?
+          component_configs << "components_subdirectory: #{runtime_config.components_subdirectory}"
+          filesystem_registry_enabled = true
+        end
+        # Default is false; only report explicit non-default override.
+        if runtime_config.same_bundle_for_client_and_server
+          component_configs << "same_bundle_for_client_and_server: #{runtime_config.same_bundle_for_client_and_server}"
+        end
+        # Default is true; only report explicit non-default override.
+        component_configs << "random_dom_id: #{runtime_config.random_dom_id}" if runtime_config.random_dom_id == false
+      else
+        components_subdir_match = content.match(/config\.components_subdirectory\s*=\s*["']([^"']+)["']/)
+        if components_subdir_match
+          component_configs << "components_subdirectory: #{components_subdir_match[1]}"
+          filesystem_registry_enabled = true
+        end
+
+        same_bundle_match = content.match(/config\.same_bundle_for_client_and_server\s*=\s*([^\s\n,]+)/)
+        component_configs << "same_bundle_for_client_and_server: #{same_bundle_match[1]}" if same_bundle_match
+
+        random_dom_match = content.match(/config\.random_dom_id\s*=\s*([^\s\n,]+)/)
+        component_configs << "random_dom_id: #{random_dom_match[1]}" if random_dom_match
       end
-
-      same_bundle_match = content.match(/config\.same_bundle_for_client_and_server\s*=\s*([^\s\n,]+)/)
-      component_configs << "same_bundle_for_client_and_server: #{same_bundle_match[1]}" if same_bundle_match
-
-      random_dom_match = content.match(/config\.random_dom_id\s*=\s*([^\s\n,]+)/)
-      component_configs << "random_dom_id: #{random_dom_match[1]}" if random_dom_match
 
       return unless component_configs.any?
 
       checker.add_info("\n📦 Component Loading:")
       component_configs.each { |config| checker.add_info("  #{config}") }
+      checker.add_info("    ℹ️  File-system based component registry enabled") if filesystem_registry_enabled
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-    def analyze_custom_extensions(content)
-      # Check for rendering extension
-      if /config\.rendering_extension\s*=\s*([^\s\n,]+)/.match?(content)
-        checker.add_info("\n🔌 Custom Extensions:")
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def analyze_custom_extensions(content, runtime_config = nil)
+      extension_messages = []
+      has_rendering_extension = false
+
+      if runtime_config
+        has_rendering_extension = runtime_config.rendering_extension.present?
+        if runtime_config.rendering_props_extension.present?
+          extension_messages << "  rendering_props_extension: Custom props logic detected"
+        end
+        if runtime_config.server_render_method.present?
+          extension_messages << "  server_render_method: #{runtime_config.server_render_method}"
+        end
+      else
+        has_rendering_extension = /config\.rendering_extension\s*=\s*([^\s\n,]+)/.match?(content)
+        if /config\.rendering_props_extension\s*=\s*([^\s\n,]+)/.match?(content)
+          extension_messages << "  rendering_props_extension: Custom props logic detected"
+        end
+
+        server_method_match = content.match(/config\.server_render_method\s*=\s*["']([^"']+)["']/)
+        extension_messages << "  server_render_method: #{server_method_match[1]}" if server_method_match
+      end
+
+      return unless has_rendering_extension || extension_messages.any?
+
+      checker.add_info("\n🔌 Custom Extensions:")
+      if has_rendering_extension
         checker.add_info("  rendering_extension: Custom rendering logic detected")
-        checker.add_info("    ℹ️  See: https://reactonrails.com/docs/guides/rendering-extensions")
+        checker.add_info("    ℹ️  See: https://reactonrails.com/docs/configuration/#rendering_extension")
       end
-
-      # Check for rendering props extension
-      if /config\.rendering_props_extension\s*=\s*([^\s\n,]+)/.match?(content)
-        checker.add_info("  rendering_props_extension: Custom props logic detected")
-      end
-
-      # Check for server render method
-      server_method_match = content.match(/config\.server_render_method\s*=\s*["']([^"']+)["']/)
-      return unless server_method_match
-
-      checker.add_info("  server_render_method: #{server_method_match[1]}")
+      extension_messages.each { |msg| checker.add_info(msg) }
     end
+    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     def check_deprecated_configuration_settings
       return unless File.exist?("config/initializers/react_on_rails.rb")
@@ -995,7 +1603,7 @@ module ReactOnRails
       deprecated_settings.each do |setting|
         checker.add_warning("  #{setting}")
       end
-      checker.add_info("📖 Migration guide: https://reactonrails.com/docs/guides/upgrading-react-on-rails")
+      checker.add_info("📖 Migration guide: https://reactonrails.com/docs/upgrading/upgrading-react-on-rails")
     end
 
     def check_breaking_changes_warnings
@@ -1063,7 +1671,7 @@ module ReactOnRails
 
       checker.add_info("\n🚨 React on Rails v16+ Breaking Changes Detected:")
       issues_found.each { |issue| checker.add_warning("  #{issue}") }
-      checker.add_info("📖 Full migration guide: https://reactonrails.com/docs/guides/upgrading-react-on-rails#upgrading-to-version-16")
+      checker.add_info("📖 Full migration guide: https://reactonrails.com/docs/upgrading/upgrading-react-on-rails#upgrading-to-version-16")
     end
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
@@ -1074,12 +1682,24 @@ module ReactOnRails
       checker.add_info("  • Modern React patterns recommended")
     end
 
+    # Returns true if bin/dev exists, false otherwise.
+    # Used by check_bin_dev_launcher to decide whether to check Procfiles.
     def check_bin_dev_launcher_setup
       bin_dev_path = "bin/dev"
 
       unless File.exist?(bin_dev_path)
-        checker.add_error("  🚫 bin/dev script not found")
-        return
+        checker.add_warning("  ⚠️  Official React on Rails bin/dev launcher not found")
+        custom_launchers = detected_custom_launcher_paths
+        if custom_launchers.any?
+          checker.add_info(
+            "    ℹ️  Custom launcher detected (#{custom_launchers.join(', ')}). " \
+            "This is OK if your project intentionally manages its own dev workflow."
+          )
+          checker.add_info("    💡 To use the official launcher instead, run: rails generate react_on_rails:install")
+        else
+          checker.add_info("    💡 Generate the official launcher with: rails generate react_on_rails:install")
+        end
+        return false
       end
 
       content = File.read(bin_dev_path)
@@ -1092,11 +1712,15 @@ module ReactOnRails
         checker.add_warning("  ⚠️  bin/dev exists but doesn't use ReactOnRails Launcher")
         checker.add_info("    💡 Consider upgrading: rails generate react_on_rails:install")
       end
+
+      true
     end
 
     def check_launcher_procfiles
+      # Keep these launcher filenames aligned with NodeRendererProcfile::DEFAULT_COMMANDS.
+      default_mode = default_dev_server_mode
       procfiles = {
-        "Procfile.dev" => "HMR development (bin/dev default)",
+        "Procfile.dev" => Dev::ServerMode.text(default_mode, :launcher_description),
         "Procfile.dev-static-assets" => "Static development (bin/dev static)",
         "Procfile.dev-prod-assets" => "Production assets (bin/dev prod)"
       }
@@ -1116,6 +1740,69 @@ module ReactOnRails
         checker.add_success("  ✅ All Launcher Procfiles available")
       else
         checker.add_info("  💡 Run: rails generate react_on_rails:install")
+      end
+
+      check_node_renderer_launcher_procfiles(NodeRendererProcfile::DEFAULT_COMMANDS.keys)
+    end
+
+    def check_node_renderer_launcher_procfiles(procfiles)
+      return unless resolved_pro_server_renderer == "NodeRenderer"
+
+      procfiles.each do |filename|
+        next unless File.exist?(filename)
+
+        content = File.read(filename)
+        next unless procfile_serves_rails_pages?(content)
+        next if procfile_starts_node_renderer_on_renderer_port?(content)
+
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  #{filename} can serve SSR pages but does not start the Node Renderer on RENDERER_PORT.
+
+          Add a process such as:
+            #{node_renderer_procfile_command(filename)}
+        MSG
+      end
+    end
+
+    def procfile_serves_rails_pages?(content)
+      active_procfile_lines(content).any? { |line| line.match?(RAILS_SERVER_COMMAND_REGEX) }
+    end
+
+    def procfile_starts_node_renderer_on_renderer_port?(content)
+      active_procfile_lines(content).any? do |line|
+        line.match?(NodeRendererProcfile::PROCESS_WITH_RENDERER_PORT_REGEX)
+      end
+    end
+
+    def active_procfile_lines(content)
+      content.each_line.grep_v(/^\s*#/).map { |line| line.sub(/#.*/, "") }
+    end
+
+    def node_renderer_procfile_command(filename)
+      # When the app still has only the legacy client/node-renderer.js (Pro
+      # setup intentionally skips Procfile rewrites in that case), suggesting
+      # renderer/node-renderer.js would point at a non-existent file. Mirror
+      # the legacy path back so the doctor's hint stays runnable.
+      if legacy_node_renderer_only?
+        NodeRendererProcfile.command_for(
+          filename,
+          renderer_script: NodeRendererProcfile::LEGACY_RENDERER_SCRIPT_PATH
+        )
+      else
+        NodeRendererProcfile.command_for(filename)
+      end
+    end
+
+    def legacy_node_renderer_only?
+      File.exist?(NodeRendererProcfile::LEGACY_RENDERER_SCRIPT_PATH) &&
+        !File.exist?(NodeRendererProcfile::NEW_RENDERER_SCRIPT_PATH)
+    end
+
+    def detected_custom_launcher_paths
+      CUSTOM_LAUNCHER_INDICATOR_FILES.filter_map do |path|
+        next unless File.file?(path)
+
+        path == "dev" ? "./dev" : path
       end
     end
 
@@ -1186,14 +1873,22 @@ module ReactOnRails
         source_entry_path = source_entry_path.sub("#{source_path}/", "")
       end
 
-      File.join(source_path, source_entry_path, bundle_filename)
+      bundle_path = File.join(source_path, source_entry_path, bundle_filename)
+      resolve_server_bundle_source_path(bundle_path)
     rescue LoadError, StandardError
       # Handle missing Shakapacker gem or other configuration errors
       bundle_filename = server_bundle_filename
-      "app/javascript/packs/#{bundle_filename}"
+      resolve_server_bundle_source_path("app/javascript/packs/#{bundle_filename}")
     end
 
     def server_bundle_filename
+      runtime_config = react_on_rails_runtime_configuration
+      if runtime_config
+        configured_value = runtime_config.server_bundle_js_file
+        # A blank runtime value intentionally disables SSR bundle checks; only nil falls back.
+        return configured_value unless configured_value.nil?
+      end
+
       # Try to read from React on Rails initializer
       initializer_path = "config/initializers/react_on_rails.rb"
       if File.exist?(initializer_path)
@@ -1206,36 +1901,72 @@ module ReactOnRails
       "server-bundle.js"
     end
 
+    def resolve_server_bundle_source_path(bundle_path)
+      return bundle_path if File.exist?(bundle_path)
+
+      base_path = bundle_path.sub(%r{\.[^./]+\z}, "")
+
+      candidate_extensions = server_bundle_source_extensions_for(bundle_path)
+      candidate_extensions.each do |extension|
+        candidate_path = "#{base_path}#{extension}"
+        return candidate_path if File.exist?(candidate_path)
+      end
+
+      bundle_path
+    end
+
+    def server_bundle_source_extensions_for(bundle_path)
+      extension = File.extname(bundle_path)
+      return SERVER_BUNDLE_SOURCE_EXTENSIONS if extension.empty?
+
+      SERVER_BUNDLE_SOURCE_EXTENSIONS.reject { |candidate_extension| candidate_extension == extension }
+    end
+
     def exit_with_status
       if checker.errors?
         puts Rainbow("❌ Doctor found critical issues. Please address errors above.").red.bold
-        exit(1)
       elsif checker.warnings?
         puts Rainbow("⚠️  Doctor found some issues. Consider addressing warnings above.").yellow
-        exit(0)
       else
         puts Rainbow("🎉 All checks passed! Your React on Rails setup is healthy.").green.bold
-        exit(0)
       end
+
+      exit(diagnosis_exit_code)
+    end
+
+    def diagnosis_exit_code
+      checker.errors? ? 1 : 0
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def check_server_bundle_prerender_consistency
       config_path = "config/initializers/react_on_rails.rb"
-      return unless File.exist?(config_path)
+      runtime_config = react_on_rails_runtime_configuration
+      return unless runtime_config || File.exist?(config_path)
 
       checker.add_info("\n🔍 Server Rendering Consistency:")
 
       begin
-        content = File.read(config_path)
+        if runtime_config
+          server_bundle_value = runtime_config.server_bundle_js_file
+          server_bundle_set =
+            if server_bundle_value.nil?
+              server_bundle_filename.to_s.strip.present?
+            else
+              server_bundle_value.present?
+            end
+          prerender_set = runtime_config.prerender
+        else
+          content = File.read(config_path)
 
-        # Check for server bundle configuration
-        server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
-        server_bundle_set = server_bundle_match && server_bundle_match[1].present?
+          # Check for server bundle configuration
+          server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
+          server_bundle_set = server_bundle_match && server_bundle_match[1].present?
 
-        # Check for global prerender setting
-        prerender_match = content.match(/config\.prerender\s*=\s*(true)/)
-        prerender_set = prerender_match
+          # Check for global prerender setting
+          prerender_match = content.match(/config\.prerender\s*=\s*(true)/)
+          prerender_set = prerender_match
+        end
 
         # Check if prerender is used in views
         uses_prerender = uses_prerender_in_views?
@@ -1244,7 +1975,7 @@ module ReactOnRails
         if (prerender_set || uses_prerender) && !server_bundle_set
           checker.add_warning("  ⚠️  Server rendering is enabled but server_bundle_js_file is not configured")
           checker.add_info("  💡 Set config.server_bundle_js_file = 'server-bundle.js' to enable SSR")
-          checker.add_info("  💡 See: https://reactonrails.com/docs/guides/server-rendering")
+          checker.add_info("  💡 See: https://reactonrails.com/docs/core-concepts/react-server-rendering/")
         elsif server_bundle_set && !prerender_set && !uses_prerender
           checker.add_info("  ℹ️  server_bundle_js_file is configured but prerender doesn't appear to be used")
           checker.add_info("  💡 Either use prerender: true in react_component calls or remove server_bundle_js_file")
@@ -1419,8 +2150,13 @@ module ReactOnRails
       false
     end
 
-    def shakapacker_config_path
-      ENV["SHAKAPACKER_CONFIG"] || DEFAULT_SHAKAPACKER_CONFIG_PATH
+    # Resolves SHAKAPACKER_CONFIG the same way ReactOnRails::Engine and Dev::ServerManager do, so
+    # doctor inspects the same config file as Rails boot even when invoked from a directory other
+    # than the Rails root. Without this, a relative SHAKAPACKER_CONFIG would fail to resolve and
+    # dev-server mode detection would silently fall back to HMR labels. Falls back to Dir.pwd when
+    # Rails isn't booted (e.g. in unit specs).
+    def default_dev_server_mode
+      @default_dev_server_mode ||= Dev::ServerMode.detect(shakapacker_config_path)
     end
 
     def check_test_public_output_path_workflow(shakapacker_content, shakapacker_config = nil)
@@ -1441,7 +2177,9 @@ module ReactOnRails
         @test_output_path_strategy = :shared
         checker.add_warning("  ⚠️  test and development share public_output_path '#{test_output_path}'")
         checker.add_info("  💡 Shared output is an advanced workflow meant for bin/dev static")
-        checker.add_info("  💡 Do not use shared output with bin/dev (HMR): manifests can collide")
+        checker.add_info(
+          "  💡 #{Dev::ServerMode.text(default_dev_server_mode, :shared_output_warning)} because manifests can collide"
+        )
         add_shared_output_path_procfile_guidance
       else
         @test_output_path_strategy = :separate
@@ -1451,23 +2189,27 @@ module ReactOnRails
     end
 
     def add_shared_output_path_procfile_guidance
-      return unless hmr_procfile_configured?
+      return unless procfile_dev_uses_dev_server?
+
+      procfile_dev_label = Dev::ServerMode.text(default_dev_server_mode, :procfile_dev_label)
 
       if static_procfile_available?
         checker.add_warning(
-          "  ⚠️  HMR Procfile.dev is present. Shared output path is high-risk unless you run bin/dev static."
+          "  ⚠️  #{procfile_dev_label} is present. Shared output path is high-risk " \
+          "unless you run bin/dev static."
         )
         checker.add_info("  💡 Use: ./bin/dev static")
         checker.add_info("  💡 For test watch in this setup: ./bin/dev test-watch --test-watch-mode=client-only")
       else
         checker.add_error(
-          "  🚫 Shared output path + HMR Procfile.dev detected, but Procfile.dev-static-assets is missing"
+          "  🚫 Shared output path + #{procfile_dev_label} detected, " \
+          "but Procfile.dev-static-assets is missing"
         )
         checker.add_info("  💡 Fix: separate test/development public_output_path values, or add static Procfile support")
       end
     end
 
-    def hmr_procfile_configured?
+    def procfile_dev_uses_dev_server?
       return false unless File.exist?("Procfile.dev")
 
       File.read("Procfile.dev").include?("shakapacker-dev-server")
@@ -1550,17 +2292,7 @@ module ReactOnRails
     end
 
     def hmr_enabled_in_shakapacker?
-      shakapacker_yml = shakapacker_config_path
-      return false unless File.exist?(shakapacker_yml)
-
-      shakapacker_config = parse_shakapacker_config(File.read(shakapacker_yml))
-      return false unless shakapacker_config.is_a?(Hash)
-
-      dev_config = (shakapacker_config["default"] || {}).merge(shakapacker_config["development"] || {})
-      dev_server = dev_config["dev_server"]
-      return false unless dev_server.is_a?(Hash)
-
-      dev_server["hmr"].to_s == "true"
+      Dev::ServerMode.hmr_enabled?(shakapacker_config_path)
     end
 
     # Returns true if Capybara is configured but NOT in external server mode.
@@ -1661,7 +2393,8 @@ module ReactOnRails
       return unless @test_output_path_strategy == :shared
 
       checker.add_info(
-        "  💡 With shared output paths, only use bin/dev static (not HMR) when running Capybara tests"
+        "  💡 With shared output paths, only use bin/dev static " \
+        "(not #{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}) when running Capybara tests"
       )
     end
 
@@ -1674,7 +2407,8 @@ module ReactOnRails
         "  💡 Tests require bin/dev (or another server) to be running at the configured app_host"
       )
       checker.add_info(
-        "  💡 Both bin/dev (HMR) and bin/dev static work in this mode"
+        "  💡 Both bin/dev (#{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}) " \
+        "and bin/dev static work in this mode"
       )
     end
 
@@ -1682,7 +2416,8 @@ module ReactOnRails
       return unless capybara_configured?
 
       checker.add_info(
-        "  💡 Capybara starts its own server — HMR assets won't work. Use bin/dev static or precompile."
+        "  💡 Capybara starts its own server — dev-server assets won't work. " \
+        "Use bin/dev static or precompile."
       )
     end
 
@@ -2029,7 +2764,7 @@ module ReactOnRails
       checker.add_info("  💡 :async can cause race conditions. Options:")
       checker.add_info("    1. Upgrade to React on Rails Pro (recommended for :async support)")
       checker.add_info("    2. Change to :defer or :sync loading strategy")
-      checker.add_info("  📖 https://reactonrails.com/docs/guides/configuration/")
+      checker.add_info("  📖 https://reactonrails.com/docs/configuration/")
     end
 
     def scan_view_files_for_async_pack_tag
@@ -2214,9 +2949,62 @@ module ReactOnRails
       checker.add_warning(<<~MSG.strip)
         ⚠️  Could not load Rails environment: #{e.message}
 
-        Pro/RSC diagnostics may reflect default values instead of your app's configuration.
+        Configuration diagnostics may reflect default values instead of your app's runtime configuration.
       MSG
       false
+    end
+
+    def react_on_rails_runtime_configuration
+      return @react_on_rails_runtime_configuration if defined?(@react_on_rails_runtime_configuration)
+
+      @react_on_rails_runtime_configuration =
+        ensure_rails_environment_loaded ? ReactOnRails.configuration : nil
+    rescue StandardError, LoadError => e
+      checker.add_warning("⚠️  Could not query React on Rails runtime configuration: #{e.message}")
+      # Memoize as nil to avoid repeated failed lookups on subsequent checks.
+      @react_on_rails_runtime_configuration = nil
+    end
+
+    def resolved_pro_server_renderer
+      return @resolved_pro_server_renderer if defined?(@resolved_pro_server_renderer)
+      return (@resolved_pro_server_renderer = nil) unless ReactOnRails::Utils.react_on_rails_pro?
+
+      rails_environment_loaded = ensure_rails_environment_loaded
+      @resolved_pro_server_renderer =
+        if rails_environment_loaded && defined?(ReactOnRailsPro)
+          # server_renderer is stored as a plain string in Pro config (for example, "NodeRenderer").
+          ReactOnRailsPro.configuration.server_renderer.to_s
+        elsif pro_initializer_has_node_renderer?
+          "NodeRenderer"
+        elsif rails_environment_loaded
+          checker.add_warning(
+            "⚠️  Could not determine Pro server renderer: ReactOnRailsPro is unavailable " \
+            "and no initializer match found."
+          )
+          nil
+        else
+          checker.add_info(
+            "ℹ️  Could not determine Pro server renderer: Rails environment unavailable and no initializer match found."
+          )
+          nil
+        end
+    rescue StandardError, LoadError => e
+      checker.add_warning("⚠️  Could not read Pro runtime renderer configuration: #{e.message}")
+      @resolved_pro_server_renderer = nil
+    end
+
+    def pro_execjs_fallback_enabled?
+      return ReactOnRailsPro.configuration.renderer_use_fallback_exec_js if defined?(ReactOnRailsPro)
+
+      config_path = "config/initializers/react_on_rails_pro.rb"
+      return true unless File.exist?(config_path)
+
+      content = File.read(config_path)
+      fallback_match = content.match(/config\.renderer_use_fallback_exec_js\s*=\s*(true|false)/)
+      fallback_match ? fallback_match[1] == "true" : true
+    rescue StandardError, LoadError => e
+      checker.add_warning("⚠️  Could not read Pro fallback ExecJS configuration: #{e.message}")
+      true
     end
 
     # Resolve the JavaScript source path from Shakapacker config.
@@ -2249,7 +3037,9 @@ module ReactOnRails
       check_pro_initializer_existence
       ensure_rails_environment_loaded
       check_pro_renderer_mode
-      check_base_package_imports
+      check_base_package_references
+      check_deprecated_renderer_cache_task
+      check_rolling_deploy_adapter
     end
 
     def check_pro_initializer_existence
@@ -2279,45 +3069,398 @@ module ReactOnRails
       checker.add_warning("⚠️  Could not detect Pro renderer mode: #{e.message}")
     end
 
-    # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',
-    # so `import ... from 'react-on-rails'` resolves silently — loading the base package instead
-    # of Pro. Components registered through the base package won't have Pro features (streaming,
-    # caching, RSC), and may cause "component not registered" errors at runtime.
-    BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
-    BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+    def check_deprecated_renderer_cache_task
+      # Resolve against Rails.root (not Dir.pwd) so the scan still fires when
+      # doctor is invoked from a subdirectory — otherwise the checks silently
+      # find nothing and the deprecation warning never surfaces.
+      #
+      # Read in binary mode (the task name is pure ASCII) so a non-UTF-8 byte
+      # in a deploy script does not raise Encoding::InvalidByteSequenceError
+      # and mask the file via the rescue below.
+      #
+      # Skip leading-comment lines (`#` is the comment prefix for all scanned
+      # file types: Procfile, Dockerfile, shell scripts, YAML, and Ruby) so
+      # files that mention the old task only inside a comment do not trip the
+      # migration nudge.
+      # Per-file rescue so a transient failure on one path (e.g. Errno::EACCES)
+      # does not abort the whole scan and silently skip the rest. The outer
+      # rescue catches anything that escapes the per-file guard. Globs are
+      # expanded under their own rescue so a failure expanding one pattern
+      # cannot stop other patterns or fixed paths from being scanned.
+      candidate_paths = (
+        RENDERER_CACHE_DEPLOY_SCRIPT_PATHS + expand_renderer_cache_deploy_script_globs
+      ).uniq
 
-    def check_base_package_imports # rubocop:disable Metrics/CyclomaticComplexity
-      source_path = resolve_js_source_path
-      js_extensions = %w[js jsx ts tsx]
-      js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
-      files_with_base_import = []
-
-      js_patterns.each do |pattern|
-        Dir.glob(pattern).each do |file|
-          content = File.read(file)
-          next unless content.match?(BASE_PACKAGE_IMPORT_PATTERN) || content.match?(BASE_PACKAGE_REQUIRE_PATTERN)
-
-          files_with_base_import << file
-        end
+      matches = candidate_paths.select do |path|
+        deploy_script_path_references_deprecated_task?(path)
       end
 
-      if files_with_base_import.empty?
-        checker.add_success("✅ No base 'react-on-rails' imports found (Pro package used correctly)")
+      return if matches.empty?
+
+      checker.add_warning(<<~MSG.strip)
+        ⚠️  Deprecated rake task '#{DEPRECATED_RENDERER_CACHE_TASK}' referenced in:
+        #{matches.map { |p| format_renderer_cache_migration_bullet(p) }.join("\n")}
+
+        The unified 'pre_seed_renderer_cache' task uses MODE=copy by default (for
+        Docker/image builds) and MODE=symlink for same-filesystem workflows.
+      MSG
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not complete scan for deprecated renderer-cache task references: #{e.message}")
+    end
+
+    def deploy_script_references_deprecated_task?(full_path, path)
+      comment_prefixes = renderer_cache_deploy_script_comment_prefixes(path)
+
+      # The trailing-comment strip requires whitespace before the comment marker,
+      # so fragments like `task#name` stay intact while `cmd # was: <deprecated>`
+      # and Jenkinsfile `cmd // was: <deprecated>` comments are filtered.
+      full_path.binread.each_line.any? do |line|
+        stripped = line.lstrip
+        next false if comment_prefixes.any? { |prefix| stripped.start_with?(prefix) }
+
+        without_inline_comment = comment_prefixes.reduce(stripped) do |content, prefix|
+          content.sub(/ +#{Regexp.escape(prefix)}.*/, "")
+        end
+        without_inline_comment.include?(DEPRECATED_RENDERER_CACHE_TASK)
+      end
+    end
+
+    def renderer_cache_deploy_script_comment_prefixes(path)
+      return ["#", "//"] if path == "Jenkinsfile"
+
+      ["#"]
+    end
+
+    def deploy_script_path_references_deprecated_task?(path)
+      full_path = Rails.root.join(path)
+
+      return false unless full_path.file?
+      # Skip files larger than RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES;
+      # deploy scripts and CI manifests should be tiny.
+      return false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
+
+      deploy_script_references_deprecated_task?(full_path, path)
+    rescue StandardError => e
+      checker.add_warning(
+        "⚠️  Could not scan #{path} for deprecated renderer-cache task references: #{e.message}"
+      )
+      false
+    end
+
+    def expand_renderer_cache_deploy_script_globs
+      # File::FNM_PATHNAME stops `*` from crossing slashes even though none of
+      # the patterns use `**`. base: scopes the expansion to the project root
+      # and yields paths relative to it. Each pattern is rescued individually
+      # so a permission error on one glob (e.g. an unreadable .github/) does
+      # not silence the rest.
+      root = Rails.root.to_s
+      RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS.flat_map do |pattern|
+        Dir.glob(pattern, File::FNM_PATHNAME, base: root)
+           .sort
+           .first(RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES)
+      rescue StandardError => e
+        checker.add_warning(
+          "⚠️  Could not expand renderer-cache deploy-script glob #{pattern}: #{e.message}"
+        )
+        []
+      end
+    end
+
+    def format_renderer_cache_migration_bullet(path)
+      suggestion = renderer_cache_migration_suggestion(path)
+      lines = suggestion.split("\n")
+      return "  • #{path} → #{suggestion}" if lines.length == 1
+
+      indented = lines.map { |line| "      #{line}" }.join("\n")
+      "  • #{path} →\n#{indented}"
+    end
+
+    def renderer_cache_migration_suggestion(path)
+      # Dockerfile* entries are RUN steps during image build, so copy mode bakes the cache into the layer.
+      # Runtime hooks (Procfile, bin/*, .kamal/deploy.yml, Capistrano config) run after the app is deployed,
+      # where both the app and renderer share the same filesystem, so symlink mode is correct.
+      if path.start_with?("Dockerfile")
+        # /app/.node-renderer-bundles is a placeholder matching the docs' Dockerfile examples;
+        # the user must adjust it to match their image's WORKDIR. Hardcoding Rails.root here would
+        # leak the developer host path (e.g. /Users/alice/myapp/...) into the Dockerfile, which
+        # does not exist inside the container.
+        "ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles\n" \
+          "RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache"
+      elsif path.start_with?(".kamal/")
+        # Kamal hooks run in two contexts: post-deploy hooks on the live server (symlink),
+        # and image-build hooks invoked during the Docker build (copy). The trailing comments
+        # disambiguate so users pick the mode that matches the hook they're editing.
+        "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink\n" \
+          "# For Kamal deploy hooks (post-deploy, on the live server): MODE=symlink\n" \
+          "# For Kamal image-build hooks (hook/pre-build inside the Docker build): MODE=copy"
+      else
+        # docker-compose.yml / compose.yaml / bin/* / config/deploy.rb / scripts/deploy.sh
+        # default to symlink (correct for local dev + same-filesystem deploys); call out the
+        # copy alternative for users driving production container builds via Compose.
+        "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink # use MODE=copy for Docker/container image builds"
+      end
+    end
+
+    # ── Rolling Deploy Adapter ────────────────────────────────────────
+
+    ROLLING_DEPLOY_REQUIRED_METHODS = %i[previous_bundle_hashes fetch upload].freeze
+
+    def check_rolling_deploy_adapter
+      adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
+
+      if adapter.nil?
+        env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
+        if env_override && !env_override.empty?
+          checker.add_warning(
+            "⚠️  PREVIOUS_BUNDLE_HASHES=#{truncate_for_warning(env_override).inspect} is set but no " \
+            "rolling_deploy_adapter is configured. Rolling-deploy seeding needs both — the env var " \
+            "overrides *discovery* but the adapter is still required to fetch bundle files. " \
+            "Set config.rolling_deploy_adapter or unset PREVIOUS_BUNDLE_HASHES."
+          )
+        else
+          checker.add_info("ℹ️  No rolling_deploy_adapter configured (rolling-deploy seeding disabled).")
+        end
+        return
+      end
+
+      return unless report_adapter_protocol(adapter)
+
+      env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
+      if env_override && !env_override.empty?
+        # PREVIOUS_BUNDLE_HASHES is a full discovery override at runtime, so
+        # probing adapter#previous_bundle_hashes here would surface timeout/error
+        # noise for a code path the deploy will never invoke. Skip the probe and
+        # state the override explicitly so operators see what's happening.
+        checker.add_info(
+          "ℹ️  PREVIOUS_BUNDLE_HASHES=#{truncate_for_warning(env_override).inspect} is set; " \
+          "skipping rolling_deploy_adapter#previous_bundle_hashes probe (env var overrides discovery)."
+        )
+        report_resolved_cache_dir
+        return
+      end
+
+      report_previous_bundle_hashes_probe(adapter)
+      report_resolved_cache_dir
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not evaluate rolling_deploy_adapter: #{e.message}")
+    end
+
+    # Cap echoed env-var values so a malformed (or accidentally large)
+    # PREVIOUS_BUNDLE_HASHES value doesn't dump kilobytes into operator output.
+    PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT = 80
+    private_constant :PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT
+
+    def truncate_for_warning(value)
+      return value if value.length <= PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT
+
+      "#{value[0, PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT]}… (#{value.length} chars total)"
+    end
+
+    def report_adapter_protocol(adapter)
+      missing = ROLLING_DEPLOY_REQUIRED_METHODS.reject { |m| adapter.respond_to?(m) }
+      if missing.empty?
+        checker.add_success(
+          "✅ rolling_deploy_adapter responds to all required methods " \
+          "(#{ROLLING_DEPLOY_REQUIRED_METHODS.join(', ')})"
+        )
+        true
+      else
+        checker.add_warning(
+          "⚠️  rolling_deploy_adapter is missing required methods: #{missing.join(', ')}. " \
+          "See docs/pro/rolling-deploy-adapters.md."
+        )
+        false
+      end
+    end
+
+    def report_previous_bundle_hashes_probe(adapter)
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      timeout_seconds = rolling_deploy_discovery_timeout_seconds
+      hashes = Timeout.timeout(timeout_seconds) { Array(adapter.previous_bundle_hashes) }
+      latency_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - start) * 1000).round
+
+      if hashes.empty?
+        checker.add_warning(
+          "⚠️  rolling_deploy_adapter#previous_bundle_hashes returned []. " \
+          "Usually indicates the upload side has never run on a prior deploy."
+        )
+      else
+        checker.add_success(
+          "✅ rolling_deploy_adapter#previous_bundle_hashes returned #{hashes.length} hash(es) in #{latency_ms}ms"
+        )
+      end
+    rescue Timeout::Error
+      checker.add_warning(
+        "⚠️  rolling_deploy_adapter#previous_bundle_hashes timed out after " \
+        "#{timeout_seconds}s"
+      )
+    rescue StandardError => e
+      checker.add_warning("⚠️  rolling_deploy_adapter#previous_bundle_hashes raised #{e.class}: #{e.message}")
+    end
+
+    def rolling_deploy_discovery_timeout_seconds
+      if defined?(ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS)
+        ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
+      else
+        # Must match the canonical Pro constant. Bidirectional pointers:
+        #   Pro file:     react_on_rails_pro/lib/react_on_rails_pro/rolling_deploy_cache_stager.rb
+        #   Pro constant: ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
+        #   Pro guard:    react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+        #                 (describe "DISCOVERY_TIMEOUT_SECONDS" → expects this fallback to equal Pro constant)
+        # The Pro spec catches drift in the Pro→OSS direction. If you change
+        # the value here without updating the Pro constant + spec, doctor will
+        # silently use a different timeout from the live stager.
+        10
+      end
+    end
+
+    # Fallback used when the Pro gem isn't loaded. Must match
+    # ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN so
+    # doctor still filters staging/backup dirs out of the bundle-hash count.
+    # Drift is caught by:
+    #   react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+    #   describe "TEMPORARY_DIRECTORY_PATTERN"
+    # PID is `\d+` to match container deployments (Docker/Kubernetes) where
+    # seeding runs as PID 1.
+    ROLLING_DEPLOY_TEMP_DIR_PATTERN = /\.(?:staging|previous)-\d+-[0-9a-f]{8,}\z/
+
+    def report_resolved_cache_dir
+      cache_dir = ReactOnRailsPro::Utils.resolve_renderer_cache_dir
+      if File.directory?(cache_dir)
+        temp_dir_pattern = rolling_deploy_temp_dir_pattern
+        subdirs = Dir.children(cache_dir).select do |entry|
+          File.directory?(File.join(cache_dir, entry)) && !entry.match?(temp_dir_pattern)
+        end
+        checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (#{subdirs.length} bundle-hash subdir(s))")
+      else
+        checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (does not exist yet)")
+      end
+    end
+
+    def rolling_deploy_temp_dir_pattern
+      if defined?(ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN)
+        ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN
+      else
+        ROLLING_DEPLOY_TEMP_DIR_PATTERN
+      end
+    end
+
+    # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',
+    # so references to 'react-on-rails' resolve silently, loading the base package instead of Pro.
+    # Components registered through the base package won't have Pro features (streaming, caching,
+    # RSC), and may cause "component not registered" errors at runtime.
+    BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+    BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN = %r{\bimport\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+    BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN = %r{^\s*import\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REFERENCE_SOURCE_ROOTS = ReactOnRails::ProMigration::JS_SOURCE_ROOTS
+    BASE_PACKAGE_REFERENCE_EXTENSIONS = ReactOnRails::ProMigration::JS_SOURCE_EXTENSIONS
+    # Explicit allowlist of documented Jest/Vitest APIs whose first argument is a module specifier.
+    BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_PATTERN =
+      ReactOnRails::ProMigration::JEST_MODULE_SPECIFIER_METHOD_PATTERN
+    BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_PATTERN =
+      ReactOnRails::ProMigration::VITEST_MODULE_SPECIFIER_METHOD_PATTERN
+    # Match known Jest/Vitest module-specifier helpers. Aliased or nested receivers
+    # are intentionally out of scope to avoid warning on arbitrary application methods.
+    #
+    # importActual/importMock exist only as vi.* methods; there is no
+    # `import { importActual } from 'vitest'` form. The bare branch below is a
+    # deliberately broad detector heuristic (the rewriter omits it because
+    # rewriting is destructive while detection is advisory) and accepts that a
+    # user-defined helper of that name taking a 'react-on-rails' string matches.
+    BASE_PACKAGE_MOCK_PATTERN = %r{
+      \b(?:
+        (?:
+          jest\.(?:#{BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_PATTERN})
+          |
+          vi\.(?:#{BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_PATTERN})
+        )
+        \s*
+        (?:<[^;\n]*>\s*)?
+        |
+        (?:importActual|importMock)
+      )
+      \s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]
+    }x
+    # In Ruby, ^ matches the start of any line, so this catches declarations anywhere in the file.
+    BASE_PACKAGE_DECLARE_MODULE_PATTERN = %r{^\s*(?:export\s+)?declare\s+module\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REFERENCE_PATTERNS = [
+      BASE_PACKAGE_IMPORT_PATTERN,
+      BASE_PACKAGE_REQUIRE_PATTERN,
+      BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN,
+      BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN,
+      BASE_PACKAGE_MOCK_PATTERN,
+      BASE_PACKAGE_DECLARE_MODULE_PATTERN
+    ].freeze
+
+    def check_base_package_references
+      files_with_base_reference = files_with_base_package_references(resolve_js_source_path)
+
+      if files_with_base_reference.empty?
+        checker.add_success("✅ No base 'react-on-rails' references found (Pro package used correctly)")
       else
         checker.add_warning(<<~MSG.strip)
-          ⚠️  Found imports from 'react-on-rails' instead of 'react-on-rails-pro':
-          #{files_with_base_import.map { |f| "  • #{f}" }.join("\n")}
+          ⚠️  Found references to 'react-on-rails' instead of 'react-on-rails-pro':
+          #{files_with_base_reference.map { |f| "  • #{f}" }.join("\n")}
 
-          The base package is a transitive dependency of Pro, so these imports resolve
+          Look for static imports, side-effect imports, CommonJS requires, dynamic imports,
+          Jest/Vitest mock helpers, or TypeScript module augmentations.
+          Note: this includes commented-out references; review each file before updating.
+
+          The base package is a transitive dependency of Pro, so these references resolve
           silently but load the base version without Pro features.
 
-          Fix: Update imports to use 'react-on-rails-pro':
-            import ReactOnRails from 'react-on-rails-pro';        // server
-            import ReactOnRails from 'react-on-rails-pro/client';  // client
+          Fix: Replace base-package references with their Pro equivalents:
+            import ReactOnRails from 'react-on-rails-pro';         // ES import (server)
+            import ReactOnRails from 'react-on-rails-pro/client';  // ES import (client)
+            import 'react-on-rails-pro';                           // Side-effect import
+            const ReactOnRails = require('react-on-rails-pro');    // CommonJS require
+            const ReactOnRails = await import('react-on-rails-pro'); // Dynamic import
+            jest.mock('react-on-rails-pro', ...);                  // Jest mock helper
+            vi.mock('react-on-rails-pro', ...);                    // Vitest mock helper
+            declare module 'react-on-rails-pro' { ... }            // TypeScript augmentation
         MSG
       end
     rescue StandardError => e
-      checker.add_warning("⚠️  Could not scan for base package imports: #{e.message}")
+      checker.add_warning("⚠️  Could not scan for base package references: #{e.message}")
+    end
+
+    def files_with_base_package_references(source_path)
+      # Scan every file type the Pro migration rewriter can modify.
+      # **/*.ts naturally matches *.d.ts declaration files because they end in .ts.
+      js_patterns = base_package_reference_source_paths(source_path).flat_map do |source_root|
+        BASE_PACKAGE_REFERENCE_EXTENSIONS.map { |ext| "#{source_root}/**/*.#{ext}" }
+      end
+
+      js_patterns.flat_map do |pattern|
+        Dir.glob(pattern)
+           .reject { |file| file.include?("/node_modules/") }
+           .select { |file| base_package_reference_file?(file) }
+      end.uniq.sort
+    end
+
+    def base_package_reference_source_paths(source_path)
+      ([source_path] + BASE_PACKAGE_REFERENCE_SOURCE_ROOTS)
+        .compact
+        .map(&:to_s)
+        .reject(&:empty?)
+        .uniq
+        .select { |path| Dir.exist?(path) }
+    end
+
+    def base_package_reference_file?(file)
+      content = File.binread(file).force_encoding("UTF-8")
+      return false unless content.valid_encoding?
+
+      base_package_reference?(content)
+    rescue SystemCallError, IOError
+      false
+    end
+
+    def base_package_reference?(content)
+      # Content-based matching intentionally catches comments and string literals
+      # so stale migration references stay visible.
+      BASE_PACKAGE_REFERENCE_PATTERNS.any? { |reference_pattern| content.match?(reference_pattern) }
     end
 
     # ── React Server Components ────────────────────────────────────
@@ -2450,7 +3593,15 @@ module ReactOnRails
       # Prefer the actually installed version from node_modules over the declared
       # range in package.json. Declared ranges like "^19.0.0" would be misleading
       # (stripped to "19.0.0" even though 19.0.4+ may be installed).
-      installed = installed_react_version
+      package_root = resolved_package_root
+      if package_root_missing?(package_root)
+        # This check only needs the directory before Node chdirs into it; an
+        # installed React version can be resolved without package.json.
+        warn_missing_package_root(package_root)
+        return nil
+      end
+
+      installed = installed_react_version(package_root)
       return installed if installed
 
       declared_react_version
@@ -2458,11 +3609,12 @@ module ReactOnRails
       nil
     end
 
-    def installed_react_version
+    def installed_react_version(package_root)
       # Use Node's own module resolution to find the actually installed React,
       # which handles hoisted dependencies in monorepos and pnpm workspaces.
-      stdout, _stderr, status = Open3.capture3("node", "-e",
-                                               "console.log(require.resolve('react/package.json'))")
+      # Resolve from the configured package root so nested client/ layouts work.
+      script = "console.log(require.resolve('react/package.json'))"
+      stdout, _stderr, status = Open3.capture3("node", "-e", script, chdir: package_root)
       return nil unless status.success?
 
       resolved_path = stdout.strip
@@ -2474,10 +3626,24 @@ module ReactOnRails
       nil
     end
 
-    def declared_react_version
-      return nil unless File.exist?("package.json")
+    def add_warning(message)
+      checker.add_warning(message)
+    end
 
-      package_json = JSON.parse(File.read("package.json"))
+    # Delegates the protected registry to checker so warnings emitted from
+    # Doctor share the same de-dupe state as warnings emitted from the checker.
+    # The cross-class call is permitted because both Doctor and SystemChecker
+    # include ConfigPathResolver, which satisfies Ruby's protected-visibility
+    # rule (caller and receiver share an ancestor that defines the method).
+    def config_path_warning_registry
+      checker.config_path_warning_registry
+    end
+
+    def declared_react_version
+      package_json_path = package_json_path_for("declared React version")
+      return nil unless package_json_path
+
+      package_json = JSON.parse(File.read(package_json_path))
       all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
       version_str = all_deps["react"]
       return nil unless version_str
@@ -2511,10 +3677,10 @@ module ReactOnRails
           The RSC bundle needs to be built separately from client/server bundles.
 
           If using Procfile.dev, add:
-            rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+            rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 
           If using a custom process manager, ensure the RSC bundle is built with
-          the RSC_BUNDLE_ONLY=yes environment variable.
+          the RSC_BUNDLE_ONLY=true environment variable.
         MSG
       end
     end

@@ -1,10 +1,62 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "stringio"
 
 describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
-  describe "#ensureAssetsCompiled" do
-    let(:invalid_command) { "sh -c 'exit 1'" }
+  def capture_stdout
+    original_stdout = $stdout
+    stream = StringIO.new
+    $stdout = stream
+    yield
+    stream.string
+  ensure
+    $stdout = original_stdout
+  end
+
+  describe "#compile_assets" do
+    let(:invalid_command) { "false" }
+    let(:valid_command) { "true" }
+
+    context "when assets compiler command is not configured" do
+      before do
+        allow(ReactOnRails.configuration)
+          .to receive(:build_test_command)
+          .and_return("")
+      end
+
+      it "prints bundler-neutral setup guidance" do
+        compiler = described_class.new
+        allow(compiler).to receive(:exit!)
+
+        output = capture_stdout { compiler.compile_assets }
+
+        expect(output).to include("the command that builds test assets for your bundler")
+        expect(output).to include("let your bundler compile test assets automatically")
+        expect(output).not_to include("bin/shakapacker")
+        expect(output).not_to include("config/shakapacker.yml")
+
+        expect(compiler).to have_received(:exit!).with(1)
+      end
+    end
+
+    context "when assets compiler command succeeds" do
+      before do
+        allow(ReactOnRails.configuration)
+          .to receive(:build_test_command)
+          .and_return(valid_command)
+        allow(ReactOnRails::Utils).to receive(:invoke_and_exit_if_failed)
+      end
+
+      it "prints bundler-neutral build messages" do
+        expect do
+          described_class.new.compile_assets
+        end.to output("\nBuilding assets...\nCompleted building assets.\n").to_stdout
+
+        # Assert the compile step actually ran, so the example fails if it is skipped.
+        expect(ReactOnRails::Utils).to have_received(:invoke_and_exit_if_failed)
+      end
+    end
 
     context "when assets compiler command is invalid" do
       before do
@@ -29,7 +81,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         escaped_cmd = Regexp.escape(invalid_command)
         expected_pattern = Regexp.new(
           "React on Rails FATAL ERROR!.*" \
-          "React on Rails: Error building webpack assets!.*" \
+          "React on Rails: Error building test assets!.*" \
           "cmd: cd \"#{escaped_root}\" && #{escaped_cmd}.*" \
           "exitstatus: 1",
           Regexp::MULTILINE
@@ -40,6 +92,22 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         rescue SystemExit
           # No op
         end.to output(expected_pattern).to_stderr
+      end
+
+      it "suggests rerunning the configured build command" do
+        expect do
+          described_class.new.compile_assets
+        rescue SystemExit
+          # No op
+        end.to output(include("Run '#{invalid_command}' manually to compile once")).to_stderr
+      end
+
+      it "does not name a specific bundler in the rerun suggestion" do
+        expect do
+          described_class.new.compile_assets
+        rescue SystemExit
+          # No op
+        end.not_to output(include("bin/shakapacker")).to_stderr
       end
     end
   end

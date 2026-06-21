@@ -1,19 +1,20 @@
 name: Lint JS and Ruby
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
       - 'main'
     # Always trigger on main; docs-only detection handles skipping heavy jobs
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'react_on_rails_pro/**'
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -23,38 +24,47 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_lint: ${{ steps.detect.outputs.run_lint }}
       run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check for full-ci label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR full-ci label is present, run everything
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_lint=true" >> "$GITHUB_OUTPUT"
-            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_generators=true" >> "$GITHUB_OUTPUT"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
+            {
+              echo "run_lint=true"
+              echo "run_js_tests=true"
+              echo "run_ruby_tests=true"
+              echo "run_dummy_tests=true"
+              echo "run_generators=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Guard docs-only main pushes
@@ -64,22 +74,11 @@ jobs:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
 
-  build:
+  docs-format-check:
     needs: detect-changes
-    # Skip only if: main push AND docs-only changes
-    # Otherwise run if: on main OR lint needed
-    # This allows docs-only commits to skip linting while ensuring full CI on main for code changes
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        needs.detect-changes.outputs.run_lint == 'true'
-      )
-    env:
-      BUNDLE_FROZEN: true
+      github.event_name == 'pull_request' &&
+      needs.detect-changes.outputs.docs_only == 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -87,22 +86,51 @@ jobs:
           # No need for history in lint job
           fetch-depth: 1
           persist-credentials: false
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 3
-          bundler: 2.5.9
       - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
+        uses: actions/setup-node@v4
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.11.0'
+          node-version-file: .tool-versions
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Install Node modules with pnpm
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter='{.}'
+      - name: Check formatting
+        run: pnpm start format.listDifferent
+
+  build:
+    needs: detect-changes
+    # Run heavyweight lint only when hosted CI is allowed and the detector says
+    # this PR actually needs lint. Docs-only PRs get the focused check above.
+    if: |
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_lint == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # No need for history in lint job
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
+          # https://github.com/nodejs/node/issues/56010
+          node-version-file: .tool-versions
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
       - name: Setup pnpm cache
         uses: actions/cache@v4
         with:
@@ -119,36 +147,49 @@ jobs:
           echo "Node version: "; node -v
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
-      - name: Save root ruby gems to cache
-        uses: actions/cache@v4
+      - name: Check Gemfile.lock platforms
+        run: ruby script/check-gemfile-lock-platforms
+      - name: Install Ruby Gems for root lint tools
+        uses: ./.github/actions/setup-bundle
         with:
-          path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-lint
+          working-directory: .
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+          install-libyaml: 'false'
+      - name: Install Ruby Gems for package
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+          install-libyaml: 'false'
       - name: Install Node modules with pnpm
         run: pnpm install --frozen-lockfile
 
-      - name: Install Ruby Gems for package
-        run: cd react_on_rails && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+      # RuboCop is owned by the root Gemfile/Gemfile.lock so OSS and Pro use one
+      # locked lint version. Keep package bundles for package-specific tasks.
       - name: Lint Ruby
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
         run: cd react_on_rails && bundle exec rubocop
+      # The benchmarks/ scripts live outside the gem, so the package rubocop run
+      # above doesn't see them. Lint them from the repo root (root .rubocop.yml).
+      - name: Lint benchmark scripts
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
+        run: bundle exec rubocop benchmarks
       - name: Validate RBS type signatures
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/Gemfile
         run: cd react_on_rails && bundle exec rake rbs:validate
       # TODO: Re-enable Steep once RBS signatures are complete for all checked files
       # Currently disabled because 374 type errors need to be fixed first
       # - name: Run Steep type checker
       #   run: bundle exec rake rbs:steep
-      - name: Save dummy app ruby gems to cache
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails/spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-lint
       - name: Install Ruby Gems for dummy app
-        run: |
-          cd react_on_rails/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-          fi
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails/spec/dummy
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+          install-libyaml: 'false'
       - name: generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Detect dead code

@@ -16,7 +16,38 @@ describe DevTestsGenerator, type: :generator do
       %w[spec/spec_helper.rb
          spec/rails_helper.rb
          spec/simplecov_helper.rb
+         eslint.config.mjs
          .rspec].each { |file| assert_file(file) }
+
+      assert_no_file(".eslintrc")
+    end
+
+    it "copies the internal flat ESLint config" do
+      assert_file("eslint.config.mjs") do |contents|
+        expect(contents).to include("import js from '@eslint/js';")
+        expect(contents).to include("import reactHooks from 'eslint-plugin-react-hooks';")
+        expect(contents).to include("importPlugin.flatConfigs.recommended")
+        expect(contents).to include("reactHooksRecommendedLatestConfigs")
+        expect(contents).to include("__DEBUG_SERVER_ERRORS__: true")
+        expect(contents).to include("'import/no-unresolved': 'off'")
+        expect(contents).to include("'react/prop-types': 'off'")
+      end
+    end
+
+    it "adds internal ESLint development dependencies" do
+      assert_file("package.json") do |contents|
+        dev_dependencies = JSON.parse(contents).fetch("devDependencies")
+
+        expect(dev_dependencies).to include(
+          "@eslint/js" => "^9.0.0",
+          "eslint" => "^9.0.0",
+          "eslint-config-prettier" => "^10.0.0",
+          "eslint-plugin-import" => "^2.29.0",
+          "eslint-plugin-react" => "^7.37.5",
+          "eslint-plugin-react-hooks" => "^6.1.1",
+          "globals" => "^16.0.0"
+        )
+      end
     end
 
     it "enables the default RSpec test asset hook in copied helpers" do
@@ -32,7 +63,10 @@ describe DevTestsGenerator, type: :generator do
     end
 
     it "copies tests" do
-      %w[spec/system/hello_world_spec.rb].each { |file| assert_file(file) }
+      assert_file("spec/system/hello_world_spec.rb") do |contents|
+        expect(contents).to include('describe "React SSR Demo", :js do')
+        expect(contents).to include("expect(heading).to have_text(/(React|Redux) SSR Demo/)")
+      end
     end
 
     it "changes package.json to use local react-on-rails version of module" do
@@ -46,7 +80,7 @@ describe DevTestsGenerator, type: :generator do
     it "adds test-related gems to Gemfile" do
       assert_file("Gemfile") do |contents|
         expect(contents).to match("gem \"rspec-rails\", group: :test")
-        expect(contents).to match("gem \"coveralls\", require: false")
+        expect(contents).to match("gem \"simplecov\", require: false, group: :test")
         # chromedriver-helper was removed as it's deprecated since 2019
         # Modern selenium-webdriver (4.x) handles driver management automatically
       end

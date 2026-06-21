@@ -1,7 +1,7 @@
 PATH
   remote: ../../..
   specs:
-    react_on_rails (16.4.0)
+    react_on_rails (17.0.0.rc.5)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -12,16 +12,15 @@ PATH
 PATH
   remote: ../..
   specs:
-    react_on_rails_pro (16.4.0)
+    react_on_rails_pro (17.0.0.rc.5)
       addressable
-      async (>= 2.6)
-      connection_pool
+      async (>= 2.29)
+      async-http (~> 0.95)
       execjs (~> 2.9)
-      http-2 (>= 1.1.1)
-      httpx (~> 1.5)
-      jwt (~> 2.7)
+      io-endpoint (~> 0.17.0)
+      jwt (>= 2.5, < 4)
       rainbow
-      react_on_rails (= 16.4.0)
+      react_on_rails (= 17.0.0.rc.5)
 
 GEM
   remote: https://rubygems.org/
@@ -107,6 +106,19 @@ GEM
       io-event (~> 1.11)
       metrics (~> 0.12)
       traces (~> 0.18)
+    async-http (0.95.1)
+      async (>= 2.10.2)
+      async-pool (~> 0.11)
+      io-endpoint (~> 0.14)
+      io-stream (~> 0.6)
+      metrics (~> 0.12)
+      protocol-http (~> 0.62)
+      protocol-http1 (~> 0.39)
+      protocol-http2 (~> 0.26)
+      protocol-url (~> 0.2)
+      traces (~> 0.10)
+    async-pool (0.11.2)
+      async (>= 2.0)
     base64 (0.3.0)
     benchmark (0.5.0)
     bigdecimal (4.0.1)
@@ -146,13 +158,12 @@ GEM
     fiber-storage (1.0.1)
     globalid (1.3.0)
       activesupport (>= 6.1)
-    http-2 (1.1.1)
-    httpx (1.6.2)
-      http-2 (>= 1.0.0)
     i18n (1.14.8)
       concurrent-ruby (~> 1.0)
     io-console (0.8.2)
+    io-endpoint (0.17.2)
     io-event (1.14.2)
+    io-stream (0.13.0)
     irb (1.17.0)
       pp (>= 0.6.0)
       prism (>= 1.3.0)
@@ -162,10 +173,10 @@ GEM
       actionview (>= 5.0.0)
       activesupport (>= 5.0.0)
     json (2.16.0)
-    jwt (2.10.2)
+    jwt (3.2.0)
       base64
     logger (1.7.0)
-    loofah (2.25.0)
+    loofah (2.25.1)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
     mail (2.9.0)
@@ -194,24 +205,33 @@ GEM
     net-smtp (0.5.1)
       net-protocol
     nio4r (2.7.5)
-    nokogiri (1.19.1)
+    nokogiri (1.19.2)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
-    nokogiri (1.19.1-aarch64-linux-gnu)
+    nokogiri (1.19.2-aarch64-linux-gnu)
       racc (~> 1.4)
-    nokogiri (1.19.1-arm-linux-gnu)
+    nokogiri (1.19.2-arm-linux-gnu)
       racc (~> 1.4)
-    nokogiri (1.19.1-arm64-darwin)
+    nokogiri (1.19.2-arm64-darwin)
       racc (~> 1.4)
-    nokogiri (1.19.1-x86_64-darwin)
+    nokogiri (1.19.2-x86_64-darwin)
       racc (~> 1.4)
-    nokogiri (1.19.1-x86_64-linux-gnu)
+    nokogiri (1.19.2-x86_64-linux-gnu)
       racc (~> 1.4)
+    ostruct (0.6.3)
     package_json (0.2.0)
     pp (0.6.3)
       prettyprint
     prettyprint (0.2.0)
     prism (1.9.0)
+    protocol-hpack (1.5.1)
+    protocol-http (0.62.2)
+    protocol-http1 (0.39.0)
+      protocol-http (~> 0.62)
+    protocol-http2 (0.26.0)
+      protocol-hpack (~> 1.4)
+      protocol-http (~> 0.62)
+    protocol-url (0.4.0)
     pry (0.14.2)
       coderay (~> 1.1)
       method_source (~> 1.0)
@@ -225,7 +245,7 @@ GEM
       nio4r (~> 2.0)
     racc (1.8.1)
     rack (3.2.5)
-    rack-proxy (0.7.7)
+    rack-proxy (0.8.2)
       rack
     rack-session (2.1.1)
       base64 (>= 0.1.0)
@@ -284,7 +304,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.1.1)
-    shakapacker (9.6.1)
+    shakapacker (10.1.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -297,12 +317,8 @@ GEM
       actionpack (>= 6.1)
       activesupport (>= 6.1)
       sprockets (>= 3.0.0)
-    sqlite3 (1.7.3-aarch64-linux)
-    sqlite3 (1.7.3-arm-linux)
-    sqlite3 (1.7.3-arm64-darwin)
-    sqlite3 (1.7.3-x86-linux)
-    sqlite3 (1.7.3-x86_64-darwin)
-    sqlite3 (1.7.3-x86_64-linux)
+    sqlite3 (1.7.3)
+      mini_portile2 (~> 2.8.0)
     stringio (3.2.0)
     thor (1.5.0)
     timeout (0.6.0)
@@ -334,10 +350,13 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  benchmark
   bootsnap
   capybara
   debug
   jbuilder
+  logger
+  ostruct
   pry
   pry-nav
   puma (>= 5.0)
@@ -345,14 +364,11 @@ DEPENDENCIES
   react_on_rails!
   react_on_rails_pro!
   selenium-webdriver
-  shakapacker (= 9.6.1)
+  shakapacker (= 10.1.0)
   sprockets-rails
   sqlite3 (~> 1.4)
   tzinfo-data
   web-console
-
-RUBY VERSION
-   ruby 3.3.7p123
 
 BUNDLED WITH
    2.5.9

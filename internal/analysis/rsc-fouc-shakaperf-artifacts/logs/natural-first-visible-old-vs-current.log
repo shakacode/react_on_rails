@@ -1,0 +1,147 @@
+time: 2026-06-04T22:27:15+03:00
+shaka-perf v0.1.3
+Discovered 2 test file(s):
+  <react_on_rails_worktree>/ab-tests/rsc-fouc.abtest.ts
+  <react_on_rails_worktree>/tmp-rsc-real-first-visible-assertion.abtest.ts
+Selected 1 of 2 test(s).
+
+[36m========================================================================================[39m
+[36mSTAGE: visreg[39m
+[36m========================================================================================[39m
+Capture and compare control vs experiment screenshots.
+[36m========================================================================================[39m
+
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.5s>[22m Loading every test page on both the control server and the experiment server, taking a screenshot of each once the page has settled, and comparing the two screenshots pixel-by-pixel. A test fails when the two sides look visibly different. This is how a code change that does not break anything functionally still gets caught when it accidentally moves a button, shifts a layout, or changes a color.
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.5s>[22m [32mCOMMAND:[39m[2m<0.5s>[22mExecuting core for "compare"
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.6s>[22m [35mcompare:[39m[2m<0.6s>[22mDiscovered 1 test file(s):
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.6s>[22m [35mcompare:[39m[2m<0.6s>[22m  <react_on_rails_worktree>/tmp-rsc-real-first-visible-assertion.abtest.ts
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.6s>[22m [35mcompare:[39m[2m<0.6s>[22mSelected 1 of 1 test(s).
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.6s>[22m Creating Browser
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.6s>[22m [35mcompare:[39m[2m<0.6s>[22mBrowser created
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.7s>[22m [34mLIVE COMPARE: opening reference (http://localhost:3020/rsc_posts_page_over_http) and test (http://localhost:3030/rsc_posts_page_over_http) simultaneously[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.7s>[22m[  control   ] annotate: wait first visible
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.7s>[22m[ experiment ] annotate: wait first visible
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.8s>[22m[ experiment ] annotate: assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.9s>[22m[  control   ] annotate: assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.9s>[22m [31mError during live compare for "diagnostic real first visible probe is styled"[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<0.9s>[22m [31mAnnotatedError: [  control   ] control first visible probe is unstyled: {"backgroundColor":"rgba(0, 0, 0, 0)","color":"rgb(0, 0, 0)","padding":"0px","borderRadius":"0px","width":840,"height":24,"text":"RSC use-client CSS probe"}[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.2s>[22m [32mx Close Browser Contexts[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.2s>[22m Disposing Browser
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.2s>[22m [32mCOMMAND:[39m[2m<1.2s>[22mExecuting core for "report"
+   See: <react_on_rails_worktree>/compare-results/experiment_screenshot/failed_diff_0401104033_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [35mcompare:[39m[2m<1.4s>[22mERROR { requireSameDimensions: true, size: isDifferent, content: 12.95%, threshold: 0.001% }: diagnostic real first visible probe is styled 0401104033_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [33mreport:[39m[2m<1.4s>[22mTest completed...
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [33mreport:[39m[2m<1.4s>[22m[32m0 Passed[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [33mreport:[39m[2m<1.4s>[22m[31m1 Failed[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [33mreport:[39m[2m<1.4s>[22mWrote per-test visreg reports under <react_on_rails_worktree>/compare-results/<unit>/artifacts/
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [33mreport:[39m[2m<1.4s>[22m-- desktop / [data-testid="rsc-css-probe"] --
+Failed while assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [32mCOMMAND:[39m[2m<1.4s>[22mCommand "report" ended with an error after [0.199s]
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [32mCOMMAND:[39m[2m<1.4s>[22mError: Failed while assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [32mCOMMAND:[39m[2m<1.4s>[22mCommand "compare" ended with an error after [0.902s]
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [32mCOMMAND:[39m[2m<1.4s>[22mError: Failed while assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [31mvisreg engine error: Failed while assert styled[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<1.4s>[22m [31mtask failed (worker 0 attempt 1/3):[39m
+[31mError: Failed while assert styled[39m
+[31m    at writePerTestReports (<global_shaka_perf>/src/visreg/core/command/report.ts:72:11)[39m
+[31m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+[31m    at async Object.execute (<global_shaka_perf>/src/visreg/core/command/report.ts:172:3)[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.4s>[22m Loading every test page on both the control server and the experiment server, taking a screenshot of each once the page has settled, and comparing the two screenshots pixel-by-pixel. A test fails when the two sides look visibly different. This is how a code change that does not break anything functionally still gets caught when it accidentally moves a button, shifts a layout, or changes a color.
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.5s>[22m [32mCOMMAND:[39m[2m<2.5s>[22mExecuting core for "compare"
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.5s>[22m [35mcompare:[39m[2m<2.5s>[22mDiscovered 1 test file(s):
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.5s>[22m [35mcompare:[39m[2m<2.5s>[22m  <react_on_rails_worktree>/tmp-rsc-real-first-visible-assertion.abtest.ts
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.5s>[22m [35mcompare:[39m[2m<2.5s>[22mSelected 1 of 1 test(s).
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.5s>[22m Creating Browser
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.6s>[22m [35mcompare:[39m[2m<2.6s>[22mBrowser created
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.6s>[22m [34mLIVE COMPARE: opening reference (http://localhost:3020/rsc_posts_page_over_http) and test (http://localhost:3030/rsc_posts_page_over_http) simultaneously[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.7s>[22m[  control   ] annotate: wait first visible
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.7s>[22m[ experiment ] annotate: wait first visible
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.8s>[22m[  control   ] annotate: assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.8s>[22m [31mError during live compare for "diagnostic real first visible probe is styled"[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<2.8s>[22m [31mAnnotatedError: [  control   ] control first visible probe is unstyled: {"backgroundColor":"rgba(0, 0, 0, 0)","color":"rgb(0, 0, 0)","padding":"0px","borderRadius":"0px","width":840,"height":24,"text":"RSC use-client CSS probe"}[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.0s>[22m[ experiment ] annotate: assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.2s>[22m [32mx Close Browser Contexts[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.2s>[22m Disposing Browser
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.3s>[22m [32mCOMMAND:[39m[2m<3.3s>[22mExecuting core for "report"
+   See: <react_on_rails_worktree>/compare-results/experiment_screenshot/failed_diff_80919543_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.4s>[22m [35mcompare:[39m[2m<3.4s>[22mERROR { requireSameDimensions: true, size: isDifferent, content: 12.95%, threshold: 0.001% }: diagnostic real first visible probe is styled 80919543_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.4s>[22m [33mreport:[39m[2m<3.4s>[22mTest completed...
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.4s>[22m [33mreport:[39m[2m<3.4s>[22m[32m0 Passed[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.4s>[22m [33mreport:[39m[2m<3.4s>[22m[31m1 Failed[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.5s>[22m [33mreport:[39m[2m<3.5s>[22mWrote per-test visreg reports under <react_on_rails_worktree>/compare-results/<unit>/artifacts/
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.5s>[22m [33mreport:[39m[2m<3.5s>[22m-- desktop / [data-testid="rsc-css-probe"] --
+Failed while assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.5s>[22m [32mCOMMAND:[39m[2m<3.5s>[22mCommand "report" ended with an error after [0.196s]
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.5s>[22m [32mCOMMAND:[39m[2m<3.5s>[22mError: Failed while assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.5s>[22m [32mCOMMAND:[39m[2m<3.5s>[22mCommand "compare" ended with an error after [0.924s]
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.5s>[22m [32mCOMMAND:[39m[2m<3.5s>[22mError: Failed while assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.5s>[22m [31mvisreg engine error: Failed while assert styled[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<3.5s>[22m [31mtask failed (worker 0 attempt 2/3):[39m
+[31mError: Failed while assert styled[39m
+[31m    at writePerTestReports (<global_shaka_perf>/src/visreg/core/command/report.ts:72:11)[39m
+[31m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+[31m    at async Object.execute (<global_shaka_perf>/src/visreg/core/command/report.ts:172:3)[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.5s>[22m Loading every test page on both the control server and the experiment server, taking a screenshot of each once the page has settled, and comparing the two screenshots pixel-by-pixel. A test fails when the two sides look visibly different. This is how a code change that does not break anything functionally still gets caught when it accidentally moves a button, shifts a layout, or changes a color.
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.5s>[22m [32mCOMMAND:[39m[2m<4.5s>[22mExecuting core for "compare"
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.5s>[22m [35mcompare:[39m[2m<4.5s>[22mDiscovered 1 test file(s):
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.5s>[22m [35mcompare:[39m[2m<4.5s>[22m  <react_on_rails_worktree>/tmp-rsc-real-first-visible-assertion.abtest.ts
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.5s>[22m [35mcompare:[39m[2m<4.5s>[22mSelected 1 of 1 test(s).
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.5s>[22m Creating Browser
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.5s>[22m [35mcompare:[39m[2m<4.5s>[22mBrowser created
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.6s>[22m [34mLIVE COMPARE: opening reference (http://localhost:3020/rsc_posts_page_over_http) and test (http://localhost:3030/rsc_posts_page_over_http) simultaneously[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.7s>[22m[ experiment ] annotate: wait first visible
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.8s>[22m[  control   ] annotate: wait first visible
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.8s>[22m[  control   ] annotate: assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.8s>[22m [31mError during live compare for "diagnostic real first visible probe is styled"[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.8s>[22m [31mAnnotatedError: [  control   ] control first visible probe is unstyled: {"backgroundColor":"rgba(0, 0, 0, 0)","color":"rgb(0, 0, 0)","padding":"0px","borderRadius":"0px","width":840,"height":24,"text":"RSC use-client CSS probe"}[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<4.9s>[22m[ experiment ] annotate: assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.1s>[22m [32mx Close Browser Contexts[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.1s>[22m Disposing Browser
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.2s>[22m [32mCOMMAND:[39m[2m<5.2s>[22mExecuting core for "report"
+   See: <react_on_rails_worktree>/compare-results/experiment_screenshot/failed_diff_1340773730_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.3s>[22m [35mcompare:[39m[2m<5.3s>[22mERROR { requireSameDimensions: true, size: isDifferent, content: 12.95%, threshold: 0.001% }: diagnostic real first visible probe is styled 1340773730_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.3s>[22m [33mreport:[39m[2m<5.3s>[22mTest completed...
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.3s>[22m [33mreport:[39m[2m<5.3s>[22m[32m0 Passed[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.3s>[22m [33mreport:[39m[2m<5.3s>[22m[31m1 Failed[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.4s>[22m [33mreport:[39m[2m<5.4s>[22mWrote per-test visreg reports under <react_on_rails_worktree>/compare-results/<unit>/artifacts/
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.4s>[22m [33mreport:[39m[2m<5.4s>[22m-- desktop / [data-testid="rsc-css-probe"] --
+Failed while assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.4s>[22m [32mCOMMAND:[39m[2m<5.4s>[22mCommand "report" ended with an error after [0.194s]
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.4s>[22m [32mCOMMAND:[39m[2m<5.4s>[22mError: Failed while assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.4s>[22m [32mCOMMAND:[39m[2m<5.4s>[22mCommand "compare" ended with an error after [0.865s]
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.4s>[22m [32mCOMMAND:[39m[2m<5.4s>[22mError: Failed while assert styled
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.4s>[22m [31mvisreg engine error: Failed while assert styled[39m
+[36mtmp-rsc-real-first-visible-assertion.abtest.ts:6[39m:[36mdesktop[39m:[36mvisreg[39m:[2m<5.4s>[22m [31mtask failed (worker 0 attempt 3/3):[39m
+[31mError: Failed while assert styled[39m
+[31m    at writePerTestReports (<global_shaka_perf>/src/visreg/core/command/report.ts:72:11)[39m
+[31m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+[31m    at async Object.execute (<global_shaka_perf>/src/visreg/core/command/report.ts:172:3)[39m
+[1m[1/1] [90mstage:[39m[36mvisreg[39m[22m
+[90mCapture and compare control vs experiment screenshots.[39m
+[32m████████████████[39m [31m100%[39m[90m · [39m[31m1/1[39m done[90m · [39m[90mpool [39m[33m0/2[39m[90m active[39m[31m · 3 errors[39m[90m · [39mETA [31m00m:00s[39m[90m · [39m[90mto skip this stage use [36m--skip-stages visreg[39m[90m[39m
+[34m<<< visreg · queued 0, running 0, done 0, skipped 0, error 1 · durations total 5.1s, avg 5.1s, max 5.1s[39m
+[34m[39m
+[34m>>> assemble · per-test artifacts (2 tests)[39m
+    [1/2] rsc first paint use-client css is styled before hydration (0.0s, 0.0 MB)
+    [2/2] diagnostic real first visible probe is styled (0.0s, 0.0 MB)
+    all tests assembled in 0.0s
+[34m[39m
+[34m>>> rendering report HTML files[39m
+    payload total ~0.0 MB across 2 test(s)
+    top 2 contributors:
+          0.0 MB  diagnostic real first visible probe is styled
+          0.0 MB  rsc first paint use-client css is styled before hydration
+    payload total ~0.0 MB across 2 test(s)
+    top 2 contributors:
+          0.0 MB  diagnostic real first visible probe is styled
+          0.0 MB  rsc first paint use-client css is styled before hydration
+    wrote <react_on_rails_worktree>/compare-results/full-report.html (0.3 MB) in 0.0s
+    wrote <react_on_rails_worktree>/compare-results/self-contained-performance-report.html (0.3 MB)
+[1m[36m[39m[22m
+[1m[36mShort report (for slack/email): [39m[22m[4m<react_on_rails_worktree>/compare-results/self-contained-performance-report.html[24m
+[1m[35mFull report (for you): [39m[22m[4m<react_on_rails_worktree>/compare-results/full-report.html[24m
+[1m[31m[39m[22m
+[1m[31mFAILED: 1 error[39m[22m
+
+exit_status=1
+copied_results=<react_on_rails>/tmp/experiments/20260604T154128Z-rsc-fouc-followup/compare-results-013-real-first-visible-atomic-old-current-20260604T192715Z

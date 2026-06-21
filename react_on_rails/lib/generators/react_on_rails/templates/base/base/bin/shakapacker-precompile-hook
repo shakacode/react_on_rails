@@ -23,11 +23,99 @@ exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
 # and doesn't need package version validation since it's part of the build itself
 ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
 
+require "pathname"
+require "fileutils"
 require_relative "../config/environment"
+
+RSC_REGISTRATION_ENTRY_PATH_ENV = "REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH"
+EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME = "server-component-registration-entry.js"
+EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules public spec test tmp vendor].freeze
+
+def clear_stale_rsc_manifest_client_references
+  stale_manifest = Rails.root.join("ssr-generated", "rsc-client-references.json")
+  FileUtils.rm_f(stale_manifest)
+end
+
+def default_rsc_manifest_registration_entry
+  Rails.root.join(
+    Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent,
+    "generated/#{EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME}"
+  )
+end
+
+def rsc_registration_entry_path_components(path)
+  expanded_path = File.expand_path(path.to_s)
+  expanded_root = "#{File.expand_path(Rails.root.to_s)}#{File::SEPARATOR}"
+  expanded_path = expanded_path.delete_prefix(expanded_root) if expanded_path.start_with?(expanded_root)
+
+  expanded_path.split(File::SEPARATOR).reject(&:empty?)
+end
+
+def valid_configured_rsc_registration_entry?(path)
+  return false unless File.file?(path)
+  return false unless File.basename(path.to_s) == EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME
+
+  path_components = rsc_registration_entry_path_components(path)
+  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS.none? { |component| path_components.include?(component) }
+end
+
+def configured_rsc_manifest_registration_entry
+  configured_path = ENV[RSC_REGISTRATION_ENTRY_PATH_ENV].to_s.strip
+  return nil if configured_path.empty?
+
+  path = Pathname.new(configured_path)
+  resolved_path = path.absolute? ? path : Rails.root.join(path)
+  return nil unless valid_configured_rsc_registration_entry?(resolved_path)
+
+  resolved_path
+end
+
+def rsc_manifest_registration_entry
+  configured_entry = configured_rsc_manifest_registration_entry
+  return configured_entry if configured_entry
+
+  default_rsc_manifest_registration_entry
+end
+
+# Keep this flow aligned with the standalone helper in
+# react_on_rails/spec/support/shakapacker_precompile_hook_shared.rb.
+def generate_rsc_manifest_client_references_if_needed
+  return if ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"
+  return unless defined?(ReactOnRailsPro)
+  return unless ReactOnRailsPro::Utils.rsc_support_enabled?
+
+  registration_entry = rsc_manifest_registration_entry
+  unless File.exist?(registration_entry)
+    clear_stale_rsc_manifest_client_references
+    return
+  end
+
+  shakapacker_bin = Rails.root.join("bin", "shakapacker")
+  unless File.exist?(shakapacker_bin)
+    raise "bin/shakapacker is missing; cannot generate RSC manifest client references. " \
+          "Restore bin/shakapacker before precompiling RSC assets."
+  end
+
+  puts Rainbow("🔎 Generating RSC manifest client references...").cyan
+
+  env = {
+    "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => "true",
+    "RSC_REFERENCE_DISCOVERY_BUILD" => "true",
+    "RSC_BUNDLE_ONLY" => "true",
+    "CLIENT_BUNDLE_ONLY" => nil,
+    "SERVER_BUNDLE_ONLY" => nil
+  }
+
+  Dir.chdir(Rails.root) do
+    system(env, shakapacker_bin.to_s, exception: true)
+  end
+  puts Rainbow("✅ RSC manifest client references generated successfully").green
+end
 
 begin
   puts Rainbow("🔄 Running React on Rails precompile hook...").cyan
   ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
+  generate_rsc_manifest_client_references_if_needed
 rescue StandardError => e
   warn Rainbow("❌ Error in precompile hook: #{e.message}").red
   warn e.backtrace.first(5).join("\n")

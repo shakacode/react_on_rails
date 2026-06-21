@@ -1,0 +1,43 @@
+/* eslint-disable import/prefer-default-export -- named export for consistency with capability API */
+
+import type { RenderParams, ErrorOptions, RenderingError } from '../types/index.ts';
+import handleError from '../handleError.ts';
+import serverRenderReactComponent from '../serverRenderReactComponent.ts';
+import { buildLengthPrefixedResult } from '../serverRenderUtils.ts';
+
+// Warn about bundle size when included in browser bundles
+if (typeof window !== 'undefined') {
+  console.warn(
+    'Optimization opportunity: this bundle includes ~14KB of server-rendering code that browsers may not need. ' +
+      'See https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352 ' +
+      '(Requires creating a free account). Click this for the stack trace.',
+  );
+}
+
+/**
+ * SSR capability.
+ * Provides server-side rendering methods (serverRenderReactComponent, handleError).
+ */
+export function createSSRCapability() {
+  return {
+    handleError(options: ErrorOptions): string | undefined {
+      return handleError(options);
+    },
+
+    serverRenderReactComponent(options: RenderParams): null | string | Promise<string> {
+      return serverRenderReactComponent(options);
+    },
+
+    prepareRenderResult(
+      html: string,
+      consoleReplayScript: string,
+      hasErrors: boolean,
+      renderingError: RenderingError | null,
+    ): string {
+      return buildLengthPrefixedResult(html, consoleReplayScript, {
+        hasErrors,
+        error: renderingError ?? undefined,
+      });
+    },
+  };
+}

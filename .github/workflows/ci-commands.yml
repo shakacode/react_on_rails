@@ -1,0 +1,528 @@
+name: CI Commands
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: ci-command-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  handle-ci-command:
+    # `contains` is case-insensitive, matching the command parser below.
+    if: |
+      github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+      contains(github.event.comment.body, '+ci-')
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Handle +ci command
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.issue.number;
+            const commentId = context.payload.comment.id;
+            const actor = context.actor;
+            const repoFullName = `${owner}/${repo}`;
+            const hostedCiLabel = 'ready-for-hosted-ci';
+            const forceFullHostedCiLabel = 'force-full-hosted-ci';
+
+            const validCommands = [
+              '+ci-run-hosted',
+              '+ci-force-full',
+              '+ci-stop-hosted',
+              '+ci-stop-full',
+              '+ci-skip-hosted',
+              '+ci-status',
+              '+ci-help'
+            ];
+
+            function commandText(commentBody) {
+              return commentBody
+                .replace(/```[\s\S]*?```/g, '')
+                .replace(/~~~[\s\S]*?~~~/g, '')
+                .split('\n')
+                .filter((line) => !/^\s*>/.test(line))
+                .join('\n');
+            }
+
+            function parseCommand(commentBody) {
+              const match = commandText(commentBody)
+                .match(/(?:^|\n)\s*(\+ci-[a-z0-9][a-z0-9-]*)(?:[ \t]+([^\n]*))?/i);
+
+              if (!match) {
+                return null;
+              }
+
+              return {
+                command: match[1].toLowerCase(),
+                args: (match[2] || '').trim()
+              };
+            }
+
+            async function postComment(body) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body
+              });
+            }
+
+            async function addReaction(content) {
+              try {
+                await github.rest.reactions.createForIssueComment({
+                  owner,
+                  repo,
+                  comment_id: commentId,
+                  content
+                });
+              } catch (error) {
+                const status = error.status || 'unknown';
+                const message = error.message || String(error);
+                const details = `${status} ${message}`;
+                core.warning(
+                  `Reaction ${content} failed on comment ${commentId}: ` +
+                  details
+                );
+              }
+            }
+
+            async function hasWriteAccess() {
+              let permission;
+              try {
+                ({ data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner,
+                  repo,
+                  username: actor
+                }));
+              } catch (error) {
+                if ([403, 404].includes(error.status)) {
+                  console.log(`Unable to read permission for ${actor}: ${error.status}`);
+                  return false;
+                }
+
+                throw error;
+              }
+
+              return ['admin', 'write'].includes(permission.permission);
+            }
+
+            async function getPullRequest() {
+              const { data: pr } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: issueNumber
+              });
+
+              return pr;
+            }
+
+            async function ensureLabel(name, description, color) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner,
+                  repo,
+                  name,
+                  description,
+                  color
+                });
+              } catch (error) {
+                if (error.status !== 422) {
+                  throw error;
+                }
+              }
+            }
+
+            async function addHostedCiLabels(forceFull) {
+              await ensureLabel(
+                hostedCiLabel,
+                'Run optimized hosted GitHub CI for this PR',
+                '0E8A16'
+              );
+
+              const labels = [hostedCiLabel];
+              if (forceFull) {
+                await ensureLabel(
+                  forceFullHostedCiLabel,
+                  'Bypass optimized hosted CI selection and run all hosted suites',
+                  'B60205'
+                );
+                labels.push(forceFullHostedCiLabel);
+              }
+
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels
+              });
+            }
+
+            async function removeLabels(labelNames) {
+              let removed = false;
+              for (const labelName of labelNames) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner,
+                    repo,
+                    issue_number: issueNumber,
+                    name: labelName
+                  });
+                  removed = true;
+                } catch (error) {
+                  if (error.status !== 404) {
+                    throw error;
+                  }
+                }
+              }
+
+              return removed;
+            }
+
+            async function removeHostedCiLabels() {
+              return removeLabels([hostedCiLabel, forceFullHostedCiLabel]);
+            }
+
+            async function removeForceFullHostedCiLabel() {
+              return removeLabels([forceFullHostedCiLabel]);
+            }
+
+            async function listPullRequestLabels() {
+              const labels = await github.paginate(github.rest.issues.listLabelsOnIssue, {
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100
+              });
+
+              return labels.map((label) => label.name);
+            }
+
+            async function listPullRequestFiles() {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner,
+                repo,
+                pull_number: issueNumber,
+                per_page: 100
+              });
+
+              return files;
+            }
+
+            function isDocsOnlyPath(filename) {
+              return filename.endsWith('.md') ||
+                filename.endsWith('.mdx') ||
+                filename.endsWith('.markdown') ||
+                filename.endsWith('.rst') ||
+                filename.endsWith('.txt') ||
+                filename === '.lychee.toml' ||
+                filename.startsWith('docs/') ||
+                filename.startsWith('internal/') ||
+                filename.startsWith('.github/ISSUE_TEMPLATE/') ||
+                filename.startsWith('.claude/') ||
+                filename.startsWith('.agents/') ||
+                filename.startsWith('.cursor/');
+            }
+
+            function isDocsOnly(files) {
+              return files.length > 0 &&
+                files.every((file) => isDocsOnlyPath(file.filename));
+            }
+
+            async function findCurrentWaiver(sha) {
+              const marker = `<!-- ci-skip-hosted:${sha} -->`;
+              for await (const page of github.paginate.iterator(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100,
+                sort: 'created',
+                direction: 'desc'
+              })) {
+                const found = page.data.find((comment) =>
+                  comment.user?.login === 'github-actions[bot]' &&
+                  comment.user?.type === 'Bot' &&
+                  (comment.body || '').startsWith(marker)
+                );
+
+                if (found) {
+                  return found;
+                }
+              }
+
+              return null;
+            }
+
+            function oneLine(value) {
+              return value.replace(/[\r\n]+/g, ' ').replace(/`+/g, "'").trim();
+            }
+
+            function helpBody() {
+              return [
+                '## CI Commands',
+                '',
+                'Use these commands at the start of a PR comment line:',
+                'Post one CI command per comment; if multiple commands are present, only the first is handled.',
+                '',
+                '- `+ci-run-hosted` - dispatch optimized hosted CI and add `ready-for-hosted-ci` for future commits',
+                '- `+ci-force-full` - dispatch hosted CI with optimized selection bypassed and add `force-full-hosted-ci`',
+                '- `+ci-stop-hosted` - remove hosted CI labels so future commits return to the required gate only',
+                '- `+ci-stop-full` - remove only the force-full hosted override',
+                '- `+ci-skip-hosted [reason]` - record a SHA-bound hosted CI waiver',
+                '- `+ci-status` - summarize the PR CI policy state',
+                '- `+ci-help` - show this help',
+                '',
+                'Arguments are optional free text after the command. For example:',
+                '',
+                '```',
+                '+ci-skip-hosted docs-only change; markdown checks are enough',
+                '```'
+              ].join('\n');
+            }
+
+            async function triggerHostedCi(pr, { forceFull }) {
+              const headRepoFullName = pr.head.repo?.full_name;
+
+              if (!headRepoFullName) {
+                await addReaction('confused');
+                await postComment([
+                  'Unable to run hosted CI from this command because the PR head repository is unavailable.',
+                  '',
+                  'The repository may have been deleted or made private. A maintainer should push the branch to this repository or trigger the required workflows manually.'
+                ].join('\n'));
+                return;
+              }
+
+              if (headRepoFullName !== repoFullName) {
+                await addReaction('confused');
+                await postComment([
+                  'Unable to run hosted CI from this command because the PR branch is from a fork.',
+                  '',
+                  'A maintainer should push the branch to this repository or trigger the required workflows manually.'
+                ].join('\n'));
+                return;
+              }
+
+              const inputs = forceFull ? { force_full_hosted: 'true' } : {};
+              const workflows = [
+                ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
+                ['JS unit tests for Renderer package', 'package-js-tests.yml', inputs],
+                ['Rspec test for gem', 'gem-tests.yml', inputs],
+                ['Integration Tests', 'integration-tests.yml', inputs],
+                ['Assets Precompile Check', 'precompile-check.yml', inputs],
+                ['Generator tests', 'examples.yml', inputs],
+                ['Playwright E2E Tests', 'playwright.yml', inputs],
+                ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
+                ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
+              ];
+
+              const dispatchResults = await Promise.allSettled(
+                workflows.map(([workflowName, workflowFile, inputs]) =>
+                  github.rest.actions.createWorkflowDispatch({
+                    owner,
+                    repo,
+                    workflow_id: workflowFile,
+                    ref: pr.head.ref,
+                    inputs
+                  }).then(() => ({ file: workflowFile, name: workflowName }))
+                )
+              );
+
+              const succeeded = [];
+              const failed = [];
+
+              for (const [index, result] of dispatchResults.entries()) {
+                if (result.status === 'fulfilled') {
+                  succeeded.push(result.value);
+                } else {
+                  failed.push({
+                    workflow: workflows[index][0],
+                    error: result.reason?.message || String(result.reason)
+                  });
+                }
+              }
+
+              let labelAdded = false;
+              if (succeeded.length > 0) {
+                try {
+                  await addHostedCiLabels(forceFull);
+                  labelAdded = true;
+                } catch (error) {
+                  failed.push({
+                    workflow: forceFull ? 'force-full hosted CI labels' : 'hosted CI label',
+                    error: error.message
+                  });
+                }
+              }
+
+              await addReaction(succeeded.length > 0 ? 'rocket' : 'confused');
+
+              const failedList = failed.length > 0
+                ? `\n\nFailed:\n${failed.map((failure) => `- ${failure.workflow}: ${failure.error}`).join('\n')}`
+                : '';
+              const labelMessage = labelAdded && forceFull
+                ? 'Added `ready-for-hosted-ci` and `force-full-hosted-ci`, so future commits will bypass optimized hosted CI selection until `+ci-stop-full` is used.'
+                : labelAdded
+                  ? 'Added `ready-for-hosted-ci`, so future commits will keep running optimized hosted CI until `+ci-stop-hosted` is used.'
+                : succeeded.length > 0
+                  ? 'The workflows were triggered, but the hosted CI labels were not added. See the failure details below.'
+                  : 'Hosted CI labels were not added because no workflows were triggered.';
+
+              await postComment([
+                forceFull ? '## Force-Full Hosted CI Requested' : '## Hosted CI Requested',
+                '',
+                `Triggered ${succeeded.length} workflow(s) for \`${pr.head.sha.slice(0, 12)}\`.`,
+                forceFull
+                  ? 'Mode: force-full hosted CI (bypasses optimized change selection).'
+                  : 'Mode: optimized hosted CI (path-selected by `script/ci-changes-detector`).',
+                labelMessage,
+                '',
+                'View progress in the Actions tab.',
+                failedList
+              ].join('\n'));
+
+              if (failed.length > 0) {
+                core.setFailed(`Failed to trigger: ${failed.map((failure) => failure.workflow).join(', ')}`);
+              }
+            }
+
+            async function handleSkipHosted(pr, args) {
+              const removedHostedCi = await removeHostedCiLabels();
+              const reason = oneLine(args) || 'not provided';
+              const shortSha = pr.head.sha.slice(0, 12);
+
+              await postComment([
+                `<!-- ci-skip-hosted:${pr.head.sha} -->`,
+                '## Hosted CI Waiver Recorded for This SHA',
+                '',
+                `@${actor} recorded a hosted-CI waiver for \`${shortSha}\` (audit record only - no workflow run was cancelled or blocked).`,
+                `Reason: \`${reason}\``,
+                '',
+                'This waiver is bound to the current head SHA and does not apply after another push.',
+                'The required fast gate still applies for this PR.',
+                ...(removedHostedCi ? ['', 'Removed hosted CI labels from this PR.'] : [])
+              ].join('\n'));
+            }
+
+            async function handleStopHosted() {
+              const removed = await removeHostedCiLabels();
+              await postComment([
+                '## Hosted CI Mode Disabled',
+                '',
+                removed
+                  ? 'Removed hosted CI labels. Future commits will use only the required gate until hosted CI is requested again.'
+                  : 'No hosted CI labels were present. Future commits are already using only the required gate.',
+                '',
+                'Use `+ci-run-hosted` to re-enable optimized hosted CI.'
+              ].join('\n'));
+            }
+
+            async function handleStopFull() {
+              const removed = await removeForceFullHostedCiLabel();
+              await postComment([
+                '## Force-Full Hosted CI Disabled',
+                '',
+                removed
+                  ? 'Removed `force-full-hosted-ci`. If `ready-for-hosted-ci` is still present, future commits keep running optimized hosted CI.'
+                  : 'No force-full hosted CI label was present.',
+                '',
+                'Use `+ci-force-full` to re-enable the force-full hosted override.'
+              ].join('\n'));
+            }
+
+            async function handleStatus(pr) {
+              const [labels, files, waiver] = await Promise.all([
+                listPullRequestLabels(),
+                listPullRequestFiles(),
+                findCurrentWaiver(pr.head.sha)
+              ]);
+
+              const docsOnly = isDocsOnly(files);
+              const hasReadyForHostedCi = labels.includes(hostedCiLabel);
+              const hasForceFullHostedCi = labels.includes(forceFullHostedCiLabel);
+
+              await postComment([
+                '## CI Status',
+                '',
+                `Head SHA: \`${pr.head.sha.slice(0, 12)}\``,
+                `Changed files: ${files.length}`,
+                `Docs-only heuristic (matches ci-changes-detector metadata paths): ${docsOnly ? 'yes' : 'no'}`,
+                `\`${hostedCiLabel}\` label: ${hasReadyForHostedCi ? 'present' : 'absent'}`,
+                `\`${forceFullHostedCiLabel}\` label: ${hasForceFullHostedCi ? 'present' : 'absent'}`,
+                `Current hosted-CI waiver: ${waiver ? 'present for this SHA' : 'not present for this SHA'}`,
+                '',
+                hasForceFullHostedCi
+                  ? 'Force-full hosted CI is enabled for this PR.'
+                  : hasReadyForHostedCi
+                    ? 'Optimized hosted CI is enabled for this PR.'
+                    : 'Only the required gate is active unless hosted CI is requested.'
+              ].join('\n'));
+            }
+
+            const parsed = parseCommand(context.payload.comment.body || '');
+            if (!parsed) {
+              return;
+            }
+
+            const userHasWriteAccess = await hasWriteAccess();
+
+            if (!validCommands.includes(parsed.command)) {
+              if (!userHasWriteAccess) {
+                return;
+              }
+
+              await addReaction('confused');
+              await postComment([
+                `Unknown CI command: \`${parsed.command}\`.`,
+                '',
+                helpBody()
+              ].join('\n'));
+              return;
+            }
+
+            if (!userHasWriteAccess) {
+              await postComment(`@${actor} Sorry, only repository collaborators with write access can use CI commands.`);
+              core.warning(`User ${actor} does not have write access`);
+              return;
+            }
+
+            const pr = await getPullRequest();
+
+            switch (parsed.command) {
+              case '+ci-run-hosted':
+                await triggerHostedCi(pr, { forceFull: false });
+                break;
+              case '+ci-force-full':
+                await triggerHostedCi(pr, { forceFull: true });
+                break;
+              case '+ci-stop-hosted':
+                await addReaction('eyes');
+                await handleStopHosted();
+                break;
+              case '+ci-stop-full':
+                await addReaction('eyes');
+                await handleStopFull();
+                break;
+              case '+ci-skip-hosted':
+                await addReaction('eyes');
+                await handleSkipHosted(pr, parsed.args);
+                break;
+              case '+ci-status':
+                await addReaction('eyes');
+                await handleStatus(pr);
+                break;
+              case '+ci-help':
+                await addReaction('eyes');
+                await postComment(helpBody());
+                break;
+            }

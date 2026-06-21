@@ -5,9 +5,20 @@ require_relative "task_helpers"
 namespace :lint do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
 
+  def root_bundle_command(command)
+    root_gemfile = File.join(monorepo_root, "Gemfile")
+    "BUNDLE_GEMFILE=\"#{root_gemfile}\" #{command}"
+  end
+
   desc "Run Rubocop as shell"
   task :rubocop do
-    sh_in_dir(gem_root, "bundle exec rubocop --version", "bundle exec rubocop .")
+    Bundler.with_unbundled_env do
+      sh_in_dir(
+        gem_root,
+        root_bundle_command("bundle exec rubocop --version"),
+        root_bundle_command("bundle exec rubocop .")
+      )
+    end
   end
 
   desc "Run stylelint as shell"
@@ -30,14 +41,16 @@ namespace :lint do # rubocop:disable Metrics/BlockLength
     sh_in_dir(gem_root, "pnpm run eslint . --fix")
     sh_in_dir(gem_root, "pnpm run prettier --write .")
     sh_in_dir(gem_root, stylelint_fix_command)
-    sh_in_dir(gem_root, "bundle exec rubocop -A")
+    Bundler.with_unbundled_env do
+      sh_in_dir(gem_root, root_bundle_command("bundle exec rubocop -A"))
+    end
     puts "Completed auto-fixing all linting violations"
   end
 
   private
 
   def stylelint_command
-    "pnpm run stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\""
+    "pnpm run lint:scss"
   end
 
   def stylelint_fix_command

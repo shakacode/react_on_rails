@@ -8,7 +8,7 @@ AllCops:
   NewCops: enable
   DisplayCopNames: true
   SuggestExtensions: false
-  TargetRubyVersion: 3.0
+  TargetRubyVersion: 3.3
 
   Include:
     - '**/Rakefile'
@@ -28,6 +28,13 @@ AllCops:
     - 'node_modules/**/*'
     - 'spec/fixtures/**/*'
     - 'spec/react_on_rails/dummy-for-generators/**/*'
+    # Root-wide RuboCop uses root-relative paths. Keep generated/package-specific
+    # exclusions here so the root sweep does not fail on files package CI exempts.
+    - 'react_on_rails_pro/spec/dummy/db/schema.rb'
+    - 'react_on_rails_pro/spec/dummy/db/seeds.rb'
+    - 'react_on_rails/spec/dummy/bin/**/*'
+    - 'react_on_rails_pro/spec/dummy/bin/**/*'
+    - 'react_on_rails_pro/spec/execjs-compatible-dummy/bin/**/*'
     - '**/vendor/**/*'
 
 Naming/FileName:

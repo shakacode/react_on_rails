@@ -15,6 +15,43 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+ROOT_GEMFILE="$ROOT_DIR/Gemfile"
+OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
+OSS_DEPS_READY=false
+
+# Keep this helper in sync with bin/ci-local and bin/setup.
+bundle_command() {
+  local gemfile="$1"
+  shift
+
+  env \
+    -u BUNDLE_APP_CONFIG \
+    -u BUNDLE_BIN_PATH \
+    -u BUNDLE_GEMFILE \
+    -u BUNDLER_VERSION \
+    -u RUBYOPT \
+    BUNDLE_GEMFILE="$gemfile" \
+    "$@"
+}
+
+ensure_oss_dependencies() {
+  if [ "$OSS_DEPS_READY" = true ]; then
+    return 0
+  fi
+
+  if ! (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle check >/dev/null 2>&1); then
+    echo -e "${YELLOW}Installing react_on_rails Ruby dependencies...${NC}"
+    if ! (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle install); then
+      echo -e "${RED}✗ react_on_rails dependency installation failed${NC}"
+      echo -e "${RED}Cannot proceed without dependencies. Please fix the errors above.${NC}"
+      exit 1
+    fi
+  fi
+
+  OSS_DEPS_READY=true
+}
+
 # Show help
 show_help() {
   cat << EOF
@@ -94,15 +131,16 @@ if [ -z "$PR_NUMBER" ]; then
     echo "Usage: bin/ci-rerun-failures [--previous] [pr-number]"
     exit 1
   fi
-  PR_INFO=$(gh pr view --json number,commits)
+  PR_INFO=$(gh pr view --json number,commits,baseRefName)
   PR_NUMBER=$(echo "$PR_INFO" | jq -r '.number')
 else
-  if ! gh pr view "$PR_NUMBER" --json number,commits >/dev/null 2>&1; then
+  if ! gh pr view "$PR_NUMBER" --json number,commits,baseRefName >/dev/null 2>&1; then
     echo -e "${RED}Error: PR #$PR_NUMBER not found${NC}"
     exit 1
   fi
-  PR_INFO=$(gh pr view "$PR_NUMBER" --json number,commits)
+  PR_INFO=$(gh pr view "$PR_NUMBER" --json number,commits,baseRefName)
 fi
+PR_BASE_REF=$(echo "$PR_INFO" | jq -r '.baseRefName // "main"')
 
 # Determine which commit to check
 if [ "$USE_PREVIOUS" = true ]; then
@@ -125,7 +163,9 @@ if [ "$USE_PREVIOUS" = true ]; then
 
     if [ "$FAILURE_COUNT" -gt 0 ]; then
       echo -e "${GREEN}Found $FAILURE_COUNT failed check(s) in commit ${COMMIT_SHA:0:8}${NC}"
-      STATUS_JSON=$(echo "$CHECK_RUNS" | jq '{statusCheckRollup: [.[] | {name: .name, conclusion: .conclusion, status: .status}], number: '$PR_NUMBER'}')
+      STATUS_JSON=$(echo "$CHECK_RUNS" |
+        jq --argjson number "$PR_NUMBER" \
+          '{statusCheckRollup: [.[] | {name: .name, conclusion: .conclusion, status: .status}], number: $number}')
       FOUND_FAILURES=true
       break
     fi
@@ -175,32 +215,82 @@ fi
 
 # Map CI job names to identifiers
 # NOTE: Version numbers below must match .github/workflows/main.yml matrix configuration
+job_name_matches() {
+  local check="$1"
+  local job_pattern="$2"
+
+  # Preserve historical prefix matching for exact keys; glob keys that already
+  # end in * match through the first condition.
+  [[ "$check" == $job_pattern ]] || [[ "$check" == $job_pattern* ]]
+}
+
 declare -A JOB_MAP
 JOB_MAP["lint-js-and-ruby"]="lint-js-and-ruby"
+JOB_MAP["required-pr-gate"]="required-pr-gate"
 JOB_MAP["rspec-package-tests"]="rspec-package-tests"
 JOB_MAP["package-js-tests"]="package-js-tests"
-JOB_MAP["dummy-app-integration-tests (3.4, 22, latest)"]="dummy-app-integration-tests"
-JOB_MAP["dummy-app-integration-tests (3.2, 20, minimum)"]="dummy-app-integration-tests"
+# Split dummy app callers include build jobs too, so only match the reusable integration job.
+JOB_MAP["webpack-dummy-app-tests / dummy-app-integration-tests*"]="dummy-app-integration-tests"
+JOB_MAP["webpack-minimum-dummy-app-tests / dummy-app-integration-tests*"]="dummy-app-integration-tests"
+JOB_MAP["rspack-dummy-app-tests / dummy-app-integration-tests*"]="dummy-app-integration-tests"
+JOB_MAP["dummy-app-integration-tests (4.0, 22, latest)"]="dummy-app-integration-tests"
+JOB_MAP["dummy-app-integration-tests (3.3, 20, minimum)"]="dummy-app-integration-tests"
 JOB_MAP["examples"]="examples"
+JOB_MAP["precompile-check"]="precompile-check"
+JOB_MAP["pro-lint"]="pro-lint"
+JOB_MAP["build-dummy-app-webpack-test-bundles"]="pro-dummy-build"
+JOB_MAP["rspec-gem-specs"]="pro-rspec-gem-specs"
+JOB_MAP["rspec-dummy-app-node-renderer"]="pro-dummy-rspec"
+JOB_MAP["dummy-app-node-renderer-e2e-tests"]="pro-dummy-e2e"
+JOB_MAP["dummy-app-rspack-rsc-runtime-gate"]="pro-rspack-rsc-runtime-gate"
 
 # Function to execute commands without eval
 run_command() {
   local cmd_id="$1"
   case "$cmd_id" in
     "lint-js-and-ruby")
-      bundle exec rubocop && pnpm run eslint --report-unused-disable-directives && pnpm start format.listDifferent
+      bundle_command "$ROOT_GEMFILE" bundle exec rubocop &&
+        pnpm run eslint --report-unused-disable-directives &&
+        pnpm start format.listDifferent
+      ;;
+    "required-pr-gate")
+      ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.safe_load_file(f, permitted_classes: [], aliases: false); puts f }" &&
+        for script in bin/ci-local bin/ci-rerun-failures bin/request-hosted-ci script/ci-changes-detector; do
+          bash -n "$script"
+        done &&
+        script/ci-changes-detector "origin/$PR_BASE_REF"
       ;;
     "rspec-package-tests")
-      bundle exec rake run_rspec:gem
+      ensure_oss_dependencies
+      (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle exec rake run_rspec:gem)
       ;;
     "package-js-tests")
       pnpm test
       ;;
     "dummy-app-integration-tests")
-      bundle exec rake run_rspec:all_dummy
+      ensure_oss_dependencies
+      (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle exec rake run_rspec:all_dummy)
       ;;
     "examples")
-      bundle exec rake run_rspec:shakapacker_examples
+      ensure_oss_dependencies
+      (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle exec rake run_rspec:shakapacker_examples)
+      ;;
+    "precompile-check")
+      ensure_oss_dependencies
+      (cd "$ROOT_DIR/react_on_rails/spec/dummy" && bundle exec rake assets:precompile)
+      ;;
+    "pro-lint")
+      (cd "$ROOT_DIR/react_on_rails_pro" &&
+        bundle_command "$ROOT_GEMFILE" bundle exec rubocop --ignore-parent-exclusion &&
+        bundle_command "$ROOT_DIR/react_on_rails_pro/Gemfile" bundle exec rake rbs:validate &&
+        pnpm run nps check-typescript)
+      ;;
+    "pro-dummy-build"|"pro-dummy-rspec"|"pro-dummy-e2e"|"pro-rspack-rsc-runtime-gate")
+      echo "No exact local equivalent for $cmd_id. Run the matching Pro dummy workflow or use bin/ci-local --all."
+      return 1
+      ;;
+    "pro-rspec-gem-specs")
+      (cd "$ROOT_DIR/react_on_rails_pro" && bundle_command "$ROOT_DIR/react_on_rails_pro/Gemfile" bundle exec rspec spec/react_on_rails_pro)
       ;;
     *)
       echo "Unknown command ID: $cmd_id"
@@ -209,16 +299,20 @@ run_command() {
   esac
 }
 
-# Map CI job names to human-readable versions (matches SWITCHING_CI_CONFIGS.md)
+# Map CI job names to human-readable versions.
+# Keep Shakapacker versions in sync with bin/ci-switch-config and SWITCHING_CI_CONFIGS.md.
 declare -A JOB_VERSION_MAP
-JOB_VERSION_MAP["dummy-app-integration-tests (3.4, 22, latest)"]="Ruby 3.4, Node 22, Shakapacker 9.3.0, React 19"
-JOB_VERSION_MAP["dummy-app-integration-tests (3.2, 20, minimum)"]="Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18"
+JOB_VERSION_MAP["webpack-dummy-app-tests / dummy-app-integration-tests*"]="Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"
+JOB_VERSION_MAP["webpack-minimum-dummy-app-tests / dummy-app-integration-tests*"]="Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18"
+JOB_VERSION_MAP["rspack-dummy-app-tests / dummy-app-integration-tests*"]="Ruby 4.0, Node 22, React 19 (rspack)"
+JOB_VERSION_MAP["dummy-app-integration-tests (4.0, 22, latest)"]="Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"
+JOB_VERSION_MAP["dummy-app-integration-tests (3.3, 20, minimum)"]="Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18"
 
 # Helper function to get version info for a job name
 get_version_info() {
   local job_name="$1"
   for mapped_job_name in "${!JOB_VERSION_MAP[@]}"; do
-    if [[ "$job_name" == "$mapped_job_name"* ]]; then
+    if job_name_matches "$job_name" "$mapped_job_name"; then
       echo " (${JOB_VERSION_MAP[$mapped_job_name]})"
       return
     fi
@@ -238,8 +332,8 @@ declare -A COMMANDS_TO_RUN
 
 while IFS= read -r check; do
   for job_name in "${!JOB_MAP[@]}"; do
-    if [[ "$check" == "$job_name"* ]]; then
-      COMMANDS_TO_RUN["${JOB_MAP[$job_name]}"]="$job_name"
+    if job_name_matches "$check" "$job_name"; then
+      COMMANDS_TO_RUN["${JOB_MAP[$job_name]}"]="$check"
       break
     fi
   done
@@ -286,10 +380,11 @@ fi
 
 echo ""
 
-# Ensure dependencies
-if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
+# Ensure root dependencies
+cd "$ROOT_DIR"
+if [ ! -d "node_modules" ] || ! bundle_command "$ROOT_GEMFILE" bundle check >/dev/null 2>&1; then
   echo -e "${YELLOW}Installing dependencies...${NC}"
-  bundle install && pnpm install
+  bundle_command "$ROOT_GEMFILE" bundle install && pnpm install
   echo ""
 fi
 

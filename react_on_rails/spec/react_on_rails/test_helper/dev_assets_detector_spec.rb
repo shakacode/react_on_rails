@@ -4,6 +4,7 @@ require_relative "../spec_helper"
 require "tmpdir"
 require "json"
 require "fileutils"
+require "stringio"
 
 # rubocop:disable RSpec/SubjectStub
 describe ReactOnRails::TestHelper::DevAssetsDetector do
@@ -69,6 +70,16 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
     path
   end
 
+  def capture_stderr
+    original_stderr = $stderr
+    stream = StringIO.new
+    $stderr = stream
+    yield
+    stream.string
+  ensure
+    $stderr = original_stderr
+  end
+
   describe "#check" do
     subject(:detector) { described_class.new }
 
@@ -114,10 +125,41 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
                          "application.js" => "http://localhost:3035/packs/application.js"
                        })
         write_source_file
+        described_class.send(:reset_hmr_warning_state!)
       end
 
       it "returns nil (HMR assets not usable)" do
         expect(detector.check).to be_nil
+      end
+
+      it "prints bundler-neutral HMR guidance" do
+        output = capture_stderr { detector.check }
+
+        expect(output).to include("your bundler's dev server memory")
+        expect(output).to include("No build_test_command is configured yet. To add one:")
+        expect(output).to include(
+          'Set config.build_test_command = "<your-build-command>" in config/initializers/react_on_rails.rb'
+        )
+        expect(output).not_to include(
+          '• Set config.build_test_command = "<your-build-command>" in config/initializers/react_on_rails.rb'
+        )
+        expect(output).not_to include("webpack-dev-server")
+        expect(output).not_to include("bin/shakapacker")
+      end
+
+      context "with build_test_command configured" do
+        before do
+          allow(ReactOnRails.configuration)
+            .to receive(:build_test_command)
+            .and_return("RAILS_ENV=test bin/vite build")
+        end
+
+        it "includes the configured command in HMR guidance" do
+          output = capture_stderr { detector.check }
+
+          expect(output).to include("• RAILS_ENV=test bin/vite build")
+          expect(output).not_to include("No build_test_command is configured yet")
+        end
       end
     end
 
@@ -262,6 +304,12 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
         expect(described_class.try_activate_dev_assets!).to be true
       end
 
+      it "prints bundler-neutral reuse guidance" do
+        expect do
+          described_class.try_activate_dev_assets!
+        end.to output(include("detected fresh static-mode asset output")).to_stdout
+      end
+
       it "overrides Shakapacker data with dev output path" do
         expect(mock_config).to receive(:instance_variable_set).with(:@data, anything) do |_name, new_data|
           expect(new_data[:public_root_path]).to eq("public")
@@ -338,14 +386,14 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
     end
 
     it "resets the HMR warning flag before each activation attempt" do
-      described_class.instance_variable_set(described_class::HMR_WARNING_PRINTED, true)
+      described_class.instance_variable_set(:@hmr_warning_printed, true)
       detector = instance_double(described_class)
       allow(described_class).to receive(:new).and_return(detector)
       allow(detector).to receive(:check).and_return(nil)
 
       described_class.try_activate_dev_assets!
 
-      expect(described_class.instance_variable_defined?(described_class::HMR_WARNING_PRINTED)).to be(false)
+      expect(described_class.instance_variable_defined?(:@hmr_warning_printed)).to be(false)
     end
   end
 end

@@ -8,10 +8,10 @@ This guide explains how to switch between different CI test configurations local
 # Check your current configuration
 bin/ci-switch-config status
 
-# Switch to minimum dependencies (Ruby 3.2, Node 20)
+# Switch to the minimum runtime/dependency profile
 bin/ci-switch-config minimum
 
-# Switch back to latest dependencies (Ruby 3.4, Node 22)
+# Switch back to the latest runtime/dependency profile
 bin/ci-switch-config latest
 ```
 
@@ -21,16 +21,16 @@ The project runs tests against two configurations:
 
 ### Latest (Default Development)
 
-- **Ruby**: 3.4
+- **Ruby**: 4.0
 - **Node**: 22
-- **Shakapacker**: 9.5.0
+- **Shakapacker**: 10.1.0
 - **React**: 19.0.0
 - **Dependencies**: Latest versions with `--frozen-lockfile`
 - **When it runs**: Always on PRs and master
 
 ### Minimum (Compatibility Testing)
 
-- **Ruby**: 3.2
+- **Ruby**: 3.3
 - **Node**: 20
 - **Shakapacker**: 8.2.0
 - **React**: 18.0.0
@@ -41,7 +41,7 @@ The project runs tests against two configurations:
 
 **Switch to minimum when:**
 
-- CI fails on `dummy-app-integration-tests (3.2, 20, minimum)` but passes on latest
+- CI fails on `dummy-app-integration-tests (3.3, 20, minimum)` but passes on latest
 - You're debugging compatibility with older dependencies
 - You want to verify minimum version support before releasing
 
@@ -99,6 +99,7 @@ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
 - If you only have rvm (no nvm) or only nvm (no rvm), the script will detect this and provide helpful error messages guiding you to install the missing manager or switch to mise/asdf.
 - **Do not mix version managers** (e.g., don't install both mise and rvm). The script prioritizes mise > asdf > rvm+nvm, so mise/asdf will always take precedence. Using multiple managers can cause confusion about which versions are active.
+- The OSS lockfiles use Bundler 4, including when testing the Ruby 3.3 minimum lane. `bin/ci-switch-config` installs the locked Bundler version for local dummy-app bundling; if you run Bundler manually on Ruby 3.3, install the lockfile version first with `gem install bundler -v 4.0.10`.
 
 ## Detailed Usage
 
@@ -122,9 +123,11 @@ bin/ci-switch-config minimum
 
 This will:
 
-1. Create `.tool-versions` with Ruby 3.2.8 and Node 20.18.1
+1. Copy `.minimum.tool-versions` to `.tool-versions`, saving the latest profile as `.maximum.tool-versions`
+   with `.maximum.tool-versions.head`
+   - This `.tool-versions` update happens for every supported version manager because CI reads the file directly.
 2. Run `script/convert` to downgrade dependencies:
-   - Shakapacker 9.5.0 → 8.2.0
+   - Shakapacker 10.1.0 → 8.2.0
    - React 19.0.0 → 18.0.0
    - Remove ESLint and other packages incompatible with Node 20
 3. Clean `node_modules` and `pnpm-lock.yaml`
@@ -157,7 +160,8 @@ bin/ci-switch-config latest
 
 This will:
 
-1. Create `.tool-versions` with Ruby 3.4.3 and Node 22.12.0
+1. Restore `.tool-versions` from `.maximum.tool-versions` when it was saved on the current git head
+   (or from git if no current saved profile exists)
 2. Restore files from git (reverting changes made by `script/convert`)
 3. Clean `node_modules` and `pnpm-lock.yaml`
 4. Reinstall dependencies with `--frozen-lockfile`
@@ -186,6 +190,8 @@ bundle exec rake run_rspec:all_dummy
 When switching to **minimum**, these files are modified:
 
 - `.tool-versions` - Ruby/Node versions
+- `.maximum.tool-versions` - saved latest Ruby/Node versions
+- `.maximum.tool-versions.head` - git commit where the saved runtime versions were captured
 - `Gemfile.development_dependencies` - Shakapacker gem version
 - `package.json` - React versions, dev dependencies removed
 - `react_on_rails/spec/dummy/package.json` - React and Shakapacker versions
@@ -193,7 +199,13 @@ When switching to **minimum**, these files are modified:
 - `node_modules/`, `pnpm-lock.yaml` - Cleaned and regenerated
 - `react_on_rails/spec/dummy/node_modules/`, `react_on_rails/spec/dummy/pnpm-lock.yaml` - Cleaned and regenerated
 
-When switching to **latest**, these files are restored from git.
+When switching to **latest**, `.tool-versions` is restored from `.maximum.tool-versions` when that saved profile
+matches the current git head (or from git if no current saved profile exists), and dependency files are restored
+from git.
+
+Keep `.tool-versions` and `.minimum.tool-versions` to plain `tool version` lines with no comments so both mise and
+asdf can parse them. The latest Node profile should stay pinned below the Node startup regression tracked in
+nodejs/node#56010 until that fix reaches an LTS patch.
 
 ## Common Workflows
 
@@ -210,7 +222,7 @@ bin/ci-switch-config minimum
 cd <project-root>
 
 # 4. Verify versions changed
-ruby --version  # Should show 3.2.x
+ruby --version  # Should show 3.3.x
 node --version  # Should show v20.x
 
 # 5. Build and test
@@ -280,12 +292,12 @@ asdf reshim nodejs
 
 ```bash
 # Install and use specific Ruby version
-rvm install 3.2.8   # or 3.4.3
-rvm use 3.2.8
+rvm install 3.3.7   # or 4.0.5
+rvm use 3.3.7
 
 # Install and use specific Node version
-nvm install 20.18.1  # or 22.12.0
-nvm use 20.18.1
+nvm install 20.19.0  # or 22.12.0
+nvm use 20.19.0
 
 # Verify versions
 ruby --version

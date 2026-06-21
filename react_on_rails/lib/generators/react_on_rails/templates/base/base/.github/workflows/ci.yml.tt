@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          # ruby-version: "3.3"  # Uncomment and set if you don't have a .ruby-version file
+          bundler-cache: true
+
+<%- if config[:package_manager] == 'pnpm' -%>
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+<%- unless config[:pnpm_version_declared] -%>
+        with:
+          # ⚠️ Verify this matches the pnpm major that wrote your pnpm-lock.yaml —
+          # major mismatches can silently change dependency resolution. To manage
+          # the version via Corepack instead, add `"packageManager": "pnpm@<exact-version>"`
+          # to package.json and remove this `with:` block. Range/tag specs (e.g. `pnpm@^10`,
+          # `pnpm@latest`) are non-reproducible and some Corepack versions reject them.
+          version: "<%= config[:pnpm_fallback_version] %>"
+<%- end -%>
+<%- end -%>
+<%- if config[:package_manager] == 'bun' -%>
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+<%- end -%>
+<%- if config[:package_manager] == 'yarn' -%>
+      - name: Enable Corepack
+        # Must run before actions/setup-node so its `cache: "yarn"` step
+        # can resolve Yarn Berry's cache directory correctly.
+        run: corepack enable
+
+<%- end -%>
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # "lts/*" tracks the current Node LTS; consider pinning (e.g. "22") for reproducible builds.
+          node-version: "lts/*"
+<%- if config[:has_lockfile] && %w[yarn pnpm npm].include?(config[:package_manager]) -%>
+          cache: "<%= config[:package_manager] %>"
+<%- end -%>
+
+      - name: Install JS dependencies
+<%- if !config[:has_lockfile] && config[:package_manager] == 'yarn' -%>
+        # Yarn Berry defaults to immutable installs; allow lockfile creation on first CI run.
+        run: yarn install --no-immutable
+<%- elsif !config[:has_lockfile] && config[:package_manager] == 'pnpm' -%>
+        # pnpm defaults to frozen-lockfile in CI; allow lockfile creation on first CI run.
+        run: pnpm install --no-frozen-lockfile
+<%- else -%>
+        run: <%= config[:package_manager] %> install
+<%- end -%>
+
+<%- if config[:has_active_record] -%>
+      - name: Set up database
+        # If using PostgreSQL or MySQL, add a services block above.
+        # See https://docs.github.com/en/actions/using-containerized-services
+        run: bin/rails db:prepare
+        env:
+          RAILS_ENV: test
+
+<%- end -%>
+      - name: Build JavaScript bundles
+        # Shakapacker default. ViteRuby users: replace with `bin/vite build --mode test`.
+        run: |
+<%- if config[:precompile_hook_command] -%>
+          <%= config[:precompile_hook_command] %>
+          SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true bin/shakapacker
+<%- else -%>
+          bin/shakapacker
+<%- end -%>
+        env:
+          RAILS_ENV: test
+          NODE_ENV: test
+
+      - name: Run tests
+        run: <%= config[:has_rspec] ? "bundle exec rspec" : "bin/rails test" %>
+        env:
+          RAILS_ENV: test

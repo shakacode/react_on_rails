@@ -6,11 +6,13 @@ require "erb"
 require_relative "generator_messages"
 require_relative "generator_helper"
 require_relative "js_dependency_manager"
+require_relative "shakapacker_precompile_hook_helper"
 module ReactOnRails
   module Generators
     class BaseGenerator < Rails::Generators::Base
       include GeneratorHelper
       include JsDependencyManager
+      include ShakapackerPrecompileHookHelper
 
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
@@ -22,11 +24,28 @@ module ReactOnRails
                    desc: "Install Redux package and Redux version of Hello World Example",
                    aliases: "-R"
 
-      # --rspack
+      # --rspack / --no-rspack (Rspack is the default on fresh installs; --no-rspack selects Webpack)
+      # IMPORTANT: do NOT add a `default:` here. The absence of a default is load-bearing — Thor
+      # only includes :rspack in the options hash when the flag is explicitly passed, which is how
+      # GeneratorHelper#using_rspack? tells an explicit choice from "no flag given" (the latter
+      # falls back to rspack_bundler_default). Adding `default: false` would make
+      # options.key?(:rspack) always true and silently break the fresh-install Rspack default.
+      # (Thor's omit-when-no-default behavior verified against Thor 1.5.0; see Gemfile.lock.)
       class_option :rspack,
                    type: :boolean,
+                   desc: "Use Rspack (default) as the bundler; pass --no-rspack to use Webpack"
+
+      # --webpack: friendly alias for --no-rspack (reconciled in GeneratorHelper#explicit_bundler_choice).
+      # No `default:` here either — same load-bearing reason as --rspack above.
+      class_option :webpack,
+                   type: :boolean,
+                   desc: "Use Webpack as the bundler (alias for --no-rspack; --no-webpack is equivalent to --rspack)"
+
+      # --tailwind
+      class_option :tailwind,
+                   type: :boolean,
                    default: false,
-                   desc: "Use Rspack instead of Webpack as the bundler"
+                   desc: "Install Tailwind CSS v4 and style the generated SSR example"
 
       # --pro
       class_option :pro,
@@ -44,6 +63,13 @@ module ReactOnRails
       # When true, copy_packer_config uses force: true to overwrite Shakapacker's default config
       # without prompting, since we know it's a fresh default (not user-customized).
       class_option :shakapacker_just_installed,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
+      # Hidden option: used by create-react-on-rails-app so fresh apps get a
+      # generated home page without changing existing-app installs.
+      class_option :new_app,
                    type: :boolean,
                    default: false,
                    hide: true
@@ -86,8 +112,20 @@ module ReactOnRails
           generator.__send__(:use_rsc?)
         end
 
+        def use_tailwind?
+          generator.__send__(:use_tailwind?)
+        end
+
         def shakapacker_version_9_or_higher?
           generator.__send__(:shakapacker_version_9_or_higher?)
+        end
+
+        def rsc_plugin_class_name
+          generator.__send__(:rsc_plugin_class_name)
+        end
+
+        def rsc_plugin_import_path
+          generator.__send__(:rsc_plugin_import_path)
         end
       end
 
@@ -98,6 +136,51 @@ module ReactOnRails
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED
 
+      def add_root_route
+        return unless options.new_app?
+        # add_root_route normally runs before copy_base_files as a generator action.
+        # Guard against accidental double invocation (for example, if future
+        # refactors trigger lazy initialization in generate_new_app_home_page?).
+        return if defined?(@new_app_root_route_added)
+
+        @new_app_root_route_added = false
+
+        if preexisting_root_route?
+          say_status :skip, "Root route already exists; keeping existing root route", :yellow
+          return
+        end
+
+        routes_path = "config/routes.rb"
+        routes_full_path = File.join(destination_root, routes_path)
+
+        unless File.file?(routes_full_path)
+          say_status :warn, "Could not inject root route; config/routes.rb was not found", :yellow
+          return
+        end
+
+        # Support both LF and CRLF route files so new-app onboarding works on Windows checkouts too.
+        routes_draw_declaration = /^\s*Rails\.application\.routes\.draw do\r?\n/
+        unless File.read(routes_full_path).match?(routes_draw_declaration)
+          say_status :warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow
+          return
+        end
+
+        inject_into_file routes_path,
+                         %(  root to: "home#index"\n),
+                         after: routes_draw_declaration
+        if options[:pretend]
+          @new_app_root_route_added = true
+          return
+        end
+
+        if File.read(routes_full_path).include?('root to: "home#index"')
+          @new_app_root_route_added = true
+          return
+        end
+
+        say_status :warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow
+      end
+
       def add_hello_world_route
         # RSC uses HelloServer instead of HelloWorld, but Redux still needs hello_world route
         return if use_rsc? && !options.redux?
@@ -105,14 +188,51 @@ module ReactOnRails
         route "get 'hello_world', to: 'hello_world#index'"
       end
 
+      def copy_packer_config
+        # Rails generator actions run in method definition order.
+        # Keep this before actions that call shakapacker_source_path or
+        # shakapacker_source_entry_path; those helpers memoize on first read.
+        if instance_variable_defined?(:@shakapacker_source_path) ||
+           instance_variable_defined?(:@shakapacker_source_entry_path)
+          raise Thor::Error, "copy_packer_config must run before path-dependent generator actions"
+        end
+
+        base_path = "base/base/"
+        config = "config/shakapacker.yml"
+        use_rspack = using_rspack?
+
+        if options.shakapacker_just_installed?
+          say "Replacing Shakapacker default config with React on Rails version"
+          # Shakapacker's installer just created this file from scratch (no pre-existing config).
+          # Safe to overwrite silently with RoR's version-aware template (e.g., private_output_path).
+          template("#{base_path}#{config}.tt", config, force: true)
+        else
+          say "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
+          # Thor handles the conflict: prompts user interactively, or respects --force/--skip flags.
+          template("#{base_path}#{config}.tt", config)
+        end
+
+        # Configure bundler-specific settings
+        configure_rspack_in_shakapacker if use_rspack
+
+        # Always ensure precompile_hook is configured (Shakapacker 9.0+ only)
+        configure_precompile_hook_in_shakapacker
+
+        # For SSR bundles, configure Shakapacker private_output_path (9.0+ only)
+        # This keeps Shakapacker and React on Rails server bundle paths in sync.
+        configure_private_output_path_in_shakapacker
+      end
+
       def create_react_directories
         # Skip HelloWorld directory for Redux (uses HelloWorldApp) or RSC (uses HelloServer)
         return if options.redux? || use_rsc?
 
-        empty_directory("app/javascript/src/HelloWorld/ror_components")
+        empty_directory(File.join(example_component_source_directory("HelloWorld"), "ror_components"))
       end
 
       def copy_base_files
+        ensure_new_app_root_route_initialized
+
         base_path = "base/base/"
         base_files = %w[Procfile.dev
                         Procfile.dev-static-assets
@@ -128,10 +248,16 @@ module ReactOnRails
         # HelloWorld controller only when not using RSC (RSC uses HelloServer)
         # Exception: Redux still needs the HelloWorld controller even with RSC
         base_files << "app/controllers/hello_world_controller.rb" unless use_rsc? && !options.redux?
+        base_files << "app/controllers/home_controller.rb" if generate_new_app_home_page?
         base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         base_templates.each do |file|
           template("#{base_path}/#{file}.tt", file)
+        end
+
+        if generate_new_app_home_page?
+          empty_directory("app/views/home")
+          template("#{base_path}/app/views/home/index.html.erb.tt", "app/views/home/index.html.erb", home_page_config)
         end
 
         # Make the hook script executable (copy_file guarantees it exists)
@@ -144,14 +270,15 @@ module ReactOnRails
 
       def copy_js_bundle_files
         base_path = "base/base/"
-        base_files = %w[app/javascript/packs/server-bundle.js]
+        copy_file("#{base_path}app/javascript/packs/server-bundle.js",
+                  shakapacker_entrypoint_path("server-bundle.js"))
 
         # Skip HelloWorld CSS for Redux (uses HelloWorldApp) or RSC (uses HelloServer)
-        unless options.redux? || use_rsc?
-          base_files << "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
-        end
+        return if options.redux? || use_rsc? || use_tailwind?
 
-        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        copy_file("#{base_path}app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css",
+                  File.join(example_component_source_directory("HelloWorld"),
+                            "ror_components/HelloWorld.module.css"))
       end
 
       def copy_webpack_config
@@ -178,30 +305,12 @@ module ReactOnRails
         copy_webpack_main_config(base_path, config)
       end
 
-      def copy_packer_config
-        base_path = "base/base/"
-        config = "config/shakapacker.yml"
+      def copy_tailwind_files
+        return unless use_tailwind?
 
-        if options.shakapacker_just_installed?
-          say "Replacing Shakapacker default config with React on Rails version"
-          # Shakapacker's installer just created this file from scratch (no pre-existing config).
-          # Safe to overwrite silently with RoR's version-aware template (e.g., private_output_path).
-          template("#{base_path}#{config}.tt", config, force: true)
-        else
-          say "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
-          # Thor handles the conflict: prompts user interactively, or respects --force/--skip flags.
-          template("#{base_path}#{config}.tt", config)
-        end
-
-        # Configure bundler-specific settings
-        configure_rspack_in_shakapacker if using_rspack?
-
-        # Always ensure precompile_hook is configured (Shakapacker 9.0+ only)
-        configure_precompile_hook_in_shakapacker
-
-        # For SSR bundles, configure Shakapacker private_output_path (9.0+ only)
-        # This keeps Shakapacker and React on Rails server bundle paths in sync.
-        configure_private_output_path_in_shakapacker
+        base_path = "base/tailwind/"
+        copy_file("#{base_path}app/javascript/stylesheets/application.css",
+                  shakapacker_stylesheet_path("application.css"))
       end
 
       def add_base_gems_to_gemfile
@@ -237,13 +346,11 @@ module ReactOnRails
       end
 
       CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<~STR
-        RSpec.configure do |config|
-          # Ensure that if we are running js tests, we are using latest webpack assets
-          # This will use the defaults of :js and :server_rendering meta tags
-          # Requires config.build_test_command in config/initializers/react_on_rails.rb.
-          # This is the default setup for React on Rails generated apps.
-          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-        end
+        # Ensure that if we are running js tests, we are using latest webpack assets
+        # This will use the defaults of :js and :server_rendering meta tags
+        # Requires config.build_test_command in config/initializers/react_on_rails.rb.
+        # This is the default setup for React on Rails generated apps.
+        ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       STR
 
       CONFIGURE_MINITEST_TO_COMPILE_ASSETS = <<~STR
@@ -254,6 +361,374 @@ module ReactOnRails
       STR
 
       private
+
+      # Fresh-install context: default to Rspack (when Shakapacker supports it) unless the
+      # app already declares a bundler. See GeneratorHelper#fresh_install_rspack_default.
+      # NOTE: InstallGenerator#rspack_bundler_default is an intentional twin of this override
+      # (both generators are independently CLI-invocable); keep the two in sync.
+      def rspack_bundler_default
+        fresh_install_rspack_default
+      end
+
+      def generated_build_test_command
+        shakapacker_build_command(env: "RAILS_ENV=test NODE_ENV=test", environment: "test")
+      end
+
+      def generate_new_app_home_page?
+        options.new_app? && new_app_root_route_added?
+      end
+
+      def new_app_root_route_added?
+        return false unless options.new_app?
+        return @new_app_root_route_added if defined?(@new_app_root_route_added)
+
+        false
+      end
+
+      def preexisting_root_route?
+        return @preexisting_root_route if defined?(@preexisting_root_route)
+
+        @preexisting_root_route = root_route_present?
+      end
+
+      def ensure_new_app_root_route_initialized
+        return unless options.new_app?
+        return if defined?(@new_app_root_route_added)
+
+        # add_root_route should run as a generator action first, but keep this
+        # explicit call so copy_base_files remains safe if action ordering changes.
+        add_root_route
+      end
+
+      def home_page_config
+        docs_url = if use_rsc?
+                     "https://reactonrails.com/docs/pro/react-server-components/"
+                   else
+                     "https://reactonrails.com/docs/"
+                   end
+
+        {
+          app_name:,
+          docs_url:,
+          examples: home_page_examples,
+          file_hints: home_page_file_hints,
+          stack_badges: home_page_stack_badges,
+          learning_links: home_page_learning_links,
+          pro_cta: home_page_pro_cta,
+          pro_section: home_page_pro_section,
+          rendering_paths: home_page_rendering_paths
+        }
+      end
+
+      def home_page_examples
+        examples = []
+
+        if use_rsc?
+          examples << {
+            label: "Open RSC demo",
+            title: "HelloServer",
+            path: "/hello_server",
+            badge: "RSC",
+            description: "Async React Server Components streamed from Rails " \
+                         "with only client islands shipping JavaScript."
+          }
+        end
+
+        unless use_rsc? && !options.redux?
+          example_description = if options.redux?
+                                  "Redux-backed server rendering with hydration."
+                                else
+                                  "Server-rendered React with hydration and hot reloading."
+                                end
+
+          examples << {
+            label: "Open SSR demo",
+            title: options.redux? ? "HelloWorldApp" : "HelloWorld",
+            path: "/hello_world",
+            badge: "SSR",
+            description: example_description
+          }
+        end
+
+        examples
+      end
+
+      def home_page_file_hints
+        hints = [
+          {
+            path: "app/views/home/index.html.erb",
+            description: "Generated landing page. Replace this once your product has a real root route."
+          },
+          {
+            path: example_source_path,
+            description: "React source for the generated example components."
+          },
+          {
+            path: example_view_path,
+            description: "Rails view that mounts the generated example."
+          },
+          {
+            path: using_rspack? ? "config/rspack/" : "config/webpack/",
+            description: "Bundler configuration generated for this app."
+          },
+          {
+            path: "bin/dev",
+            description: "Launch Rails and the asset watcher together from one command."
+          }
+        ]
+
+        if use_pro?
+          hints << {
+            path: "renderer/node-renderer.js",
+            description: "Node renderer entrypoint used for Pro SSR and RSC."
+          }
+        end
+
+        hints
+      end
+
+      def home_page_learning_links
+        links = [
+          {
+            title: "Documentation guide",
+            url: "https://reactonrails.com/docs/",
+            description: "Core install, generator, and API docs for the OSS stack."
+          },
+          {
+            title: "Compare OSS and Pro",
+            url: "https://reactonrails.com/docs/getting-started/oss-vs-pro/",
+            description: "See which capabilities stay in OSS and which move into the Pro track."
+          },
+          {
+            title: "Pro quick start",
+            url: "https://reactonrails.com/docs/getting-started/pro-quick-start/",
+            description: "Add the Pro gem and package changes when you are ready for the upgrade."
+          },
+          {
+            title: "Marketplace RSC demo",
+            url: "https://github.com/shakacode/react-on-rails-demo-marketplace-rsc",
+            description: "Study a larger app comparing traditional SSR, client boundaries, and streamed RSC."
+          }
+        ]
+
+        return links unless use_rsc?
+
+        [
+          {
+            title: "React Server Components guide",
+            url: "https://reactonrails.com/docs/pro/react-server-components/",
+            description: "Read the architecture, rendering flow, and migration guidance for the Pro RSC stack."
+          },
+          {
+            title: "RSC tutorial",
+            url: "https://reactonrails.com/docs/pro/react-server-components/tutorial/",
+            description: "Walk through the generated HelloServer example end to end."
+          }
+        ] + links
+      end
+
+      def home_page_pro_cta
+        if use_rsc?
+          {
+            label: "RSC tutorial",
+            url: "https://reactonrails.com/docs/pro/react-server-components/tutorial/"
+          }
+        elsif use_pro?
+          {
+            label: "See Pro docs",
+            url: "https://reactonrails.com/pro/"
+          }
+        else
+          {
+            label: "Compare OSS and Pro",
+            url: "https://reactonrails.com/docs/getting-started/oss-vs-pro/"
+          }
+        end
+      end
+
+      def home_page_pro_section
+        {
+          eyebrow: use_pro? ? "Included in this app" : "Worth evaluating next",
+          title: use_pro? ? "React on Rails Pro is already wired in" : "Why teams move from OSS to Pro",
+          description: use_pro? ? home_page_pro_description_for_enabled_app : home_page_pro_description_for_oss_app,
+          note: use_pro? ? home_page_pro_note_for_enabled_app : home_page_pro_note_for_oss_app,
+          features: home_page_pro_features,
+          links: home_page_pro_links
+        }
+      end
+
+      def home_page_pro_features
+        [
+          {
+            title: "React Server Components",
+            description: "Stream async server components from Rails and keep JavaScript on the client " \
+                         "only where it adds value."
+          },
+          {
+            title: "Node renderer",
+            description: "Use a Node-based rendering path when you need higher-throughput SSR or " \
+                         "richer runtime support."
+          },
+          {
+            title: "Upgrade path",
+            description: "Compare OSS and Pro, follow the quick start, and study the marketplace " \
+                         "demo before rolling changes into a real app."
+          }
+        ]
+      end
+
+      def home_page_pro_links
+        links = [
+          {
+            label: "React on Rails Pro",
+            url: "https://reactonrails.com/pro/"
+          },
+          {
+            label: "Marketplace demo",
+            url: "https://github.com/shakacode/react-on-rails-demo-marketplace-rsc"
+          }
+        ]
+
+        if use_rsc?
+          links.unshift(
+            {
+              label: "RSC guide",
+              url: "https://reactonrails.com/docs/pro/react-server-components/"
+            }
+          )
+        else
+          links.unshift(
+            {
+              label: "OSS vs Pro",
+              url: "https://reactonrails.com/docs/getting-started/oss-vs-pro/"
+            }
+          )
+        end
+
+        links
+      end
+
+      def home_page_rendering_paths
+        [
+          home_page_ssr_path,
+          home_page_rsc_path,
+          home_page_compare_path
+        ]
+      end
+
+      def home_page_ssr_path
+        if use_rsc? && !options.redux?
+          {
+            badge: "SSR",
+            title: "Server render + hydrate",
+            description: "The OSS baseline: render HTML on the server, then hydrate React in the browser.",
+            url: "https://reactonrails.com/docs/getting-started/tutorial/",
+            cta: "Read the SSR tutorial",
+            external: true
+          }
+        else
+          {
+            badge: "SSR",
+            title: "Server render + hydrate",
+            description: "Rendered on the server, hydrated in the browser, and ready for hot reloading in development.",
+            url: "/hello_world",
+            cta: "Open SSR demo",
+            external: false
+          }
+        end
+      end
+
+      def home_page_rsc_path
+        if use_rsc?
+          {
+            badge: "RSC",
+            title: "Async server components",
+            description: "This app already streams React Server Components from Rails with small client islands.",
+            url: "/hello_server",
+            cta: "Open RSC demo",
+            external: false
+          }
+        else
+          {
+            badge: "RSC",
+            title: "Streaming with server/client boundaries",
+            description: "Use the Pro stack when you want React Server Components and streamed rendering.",
+            url: "https://reactonrails.com/docs/pro/react-server-components/",
+            cta: "See RSC docs",
+            external: true
+          }
+        end
+      end
+
+      def home_page_compare_path
+        if use_pro?
+          {
+            badge: "PRO",
+            title: "Node renderer + upgrade docs",
+            description: "Pro keeps the Rails integration story but adds the Node renderer, RSC " \
+                         "docs, and support paths.",
+            url: "https://reactonrails.com/pro/",
+            cta: "Open Pro overview",
+            external: true
+          }
+        else
+          {
+            badge: "COMPARE",
+            title: "Know when to upgrade",
+            description: "Stay on OSS for the baseline, then compare with Pro before you need RSC " \
+                         "or higher-throughput SSR.",
+            url: "https://reactonrails.com/docs/getting-started/oss-vs-pro/",
+            cta: "Compare OSS and Pro",
+            external: true
+          }
+        end
+      end
+
+      def home_page_stack_badges
+        badges = [
+          options.typescript? ? "TypeScript" : "JavaScript",
+          using_rspack? ? "Rspack" : "Webpack",
+          use_rsc? ? "React Server Components" : "Server-side rendering",
+          "Rails + PostgreSQL"
+        ]
+        badges << "React on Rails Pro" if use_pro?
+        badges
+      end
+
+      def example_source_path
+        return example_component_source_path("HelloServer") if use_rsc? && !options.redux?
+        return example_component_source_path("HelloWorldApp") if options.redux?
+
+        example_component_source_path("HelloWorld")
+      end
+
+      def example_view_path
+        use_rsc? && !options.redux? ? "app/views/hello_server/index.html.erb" : "app/views/hello_world/index.html.erb"
+      end
+
+      def home_page_pro_description_for_enabled_app
+        if use_rsc?
+          "This fresh app already includes the Pro RSC stack. Use the links below to go deeper on " \
+            "the generated HelloServer route, the Node renderer, and larger example apps."
+        else
+          "This fresh app already includes the Pro stack. Use the links below to learn the Node " \
+            "renderer and the broader upgrade story before you shape the app into your own product."
+        end
+      end
+
+      def home_page_pro_description_for_oss_app
+        "Stay on OSS for the base Rails + React workflow. Move to Pro when you want React Server Components, " \
+          "the Node renderer, or a clearer path for performance-focused rendering work."
+      end
+
+      def home_page_pro_note_for_enabled_app
+        "React on Rails Pro can be enabled route by route, so validate the flows that matter before " \
+          "expanding the footprint."
+      end
+
+      def home_page_pro_note_for_oss_app
+        "Review the Pro docs and upgrade guide first, then enable it with the appropriate license when you're ready."
+      end
 
       def preferred_rspec_helper_file
         rails_helper = File.join(destination_root, "spec/rails_helper.rb")
@@ -523,9 +998,10 @@ module ReactOnRails
           # Note: files originally generated with --pro or --rsc will not match when the
           # current run omits those options; in that case, we preserve the directory.
           # Templates rely on config[:message] plus a small helper subset exposed by
-          # TemplateRenderContext (add_documentation_reference, use_pro?, use_rsc?,
-          # shakapacker_version_9_or_higher?). Missing method delegates raise
-          # NoMethodError and are caught below, treating the file as non-removable.
+          # TemplateRenderContext (add_documentation_reference, use_pro?, use_rsc?, use_tailwind?,
+          # shakapacker_version_9_or_higher?, rsc_plugin_class_name, rsc_plugin_import_path).
+          # Missing method delegates raise NoMethodError and are caught below, treating the
+          # file as non-removable.
           # Missing config hash keys return nil silently, so any new config key
           # required by templates must be added to template_doc_config above.
           # Use TemplateRenderContext#erb_binding to avoid leaking method-local
@@ -570,13 +1046,13 @@ module ReactOnRails
         expected_configs = shakapacker_default_configs
 
         # Check if the content matches any of the known default configurations
-        expected_configs.any? { |config| content_matches_template?(content, config, strip_comments: strip_comments) }
+        expected_configs.any? { |config| content_matches_template?(content, config, strip_comments:) }
       end
 
       def content_matches_template?(content, template, strip_comments: false)
         # Normalize whitespace and compare
-        normalize_config_content(content, strip_comments: strip_comments) ==
-          normalize_config_content(template, strip_comments: strip_comments)
+        normalize_config_content(content, strip_comments:) ==
+          normalize_config_content(template, strip_comments:)
       end
 
       def normalize_config_content(content, strip_comments: false)
@@ -731,7 +1207,11 @@ module ReactOnRails
         content = File.read(helper_file)
         return if content.match?(/^\s*[^#\s][^#]*ReactOnRails::TestHelper\.configure_rspec_to_compile_assets/)
 
-        updated_content = content.sub("RSpec.configure do |config|", CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
+        updated_content = content.sub(/^(?<indent>\s*)RSpec\.configure do \|config\|\s*$/) do |header|
+          indent = Regexp.last_match[:indent]
+          insertion = CONFIGURE_RSPEC_TO_COMPILE_ASSETS.lines.map { |line| "#{indent}  #{line}" }.join
+          "#{header}\n#{insertion}"
+        end
         return if updated_content == content
 
         File.write(helper_file, updated_content)
@@ -778,8 +1258,9 @@ module ReactOnRails
 
         content = File.read(shakapacker_config_path)
 
-        # Already has an active (non-commented) precompile_hook configured? Don't overwrite.
-        return if content.match?(/^\s+precompile_hook:\s*['"][^'"]+['"]/)
+        # Don't materialize placeholders when any placeholder section already has
+        # a direct or inherited active precompile_hook.
+        return if active_precompile_hook_configured?(content)
 
         # Replace the commented placeholder with the actual value
         # Shakapacker 9.x default config has: # precompile_hook: ~

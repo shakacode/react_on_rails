@@ -1,19 +1,24 @@
 name: Integration Tests
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event.pull_request.number && format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) || format('{0}-{1}', github.workflow, github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches:
       - 'main'
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'react_on_rails_pro/**'
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
     inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
         required: false
         type: boolean
         default: false
@@ -23,37 +28,47 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_lint: ${{ steps.detect.outputs.run_lint }}
       run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
-      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
+      should_use_full_matrix: ${{ steps.hosted-ci.outputs.should_use_full_matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
           # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
           fetch-depth: 50
           persist-credentials: false
-      - name: Check for full-ci label
-        id: check-label
-        uses: ./.github/actions/check-full-ci-label
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR full-ci label is present, run everything
-          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_lint=true" >> "$GITHUB_OUTPUT"
-            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_generators=true" >> "$GITHUB_OUTPUT"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
+            {
+              echo "run_lint=true"
+              echo "run_js_tests=true"
+              echo "run_ruby_tests=true"
+              echo "run_dummy_tests=true"
+              echo "run_generators=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
           else
-            BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+            BASE_REF="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
             script/ci-changes-detector "$BASE_REF"
           fi
         shell: bash
@@ -67,254 +82,132 @@ jobs:
   setup-integration-matrix:
     needs: detect-changes
     runs-on: ubuntu-22.04
+    # Emit one matrix per independent build -> integration chain. Webpack latest keeps the
+    # existing webpack-dummy-app-tests caller; full-matrix runs add a separate webpack minimum
+    # caller so dependency-level build failures cannot skip each other's integration tests.
+    # Rspack remains a single latest-only caller. Refs #3593 / #3622 (follow-up to #3481 / #3581).
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      webpack_matrix: ${{ steps.set-matrix.outputs.webpack_matrix }}
+      webpack_minimum_matrix: ${{ steps.set-matrix.outputs.webpack_minimum_matrix }}
+      rspack_matrix: ${{ steps.set-matrix.outputs.rspack_matrix }}
+      run_full_matrix: ${{ steps.set-matrix.outputs.run_full_matrix }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - id: set-matrix
+        env:
+          LATEST_RUBY_VERSION: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+          LATEST_NODE_VERSION: ${{ steps.tool-versions.outputs.node-major-version }}
+          MINIMUM_RUBY_VERSION: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
+          MINIMUM_NODE_VERSION: ${{ steps.tool-versions.outputs.minimum-node-major-version }}
+          SHOULD_USE_FULL_MATRIX: ${{ needs.detect-changes.outputs.should_use_full_matrix }}
         run: |
-          # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label)
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
-             [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             [[ "${{ inputs.force_run }}" == "true" ]] || \
-             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
-            # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"3.4","node-version":"22","dependency-level":"latest"},{"ruby-version":"3.2","node-version":"20","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
+          # Integration matrices float Node within each supported major; single-lane
+          # workflows use exact patch versions when exercising the minimum floor.
+          latest_ruby_version="$LATEST_RUBY_VERSION"
+          latest_node_version="$LATEST_NODE_VERSION"
+          minimum_ruby_version="$MINIMUM_RUBY_VERSION"
+          minimum_node_version="$MINIMUM_NODE_VERSION"
+
+          # Full matrices run only on main, merge queue, release targets, or
+          # explicit force-full hosted CI. Normal hosted PR CI stays optimized.
+          if [[ "$SHOULD_USE_FULL_MATRIX" == "true" ]]; then
+            run_full_matrix=true
           else
-            # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"3.4","node-version":"22","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
+            run_full_matrix=false
           fi
+          # Legs are built with `jq -nc` so the JSON stays readable/diffable (one leg per line) while
+          # still emitting compact single-line output for $GITHUB_OUTPUT. Refs #3481.
+          # Primary Webpack leg: test latest versions in both full and PR modes.
+          webpack_matrix="$(jq -nc \
+            --arg latest_ruby_version "$latest_ruby_version" \
+            --arg latest_node_version "$latest_node_version" \
+            '{
+            "include": [
+              {
+                "ruby-version": $latest_ruby_version,
+                "node-version": $latest_node_version,
+                "dependency-level": "latest",
+                "bundler": "webpack"
+              }
+            ]
+          }')"
+          # Full matrix only: test minimum supported versions for Webpack in its own reusable-workflow
+          # call so its build -> integration chain is independent from Webpack latest. Refs #3622.
+          webpack_minimum_matrix="$(jq -nc \
+            --arg minimum_ruby_version "$minimum_ruby_version" \
+            --arg minimum_node_version "$minimum_node_version" \
+            '{
+            "include": [
+              {
+                "ruby-version": $minimum_ruby_version,
+                "node-version": $minimum_node_version,
+                "dependency-level": "minimum",
+                "bundler": "webpack"
+              }
+            ]
+          }')"
+          # Rspack runs the latest leg in both full and PR modes (it has no minimum-version leg yet).
+          rspack_matrix="$(jq -nc \
+            --arg latest_ruby_version "$latest_ruby_version" \
+            --arg latest_node_version "$latest_node_version" \
+            '{
+            "include": [
+              {
+                "ruby-version": $latest_ruby_version,
+                "node-version": $latest_node_version,
+                "dependency-level": "latest",
+                "bundler": "rspack"
+              }
+            ]
+          }')"
+          {
+            echo "webpack_matrix=${webpack_matrix}"
+            echo "webpack_minimum_matrix=${webpack_minimum_matrix}"
+            echo "rspack_matrix=${rspack_matrix}"
+            echo "run_full_matrix=${run_full_matrix}"
+          } >> "$GITHUB_OUTPUT"
 
-  build-dummy-app-webpack-test-bundles:
+  # One reusable-workflow call per independent bundler/dependency-level chain. Each call owns its
+  # own build -> integration job chain (see dummy-app-bundler-tests.yml), so a build failure in one
+  # chain no longer skips another chain's integration tests. Refs #3593 / #3622.
+  # The shared gating keeps regular PR updates cheap while allowing optimized
+  # hosted CI only after an explicit hosted request or for release/main/queue.
+  webpack-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
-    # Skip only if: main push AND docs-only changes
-    # Otherwise run if: on main OR workflow_dispatch OR dummy tests needed
-    # This allows docs-only commits to skip heavy jobs while ensuring full CI on main for code changes
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_dummy_tests == 'true'
-      )
-    strategy:
-      matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ matrix.ruby-version }}
-          bundler: 2.5.9
-      # libyaml-dev is needed for psych v5
-      # this gem depends on sdoc which depends on rdoc which depends on psych
-      - name: Fix dependency for libyaml-dev
-        run: sudo apt install libyaml-dev
-      - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
-        with:
-          node-version: ${{ matrix.node-version }}
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-      - name: Print system information
-        run: |
-          echo "Linux release: "; cat /etc/issue
-          echo "Current user: "; whoami
-          echo "Current directory: "; pwd
-          echo "Ruby version: "; ruby -v
-          echo "Node version: "; node -v
-          echo "pnpm version: "; pnpm --version
-          echo "Bundler version: "; bundle --version
-      - name: Run conversion script for older Node compatibility
-        if: matrix.dependency-level == 'minimum'
-        run: script/convert
-      - name: Install Node modules with pnpm
-        # minimum config changes package.json (shakapacker version), so can't use frozen lockfile
-        run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
-      - name: Build workspace packages
-        run: pnpm run build
-      - name: Verify single React resolution for core dummy build
-        run: node script/check-single-react-resolution.mjs react_on_rails/spec/dummy packages/react-on-rails
-      - name: Save dummy app ruby gems to cache
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails/spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-      - name: Install Ruby Gems for dummy app
-        run: |
-          cd react_on_rails/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-          fi
-      - name: generate file system-based packs
-        run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
-      - name: Smoke check generated pack entrypoints
-        run: test -s react_on_rails/spec/dummy/client/app/generated/server-bundle-generated.js
-      - name: Build test bundles for dummy app
-        run: |
-          rm -rf react_on_rails/spec/dummy/public/webpack/test
-          pnpm --filter "react_on_rails" run build:rescript
-          cd react_on_rails/spec/dummy && RAILS_ENV="test" NODE_ENV="test" bin/shakapacker
-      - id: get-sha
-        run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
-      - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
-        uses: actions/cache/save@v4
-        with:
-          path: react_on_rails/spec/dummy/public/webpack
-          key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_dummy_tests == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dummy-app-bundler-tests.yml
+    with:
+      matrix: ${{ needs.setup-integration-matrix.outputs.webpack_matrix }}
 
-  dummy-app-integration-tests:
-    needs: [detect-changes, setup-integration-matrix, build-dummy-app-webpack-test-bundles]
-    # Run on main, workflow_dispatch, OR when tests needed on PR
+  webpack-minimum-dummy-app-tests:
+    needs: [detect-changes, setup-integration-matrix]
     if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
-      ) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_dummy_tests == 'true'
-      )
-    strategy:
-      matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ matrix.ruby-version }}
-          bundler: 2.5.9
-      - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
-        with:
-          node-version: ${{ matrix.node-version }}
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-      - name: Print system information
-        run: |
-          echo "Linux release: "; cat /etc/issue
-          echo "Current user: "; whoami
-          echo "Current directory: "; pwd
-          echo "Ruby version: "; ruby -v
-          echo "Node version: "; node -v
-          echo "pnpm version: "; pnpm --version
-          echo "Bundler version: "; bundle --version
-      - name: Run conversion script for older Node compatibility
-        if: matrix.dependency-level == 'minimum'
-        run: script/convert
-      - name: Save root ruby gems to cache
-        uses: actions/cache@v4
-        with:
-          path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-      - name: Save dummy app ruby gems to cache
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails/spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-      - id: get-sha
-        run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
-      - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails/spec/dummy/public/webpack
-          key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-      - name: Install Node modules with pnpm
-        # minimum config changes package.json (shakapacker version), so can't use frozen lockfile
-        run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
-      - name: Build workspace packages
-        run: pnpm run build
-      - name: Dummy JS tests
-        run: pnpm --filter "react_on_rails" run test:js
-      - name: Install Ruby Gems for package
-        run: |
-          cd react_on_rails
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-          fi
-      - name: Install Ruby Gems for dummy app
-        run: |
-          cd react_on_rails/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-          fi
-      - name: Ensure minimum required Chrome version
-        run: |
-          echo -e "Already installed $(google-chrome --version)\n"
-          MINIMUM_REQUIRED_CHROME_VERSION=75
-          INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
-          if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
-            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-            sudo apt-get update
-            sudo apt-get install google-chrome-stable
-            echo -e "\nInstalled $(google-chrome --version)"
-          fi
-      - name: Increase the amount of inotify watchers
-        run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
-      - name: generate file system-based packs
-        run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
-      - name: Git Stuff
-        if: matrix.dependency-level == 'minimum'
-        run: |
-          git config user.email "you@example.com"
-          git config user.name "Your Name"
-          git commit -am "stop generators from complaining about uncommitted code"
-      - run: cd react_on_rails/spec/dummy && bundle info shakapacker
-      - name: Set packer version environment variable
-        run: |
-          echo "CI_DEPENDENCY_LEVEL=ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}" >> $GITHUB_ENV
-      - name: Main CI
-        run: cd react_on_rails && bundle exec rake run_rspec:all_dummy
-      - name: Store test results
-        uses: actions/upload-artifact@v4
-        with:
-          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-          path: ~/rspec
-      - name: Store artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dummy-app-capybara-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-          path: react_on_rails/spec/dummy/tmp/capybara
-      - name: Store artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dummy-app-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-          path: react_on_rails/spec/dummy/log/test.log
-      - name: Store artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dummy-app-pnpm-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-          path: react_on_rails/spec/dummy/pnpm-debug.log
+      needs.setup-integration-matrix.outputs.run_full_matrix == 'true' &&
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_dummy_tests == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dummy-app-bundler-tests.yml
+    with:
+      matrix: ${{ needs.setup-integration-matrix.outputs.webpack_minimum_matrix }}
+
+  rspack-dummy-app-tests:
+    needs: [detect-changes, setup-integration-matrix]
+    if: |
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_dummy_tests == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dummy-app-bundler-tests.yml
+    with:
+      matrix: ${{ needs.setup-integration-matrix.outputs.rspack_matrix }}

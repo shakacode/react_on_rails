@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro",
-  "version": "16.4.0",
+  "version": "17.0.0-rc.5",
   "description": "React on Rails Pro package with React Server Components support",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
@@ -8,8 +8,9 @@
     "build": "pnpm run clean && tsc",
     "build-watch": "pnpm run clean && tsc --watch",
     "clean": "rm -rf ./lib",
-    "test": "pnpm run test:non-rsc && pnpm run test:rsc",
-    "test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(RSC|stream|registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"",
+    "test": "pnpm run test:non-rsc && pnpm run test:streaming && pnpm run test:rsc",
+    "test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(RSC|stream|registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"",
+    "test:streaming": "node scripts/check-react-version.cjs || jest tests/streamServerRenderedReactComponent.test.jsx tests/streamBackpressure.e2e.test.tsx tests/injectRSCPayload.test.ts tests/SuspenseHydration.test.tsx tests/parseLengthPrefixedStream.test.ts --runInBand",
     "test:rsc": "node scripts/check-react-version.cjs || NODE_CONDITIONS=react-server jest tests/*.rsc.test.*",
     "type-check": "tsc --noEmit --noErrorTruncation",
     "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
@@ -17,7 +18,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shakacode/react_on_rails.git"
+    "url": "git+https://github.com/shakacode/react_on_rails.git",
+    "directory": "packages/react-on-rails-pro"
   },
   "keywords": [
     "react",
@@ -39,11 +41,27 @@
     "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
     "./ReactOnRails.node": "./lib/ReactOnRails.node.js",
+    "./useRailsForm": "./lib/useRailsForm.js",
     "./tanstack-router": {
       "types": "./lib/tanstack-router.d.ts",
       "default": "./lib/tanstack-router.js"
     },
+    "./rscPayloadNode": {
+      "react-server": {
+        "types": "./lib/createRscPayloadNode.server.d.ts",
+        "default": "./lib/createRscPayloadNode.server.js"
+      },
+      "node": {
+        "types": "./lib/createRscPayloadNode.server.d.ts",
+        "default": "./lib/createRscPayloadNode.server.js"
+      },
+      "default": {
+        "types": "./lib/createRscPayloadNode.client.d.ts",
+        "default": "./lib/createRscPayloadNode.client.js"
+      }
+    },
     "./registerServerComponent/client": "./lib/registerServerComponent/client.js",
+    "./registerDefaultRSCProvider/client": "./lib/registerDefaultRSCProvider.client.js",
     "./registerServerComponent/server": {
       "react-server": "./lib/registerServerComponent/server.rsc.js",
       "default": "./lib/registerServerComponent/server.js"
@@ -53,7 +71,14 @@
       "react-server": "./lib/wrapServerComponentRenderer/server.rsc.js",
       "default": "./lib/wrapServerComponentRenderer/server.js"
     },
-    "./RSCRoute": "./lib/RSCRoute.js",
+    "./cache": {
+      "react-server": "./lib/cache/index.js",
+      "default": "./lib/cache/index.stub.js"
+    },
+    "./RSCRoute": {
+      "types": "./lib/RSCRoute.d.ts",
+      "default": "./lib/RSCRoute.js"
+    },
     "./RSCProvider": "./lib/RSCProvider.js",
     "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
   },
@@ -63,14 +88,18 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": ">= 19.0.2 <= 19.2.3",
-    "@tanstack/react-router": ">=1.139.0 <2.0.0"
+    "react-on-rails-rsc": "^19.0.5",
+    "@tanstack/react-router": ">=1.139.0 <2.0.0",
+    "ioredis": ">= 5"
   },
   "peerDependenciesMeta": {
     "@tanstack/react-router": {
       "optional": true
     },
     "react-on-rails-rsc": {
+      "optional": true
+    },
+    "ioredis": {
       "optional": true
     }
   },
@@ -82,12 +111,15 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails#readme",
+  "homepage": "https://reactonrails.com/docs/pro/",
   "devDependencies": {
+    "@tanstack/react-router": "1.163.3",
+    "@tanstack/store": "0.9.1",
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
-    "react": "^19.0.3",
-    "react-dom": "^19.0.3",
-    "react-on-rails-rsc": "^19.0.4"
+    "react": "~19.0.4",
+    "react-dom": "~19.0.4",
+    "react-on-rails-rsc": "19.0.5",
+    "ioredis": "5.11.1"
   }
 }

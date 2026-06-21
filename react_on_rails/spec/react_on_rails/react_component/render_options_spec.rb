@@ -13,8 +13,8 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
   def the_attrs(react_component_name: "App", options: {})
     {
-      react_component_name: react_component_name,
-      options: options
+      react_component_name:,
+      options:
     }
   end
 
@@ -59,7 +59,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     context "with props Hash" do
       it "returns props" do
         props = { a_prop: 2 }
-        attrs = the_attrs(options: { props: props })
+        attrs = the_attrs(options: { props: })
 
         opts = described_class.new(**attrs)
 
@@ -71,7 +71,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
   describe "#react_component_name" do
     it "returns react_component_name with correct format" do
       react_component_name = "some_app"
-      attrs = the_attrs(react_component_name: react_component_name)
+      attrs = the_attrs(react_component_name:)
 
       opts = described_class.new(**attrs)
 
@@ -117,7 +117,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     context "with id option" do
       it "returns given id" do
         options = { id: "im-an-id" }
-        attrs = the_attrs(options: options)
+        attrs = the_attrs(options:)
 
         opts = described_class.new(**attrs)
 
@@ -141,13 +141,54 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     context "with html_options" do
       it "returns html options" do
         html_options = { id: 2 }
-        options = { html_options: html_options }
-        attrs = the_attrs(options: options)
+        options = { html_options: }
+        attrs = the_attrs(options:)
 
         opts = described_class.new(**attrs)
 
         expect(opts.html_options).to eq html_options
       end
+    end
+  end
+
+  describe "#hydrate_on" do
+    it "defaults to immediate and is not explicit" do
+      opts = described_class.new(**the_attrs)
+
+      expect(opts.hydrate_on).to eq(:immediate)
+    end
+
+    context "without React on Rails Pro" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "accepts supported symbol modes" do
+        %i[immediate visible idle].each do |hydrate_on|
+          opts = described_class.new(**the_attrs(options: { hydrate_on: }))
+
+          expect(opts.hydrate_on).to eq(hydrate_on)
+        end
+      end
+
+      it "normalizes supported string modes" do
+        opts = described_class.new(**the_attrs(options: { hydrate_on: "visible" }))
+
+        expect(opts.hydrate_on).to eq(:visible)
+      end
+    end
+
+    it "rejects unsupported modes" do
+      expect do
+        described_class.new(**the_attrs(options: { hydrate_on: :interaction }))
+      end.to raise_error(ArgumentError, /Supported OSS modes are :immediate, :visible, and :idle/)
+    end
+
+    it "rejects deferred modes when React on Rails Pro is installed" do
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      expect do
+        described_class.new(**the_attrs(options: { hydrate_on: :visible }))
+      end.to raise_error(ArgumentError, /React on Rails Pro does not support hydrate_on scheduling/)
     end
   end
 
@@ -222,7 +263,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         it "returns #{option}" do
           options = {}
           options[option] = false
-          attrs = the_attrs(options: options)
+          attrs = the_attrs(options:)
           if option == :prerender
             with_prerender_env_override_cleared do
               opts = described_class.new(**attrs)
@@ -248,101 +289,6 @@ describe ReactOnRails::ReactComponent::RenderOptions do
             opts = described_class.new(**attrs)
             expect(opts.public_send(option)).to be true
           end
-        end
-      end
-    end
-  end
-
-  describe "#immediate_hydration" do
-    context "with Pro license" do
-      before do
-        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-      end
-
-      context "with immediate_hydration option set to true" do
-        it "returns true" do
-          options = { immediate_hydration: true }
-          attrs = the_attrs(options: options)
-
-          opts = described_class.new(**attrs)
-
-          expect(opts.immediate_hydration).to be true
-        end
-      end
-
-      context "with immediate_hydration option set to false" do
-        it "returns false (override)" do
-          options = { immediate_hydration: false }
-          attrs = the_attrs(options: options)
-
-          opts = described_class.new(**attrs)
-
-          expect(opts.immediate_hydration).to be false
-        end
-      end
-
-      context "without immediate_hydration option" do
-        it "returns true (Pro default)" do
-          attrs = the_attrs
-
-          opts = described_class.new(**attrs)
-
-          expect(opts.immediate_hydration).to be true
-        end
-      end
-    end
-
-    context "without Pro gem installed" do
-      before do
-        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-      end
-
-      context "with immediate_hydration option set to true (not recommended)" do
-        it "returns false and logs a warning (enforces fallback)" do
-          options = { immediate_hydration: true }
-          attrs = the_attrs(options: options)
-
-          expect(Rails.logger).to receive(:warn)
-            .with(/immediate_hydration: true requires the React on Rails Pro gem to be installed/)
-
-          opts = described_class.new(**attrs)
-
-          expect(opts.immediate_hydration).to be false
-        end
-      end
-
-      context "with immediate_hydration option set to false" do
-        it "returns false" do
-          options = { immediate_hydration: false }
-          attrs = the_attrs(options: options)
-
-          opts = described_class.new(**attrs)
-
-          expect(opts.immediate_hydration).to be false
-        end
-      end
-
-      context "without immediate_hydration option" do
-        it "returns false (non-Pro-install default)" do
-          attrs = the_attrs
-
-          opts = described_class.new(**attrs)
-
-          expect(opts.immediate_hydration).to be false
-        end
-      end
-
-      context "with invalid immediate_hydration value" do
-        it "raises ArgumentError for non-boolean values" do
-          options = { immediate_hydration: "yes" }
-          attrs = the_attrs(options: options)
-
-          opts = described_class.new(**attrs)
-
-          expect { opts.immediate_hydration }.to raise_error(
-            ArgumentError,
-            /immediate_hydration must be true, false, or nil/
-          )
         end
       end
     end

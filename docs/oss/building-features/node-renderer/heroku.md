@@ -1,7 +1,7 @@
 # Node Renderer: Heroku Deployment
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
+> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 Most React on Rails Pro installations of the Node SSR Renderer will deploy the Rails and Renderer
 instances on the same server. This technique results in better performance since it avoids network
@@ -25,39 +25,54 @@ web: bin/runsvdir-dyno
 
 `/Procfile.web`
 
+Your `/Procfile.web` should keep the `puma` line and use the `renderer` line that matches your
+package manager:
+
+| Package manager | `renderer` line                    |
+| --------------- | ---------------------------------- |
+| npm             | `renderer: npm run node-renderer`  |
+| yarn            | `renderer: yarn run node-renderer` |
+| pnpm            | `renderer: pnpm run node-renderer` |
+
+For example, a complete `/Procfile.web` using pnpm:
+
 ```text
 puma: bundle exec puma -C config/puma.rb
-renderer: bin/node-renderer
+renderer: pnpm run node-renderer
 ```
 
-### bin/node-renderer
+Define the script in your root `package.json` so Heroku can run it from the app root:
 
-```bash
-#!/bin/bash
-cd client
-yarn run node-renderer
+```json
+{
+  "scripts": {
+    "node-renderer": "node renderer/node-renderer.js"
+  }
+}
 ```
 
-Be sure your script to run the node-renderer sets some port, like 3800 which is also set as the
-config.renderer_url for your Rails server.
+> **Note:** The script above relies on the default
+> `port: process.env.RENDERER_PORT || 3800` in the JS configuration example. That default is fine
+> for the same-dyno deployment above. If you deploy the renderer as a separate Heroku app, switch
+> the renderer config to `process.env.PORT` instead of `RENDERER_PORT`.
 
-### node-renderer
-
-Any task in client/package.json that starts the node-renderer
+Be sure your node-renderer script listens on the same port as the Rails `config.renderer_url`
+value, for example `http://localhost:3800`.
 
 ### Modifying Precompile Task
 
 _Not necessary if you are using [bundle caching](../bundle-caching.md) as doing so will result in the below being done automatically._
 
-To avoid the initial round trip to get a bundle on the renderer, you can do something like this to copy the file during precompile.
+To avoid the initial round trip to get a bundle on the renderer, you can pre-stage the renderer cache during precompile.
 
 See [lib/tasks/assets.rake](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/lib/tasks/assets.rake) for a couple tasks that you can use.
 
-If you're using the default tmp/bundles subdirectory for the node-renderer, you don't need to set the
-ENV value for `RENDERER_BUNDLE_PATH`. Otherwise, please set this ENV value so the files get copied
-to the right place.
+For same-dyno / same-filesystem deployments such as Heroku, the legacy
+`react_on_rails_pro:pre_stage_bundle_for_node_renderer` task is still appropriate. It pre-stages the same bundle-hash cache layout the renderer uses at runtime, but does so with symlinks instead of copies. Prefer `react_on_rails_pro:pre_seed_renderer_cache` for Docker/image-build workflows where the cache needs to be copied into an immutable artifact.
 
-Then you can use the rake task: `react_on_rails_pro:pre_stage_bundle_for_node_renderer`.
+If you're not using the default cache location, set `RENDERER_SERVER_BUNDLE_CACHE_PATH` so the files stage into the right place. `RENDERER_BUNDLE_PATH` remains a deprecated compatibility alias.
+
+Then you can use the rake task: `react_on_rails_pro:pre_seed_renderer_cache MODE=symlink`.
 
 You might do something like this:
 
@@ -66,7 +81,7 @@ Rake::Task["assets:precompile"]
     .clear_prerequisites
     .enhance([:environment, "react_on_rails:assets:compile_environment"])
     .enhance do
-  Rake::Task["react_on_rails_pro:pre_stage_bundle_for_node_renderer"].invoke
+  ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink)
 end
 ```
 

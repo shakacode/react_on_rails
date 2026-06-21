@@ -6,8 +6,13 @@ ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
   config.renderer_url = ENV.fetch("REACT_RENDERER_URL", "http://localhost:3800")
 
-  # See value in client/node-renderer.js
-  config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
+  # See value in renderer/node-renderer.js
+  # For production, set RENDERER_PASSWORD as an env var and remove the literal fallback.
+<% if @generated_renderer_password -%>
+  config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "<%= @generated_renderer_password %>")
+<% else -%>
+  config.renderer_password = ENV["RENDERER_PASSWORD"]
+<% end -%>
 
   config.ssr_timeout = 5
   config.renderer_request_retry_limit = 1

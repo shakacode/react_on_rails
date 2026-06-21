@@ -1,6 +1,6 @@
 # react-on-rails-pro
 
-The client-side JavaScript package for [React on Rails Pro](https://github.com/shakacode/react_on_rails). This package **replaces** the base `react-on-rails` package and re-exports everything from it, plus Pro-exclusive features like React Server Components support.
+The client-side JavaScript package for [React on Rails Pro](https://reactonrails.com/docs/pro/). This package **replaces** the base `react-on-rails` package and re-exports everything from it, plus Pro-exclusive features like React Server Components support.
 
 ## Installation
 
@@ -13,6 +13,8 @@ pnpm add react-on-rails-pro
 ```
 
 **Important:** When using the `react_on_rails_pro` Ruby gem, you **must** use this package (`react-on-rails-pro`) instead of `react-on-rails`. If the Pro gem detects the base `react-on-rails` npm package at runtime, it will raise an error.
+
+React on Rails Pro is free to evaluate in development, CI/CD, and staging. A paid license is required only for production deployments.
 
 ## Usage
 
@@ -31,12 +33,13 @@ ReactOnRails.register({ MyComponent });
 ### React Server Components (Pro-exclusive)
 
 ```javascript
-import { RSCRoute } from 'react-on-rails-pro/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+import { createRscPayloadNode } from 'react-on-rails-pro/rscPayloadNode';
 import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
-import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
+import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/client';
 
 // Register a server component for client-side hydration
-registerServerComponent({ MyServerComponent });
+registerServerComponent('MyServerComponent');
 ```
 
 ## Package Relationship
@@ -63,6 +66,7 @@ This package wraps and extends the base `react-on-rails` package. You only need 
 | `react-on-rails-pro/client`                             | Client-only build (no SSR utilities)                    |
 | `react-on-rails-pro/RSCRoute`                           | React Server Components route component                 |
 | `react-on-rails-pro/RSCProvider`                        | RSC provider component                                  |
+| `react-on-rails-pro/rscPayloadNode`                     | Browser helper for RSC payloads as route data           |
 | `react-on-rails-pro/registerServerComponent/client`     | Client-side server component registration               |
 | `react-on-rails-pro/registerServerComponent/server`     | Server-side server component registration               |
 | `react-on-rails-pro/wrapServerComponentRenderer/client` | Client-side renderer wrapping                           |
@@ -90,8 +94,10 @@ See the [full installation guide](https://reactonrails.com/docs/pro/installation
 - [Installation Guide](https://reactonrails.com/docs/pro/installation)
 - [Configuration Reference](https://reactonrails.com/docs/configuration/configuration-pro)
 - [React Server Components Tutorial](https://reactonrails.com/docs/pro/react-server-components/tutorial)
-- [React on Rails Pro Overview](https://pro.reactonrails.com/)
+- [RSC Payloads as Route Data](https://reactonrails.com/docs/pro/react-server-components/rsc-payload-route-data)
+- [Upgrade from OSS to Pro](https://reactonrails.com/docs/pro/upgrading-to-pro/)
+- [React on Rails Pro Overview](https://reactonrails.com/docs/pro/)
 
 ## License
 
-Commercial software. No license required for evaluation, development, testing, or CI/CD. A paid license is required for production deployments. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for licensing.
+Commercial software. No license required for evaluation, development, testing, or CI/CD. A paid license is required for production deployments. Contact [ShakaCode](https://pro.reactonrails.com/contact) for licensing.

@@ -2,6 +2,7 @@ module ReactOnRails
   module Dev
     class ProcessManager
       VERSION_CHECK_TIMEOUT: Integer
+      ENV_KEYS_TO_PRESERVE: Array[String]
 
       def self.installed?: (String) -> bool
       def self.ensure_procfile: (String) -> void
@@ -16,6 +17,7 @@ module ReactOnRails
       def self.process_available_in_system?: (String) -> bool
       def self.with_unbundled_context: () { () -> untyped } -> untyped
       def self.show_process_manager_installation_help: () -> void
+      def self.preserve_runtime_env_vars: () -> Hash[String, String]
       def self.valid_procfile_path?: (String) -> bool
     end
   end

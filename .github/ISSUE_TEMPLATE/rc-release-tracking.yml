@@ -1,0 +1,236 @@
+name: RC release gate tracking
+description: Track RC validation and final release readiness across hard-gate apps.
+title: "Release gate: react_on_rails X.Y.Z"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use one issue per final release target. Add a new RC section inside this same issue for each RC that is cut before the final release.
+
+        The final release should not ship until every hard gate below has passing smoke evidence, green required CI, or an explicit waiver for a failure proven unrelated to the RC.
+
+  - type: input
+    id: final-release-target
+    attributes:
+      label: Final release target
+      description: The stable version this issue gates.
+      placeholder: react_on_rails 17.0.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: package-versions
+    attributes:
+      label: Package versions under test
+      description: Record every package version involved in this release wave.
+      value: |
+        - `react_on_rails` gem:
+        - `react-on-rails` npm:
+        - `react_on_rails_pro` gem, if used:
+        - `react-on-rails-pro` npm, if used:
+        - `react-on-rails-pro-node-renderer`, if used:
+        - `shakapacker` gem/npm, if changed:
+        - `cpflow`, if changed:
+    validations:
+      required: true
+
+  - type: textarea
+    id: agent-release-mode
+    attributes:
+      label: Agent Release Mode
+      description: |
+        Live coordination block for Codex/Claude agents. Keep exactly one active tracker per final release target.
+        Canonical interpretation rules are in AGENTS.md -> Release Mode And Auto-Merge Coordination.
+        If this block is incomplete, agents should use strict-rc and report the missing block.
+        Tracker update rule: agents should prefer append-only comments for concurrent per-PR updates. Re-read this issue immediately before editing the body; if the body changed and the update cannot be merged safely, post the intended update as a Tracker Update comment instead.
+      value: |
+        Mode: strict-rc
+        Allowed modes: development, accelerated-rc, strict-rc, final-release
+        Auto-merge threshold: not enabled unless Mode is intentionally changed to accelerated-rc
+        Recent close guard: use Released or Superseded by #NNN in the closing label/comment
+        Full interpretation rules: AGENTS.md -> Release Mode And Auto-Merge Coordination
+    validations:
+      required: true
+
+  - type: textarea
+    id: hard-gates
+    attributes:
+      label: Hard gates
+      description: Link each RC PR and record the minimum smoke/CI evidence.
+      value: |
+        ## Non-demo gate
+
+        - [ ] `react_on_rails` generator/install smoke
+          - RC/final version:
+          - Commands:
+            - `bundle exec rspec react_on_rails/spec/react_on_rails/generators`
+            - `pnpm run build`
+            - `CREATE_ROR_SMOKE_SCOPE=oss packages/create-react-on-rails-app/scripts/smoke-test-local-gems.sh`
+          - Result:
+          - Issue/waiver:
+
+        ## App gates
+
+        - [ ] `shakacode/hichee`
+          - PR:
+          - Public-safe evidence:
+          - Tester/date:
+          - Issue/waiver:
+
+        - [ ] `shakacode/react-on-rails-demo-marketplace-rsc`
+          - PR:
+          - Install/build/smoke evidence:
+          - Required CI:
+          - Issue/waiver:
+
+        - [ ] `shakacode/react-on-rails-demo-hacker-news-rsc`
+          - PR:
+          - Install/build/smoke evidence:
+          - Required CI:
+          - Issue/waiver:
+
+        - [ ] `shakacode/react-on-rails-demo-gumroad-rsc`
+          - PR:
+          - Install/build/smoke evidence:
+          - Required CI:
+          - Issue/waiver:
+
+        - [ ] `shakacode/react-webpack-rails-tutorial`
+          - PR:
+          - Install/build/smoke evidence:
+          - Required CI:
+          - Issue/waiver:
+
+        - [ ] `shakacode/react-on-rails-starter-tanstack`
+          - PR:
+          - Install/build/smoke evidence:
+          - Required CI:
+          - Issue/waiver:
+    validations:
+      required: true
+
+  - type: textarea
+    id: rc-results
+    attributes:
+      label: RC results
+      description: Add one subsection per RC. Keep all RCs for this final release target in this issue.
+      value: |
+        ## RC 1
+
+        - Version(s):
+        - Released at:
+        - Hard gates completed:
+        - Suspected RC regressions:
+        - Waivers:
+        - Decision for next step:
+
+        ## RC 2
+
+        - Version(s):
+        - Released at:
+        - Hard gates completed:
+        - Suspected RC regressions:
+        - Waivers:
+        - Decision for next step:
+    validations:
+      required: false
+
+  - type: textarea
+    id: advisory-checks
+    attributes:
+      label: Advisory AI review checks
+      description: AI review checks are advisory unless they report a real actionable bug.
+      value: |
+        - Claude:
+        - CodeRabbit:
+        - Cursor Bugbot:
+        - Other:
+        - Actionable issues filed:
+    validations:
+      required: false
+
+  - type: textarea
+    id: shelved-repos
+    attributes:
+      label: Shelved or non-gating repos
+      description: Keep these visible so they are not forgotten, but do not let them block final.
+      value: |
+        - `shakacode/react-on-rails-demo-ssr-hmr`
+          - Reason: outdated; modernization issue `shakacode/react-on-rails-demo-ssr-hmr#77`
+          - Current action:
+
+        - `shakacode/react-on-rails-example-migration`
+          - Reason: migration example value is not part of the current final gate
+          - Current action:
+
+        - `shakacode/react-on-rails-example-open-flights`
+          - Reason: migration reference, not a current blocker
+          - Current action:
+
+        - `shakacode/react-on-rails-demo-v16-bundle-splitting`
+          - Reason: inherited from an older spec, not part of the current public-example gate
+          - Current action:
+
+        - `shakacode/react_on_rails-demo-octochangelog-on-rails-pro`
+          - Reason: Pro/RSC signal, but not part of the current approved hard gate
+          - Current action:
+
+        - `shakacode/react-on-rails-rsc-demo`
+          - Reason: retired and archived; generator validation moved to `react_on_rails`
+          - Current action: no RC bump
+    validations:
+      required: false
+
+  - type: textarea
+    id: final-bumps
+    attributes:
+      label: Final-version bump PRs
+      description: Fill this after the final release ships. The tracker stays open until final bumps are merged or explicitly followed up.
+      value: |
+        - [ ] `shakacode/hichee`
+          - Final PR:
+          - Result:
+
+        - [ ] `shakacode/react-on-rails-demo-marketplace-rsc`
+          - Final PR:
+          - Result:
+
+        - [ ] `shakacode/react-on-rails-demo-hacker-news-rsc`
+          - Final PR:
+          - Result:
+
+        - [ ] `shakacode/react-on-rails-demo-gumroad-rsc`
+          - Final PR:
+          - Result:
+
+        - [ ] `shakacode/react-webpack-rails-tutorial`
+          - Final PR:
+          - Result:
+
+        - [ ] `shakacode/react-on-rails-starter-tanstack`
+          - Final PR:
+          - Result:
+    validations:
+      required: false
+
+  - type: textarea
+    id: go-no-go
+    attributes:
+      label: Final go/no-go
+      description: Complete before publishing the final release, then update again after final bump PRs merge.
+      value: |
+        ## Before final release
+
+        - [ ] Every hard gate passed or has an explicit waiver
+        - [ ] Every suspected RC regression is fixed or filed
+        - [ ] HiChee evidence is public-safe
+        - [ ] Maintainer approving final release:
+        - [ ] Decision:
+
+        ## After final release
+
+        - [ ] Fresh final bump PRs opened
+        - [ ] Final bump PRs merged or follow-up issues filed
+        - [ ] Tracker close summary posted
+    validations:
+      required: true

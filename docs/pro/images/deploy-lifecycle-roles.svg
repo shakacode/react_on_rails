@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 510" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>A deploy's two adapter roles: pre-seed and publish</title>
+  <desc>Sequence diagram across four lanes — the current deploy, the rolling_deploy_adapter, the artifact store, and the new renderer cache. In the pre-seed phase the deploy lists recent hashes, fetches the still-draining bundle plus its companion assets, and stages them so the renderer is warm. In the publish phase the deploy uploads its own bundle so a future deploy can find it.</desc>
+  <defs>
+    <linearGradient id="buildGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A90D9"/><stop offset="100%" stop-color="#2E5A8A"/>
+    </linearGradient>
+    <linearGradient id="adapterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#6D28D9"/>
+    </linearGradient>
+    <linearGradient id="storeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/><stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#68A063"/><stop offset="100%" stop-color="#3C873A"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .lane-line { stroke: #E2E8F0; }
+      .phase-box { fill: none; stroke: #CBD5E1; }
+      .phase-label-bg { fill: #F1F5F9; stroke: #CBD5E1; }
+      .phase-label { fill: #475569; }
+      .seed-tint { fill: #EFF6FF; }
+      .pub-tint { fill: #ECFDF5; }
+      .msg-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .msg-text { fill: #1E40AF; }
+      .ret-box { fill: #ECFDF5; stroke: #86EFAC; }
+      .ret-text { fill: #166534; }
+      .arrow-fwd { stroke: #94A3B8; }
+      .arrow-ret { stroke: #22C55E; }
+      .head-fwd { fill: #94A3B8; }
+      .head-ret { fill: #22C55E; }
+      .note { fill: #475569; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .lane-line { stroke: #334155; }
+        .phase-box { stroke: #475569; }
+        .phase-label-bg { fill: #1E293B; stroke: #475569; }
+        .phase-label { fill: #94A3B8; }
+        .seed-tint { fill: #172554; }
+        .pub-tint { fill: #052E16; }
+        .msg-box { fill: #172554; stroke: #3B82F6; }
+        .msg-text { fill: #93C5FD; }
+        .ret-box { fill: #052E16; stroke: #10B981; }
+        .ret-text { fill: #6EE7B7; }
+        .arrow-fwd { stroke: #CBD5E1; }
+        .head-fwd { fill: #CBD5E1; }
+        .arrow-ret { stroke: #4ADE80; }
+        .head-ret { fill: #4ADE80; }
+        .note { fill: #94A3B8; }
+      }
+      .s1 { opacity:0; animation: reveal 12s ease 0.3s infinite; }
+      .s2 { opacity:0; animation: reveal 12s ease 1.2s infinite; }
+      .s3 { opacity:0; animation: reveal 12s ease 2.1s infinite; }
+      .s4 { opacity:0; animation: reveal 12s ease 3.0s infinite; }
+      .s5 { opacity:0; animation: reveal 12s ease 3.9s infinite; }
+      .s6 { opacity:0; animation: reveal 12s ease 4.8s infinite; }
+      .s7 { opacity:0; animation: reveal 12s ease 6.2s infinite; }
+      .s8 { opacity:0; animation: reveal 12s ease 7.1s infinite; }
+      @keyframes reveal { 0% { opacity:0; } 3% { opacity:1; } 93% { opacity:1; } 97% { opacity:0; } 100% { opacity:0; } }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; } }
+    </style>
+  </defs>
+
+  <rect width="880" height="510" class="bg"/>
+  <text x="440" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">A deploy plays two adapter roles</text>
+  <text x="440" y="47" text-anchor="middle" font-size="11" class="subtitle">Pre-seed warms THIS deploy; publish leaves a trail for the NEXT one</text>
+
+  <!-- lane headers -->
+  <rect x="40" y="60" width="150" height="32" rx="8" fill="url(#buildGrad)" filter="url(#shadow)"/>
+  <text x="115" y="80" text-anchor="middle" font-size="10.5" font-weight="600" fill="white">Current deploy (def)</text>
+  <rect x="280" y="60" width="150" height="32" rx="8" fill="url(#adapterGrad)" filter="url(#shadow)"/>
+  <text x="355" y="80" text-anchor="middle" font-size="10" font-weight="600" fill="white">rolling_deploy_adapter</text>
+  <rect x="520" y="60" width="150" height="32" rx="8" fill="url(#storeGrad)" filter="url(#shadow)"/>
+  <text x="595" y="80" text-anchor="middle" font-size="10" font-weight="600" fill="white">Artifact store</text>
+  <rect x="760" y="60" width="100" height="32" rx="8" fill="url(#nodeGrad)" filter="url(#shadow)"/>
+  <text x="810" y="80" text-anchor="middle" font-size="9.5" font-weight="600" fill="white">Renderer cache</text>
+
+  <line x1="115" y1="98" x2="115" y2="488" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="355" y1="98" x2="355" y2="488" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="595" y1="98" x2="595" y2="488" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="810" y1="98" x2="810" y2="488" class="lane-line" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+  <!-- PRE-SEED phase -->
+  <rect x="32" y="108" width="836" height="246" rx="9" class="seed-tint" opacity="0.5"/>
+  <rect x="32" y="108" width="836" height="246" rx="9" class="phase-box" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+  <rect x="32" y="108" width="430" height="20" rx="6" class="phase-label-bg" stroke-width="1"/>
+  <text x="44" y="122" font-size="10" font-weight="600" class="phase-label">Pre-seed — warm THIS deploy before it serves traffic</text>
+
+  <g class="s1">
+    <line x1="121" y1="148" x2="347" y2="148" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="347,145 354,148 347,151" class="head-fwd"/>
+    <rect x="170" y="138" width="130" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="235" y="150" text-anchor="middle" font-size="8.5" font-weight="500" class="msg-text">previous_bundle_hashes()</text>
+  </g>
+  <g class="s2">
+    <line x1="361" y1="180" x2="587" y2="180" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="587,177 594,180 587,183" class="head-fwd"/>
+    <rect x="420" y="170" width="110" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="475" y="182" text-anchor="middle" font-size="8.5" font-weight="500" class="msg-text">list recent hashes</text>
+  </g>
+  <g class="s3">
+    <line x1="589" y1="212" x2="363" y2="212" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="363,209 356,212 363,215" class="head-ret"/>
+    <rect x="430" y="202" width="90" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="475" y="214" text-anchor="middle" font-size="8.5" font-weight="500" class="ret-text">["abc"] · draining</text>
+  </g>
+  <g class="s4">
+    <line x1="121" y1="244" x2="347" y2="244" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="347,241 354,244 347,247" class="head-fwd"/>
+    <rect x="195" y="234" width="80" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="235" y="246" text-anchor="middle" font-size="8.5" font-weight="500" class="msg-text">fetch("abc")</text>
+    <line x1="361" y1="266" x2="587" y2="266" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="587,263 594,266 587,269" class="head-fwd"/>
+    <rect x="408" y="256" width="134" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="475" y="268" text-anchor="middle" font-size="8" font-weight="500" class="msg-text">download bundle + assets</text>
+  </g>
+  <g class="s5">
+    <line x1="589" y1="296" x2="121" y2="296" class="arrow-ret" stroke-width="2" stroke-dasharray="6 3"/>
+    <polygon points="121,293 114,296 121,299" class="head-ret"/>
+    <rect x="285" y="286" width="200" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="385" y="298" text-anchor="middle" font-size="8" font-weight="500" class="ret-text">bundle abc + loadable-stats / RSC manifests</text>
+  </g>
+  <g class="s6">
+    <line x1="121" y1="328" x2="802" y2="328" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="802,325 809,328 802,331" class="head-fwd"/>
+    <rect x="360" y="318" width="200" height="18" rx="4" class="ret-box" stroke-width="1"/>
+    <text x="460" y="330" text-anchor="middle" font-size="8" font-weight="600" class="ret-text">stage at {cache}/abc/abc.js → warm for abc + def</text>
+  </g>
+
+  <!-- PUBLISH phase -->
+  <rect x="32" y="362" width="836" height="118" rx="9" class="pub-tint" opacity="0.5"/>
+  <rect x="32" y="362" width="836" height="118" rx="9" class="phase-box" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+  <rect x="32" y="362" width="430" height="20" rx="6" class="phase-label-bg" stroke-width="1"/>
+  <text x="44" y="376" font-size="10" font-weight="600" class="phase-label">Publish — leave def behind for the NEXT deploy</text>
+
+  <g class="s7">
+    <line x1="121" y1="406" x2="347" y2="406" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="347,403 354,406 347,409" class="head-fwd"/>
+    <rect x="170" y="396" width="130" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="235" y="408" text-anchor="middle" font-size="8" font-weight="500" class="msg-text">upload("def", bundle:, assets:)</text>
+  </g>
+  <g class="s8">
+    <line x1="361" y1="440" x2="587" y2="440" class="arrow-fwd" stroke-width="1.5"/>
+    <polygon points="587,437 594,440 587,443" class="head-fwd"/>
+    <rect x="398" y="430" width="154" height="18" rx="4" class="msg-box" stroke-width="1"/>
+    <text x="475" y="442" text-anchor="middle" font-size="8" font-weight="500" class="msg-text">store bundle def + companions</text>
+  </g>
+
+  <text x="440" y="500" text-anchor="middle" font-size="10" class="note">A custom adapter implements three class methods: previous_bundle_hashes, fetch(hash), and upload(hash, …).</text>
+</svg>

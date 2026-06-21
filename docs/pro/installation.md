@@ -1,6 +1,10 @@
 # Installation
 
-React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. A **paid license is required for production deployments only**. No license token is needed for evaluation, local development, testing, or CI/CD. Contact [justin@shakacode.com](mailto:justin@shakacode.com) to purchase a license.
+React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. A **paid license is required for production deployments only**.
+
+**Friendly license model:** Try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate. If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app.
+
+When you are ready for production, visit [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license.
 
 **Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
 
@@ -8,11 +12,11 @@ Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHAN
 
 ## Version Format
 
-For the commands below, choose versions from the CHANGELOG and replace placeholders like
+For the commands below, choose versions 16.4.0 or greater from the CHANGELOG and replace placeholders like
 `<gem_version>` and `<npm_version>`. Note that for pre-release versions:
 
-- Gems use all periods: `16.2.0.beta.1`
-- NPM packages use dashes: `16.2.0-beta.1`
+- Gems use all periods: `16.4.0.beta.1`
+- NPM packages use dashes: `16.4.0-beta.1`
 
 # Generator Installation (Recommended)
 
@@ -34,7 +38,7 @@ git commit -m "Prepare app for React on Rails Pro install"
 bundle exec rails generate react_on_rails:install --pro
 ```
 
-This creates the Pro initializer, node-renderer.js, installs npm packages, and adds the Node Renderer to Procfile.dev.
+This creates the Pro initializer, `renderer/node-renderer.js`, installs npm packages, and adds the Node Renderer to Procfile.dev.
 
 ## Upgrading an Existing App
 
@@ -52,7 +56,7 @@ The standalone generator adds Pro-specific files and modifies your existing webp
 
 ## After Running the Generator
 
-Run a quick validation, then configure your license.
+Run a quick validation. For evaluation and non-production deployments, you can skip license setup.
 
 ```bash
 bundle exec rails react_on_rails:doctor
@@ -66,17 +70,18 @@ If port 3000 is already in use:
 PORT=3001 bin/dev
 ```
 
-Set the license environment variable:
+For production deployments, set the license environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
-See [License Configuration](#license-configuration-production-only) below for other options.
+See [License Configuration](#license-configuration-production-only) below for other options and
+[Pro pricing and sign up](https://pro.reactonrails.com/) when you need a production license.
 
 ## Adding React Server Components
 
-RSC requires React on Rails Pro and React 19.0.x. To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
+RSC requires React on Rails Pro and React 19 with a compatible `react-on-rails-rsc` version. To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
 
 ```bash
 # Fresh install with RSC
@@ -98,7 +103,7 @@ The sections below describe manual installation steps. Use these if you need fin
 
 ## Prerequisites
 
-Ensure your **Rails** app is using the **react_on_rails** gem, version 16.0.0 or higher.
+Ensure your **Rails** app is using the **react_on_rails** gem, version 16.4.0 or higher.
 
 ## Install react_on_rails_pro Gem
 
@@ -122,7 +127,9 @@ gem install react_on_rails_pro --version "<version>"
 
 ## License Configuration (Production Only)
 
-React on Rails Pro uses a license-optional model to simplify evaluation and development. A license token is optional for evaluation, local development, test environments, CI/CD pipelines, and staging/non-production deployments.
+React on Rails Pro uses a friendly license model to simplify evaluation and development. A license token is optional for evaluation, local development, test environments, CI/CD pipelines, and staging/non-production deployments.
+
+If no license is configured, the app continues running in unlicensed mode and logs license status instead of blocking startup. In production, that log message is a warning because a paid license is required; in non-production environments, it is informational.
 
 **For production deployments**, set your license token as an environment variable:
 
@@ -131,6 +138,40 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
 ⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
+
+### License Validation Lifecycle
+
+React on Rails Pro currently validates licenses offline with the public key embedded in the gem and node renderer
+package. There is no network call to ShakaCode during validation.
+
+License validation happens in these places:
+
+- Rails checks the license after application initialization and logs the result.
+- The standalone node renderer checks the license when the renderer master process starts and logs the result.
+- The browser receives `railsContext.rorPro` as a Pro-installed signal only; it does not validate the license.
+
+A missing, expired, or invalid license does not prevent Rails or the node renderer from starting. In production, license
+issues are logged as warnings, and Rails includes an HTML attribution comment indicating the license state.
+
+### Verify License Compliance
+
+Pro validates licenses **offline** at boot, and a missing, invalid, or expired license never crashes the app — Rails and the node renderer simply log the issue. The recommended way to catch license problems before they reach production is the built-in rake task, which exits non-zero when the license is missing, invalid, or expired:
+
+```bash
+RAILS_ENV=production bundle exec rake react_on_rails_pro:verify_license
+```
+
+Add it to your deploy pipeline as a one-line gate:
+
+```yaml
+- name: Verify React on Rails Pro license
+  env:
+    REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
+    RAILS_ENV: production
+  run: bundle exec rake react_on_rails_pro:verify_license
+```
+
+A valid-but-expiring license (within 30 days) still exits 0; the task logs a renewal-required warning. To fail closed on expiring-soon licenses, send renewal emails, run advisory (non-blocking) scheduled checks, or parse the JSON output, see [License CI Integration](./license-ci-integration.md).
 
 For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
@@ -188,11 +229,11 @@ Pro-exclusive imports:
 
 ```javascript
 // React Server Components
-import { RSCRoute } from 'react-on-rails-pro/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
 // Async component loading
-import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
+import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/client';
 ```
 
 See the [React Server Components tutorial](./react-server-components/tutorial.md) for detailed usage.
@@ -227,7 +268,7 @@ yarn add react-on-rails-pro-node-renderer@<npm_version> --exact
 
 ## Node Renderer Setup
 
-Create a JavaScript file to configure and launch the node renderer, for example `react-on-rails-pro-node-renderer.js`:
+Create a JavaScript file to configure and launch the node renderer at `renderer/node-renderer.js`:
 
 ```js
 const path = require('path');
@@ -243,7 +284,7 @@ const config = {
 
   // Password for Rails <-> Node renderer communication
   // See value in /config/initializers/react_on_rails_pro.rb
-  password: env.RENDERER_PASSWORD || 'changeme',
+  password: env.RENDERER_PASSWORD,
 
   port: env.RENDERER_PORT || 3800,
 
@@ -276,7 +317,7 @@ Add a script to your `package.json`:
 ```json
 {
   "scripts": {
-    "node-renderer": "node ./react-on-rails-pro-node-renderer.js"
+    "node-renderer": "node renderer/node-renderer.js"
   }
 }
 ```
@@ -298,7 +339,8 @@ ReactOnRailsPro.configure do |config|
 
   # Configure renderer connection
   config.renderer_url = ENV["REACT_RENDERER_URL"] || "http://localhost:3800"
-  config.renderer_password = ENV["RENDERER_PASSWORD"] || "changeme"
+  # Optional: omit this line to let Rails auto-read ENV["RENDERER_PASSWORD"].
+  # config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
 
   # Enable prerender caching (recommended)
   config.prerender_caching = true

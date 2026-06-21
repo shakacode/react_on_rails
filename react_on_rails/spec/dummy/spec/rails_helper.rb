@@ -81,7 +81,7 @@ RSpec.configure do |config|
     options = Selenium::WebDriver::Chrome::Options.new
     options.add_argument("--headless=new")
 
-    Capybara::Selenium::Driver.new(app, browser: :chrome, options: options)
+    Capybara::Selenium::Driver.new(app, browser: :chrome, options:)
   end
 
   #

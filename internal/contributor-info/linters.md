@@ -1,16 +1,24 @@
 # Linters
 
-These linters support the [ShakaCode Style Guidelines](../misc/style.md)
+These linters support the [ShakaCode Style Guidelines](../../docs/oss/misc/style.md)
 
 ## Autofix!
 
 If you haven't tried the autofix options for `eslint` and `rubocop`, you're seriously missing out!
 
 1. Be **SURE** you have a clean git status, as you'll want to review what the autofix does to your code!
-2. **Rubocop:** Be sure to be in the correct directory where you have Ruby files, usually the top level of your Rails project.
+2. **RuboCop:** In this monorepo, use the root bundle that owns the RuboCop version. For routine
+   OSS Ruby and JS/TS formatting, prefer `rake autofix`; for targeted Ruby autofix on a specific package:
 
 ```bash
-bundle exec rubocop -a
+# OSS Ruby (react_on_rails package only; equivalent to rake autofix's Ruby step):
+# -A includes unsafe cops, matching the set rake autofix applies.
+(cd react_on_rails && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop -A)
+
+# Pro Ruby or RuboCop config changes:
+# --ignore-parent-exclusion prevents root AllCops Exclude patterns, written as root-relative paths,
+# from being applied while running inside react_on_rails_pro/.
+(cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop -A --ignore-parent-exclusion)
 ```
 
 3. **ESLint:** Be sure to be in the correct directory where you have JS files.
@@ -70,7 +78,7 @@ Rule severity is configured with `'off'`, `'warn'` or `'error'`. In older config
 
 Rules can also take a few additional options. In this case, the rule can be set to an array, the first item of which is the severity and the rest are options.
 
-See file [.eslintrc](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/lib/generators/react_on_rails/templates/.eslintrc) for examples of configuration
+See file [.eslintrc](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/lib/generators/react_on_rails/templates/.eslintrc) for examples of configuration
 
 ### Specify/Override rules in code
 

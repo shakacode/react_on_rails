@@ -1,0 +1,233 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>React.cache() vs Prop Drilling</title>
+  <desc>Animated toggle between two approaches to sharing per-request data across Server Components: prop drilling (threading data through every component) versus React.cache() with zero-arg cached getters that any component can call directly.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .bad-header { fill: #FEE2E2; stroke: #FECACA; }
+      .bad-text { fill: #991B1B; }
+      .good-header { fill: #D1FAE5; stroke: #86EFAC; }
+      .good-text { fill: #166534; }
+      .node-box { fill: #F1F5F9; stroke: #CBD5E1; }
+      .node-text { fill: #334155; }
+      .prop-line { stroke: #EF4444; }
+      .prop-badge { fill: #FEE2E2; stroke: #FECACA; }
+      .prop-badge-text { fill: #991B1B; }
+      .cache-box { fill: #DBEAFE; stroke: #93C5FD; }
+      .cache-text { fill: #1E40AF; }
+      .cache-line { stroke: #3B82F6; }
+      .code-bg { fill: #1E293B; }
+      .code-text { fill: #E2E8F0; }
+      .code-keyword { fill: #67E8F9; }
+      .code-fn { fill: #C4B5FD; }
+      .code-string { fill: #4ADE80; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+      .tree-line { stroke: #94A3B8; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .bad-header { fill: #450A0A; stroke: #F87171; }
+        .bad-text { fill: #FCA5A5; }
+        .good-header { fill: #052E16; stroke: #10B981; }
+        .good-text { fill: #6EE7B7; }
+        .node-box { fill: #1E293B; stroke: #475569; }
+        .node-text { fill: #CBD5E1; }
+        .prop-line { stroke: #F87171; }
+        .prop-badge { fill: #450A0A; stroke: #F87171; }
+        .prop-badge-text { fill: #FCA5A5; }
+        .cache-box { fill: #172554; stroke: #3B82F6; }
+        .cache-text { fill: #93C5FD; }
+        .cache-line { stroke: #60A5FA; }
+        .code-bg { fill: #0F172A; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+        .tree-line { stroke: #64748B; }
+      }
+
+      .approach-a { opacity: 1; animation: toggleA 12s ease infinite; }
+      .approach-b { opacity: 0; animation: toggleB 12s ease infinite; }
+
+      @keyframes toggleA {
+        0%, 40% { opacity: 1; } 48%, 88% { opacity: 0; } 96%, 100% { opacity: 1; }
+      }
+      @keyframes toggleB {
+        0%, 40% { opacity: 0; } 48%, 88% { opacity: 1; } 96%, 100% { opacity: 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; }
+        .approach-a, .approach-b { opacity: 1 !important; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="480" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Per-Request Data: Prop Drilling vs React.cache()</text>
+  <text x="450" y="46" text-anchor="middle" font-size="11" class="subtitle">Two approaches to sharing data across Server Components within a single request</text>
+
+  <!-- ============ APPROACH A: Prop Drilling ============ -->
+  <g class="approach-a">
+    <!-- Header -->
+    <rect x="30" y="60" width="840" height="32" rx="12" class="bad-header" stroke-width="1.5"/>
+    <text x="450" y="81" text-anchor="middle" font-size="13" font-weight="700" class="bad-text">❌  Prop Drilling — every level must accept and forward all shared data</text>
+
+    <!-- Component tree -->
+    <rect x="30" y="100" width="440" height="280" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="250" y="124" text-anchor="middle" font-size="12" font-weight="600" class="label-text">Component Tree</text>
+
+    <!-- ProductPage (root) -->
+    <rect x="130" y="138" width="240" height="26" rx="6" class="node-box" stroke-width="1.5"/>
+    <text x="142" y="155" font-size="10" font-weight="600" class="node-text">ProductPage</text>
+    <rect x="248" y="140" width="100" height="18" rx="9" class="prop-badge" stroke-width="1"/>
+    <text x="298" y="153" text-anchor="middle" font-size="7" class="prop-badge-text">locale, user, flags</text>
+
+    <!-- Lines down -->
+    <line x1="160" y1="164" x2="160" y2="180" class="tree-line" stroke-width="1"/>
+    <line x1="250" y1="164" x2="270" y2="220" class="tree-line" stroke-width="1"/>
+    <line x1="340" y1="164" x2="360" y2="260" class="tree-line" stroke-width="1"/>
+
+    <!-- Header child -->
+    <rect x="80" y="180" width="160" height="26" rx="6" class="node-box" stroke-width="1.5"/>
+    <text x="92" y="197" font-size="10" class="node-text">Header</text>
+    <rect x="152" y="182" width="76" height="18" rx="9" class="prop-badge" stroke-width="1"/>
+    <text x="190" y="195" text-anchor="middle" font-size="7" class="prop-badge-text">locale, user</text>
+
+    <!-- ProductDetails child -->
+    <rect x="170" y="220" width="200" height="26" rx="6" class="node-box" stroke-width="1.5"/>
+    <text x="182" y="237" font-size="10" class="node-text">ProductDetails</text>
+    <rect x="296" y="222" width="66" height="18" rx="9" class="prop-badge" stroke-width="1"/>
+    <text x="329" y="235" text-anchor="middle" font-size="7" class="prop-badge-text">locale, flags</text>
+
+    <!-- ReviewSection child -->
+    <rect x="260" y="260" width="200" height="26" rx="6" class="node-box" stroke-width="1.5"/>
+    <text x="272" y="277" font-size="10" class="node-text">ReviewSection</text>
+    <rect x="384" y="262" width="68" height="18" rx="9" class="prop-badge" stroke-width="1"/>
+    <text x="418" y="275" text-anchor="middle" font-size="7" class="prop-badge-text">locale, user</text>
+
+    <!-- Prop drilling arrows -->
+    <line x1="155" y1="164" x2="155" y2="180" class="prop-line" stroke-width="2" stroke-dasharray="4 2"/>
+    <line x1="250" y1="164" x2="270" y2="220" class="prop-line" stroke-width="2" stroke-dasharray="4 2"/>
+    <line x1="340" y1="164" x2="360" y2="260" class="prop-line" stroke-width="2" stroke-dasharray="4 2"/>
+
+    <!-- Footer -->
+    <rect x="170" y="300" width="160" height="26" rx="6" class="node-box" stroke-width="1.5"/>
+    <text x="182" y="317" font-size="10" class="node-text">Footer</text>
+    <rect x="242" y="302" width="56" height="18" rx="9" class="prop-badge" stroke-width="1"/>
+    <text x="270" y="315" text-anchor="middle" font-size="7" class="prop-badge-text">locale</text>
+
+    <text x="250" y="358" text-anchor="middle" font-size="9" class="bad-text">Every component must explicitly</text>
+    <text x="250" y="372" text-anchor="middle" font-size="9" class="bad-text">accept and pass down shared data</text>
+
+    <!-- Problems list -->
+    <rect x="490" y="100" width="380" height="280" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="680" y="124" text-anchor="middle" font-size="12" font-weight="600" class="label-text">Problems</text>
+
+    <text x="510" y="152" font-size="10" class="bad-text">1. Intermediate components accept props they don't use</text>
+    <text x="510" y="178" font-size="10" class="bad-text">2. Adding new shared data = edit every ancestor</text>
+    <text x="510" y="204" font-size="10" class="bad-text">3. Prop interfaces grow unbounded</text>
+    <text x="510" y="230" font-size="10" class="bad-text">4. Refactoring moves are blocked by prop chains</text>
+
+    <rect x="510" y="260" width="340" height="100" rx="8" class="code-bg"/>
+    <text x="524" y="280" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">function</text>
+    <text x="570" y="280" font-family="ui-monospace, monospace" font-size="9" class="code-fn"> ProductPage</text>
+    <text x="660" y="280" font-family="ui-monospace, monospace" font-size="9" class="code-text">({</text>
+    <text x="530" y="296" font-family="ui-monospace, monospace" font-size="9" class="code-text">  locale, user, featureFlags, product</text>
+    <text x="524" y="312" font-family="ui-monospace, monospace" font-size="9" class="code-text">}) {</text>
+    <text x="536" y="328" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">  return</text>
+    <text x="574" y="328" font-family="ui-monospace, monospace" font-size="9" class="code-text"> &lt;Header locale={locale} user={user} /&gt;</text>
+    <text x="536" y="344" font-family="ui-monospace, monospace" font-size="9" class="code-text">  ...</text>
+  </g>
+
+  <!-- ============ APPROACH B: React.cache() ============ -->
+  <g class="approach-b">
+    <!-- Header -->
+    <rect x="30" y="60" width="840" height="32" rx="12" class="good-header" stroke-width="1.5"/>
+    <text x="450" y="81" text-anchor="middle" font-size="13" font-weight="700" class="good-text">✅  React.cache() — any component can call getIntl() directly</text>
+
+    <!-- Component tree -->
+    <rect x="30" y="100" width="440" height="280" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="250" y="124" text-anchor="middle" font-size="12" font-weight="600" class="label-text">Component Tree</text>
+
+    <!-- Cache store (center) -->
+    <rect x="56" y="140" width="130" height="70" rx="10" class="cache-box" stroke-width="2"/>
+    <text x="121" y="162" text-anchor="middle" font-size="10" font-weight="700" class="cache-text">React.cache()</text>
+    <text x="121" y="178" text-anchor="middle" font-size="8" class="cache-text">getIntl(locale)</text>
+    <text x="121" y="192" text-anchor="middle" font-size="8" class="cache-text">getUser()</text>
+
+    <!-- Components accessing cache directly -->
+    <rect x="220" y="140" width="220" height="26" rx="6" class="node-box" stroke-width="1.5"/>
+    <text x="330" y="157" text-anchor="middle" font-size="10" font-weight="600" class="node-text">ProductPage</text>
+
+    <rect x="220" y="186" width="100" height="24" rx="6" class="node-box" stroke-width="1.5"/>
+    <text x="270" y="202" text-anchor="middle" font-size="10" class="node-text">Header</text>
+
+    <rect x="220" y="224" width="140" height="24" rx="6" class="node-box" stroke-width="1.5"/>
+    <text x="290" y="240" text-anchor="middle" font-size="10" class="node-text">ProductDetails</text>
+
+    <rect x="220" y="262" width="140" height="24" rx="6" class="node-box" stroke-width="1.5"/>
+    <text x="290" y="278" text-anchor="middle" font-size="10" class="node-text">ReviewSection</text>
+
+    <rect x="220" y="300" width="100" height="24" rx="6" class="node-box" stroke-width="1.5"/>
+    <text x="270" y="316" text-anchor="middle" font-size="10" class="node-text">Footer</text>
+
+    <!-- Cache access lines (horizontal) -->
+    <line x1="186" y1="175" x2="220" y2="198" class="cache-line" stroke-width="1.5" stroke-dasharray="4 2"/>
+    <line x1="186" y1="175" x2="220" y2="236" class="cache-line" stroke-width="1.5" stroke-dasharray="4 2"/>
+    <line x1="186" y1="175" x2="220" y2="274" class="cache-line" stroke-width="1.5" stroke-dasharray="4 2"/>
+    <line x1="186" y1="175" x2="220" y2="312" class="cache-line" stroke-width="1.5" stroke-dasharray="4 2"/>
+
+    <text x="250" y="358" text-anchor="middle" font-size="9" class="good-text">Any component calls the cached getter directly —</text>
+    <text x="250" y="372" text-anchor="middle" font-size="9" class="good-text">no props needed. Memoized per-request.</text>
+
+    <!-- Code + benefits -->
+    <rect x="490" y="100" width="380" height="280" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="680" y="124" text-anchor="middle" font-size="12" font-weight="600" class="label-text">Pattern</text>
+
+    <rect x="510" y="138" width="340" height="100" rx="8" class="code-bg"/>
+    <text x="524" y="156" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">import</text>
+    <text x="562" y="156" font-family="ui-monospace, monospace" font-size="9" class="code-text"> { cache } </text>
+    <text x="620" y="156" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">from</text>
+    <text x="646" y="156" font-family="ui-monospace, monospace" font-size="9" class="code-string"> 'react'</text>
+    <text x="524" y="178" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">const</text>
+    <text x="558" y="178" font-family="ui-monospace, monospace" font-size="9" class="code-fn"> getIntl</text>
+    <text x="610" y="178" font-family="ui-monospace, monospace" font-size="9" class="code-text"> = </text>
+    <text x="624" y="178" font-family="ui-monospace, monospace" font-size="9" class="code-fn">cache</text>
+    <text x="652" y="178" font-family="ui-monospace, monospace" font-size="9" class="code-text">((locale) =&gt; {</text>
+    <text x="536" y="196" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">  return</text>
+    <text x="576" y="196" font-family="ui-monospace, monospace" font-size="9" class="code-fn"> createIntl</text>
+    <text x="656" y="196" font-family="ui-monospace, monospace" font-size="9" class="code-text">({ locale, ... })</text>
+    <text x="524" y="214" font-family="ui-monospace, monospace" font-size="9" class="code-text">})</text>
+    <text x="524" y="232" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">const</text>
+    <text x="558" y="232" font-family="ui-monospace, monospace" font-size="9" class="code-text"> intl = </text>
+    <text x="602" y="232" font-family="ui-monospace, monospace" font-size="9" class="code-fn">getIntl</text>
+    <text x="648" y="232" font-family="ui-monospace, monospace" font-size="9" class="code-text">(locale)</text>
+
+    <!-- Properties -->
+    <text x="510" y="260" font-size="10" font-weight="600" class="good-text">Properties:</text>
+    <text x="510" y="280" font-size="10" class="label-text">Scope: one server render (one request)</text>
+    <text x="510" y="298" font-size="10" class="label-text">Keys compared with Object.is — use primitives</text>
+    <text x="510" y="316" font-size="10" class="label-text">Define at module level, never in component body</text>
+    <text x="510" y="334" font-size="10" class="label-text">Server Components only</text>
+    <text x="510" y="360" font-size="9" font-weight="600" class="good-text">No cross-request leakage — cache is per-request</text>
+  </g>
+
+  <!-- Bottom callout (always visible) -->
+  <rect x="100" y="400" width="700" height="64" rx="10" class="note-box" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="424" text-anchor="middle" font-size="11" font-weight="700" class="note-text">React.cache() replaces useContext for Server Components</text>
+  <text x="450" y="444" text-anchor="middle" font-size="10" class="note-text">Server Components can't use React context — React.cache() is the per-request memoization store</text>
+  <text x="450" y="458" text-anchor="middle" font-size="9" class="label-sub">Scoped to one render. Safe. No global state.</text>
+</svg>

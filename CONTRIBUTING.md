@@ -1,14 +1,13 @@
 # Tips for Contributors
 
-**🏗️ Important: Monorepo Merger in Progress**
+**🏗️ Monorepo structure**
 
-We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [internal/planning/MONOREPO_MERGER_PLAN_REF.md](./internal/planning/MONOREPO_MERGER_PLAN_REF.md) for details.
+This repository is a monorepo containing both the MIT-licensed core (the `react_on_rails` gem and the `react-on-rails` npm package) and the Pro packages (the `react_on_rails_pro` gem and the `react-on-rails-pro` and `react-on-rails-pro-node-renderer` npm packages). License boundaries are directory-based — see [LICENSE.md](./LICENSE.md) for the authoritative list of which directories use which license.
 
-During this transition:
+When contributing:
 
-- Continue contributing to the current structure
-- License compliance remains critical - ensure no Pro code enters MIT-licensed areas
-- Major structural changes may be coordinated with the merger plan
+- License compliance is critical — never add Pro code to MIT-licensed directories.
+- Follow the existing directory layout for the package you are changing.
 
 ---
 
@@ -54,9 +53,9 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 
 # Example apps
 
-The [`react_on_rails/spec/dummy` app](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy) is an example of the various setup techniques you can use with the gem.
+The [`react_on_rails/spec/dummy` app](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy) is an example of the various setup techniques you can use with the gem.
 
-There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/execjs-compatible-dummy).
+There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/execjs-compatible-dummy).
 
 When you add a new feature, consider adding an example demonstrating it to the example apps.
 
@@ -172,7 +171,7 @@ The examples below are for the `main` branch of `react-on-rails` package.
 See [this issue](https://github.com/pnpm/pnpm/issues/4765).
 
 ```shell
-pnpm add "github:shakacode/react_on_rails/repo#main&path:packages/react-on-rails"
+pnpm add "github:shakacode/react_on_rails#main&path:packages/react-on-rails"
 ```
 
 #### Yarn Berry
@@ -209,7 +208,7 @@ After checking out the repo and ensuring you have Ruby and Node version managers
 
 ```sh
 # First, verify your versions match the project requirements
-ruby -v  # Should show 3.4.x or version in .ruby-version
+ruby -v  # Should show 4.0.x (latest), 3.3.x (minimum), or version in .ruby-version
 node -v  # Should show 22.x or version in .node-version
 
 # Then run the setup script
@@ -254,6 +253,16 @@ pnpm install
 ```
 
 You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+
+### Lockfile Platforms
+
+When committing any `Gemfile.lock`, ensure it includes the Linux platform used by CI.
+If you generated or refreshed a lockfile on macOS or another non-Linux platform and `x86_64-linux` is missing from the
+`PLATFORMS` section, the lint workflow will fail. Run this in the directory that owns that lockfile before committing:
+
+```sh
+bundle lock --add-platform x86_64-linux
+```
 
 ### Local Node Package
 
@@ -351,6 +360,8 @@ Run only RuboCop:
 rake lint:rubocop
 ```
 
+For v17, new Ruby code should use long-form hash syntax instead of shorthand; shorthand cleanup is tracked for v18 in [#3501](https://github.com/shakacode/react_on_rails/issues/3501).
+
 Run only ESLint:
 
 ```sh
@@ -430,9 +441,9 @@ Run `rake` for testing the gem and `react_on_rails/spec/dummy`. Otherwise, the `
 
 If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
 
-After running a test, you can view the coverage results SimpleCov reports by opening `coverage/index.html`.
+If you run tests with `COVERAGE=true`, you can view the SimpleCov report at `coverage/index.html`.
 
-Turbolinks 5 is included in the test app, unless "DISABLE_TURBOLINKS" is set to YES in the environment.
+The Turbolinks 5 gem is always bundled in the test app. Setting `DISABLE_TURBOLINKS=TRUE` in the environment suppresses the `require_asset` call in `react_on_rails/spec/dummy/app/assets/javascripts/application_non_webpack.js.erb`, so Turbolinks does not load at runtime — but the gem itself stays in the bundle to keep the gemset consistent with `Gemfile.lock`.
 
 Run `rake -T` or `rake -D` to see testing options.
 
@@ -459,40 +470,70 @@ After updating the source files above, regenerate lock files by running `bundle 
 
 - `react_on_rails/` and `react_on_rails/spec/dummy/` (OSS)
 - `react_on_rails_pro/` and `react_on_rails_pro/spec/dummy/` and `react_on_rails_pro/spec/execjs-compatible-dummy/` (Pro)
-- Root `Gemfile.lock` and `pnpm-lock.yaml`
+- `react_on_rails/Gemfile.lock` and root `pnpm-lock.yaml`
 
 **Example apps (handled automatically):**
 
 The CI-generated example apps (under `gen-examples/`) automatically resolve the shakapacker version via the gem dependency. The `pin_shakapacker_npm_version` helper in `react_on_rails/rakelib/shakapacker_examples.rake` ensures the npm version matches the gem.
 
+## Updating the pnpm Fallback Version for Scaffolded CI
+
+The `react_on_rails:install` generator scaffolds a GitHub Actions workflow that uses `pnpm/action-setup@v4`. When the target app declares `packageManager: pnpm@…` in its `package.json`, the scaffold reads the pin from there. When it does not (e.g., existing Shakapacker apps that only have `pnpm-lock.yaml`), the scaffold has to supply an explicit `version:` to the action — otherwise the workflow fails before installing dependencies.
+
+That fallback comes from `CI_PNPM_FALLBACK_VERSION` in [`react_on_rails/lib/generators/react_on_rails/install_generator.rb`](./react_on_rails/lib/generators/react_on_rails/install_generator.rb).
+
+**When to bump:**
+
+- Whenever Renovate updates the repo's own root `package.json` `packageManager` pin to a newer pnpm version. The spec `keeps the fallback pin tied to a version-specific pnpm release note` (in `react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb`) fails when `CI_PNPM_FALLBACK_VERSION` drifts from the `packageManager` version in `package.json`; treat that failure as the signal to update the fallback version and release-note URL in the same PR.
+- Review pnpm release PRs from Renovate, at minimum on every pnpm **major** release and ideally on each minor as well. A new major may change the lockfile format, in which case projects scaffolded without `packageManager` will fail with the older pinned pnpm. Renovate may open separate PRs for `package.json` and `CI_PNPM_FALLBACK_VERSION`; merge the constant-bump PR first or batch both updates into one PR to keep CI green.
+
+**What to update together (single commit):**
+
+1. The `CI_PNPM_FALLBACK_VERSION` constant value in `install_generator.rb`
+2. The `https://github.com/pnpm/pnpm/releases/tag/v<version>` URL in the comment above the constant
+3. The root `package.json` `packageManager` field when bumping manually; for Renovate PRs, verify the existing `packageManager` bump matches the fallback version. The spec catches drift between these values.
+4. Re-run `pnpm install` in the repo root so the root `pnpm-lock.yaml` matches
+
+**Verification:**
+
+```sh
+bundle exec rspec react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb \
+  -e "keeps the fallback pin tied to a version-specific pnpm release note"
+```
+
+Users who want exact reproducibility in their generated CI can commit a `packageManager: pnpm@<version>` field to their own `package.json`; the generator then omits the fallback `version:` entirely.
+
 ## CI Testing and Optimization
 
-React on Rails uses an optimized CI pipeline that runs faster on branches while maintaining full coverage on `main`. Contributors have access to local CI tools to validate changes before pushing.
+React on Rails uses a small required PR gate plus opt-in hosted validation. Contributors should validate locally before pushing, then request optimized hosted CI only when the branch is ready for remote confirmation.
 
 ### CI Behavior
 
-- **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback (~12 min vs ~45 min)
-- **On Main**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
-- **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
+- **Required PR gate**: Always starts for PRs and keeps the merge signal cheap.
+- **Optimized hosted CI**: Runs path-selected hosted suites after `+ci-run-hosted`, `ready-for-hosted-ci`, release-target PRs, merge queue, `main`, or manual dispatch.
+- **Force-full hosted CI**: Runs every hosted suite only after `+ci-force-full`, `force-full-hosted-ci`, or a manual `force_full_hosted: true` dispatch.
+- **Docs-only changes**: Expensive hosted suites skip when only documentation/metadata paths change (`*.md`, `*.mdx`, `*.markdown`, `*.rst`, `*.txt`, `docs/`, `internal/`, `.github/ISSUE_TEMPLATE/`, or `.lychee.toml`)
 
 ### Local CI Tools
 
 #### `bin/ci-local` - Smart Local CI Runner
 
-Analyzes your changes and runs appropriate tests locally before pushing:
+Analyzes your changes and runs appropriate tests locally before pushing. By
+default, it auto-detects the current PR base branch and runs optimized
+changed-files CI:
 
 ```bash
 # Auto-detect what to test based on changed files
 bin/ci-local
 
-# Run all CI checks (same as main branch)
+# Same optimized mode, made explicit
+bin/ci-local --changed
+
+# Run broad local CI where practical
 bin/ci-local --all
 
 # Quick check - only fast tests, skip slow integration tests
 bin/ci-local --fast
-
-# Compare against a different branch
-bin/ci-local origin/develop
 ```
 
 **Benefits:**
@@ -527,9 +568,9 @@ Recommended CI jobs:
   ✓ JS unit tests
 ```
 
-#### `/run-ci` - Claude Code Command
+#### `/run-ci` - Claude Code Skill
 
-If using Claude Code, run `/run-ci` for interactive CI execution that:
+If using Claude Code, run the `/run-ci` skill for interactive CI execution that:
 
 1. Analyzes your changes
 2. Shows recommended CI jobs
@@ -542,25 +583,25 @@ If using Claude Code, run `/run-ci` for interactive CI execution that:
 
 - Run `bin/ci-local` before pushing to catch issues early
 - Use `bin/ci-local --fast` during rapid iteration
-- Trust the reduced matrix on PRs - main validates everything
+- Use optimized hosted CI for final remote confirmation, and reserve force-full hosted CI for explicit broad-matrix decisions
 - Separate docs-only changes into dedicated commits/PRs when possible
 
 ❌ **DON'T:**
 
 - Push without running local tests first
 - Mix code and docs changes if you want docs to skip CI
-- Expect PR CI to catch minimum Ruby/Node version issues (use `bin/ci-local --all` for that)
+- Expect the required PR gate alone to catch minimum Ruby/Node version issues (use `bin/ci-local --all` or force-full hosted CI for that)
 
 ### Understanding CI Optimizations
 
-The CI system intelligently skips unnecessary work:
+The optimized detector intelligently skips unnecessary hosted work:
 
-| Change Type                | CI Behavior           | Time Saved |
-| -------------------------- | --------------------- | ---------- |
-| Docs only (`.md`, `docs/`) | Skips all CI          | 100%       |
-| Ruby code only             | Skips JS tests        | ~30%       |
-| JS code only               | Skips Ruby-only tests | ~30%       |
-| Workflow changes           | Runs lint only        | ~75%       |
+| Change Type                | Optimized Hosted Behavior                                                  |
+| -------------------------- | -------------------------------------------------------------------------- |
+| Docs only (`.md`, `docs/`) | Skips expensive hosted suites                                              |
+| Ruby code only             | Runs Ruby/lint coverage, skips JS-only suites                              |
+| JS code only               | Runs JS/lint coverage, skips Ruby-only suites                              |
+| Workflow changes           | Runs CI-infrastructure validation, no benchmarks unless explicitly labeled |
 
 For more details, see [`internal/contributor-info/ci-optimization.md`](./internal/contributor-info/ci-optimization.md).
 
@@ -568,54 +609,127 @@ For more details, see [`internal/contributor-info/ci-optimization.md`](./interna
 
 React on Rails provides PR comment commands to control CI behavior:
 
-#### `/run-skipped-ci` (or `/run-skipped-tests`) - Enable Full CI Mode
+Post one CI command per comment. If a comment contains multiple `+ci-*` commands, the command workflow handles only the first one.
 
-Runs all skipped CI checks and enables full CI mode for the PR:
+Maintainers and contributors with a local authenticated `gh` session can also
+run `bin/request-hosted-ci` from a PR branch or add `ready-for-hosted-ci` directly.
+That user-token label event starts optimized hosted workflows. Agents and
+maintainers who want an auditable PR-visible decision should prefer the
+`+ci-*` comment commands.
+
+#### `+ci-run-hosted` - Enable Optimized Hosted CI
+
+Adds the hosted CI readiness label and dispatches hosted workflows for the current head SHA:
 
 ```
-/run-skipped-ci
-# or use the shorter alias:
-/run-skipped-tests
++ci-run-hosted
 ```
 
 **What it does:**
 
-- Triggers all CI workflows that were skipped due to unchanged code
-- Adds the `full-ci` label to the PR
-- **Persists across future commits** - all subsequent pushes will run the full test suite
-- Runs minimum dependency tests (Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18)
+- Dispatches hosted workflows for the current head SHA
+- Creates and adds the `ready-for-hosted-ci` label to the PR
+- **Persists across future commits** - subsequent pushes run optimized hosted CI
+- Keeps `script/ci-changes-detector` in charge of which suites are applicable
 
 **When to use:**
 
-- You want comprehensive testing across all configurations
-- Testing changes that might affect minimum supported versions
-- Validating generator changes or core functionality
-- Before merging PRs that touch critical paths
+- The PR has passed local validation and is ready for remote confirmation
+- Reviewers need hosted results before merge-readiness
+- You want an auditable current-head hosted CI request
 
-#### `/stop-run-skipped-ci` - Disable Full CI Mode
+#### `+ci-force-full` - Force Full Hosted CI
 
-Removes the `full-ci` label and returns to standard CI behavior:
+Bypasses optimized suite selection and dispatches every hosted suite:
 
 ```
-/stop-run-skipped-ci
++ci-force-full
 ```
 
 **What it does:**
 
-- Removes the `full-ci` label from the PR
-- Future commits will use the optimized CI suite (tests only changed code)
+- Dispatches hosted workflows with `force_full_hosted: true`
+- Creates and adds `ready-for-hosted-ci` and `force-full-hosted-ci`
+- **Persists across future commits** until `+ci-stop-full` removes the force-full override
+
+**When to use:**
+
+- A maintainer explicitly wants the broad hosted matrix
+- The PR changes CI detection, runtime floors, package manager behavior, release/build/publishing logic, or similarly cross-cutting infrastructure
+- You need to prove optimized selection itself is not hiding a regression path
+
+#### `+ci-stop-hosted` - Disable Hosted CI Mode
+
+Removes hosted CI labels and returns to required-gate-only behavior:
+
+```
++ci-stop-hosted
+```
+
+**What it does:**
+
+- Removes `ready-for-hosted-ci` and `force-full-hosted-ci` from the PR
+- Future commits use only the required gate until hosted CI is requested again
 - Does not stop currently running workflows
 
 **When to use:**
 
-- You've validated changes with full CI and want to return to faster feedback
-- Reducing CI time during rapid iteration on a PR
+- The PR is back in active iteration and hosted CI should not rerun on every push
 
-**Note:** The `full-ci` label is preserved on merged PRs as a historical record of which PRs ran with comprehensive testing.
+#### `+ci-stop-full` - Disable Only Force-Full Hosted CI
+
+Removes the force-full override while leaving optimized hosted CI enabled if present:
+
+```
++ci-stop-full
+```
+
+**What it does:**
+
+- Removes `force-full-hosted-ci` from the PR
+- Leaves `ready-for-hosted-ci` in place if it was present
+- Does not stop currently running workflows
+
+**When to use:**
+
+- The broad matrix is no longer needed, but optimized hosted CI should continue
+
+#### `+ci-skip-hosted [reason]` - Record a Hosted CI Waiver
+
+Records that a maintainer intentionally waived hosted CI for the current PR head SHA:
+
+```
++ci-skip-hosted docs-only change; markdown checks are enough
+```
+
+The reason is optional. If omitted, the bot records `not provided`.
+
+**What it does:**
+
+- Posts an audit comment with the current head SHA
+- Does not cancel or block any workflow run
+- Removes hosted CI labels if present
+- Does not skip the required fast gate
+- Does not apply to later pushes, because the waiver is bound to the SHA in the comment
+
+Use this when you intentionally choose not to run hosted CI before merge, especially when acting as an administrator.
+
+#### `+ci-status` and `+ci-help`
+
+Use `+ci-status` to summarize the current head SHA, whether the PR matches the docs-only metadata paths, whether hosted CI labels are present, and whether the current SHA has a waiver comment.
+
+Use `+ci-help` to list the available CI commands.
+
+**Note:** `ready-for-hosted-ci` records that a PR ran optimized hosted CI. `force-full-hosted-ci` records the separate decision to bypass optimized selection.
+
+Legacy slash commands (`/run-skipped-ci`, `/run-skipped-tests`, and `/stop-run-skipped-ci`) were removed. Use `+ci-*` commands because GitHub's comment editor uses `/` for built-in slash command autocomplete.
 
 #### Important Notes
 
-- **Force-pushes:** The `/run-skipped-ci` command adds the `full-ci` label to your PR. If you force-push after commenting, the initial workflow run will test the old commit, but subsequent pushes will automatically run full CI because the label persists.
+- **Force-pushes:** `+ci-run-hosted` and `+ci-force-full` dispatch workflows for the current head SHA before adding labels. If you force-push after commenting, the initial workflow run may test the old commit, but subsequent pushes follow the persistent labels.
+- **Workflow-token labels:** A label added by a workflow's `GITHUB_TOKEN` does not start new `pull_request` workflow runs by itself. That is why the comment commands dispatch workflows for the current head SHA before adding labels.
+- **Fork PRs:** Comment-command hosted CI does not dispatch same-repository workflows or add persistent labels for fork heads. A maintainer should push a trusted base-repository branch when Pro or secret-backed CI is required.
+- **Waivers:** The `+ci-skip-hosted` command records the exact SHA in the PR conversation. If you push another commit, use `+ci-skip-hosted` again if you still intend to waive hosted CI.
 - **Branch operations:** Avoid deleting or force-pushing branches while workflows are running, as this may cause failures.
 
 ### Benchmarking

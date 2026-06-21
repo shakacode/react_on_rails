@@ -1,0 +1,39 @@
+name: Git Diff Base and CI Detector Tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'script/lib/git-diff-base'
+      - 'script/lib/git-diff-base-test.bash'
+      - 'script/ci-changes-detector'
+      - 'script/ci-changes-detector-test.bash'
+      - '.github/workflows/git-diff-base-tests.yml'
+  pull_request:
+    paths:
+      - 'script/lib/git-diff-base'
+      - 'script/lib/git-diff-base-test.bash'
+      - 'script/ci-changes-detector'
+      - 'script/ci-changes-detector-test.bash'
+      - '.github/workflows/git-diff-base-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Shellcheck detector scripts and test harnesses
+        run: shellcheck -x script/lib/git-diff-base script/lib/git-diff-base-test.bash script/ci-changes-detector script/ci-changes-detector-test.bash
+
+      - name: Run git-diff-base test harness
+        run: bash script/lib/git-diff-base-test.bash
+
+      - name: Run CI changes detector test harness
+        run: bash script/ci-changes-detector-test.bash

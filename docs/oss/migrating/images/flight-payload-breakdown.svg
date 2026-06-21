@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 440" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Flight Payload Composition Breakdown</title>
+  <desc>Diagram showing what makes up the RSC Flight payload: className strings (~48%), structural JSON (~25%), and content data (~27%). Includes expansion ratio benchmarks for real components like StarRating (16:1) and ReviewSnippets (9.3:1).</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .bar-classname { fill: #F87171; }
+      .bar-structural { fill: #60A5FA; }
+      .bar-content { fill: #4ADE80; }
+      .bar-bg { fill: #E2E8F0; }
+      .classname-text { fill: #991B1B; }
+      .structural-text { fill: #1E40AF; }
+      .content-text { fill: #166534; }
+      .code-bg { fill: #1E293B; }
+      .code-text { fill: #E2E8F0; }
+      .code-classname { fill: #F87171; }
+      .code-structure { fill: #60A5FA; }
+      .code-content { fill: #4ADE80; }
+      .table-header { fill: #F1F5F9; stroke: #E2E8F0; }
+      .table-row { fill: white; stroke: #E2E8F0; }
+      .table-text { fill: #334155; }
+      .ratio-text { fill: #991B1B; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .bar-bg { fill: #334155; }
+        .classname-text { fill: #FCA5A5; }
+        .structural-text { fill: #93C5FD; }
+        .content-text { fill: #6EE7B7; }
+        .code-bg { fill: #0F172A; }
+        .table-header { fill: #0F172A; stroke: #334155; }
+        .table-row { fill: #1E293B; stroke: #334155; }
+        .table-text { fill: #CBD5E1; }
+        .ratio-text { fill: #FCA5A5; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+      }
+
+      .reveal1, .reveal2, .reveal3, .reveal4 { opacity: 1; }
+    </style>
+  </defs>
+
+  <rect width="900" height="440" class="bg"/>
+  <text x="450" y="26" text-anchor="middle" font-size="18" font-weight="700" class="title">Flight Payload Composition</text>
+  <text x="450" y="44" text-anchor="middle" font-size="11" class="subtitle">What makes up the RSC payload — and why expansion ratios matter for optimization</text>
+
+  <!-- LEFT: Composition bar chart -->
+  <g class="reveal1">
+    <rect x="30" y="60" width="420" height="240" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="240" y="86" text-anchor="middle" font-size="12" font-weight="600" class="label-text">Payload Composition (typical page)</text>
+
+    <!-- Stacked bar -->
+    <rect x="60" y="104" width="360" height="40" rx="6" class="bar-bg"/>
+    <rect x="60" y="104" width="173" height="40" rx="6" class="bar-classname"/>
+    <rect x="233" y="104" width="90" height="40" class="bar-structural"/>
+    <rect x="323" y="104" width="97" height="40" rx="6" class="bar-content"/>
+
+    <!-- Labels on bars -->
+    <text x="146" y="128" text-anchor="middle" font-size="11" font-weight="700" fill="white">~48%</text>
+    <text x="278" y="128" text-anchor="middle" font-size="11" font-weight="700" fill="white">~25%</text>
+    <text x="371" y="128" text-anchor="middle" font-size="11" font-weight="700" fill="white">~27%</text>
+
+    <!-- Legend -->
+    <rect x="60" y="160" width="14" height="14" rx="3" class="bar-classname"/>
+    <text x="80" y="172" font-size="10" class="classname-text">className strings (Tailwind)</text>
+
+    <rect x="60" y="182" width="14" height="14" rx="3" class="bar-structural"/>
+    <text x="80" y="194" font-size="10" class="structural-text">Structural JSON (["$","div",...])</text>
+
+    <rect x="60" y="204" width="14" height="14" rx="3" class="bar-content"/>
+    <text x="80" y="216" font-size="10" class="content-text">Content data (text, values)</text>
+
+    <!-- Example JSON -->
+    <rect x="50" y="234" width="380" height="50" rx="6" class="code-bg"/>
+    <text x="66" y="252" font-family="ui-monospace, monospace" font-size="8" class="code-structure">["$","div",null,{"</text>
+    <text x="170" y="252" font-family="ui-monospace, monospace" font-size="8" class="code-classname">className</text>
+    <text x="226" y="252" font-family="ui-monospace, monospace" font-size="8" class="code-structure">":"</text>
+    <text x="240" y="252" font-family="ui-monospace, monospace" font-size="8" class="code-classname">flex items-center</text>
+    <text x="66" y="266" font-family="ui-monospace, monospace" font-size="8" class="code-classname">  justify-between px-4 py-2 bg-white</text>
+    <text x="66" y="278" font-family="ui-monospace, monospace" font-size="8" class="code-structure">  ","children":[</text>
+    <text x="160" y="278" font-family="ui-monospace, monospace" font-size="8" class="code-content">"Hello World"</text>
+    <text x="244" y="278" font-family="ui-monospace, monospace" font-size="8" class="code-structure">]}]</text>
+  </g>
+
+  <!-- RIGHT: Expansion Ratio Table -->
+  <g class="reveal2">
+    <rect x="470" y="60" width="410" height="240" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="675" y="86" text-anchor="middle" font-size="12" font-weight="600" class="label-text">Expansion Ratios (real benchmarks)</text>
+
+    <!-- Table header -->
+    <rect x="490" y="100" width="370" height="26" rx="4" class="table-header" stroke-width="1"/>
+    <text x="580" y="118" text-anchor="middle" font-size="9" font-weight="600" class="label-text">Component</text>
+    <text x="700" y="118" text-anchor="middle" font-size="9" font-weight="600" class="label-text">Data → Payload</text>
+    <text x="810" y="118" text-anchor="middle" font-size="9" font-weight="600" class="label-text">Ratio</text>
+  </g>
+
+  <!-- Table rows with stagger -->
+  <g class="reveal2">
+    <rect x="490" y="126" width="370" height="26" rx="0" class="table-row" stroke-width="1"/>
+    <text x="580" y="144" text-anchor="middle" font-size="10" class="table-text">StarRating</text>
+    <text x="700" y="144" text-anchor="middle" font-size="10" class="table-text">30 B → 498 B</text>
+    <text x="810" y="144" text-anchor="middle" font-size="11" font-weight="700" class="ratio-text">16:1</text>
+  </g>
+
+  <g class="reveal3">
+    <rect x="490" y="152" width="370" height="26" rx="0" class="table-row" stroke-width="1"/>
+    <text x="580" y="170" text-anchor="middle" font-size="10" class="table-text">ReviewSnippets</text>
+    <text x="700" y="170" text-anchor="middle" font-size="10" class="table-text">~100 B → 934 B</text>
+    <text x="810" y="170" text-anchor="middle" font-size="11" font-weight="700" class="ratio-text">9.3:1</text>
+
+    <rect x="490" y="178" width="370" height="26" rx="0" class="table-row" stroke-width="1"/>
+    <text x="580" y="196" text-anchor="middle" font-size="10" class="table-text">FeaturesList</text>
+    <text x="700" y="196" text-anchor="middle" font-size="10" class="table-text">~30 B → 190 B</text>
+    <text x="810" y="196" text-anchor="middle" font-size="11" font-weight="700" class="ratio-text">6:1</text>
+  </g>
+
+  <g class="reveal4">
+    <rect x="490" y="204" width="370" height="26" rx="4" class="table-row" stroke-width="1"/>
+    <text x="580" y="222" text-anchor="middle" font-size="10" class="table-text">ProductTags</text>
+    <text x="700" y="222" text-anchor="middle" font-size="10" class="table-text">~10 B → 155 B</text>
+    <text x="810" y="222" text-anchor="middle" font-size="11" font-weight="700" class="ratio-text">15:1</text>
+
+    <text x="675" y="256" text-anchor="middle" font-size="9" class="label-sub">High expansion = className-heavy + deeply nested</text>
+    <text x="675" y="272" text-anchor="middle" font-size="9" class="label-sub">Repeated components with high ratio → candidate for client</text>
+  </g>
+
+  <!-- Visual bar for StarRating -->
+  <g class="reveal4">
+    <rect x="30" y="320" width="840" height="80" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="450" y="342" text-anchor="middle" font-size="11" font-weight="600" class="label-text">StarRating Expansion: 30 bytes of data → 498 bytes of Flight payload</text>
+
+    <text x="46" y="372" font-size="9" class="label-sub">Data:</text>
+    <rect x="86" y="360" width="24" height="16" rx="3" class="bar-content"/>
+
+    <text x="136" y="372" font-size="9" class="label-sub">Flight payload:</text>
+    <rect x="220" y="360" width="400" height="16" rx="3" class="bar-bg"/>
+    <rect x="220" y="360" width="192" height="16" rx="3" class="bar-classname"/>
+    <rect x="412" y="360" width="100" height="16" class="bar-structural"/>
+    <rect x="512" y="360" width="108" height="16" rx="3" class="bar-content"/>
+
+    <text x="314" y="390" text-anchor="middle" font-size="8" class="classname-text">className (48%)</text>
+    <text x="462" y="390" text-anchor="middle" font-size="8" class="structural-text">structure (25%)</text>
+    <text x="566" y="390" text-anchor="middle" font-size="8" class="content-text">content (27%)</text>
+  </g>
+
+  <!-- Bottom callout -->
+  <rect x="100" y="416" width="700" height="20" rx="6" class="note-box" stroke-width="1"/>
+  <text x="450" y="430" text-anchor="middle" font-size="10" font-weight="600" class="note-text">Components with high expansion ratios AND high repetition count are candidates for client optimization</text>
+</svg>

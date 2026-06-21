@@ -23,6 +23,7 @@ NC='\033[0m' # No Color
 # Script directory (for running from anywhere)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
 
 # Optional directories that should be skipped (not hard-fail) when Ruby doesn't match Gemfile.
 OPTIONAL_SETUP_DIRS=(
@@ -50,11 +51,12 @@ show_help() {
   echo ""
   echo "This script will:"
   echo "  1. Install root pnpm and bundle dependencies"
-  echo "  2. Build the node package"
-  echo "  3. Set up react_on_rails/spec/dummy"
-  echo "  4. Set up react_on_rails_pro (if present and not skipped)"
-  echo "  5. Set up react_on_rails_pro/spec/dummy (if present and not skipped)"
-  echo "  6. Set up react_on_rails_pro/spec/execjs-compatible-dummy (if present and not skipped)"
+  echo "  2. Set up react_on_rails"
+  echo "  3. Build the node package"
+  echo "  4. Set up react_on_rails/spec/dummy"
+  echo "  5. Set up react_on_rails_pro (if present and not skipped)"
+  echo "  6. Set up react_on_rails_pro/spec/dummy (if present and not skipped)"
+  echo "  7. Set up react_on_rails_pro/spec/execjs-compatible-dummy (if present and not skipped)"
 }
 
 print_step() {
@@ -71,6 +73,21 @@ print_error() {
 
 print_success() {
   echo -e "${GREEN}✓${NC} $1"
+}
+
+# Keep this helper in sync with bin/ci-local and bin/ci-rerun-failures.
+bundle_command() {
+  local gemfile="$1"
+  shift
+
+  env \
+    -u BUNDLE_APP_CONFIG \
+    -u BUNDLE_BIN_PATH \
+    -u BUNDLE_GEMFILE \
+    -u BUNDLER_VERSION \
+    -u RUBYOPT \
+    BUNDLE_GEMFILE="$gemfile" \
+    "$@"
 }
 
 check_prerequisites() {
@@ -176,6 +193,7 @@ install_dependencies() {
 
   # Install Ruby dependencies if Gemfile exists
   if [ -f "Gemfile" ]; then
+    local gemfile_path="$dir/Gemfile"
     local required_ruby_version
     local current_ruby_version
 
@@ -205,10 +223,10 @@ install_dependencies() {
     fi
 
     echo "  Installing Ruby dependencies..."
-    if bundle check &> /dev/null; then
+    if bundle_command "$gemfile_path" bundle check &> /dev/null; then
       print_success "Ruby dependencies already satisfied"
     else
-      if ! bundle install; then
+      if ! bundle_command "$gemfile_path" bundle install; then
         print_error "Failed to install Ruby dependencies in $name"
         exit 1
       fi
@@ -237,7 +255,7 @@ build_node_package() {
   # Builds TypeScript packages. This compiles src/ to lib/.
   # The dummy apps use workspace:* protocol so pnpm install links them automatically.
   print_step "Building node package..."
-  if ! rake node_package; then
+  if ! (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle exec rake node_package); then
     print_error "Failed to build node package"
     exit 1
   fi
@@ -257,7 +275,8 @@ verify_build_artifacts() {
 }
 
 show_elapsed_time() {
-  local END_TIME=$(date +%s)
+  local END_TIME
+  END_TIME=$(date +%s)
   local ELAPSED=$((END_TIME - START_TIME))
   local MINUTES=$((ELAPSED / 60))
   local SECONDS=$((ELAPSED % 60))
@@ -306,6 +325,9 @@ main() {
 
   # Root dependencies
   install_dependencies "$ROOT_DIR" "root directory"
+
+  # Open source gem dependencies
+  install_dependencies "$ROOT_DIR/react_on_rails" "react_on_rails"
 
   # Build node package
   build_node_package

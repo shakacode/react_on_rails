@@ -1,0 +1,9 @@
+# Excludes directories that generate false positives:
+# - tests/fixtures: pre-built webpack bundles checked in as test artifacts, not source code
+# - spec/dummy: Rails test apps used for integration testing, not production code
+
+paths-ignore:
+  - 'packages/react-on-rails-pro-node-renderer/tests/fixtures/**'
+  - 'react_on_rails_pro/spec/dummy/**'
+  - 'react_on_rails_pro/spec/execjs-compatible-dummy/**'
+  - 'react_on_rails/spec/dummy/**'

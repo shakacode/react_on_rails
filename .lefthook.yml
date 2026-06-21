@@ -25,11 +25,25 @@ pre-commit:
       run: bin/lefthook/prettier-format all-changed
       stage_fixed: true
 
+    markdown-links:
+      glob: "{*.md,**/*.md}"
+      run: bin/lefthook/markdown-link-lint all-changed --offline
+
     trailing-newlines:
       run: bin/lefthook/check-trailing-newlines all-changed
       stage_fixed: true
+
+    # When any Pro file is staged, verify the staged index for every proprietary
+    # Pro file. Check-only (run `--fix` and re-stage to insert/upgrade).
+    pro-license-headers:
+      # Mirrors PRO_TREES in script/check-pro-license-headers; keep in sync when adding a new Pro tree.
+      glob: "{react_on_rails_pro/*,react_on_rails_pro/**/*,packages/react-on-rails-pro/*,packages/react-on-rails-pro/**/*,packages/react-on-rails-pro-node-renderer/*,packages/react-on-rails-pro-node-renderer/**/*}"
+      run: ruby script/check-pro-license-headers --check-staged
 
 pre-push:
   commands:
     branch-lint:
       run: bin/lefthook/ruby-lint branch
+
+    markdown-links:
+      run: bin/lefthook/markdown-link-lint branch

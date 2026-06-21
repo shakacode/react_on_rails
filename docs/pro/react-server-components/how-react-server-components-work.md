@@ -12,6 +12,10 @@ The `react-on-rails-rsc/WebpackLoader` is a custom loader that removes the clien
 
 The RSC Webpack Loader works when it finds a file with the `'use client'` directive on top of it.
 
+<p align="center">
+  <img src="images/webpack-loader-transform.svg" alt="Animated before/after diagram showing how the RSC Webpack Loader transforms a 'use client' file: the original file with component implementations is replaced with ClientReference proxy stubs that point to the client bundle entry." width="840" />
+</p>
+
 ```js
 // app/javascript/client/app/components/HomePage.jsx
 'use client';
@@ -110,6 +114,16 @@ Let's search for the client component `ToggleContainer` that we built before in 
 
 This entry indicates that the `ToggleContainer` client component is included in the `client25` chunk. The `js/client25.js` file contains the client-side code for the `ToggleContainer` component. You can find the `client25` chunk in the `public/webpack/<environment>/js/client25.js` file. Also, the `id` field is the Webpack module ID for the `ToggleContainer` client component. It's used by react runtime to load and hydrate the component in the browser.
 
+### Registration Entry Path Override
+
+`bin/shakapacker-precompile-hook` normally finds the generated `server-component-registration-entry.js` at React on Rails' default generated path, with a pruned scan fallback for older generated apps. If your app writes that entry somewhere else, set `REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH` to the relative or absolute path before running the hook. The same value is also used by the RSC discovery build and by the webpack client-reference resolver when it checks whether `ssr-generated/rsc-client-references.json` is stale.
+
+### CSS Links for `'use client'` Boundaries
+
+React on Rails Pro reads CSS metadata from the RSC client manifest and emits `<link rel="stylesheet" data-precedence="rsc-css">` entries into the RSC payload. React hoists those stylesheet links into `<head>` and delays committing the corresponding streamed content until the stylesheets are ready, which prevents a flash of unstyled content for client components behind RSC boundaries.
+
+The current resolver works from the manifest alone, so it emits CSS for every `'use client'` module entry in the manifest instead of only the client references encountered by one render. This is intentional for now: CSS modules and component-scoped styles remain safe, but global CSS imported by a client component can apply on an RSC page that did not render that component. Because these stylesheet links are render-blocking, avoid importing page-specific global CSS from broad client-component entry points until `react-on-rails-rsc` can attach CSS at the rendered client-reference boundary.
+
 If you want to change the file name of the `react-client-manifest.json` file, you can do so by setting the `clientManifestFilename` option in the `react-on-rails-rsc/WebpackPlugin` plugin as follows:
 
 ```js
@@ -133,6 +147,10 @@ end
 ```
 
 ## React Server Component Payload (RSC Payload)
+
+<p align="center">
+  <img src="images/flight-payload-streaming.svg" alt="Animated diagram showing how React Server Components serialize the element tree into Flight protocol wire-format chunks that stream to the client, where React reconstructs the component tree. Shows hint chunks, import chunks, model chunks, and streaming promise resolution." width="840" />
+</p>
 
 The React Server Component Payload (RSC Payload) is a mechanism that allows you to pass the rendered server components from the server to the client. You can use the `rsc_payload_react_component` helper function to embed the RSC payload of any component in your Rails views. Let's try to embed the RSC payload of the `ReactServerComponentPage` component in the `app/views/pages/react_server_component_page_rsc_payload.html.erb` view.
 
@@ -222,21 +240,7 @@ Rails.application.routes.draw do
 end
 ```
 
-In this case, ensure you pass the correct path to `registerServerComponent` function in the client bundle.
-
-```js
-// client/app/packs/client-bundle.js
-import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
-
-registerServerComponent(
-  {
-    rscPayloadGenerationUrlPath: 'flight-payload',
-  },
-  'ReactServerComponentPage',
-);
-```
-
-Or if you enabled the `auto_load_bundle` option to make React on Rails automatically register react components, you can pass the path to the `rsc_payload_generation_url_path` config in React on Rails Pro configuration.
+If you customize the route path, ensure the `rsc_payload_generation_url_path` config matches:
 
 ```ruby
 # config/initializers/react_on_rails.rb

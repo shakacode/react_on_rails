@@ -1,6 +1,9 @@
 # Upgrading from React on Rails to React on Rails Pro
 
-Already using React on Rails? Upgrading to Pro is straightforward: swap the gem and npm package with their Pro equivalents, then run the Pro generator. The upgrade is safe, reversible, and free to evaluate.
+Already using React on Rails? Upgrading to Pro is straightforward: swap the gem and npm package with their Pro equivalents, then run the Pro generator. The upgrade is safe, reversible, and free to evaluate. See [Pro pricing and sign up](https://pro.reactonrails.com/) when you are ready for production.
+
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user already has OSS React on Rails and wants to upgrade to Pro. The upgrade is three steps: swap the gem, swap the npm package, run the generator. Remember the pairing rule: `react_on_rails_pro` gem pairs with `react-on-rails-pro` npm package (never with the base `react-on-rails`).
 
 ## What You Get
 
@@ -18,16 +21,18 @@ Pro includes core React on Rails as a dependency — just swap the packages and 
 
 ## Three Steps to Upgrade
 
-> **Version note:** The examples below use `16.4.0` for illustration. Before you begin, check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) to find the latest version and substitute it in the commands below. Always use an exact version pin (`=`) for the gem and `--save-exact`/`--exact` for the npm package.
+> **Version note:** Replace `VERSION` below with the latest version from [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md). React on Rails requires exact gem/npm version parity — use `=` for the gem and `--save-exact`/`--exact` for npm. After upgrading to 16.5.0+, run `bundle exec rake react_on_rails:sync_versions` to verify versions are aligned.
 >
-> **RC versions:** RubyGems and npm use different pre-release separators. For example, release candidate 9 of version 16.4.0 is `16.4.0.rc.9` on RubyGems (dots) but `16.4.0-rc.9` on npm (hyphen). Make sure to use the correct format for each package manager.
+> **RC versions:** RubyGems and npm use different pre-release separators — e.g., `VERSION.rc.9` on RubyGems (dots) vs `VERSION-rc.9` on npm (hyphen).
+>
+> **For later upgrades:** Once you are on Pro, follow the [Coupled Pro Upgrade Checklist](./updating.md#coupled-pro-upgrade-checklist) for every subsequent Pro version bump. It covers the Ruby + JavaScript lockfile pairing, prerelease formats, and RSC manifest verification.
 
 ### 1. Swap the gem
 
 Replace `react_on_rails` with `react_on_rails_pro` in your Gemfile. Pro depends on the core gem, so you only need the Pro entry:
 
 ```ruby
-gem "react_on_rails_pro", "= 16.4.0"
+gem "react_on_rails_pro", "= VERSION"
 ```
 
 Then run `bundle install`.
@@ -36,7 +41,7 @@ Or use the command line, which handles both the Gemfile edits and install:
 
 ```bash
 bundle remove react_on_rails
-bundle add react_on_rails_pro --version="= 16.4.0"
+bundle add react_on_rails_pro --version="= VERSION"
 ```
 
 > **Important:** `bundle add` does not remove existing gems. You must run `bundle remove` first, otherwise both gems will appear in your Gemfile, which can cause Bundler warnings or version conflicts.
@@ -47,13 +52,16 @@ Replace `react-on-rails` with `react-on-rails-pro`:
 
 ```bash
 # npm
-npm uninstall react-on-rails && npm install react-on-rails-pro@16.4.0 --save-exact
+npm uninstall react-on-rails && npm install react-on-rails-pro@VERSION --save-exact
 
 # yarn
-yarn remove react-on-rails && yarn add react-on-rails-pro@16.4.0 --exact
+yarn remove react-on-rails && yarn add react-on-rails-pro@VERSION --exact
 
 # pnpm
-pnpm remove react-on-rails && pnpm add react-on-rails-pro@16.4.0 --save-exact
+pnpm remove react-on-rails && pnpm add react-on-rails-pro@VERSION --save-exact
+
+# bun
+bun remove react-on-rails && bun add react-on-rails-pro@VERSION --exact
 ```
 
 Then update your imports:
@@ -87,15 +95,17 @@ That's it. Your app is now running React on Rails Pro.
 If you're setting up a new app (not upgrading an existing one), use the `--pro` flag:
 
 ```bash
-bundle add react_on_rails_pro --version="= 16.4.0"
+bundle add react_on_rails_pro --version="= VERSION"
 bundle exec rails generate react_on_rails:install --pro
 ```
 
 ## Try Pro Risk-Free
 
-React on Rails Pro is **free to try** — no license token is needed for local development, testing, CI/CD, or staging environments. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
+React on Rails Pro uses a **friendly license model**: try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
 
-A **paid license is required for all production deployments**. Startups and small companies should contact [justin@shakacode.com](mailto:justin@shakacode.com) for discounted pricing. Visit [pro.reactonrails.com](https://pro.reactonrails.com/) for details. When you're ready, set the token as an environment variable:
+If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app. In production, that log message is a warning because a paid license is required.
+
+A **paid license is required for all production deployments**. Visit [Pro pricing and sign up](https://pro.reactonrails.com/) for current options. Startups and small companies should contact [justin@shakacode.com](mailto:justin@shakacode.com) for discounted pricing. When you're ready, set the token as an environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
@@ -120,4 +130,5 @@ Pro-only features (fragment caching, Node renderer, RSC) will stop working, but 
 - [Installation reference](./installation.md) - Detailed manual installation steps
 - [Configuration](../oss/configuration/configuration-pro.md) - All Pro configuration options
 - [Upgrading Pro versions](./updating.md) - Upgrading between Pro versions
-- [React Server Components](./react-server-components/tutorial.md) - Get started with RSC
+- [Add RSC to Your Pro App](./react-server-components/upgrading-existing-pro-app.md) - Add RSC support to an existing Pro installation
+- [React Server Components Tutorial](./react-server-components/tutorial.md) - Learn RSC concepts step by step

@@ -1,7 +1,7 @@
 # Bundle Caching
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — Available with [React on Rails Pro](../../pro/react-on-rails-pro.md).
+> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 Bundle caching avoids redundant webpack builds by caching bundles based on a digest of source files.
 
@@ -65,7 +65,6 @@ And define it like this:
 module CustomBuildCommand
   def self.call
     ReactOnRailsPro::AssetsPrecompile.call
-    Rake::Task['react_on_rails_pro:pre_stage_bundle_for_node_renderer'].invoke
   end
 end
 ```
@@ -102,9 +101,10 @@ The goal is that Ruby only changes that don't affect your webpack bundles don't 
 
 ### 3. Remove any call to rake task `react_on_rails_pro:pre_stage_bundle_for_node_renderer`
 
-This task is called automatically if you're using bundle caching.
+This task is called automatically if you're using bundle caching. The automatic staging uses the same bundle-hash cache layout as the renderer's runtime upload flow and the copy-based `react_on_rails_pro:pre_seed_renderer_cache` task used for Docker/image-build workflows.
 
 ```ruby
+  # Remove this line — pre-staging is now automatic when bundle caching is enabled.
   Rake::Task['react_on_rails_pro:pre_stage_bundle_for_node_renderer'].invoke
 ```
 

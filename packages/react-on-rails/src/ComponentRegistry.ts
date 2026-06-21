@@ -1,13 +1,15 @@
-import type { RegisteredComponent, ReactComponentOrRenderFunction } from './types/index.ts';
+import type { RegisteredComponent, RegisteredComponentValue } from './types/index.ts';
 import isRenderFunction from './isRenderFunction.ts';
 
-const registeredComponents = new Map<string, RegisteredComponent>();
+type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
+
+const registeredComponents = new Map<string, RegisteredComponentEntry>();
 
 export default {
   /**
    * @param components { component1: component1, component2: component2, etc. }
    */
-  register(components: Record<string, ReactComponentOrRenderFunction>): void {
+  register(components: Record<string, RegisteredComponentValue>): void {
     Object.keys(components).forEach((name) => {
       const component = components[name];
       if (!component) {
@@ -40,7 +42,7 @@ export default {
    * @param name
    * @returns { name, component, renderFunction, isRenderer }
    */
-  get(name: string): RegisteredComponent {
+  get(name: string): RegisteredComponentEntry {
     const registeredComponent = registeredComponents.get(name);
     if (registeredComponent !== undefined) {
       return registeredComponent;
@@ -56,7 +58,7 @@ Registered component names include [ ${keys} ]. Maybe you forgot to register the
    * @returns Map where key is the component name and values are the
    * { name, component, renderFunction, isRenderer}
    */
-  components(): Map<string, RegisteredComponent> {
+  components(): Map<string, RegisteredComponentEntry> {
     return registeredComponents;
   },
 
@@ -65,7 +67,7 @@ Registered component names include [ ${keys} ]. Maybe you forgot to register the
    * @param _name Component name to wait for
    * @throws Always throws error indicating pro package is required
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   getOrWaitForComponent(_name: string): never {
     throw new Error('getOrWaitForComponent requires react-on-rails-pro package');
   },

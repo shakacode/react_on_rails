@@ -4,6 +4,7 @@ require "json"
 require "fileutils"
 require "net/http"
 require "uri"
+require_relative "benchmark_target_monitor"
 
 # Shared utilities for benchmark scripts
 # Note: env_or_default and validation helpers are in benchmark_config.rb
@@ -19,9 +20,13 @@ rescue StandardError => e
   raise "Failed to read #{tool_name} results: #{e.message}"
 end
 
-# Create failure metrics array for summary
+# Create failure metrics array for summary (rps, p50, p90 + status message).
+# The status message is truncated so a long exception (e.g. a JSON parse error)
+# cannot misalign the `column -t` summary table.
 def failure_metrics(error)
-  ["FAILED", "FAILED", "FAILED", "FAILED", "FAILED", error.message]
+  message = error.message.to_s.tr("\n", " ")
+  message = "#{message[0, 77]}..." if message.length > 80
+  ["FAILED", "FAILED", "FAILED", message]
 end
 
 # Append a line to the summary file
@@ -38,7 +43,7 @@ def server_responding?(uri)
   success = response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
   info = "HTTP #{response.code} #{response.message}"
   info += " -> #{response['location']}" if response.is_a?(Net::HTTPRedirection) && response["location"]
-  { success: success, info: info }
+  { success:, info: }
 rescue StandardError => e
   { success: false, info: "#{e.class.name}: #{e.message}" }
 end
@@ -95,4 +100,11 @@ end
 def display_summary(summary_file)
   puts "\nSummary saved to #{summary_file}"
   system("column", "-t", "-s", "\t", summary_file)
+end
+
+# Requires BENCHMARK_JSON and DISPLAY_JSON constants from benchmark_config.rb.
+def write_benchmark_payload(bmf_collector, target_monitor:, append: false)
+  target_monitor.verify_after_measurement!
+  bmf_collector.write_bmf_json(BENCHMARK_JSON, append:)
+  bmf_collector.write_display_json(DISPLAY_JSON, append:)
 end

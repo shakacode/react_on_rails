@@ -362,7 +362,7 @@ module ReactOnRails
           context "with server file not in manifest", packer_type.to_sym do
             it "returns the private ssr-generated path for server bundles" do
               server_bundle_name = "server-bundle.js"
-              mock_bundle_configs(server_bundle_name: server_bundle_name)
+              mock_bundle_configs(server_bundle_name:)
               mock_missing_manifest_entry(server_bundle_name)
 
               path = described_class.server_bundle_js_file_path
@@ -373,7 +373,7 @@ module ReactOnRails
             context "with server_bundle_output_path configured and enforce_private_server_bundles=false" do
               it "returns the configured path directly without checking file existence" do
                 server_bundle_name = "server-bundle.js"
-                mock_bundle_configs(server_bundle_name: server_bundle_name)
+                mock_bundle_configs(server_bundle_name:)
                 mock_missing_manifest_entry(server_bundle_name)
                 # NOTE: mock_bundle_configs sets enforce_private_server_bundles to false
 
@@ -1023,97 +1023,31 @@ module ReactOnRails
       end
     end
 
-    describe ".normalize_immediate_hydration" do
-      context "with Pro gem installed" do
-        before do
-          allow(described_class).to receive(:react_on_rails_pro?).and_return(true)
-        end
+    describe ".command_available?" do
+      it "shells out to which on non-Windows" do
+        allow(described_class).to receive_messages(running_on_windows?: false, system: true)
 
-        it "returns true when value is explicitly true" do
-          result = described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
-          expect(result).to be true
-        end
-
-        it "returns false when value is explicitly false" do
-          result = described_class.normalize_immediate_hydration(false, "TestComponent", "Component")
-          expect(result).to be false
-        end
-
-        it "returns true when value is nil (Pro-install default)" do
-          result = described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
-          expect(result).to be true
-        end
-
-        it "does not log a warning for any valid value" do
-          expect(Rails.logger).not_to receive(:warn)
-
-          described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
-          described_class.normalize_immediate_hydration(false, "TestComponent", "Component")
-          described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
-        end
+        expect(described_class.command_available?("node")).to be(true)
+        expect(described_class).to have_received(:system).with("which", "node", out: File::NULL, err: File::NULL)
       end
 
-      context "without Pro gem installed" do
-        before do
-          allow(described_class).to receive(:react_on_rails_pro?).and_return(false)
-        end
+      it "shells out to where on Windows" do
+        allow(described_class).to receive_messages(running_on_windows?: true, system: true)
 
-        it "returns false and logs warning when value is explicitly true" do
-          expect(Rails.logger).to receive(:warn)
-            .with(/immediate_hydration: true requires the React on Rails Pro gem to be installed/)
-
-          result = described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
-          expect(result).to be false
-        end
-
-        it "returns false when value is explicitly false" do
-          expect(Rails.logger).not_to receive(:warn)
-
-          result = described_class.normalize_immediate_hydration(false, "TestComponent", "Component")
-          expect(result).to be false
-        end
-
-        it "returns false when value is nil (non-Pro-install default)" do
-          expect(Rails.logger).not_to receive(:warn)
-
-          result = described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
-          expect(result).to be false
-        end
-
-        it "includes component name and type in warning message" do
-          expect(Rails.logger).to receive(:warn) do |message|
-            expect(message).to include("TestStore")
-            expect(message).to include("Store")
-          end
-
-          described_class.normalize_immediate_hydration(true, "TestStore", "Store")
-        end
+        expect(described_class.command_available?("node")).to be(true)
+        expect(described_class).to have_received(:system).with("where", "node", out: File::NULL, err: File::NULL)
       end
 
-      context "with invalid values" do
-        it "raises ArgumentError for string values" do
-          expect do
-            described_class.normalize_immediate_hydration("yes", "TestComponent", "Component")
-          end.to raise_error(ArgumentError, /immediate_hydration must be true, false, or nil/)
-        end
+      it "returns false when the command is missing" do
+        allow(described_class).to receive_messages(running_on_windows?: false, system: false)
 
-        it "raises ArgumentError for numeric values" do
-          expect do
-            described_class.normalize_immediate_hydration(1, "TestComponent", "Component")
-          end.to raise_error(ArgumentError, /immediate_hydration must be true, false, or nil/)
-        end
+        expect(described_class.command_available?("nope")).to be(false)
+      end
 
-        it "raises ArgumentError for hash values" do
-          expect do
-            described_class.normalize_immediate_hydration({}, "TestComponent", "Component")
-          end.to raise_error(ArgumentError, /immediate_hydration must be true, false, or nil/)
-        end
+      it "coerces nil from system (which/where itself missing) to false" do
+        allow(described_class).to receive_messages(running_on_windows?: false, system: nil)
 
-        it "includes the invalid value in error message" do
-          expect do
-            described_class.normalize_immediate_hydration("invalid", "TestComponent", "Component")
-          end.to raise_error(ArgumentError, /Got: "invalid" \(String\)/)
-        end
+        expect(described_class.command_available?("anything")).to be(false)
       end
     end
   end

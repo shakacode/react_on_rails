@@ -2,7 +2,7 @@
 # - Only security updates (version updates disabled via open-pull-requests-limit: 0)
 # - Dependencies grouped within each ecosystem/directory
 # - 3-day minimum release age for new versions (so they can't be unpublished in NPM)
-# - Labels: "dependencies" (default), language-specific (javascript/ruby/github-actions), "full-ci"
+# - Labels: "dependencies" (default), language-specific (javascript/ruby/github-actions), "ready-for-hosted-ci"
 #
 # Note: Root pnpm workspace (/) covers packages/react-on-rails, etc.
 # Dummy apps have separate lock files and are listed explicitly.
@@ -29,7 +29,7 @@ updates:
     labels:
       - "dependencies"
       - "javascript"
-      - "full-ci"
+      - "ready-for-hosted-ci"
     # Disable version update PRs - only security updates will be created
     open-pull-requests-limit: 0
     cooldown:
@@ -50,7 +50,7 @@ updates:
     labels:
       - "dependencies"
       - "javascript"
-      - "full-ci"
+      - "ready-for-hosted-ci"
     cooldown:
       default-days: 3
     groups:
@@ -62,10 +62,10 @@ updates:
           - "shakapacker"
     multi-ecosystem-group: "execjs-dummy-shakapacker"
 
-  # Ruby gems - Open source and Pro gems (including dummy apps)
-  # Root directory is not included because it reuses the Gemfile from react_on_rails
+  # Ruby gems - root tooling plus Open source and Pro gems (including dummy apps)
   - package-ecosystem: "bundler"
     directories:
+      - "/"
       - "/react_on_rails"
       - "/react_on_rails/spec/dummy"
       - "/react_on_rails_pro"
@@ -75,7 +75,7 @@ updates:
     labels:
       - "dependencies"
       - "ruby"
-      - "full-ci"
+      - "ready-for-hosted-ci"
     open-pull-requests-limit: 0
     cooldown:
       default-days: 3
@@ -95,7 +95,7 @@ updates:
     labels:
       - "dependencies"
       - "ruby"
-      - "full-ci"
+      - "ready-for-hosted-ci"
     cooldown:
       default-days: 3
     groups:
@@ -115,7 +115,7 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
-      - "full-ci"
+      - "ready-for-hosted-ci"
     open-pull-requests-limit: 0
     cooldown:
       default-days: 3

@@ -1,0 +1,87 @@
+name: Hosted CI selectors
+description: Computes hosted-CI readiness, force-full, release-target, and matrix selectors.
+inputs:
+  force-full-hosted:
+    description: 'Whether this manual dispatch should bypass optimized hosted-CI selection.'
+    required: false
+    default: 'false'
+outputs:
+  hosted_ci_requested:
+    description: 'Whether the PR has the ready-for-hosted-ci label.'
+    value: ${{ steps.select.outputs.hosted_ci_requested }}
+  force_full_hosted_ci_requested:
+    description: 'Whether the PR has the force-full-hosted-ci label.'
+    value: ${{ steps.select.outputs.force_full_hosted_ci_requested }}
+  is_release_target:
+    description: 'Whether the PR base branch is a release target.'
+    value: ${{ steps.select.outputs.is_release_target }}
+  should_run_hosted_ci:
+    description: 'Whether hosted jobs are allowed to run for this event.'
+    value: ${{ steps.select.outputs.should_run_hosted_ci }}
+  should_force_full_hosted_ci:
+    description: 'Whether optimized selection should be bypassed for hosted CI.'
+    value: ${{ steps.select.outputs.should_force_full_hosted_ci }}
+  should_use_full_matrix:
+    description: 'Whether version/dependency matrices should use their broad shape.'
+    value: ${{ steps.select.outputs.should_use_full_matrix }}
+runs:
+  using: composite
+  steps:
+    - name: Select hosted CI mode
+      id: select
+      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+      with:
+        script: |
+          const forceFullInput = '${{ inputs.force-full-hosted }}'.toLowerCase() === 'true';
+          const pullRequest = context.payload.pull_request;
+          const labels = [];
+
+          if (pullRequest) {
+            const { data } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pullRequest.number
+            });
+            labels.push(...data.map((label) => label.name));
+          }
+
+          const hostedCiRequested = labels.includes('ready-for-hosted-ci');
+          const forceFullHostedCiRequested = labels.includes('force-full-hosted-ci');
+          const shouldForceFullHostedCi = forceFullInput || forceFullHostedCiRequested;
+          const baseRef = pullRequest?.base?.ref || '';
+          // Keep release-target naming in one place. These are base branches,
+          // not arbitrary source branches.
+          const isReleaseTarget = baseRef.startsWith('release/') ||
+            baseRef.startsWith('releases/') ||
+            baseRef.startsWith('release-');
+
+          const eventName = context.eventName;
+          const isPushToMain = eventName === 'push' && context.ref === 'refs/heads/main';
+          const isMergeGroup = eventName === 'merge_group';
+          const shouldRunHostedCi = eventName !== 'pull_request' ||
+            hostedCiRequested ||
+            forceFullHostedCiRequested ||
+            isReleaseTarget;
+          const shouldUseFullMatrix = shouldForceFullHostedCi ||
+            isPushToMain ||
+            isMergeGroup ||
+            isReleaseTarget;
+
+          const outputs = {
+            hosted_ci_requested: hostedCiRequested,
+            force_full_hosted_ci_requested: forceFullHostedCiRequested,
+            is_release_target: isReleaseTarget,
+            should_run_hosted_ci: shouldRunHostedCi,
+            should_force_full_hosted_ci: shouldForceFullHostedCi,
+            should_use_full_matrix: shouldUseFullMatrix
+          };
+
+          for (const [name, value] of Object.entries(outputs)) {
+            core.setOutput(name, value ? 'true' : 'false');
+          }
+
+          console.log(`hosted CI requested: ${hostedCiRequested}`);
+          console.log(`force-full hosted CI requested: ${shouldForceFullHostedCi}`);
+          console.log(`release target: ${isReleaseTarget}`);
+          console.log(`run hosted CI: ${shouldRunHostedCi}`);
+          console.log(`use full matrix: ${shouldUseFullMatrix}`);

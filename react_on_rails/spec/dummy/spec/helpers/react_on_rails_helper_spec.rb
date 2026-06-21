@@ -61,20 +61,23 @@ describe ReactOnRailsHelper do
   end
 
   describe "#load_pack_for_generated_component" do
+    let(:react_component_name) { "component_name" }
+    let(:generated_component_name) { "ComponentName" }
     let(:render_options) do
-      ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: "component_name",
+      ReactOnRails::ReactComponent::RenderOptions.new(react_component_name:,
                                                       options: {})
     end
 
     it "appends js/css pack tag" do
       allow(helper).to receive(:append_javascript_pack_tag)
       allow(helper).to receive(:append_stylesheet_pack_tag)
-      expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
+      expect { helper.load_pack_for_generated_component(react_component_name, render_options) }.not_to raise_error
 
       # Default loading strategy is now always :defer to prevent race conditions
       # between component registration and hydration, regardless of async support
-      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
-      expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/#{generated_component_name}",
+                                                                        { defer: true })
+      expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/#{generated_component_name}")
     end
 
     context "when async loading is enabled" do
@@ -95,12 +98,12 @@ describe ReactOnRailsHelper do
 
           allow(helper).to receive(:append_javascript_pack_tag)
           allow(helper).to receive(:append_stylesheet_pack_tag)
-          expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
+          expect { helper.load_pack_for_generated_component(react_component_name, render_options) }.not_to raise_error
           expect(helper).to have_received(:append_javascript_pack_tag).with(
-            "generated/component_name",
+            "generated/#{generated_component_name}",
             { defer: false, async: true }
           )
-          expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+          expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/#{generated_component_name}")
         ensure
           helper.define_singleton_method(:append_javascript_pack_tag, original_append_javascript_pack_tag)
         end
@@ -115,16 +118,281 @@ describe ReactOnRailsHelper do
       it "appends the defer attribute to the script tag" do
         allow(helper).to receive(:append_javascript_pack_tag)
         allow(helper).to receive(:append_stylesheet_pack_tag)
-        expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
-        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
-        expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+        expect { helper.load_pack_for_generated_component(react_component_name, render_options) }.not_to raise_error
+        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/#{generated_component_name}",
+                                                                          { defer: true })
+        expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/#{generated_component_name}")
       end
     end
 
     it "throws an error in development if generated component isn't found" do
+      missing_render_options = ReactOnRails::ReactComponent::RenderOptions.new(
+        react_component_name: "nonexisting_component",
+        options: {}
+      )
       allow(Rails.env).to receive(:development?).and_return(true)
-      expect { helper.load_pack_for_generated_component("nonexisting_component", render_options) }
+      expect { helper.load_pack_for_generated_component("nonexisting_component", missing_render_options) }
         .to raise_error(ReactOnRails::SmartError, /Auto-loaded Bundle Missing/)
+    end
+  end
+
+  describe "#react_on_rails_preload_links" do
+    let(:manifest) { instance_double(Shakapacker::Manifest) }
+    let(:integrity_config) { { enabled: false, cross_origin: "anonymous" } }
+    let(:shakapacker_config) do
+      instance_double(Shakapacker::Configuration, integrity: integrity_config, nested_entries?: true)
+    end
+    let(:shakapacker_instance) { instance_double(Shakapacker::Instance, manifest:, config: shakapacker_config) }
+
+    before do
+      allow(Shakapacker).to receive(:instance).and_return(shakapacker_instance)
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+    end
+
+    def preload_link_nodes(html)
+      Nokogiri::HTML.fragment(html).css("link")
+    end
+
+    it "emits script and stylesheet preload tags for a generated component pack" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return(["/packs/runtime-123.js", "/packs/generated/HelloWorld-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(["/packs/generated/HelloWorld-789.css"])
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hello_world"))
+
+      expect(links.map { |link| link["href"] }).to eq(
+        ["/packs/runtime-123.js", "/packs/generated/HelloWorld-456.js", "/packs/generated/HelloWorld-789.css"]
+      )
+      expect(links.map { |link| [link["rel"], link["as"]] }).to eq(
+        [%w[preload script], %w[preload script], %w[preload style]]
+      )
+    end
+
+    it "raises the standard nested entries error when generated packs cannot be looked up" do
+      allow(ReactOnRails::PackerUtils).to receive(:nested_entries?).and_return(false)
+
+      expect { helper.react_on_rails_preload_links("hello_world") }
+        .to raise_error(ReactOnRails::Error, /nested_entries/)
+      expect(manifest).not_to have_received(:lookup_pack_with_chunks!)
+    end
+
+    it "emits modulepreload tags for module manifest assets" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/ModernComponent-123.js",
+                        "type" => "module",
+                        "integrity" => "sha384-modern"
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true, cross_origin: "anonymous" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.size).to eq(1)
+      expect(links.first["href"]).to eq("/packs/generated/ModernComponent-123.js")
+      expect(links.first["rel"]).to eq("modulepreload")
+      expect(links.first["as"]).to be_nil
+      expect(links.first["integrity"]).to eq("sha384-modern")
+      expect(links.first["crossorigin"]).to eq("anonymous")
+    end
+
+    it "emits modulepreload tags for mjs assets with query strings" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([{ "src" => "/packs/generated/ModernComponent-123.mjs?v=abc" }])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["href"]).to eq("/packs/generated/ModernComponent-123.mjs?v=abc")
+      expect(links.first["rel"]).to eq("modulepreload")
+      expect(links.first["crossorigin"]).to eq("anonymous")
+    end
+
+    it "preserves configured crossorigin values on modulepreload tags without integrity" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([{ "src" => "/packs/generated/ModernComponent-123.mjs" }])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: false, cross_origin: "" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["crossorigin"]).to eq("")
+    end
+
+    it "preserves explicit false manifest values when classifying module assets" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/LegacyModule", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/LegacyModule-123.mjs",
+                        # String keys take precedence, so "module" => false wins over module: true.
+                        "module" => false,
+                        module: true
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/LegacyModule", type: :stylesheet)
+        .and_return(nil)
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("legacy_module"))
+
+      expect(links.first["rel"]).to eq("preload")
+      expect(links.first["as"]).to eq("script")
+    end
+
+    it "preserves configured crossorigin values on modulepreload tags with integrity" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/ModernComponent-123.mjs",
+                        "integrity" => "sha384-modern"
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true, cross_origin: "" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["crossorigin"]).to eq("")
+    end
+
+    it "defaults missing crossorigin values on modulepreload tags with integrity" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ModernComponent", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/generated/ModernComponent-123.mjs",
+                        "integrity" => "sha384-modern"
+                      }
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ModernComponent", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+      expect(links.first["integrity"]).to eq("sha384-modern")
+      expect(links.first["crossorigin"]).to eq("anonymous")
+    end
+
+    it "resolves manifest sources through Rails asset paths" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HostedComponent", type: :javascript)
+        .and_return(["/packs/generated/HostedComponent-123.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HostedComponent", type: :stylesheet)
+        .and_return(["/packs/generated/HostedComponent-456.css"])
+      allow(helper).to receive(:path_to_asset) do |source, options|
+        expect(options).to eq(skip_pipeline: true)
+        "https://cdn.example.com#{source}"
+      end
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hosted_component"))
+
+      expect(links.map { |link| link["href"] }).to eq(
+        [
+          "https://cdn.example.com/packs/generated/HostedComponent-123.js",
+          "https://cdn.example.com/packs/generated/HostedComponent-456.css"
+        ]
+      )
+    end
+
+    it "normalizes prefixed generated pack names consistently" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return(["/packs/generated/HelloWorld-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(nil)
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("generated/hello_world"))
+
+      expect(links.first["href"]).to eq("/packs/generated/HelloWorld-456.js")
+    end
+
+    it "rejects hyphenated component names before manifest lookup" do
+      expect { helper.react_on_rails_preload_links("my-component") }
+        .to raise_error(ArgumentError, /without hyphens/)
+      expect(manifest).not_to have_received(:lookup_pack_with_chunks!)
+    end
+
+    it "raises a clear error for hash manifest sources without src" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/BrokenComponent", type: :javascript)
+        .and_return([{ "integrity" => "sha384-broken" }])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/BrokenComponent", type: :stylesheet)
+        .and_return(nil)
+
+      expect { helper.react_on_rails_preload_links("broken_component") }
+        .to raise_error(ArgumentError, /manifest source without src/)
+    end
+
+    it "deduplicates shared chunks across component packs" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return(["/packs/runtime-123.js", "/packs/generated/HelloWorld-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(["/packs/shared-789.css"])
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/ReduxApp", type: :javascript)
+        .and_return(["/packs/runtime-123.js", "/packs/generated/ReduxApp-456.js"])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/ReduxApp", type: :stylesheet)
+        .and_return(["/packs/shared-789.css"])
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hello_world", "generated/ReduxApp"))
+
+      expect(links.map { |link| link["href"] }).to eq(
+        [
+          "/packs/runtime-123.js",
+          "/packs/generated/HelloWorld-456.js",
+          "/packs/shared-789.css",
+          "/packs/generated/ReduxApp-456.js"
+        ]
+      )
+    end
+
+    it "deduplicates assets by href before rendering link attributes" do
+      allow(manifest).to receive(:lookup_pack_with_chunks!)
+        .with("generated/HelloWorld", type: :javascript)
+        .and_return([
+                      {
+                        "src" => "/packs/runtime-123.js",
+                        "integrity" => "sha384-runtime"
+                      },
+                      "/packs/runtime-123.js"
+                    ])
+      allow(manifest).to receive(:lookup_pack_with_chunks)
+        .with("generated/HelloWorld", type: :stylesheet)
+        .and_return(nil)
+      allow(shakapacker_config).to receive(:integrity).and_return({ enabled: true, cross_origin: "anonymous" })
+
+      links = preload_link_nodes(helper.react_on_rails_preload_links("hello_world"))
+
+      expect(links.size).to eq(1)
+      expect(links.first["href"]).to eq("/packs/runtime-123.js")
+      expect(links.first["integrity"]).to eq("sha384-runtime")
     end
   end
 
@@ -189,7 +457,7 @@ describe ReactOnRailsHelper do
   end
 
   describe "#react_component" do
-    subject(:react_app) { react_component("App", props: props) }
+    subject(:react_app) { react_component("App", props:) }
 
     before { allow(SecureRandom).to receive(:uuid).and_return(0, 1, 2, 3) }
 
@@ -211,8 +479,7 @@ describe ReactOnRailsHelper do
       <<~SCRIPT
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
-        data-component-name="App" data-dom-id="App-react-component"
-        data-immediate-hydration="true">{"name":"My Test Name"}</script>
+        data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
       SCRIPT
     end
 
@@ -220,8 +487,7 @@ describe ReactOnRailsHelper do
       <<~SCRIPT
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
-        data-component-name="App" data-dom-id="App-react-component"
-        data-immediate-hydration="true">{}</script>
+        data-component-name="App" data-dom-id="App-react-component">{}</script>
       SCRIPT
     end
 
@@ -254,7 +520,7 @@ describe ReactOnRailsHelper do
       end
 
       it "merges clientProps into the component props JSON for client hydration" do
-        result = react_component("App", props: props, prerender: true)
+        result = react_component("App", props:, prerender: true)
 
         expect(result).to include('"name":"My Test Name"')
         expect(result).to include('"__tanstackRouterDehydratedState":{"url":"/products?category=tools"}')
@@ -327,15 +593,24 @@ describe ReactOnRailsHelper do
       expect(expect(react_app).target).to script_tag_be_included(react_definition_script)
     }
 
+    it "warns when immediate_hydration option is passed" do
+      allow(Rails.logger).to receive(:warn)
+      ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
+
+      react_component("App", props:, immediate_hydration: false)
+      react_component("App", props:, immediate_hydration: false)
+
+      expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
+    end
+
     context "with 'random_dom_id' option set to false" do
-      subject(:react_app) { react_component("App", props: props, random_dom_id: false) }
+      subject(:react_app) { react_component("App", props:, random_dom_id: false) }
 
       let(:react_definition_script) do
         <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
-          data-component-name="App" data-dom-id="App-react-component"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -344,14 +619,13 @@ describe ReactOnRailsHelper do
     end
 
     context "with 'random_dom_id' option set to true" do
-      subject(:react_app) { react_component("App", props: props, random_dom_id: true) }
+      subject(:react_app) { react_component("App", props:, random_dom_id: true) }
 
       let(:react_definition_script) do
         <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component-0" \
-          data-component-name="App" data-dom-id="App-react-component-0"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component-0">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -360,7 +634,7 @@ describe ReactOnRailsHelper do
     end
 
     context "with 'random_dom_id' global" do
-      subject(:react_app) { react_component("App", props: props) }
+      subject(:react_app) { react_component("App", props:) }
 
       around do |example|
         ReactOnRails.configure { |config| config.random_dom_id = false }
@@ -372,8 +646,7 @@ describe ReactOnRailsHelper do
         <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
-          data-component-name="App" data-dom-id="App-react-component"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -382,7 +655,7 @@ describe ReactOnRailsHelper do
     end
 
     context "with 'id' option" do
-      subject(:react_app) { react_component("App", props: props, id: id) }
+      subject(:react_app) { react_component("App", props:, id:) }
 
       let(:id) { "shaka_div" }
 
@@ -390,8 +663,7 @@ describe ReactOnRailsHelper do
         <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-shaka_div" \
-          data-component-name="App" data-dom-id="shaka_div"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="shaka_div">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -419,6 +691,45 @@ describe ReactOnRailsHelper do
       end
     end
 
+    context "with hydrate_on" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "does not add data-hydrate-on when the option is omitted" do
+        result = react_component("App")
+
+        expect(result).not_to match(/data-hydrate-on=/)
+      end
+
+      it "adds data-hydrate-on for explicit immediate mode" do
+        result = react_component("App", hydrate_on: :immediate)
+
+        expect(result).to match(/data-hydrate-on="immediate"/)
+      end
+
+      it "adds data-hydrate-on for visible mode" do
+        result = react_component("App", hydrate_on: :visible)
+
+        expect(result).to match(/data-hydrate-on="visible"/)
+      end
+
+      it "rejects interaction mode because it is not implemented in OSS" do
+        expect do
+          react_component("App", hydrate_on: :interaction)
+        end.to raise_error(ArgumentError, /Supported OSS modes are :immediate, :visible, and :idle/)
+      end
+    end
+
+    context "with hydrate_on and React on Rails Pro installed" do
+      it "rejects deferred scheduling modes" do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        expect do
+          react_component("App", hydrate_on: :visible)
+        end.to raise_error(ArgumentError, /React on Rails Pro does not support hydrate_on scheduling/)
+      end
+    end
+
     context "with 'html_options' tag option" do
       subject { react_component("App", html_options: { tag: "span" }) }
 
@@ -433,28 +744,32 @@ describe ReactOnRailsHelper do
       it { is_expected.to include '<div id="App-react-component-0"></div>' }
     end
 
-    describe "'immediate_hydration' tag option" do
-      let(:immediate_hydration_script) do
+    describe "Pro inline hydration script" do
+      let(:hydration_script) do
         %(typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');)
           .html_safe
       end
 
-      context "with 'immediate_hydration' == false" do
-        subject { react_component("App", immediate_hydration: false) }
-
-        it { is_expected.not_to include immediate_hydration_script }
-      end
-
-      context "without 'immediate_hydration' tag option" do
+      context "with Pro gem installed" do
         subject { react_component("App") }
 
-        it { is_expected.to include immediate_hydration_script }
+        it { is_expected.to include hydration_script }
+      end
+
+      context "without Pro gem installed" do
+        subject { react_component("App") }
+
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it { is_expected.not_to include hydration_script }
       end
     end
   end
 
   describe "#react_component_hash" do
-    subject(:react_app) { react_component_hash("App", props: props) }
+    subject(:react_app) { react_component_hash("App", props:) }
 
     let(:props) { { name: "My Test Name" } }
 
@@ -473,6 +788,16 @@ describe ReactOnRailsHelper do
       expect(react_app).to have_key("componentHtml")
       expect(react_app).to have_key("title")
     end
+
+    it "warns when immediate_hydration option is passed" do
+      allow(Rails.logger).to receive(:warn)
+      ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
+
+      react_component_hash("App", props:, immediate_hydration: false)
+      react_component_hash("App", props:, immediate_hydration: false)
+
+      expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
+    end
   end
 
   describe "#server_render_js error serialization" do
@@ -487,7 +812,15 @@ describe ReactOnRailsHelper do
         function runGeneratedCode(generatedCode) {
           var ReactOnRails = {
             handleError: function() { return ''; },
-            getConsoleReplayScript: function() { return ''; }
+            getConsoleReplayScript: function() { return ''; },
+            prepareRenderResult: function(html, consoleReplayScript, hasErrors, renderingError) {
+              return JSON.stringify({
+                html: html,
+                consoleReplayScript: consoleReplayScript,
+                hasErrors: hasErrors,
+                renderingError: renderingError || null
+              });
+            }
           };
           // Evaluate generated wrapper JS in a test sandbox before Ruby post-processing.
           return eval(generatedCode);
@@ -548,17 +881,166 @@ describe ReactOnRailsHelper do
         server_render_js("(function() { throw 42; })()", throw_js_errors: true)
       end.to raise_error(ReactOnRails::PrerenderError)
     end
+
+    it "includes streaming renderingError metadata in PrerenderError details" do
+      allow(ReactOnRails::Utils).to receive(:full_text_errors_enabled?).and_return(true)
+
+      chunk_result = {
+        "consoleReplayScript" => "",
+        "hasErrors" => true,
+        "renderingError" => {
+          "message" => "useState is not a function",
+          "stack" => <<~STACK.chomp
+            TypeError: useState is not a function
+                at CommentsToggle (/app/components/CommentsToggle.jsx:12:15)
+          STACK
+        }
+      }
+
+      expect do
+        helper.send(:raise_prerender_error, chunk_result, "CommentsToggle", {}, "generated js")
+      end.to raise_error(ReactOnRails::PrerenderError) { |error|
+        expect(error.message).to include("useState is not a function")
+        expect(error.message).to include("/app/components/CommentsToggle.jsx:12:15")
+      }
+    end
+
+    it "drops the V8 error-type header line from the backtrace built from renderingError" do
+      json_result = {
+        "renderingError" => {
+          "message" => "useState is not a function",
+          "stack" => <<~STACK.chomp
+            TypeError: useState is not a function
+                at CommentsToggle (/app/components/CommentsToggle.jsx:12:15)
+                at PostsPage (/app/components/PostsPage.jsx:8:3)
+          STACK
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error.backtrace.first).to start_with("at CommentsToggle")
+      expect(error.backtrace).not_to include(/^TypeError:/)
+    end
+
+    it "filters non-`at` header lines that appear mid-stack (chained exceptions)" do
+      json_result = {
+        "renderingError" => {
+          "message" => "boom",
+          "stack" => <<~STACK.chomp
+            TypeError: boom
+                at A (/app/a.js:1:1)
+            Caused by: Error: root
+                at B (/app/b.js:2:2)
+          STACK
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error.backtrace).to eq(["at A (/app/a.js:1:1)", "at B (/app/b.js:2:2)"])
+    end
+
+    it "builds a diagnostic from a stack-only renderingError with no message" do
+      json_result = {
+        "renderingError" => {
+          "stack" => "TypeError: boom\n    at Foo (/app/foo.js:1:1)"
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error).not_to be_nil
+      expect(error.message).to eq("RSC stream metadata reported a rendering error")
+      expect(error.backtrace.first).to start_with("at Foo")
+    end
+
+    it "returns nil when renderingError has neither message nor stack" do
+      error = helper.send(:rendering_error_from_result, { "renderingError" => {} })
+
+      expect(error).to be_nil
+    end
+
+    it "ignores a non-String stack (e.g. an array of frames) instead of producing garbage frames" do
+      json_result = {
+        "renderingError" => {
+          "message" => "boom",
+          "stack" => ["at A (/app/a.js:1:1)"]
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error.backtrace).to be_nil
+    end
+
+    it "leaves backtrace nil when renderingError has no stack so error reporters can enrich it" do
+      json_result = {
+        "renderingError" => {
+          "message" => "useState is not a function"
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error.backtrace).to be_nil
+    end
+
+    it "leaves backtrace nil when the stack is a header line with no parseable frames" do
+      json_result = {
+        "renderingError" => {
+          "message" => "useState is not a function",
+          "stack" => "TypeError: useState is not a function"
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error.backtrace).to be_nil
+    end
+
+    it "raises PrerenderError without crashing when renderingError has no stack (full text errors)" do
+      allow(ReactOnRails::Utils).to receive(:full_text_errors_enabled?).and_return(true)
+
+      chunk_result = {
+        "consoleReplayScript" => "",
+        "hasErrors" => true,
+        "renderingError" => { "message" => "useState is not a function" }
+      }
+
+      expect do
+        helper.send(:raise_prerender_error, chunk_result, "CommentsToggle", {}, "generated js")
+      end.to raise_error(ReactOnRails::PrerenderError) { |error|
+        expect(error.message).to include("useState is not a function")
+      }
+    end
+
+    it "raises PrerenderError without crashing when renderingError has no stack (cleaned backtrace)" do
+      allow(ReactOnRails::Utils).to receive(:full_text_errors_enabled?).and_return(false)
+
+      chunk_result = {
+        "consoleReplayScript" => "",
+        "hasErrors" => true,
+        "renderingError" => { "message" => "useState is not a function" }
+      }
+
+      expect do
+        helper.send(:raise_prerender_error, chunk_result, "CommentsToggle", {}, "generated js")
+      end.to raise_error(ReactOnRails::PrerenderError) { |error|
+        expect(error.message).to include("useState is not a function")
+      }
+    end
   end
 
   describe "#redux_store" do
-    subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
+    subject(:store) { redux_store("reduxStore", props:) }
 
     let(:props) do
       { name: "My Test Name" }
     end
 
     let(:react_store_script) do
-      '<script type="application/json" data-js-react-on-rails-store="reduxStore" data-immediate-hydration="true">' \
+      '<script type="application/json" data-js-react-on-rails-store="reduxStore">' \
         '{"name":"My Test Name"}' \
         "</script>"
     end
@@ -573,42 +1055,20 @@ describe ReactOnRailsHelper do
       expect(expect(store).target).to script_tag_be_included(react_store_script)
     }
 
-    context "without Pro gem installed" do
-      before do
-        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-      end
+    it "warns once when immediate_hydration option is passed" do
+      allow(Rails.logger).to receive(:warn)
+      ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
 
-      context "with immediate_hydration option set to true (not recommended)" do
-        it "returns false for immediate_hydration and logs a warning" do
-          expect(Rails.logger).to receive(:warn)
-            .with(/immediate_hydration: true requires the React on Rails Pro gem to be installed/)
+      redux_store("reduxStore", props:, immediate_hydration: false)
+      redux_store("reduxStore", props:, immediate_hydration: true)
 
-          result = redux_store("reduxStore", props: props, immediate_hydration: true)
+      expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
+    end
 
-          # Verify that the store tag does NOT have immediate hydration enabled
-          expect(result).not_to include('data-immediate-hydration="true"')
-        end
-      end
-
-      context "with immediate_hydration option set to false" do
-        it "returns false for immediate_hydration without warning" do
-          expect(Rails.logger).not_to receive(:warn)
-
-          result = redux_store("reduxStore", props: props, immediate_hydration: false)
-
-          # Verify that the store tag does NOT have immediate hydration enabled
-          expect(result).not_to include('data-immediate-hydration="true"')
-        end
-      end
-
-      context "without immediate_hydration option (nil)" do
-        it "defaults to false for non-Pro installs" do
-          result = redux_store("reduxStore", props: props)
-
-          # Verify that the store tag does NOT have immediate hydration enabled
-          expect(result).not_to include('data-immediate-hydration="true"')
-        end
-      end
+    it "raises an ArgumentError for unknown keywords" do
+      expect do
+        redux_store("reduxStore", props:, typo_option: true)
+      end.to raise_error(ArgumentError, "unknown keyword: :typo_option")
     end
   end
 
@@ -737,12 +1197,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the Pro attribution comment in the rendered output" do
-          result = react_component("App", props: props)
+          result = react_component("App", props:)
           expect(result).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
         end
 
         it "includes the attribution comment only once" do
-          result = react_component("App", props: props)
+          result = react_component("App", props:)
           comment_count = result.scan("<!-- Powered by React on Rails Pro").length
           expect(comment_count).to eq(1)
         end
@@ -754,12 +1214,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the open source attribution comment in the rendered output" do
-          result = react_component("App", props: props)
+          result = react_component("App", props:)
           expect(result).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
         end
 
         it "includes the attribution comment only once" do
-          result = react_component("App", props: props)
+          result = react_component("App", props:)
           comment_count = result.scan("<!-- Powered by React on Rails").length
           expect(comment_count).to eq(1)
         end
@@ -775,12 +1235,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the Pro attribution comment in the rendered output" do
-          result = redux_store("TestStore", props: props)
+          result = redux_store("TestStore", props:)
           expect(result).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
         end
 
         it "includes the attribution comment only once" do
-          result = redux_store("TestStore", props: props)
+          result = redux_store("TestStore", props:)
           comment_count = result.scan("<!-- Powered by React on Rails Pro").length
           expect(comment_count).to eq(1)
         end
@@ -792,12 +1252,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the open source attribution comment in the rendered output" do
-          result = redux_store("TestStore", props: props)
+          result = redux_store("TestStore", props:)
           expect(result).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
         end
 
         it "includes the attribution comment only once" do
-          result = redux_store("TestStore", props: props)
+          result = redux_store("TestStore", props:)
           comment_count = result.scan("<!-- Powered by React on Rails").length
           expect(comment_count).to eq(1)
         end
@@ -822,12 +1282,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the Pro attribution comment in the componentHtml" do
-          result = react_component_hash("App", props: props, prerender: true)
+          result = react_component_hash("App", props:, prerender: true)
           expect(result["componentHtml"]).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
         end
 
         it "includes the attribution comment only once" do
-          result = react_component_hash("App", props: props, prerender: true)
+          result = react_component_hash("App", props:, prerender: true)
           comment_count = result["componentHtml"].scan("<!-- Powered by React on Rails Pro").length
           expect(comment_count).to eq(1)
         end
@@ -839,12 +1299,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the open source attribution comment in the componentHtml" do
-          result = react_component_hash("App", props: props, prerender: true)
+          result = react_component_hash("App", props:, prerender: true)
           expect(result["componentHtml"]).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
         end
 
         it "includes the attribution comment only once" do
-          result = react_component_hash("App", props: props, prerender: true)
+          result = react_component_hash("App", props:, prerender: true)
           comment_count = result["componentHtml"].scan("<!-- Powered by React on Rails").length
           expect(comment_count).to eq(1)
         end
@@ -860,8 +1320,8 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the attribution comment only once when calling multiple react_component helpers" do
-          result1 = react_component("App1", props: props)
-          result2 = react_component("App2", props: props)
+          result1 = react_component("App1", props:)
+          result2 = react_component("App2", props:)
           combined_result = result1 + result2
 
           comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
@@ -869,8 +1329,8 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the attribution comment only once when calling mixed SSR helpers" do
-          component_result = react_component("App", props: props)
-          store_result = redux_store("TestStore", props: props)
+          component_result = react_component("App", props:)
+          store_result = redux_store("TestStore", props:)
           combined_result = component_result + store_result
 
           comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
@@ -878,7 +1338,7 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the attribution comment only once when calling react_component multiple times" do
-          results = Array.new(5) { |i| react_component("App#{i}", props: props) }
+          results = Array.new(5) { |i| react_component("App#{i}", props:) }
           combined_result = results.join
 
           comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
@@ -892,8 +1352,8 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the attribution comment only once when calling multiple react_component helpers" do
-          result1 = react_component("App1", props: props)
-          result2 = react_component("App2", props: props)
+          result1 = react_component("App1", props:)
+          result2 = react_component("App2", props:)
           combined_result = result1 + result2
 
           comment_count = combined_result.scan("<!-- Powered by React on Rails").length
@@ -901,8 +1361,8 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the attribution comment only once when calling mixed SSR helpers" do
-          component_result = react_component("App", props: props)
-          store_result = redux_store("TestStore", props: props)
+          component_result = react_component("App", props:)
+          store_result = redux_store("TestStore", props:)
           combined_result = component_result + store_result
 
           comment_count = combined_result.scan("<!-- Powered by React on Rails").length
@@ -979,8 +1439,11 @@ describe ReactOnRailsHelper do
         dom_id: "HelloWorld-react-component-0",
         react_component_name: "HelloWorld",
         trace: false,
+        hydrate_on: :immediate,
+        internal_option: nil,
         store_dependencies: nil,
-        immediate_hydration: true
+        html_streaming?: false,
+        auto_load_bundle: false
       )
     end
 
@@ -989,7 +1452,7 @@ describe ReactOnRailsHelper do
         allow(helper).to receive(:csp_nonce).and_return("component-nonce-abc")
       end
 
-      it "adds nonce to the immediate hydration script" do
+      it "adds nonce to the Pro hydration script" do
         result = helper.send(:generate_component_script, render_options)
         expect(result).to include('nonce="component-nonce-abc"')
         expect(result).to include("reactOnRailsComponentLoaded")
@@ -1007,29 +1470,45 @@ describe ReactOnRailsHelper do
         allow(helper).to receive(:csp_nonce).and_return(nil)
       end
 
-      it "does not add nonce to the immediate hydration script" do
+      it "does not add nonce to the Pro hydration script" do
         result = helper.send(:generate_component_script, render_options)
         expect(result).not_to include("nonce=")
         expect(result).to include("reactOnRailsComponentLoaded")
       end
     end
 
-    context "when immediate_hydration is disabled" do
-      let(:render_options) do
-        instance_double(
-          ReactOnRails::ReactComponent::RenderOptions,
-          client_props: { name: "World" },
-          dom_id: "HelloWorld-react-component-0",
-          react_component_name: "HelloWorld",
-          trace: false,
-          store_dependencies: nil,
-          immediate_hydration: false
-        )
+    context "when Pro gem is not installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
       end
 
-      it "does not include an immediate hydration script" do
+      it "does not include a hydration script" do
         result = helper.send(:generate_component_script, render_options)
         expect(result).not_to include("reactOnRailsComponentLoaded")
+      end
+    end
+
+    context "when auto-loaded generated stylesheet hrefs are available" do
+      let(:stylesheet_sources) do
+        [{ source: "css/shared-generated-pack-deadbeef.css", source_type: :stylesheet }]
+      end
+
+      before do
+        allow(render_options).to receive(:auto_load_bundle).and_return(true)
+        allow(helper).to receive(:preload_sources_for_stylesheet_pack)
+          .with("generated/HelloWorld")
+          .and_return(stylesheet_sources)
+        allow(helper).to receive(:unique_preload_sources_by_href)
+          .with(stylesheet_sources)
+          .and_return([{ href: "/webpack/test/css/shared-generated-pack-deadbeef.css" }])
+      end
+
+      it "adds generated stylesheet href metadata to the component specification script" do
+        result = helper.send(:generate_component_script, render_options)
+        script = Nokogiri::HTML.fragment(result).css("script.js-react-on-rails-component").first
+
+        expect(script["data-generated-stylesheet-hrefs"])
+          .to eq(["/webpack/test/css/shared-generated-pack-deadbeef.css"].to_json)
       end
     end
   end
@@ -1040,8 +1519,7 @@ describe ReactOnRailsHelper do
     let(:redux_store_data) do
       {
         props: { count: 0 },
-        store_name: "MyStore",
-        immediate_hydration: true
+        store_name: "MyStore"
       }
     end
 
@@ -1050,7 +1528,7 @@ describe ReactOnRailsHelper do
         allow(helper).to receive(:csp_nonce).and_return("store-nonce-xyz")
       end
 
-      it "adds nonce to the immediate hydration script" do
+      it "adds nonce to the Pro hydration script" do
         result = helper.send(:generate_store_script, redux_store_data)
         expect(result).to include('nonce="store-nonce-xyz"')
         expect(result).to include("reactOnRailsStoreLoaded")
@@ -1068,26 +1546,38 @@ describe ReactOnRailsHelper do
         allow(helper).to receive(:csp_nonce).and_return(nil)
       end
 
-      it "does not add nonce to the immediate hydration script" do
+      it "does not add nonce to the Pro hydration script" do
         result = helper.send(:generate_store_script, redux_store_data)
         expect(result).not_to include("nonce=")
         expect(result).to include("reactOnRailsStoreLoaded")
       end
     end
 
-    context "when immediate_hydration is disabled" do
-      let(:redux_store_data) do
-        {
-          props: { count: 0 },
-          store_name: "MyStore",
-          immediate_hydration: false
-        }
+    context "when Pro gem is not installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
       end
 
-      it "does not include an immediate hydration script" do
+      it "does not include a hydration script" do
         result = helper.send(:generate_store_script, redux_store_data)
         expect(result).not_to include("reactOnRailsStoreLoaded")
       end
+    end
+
+    it "escapes store_name when serializing data-js-react-on-rails-store" do
+      injected_store_name = 'MyStore" onmouseover="alert(1)'
+      result = helper.send(
+        :generate_store_script,
+        {
+          props: { count: 0 },
+          store_name: injected_store_name
+        }
+      )
+
+      expect(result).to include(
+        'data-js-react-on-rails-store="MyStore&quot; onmouseover=&quot;alert(1)"'
+      )
+      expect(result).not_to include('data-js-react-on-rails-store="MyStore" onmouseover=')
     end
   end
 

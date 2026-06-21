@@ -1,8 +1,13 @@
+/**
+ * @deprecated Use `capabilities/core.ts` instead. This file is kept for backward compatibility
+ * with older versions of react-on-rails-pro that import from `react-on-rails/@internal/base/client`.
+ */
+
 import type { ReactElement } from 'react';
 import type {
   RegisteredComponent,
   RenderReturnType,
-  ReactComponentOrRenderFunction,
+  RegisteredComponentValue,
   AuthenticityHeaders,
   Store,
   StoreGenerator,
@@ -13,6 +18,13 @@ import * as Authenticity from '../Authenticity.ts';
 import buildConsoleReplay, { consoleReplay } from '../buildConsoleReplay.ts';
 import reactHydrateOrRender from '../reactHydrateOrRender.ts';
 import createReactOutput from '../createReactOutput.ts';
+import componentRegistrationMetric from '../componentRegistrationMetric.ts';
+import {
+  buildRootErrorCallbackOptions,
+  getRootErrorHandlers,
+  resetRootErrorHandlers,
+  setRootErrorHandlers,
+} from '../rootErrorHandlers.ts';
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
@@ -21,11 +33,13 @@ const DEFAULT_OPTIONS = {
   logComponentRegistration: false,
 };
 
+type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
+
 interface Registries {
   ComponentRegistry: {
-    register: (components: Record<string, ReactComponentOrRenderFunction>) => void;
-    get: (name: string) => RegisteredComponent;
-    components: () => Map<string, RegisteredComponent>;
+    register: (components: Record<string, RegisteredComponentValue>) => void;
+    get: (name: string) => RegisteredComponentEntry;
+    components: () => Map<string, RegisteredComponentEntry>;
   };
   StoreRegistry: {
     register: (storeGenerators: Record<string, StoreGenerator>) => void;
@@ -51,6 +65,8 @@ export type BaseClientObjectType = Omit<
   | 'reactOnRailsStoreLoaded'
   | 'streamServerRenderedReactComponent'
   | 'serverRenderRSCReactComponent'
+  | 'addAsyncPropsCapabilityToComponentProps'
+  | 'getOrCreateAsyncPropsManager'
 >;
 
 // Cache to track created objects and their registries
@@ -128,42 +144,56 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
     },
 
     reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType {
-      return reactHydrateOrRender(domNode, reactElement, hydrate);
+      // The component name is unknown on this low-level path; the dom id still ties errors to a mount.
+      const rootErrorCallbackOptions = buildRootErrorCallbackOptions(
+        { domNodeId: domNode.id || undefined },
+        hydrate,
+      );
+      return reactHydrateOrRender(domNode, reactElement, hydrate, rootErrorCallbackOptions);
     },
 
     setOptions(newOptions: Partial<ReactOnRailsOptions>): void {
-      if (typeof newOptions.traceTurbolinks !== 'undefined') {
-        this.options.traceTurbolinks = newOptions.traceTurbolinks;
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.traceTurbolinks;
+      const { traceTurbolinks, turbo, debugMode, logComponentRegistration, rootErrorHandlers, ...rest } =
+        newOptions;
+
+      if (typeof traceTurbolinks !== 'undefined') {
+        this.options.traceTurbolinks = traceTurbolinks;
       }
 
-      if (typeof newOptions.turbo !== 'undefined') {
-        this.options.turbo = newOptions.turbo;
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.turbo;
+      if (typeof turbo !== 'undefined') {
+        this.options.turbo = turbo;
       }
 
-      if (typeof newOptions.debugMode !== 'undefined') {
-        this.options.debugMode = newOptions.debugMode;
-        if (newOptions.debugMode) {
+      if (typeof debugMode !== 'undefined') {
+        this.options.debugMode = debugMode;
+        if (debugMode) {
           console.log('[ReactOnRails] Debug mode enabled');
         }
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.debugMode;
       }
 
-      if (typeof newOptions.logComponentRegistration !== 'undefined') {
-        this.options.logComponentRegistration = newOptions.logComponentRegistration;
-        if (newOptions.logComponentRegistration) {
+      if (typeof logComponentRegistration !== 'undefined') {
+        this.options.logComponentRegistration = logComponentRegistration;
+        if (logComponentRegistration) {
           console.log('[ReactOnRails] Component registration logging enabled');
         }
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.logComponentRegistration;
       }
 
-      if (Object.keys(newOptions).length > 0) {
-        throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
+      if (Object.prototype.hasOwnProperty.call(newOptions, 'rootErrorHandlers')) {
+        // MUST SYNC: sibling implementation exists in packages/react-on-rails/src/capabilities/core.ts.
+        // Validates and merges the handlers per key (partial updates keep previously registered
+        // callbacks); warns when the React runtime cannot support them. Store the merged result so
+        // `option('rootErrorHandlers')` reflects the effective registration.
+        if (typeof rootErrorHandlers === 'undefined') {
+          resetRootErrorHandlers();
+          this.options.rootErrorHandlers = undefined;
+        } else {
+          setRootErrorHandlers(rootErrorHandlers);
+          this.options.rootErrorHandlers = getRootErrorHandlers();
+        }
+      }
+
+      if (Object.keys(rest).length > 0) {
+        throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(rest)}`);
       }
     },
 
@@ -181,13 +211,14 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
 
     resetOptions(): void {
       this.options = { ...DEFAULT_OPTIONS };
+      resetRootErrorHandlers();
     },
 
     // ===================================================================
     // REGISTRY METHOD IMPLEMENTATIONS - Using provided registries
     // ===================================================================
 
-    register(components: Record<string, ReactComponentOrRenderFunction>): void {
+    register(components: Record<string, RegisteredComponentValue>): void {
       if (this.options.debugMode || this.options.logComponentRegistration) {
         // Use performance.now() if available, otherwise fallback to Date.now()
         const perf = typeof performance !== 'undefined' ? performance : { now: () => Date.now() };
@@ -208,8 +239,10 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
         if (this.options.debugMode) {
           componentNames.forEach((name) => {
             const component = components[name];
-            const size = component.toString().length;
-            console.log(`[ReactOnRails] ✅ Registered: ${name} (${size} chars)`);
+            const registrationMetric = componentRegistrationMetric(component);
+            console.log(
+              `[ReactOnRails] ✅ Registered: ${name} (${registrationMetric.value} ${registrationMetric.label})`,
+            );
           });
         }
       } else {
@@ -247,11 +280,11 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
       StoreRegistry.clearHydratedStores();
     },
 
-    getComponent(name: string): RegisteredComponent {
+    getComponent(name: string): RegisteredComponentEntry {
       return ComponentRegistry.get(name);
     },
 
-    registeredComponents(): Map<string, RegisteredComponent> {
+    registeredComponents(): Map<string, RegisteredComponentEntry> {
       return ComponentRegistry.components();
     },
 
@@ -265,17 +298,21 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
 
     render(
       name: string,
-      props: Record<string, string>,
+      props: Record<string, unknown>,
       domNodeId: string,
       hydrate: boolean,
     ): RenderReturnType {
       const componentObj = ComponentRegistry.get(name);
       const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
-      return this.reactHydrateOrRender(
+      return reactHydrateOrRender(
         document.getElementById(domNodeId) as Element,
         reactElement as ReactElement,
         hydrate,
+        buildRootErrorCallbackOptions(
+          { componentName: name || undefined, domNodeId: domNodeId || undefined },
+          hydrate,
+        ),
       );
     },
 
@@ -313,6 +350,14 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
       void args; // Mark as used
       throw new Error(
         'handleError is not available in "react-on-rails/client". Import "react-on-rails" server-side.',
+      );
+    },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    prepareRenderResult(...args: any[]): any {
+      void args; // Mark as used
+      throw new Error(
+        'prepareRenderResult is not available in "react-on-rails/client". Import "react-on-rails" server-side.',
       );
     },
   };

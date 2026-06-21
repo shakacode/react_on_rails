@@ -128,9 +128,9 @@ module ReactOnRails
       webpack_generated_files = ReactOnRails.configuration.webpack_generated_files
 
       @webpack_assets_status_checker ||= ReactOnRails::TestHelper::WebpackAssetsStatusChecker.new(
-        source_path: source_path,
-        generated_assets_full_path: generated_assets_full_path,
-        webpack_generated_files: webpack_generated_files
+        source_path:,
+        generated_assets_full_path:,
+        webpack_generated_files:
       )
     end
 
@@ -138,7 +138,9 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
         config/shakapacker.yml to enable nested entries. for more information read
-        https://reactonrails.com/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
+        https://reactonrails.com/docs/core-concepts/auto-bundling/#enable-nested_entries-for-shakapacker
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
 
       raise ReactOnRails::Error, msg
@@ -150,6 +152,8 @@ module ReactOnRails
         Installed version: #{ReactOnRails::PackerUtils.shakapacker_version}
 
         To fix: Upgrade Shakapacker, or set `auto_load_bundle: false` in your ReactOnRails configuration.
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
 
       raise ReactOnRails::Error, msg

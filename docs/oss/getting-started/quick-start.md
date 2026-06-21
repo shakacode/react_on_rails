@@ -2,17 +2,20 @@
 
 > **Get your first React component running in Rails in 15 minutes**
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user wants the shortest path to a working React on Rails install in a new Rails app. For adding React to an existing app, use [Install into an Existing Rails App](./installation-into-an-existing-rails-app.md) instead. For a guided walkthrough, use the [Tutorial](./tutorial.md).
+
 This guide will have you rendering React components in your Rails app as quickly as possible. We'll skip the theory for now and focus on getting something working.
 
 ## ✅ Prerequisites
 
 Before starting, make sure you have:
 
-- **🚨 React on Rails 16.0+** (this guide)
-- **🚨 Shakapacker 6+** (7+ recommended for React on Rails 16)
-- **Rails 7+** application (Rails 5.2+ supported)
-- **Ruby 3.0+** (required)
-- **Node.js 20+** and a package manager (**npm**, **Yarn**, or **pnpm**)
+- **🚨 React on Rails 17.0.0+** (this guide)
+- **Shakapacker 6+** — installed automatically by the React on Rails generator (7+ recommended for React on Rails 17)
+- **Rails 7+** application
+- **Ruby 3.3+** (required)
+- **Node.js 18+** and a package manager (**npm**, **pnpm**, **Yarn**, or **bun**)
 - **Foreman or Overmind** (for running `bin/dev`)
 - **Basic familiarity** with React and Rails
 
@@ -26,25 +29,40 @@ Add the React on Rails gem and run its installer:
 # Add the gem
 bundle add react_on_rails --strict
 
-# Commit your changes (required for generator)
-git add . && git commit -m "Add react_on_rails gem"
+# Optional but recommended: commit or stash first so generated files show as a clean diff
+# git add . && git commit -m "Prepare for React on Rails install"
 
-# Run the installer
-bin/rails generate react_on_rails:install
+# Run the installer for TypeScript
+bin/rails generate react_on_rails:install --typescript
 
-# Optional: Use Rspack for ~20x faster builds
-# bin/rails generate react_on_rails:install --rspack
+# Fresh installs use Rspack by default when supported (Shakapacker 9+).
+# To force Webpack instead, pass --no-rspack:
+# bin/rails generate react_on_rails:install --typescript --no-rspack
+
+# For JavaScript instead of TypeScript, omit --typescript
+# bin/rails generate react_on_rails:install
+```
+
+If the generator reports dependency-install warnings (for example, `JavaScript dependencies installation failed ...`), run your package manager install and compile once before moving on:
+
+```bash
+npm install
+# or: pnpm install
+# or: yarn install
+# or: bun install
+
+bundle exec rails shakapacker:compile
 ```
 
 Take a look at the files created by the generator.
 
-- jsx files created
+- Component files (`.tsx` for TypeScript, `.jsx` for JavaScript)
 - Shakapacker install
-- React component files in `client/`
+- React component files in `app/javascript/src/`
 - A sample controller and view
-- Webpack configuration
+- Bundler configuration
 
-> 💡 **Performance Tip:** Add the `--rspack` flag for significantly faster builds (~20x improvement). You can also switch bundlers later with `bin/switch-bundler rspack`.
+> 💡 **Performance Tip:** Fresh installs use Rspack by default when supported by your Shakapacker version (9+) for significantly faster builds. To compare or temporarily force Webpack, run the installer with `--no-rspack`; you can also switch bundlers later with `bin/switch-bundler webpack` or `bin/switch-bundler rspack`.
 >
 > **Note on `bin/switch-bundler`:** This utility safely switches between webpack and rspack by updating `shakapacker.yml` and managing dependencies. However, it does not modify custom webpack configuration code. If you have custom webpack plugins or loaders, you may need to update those manually to work with rspack. See [Rspack documentation](../api-reference/generator-details.md#rspack-support) for details on unified configuration patterns.
 
@@ -55,7 +73,7 @@ Take a look at the files created by the generator.
 > - **overmind**: `brew install overmind` (macOS) or see [installation guide](https://github.com/DarthSim/overmind#installation)
 > - **foreman**: `gem install foreman` (install globally, not in your project bundle - [details](https://github.com/ddollar/foreman/wiki/Don't-Bundle-Foreman))
 
-Start both Rails and the Webpack dev server:
+Start both Rails and the bundler dev server:
 
 ```bash
 ./bin/dev
@@ -64,7 +82,7 @@ Start both Rails and the Webpack dev server:
 This starts both:
 
 - Rails server on `http://localhost:3000`
-- Webpack dev server for hot reloading
+- Bundler dev server for hot reloading
 
 ## 🎨 Step 3: See Your Component (2 minutes)
 
@@ -82,7 +100,7 @@ You should see a page with a React component saying "Hello World"!
 
 Let's make a quick change to see hot reloading in action:
 
-1. Open `app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx`
+1. Open the generated HelloWorld component (`app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx`)
 2. Change the text from "Hello World" to "Hello from React!"
 3. Save the file
 4. Watch your browser automatically refresh
@@ -98,12 +116,12 @@ Now let's add a React component to one of your existing Rails views:
 mkdir -p app/javascript/src/SimpleCounter/ror_components
 
 # Create the component file
-touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.jsx
+touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.tsx
 ```
 
-Add this content to `SimpleCounter.jsx`:
+Add this content to `SimpleCounter.tsx`:
 
-```jsx
+```tsx
 import React, { useState } from 'react';
 
 const SimpleCounter = ({ initialCount = 0 }) => {
@@ -175,10 +193,11 @@ Now that you have React on Rails working, here's what to explore next:
 1. **[Using React on Rails](./using-react-on-rails.md)** - Core concepts explained
 2. **[View Helpers API](../api-reference/view-helpers-api.md)** - Learn all the options for `react_component`
 3. **[Hot Module Replacement](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Optimize your dev workflow
+4. **[Curious how React on Rails compares to alternatives?](./comparing-react-on-rails-to-alternatives.md)** - Supplemental context on Hotwire, Inertia Rails, and react-rails
 
 ### Dive Deeper
 
-1. **[Complete Tutorial](../getting-started/tutorial.md)** - Build a full app with Redux
+1. **[Complete Tutorial](../getting-started/tutorial.md)** - Build a TypeScript component with hooks and auto-bundling
 2. **[Server-Side Rendering](../core-concepts/react-server-rendering.md)** - Optimize for SEO and performance
 3. **[Production Deployment](../deployment/README.md)** - Deploy to production
 
@@ -190,11 +209,12 @@ Now that you have React on Rails working, here's what to explore next:
 ### Go Pro
 
 :::tip Pro Upgrade
-React on Rails Pro adds [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and a [Node renderer](../../pro/node-renderer.md) for 10-100x faster SSR. Free to evaluate — no license needed for development. [Upgrade guide →](../../pro/upgrading-to-pro.md)
+Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to the [upgrade guide](../../pro/upgrading-to-pro.md), [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Friendly license model: no token is required for development, test, CI/CD, or staging.
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
-- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - React Server Components, streaming SSR, and 3-10x faster SSR
+- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - Three-step migration from OSS
+- **[Pro pricing and sign up](https://pro.reactonrails.com/)** - Current plans and production licenses
 
 ## 🆘 Need Help?
 
@@ -210,11 +230,14 @@ React on Rails Pro adds [React Server Components](../../pro/react-server-compone
 # Start development servers
 ./bin/dev
 
-# Generate React on Rails files
-bin/rails generate react_on_rails:install
+# Generate React on Rails files with TypeScript support
+bin/rails generate react_on_rails:install --typescript
 
-# Create a new component
-bin/rails generate react_on_rails:component MyComponent
+# Add a new component: create a file under a `ror_components` directory, then
+# render it with `<%= react_component("MyComponent") %>` in any Rails view.
+# With auto-bundling there's no generator and no manual registration step.
+mkdir -p app/javascript/src/MyComponent/ror_components
+touch app/javascript/src/MyComponent/ror_components/MyComponent.tsx
 
 # Build for production (use your package manager)
 pnpm run build  # or: yarn run build, npm run build
@@ -222,11 +245,9 @@ pnpm run build  # or: yarn run build, npm run build
 
 ### Key File Locations
 
-- **Components**: `client/app/bundles/[ComponentName]/components/`
-- **Registration**: `client/app/bundles/[ComponentName]/startup/registration.js`
-- **Packs**: `app/javascript/packs/`
+- **Components (auto-bundling)**: `app/javascript/src/[ComponentName]/ror_components/`
 - **Config**: `config/initializers/react_on_rails.rb`
-- **Webpack**: `config/shakapacker.yml`
+- **Bundler config**: `config/shakapacker.yml`
 
 ---
 

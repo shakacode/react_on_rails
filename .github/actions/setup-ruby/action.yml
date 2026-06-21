@@ -1,0 +1,70 @@
+name: Setup Ruby runtime
+description: Install Ruby runtime prerequisites and set up Ruby, optionally with cached Bundler dependencies.
+
+inputs:
+  ruby-version:
+    description: Ruby version used by the job.
+    required: true
+  bundler-version:
+    description: >
+      Bundler version selector passed through to ruby/setup-ruby.
+      Use default, latest, none, Gemfile.lock, or x.y.z. Defaults to "default"
+      (the bundler shipped with the chosen Ruby). Most callers should use
+      setup-bundle instead, which defaults this to Gemfile.lock.
+    required: false
+    default: default
+  working-directory:
+    description: Working directory passed through to ruby/setup-ruby for both cache and non-cache setup paths.
+    required: false
+    default: .
+  bundler-cache:
+    description: Whether ruby/setup-ruby should install and cache Bundler dependencies.
+    required: false
+    default: 'false'
+  frozen:
+    description: Whether to run Bundler in frozen mode when bundler-cache is enabled; has no effect otherwise.
+    required: false
+    default: 'true'
+  cache-version:
+    description: Arbitrary cache-version value passed through to ruby/setup-ruby when bundler-cache is enabled.
+    required: false
+    default: '0'
+  install-libyaml:
+    description: >
+      Whether to install libyaml-dev before Ruby/Bundler steps.
+      Only takes effect on Linux runners; silently ignored elsewhere.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Install libyaml-dev
+      if: runner.os == 'Linux' && inputs.install-libyaml == 'true'
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
+
+    # Split the non-cache/cache paths because GitHub Actions does not support
+    # conditional env blocks on one step; Bundler env vars only affect installs.
+    - name: Setup Ruby
+      if: inputs.bundler-cache != 'true'
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ inputs.ruby-version }}
+        working-directory: ${{ inputs.working-directory }}
+        bundler: ${{ inputs.bundler-version }}
+        bundler-cache: false
+
+    - name: Setup Ruby and install cached gems
+      if: inputs.bundler-cache == 'true'
+      uses: ruby/setup-ruby@v1
+      env:
+        BUNDLE_FROZEN: ${{ inputs.frozen }}
+        BUNDLE_RETRY: '3'
+        BUNDLE_JOBS: '4'
+      with:
+        ruby-version: ${{ inputs.ruby-version }}
+        working-directory: ${{ inputs.working-directory }}
+        bundler: ${{ inputs.bundler-version }}
+        bundler-cache: true
+        cache-version: ${{ inputs.cache-version }}

@@ -1,28 +1,65 @@
 name: Playwright E2E Tests
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event.pull_request.number && format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) || format('{0}-{1}', github.workflow, github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches: [main]
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    # Always trigger on main; non-runtime detection handles skipping heavy jobs
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
   workflow_dispatch:
+    inputs:
+      force_full_hosted:
+        description: 'Force full hosted CI (bypass optimized detect-changes)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   detect-changes:
     permissions:
       contents: read
       actions: read
+      issues: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
+      run_e2e_tests: ${{ steps.detect.outputs.run_e2e_tests }}
+      should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+      should_force_full_hosted_ci: ${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Select hosted CI mode
+        id: hosted-ci
+        uses: ./.github/actions/hosted-ci-selectors
+        with:
+          force-full-hosted: ${{ inputs.force_full_hosted || false }}
       - name: Detect relevant changes
         id: detect
         run: |
-          BASE_REF="${{ github.event.before || 'origin/main' }}"
+          # Force-full hosted CI is the explicit escape hatch that bypasses
+          # optimized change selection. Hosted readiness alone stays path-based.
+          if [ "${{ steps.hosted-ci.outputs.should_force_full_hosted_ci }}" = "true" ]; then
+            {
+              echo "run_e2e_tests=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Guard docs-only main pushes
@@ -36,29 +73,31 @@ jobs:
     needs: detect-changes
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'workflow_dispatch' || !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
-      )
+      needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
+      needs.detect-changes.outputs.run_e2e_tests == 'true'
     steps:
       - uses: actions/checkout@v4
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
-      - uses: ruby/setup-ruby@v1
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: '3.3'
-          bundler-cache: true
+          # Keep the single E2E lane on the minimum runtime; matrix workflows cover latest.
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
 
-      - uses: ./.github/actions/setup-node-with-retry
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Pin the single E2E lane to the exact Shakapacker floor from .minimum.tool-versions.
+          node-version: ${{ steps.tool-versions.outputs.minimum-node-version }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -69,14 +108,17 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build workspace packages
         run: pnpm run build
 
       - name: Install dummy app Ruby dependencies
-        working-directory: react_on_rails/spec/dummy
-        run: bundle install
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails/spec/dummy
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
+          install-libyaml: 'false'
 
       - name: Install Playwright browsers
         working-directory: react_on_rails/spec/dummy

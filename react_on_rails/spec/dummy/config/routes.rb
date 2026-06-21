@@ -31,6 +31,7 @@ Rails.application.routes.draw do
   get "render_js" => "pages#render_js"
   get "react_router(/*all)" => "react_router#index", as: :react_router
   get "pure_component" => "pages#pure_component"
+  get "react_compiler_example" => "pages#react_compiler_example"
   get "css_modules_images_fonts_example" => "pages#css_modules_images_fonts_example"
   get "turbolinks_cache_disabled" => "pages#turbolinks_cache_disabled"
   get "rendered_html" => "pages#rendered_html"
@@ -39,9 +40,23 @@ Rails.application.routes.draw do
   get "react_helmet_broken" => "pages#react_helmet_broken"
   get "broken_app" => "pages#broken_app"
   get "image_example" => "pages#image_example"
+  get "font_optimization_example" => "pages#font_optimization_example"
+  get "client_side_activity" => "pages#client_side_activity"
+  get "server_side_activity" => "pages#server_side_activity"
   get "context_function_return_jsx" => "pages#context_function_return_jsx"
   get "pure_component_wrapped_in_function" => "pages#pure_component_wrapped_in_function"
   get "turbo_frame_tag_hello_world" => "pages#turbo_frame_tag_hello_world"
   post "turbo_stream_send_hello_world" => "pages#turbo_stream_send_hello_world"
   get "manual_render_test" => "pages#manual_render_test"
+  get "root_error_callbacks" => "pages#root_error_callbacks"
+  get "hydration_scheduling" => "pages#hydration_scheduling"
+
+  # EXPERIMENTAL View Transitions demo (issue #3888). Inert by default: the
+  # route only exists when the dummy app is booted with VIEW_TRANSITIONS_DEMO=true.
+  # See docs/oss/building-features/view-transitions.md.
+  get "view_transitions_demo" => "pages#view_transitions_demo" if ENV["VIEW_TRANSITIONS_DEMO"] == "true"
+
+  # useRailsForm example (issue #3872): client form + JSON mutation endpoint.
+  get "rails_form" => "pages#rails_form"
+  post "contact_messages" => "contact_messages#create"
 end

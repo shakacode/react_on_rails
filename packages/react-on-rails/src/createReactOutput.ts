@@ -1,6 +1,31 @@
 import { createElement, isValidElement, type ReactElement } from 'react';
-import type { CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index.ts';
+import type {
+  CreateParams,
+  ReactComponent,
+  ServerRenderFunction,
+  CreateReactOutputResult,
+} from './types/index.ts';
 import { isServerRenderHash, isPromise } from './isServerRenderResult.ts';
+import { isRendererTeardownResult } from './rendererTeardown.ts';
+
+const unsupportedManualRendererMessage = (name: string) =>
+  `ReactOnRails.render() does not support renderer functions ("${name}"). ` +
+  'Use normal React on Rails component rendering so renderer teardowns are captured on navigation.';
+
+function isReactObjectComponentType(value: unknown): value is ReactComponent {
+  if (value == null || typeof value !== 'object') {
+    return false;
+  }
+
+  // React.memo, React.forwardRef, React.lazy, and related component types are non-callable
+  // objects tagged with React's element-type marker.
+  const typeMarker = (value as { $$typeof?: unknown }).$$typeof;
+  return typeof typeMarker === 'symbol' || typeof typeMarker === 'number';
+}
+
+function isReactComponentType(value: unknown): value is ReactComponent {
+  return typeof value === 'function' || typeof value === 'string' || isReactObjectComponentType(value);
+}
 
 function createReactElementFromRenderFunctionResult(
   renderFunctionResult: ReactComponent,
@@ -41,7 +66,7 @@ export default function createReactOutput({
   trace,
   shouldHydrate,
 }: CreateParams): CreateReactOutputResult {
-  const { name, component, renderFunction } = componentObj;
+  const { name, component, renderFunction, isRenderer } = componentObj;
 
   if (trace) {
     if (railsContext && railsContext.serverSide) {
@@ -66,7 +91,32 @@ export default function createReactOutput({
     if (trace) {
       console.log(`${name} is a renderFunction`);
     }
-    const renderFunctionResult = (component as RenderFunction)(props, railsContext);
+    // createReactOutput only handles render-functions that return a component or server-render hash.
+    // The 3-argument renderer form (which owns its own mount and may return a RendererTeardownResult)
+    // never reaches here on the supported paths: the client renderers delegate it earlier
+    // (`delegateToRenderer`) and return before this call, and server rendering rejects it upstream in
+    // validateComponent ("Detected a renderer while server rendering"). The only path that reaches
+    // here with a renderer is the manual public `ReactOnRails.render()` API, where renderers are
+    // unsupported because their teardown can't be tracked for cleanup. Reject it loudly and *before*
+    // invoking, rather than calling it with no domNodeId and rendering a half-wired, leak-prone result.
+    if (isRenderer) {
+      throw new Error(unsupportedManualRendererMessage(name));
+    }
+
+    if (typeof component !== 'function') {
+      throw new Error(`Registered render function "${name}" must be a function.`);
+    }
+
+    // The cast only narrows the broad RegisteredComponentValue union (which isn't structurally
+    // callable) to a concrete render-function role; it does not widen what may be returned.
+    const renderFunctionResult = (component as ServerRenderFunction)(props, railsContext);
+    // Defense-in-depth: RenderFunction (= ServerRenderFunction) returns RenderFunctionResult, which
+    // already excludes RendererTeardownResult at the type level, so a teardown can't arrive here from
+    // a typed caller. Reject it at runtime anyway for untyped JS callers that ignore the contract.
+    if (isRendererTeardownResult(renderFunctionResult)) {
+      throw new Error(unsupportedManualRendererMessage(name));
+    }
+
     if (isServerRenderHash(renderFunctionResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
@@ -77,6 +127,9 @@ export default function createReactOutput({
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
       return renderFunctionResult.then((result) => {
+        if (isRendererTeardownResult(result)) {
+          throw new Error(unsupportedManualRendererMessage(name));
+        }
         // If the result is a function, then it returned a React Component (even class components are functions).
         if (typeof result === 'function') {
           return createReactElementFromRenderFunctionResult(result, name, props);
@@ -87,6 +140,12 @@ export default function createReactOutput({
 
     return createReactElementFromRenderFunctionResult(renderFunctionResult, name, props);
   }
-  // else
-  return createElement(component as ReactComponent, props);
+
+  if (!isReactComponentType(component)) {
+    throw new Error(
+      `Registered component "${name}" must be a function, string, or React object component type.`,
+    );
+  }
+
+  return createElement(component, props);
 }

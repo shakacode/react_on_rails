@@ -2,6 +2,8 @@
 
 Fragment caching is a React on Rails Pro feature that caches the complete rendered output of a React component — including the cost of computing props from the database, serializing them to JSON, and evaluating JavaScript. On a cache hit, none of that work happens.
 
+> **Route map**: Start at [React on Rails Pro](./react-on-rails-pro.md) if you're choosing a path. This page is the canonical fragment caching overview; for the lower-level cache settings and tradeoffs, see the [SSR caching guide](../oss/building-features/caching.md) and [Pro configuration docs](../oss/configuration/configuration-pro.md).
+
 ## Why Fragment Caching?
 
 Every server-rendered React component involves multiple expensive steps:
@@ -38,6 +40,37 @@ end %>
 ```
 
 A `cached_react_component_hash` variant is also available for cases where you need to extract metadata (like `<title>`) from the rendered output.
+
+## Tag-Based Revalidation
+
+Cache keys handle "is this entry still current?" at read time. For the write side — "this record changed, bust every cached component that depends on it" — tag the entries and revalidate by tag (the React on Rails Pro analog of Next.js `revalidateTag`):
+
+```erb
+<%= cached_react_component("PostShow",
+      cache_key: [@post, I18n.locale],
+      cache_tags: [@post],
+      cache_options: { expires_in: 12.hours }) do
+      { post: @post.to_props }
+    end %>
+```
+
+```ruby
+ReactOnRailsPro.revalidate_tag(post) # deletes every entry tagged with post.cache_key
+```
+
+Or let the model own its invalidation via `after_commit`:
+
+```ruby
+class Post < ApplicationRecord
+  include ReactOnRailsPro::Cache::Revalidates
+
+  revalidates_react_cache # default tag: record.cache_key, e.g. "posts/42"
+end
+```
+
+Tag revalidation is best-effort and bounded by `expires_in` — always set it on tagged entries, and use a shared cache store (Redis/Memcached) in production. If a cache store raises while deleting tagged entries, the tag index may already be cleared; any surviving entries can no longer be found by that tag and will only drain through their own expiry. See the [Tag-Based Revalidation section](../oss/building-features/caching.md#tag-based-revalidation) of the caching guide for the full contract, tag normalization rules, index configuration, and the Next.js `revalidateTag` mapping.
+
+ActiveRecord-style tag objects normalize to `collection/id` (for example `posts/42`) before they are indexed. Pass an explicit String tag if a value object exposes `model_name` and `id` but should use a custom key.
 
 ## Cache Warming
 

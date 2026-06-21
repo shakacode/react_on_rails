@@ -346,7 +346,7 @@ The default `Procfile.dev` includes:
 ```procfile
 rails: bundle exec rails s -p ${PORT:-3000}
 dev-server: bin/shakapacker-dev-server
-server-bundle: SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
+server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 ```
 
 ## Running Multiple Worktrees Simultaneously
@@ -370,6 +370,129 @@ SHAKAPACKER_DEV_SERVER_PORT=3036
 ```
 
 When `PORT` or `SHAKAPACKER_DEV_SERVER_PORT` are set, auto-detection is skipped entirely.
+
+### Coding Agent / CI Integration
+
+When using coding agent tools that run multiple workspaces concurrently
+([Conductor.build](https://conductor.build), OpenAI Codex, Quad Code, etc.),
+set `REACT_ON_RAILS_BASE_PORT` to derive all service ports from a single value.
+This eliminates the need for per-worktree `.env` files.
+
+> **Important:** Run each live `bin/dev` stack from a separate checkout, worktree,
+> or copied app directory. Starting two stacks from the exact same app path is
+> not supported because build tools such as ReScript and webpack watchers share
+> lock files and runtime artifacts within that directory.
+
+`bin/dev` assigns ports using fixed offsets from the base:
+
+| Service             | Offset | Example (base=4000) |
+| ------------------- | ------ | ------------------- |
+| Rails server        | +0     | 4000                |
+| Webpack dev server  | +1     | 4001                |
+| Node renderer (Pro) | +2     | 4002                |
+| _(reserved)_        | +3–+9  | 4003–4009           |
+
+When a base port is detected, `bin/dev` also sets `RENDERER_PORT` and
+`REACT_RENDERER_URL` automatically so the Pro Node Renderer and Rails
+initializer agree on the port without any additional configuration.
+
+> **Heads up:** setting `RENDERER_PORT`, `RENDERER_URL`, or `REACT_RENDERER_URL`
+> in your environment activates the Pro renderer code path even in OSS apps —
+> in base-port mode this means `RENDERER_PORT` and `REACT_RENDERER_URL` will be
+> derived from the base and propagated to spawned processes. If you use
+> `RENDERER_PORT` in your environment for an unrelated purpose, rename your
+> variable to avoid the side effect.
+>
+> **Note:** Base-port mode derives the node renderer URL as
+> `http://localhost:<port>`. If you run the renderer in a Docker container or
+> on a remote host (e.g. `REACT_RENDERER_URL=http://renderer:3800`), do not use
+> base-port mode — set `REACT_RENDERER_URL` explicitly and use the
+> [manual worktree setup](#manual-worktree-port-setup-pro) instead. `bin/dev`
+> will warn at runtime if a pre-set `REACT_RENDERER_URL` is overridden.
+
+**Recognized environment variables** (checked in order):
+
+1. `REACT_ON_RAILS_BASE_PORT` — the canonical base port variable; any tool can set this.
+2. `CONDUCTOR_PORT` — set automatically by [Conductor.build](https://conductor.build).
+
+> **Note on `CONDUCTOR_PORT`:** React on Rails treats `CONDUCTOR_PORT` as the
+> **base** of a consecutive port block (Rails = base + 0, webpack = base + 1,
+> renderer = base + 2). This interpretation is not part of a public Conductor
+> API; treat `CONDUCTOR_PORT` support as best-effort until Conductor documents
+> the contract. If a future Conductor release redefines `CONDUCTOR_PORT` (for
+> example, to mean the Rails port itself), override by setting
+> `REACT_ON_RAILS_BASE_PORT` explicitly — it takes precedence and uses the
+> same derivation rules.
+
+**Priority chain:** base port > explicit per-service env vars (`PORT`, etc.) > auto-detect free ports.
+
+**Example: setting the base port in a tool's configuration:**
+
+```sh
+# In your agent tool's workspace setup or .env
+REACT_ON_RAILS_BASE_PORT=4000
+```
+
+#### Tool-specific setup
+
+[Conductor.build](https://conductor.build) sets `CONDUCTOR_PORT` for you — no configuration
+needed. Other tools (Claude Code CLI, [OpenAI Codex](https://github.com/openai/codex) CLI or app,
+plain `git worktree`, etc.) don't inject a port variable, so pick a different base per checkout
+using one of the options below.
+
+- **Per-worktree `.env` file** (tool-agnostic; gitignored by default):
+
+  ```sh
+  # .env at the root of each worktree
+  REACT_ON_RAILS_BASE_PORT=4000
+  ```
+
+- **Claude Code `.claude/settings.json`** (per-project, checked in or local):
+
+  ```json
+  {
+    "env": {
+      "REACT_ON_RAILS_BASE_PORT": "4000"
+    }
+  }
+  ```
+
+- **Shell export** (ad hoc, one session):
+
+  ```sh
+  REACT_ON_RAILS_BASE_PORT=4000 bin/dev
+  ```
+
+`bin/dev` reads the variable from the process environment regardless of how it was set, so mix
+and match whichever is most convenient for each tool.
+
+If you create a new checkout by copying an existing app directory while another
+`bin/dev` is running, the copy can inherit `tmp/pids/server.pid` or Overmind
+socket files from the original app. `bin/dev` now cleans those copied stale
+runtime files automatically on startup. If you launch processes outside
+`bin/dev`, clear those files yourself before booting the copied app.
+
+### Manual Worktree Port Setup (Pro)
+
+If you use the [Node Renderer](./node-renderer/basics.md) (React on Rails Pro) with manual
+worktrees (no base port), you need to configure the renderer port in addition to the standard
+Rails and webpack ports:
+
+```sh
+# .env in each worktree
+PORT=3001
+SHAKAPACKER_DEV_SERVER_PORT=3036
+RENDERER_PORT=3801
+REACT_RENDERER_URL=http://localhost:3801
+```
+
+The renderer port must match on both sides: `RENDERER_PORT` is read by the Node process and
+`REACT_RENDERER_URL` is read by the Rails-side Pro initializer.
+
+> **Note:** `bin/dev kill` only stops the renderer when `RENDERER_PORT` (or `REACT_RENDERER_URL`)
+> is exported in the current shell. From a fresh terminal that hasn't sourced your worktree's
+> `.env`, run e.g. `RENDERER_PORT=3801 bin/dev kill`, or source `.env` first. Otherwise the
+> renderer process will silently keep running.
 
 ## See Also
 

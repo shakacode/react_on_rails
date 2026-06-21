@@ -1,4 +1,4 @@
-<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/development.js") %>
+<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/development.js") %>
 
 const { devServer, inliningCss, config } = require('shakapacker');
 
@@ -10,8 +10,8 @@ const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
     // eslint-disable-next-line global-require
     if (config.assets_bundler === 'rspack') {
       // Rspack uses @rspack/plugin-react-refresh for React Fast Refresh
-      const ReactRefreshPlugin = require('@rspack/plugin-react-refresh');
-      clientWebpackConfig.plugins.push(new ReactRefreshPlugin());
+      const { ReactRefreshRspackPlugin } = require('@rspack/plugin-react-refresh');
+      clientWebpackConfig.plugins.push(new ReactRefreshRspackPlugin());
     } else {
       // Webpack uses @pmmmwh/react-refresh-webpack-plugin
       const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');

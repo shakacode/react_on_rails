@@ -74,9 +74,9 @@ module ReactOnRails
             file_list = make_file_list(make_globs(generated_assets_full_path)).to_ary
             puts "V" * 80
             puts "Please define config.webpack_generated_files (array) so the test helper knows " \
-                 "which files are required. If you are using Shakapacker, you typically need to only " \
+                 "which generated asset files are required. For Shakapacker apps, you typically only " \
                  "include 'manifest.json'."
-            puts "Detected the possible following files to check for webpack compilation in " \
+            puts "Detected the possible following files to check for completed asset compilation in " \
                  "#{generated_assets_full_path}"
             puts file_list.join("\n")
             puts "^" * 80

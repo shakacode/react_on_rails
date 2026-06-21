@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Push the 'use client' Boundary Down</title>
+  <desc>Static before-and-after diagram showing how to migrate a React component tree by pushing the 'use client' directive from the root down to only the leaf components that truly need interactivity. Before: the entire tree is client code. After: only interactive leaves are client components.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .server-node { fill: #ECFDF5; stroke: #22C55E; }
+      .server-text { fill: #166534; }
+      .client-node { fill: #FFF7ED; stroke: #F97316; }
+      .client-text { fill: #9A3412; }
+      .all-client { fill: #FEE2E2; stroke: #FECACA; }
+      .all-client-text { fill: #991B1B; }
+      .tree-line { stroke: #94A3B8; }
+      .badge-uc { fill: #FEE2E2; stroke: #EF4444; }
+      .badge-text { fill: #991B1B; }
+      .badge-rsc { fill: #D1FAE5; stroke: #22C55E; }
+      .badge-rsc-text { fill: #166534; }
+      .arrow-body { fill: #94A3B8; }
+      .bad-header { fill: #FEE2E2; stroke: #FECACA; }
+      .bad-text { fill: #991B1B; }
+      .good-header { fill: #D1FAE5; stroke: #86EFAC; }
+      .good-text { fill: #166534; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+      .bundle-bar-bad { fill: #F87171; }
+      .bundle-bar-good { fill: #22C55E; }
+      .bundle-bar-bg { fill: #E2E8F0; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .server-node { fill: #052E16; stroke: #10B981; }
+        .server-text { fill: #6EE7B7; }
+        .client-node { fill: #431407; stroke: #F97316; }
+        .client-text { fill: #FDBA74; }
+        .all-client { fill: #450A0A; stroke: #F87171; }
+        .all-client-text { fill: #FCA5A5; }
+        .tree-line { stroke: #64748B; }
+        .badge-uc { fill: #450A0A; stroke: #F87171; }
+        .badge-text { fill: #FCA5A5; }
+        .badge-rsc { fill: #052E16; stroke: #10B981; }
+        .badge-rsc-text { fill: #6EE7B7; }
+        .arrow-body { fill: #64748B; }
+        .bad-header { fill: #450A0A; stroke: #F87171; }
+        .bad-text { fill: #FCA5A5; }
+        .good-header { fill: #052E16; stroke: #10B981; }
+        .good-text { fill: #6EE7B7; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+        .bundle-bar-bg { fill: #334155; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="460" class="bg"/>
+  <text x="450" y="26" text-anchor="middle" font-size="18" font-weight="700" class="title">Push the Boundary Down</text>
+  <text x="450" y="44" text-anchor="middle" font-size="11" class="subtitle">Move 'use client' from the root to only the components that need interactivity</text>
+
+  <!-- ============ LEFT: Before (all client) ============ -->
+  <rect x="20" y="58" width="400" height="336" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="20" y="58" width="400" height="28" rx="12" class="bad-header" stroke-width="1"/>
+  <rect x="20" y="74" width="400" height="12" class="bad-header"/>
+  <text x="220" y="78" text-anchor="middle" font-size="12" font-weight="700" class="bad-text">❌ Before — Everything Client</text>
+
+  <!-- ProductPage (root, 'use client') -->
+  <rect x="140" y="96" width="150" height="28" rx="6" class="all-client" stroke-width="2"/>
+  <text x="215" y="114" text-anchor="middle" font-size="10" font-weight="600" class="all-client-text">ProductPage</text>
+  <rect x="295" y="100" width="56" height="18" rx="9" class="badge-uc" stroke-width="1"/>
+  <text x="323" y="113" text-anchor="middle" font-size="7" font-weight="700" class="badge-text">'use client'</text>
+
+  <!-- Fork: root → 3 children (right-angle connectors) -->
+  <line x1="215" y1="124" x2="215" y2="136" class="tree-line" stroke-width="1.5"/>
+  <line x1="105" y1="136" x2="325" y2="136" class="tree-line" stroke-width="1.5"/>
+  <line x1="105" y1="136" x2="105" y2="150" class="tree-line" stroke-width="1.5"/>
+  <line x1="215" y1="136" x2="215" y2="150" class="tree-line" stroke-width="1.5"/>
+  <line x1="325" y1="136" x2="325" y2="150" class="tree-line" stroke-width="1.5"/>
+
+  <!-- ProductHeader -->
+  <rect x="48" y="150" width="114" height="24" rx="6" class="all-client" stroke-width="1.5"/>
+  <text x="105" y="166" text-anchor="middle" font-size="9" class="all-client-text">ProductHeader</text>
+
+  <!-- ReviewList -->
+  <rect x="167" y="150" width="96" height="24" rx="6" class="all-client" stroke-width="1.5"/>
+  <text x="215" y="166" text-anchor="middle" font-size="9" class="all-client-text">ReviewList</text>
+
+  <!-- AddToCartButton -->
+  <rect x="268" y="150" width="114" height="24" rx="6" class="all-client" stroke-width="1.5"/>
+  <text x="325" y="166" text-anchor="middle" font-size="9" class="all-client-text">AddToCartButton</text>
+
+  <!-- Fork: ProductHeader → 2 children -->
+  <line x1="105" y1="174" x2="105" y2="186" class="tree-line" stroke-width="1"/>
+  <line x1="65" y1="186" x2="150" y2="186" class="tree-line" stroke-width="1"/>
+  <line x1="65" y1="186" x2="65" y2="198" class="tree-line" stroke-width="1"/>
+  <line x1="150" y1="186" x2="150" y2="198" class="tree-line" stroke-width="1"/>
+
+  <!-- ProductImage -->
+  <rect x="25" y="198" width="80" height="22" rx="5" class="all-client" stroke-width="1"/>
+  <text x="65" y="213" text-anchor="middle" font-size="8" class="all-client-text">ProductImage</text>
+
+  <!-- ShareButton -->
+  <rect x="110" y="198" width="80" height="22" rx="5" class="all-client" stroke-width="1"/>
+  <text x="150" y="213" text-anchor="middle" font-size="8" class="all-client-text">ShareButton</text>
+
+  <!-- Bundle bar -->
+  <text x="215" y="258" text-anchor="middle" font-size="10" font-weight="600" class="label-text">Client Bundle</text>
+  <rect x="60" y="268" width="320" height="12" rx="6" class="bundle-bar-bad"/>
+  <text x="215" y="296" text-anchor="middle" font-size="10" font-weight="700" class="bad-text">100% in client bundle</text>
+  <text x="215" y="312" text-anchor="middle" font-size="9" class="label-sub">All 6 components ship as JavaScript</text>
+
+  <!-- Arrow between panels -->
+  <line x1="425" y1="168" x2="468" y2="168" class="tree-line" stroke-width="2"/>
+  <polygon points="468,164 480,168 468,174" class="arrow-body"/>
+  <text x="452" y="186" text-anchor="middle" font-size="9" font-weight="600" class="label-text">migrate</text>
+
+  <!-- ============ RIGHT: After (selective) ============ -->
+  <rect x="480" y="58" width="400" height="336" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="480" y="58" width="400" height="28" rx="12" class="good-header" stroke-width="1"/>
+  <rect x="480" y="74" width="400" height="12" class="good-header"/>
+  <text x="680" y="78" text-anchor="middle" font-size="12" font-weight="700" class="good-text">✅ After — Only Interactive Leaves</text>
+
+  <!-- ProductPage (server now) -->
+  <rect x="600" y="96" width="150" height="28" rx="6" class="server-node" stroke-width="2"/>
+  <text x="675" y="114" text-anchor="middle" font-size="10" font-weight="600" class="server-text">ProductPage</text>
+  <rect x="755" y="100" width="48" height="18" rx="9" class="badge-rsc" stroke-width="1"/>
+  <text x="779" y="113" text-anchor="middle" font-size="7" font-weight="700" class="badge-rsc-text">Server</text>
+
+  <!-- Fork: root → 3 children (right-angle connectors) -->
+  <line x1="675" y1="124" x2="675" y2="136" class="tree-line" stroke-width="1.5"/>
+  <line x1="565" y1="136" x2="785" y2="136" class="tree-line" stroke-width="1.5"/>
+  <line x1="565" y1="136" x2="565" y2="150" class="tree-line" stroke-width="1.5"/>
+  <line x1="675" y1="136" x2="675" y2="150" class="tree-line" stroke-width="1.5"/>
+  <line x1="785" y1="136" x2="785" y2="150" class="tree-line" stroke-width="1.5"/>
+
+  <!-- ProductHeader (server) -->
+  <rect x="508" y="150" width="114" height="24" rx="6" class="server-node" stroke-width="1.5"/>
+  <text x="565" y="166" text-anchor="middle" font-size="9" class="server-text">ProductHeader</text>
+
+  <!-- ReviewList (server) -->
+  <rect x="627" y="150" width="96" height="24" rx="6" class="server-node" stroke-width="1.5"/>
+  <text x="675" y="166" text-anchor="middle" font-size="9" class="server-text">ReviewList</text>
+
+  <!-- AddToCartButton (client) -->
+  <rect x="728" y="150" width="114" height="24" rx="6" class="client-node" stroke-width="2"/>
+  <text x="785" y="166" text-anchor="middle" font-size="9" class="client-text">AddToCartButton</text>
+  <rect x="759" y="176" width="52" height="14" rx="7" class="badge-uc" stroke-width="1"/>
+  <text x="785" y="187" text-anchor="middle" font-size="6" font-weight="700" class="badge-text">'use client'</text>
+
+  <!-- Fork: ProductHeader → 2 children -->
+  <line x1="565" y1="174" x2="565" y2="186" class="tree-line" stroke-width="1"/>
+  <line x1="525" y1="186" x2="610" y2="186" class="tree-line" stroke-width="1"/>
+  <line x1="525" y1="186" x2="525" y2="198" class="tree-line" stroke-width="1"/>
+  <line x1="610" y1="186" x2="610" y2="198" class="tree-line" stroke-width="1"/>
+
+  <!-- ProductImage (server) -->
+  <rect x="485" y="198" width="80" height="22" rx="5" class="server-node" stroke-width="1"/>
+  <text x="525" y="213" text-anchor="middle" font-size="8" class="server-text">ProductImage</text>
+
+  <!-- ShareButton (client) -->
+  <rect x="570" y="198" width="80" height="22" rx="5" class="client-node" stroke-width="2"/>
+  <text x="610" y="213" text-anchor="middle" font-size="8" class="client-text">ShareButton</text>
+  <rect x="584" y="222" width="52" height="14" rx="7" class="badge-uc" stroke-width="1"/>
+  <text x="610" y="233" text-anchor="middle" font-size="6" font-weight="700" class="badge-text">'use client'</text>
+
+  <!-- Bundle bar -->
+  <text x="675" y="258" text-anchor="middle" font-size="10" font-weight="600" class="label-text">Client Bundle</text>
+  <rect x="520" y="268" width="320" height="12" rx="6" class="bundle-bar-bg"/>
+  <rect x="520" y="268" width="106" height="12" rx="6" class="bundle-bar-good"/>
+  <text x="675" y="296" text-anchor="middle" font-size="10" font-weight="700" class="good-text">~33% in client bundle (2 of 6)</text>
+  <text x="675" y="312" text-anchor="middle" font-size="9" class="label-sub">Only interactive leaves ship as JavaScript</text>
+
+  <!-- Bottom callout -->
+  <rect x="100" y="410" width="700" height="38" rx="8" class="note-box" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="428" text-anchor="middle" font-size="10" font-weight="600" class="note-text">Display-only components (images, reviews) become Server Components — zero client JS</text>
+  <text x="450" y="442" text-anchor="middle" font-size="9" class="note-text">Only components with hooks, state, or event handlers need 'use client'</text>
+</svg>

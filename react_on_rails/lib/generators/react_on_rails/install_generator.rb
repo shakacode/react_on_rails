@@ -3,11 +3,13 @@
 require "rails/generators"
 require "json"
 require "bundler"
+require "open3"
 require_relative "generator_helper"
 require_relative "generator_messages"
 require_relative "js_dependency_manager"
 require_relative "pro_setup"
 require_relative "rsc_setup"
+require_relative "shakapacker_precompile_hook_helper"
 # Load-path require: git_utils lives under react_on_rails/lib, not relative to this generator directory.
 require "react_on_rails/git_utils"
 
@@ -22,6 +24,7 @@ module ReactOnRails
       include JsDependencyManager
       include ProSetup
       include RscSetup
+      include ShakapackerPrecompileHookHelper
 
       # fetch USAGE file for details generator description
       source_root(File.expand_path(__dir__))
@@ -40,17 +43,43 @@ module ReactOnRails
                    desc: "Generate TypeScript files and install TypeScript dependencies. Default: false",
                    aliases: "-T"
 
-      # --rspack
-      class_option :rspack,
+      # --tailwind
+      class_option :tailwind,
                    type: :boolean,
                    default: false,
-                   desc: "Use Rspack instead of Webpack as the bundler. Default: false"
+                   desc: "Install Tailwind CSS v4 and style the generated SSR example. Default: false"
+
+      # --rspack / --no-rspack (Rspack is the default on fresh installs; --no-rspack selects Webpack)
+      # IMPORTANT: do NOT add a `default:` here. The absence of a default is load-bearing — Thor
+      # only includes :rspack in the options hash when the flag is explicitly passed, which is how
+      # GeneratorHelper#using_rspack? tells an explicit choice from "no flag given" (the latter
+      # falls back to rspack_bundler_default). Adding `default: false` would make
+      # options.key?(:rspack) always true and silently break the fresh-install Rspack default.
+      # (Thor's omit-when-no-default behavior verified against Thor 1.5.0; see Gemfile.lock.)
+      class_option :rspack,
+                   type: :boolean,
+                   desc: "Use Rspack (default) as the bundler; pass --no-rspack to use Webpack"
+
+      # --webpack: friendly alias for --no-rspack (reconciled in GeneratorHelper#explicit_bundler_choice).
+      # No `default:` here either — same load-bearing reason as --rspack above.
+      class_option :webpack,
+                   type: :boolean,
+                   desc: "Use Webpack as the bundler (alias for --no-rspack; --no-webpack is equivalent to --rspack)"
 
       # --ignore-warnings
       class_option :ignore_warnings,
                    type: :boolean,
                    default: false,
                    desc: "Skip warnings. Default: false"
+
+      # --agent-files / --no-agent-files
+      # Emits consumer-scoped AI-agent guidance (AGENTS.md) plus thin editor pointer
+      # files (CLAUDE.md, .cursor/rules/react-on-rails.mdc, .github/copilot-instructions.md).
+      # Default ON; pass --no-agent-files to skip. Existing files are never overwritten.
+      class_option :agent_files,
+                   type: :boolean,
+                   default: true,
+                   desc: "Write AI-agent guidance files (AGENTS.md + editor pointers). Default: true"
 
       # --pro
       class_option :pro,
@@ -76,9 +105,18 @@ module ReactOnRails
                    default: false,
                    hide: true
 
+      # Hidden option: used by create-react-on-rails-app to enable fresh-app
+      # scaffolding (landing page + browser-open defaults) without changing the
+      # behavior of install runs inside existing apps.
+      class_option :new_app,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
-      SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
+      HELLO_WORLD_ROUTE = "hello_world"
+      HELLO_SERVER_ROUTE = "hello_server"
       # Matches the stock `bin/dev` written by Rails 8.x. Rails 7.1 commonly
       # generated a foreman-based shell script instead, which stock_rails_bin_dev?
       # also recognizes so the React on Rails template can replace either variant.
@@ -123,6 +161,19 @@ module ReactOnRails
         SH
       ].map { |template| template.gsub("\r\n", "\n").strip }.freeze
 
+      # Exact fallback used when the scaffolded CI workflow has to supply a pnpm
+      # version because `pnpm/action-setup` requires one unless package.json declares
+      # `packageManager`. Match the repo's own packageManager version so generated
+      # CI defaults to the pnpm major this codebase tests with. Track the exact release
+      # used for this fallback at https://github.com/pnpm/pnpm/releases/tag/v10.33.4;
+      # update this URL with the constant when bumping. Users who need exact
+      # reproducibility should commit `packageManager` to their package.json instead.
+      # Bump checklist: heading text below is spec-asserted.
+      # CONTRIBUTING.md > "Updating the pnpm Fallback Version for Scaffolded CI".
+      # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$ allowedVersions=<11
+      CI_PNPM_FALLBACK_VERSION = "10.33.4"
+      private_constant :CI_PNPM_FALLBACK_VERSION
+
       # Main generator entry point
       #
       # Sets up React on Rails in a Rails application by:
@@ -144,7 +195,10 @@ module ReactOnRails
 
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
+          add_package_json_scripts
+          add_ci_workflow
           add_bin_scripts
+          add_agent_files
           add_post_install_message
         else
           error = <<~MSG.strip
@@ -170,20 +224,29 @@ module ReactOnRails
 
       private
 
+      # Fresh-install context: default to Rspack (when Shakapacker supports it) unless the
+      # app already declares a bundler. See GeneratorHelper#fresh_install_rspack_default.
+      # NOTE: BaseGenerator#rspack_bundler_default is an intentional twin of this override
+      # (both generators are independently CLI-invocable); keep the two in sync.
+      def rspack_bundler_default
+        fresh_install_rspack_default
+      end
+
       def invoke_generators
         ensure_shakapacker_installed
-        if options.typescript?
-          install_typescript_dependencies
-          create_css_module_types
-          create_typescript_config
-        end
+        install_typescript_dependencies if options.typescript?
         # `invoke` instantiates child generators with a fresh options hash, so
         # --pretend/--force/--skip must be forwarded explicitly at each boundary.
         invoke "react_on_rails:base", [],
-               { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
-                 pro: options.pro?, rsc: options.rsc?,
+               { typescript: options.typescript?, redux: options.redux?, rspack: using_rspack?,
+                 pro: use_pro?, rsc: use_rsc?, tailwind: use_tailwind?, new_app: options.new_app?,
                  shakapacker_just_installed: shakapacker_just_installed?,
                  force: options[:force], skip: options[:skip], pretend: options[:pretend] }
+
+        if options.typescript?
+          create_css_module_types
+          create_typescript_config
+        end
 
         # Component generator logic:
         # - --rsc without --redux: Skip HelloWorld, HelloServer will be generated in setup_rsc
@@ -191,18 +254,24 @@ module ReactOnRails
         # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
+                                                          tailwind: use_tailwind?,
                                                           invoked_by_install: true,
+                                                          new_app: options.new_app?,
+                                                          rsc: use_rsc?,
                                                           force: options[:force], skip: options[:skip],
                                                           pretend: options[:pretend] }
         elsif !use_rsc?
           # Only generate HelloWorld if RSC is not enabled
           # For RSC, HelloServer replaces HelloWorld as the example component
           invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript?,
+                                                        tailwind: use_tailwind?,
+                                                        new_app: options.new_app?,
                                                         force: options[:force], skip: options[:skip],
                                                         pretend: options[:pretend] }
         end
 
         setup_react_dependencies
+        ensure_jsx_in_js_compatibility
 
         # Invoke standalone Pro/RSC generators when flags are used
         # Pass invoked_by_install: true so they skip message printing (we handle it)
@@ -214,6 +283,8 @@ module ReactOnRails
         return unless use_rsc?
 
         invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true,
+                                           new_app: options.new_app?, redux: options.redux?,
+                                           tailwind: use_tailwind?,
                                            force: options[:force], skip: options[:skip],
                                            pretend: options[:pretend] }
       end
@@ -227,10 +298,197 @@ module ReactOnRails
         setup_js_dependencies
       end
 
+      def add_ci_workflow
+        return if options[:pretend]
+
+        ci_path = ".github/workflows/ci.yml"
+        # Generators may run non-interactively (CI, scripts), so we never want Thor's
+        # `template` to prompt on conflict. Treat any existing workflow as "skip" by
+        # default; users who want to overwrite must pass --force explicitly. --skip
+        # falls into the same path because the desired outcome is identical.
+        if File.exist?(File.join(destination_root, ci_path)) && !options[:force]
+          say_status :skip, "#{ci_path} already exists (pass --force to overwrite)", :yellow
+          return
+        end
+
+        package_json = GeneratorMessages.read_package_json(destination_root)
+        package_manager = GeneratorMessages.detect_package_manager(
+          app_root: destination_root,
+          package_json:
+        )
+        # Scope the lockfile check to the detected manager: a generic "any lockfile exists" check
+        # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
+        has_lockfile = GeneratorMessages.lockfile_for_manager?(package_manager, app_root: destination_root)
+        # `pnpm/action-setup@v4` requires an explicit `version:` unless package.json declares
+        # `packageManager: pnpm@...`. Only ask the question for pnpm projects — other managers
+        # never read this flag — and require a pnpm-specific declaration so an env-override to
+        # pnpm while package.json declares a different manager still gets the version pin.
+        pnpm_version_declared = package_manager == "pnpm" &&
+                                GeneratorMessages.package_manager_declared?(
+                                  app_root: destination_root,
+                                  manager: "pnpm",
+                                  package_json:
+                                )
+        has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
+        has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||
+                    File.exist?(File.join(destination_root, "spec/spec_helper.rb"))
+        template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
+                 { package_manager:, has_lockfile:,
+                   pnpm_version_declared:,
+                   pnpm_fallback_version: CI_PNPM_FALLBACK_VERSION,
+                   has_active_record:, has_rspec:,
+                   precompile_hook_command: shakapacker_precompile_hook_command(environment: "test") })
+        @ci_workflow_generated = true
+      end
+
+      # RAILS_ENV=production runs the hook with production Rails config, while
+      # NODE_ENV=production makes Shakapacker emit a minified production bundle.
+      def default_package_json_scripts
+        {
+          "build" => shakapacker_build_command(env: "RAILS_ENV=production NODE_ENV=production"),
+          "build:test" => shakapacker_build_command(env: "RAILS_ENV=test NODE_ENV=test", environment: "test")
+        }
+      end
+
+      def add_package_json_scripts
+        return if options[:pretend]
+
+        package_json_path = File.join(destination_root, "package.json")
+        return unless File.exist?(package_json_path)
+
+        original_text = File.read(package_json_path)
+        existing_scripts = JSON.parse(original_text)["scripts"] || {}
+        scripts_to_add = default_package_json_scripts.reject { |key, _| existing_scripts.key?(key) }
+
+        if scripts_to_add.empty?
+          say_status :skip, "build scripts already present in package.json", :yellow
+          return
+        end
+
+        updated_text = inject_scripts_into_package_json(original_text, scripts_to_add, existing_scripts)
+        File.write(package_json_path, updated_text)
+        say_status :append, "📝 Added build scripts (#{scripts_to_add.keys.join(', ')}) to package.json", :yellow
+      rescue JSON::ParserError => e
+        GeneratorMessages.add_warning("⚠️  Could not parse package.json to add scripts: #{e.message}")
+      rescue Errno::EACCES, Errno::ENOENT => e
+        GeneratorMessages.add_warning("⚠️  Failed to add build scripts to package.json: #{e.message}")
+      end
+
+      # Inserts new entries into the existing "scripts" object without rewriting the rest of
+      # package.json, so Prettier-formatted files only see the added lines in the diff.
+      # Falls back to a structured rewrite when the "scripts" key is absent or when the
+      # scripts object can't be located unambiguously (e.g. malformed JSON).
+      #
+      # Relies on the JSON invariant that `"scripts": {` cannot appear unescaped inside a
+      # preceding string value — in valid JSON the `"` characters are escaped as `\"`, so
+      # the regex can never falsely match a substring nested in a string literal.
+      def inject_scripts_into_package_json(original_text, scripts_to_add, existing_scripts)
+        opener = original_text.match(/"scripts"\s*:\s*\{/m)
+        return rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts) unless opener
+
+        inner_start = opener.end(0)
+        inner_end = find_matching_brace(original_text, inner_start)
+        return rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts) unless inner_end
+
+        inner = original_text[inner_start...inner_end]
+        # Detect the indent of the "scripts" key wherever it appears (any object position),
+        # not only when it's the first key. Defaults to two spaces so the closing `}` of the
+        # rebuilt scripts block lines up under "scripts" instead of being emitted at column 0.
+        object_indent = original_text[/\n([ \t]*)"scripts"/, 1] || "  "
+        entry_indent = inner[/\n([ \t]+)"/, 1] || "#{object_indent}  "
+        new_entries = scripts_to_add.map { |key, value| %(#{entry_indent}#{key.to_json}: #{value.to_json}) }
+
+        rebuilt_inner =
+          if existing_scripts.any?
+            trimmed = inner.sub(/\s*\z/, "")
+            separator = trimmed.end_with?(",") ? "" : ","
+            "#{trimmed}#{separator}\n#{new_entries.join(",\n")}\n#{object_indent}"
+          else
+            "\n#{new_entries.join(",\n")}\n#{object_indent}"
+          end
+
+        "#{original_text[0...opener.begin(0)]}\"scripts\": {#{rebuilt_inner}}#{original_text[(inner_end + 1)..]}"
+      end
+
+      # Returns the index of the `}` that closes the `{` whose body starts at `start`,
+      # or nil if the object is unterminated. Tracks brace depth while stepping through
+      # JSON string literals so `}` characters inside script values (e.g.
+      # "lint": "eslint '{src,test}/**/*.js'") do not match a non-matching brace.
+      def find_matching_brace(text, start)
+        depth = 1
+        i = start
+        while i < text.length
+          case text[i]
+          when '"'
+            i = skip_json_string(text, i)
+            return nil unless i
+          when "{"
+            depth += 1
+            i += 1
+          when "}"
+            depth -= 1
+            return i if depth.zero?
+
+            i += 1
+          else
+            i += 1
+          end
+        end
+        nil
+      end
+
+      # Given an index pointing at the opening `"` of a JSON string, returns the index
+      # just past the closing `"`. Honours `\"` and `\\` escapes. Returns nil if the
+      # string is unterminated.
+      def skip_json_string(text, start)
+        i = start + 1
+        while i < text.length
+          case text[i]
+          when "\\"
+            i += 2
+          when '"'
+            return i + 1
+          else
+            i += 1
+          end
+        end
+        nil
+      end
+
+      # Used only when the "scripts" key is missing entirely or the regex can't locate it.
+      # This path does reformat the whole file, but it's rare — a Rails package.json with
+      # no scripts key at all is unusual.
+      def rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts)
+        content = JSON.parse(original_text)
+        content["scripts"] = existing_scripts.merge(scripts_to_add)
+        indent = original_text[/\A\{\n(\s+)/, 1] || "  "
+        "#{JSON.pretty_generate(content, indent:)}\n"
+      end
+
+      def ensure_jsx_in_js_compatibility
+        return if options[:pretend]
+        return unless using_swc?
+        return unless jsx_in_js_files_present?
+
+        say "⚙️  Detected JSX in .js files; switching shakapacker javascript_transpiler to babel for compatibility",
+            :yellow
+        set_javascript_transpiler_to_babel
+        babel_loader_added = add_packages(["babel-loader"], dev: true)
+        babel_preset_added = add_babel_react_dependencies
+        return if babel_loader_added && babel_preset_added
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Babel compatibility dependencies may be incomplete after switching from SWC.
+          Please verify `babel-loader` and `@babel/preset-react` are installed.
+        MSG
+      end
+
       # NOTE: other requirements for existing files such as .gitignore or application.
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
+        warn_if_unsupported_env_package_manager
+
         # Non-blocking: warn about dirty worktree but don't prevent installation.
         # A clean tree makes the generator diff easier to review, but blocking would
         # be too strict for a generator that creates many new files.
@@ -242,11 +500,12 @@ module ReactOnRails
         # it on a clean worktree. On a dirty tree, use the read-only pro_gem_installed?
         # check to catch a missing gem without triggering auto-install.
         if has_worktree_issues && use_pro? && !pro_gem_installed?
+          required_flag = pro_requirement_flag
           GeneratorMessages.add_error(<<~MSG.strip)
-            🚫 react_on_rails_pro gem is required for #{options[:rsc] ? '--rsc' : '--pro'} but is not installed.
+            🚫 react_on_rails_pro gem is required for #{required_flag} but is not installed.
             Auto-install was skipped because the worktree has uncommitted changes.
             Please add it manually:
-              gem 'react_on_rails_pro', '~> #{recommended_pro_gem_version}'
+              gem 'react_on_rails_pro', '#{pro_gem_version_requirement}'
             Then run: bundle install
           MSG
           return false
@@ -255,10 +514,21 @@ module ReactOnRails
         !(missing_node? || missing_package_manager? || (!has_worktree_issues && missing_pro_gem?))
       end
 
-      def missing_node?
-        node_missing = ReactOnRails::Utils.running_on_windows? ? `where node`.blank? : `which node`.blank?
+      def warn_if_unsupported_env_package_manager
+        env_value = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip
+        return if env_value.nil? || env_value.empty?
+        return if GeneratorMessages.supported_package_manager?(env_value.downcase)
 
-        if node_missing
+        supported = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.join(", ")
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  REACT_ON_RAILS_PACKAGE_MANAGER='#{env_value}' is not a supported package manager.
+          Supported values: #{supported}.
+          Falling through to package.json / lockfile / npm-default detection.
+        MSG
+      end
+
+      def missing_node?
+        unless ReactOnRails::Utils.command_available?("node")
           error = <<~MSG.strip
             🚫 Node.js is required but not found on your system.
 
@@ -342,19 +612,21 @@ module ReactOnRails
 
         # Copy bin scripts from templates
         template_bin_path = "#{__dir__}/templates/base/base/bin"
-        directory_options = {}
-        directory_options[:exclude_pattern] = %r{/dev(?:\.tt)?\z} if preserve_existing_bin_dev?
+        # Always exclude `dev` from the bulk copy; it is handled explicitly below
+        # so we can patch DEFAULT_ROUTE and AUTO_OPEN_BROWSER_ONCE after copying.
+        directory_options = { exclude_pattern: %r{/dev(?:\.tt)?\z} }
         directory template_bin_path, "bin", directory_options
 
-        # For --rsc without --redux, hello_world doesn't exist — update DEFAULT_ROUTE
-        if use_rsc? && !options.redux?
-          if preserve_existing_bin_dev?
+        if preserve_existing_bin_dev?
+          if use_rsc? && !options.redux? && !options.new_app?
             say_status :warn,
-                       'Custom bin/dev detected: update DEFAULT_ROUTE to "hello_server" manually for --rsc',
+                       "Custom bin/dev detected: update DEFAULT_ROUTE to \"#{HELLO_SERVER_ROUTE}\" manually for --rsc",
                        :yellow
-          else
-            gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
           end
+        else
+          copy_file("#{template_bin_path}/dev", "bin/dev")
+          gsub_file "bin/dev", /^DEFAULT_ROUTE = .*$/, "DEFAULT_ROUTE = #{default_bin_dev_route.inspect}"
+          gsub_file "bin/dev", /^AUTO_OPEN_BROWSER_ONCE = .*$/, "AUTO_OPEN_BROWSER_ONCE = #{options.new_app?}"
         end
 
         # `directory` and `gsub_file` above are Thor actions that already honor
@@ -364,9 +636,44 @@ module ReactOnRails
           return
         end
 
-        # Make these and only these files executable
+        # Make these and only these files executable. Use destination_root so
+        # chmod remains correct even if an earlier generator step changed Dir.pwd.
         files_to_become_executable = bin_scripts_to_chmod(template_bin_path)
         File.chmod(0o755, *files_to_become_executable)
+      end
+
+      # Consumer-scoped AI-agent guidance written into the generated app. The canonical
+      # AGENTS.md content lives in templates/agent_files/ and is the single source of truth;
+      # create-react-on-rails-app gets it for free because it delegates to this generator.
+      # Each file is copied only when absent so we never clobber an app's existing agent files.
+      AGENT_FILES = %w[
+        AGENTS.md
+        CLAUDE.md
+        .cursor/rules/react-on-rails.mdc
+        .github/copilot-instructions.md
+      ].freeze
+      private_constant :AGENT_FILES
+
+      def add_agent_files
+        return unless options.agent_files?
+
+        # AGENTS.md is the canonical file the editor pointers (CLAUDE.md, Cursor, Copilot) all
+        # reference. If the app already has its own AGENTS.md, it may document unrelated
+        # conventions, so leave it untouched AND skip the pointer files rather than emit editor
+        # guidance pointing at an AGENTS.md we did not write.
+        if File.exist?(File.join(destination_root, "AGENTS.md"))
+          say_status :skip, "AGENTS.md already exists; leaving it and the editor pointer files untouched", :yellow
+          return
+        end
+
+        AGENT_FILES.each do |relative_path|
+          if File.exist?(File.join(destination_root, relative_path))
+            say_status :skip, "#{relative_path} already exists; leaving it untouched", :yellow
+            next
+          end
+
+          copy_file("templates/agent_files/#{relative_path}", relative_path)
+        end
       end
 
       def replace_stock_rails_bin_dev!
@@ -397,9 +704,20 @@ module ReactOnRails
       end
 
       def bin_scripts_to_chmod(template_bin_path)
-        files = Dir.children(template_bin_path)
-        files.reject! { |f| f == "dev" } if preserve_existing_bin_dev?
-        files.map { |filename| "bin/#{filename}" }
+        files = Dir.children(template_bin_path).reject { |filename| filename == "dev" }
+        files << "dev" unless preserve_existing_bin_dev?
+        files.map { |filename| File.join(destination_root, "bin/#{filename}") }
+      end
+
+      def default_bin_dev_route
+        return "/" if options.new_app? && new_app_root_route_available?
+        return "hello_server" if use_rsc? && !options.redux?
+
+        "hello_world"
+      end
+
+      def new_app_root_route_available?
+        root_route_present?
       end
 
       def stock_rails_bin_dev?
@@ -418,20 +736,24 @@ module ReactOnRails
         # Determine what route and component will be created by the generator
         if use_rsc? && !options.redux?
           # RSC without Redux: HelloServer replaces HelloWorld
-          route = "hello_server"
+          route = HELLO_SERVER_ROUTE
           component_name = "HelloServer"
         else
-          route = "hello_world"
+          route = HELLO_WORLD_ROUTE
           component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
         end
 
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation(
-                                     component_name: component_name,
-                                     route: route,
+                                     component_name:,
+                                     route:,
                                      pro: use_pro?,
                                      rsc: use_rsc?,
-                                     shakapacker_just_installed: shakapacker_just_installed?
+                                     shakapacker_just_installed: shakapacker_just_installed?,
+                                     landing_page: options.new_app? && new_app_root_route_available?,
+                                     ci_workflow_generated: @ci_workflow_generated == true,
+                                     app_root: destination_root
                                    ))
+        GeneratorMessages.add_info(rsc_verification_message) if use_rsc?
       end
 
       def shakapacker_setup_incomplete?
@@ -443,15 +765,33 @@ module ReactOnRails
         flags = []
         flags << "--redux" if options.redux?
         flags << "--typescript" if options.typescript?
-        flags << "--rspack" if options.rspack?
+        # Echo the resolved bundler choice (normalized to --rspack/--no-rspack, so a --webpack
+        # alias re-runs as --no-rspack) only when the user passed one explicitly. An unset choice
+        # re-resolves to the fresh-install default on re-run, so we don't pin it here.
+        flags << (using_rspack? ? "--rspack" : "--no-rspack") if bundler_flag_given?
 
-        if use_rsc?
+        if options.rsc?
           flags << "--rsc"
         elsif options.pro?
           flags << "--pro"
         end
 
+        # Preserve an explicit agent-files opt-out so the suggested re-run doesn't emit
+        # AGENTS.md/editor files a user deliberately skipped (--agent-files defaults to on).
+        flags << "--no-agent-files" unless options.agent_files?
+
         ["rails generate react_on_rails:install", *flags].join(" ")
+      end
+
+      def rsc_verification_message
+        <<~MSG
+
+          🔎 RSC Pro Verification:
+          ─────────────────────────────────────────────────────────────────────────
+          1. Start all processes: #{Rainbow('bin/dev').cyan}
+          2. Visit: #{Rainbow("http://localhost:<port>/#{HELLO_SERVER_ROUTE}").cyan.underline}
+          3. Confirm the page streams and the Like button hydrates on click.
+        MSG
       end
 
       def recovery_working_tree_lines
@@ -472,7 +812,7 @@ module ReactOnRails
       end
 
       def incomplete_installation_message
-        package_install_step = "#{GeneratorMessages.detect_package_manager} install"
+        package_install_step = "#{GeneratorMessages.detect_package_manager(app_root: destination_root)} install"
 
         <<~MSG
 
@@ -518,8 +858,7 @@ module ReactOnRails
       end
 
       def cli_exists?(command)
-        which_command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
-        system(which_command, command, out: File::NULL, err: File::NULL)
+        ReactOnRails::Utils.command_available?(command)
       end
 
       def normalize_bin_dev_content(content)
@@ -579,20 +918,88 @@ module ReactOnRails
           return false
         end
 
-        # Then run the shakapacker installer
-        # Use options.rspack? directly (not using_rspack?): shakapacker.yml doesn't exist yet at this
-        # point, so using_rspack? would fall back to rspack_configured_in_project? which returns false,
-        # causing Shakapacker to install webpack configs into config/webpack/ instead of rspack.
-        shakapacker_install_env = options.rspack? ? { "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" } : {}
+        seed_package_manager_in_package_json_from_lockfile!
+
+        # Then run the shakapacker installer.
+        # Resolve the bundler via using_rspack?. shakapacker.yml doesn't exist yet at this point,
+        # so the fresh-install default applies: an unset --rspack flag resolves to Rspack when
+        # Shakapacker supports it (shakapacker_version_9_or_higher? is optimistically true on a
+        # brand-new install where Shakapacker isn't loaded yet). Pass the resolved choice explicitly
+        # so Shakapacker installs dependencies for the same bundler that React on Rails configures.
+        assets_bundler = using_rspack? ? "rspack" : "webpack"
+        shakapacker_install_env = { "SHAKAPACKER_ASSETS_BUNDLER" => assets_bundler }
         success = Bundler.with_unbundled_env do
           system(shakapacker_install_env, "bundle exec rails shakapacker:install")
         end
         if success
+          resolve_browserslist_conflict_after_shakapacker_install
           true
         else
           handle_shakapacker_install_error
           false
         end
+      end
+
+      def seed_package_manager_in_package_json_from_lockfile!
+        return unless File.exist?("package.json")
+
+        package_json_content = JSON.parse(File.read("package.json"))
+        return if package_json_content["packageManager"]
+
+        manager = detect_package_manager_from_lockfiles
+        return unless manager
+
+        version = detect_package_manager_version(manager)
+        return unless version
+
+        package_json_content["packageManager"] = "#{manager}@#{version}"
+        File.write("package.json", "#{JSON.pretty_generate(package_json_content)}\n")
+        say "🔧 Added packageManager=#{manager}@#{version} to package.json before shakapacker:install", :yellow
+      rescue JSON::ParserError => e
+        GeneratorMessages.add_warning("⚠️  Could not parse package.json to set packageManager: #{e.message}")
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Failed to seed packageManager in package.json: #{e.message}")
+      end
+
+      def resolve_browserslist_conflict_after_shakapacker_install
+        return unless File.exist?(".browserslistrc") && File.exist?("package.json")
+
+        package_json_content = JSON.parse(File.read("package.json"))
+        return unless package_json_content.key?("browserslist")
+
+        package_json_content.delete("browserslist")
+        File.write("package.json", "#{JSON.pretty_generate(package_json_content)}\n")
+        say "🔧 Removed package.json browserslist because .browserslistrc is present", :yellow
+      rescue JSON::ParserError => e
+        GeneratorMessages.add_warning("⚠️  Could not parse package.json for browserslist cleanup: #{e.message}")
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Failed to clean browserslist conflict: #{e.message}")
+      end
+
+      def detect_package_manager_from_lockfiles
+        GeneratorMessages.detect_package_manager_from_lockfiles
+      end
+
+      def detect_package_manager_version(package_manager)
+        unless cli_exists?(package_manager)
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  #{package_manager} lockfile found but `#{package_manager}` command is not available on PATH.
+            Install #{package_manager} and re-run the generator.
+          MSG
+          return nil
+        end
+
+        stdout, stderr, status = Open3.capture3(package_manager, "--version")
+        return stdout.strip if status.success?
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to determine #{package_manager} version (#{stderr.strip}).
+          Install #{package_manager} and re-run the generator.
+        MSG
+        nil
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Failed to detect #{package_manager} version: #{e.message}")
+        nil
       end
 
       def finalize_shakapacker_setup(yml_content_before)
@@ -665,12 +1072,18 @@ module ReactOnRails
       end
 
       def missing_package_manager?
-        package_managers = %w[npm pnpm yarn bun]
-        missing = package_managers.none? { |pm| cli_exists?(pm) }
+        selected, source = GeneratorMessages.detect_package_manager_with_source(app_root: destination_root)
+        return false if GeneratorMessages.package_manager_executable_available?(selected)
 
-        if missing
+        available_package_managers = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.select do |pm|
+          pm != selected && GeneratorMessages.package_manager_executable_available?(pm)
+        end
+
+        if available_package_managers.empty?
           error = <<~MSG.strip
             🚫 No JavaScript package manager found on your system.
+
+            #{package_manager_source_description(selected, source)}
 
             React on Rails requires a JavaScript package manager to install dependencies.
             Please install one of the following:
@@ -686,7 +1099,56 @@ module ReactOnRails
           return true
         end
 
-        false
+        action_separator = %i[default env].include?(source) ? " or " : ", update the source above, or "
+        error = <<~MSG.strip
+          🚫 JavaScript package manager '#{selected}' was selected, but the command was not found.
+
+          #{package_manager_source_description(selected, source)}
+          Install '#{selected}'#{action_separator}set REACT_ON_RAILS_PACKAGE_MANAGER
+          to one of the available package managers: #{available_package_managers.join(', ')}.
+        MSG
+        GeneratorMessages.add_error(error)
+        true
+      end
+
+      def package_manager_source_description(selected, source)
+        case source
+        when :env
+          "Selected via the REACT_ON_RAILS_PACKAGE_MANAGER environment variable."
+        when :package_json
+          "Selected via the `packageManager` field in package.json."
+        when :lockfile
+          lockfile = GeneratorMessages.lockfile_filename_for(selected, app_root: destination_root)
+          lockfile ? "Selected via the #{lockfile} lockfile on disk." : "Selected via a lockfile on disk."
+        when :default
+          "Selected via the npm default fallback (no env var, packageManager field, or lockfile detected)."
+        else
+          raise ArgumentError, "Unknown package manager source: #{source.inspect}"
+        end
+      end
+
+      def jsx_in_js_files_present?
+        Dir.glob("app/javascript/**/*.js").any? do |path|
+          content = File.read(path)
+          content.match?(%r{<\s*[A-Za-z][\w:-]*(\s|>|/)}) || content.match?(/<\s*>/)
+        rescue StandardError
+          false
+        end
+      end
+
+      def set_javascript_transpiler_to_babel
+        shakapacker_config_path = "config/shakapacker.yml"
+        return unless File.exist?(shakapacker_config_path)
+
+        swc_transpiler_pattern = /^(\s*javascript_transpiler:\s*)["']?swc["']?(\s*(?:#.*)?)$/
+        return unless File.read(shakapacker_config_path).match?(swc_transpiler_pattern)
+
+        gsub_file(
+          shakapacker_config_path,
+          swc_transpiler_pattern,
+          '\1"babel"\2'
+        )
+        @using_swc = false
       end
 
       def install_typescript_dependencies
@@ -708,9 +1170,7 @@ module ReactOnRails
 
         say "📝 Creating CSS module type definitions...", :yellow
 
-        # Ensure the types directory exists
-        FileUtils.mkdir_p("app/javascript/types")
-
+        css_module_types_path = File.join(shakapacker_source_path, "types", "css-modules.d.ts")
         css_module_types_content = <<~TS.strip
           // TypeScript definitions for CSS modules
           declare module "*.module.css" {
@@ -729,7 +1189,7 @@ module ReactOnRails
           }
         TS
 
-        File.write("app/javascript/types/css-modules.d.ts", css_module_types_content)
+        create_file(css_module_types_path, css_module_types_content)
         say "✅ Created CSS module type definitions", :green
       end
 
@@ -761,7 +1221,7 @@ module ReactOnRails
             "jsx" => "react-jsx"
           },
           "include" => [
-            "app/javascript/**/*"
+            File.join(shakapacker_source_path, "**/*")
           ]
         }
 
