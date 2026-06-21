@@ -238,7 +238,7 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
         exit 0
       fi
 
-      if [ "$1" = "api" ] && [ "$3" = "Accept: application/vnd.github+json" ] && [ "$4" = "repos/owner/repo/issues/123/reactions?per_page=100" ]; then
+      if [ "$1" = "api" ] && [ "$2" = "-H" ] && [ "$3" = "Accept: application/vnd.github+json" ] && [ "$4" = "repos/owner/repo/issues/123/reactions?per_page=100" ]; then
         printf '[[{"user":{"login":"justin808"}}]]'
         exit 0
       fi
