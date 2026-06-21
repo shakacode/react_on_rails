@@ -504,15 +504,15 @@ sequenceDiagram
 
 Key files:
 
-- [react_on_rails_pro/app/helpers/react_on_rails_pro_helper.rb](../react_on_rails_pro/app/helpers/react_on_rails_pro_helper.rb)
-- [react_on_rails_pro/lib/react_on_rails_pro/concerns/stream.rb](../react_on_rails_pro/lib/react_on_rails_pro/concerns/stream.rb)
-- [react_on_rails_pro/lib/react_on_rails_pro/request.rb](../react_on_rails_pro/lib/react_on_rails_pro/request.rb)
-- [react_on_rails_pro/lib/react_on_rails_pro/server_rendering_js_code.rb](../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_js_code.rb)
-- [react_on_rails_pro/lib/react_on_rails_pro/server_rendering_pool/node_rendering_pool.rb](../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_pool/node_rendering_pool.rb)
-- [packages/react-on-rails-pro/src/streamServerRenderedReactComponent.ts](../packages/react-on-rails-pro/src/streamServerRenderedReactComponent.ts)
-- [packages/react-on-rails-pro/src/RSCRequestTracker.ts](../packages/react-on-rails-pro/src/RSCRequestTracker.ts)
-- [packages/react-on-rails-pro/src/injectRSCPayload.ts](../packages/react-on-rails-pro/src/injectRSCPayload.ts)
-- [packages/react-on-rails-pro/src/ReactOnRailsRSC.ts](../packages/react-on-rails-pro/src/ReactOnRailsRSC.ts)
+- [react_on_rails_pro/app/helpers/react_on_rails_pro_helper.rb](../../react_on_rails_pro/app/helpers/react_on_rails_pro_helper.rb)
+- [react_on_rails_pro/lib/react_on_rails_pro/concerns/stream.rb](../../react_on_rails_pro/lib/react_on_rails_pro/concerns/stream.rb)
+- [react_on_rails_pro/lib/react_on_rails_pro/request.rb](../../react_on_rails_pro/lib/react_on_rails_pro/request.rb)
+- [react_on_rails_pro/lib/react_on_rails_pro/server_rendering_js_code.rb](../../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_js_code.rb)
+- [react_on_rails_pro/lib/react_on_rails_pro/server_rendering_pool/node_rendering_pool.rb](../../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_pool/node_rendering_pool.rb)
+- [packages/react-on-rails-pro/src/streamServerRenderedReactComponent.ts](../../packages/react-on-rails-pro/src/streamServerRenderedReactComponent.ts)
+- [packages/react-on-rails-pro/src/RSCRequestTracker.ts](../../packages/react-on-rails-pro/src/RSCRequestTracker.ts)
+- [packages/react-on-rails-pro/src/injectRSCPayload.ts](../../packages/react-on-rails-pro/src/injectRSCPayload.ts)
+- [packages/react-on-rails-pro/src/ReactOnRailsRSC.ts](../../packages/react-on-rails-pro/src/ReactOnRailsRSC.ts)
 
 ### The Server Bundle to RSC Bundle Handoff
 
@@ -531,8 +531,8 @@ flowchart TD
 
 Important source:
 
-- [server_rendering_js_code.rb](../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_js_code.rb)
-- [ReactOnRailsRSC.ts](../packages/react-on-rails-pro/src/ReactOnRailsRSC.ts)
+- [server_rendering_js_code.rb](../../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_js_code.rb)
+- [ReactOnRailsRSC.ts](../../packages/react-on-rails-pro/src/ReactOnRailsRSC.ts)
 - Node renderer VM boundary, from sub-agent: `packages/react-on-rails-pro-node-renderer/src/worker/vm.ts`
 
 ### RSCRequestTracker
@@ -559,9 +559,9 @@ flowchart LR
 
 Source:
 
-- [RSCRequestTracker.ts](../packages/react-on-rails-pro/src/RSCRequestTracker.ts)
-- [getReactServerComponent.server.ts](../packages/react-on-rails-pro/src/getReactServerComponent.server.ts)
-- [injectRSCPayload.ts](../packages/react-on-rails-pro/src/injectRSCPayload.ts)
+- [RSCRequestTracker.ts](../../packages/react-on-rails-pro/src/RSCRequestTracker.ts)
+- [getReactServerComponent.server.ts](../../packages/react-on-rails-pro/src/getReactServerComponent.server.ts)
+- [injectRSCPayload.ts](../../packages/react-on-rails-pro/src/injectRSCPayload.ts)
 
 ### What RORP Inlines Into HTML
 
@@ -601,8 +601,8 @@ sequenceDiagram
 
 Source:
 
-- [injectRSCPayload.ts](../packages/react-on-rails-pro/src/injectRSCPayload.ts)
-- [getReactServerComponent.client.ts](../packages/react-on-rails-pro/src/getReactServerComponent.client.ts)
+- [injectRSCPayload.ts](../../packages/react-on-rails-pro/src/injectRSCPayload.ts)
+- [getReactServerComponent.client.ts](../../packages/react-on-rails-pro/src/getReactServerComponent.client.ts)
 
 ### Later Client Rendering in RORP
 
@@ -614,10 +614,10 @@ When the browser later needs a server component that was not embedded, `getReact
 
 Rails routes that to the RSC payload controller/helper:
 
-- [routes.rb](../react_on_rails_pro/lib/react_on_rails_pro/routes.rb)
-- [rsc_payload_renderer.rb](../react_on_rails_pro/lib/react_on_rails_pro/concerns/rsc_payload_renderer.rb)
-- [rsc_payload.text.erb](../react_on_rails_pro/app/views/react_on_rails_pro/rsc_payload.text.erb)
-- [react_on_rails_pro_helper.rb](../react_on_rails_pro/app/helpers/react_on_rails_pro_helper.rb)
+- [routes.rb](../../react_on_rails_pro/lib/react_on_rails_pro/routes.rb)
+- [rsc_payload_renderer.rb](../../react_on_rails_pro/lib/react_on_rails_pro/concerns/rsc_payload_renderer.rb)
+- [rsc_payload.text.erb](../../react_on_rails_pro/app/views/react_on_rails_pro/rsc_payload.text.erb)
+- [react_on_rails_pro_helper.rb](../../react_on_rails_pro/app/helpers/react_on_rails_pro_helper.rb)
 
 This is not a full router-tree navigation protocol. It is a named server-component payload endpoint. That design is a good fit for Rails pages where route ownership remains in Rails.
 
@@ -651,10 +651,10 @@ The RSC bundle is derived from the server bundle but:
 
 Source:
 
-- [rscWebpackConfig.js](../react_on_rails_pro/spec/dummy/config/webpack/rscWebpackConfig.js)
-- [serverWebpackConfig.js](../react_on_rails_pro/spec/dummy/config/webpack/serverWebpackConfig.js)
-- [clientWebpackConfig.js](../react_on_rails_pro/spec/dummy/config/webpack/clientWebpackConfig.js)
-- [ServerClientOrBoth.js](../react_on_rails_pro/spec/dummy/config/webpack/ServerClientOrBoth.js)
+- [rscWebpackConfig.js](../../react_on_rails_pro/spec/dummy/config/webpack/rscWebpackConfig.js)
+- [serverWebpackConfig.js](../../react_on_rails_pro/spec/dummy/config/webpack/serverWebpackConfig.js)
+- [clientWebpackConfig.js](../../react_on_rails_pro/spec/dummy/config/webpack/clientWebpackConfig.js)
+- [ServerClientOrBoth.js](../../react_on_rails_pro/spec/dummy/config/webpack/ServerClientOrBoth.js)
 
 ### Development Mode
 
@@ -676,7 +676,7 @@ flowchart TD
     Rails --> Renderer
 ```
 
-Source: [Procfile.dev](../react_on_rails_pro/spec/dummy/Procfile.dev)
+Source: [Procfile.dev](../../react_on_rails_pro/spec/dummy/Procfile.dev)
 
 Practical meaning:
 
@@ -711,9 +711,9 @@ Production RORP has the same conceptual artifacts as development, but they are p
 
 Source:
 
-- [request.rb](../react_on_rails_pro/lib/react_on_rails_pro/request.rb)
-- [node_rendering_pool.rb](../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_pool/node_rendering_pool.rb)
-- [prepare_node_renderer_bundles.rb](../react_on_rails_pro/lib/react_on_rails_pro/prepare_node_renderer_bundles.rb)
+- [request.rb](../../react_on_rails_pro/lib/react_on_rails_pro/request.rb)
+- [node_rendering_pool.rb](../../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_pool/node_rendering_pool.rb)
+- [prepare_node_renderer_bundles.rb](../../react_on_rails_pro/lib/react_on_rails_pro/prepare_node_renderer_bundles.rb)
 
 ## Direct Comparison
 
@@ -862,9 +862,9 @@ loader remains `WebpackLoader`-based because `RspackLoader` reports client modul
 
 Local docs with practical details:
 
-- [Webpack configuration: Rspack vs Webpack](../docs/oss/core-concepts/webpack-configuration.md)
-- [Migrating from Webpack to Rspack](../docs/oss/migrating/migrating-from-webpack-to-rspack.md)
-- [Generator details](../docs/oss/api-reference/generator-details.md)
+- [Webpack configuration: Rspack vs Webpack](../../docs/oss/core-concepts/webpack-configuration.md)
+- [Migrating from Webpack to Rspack](../../docs/oss/migrating/migrating-from-webpack-to-rspack.md)
+- [Generator details](../../docs/oss/api-reference/generator-details.md)
 
 ### In Next.js
 
@@ -1030,19 +1030,19 @@ React's own docs warn framework implementers about this. The separate `react-on-
 
 ### React on Rails Pro
 
-- [rendering-flow.md](../docs/pro/react-server-components/rendering-flow.md): existing Pro RSC flow doc.
-- [server_rendering_js_code.rb](../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_js_code.rb): generated JS and `generateRSCPayload`.
-- [request.rb](../react_on_rails_pro/lib/react_on_rails_pro/request.rb): Rails-to-node-renderer request and asset upload.
-- [node_rendering_pool.rb](../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_pool/node_rendering_pool.rb): server vs RSC bundle hash selection.
-- [streamServerRenderedReactComponent.ts](../packages/react-on-rails-pro/src/streamServerRenderedReactComponent.ts): server bundle SSR streaming.
-- [ReactOnRailsRSC.ts](../packages/react-on-rails-pro/src/ReactOnRailsRSC.ts): RSC bundle runtime.
-- [RSCRequestTracker.ts](../packages/react-on-rails-pro/src/RSCRequestTracker.ts): request-scoped Flight stream tracking.
-- [injectRSCPayload.ts](../packages/react-on-rails-pro/src/injectRSCPayload.ts): HTML inline payload injection.
-- [getReactServerComponent.server.ts](../packages/react-on-rails-pro/src/getReactServerComponent.server.ts): SSR-side RSC consumer.
-- [getReactServerComponent.client.ts](../packages/react-on-rails-pro/src/getReactServerComponent.client.ts): browser-side RSC consumer.
-- [RSCRoute.tsx](../packages/react-on-rails-pro/src/RSCRoute.tsx): Client Component bridge for rendering registered server components.
-- [RSCProvider.tsx](../packages/react-on-rails-pro/src/RSCProvider.tsx): component cache and environment-independent RSC access.
-- [rscWebpackConfig.js](../react_on_rails_pro/spec/dummy/config/webpack/rscWebpackConfig.js): RSC bundle configuration.
+- [rendering-flow.md](../../docs/pro/react-server-components/rendering-flow.md): existing Pro RSC flow doc.
+- [server_rendering_js_code.rb](../../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_js_code.rb): generated JS and `generateRSCPayload`.
+- [request.rb](../../react_on_rails_pro/lib/react_on_rails_pro/request.rb): Rails-to-node-renderer request and asset upload.
+- [node_rendering_pool.rb](../../react_on_rails_pro/lib/react_on_rails_pro/server_rendering_pool/node_rendering_pool.rb): server vs RSC bundle hash selection.
+- [streamServerRenderedReactComponent.ts](../../packages/react-on-rails-pro/src/streamServerRenderedReactComponent.ts): server bundle SSR streaming.
+- [ReactOnRailsRSC.ts](../../packages/react-on-rails-pro/src/ReactOnRailsRSC.ts): RSC bundle runtime.
+- [RSCRequestTracker.ts](../../packages/react-on-rails-pro/src/RSCRequestTracker.ts): request-scoped Flight stream tracking.
+- [injectRSCPayload.ts](../../packages/react-on-rails-pro/src/injectRSCPayload.ts): HTML inline payload injection.
+- [getReactServerComponent.server.ts](../../packages/react-on-rails-pro/src/getReactServerComponent.server.ts): SSR-side RSC consumer.
+- [getReactServerComponent.client.ts](../../packages/react-on-rails-pro/src/getReactServerComponent.client.ts): browser-side RSC consumer.
+- [RSCRoute.tsx](../../packages/react-on-rails-pro/src/RSCRoute.tsx): Client Component bridge for rendering registered server components.
+- [RSCProvider.tsx](../../packages/react-on-rails-pro/src/RSCProvider.tsx): component cache and environment-independent RSC access.
+- [rscWebpackConfig.js](../../react_on_rails_pro/spec/dummy/config/webpack/rscWebpackConfig.js): RSC bundle configuration.
 
 ## Suggested Public Documentation Shape
 
