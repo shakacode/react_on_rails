@@ -143,6 +143,8 @@ exclude = [
   '^https://github\.com/K4sku$',  # Intermittent 502 from GitHub user page in CI
   '^https://github\.com/npm/cli/issues/6253$',  # Intermittent 502 from GitHub issue pages in CI
   '^https://github\.com/search\?q=gem\+react_on_rails&ref=advsearch&type=repositories&utf8=%E2%9C%93$',  # Intermittent 502 from GitHub search in CI
+  '^https://github\.com/shakacode/react_on_rails/issues/1457(#.*)?$',  # Intermittent 500 from GitHub issue pages in CI
+  '^https://github\.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/client/app/components/Loadable/routes/Routes\.imports-hmr\.jsx(#.*)?$',  # Intermittent 500 from GitHub blob pages in CI
 
   # ============================================================================
   # EXTERNAL DOC PAGES WITH CI CONNECTIVITY FAILURES
