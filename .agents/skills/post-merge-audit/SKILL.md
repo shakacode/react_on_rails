@@ -200,8 +200,8 @@ The audit should usually produce an issue plan for non-OK findings, but not crea
 
 - **No issue**: for `OK`, duplicate findings, findings fully resolved by the
   audit evidence, evidenced `realized` lanes, healthy `in_progress` worked-issue
-  lanes, evidenced `satisfied` or `waived` QA lanes, or evidenced `not
-applicable` QA omissions; include `realized`, worked-issue `in_progress`,
+  lanes, evidenced `satisfied` or `waived` QA lanes, or evidenced QA omissions
+  marked `not applicable`; include `realized`, worked-issue `in_progress`,
   `satisfied`, `waived`, and `not applicable` rows in the worked-issue/QA-lane
   coverage table so the coordinator can see they were checked.
 - **Changelog only**: for missing changelog entries; prefer one bundled changelog issue or a recommendation to run `/update-changelog`, not one issue per entry.

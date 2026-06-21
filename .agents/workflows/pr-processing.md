@@ -1394,9 +1394,11 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
 
    Sync note: this scope algorithm is intentionally mirrored in
    `.agents/skills/post-merge-audit/SKILL.md` and
-   `.agents/workflows/post-merge-audit.md`; QA lane planning and handoff
-   touchpoints are also mirrored in `.agents/skills/pr-batch/SKILL.md` and
-   `.agents/skills/plan-pr-batch/SKILL.md`; update all copies together.
+   `.agents/workflows/post-merge-audit.md`; QA lane planning, handoff, and
+   audit-verification touchpoints are also mirrored in
+   `.agents/skills/pr-batch/SKILL.md`, `.agents/skills/plan-pr-batch/SKILL.md`,
+   `.agents/skills/post-merge-audit/SKILL.md`, and
+   `.agents/workflows/post-merge-audit.md`; update all copies together.
 
    After the scope algorithm identifies the batch or reports an `UNKNOWN` scope,
    collect any QA lane and QA Evidence block for that batch. Do not use missing
