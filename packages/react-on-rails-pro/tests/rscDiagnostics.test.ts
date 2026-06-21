@@ -180,6 +180,17 @@ describe('RSC diagnostics', () => {
     expect(rscStreamDiagnosticMatchesError(diagnosticError, genericStreamError)).toBe(true);
   });
 
+  it('does not match React generic Server Components render prefixes without a separator boundary', () => {
+    const diagnosticError = new Error(
+      '[ReactOnRails] RSC bundle rendering failed.\n' +
+        'Component: CommentsToggle\n' +
+        'Original error: useState is not a function',
+    );
+    const genericLookalikeError = new Error('An error occurred in the Server Components render.SomeSuffix');
+
+    expect(rscStreamDiagnosticMatchesError(diagnosticError, genericLookalikeError)).toBe(false);
+  });
+
   it('matches ordinary diagnostics when React reports a multi-line stream error', () => {
     const diagnosticError = new Error(
       '[ReactOnRails] RSC bundle rendering failed.\n' +
@@ -189,6 +200,23 @@ describe('RSC diagnostics', () => {
     );
     const streamError = new Error('useState is not a function\nextra context from React');
 
+    expect(rscStreamDiagnosticMatchesError(diagnosticError, streamError)).toBe(true);
+  });
+
+  it('matches ordinary diagnostics built from RSC stream metadata to the React stream error', () => {
+    const diagnosticError = buildRSCStreamDiagnosticError(
+      {
+        renderingError: {
+          message: 'useState is not a function',
+          stack:
+            'TypeError: useState is not a function\n    at CommentsToggle (/app/CommentsToggle.tsx:10:5)',
+        },
+      },
+      { componentName: 'CommentsToggle' },
+    );
+    const streamError = new Error('useState is not a function\nextra context from React');
+
+    if (!diagnosticError) throw new Error('Expected RSC stream diagnostic metadata to build an error');
     expect(rscStreamDiagnosticMatchesError(diagnosticError, streamError)).toBe(true);
   });
 

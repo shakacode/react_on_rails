@@ -288,6 +288,8 @@ const streamRenderReactComponent = (
       // Ordering invariant: `reportError` sets `renderState.hasErrors = true` synchronously, and
       // `onError` runs synchronously inside React's render before this `.catch` rejection settles in a
       // later microtask — so if `onError` reported an error, `hasErrors` is already true when read here.
+      // If React changes that ordering, the first path to consume the diagnostics wins and the second
+      // sees an empty capture list, avoiding double-enrichment.
       const convertedError = convertToError(e);
       const error = renderState.hasErrors
         ? convertedError // onError already handled this render error; don't re-enrich (a no-op, but explicit).
