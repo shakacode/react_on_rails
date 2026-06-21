@@ -281,6 +281,10 @@ issue intent-achievement or QA-coverage classification, and `UNKNOWN` facts.
 
 Example worked-issue coverage table (`batch-abc` and issue numbers are
 placeholders; replace them with the real batch id and issues):
+
+`Final state` is the operational lane outcome. `Classification` is the
+worked-issue intent class or QA-coverage result.
+
 | Issue | Lane/branch | Evidence | Final state | Classification | UNKNOWN facts |
 | --- | --- | --- | --- | --- | --- |
 | #1234 | batch-abc:issue-1234 / codex/example | PR #2345 merged | merged | realized | none |

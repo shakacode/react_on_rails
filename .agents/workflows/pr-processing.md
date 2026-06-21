@@ -446,7 +446,9 @@ Coordinate QA with the same primitives as other batch lanes:
 - The QA owner gets a stable agent id, branch/worktree ownership when files may be edited, and
   `agent-coord claim` / `agent-coord heartbeat` updates at lane start, evidence refresh, blocked state,
   resumed state, and done state. If private state is unavailable, record claim and heartbeat state as
-  `UNKNOWN` and use the public claim-comment fallback only where the dependency rules allow it.
+  `UNKNOWN` and use the public claim-comment fallback only where the dependency rules allow it. This is
+  the "allowed fallback evidence" referenced by the skills: complete the QA Evidence fields and use
+  `UNKNOWN` only for the private claim/heartbeat sub-values that cannot be verified.
 - QA may run in parallel with audit or closeout once changed areas and candidate PRs are known, but it
   must not push dependent changes while declared `blocked_on` refs remain unmet.
 - QA findings are triaged like other batch findings: release-blocking issues stop readiness or
@@ -505,6 +507,22 @@ Examples:
 - QA lane status: not applicable
 - Release-blocking status: not applicable
 - Process-gap disposition: not applicable (no recurring process miss found)
+```
+
+```markdown
+### QA Evidence
+
+- QA lane: codex-qa, branch qa/batch-rc, claim active, heartbeat blocked
+- Scope checked: release-affecting CI config and generator changes for PRs #3 and #4
+- Tested at: PR #3 abc9876 and PR #4 fed4321
+- Automated checks: worker validation plus `pnpm start format.listDifferent`
+- Manual checks: CI smoke-test failure reproduced on generated example
+- Findings: generator output mismatch on Node 20: release-blocking, fix in progress in PR #5
+- QA required: yes
+- QA required rationale: release-affecting CI/generator batch requires independent QA coverage
+- QA lane status: blocked
+- Release-blocking status: blocked
+- Process-gap disposition: not applicable (finding is active, not a recurring process miss)
 ```
 
 ### Plan To Goal Handoff
@@ -1500,6 +1518,9 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
      approves tracking it as an issue
    - one child issue or approved coordinator action for each `partial`, `missed`,
      `regressed`, or `unknown` worked-issue outcome that needs follow-up
+   - one child issue or approved coordinator action for each non-OK QA coverage
+     outcome (`blocked`, `unknown`, or release-audit `in_progress`) that needs
+     follow-up, naming the missing evidence, fix, waiver, or decision
    - hidden `post-merge-audit-finding` fingerprints so duplicate child issues can be detected
    - for process findings, include the Process Gap Disposition fields above,
      especially `Mechanism target` and `Replay evidence or park reason`, before
