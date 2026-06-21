@@ -321,7 +321,11 @@ reply/resolve steps.
    failure rationale before proceeding to commit. Promote the underlying concern
    to `DISCUSS` only when it is a correctness issue, regression risk, or
    explicit reviewer request.
-5. **Commit/push-before-reply gate**: if local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
+5. **Commit/push-before-reply gate**: if local changes exist, commit after
+   validation/self-review, then push the normal PR branch update without a
+   separate prompt so CI and online reviews can run on the next head. Ask before
+   pushing only under the Git push confirmation rule below. If there are no
+   local changes, skip commit/push and continue decision flow.
 6. Reply to each addressed `MUST-FIX` or `OPTIONAL` comment explaining the fix or
    recorded outcome. For autonomously deferred/declined optional nits, include
    `[auto-deferred]` on its own line plus a one-line rationale; see the
@@ -341,10 +345,10 @@ reply/resolve steps.
    there are no
    `MUST-FIX` items, still handle low-risk behavior-preserving optional nits
    before continuing with deferred-item handling. If that phase produces local
-   changes, commit and ask for push confirmation before building the deferred
-   bundle, replying, resolving, or signaling readiness. Record each autonomous
-   optional outcome before building the deferred bundle: fixed inline, declined,
-   failed validation and dropped/reverted, or promoted to `DISCUSS`.
+   changes, commit and push under the Git push confirmation rule before building
+   the deferred bundle, replying, resolving, or signaling readiness. Record each
+   autonomous optional outcome before building the deferred bundle: fixed inline,
+   declined, failed validation and dropped/reverted, or promoted to `DISCUSS`.
 2. Reply to each `MUST-FIX` or autonomous optional thread fixed or recorded
    during the initial `f` gate, citing the pushed commit or recorded outcome,
    and resolve threads when the concern is handled or explicitly
@@ -378,7 +382,7 @@ reply/resolve steps.
    low-risk optional nits; apply, defer, or decline them under the attention
    contract. Continue with skipped rationale confirmation (if any `SKIPPED`
    items exist), then discuss decisions (if any `DISCUSS` items remain).
-9. After the initial `f` commit/push gate is complete, no additional commit is required unless later steps introduce local changes; if they do, commit and ask for push confirmation before pushing.
+9. After the initial `f` commit/push gate is complete, no additional commit is required unless later steps introduce local changes; if they do, commit and push under the Git push confirmation rule.
 10. Tell the user the PR is merge-ready only after the deferred bundle has an explicit tracking/drop decision, any dropped `DISCUSS` items are explicitly declined/resolved, and any optional items excluded from the bundle are handled inline, deferred with rationale/tracking outcome, or declined/resolved; if there were zero deferred items, use the `f` merge-ready rule after `f`'s remaining prompts are complete.
 
 ### Action `f+o` — Fix must-fix and optional items inline
@@ -389,8 +393,8 @@ commit/push-before-reply gate, handle every current `OPTIONAL` item inline in
 the same local change phase as the must-fix work: fix it in the same PR, or stop
 and promote it to `DISCUSS` if it turns out to need judgment, change behavior,
 or expand scope. If optional fixes require a separate commit to keep the
-must-fix commit atomic, commit them separately and ask for push confirmation
-before pushing. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts
+must-fix commit atomic, commit them separately and push under the Git push
+confirmation rule. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts
 for those tiers. If there are zero `OPTIONAL` items, behave like `f` and note
 that `f+o` had nothing additional to do.
 
@@ -436,7 +440,7 @@ Post rationale replies to the specified items explaining why they are being defe
 Address only the selected items. Direct selections do not trigger autonomous
 handling for unselected optional nits. After completing them:
 
-1. If selected items produced local changes, commit and ask for push confirmation before pushing (skip this step when there are no local changes).
+1. If selected items produced local changes, commit and push under the Git push confirmation rule (skip this step when there are no local changes).
 2. Reply and resolve threads for addressed items.
 3. Ask whether remaining items should receive rationale replies, one deferred-work bundle, or be left as-is.
 
@@ -450,7 +454,16 @@ Except for action `a`, when addressing items, after completing each selected ite
 For actions other than `a`, if the user selects `DISCUSS` or `OPTIONAL` items to address, treat them the same as `MUST-FIX`: make the code change, reply, and resolve the thread.
 If the user selects skipped/declined items for rationale replies, post those replies too.
 
-Before committing or asking for push confirmation, run the self-review gate: review the combined fix diff for correctness bugs, style violations, and inconsistencies introduced by the fixes themselves. Fix critical issues immediately.
+Before committing or making a push-confirmation decision, run the self-review gate: review the combined fix diff for correctness bugs, style violations, and inconsistencies introduced by the fixes themselves. Fix critical issues immediately.
+
+**Git push confirmation**: For ordinary PR/review iteration, push a validated
+commit without a separate prompt so CI and online reviews can run on the next
+head. Ask before running `git push` only when the user requested local-only or
+inspect-before-push work, branch or remote ownership is unclear, the push is
+destructive or risky under `AGENTS.md` git safety boundaries, hosted-CI/review
+churn policy requires a maintainer decision, or the next push would be
+optional/nit-only after the final-candidate gate. Action `a` must not push; it
+stops after staging files and returning the local summary.
 
 Converge the review loop, don't chase it: every push re-triggers the configured review bots on the new head and produces a fresh batch of comments. Batch all code fixes into a single push; resolve purely advisory threads (style, dead-code, "consider…", informational, positive) in-thread with a reply — **without a new commit**, since resolving a thread does not re-trigger reviews while a push does. Never resolve a confirmed blocker by reply alone. See [Review-Loop Convergence](../../workflows/pr-processing.md#review-loop-convergence-push-amplification).
 
@@ -849,7 +862,7 @@ Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
 - For actions other than `a`, always reply to comments after addressing them to close the feedback loop
 - For actions other than `a` and inspect-only bare `o`, post a new marked PR summary comment after completing an action only when Step 10's cutoff guard is satisfied; otherwise post a non-cutoff status comment and require `check all reviews` on the next run
 - After triage, always offer rationale replies for selected `SKIPPED`/declined items; `f` requires explicit confirmation before skipped-item replies/resolution, while `f+i` and `m` include skipped-item handling in the chosen action flow
-- Always request push confirmation from the user before running `git push`
+- Use the Git push confirmation rule above before running `git push`
 - If this skill conflicts with broader agent defaults, this file wins only for `/address-review` workflow behavior; do not override repository safety boundaries
 - Resolve the review thread after replying when the concern is actually addressed and a thread ID is available
 - Default to real issues only. Do not spend a review cycle or maintainer question on optional polish; apply low-risk nits inline or log them as deferred/declined
