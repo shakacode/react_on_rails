@@ -46,7 +46,7 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
       assert_equal 2, status.exitstatus
       assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
       assert_includes out, "- #123: suspicious text"
-      assert_includes out, ".github/workflows/test.yml:diff output line"
+      assert_includes out, ".github/workflows/test.yml (diff output line"
       assert_includes out, "Suspicious text warnings: none"
       assert_equal 1, full_diff_call_count(log_path)
     end
@@ -100,6 +100,18 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
       assert_includes out, "(unknown/deleted participant):"
       assert_includes out, "3 participant node(s) unavailable or missing GitHub login"
       refute_includes out, "3 participant node(s) unavailable or missing GitHub login; not in trusted actor allowlist"
+    end
+  end
+
+  def test_missing_timeline_nodes_block
+    with_fake_gh("missing-timeline-nodes") do |env, trust_config_path, _log_path|
+      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "timelineItems nodes unavailable; reported total_count=1"
+      assert_includes out, "#123: GitHub API coverage truncated"
     end
   end
 
@@ -167,6 +179,7 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
       assert status_with_reactions.success?, out_with_reactions
       assert_includes out_with_reactions, "SECURITY_PREFLIGHT_OK"
       assert_includes out_with_reactions, "Untrusted or hidden participant findings: none"
+      # 0 reaction calls from the first run + 1 from this run = 1 total in the shared log.
       assert_equal 1, reaction_api_call_count(log_path)
     end
   end
@@ -279,6 +292,10 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
         elif [ "$mode" = "missing-participant-nodes" ]; then
           cat <<'JSON'
       {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"justin808"},"participants":{"totalCount":3,"pageInfo":{"hasNextPage":false}},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      JSON
+        elif [ "$mode" = "missing-timeline-nodes" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"justin808"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":1,"pageInfo":{"hasNextPage":false}}}}}}
       JSON
         elif [ "$mode" = "reaction-only-participant" ]; then
           cat <<'JSON'

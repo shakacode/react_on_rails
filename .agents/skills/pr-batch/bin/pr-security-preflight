@@ -253,7 +253,7 @@ def suspicious_added_lines(diff, pattern:)
     next unless line.start_with?("+") && !line.start_with?("+++")
     next unless line.match?(pattern)
 
-    location = current_file ? "#{current_file}:diff output line #{index}" : "diff output line #{index}"
+    location = current_file ? "#{current_file} (diff output line #{index})" : "diff output line #{index}"
     { location: }
   end
 end
@@ -436,18 +436,22 @@ def fetch_target_graph(owner:, name:, number:, query:)
   )
 end
 
-def connection_overflow_finding(target, connection_name)
+def connection_coverage_finding(target, connection_name)
   connection = target.fetch(connection_name)
+  total_count = connection["totalCount"].to_i
+  nodes = connection["nodes"]
+
+  unless nodes.is_a?(Array)
+    return { connection: connection_name, fetched_count: 0, reason: "nodes unavailable", total_count: }
+  end
+
   return unless connection.dig("pageInfo", "hasNextPage")
 
-  total_count = connection["totalCount"].to_i
-  fetched_count = Array(connection["nodes"]).size
-
-  { connection: connection_name, fetched_count:, total_count: }
+  { connection: connection_name, fetched_count: nodes.size, reason: "truncated", total_count: }
 end
 
 def graph_coverage_findings(target)
-  %w[participants timelineItems].filter_map { |connection_name| connection_overflow_finding(target, connection_name) }
+  %w[participants timelineItems].filter_map { |connection_name| connection_coverage_finding(target, connection_name) }
 end
 
 def participant_logins_and_unknown_count(target)
@@ -455,7 +459,8 @@ def participant_logins_and_unknown_count(target)
   participant_nodes = participant_connection["nodes"]
   unless participant_nodes.is_a?(Array)
     # A missing/null nodes array means participant coverage is unknown; fail closed
-    # with at least one unknown participant even when totalCount is absent.
+    # with at least one unknown participant because the count itself is ambiguous
+    # when the node list is unavailable.
     missing_count = [participant_connection["totalCount"].to_i, 1].max
     return { participants: Set.new, unknown_count: missing_count }
   end
@@ -563,8 +568,13 @@ def print_graph_coverage_findings(findings)
 
   puts "  GitHub API coverage findings:"
   findings.each do |finding|
-    puts "    - #{finding.fetch(:connection)} fetched #{finding.fetch(:fetched_count)} of " \
-         "#{finding.fetch(:total_count)} nodes"
+    if finding.fetch(:reason) == "nodes unavailable"
+      puts "    - #{finding.fetch(:connection)} nodes unavailable; " \
+           "reported total_count=#{finding.fetch(:total_count)}"
+    else
+      puts "    - #{finding.fetch(:connection)} fetched #{finding.fetch(:fetched_count)} of " \
+           "#{finding.fetch(:total_count)} nodes"
+    end
   end
 end
 
@@ -577,7 +587,7 @@ def print_participant_findings(findings)
   puts "  Untrusted or hidden participant findings:"
   findings.each do |finding|
     reasons = []
-    reasons << finding.fetch(:reason) if finding[:reason]
+    reasons << finding[:reason] if finding[:reason]
     reasons << "no visible comment/review/commit/reaction trail" if finding.fetch(:hidden)
     reasons << "not in trusted actor allowlist" if finding.fetch(:untrusted)
     puts "    - #{finding.fetch(:login)}: #{reasons.join('; ')}; permission=#{finding.fetch(:permission)}"
