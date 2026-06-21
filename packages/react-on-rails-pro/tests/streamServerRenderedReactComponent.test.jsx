@@ -140,10 +140,12 @@ const makeDeferredThrower = (message, delayMs) => async () => {
   throw new Error(message);
 };
 
-const FirstDeferredThrow = makeDeferredThrower('First deferred failure (correlated)', 10);
+const FIRST_DEFERRED_FAILURE_MESSAGE = 'First deferred failure (correlated)';
+const FirstDeferredThrow = makeDeferredThrower(GENERIC_RSC_DEFERRED_ERROR_MESSAGE, 10);
 const SECOND_DEFERRED_FAILURE_MESSAGE = 'Second deferred failure (unrelated)';
 const SecondDeferredThrow = makeDeferredThrower(SECOND_DEFERRED_FAILURE_MESSAGE, 30);
-const UnrelatedFirstDeferredThrow = makeDeferredThrower('First deferred failure (unrelated)', 10);
+const UNRELATED_FIRST_DEFERRED_FAILURE_MESSAGE = 'First deferred failure (unrelated)';
+const UnrelatedFirstDeferredThrow = makeDeferredThrower(UNRELATED_FIRST_DEFERRED_FAILURE_MESSAGE, 10);
 const CorrelatedSecondDeferredThrow = makeDeferredThrower(GENERIC_RSC_DEFERRED_ERROR_MESSAGE, 30);
 
 const SHARED_DIAGNOSTIC_COMPONENT = 'SharedDiagnosticComponent';
@@ -198,7 +200,7 @@ const AlreadyMergedThenGenericThrowShell = () => (
       <AlreadyMergedDeferredThrow />
     </React.Suspense>
     <React.Suspense fallback={<div>Loading second...</div>}>
-      <SecondDeferredThrow />
+      <CorrelatedSecondDeferredThrow />
     </React.Suspense>
   </main>
 );
@@ -615,7 +617,7 @@ describe('streamServerRenderedReactComponent', () => {
         `[ReactOnRails] RSC bundle rendering failed.\n` +
           `Component: CommentsToggle\n` +
           `Module: /app/components/CommentsToggle.jsx\n` +
-          `Original error: First deferred failure (correlated)`,
+          `Original error: ${FIRST_DEFERRED_FAILURE_MESSAGE}`,
       );
       diagnosticError.name = 'ReactOnRailsRSCStreamError';
       railsContext.recordRSCDiagnostic('CommentsToggle', diagnosticError);
@@ -667,7 +669,7 @@ describe('streamServerRenderedReactComponent', () => {
         `[ReactOnRails] RSC bundle rendering failed.\n` +
           `Component: CommentsToggle\n` +
           `Module: /app/components/CommentsToggle.jsx\n` +
-          `Original error: Second deferred failure (correlated)`,
+          `Original error: ${UNRELATED_FIRST_DEFERRED_FAILURE_MESSAGE}`,
       );
       diagnosticError.name = 'ReactOnRailsRSCStreamError';
       railsContext.recordRSCDiagnostic('CommentsToggle', diagnosticError);
@@ -691,14 +693,14 @@ describe('streamServerRenderedReactComponent', () => {
     });
   };
 
-  it('preserves a lone captured RSC diagnostic when an unrelated error surfaces first (#3475)', async () => {
+  it('preserves a lone captured RSC diagnostic when an unrelated same-message error surfaces first (#3475)', async () => {
     const renderResult = setupUnrelatedFirstThenSingleCaptureTest();
     const emittedErrors = await collectEmittedErrors(renderResult);
 
     expect(emittedErrors).toHaveLength(2);
 
     const firstError = emittedErrors.find((error) =>
-      error.message.includes('First deferred failure (unrelated)'),
+      error.message.includes(UNRELATED_FIRST_DEFERRED_FAILURE_MESSAGE),
     );
     expect(firstError).toBeDefined();
     expect(firstError.message).not.toContain('RSC bundle rendering failed');
@@ -708,6 +710,7 @@ describe('streamServerRenderedReactComponent', () => {
     expect(secondError).toBeDefined();
     expect(secondError.message).toContain(`React stream error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`);
     expect(secondError.message).toContain('Component: CommentsToggle');
+    expect(secondError.message).toContain(`Original error: ${UNRELATED_FIRST_DEFERRED_FAILURE_MESSAGE}`);
   });
 
   const setupAlreadyMergedThenGenericErrorTest = () => {
@@ -752,7 +755,7 @@ describe('streamServerRenderedReactComponent', () => {
     expect(firstError.message).toContain(`Original error: ${SECOND_DEFERRED_FAILURE_MESSAGE} while loading`);
 
     const secondError = emittedErrors.find((error) =>
-      error.message.includes(`React stream error: ${SECOND_DEFERRED_FAILURE_MESSAGE}`),
+      error.message.includes(`React stream error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`),
     );
     expect(secondError).toBeDefined();
     expect(secondError.message).toContain(`Component: ${SHARED_DIAGNOSTIC_COMPONENT}`);

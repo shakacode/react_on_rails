@@ -64,7 +64,7 @@ const isGenericRSCStreamError = (message: string) =>
     return nextCharacter === undefined || /\s/.test(nextCharacter);
   });
 
-export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamError: Error) => {
+export const rscStreamDiagnosticMatchesError = (_diagnosticError: Error, streamError: Error) => {
   const streamMessage = nonBlankString(streamError.message);
   if (!streamMessage) return false;
   // React can hide the underlying Server Component failure behind this generic message. If a
@@ -73,18 +73,10 @@ export const rscStreamDiagnosticMatchesError = (diagnosticError: Error, streamEr
   // with 2+ captures the caller reports all of them as candidates instead of pretending to know
   // which component failed. This assumes only React's RSC machinery emits the exact prefix above at
   // runtime; verify the prefix on React bumps.
-  if (isGenericRSCStreamError(streamMessage)) return true;
-
-  const originalErrorLine = diagnosticError.message
-    .split('\n')
-    .find((line) => line.startsWith(ORIGINAL_ERROR_PREFIX));
-  // Coupled to buildRSCStreamDiagnosticError's `Original error:` line. If several raw diagnostics
-  // share this first-line message, they all match and the caller builds a combined candidate error
-  // rather than guessing which component failed.
-  // React puts the original exception message on line 1 of its re-thrown stream error; multi-line
-  // messages intentionally match on that first line only.
-  const streamFirstLine = streamMessage.split('\n')[0];
-  return originalErrorLine === `${ORIGINAL_ERROR_PREFIX}${streamFirstLine}`;
+  // Do not correlate ordinary stream errors by first-line text. A separate Suspense boundary can
+  // throw the same message as a captured RSC diagnostic; consuming the diagnostic there would hide
+  // the later generic RSC stream error that actually needs the diagnostic context.
+  return isGenericRSCStreamError(streamMessage);
 };
 
 // Bundler/framework frames point at library code rather than the failing component, so they
@@ -144,7 +136,7 @@ export const buildRSCStreamDiagnosticError = (
     context.componentName && `Component: ${context.componentName}`,
     context.source && `Source: ${context.source}`,
     modulePath && `Module: ${modulePath}`,
-    `Original error: ${originalMessage ?? fallbackOriginalError}`,
+    `${ORIGINAL_ERROR_PREFIX}${originalMessage ?? fallbackOriginalError}`,
   ]
     .filter((line): line is string => Boolean(line))
     .join('\n');

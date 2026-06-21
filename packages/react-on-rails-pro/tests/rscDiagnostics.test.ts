@@ -191,7 +191,7 @@ describe('RSC diagnostics', () => {
     expect(rscStreamDiagnosticMatchesError(diagnosticError, genericLookalikeError)).toBe(false);
   });
 
-  it('matches ordinary diagnostics when React reports a multi-line stream error', () => {
+  it('does not match ordinary stream errors that share the diagnostic first line', () => {
     const diagnosticError = new Error(
       '[ReactOnRails] RSC bundle rendering failed.\n' +
         'Component: CommentsToggle\n' +
@@ -200,10 +200,10 @@ describe('RSC diagnostics', () => {
     );
     const streamError = new Error('useState is not a function\nextra context from React');
 
-    expect(rscStreamDiagnosticMatchesError(diagnosticError, streamError)).toBe(true);
+    expect(rscStreamDiagnosticMatchesError(diagnosticError, streamError)).toBe(false);
   });
 
-  it('matches ordinary diagnostics built from RSC stream metadata to the React stream error', () => {
+  it('keeps built RSC diagnostics from matching ordinary same-message stream errors', () => {
     const diagnosticError = buildRSCStreamDiagnosticError(
       {
         renderingError: {
@@ -217,7 +217,7 @@ describe('RSC diagnostics', () => {
     const streamError = new Error('useState is not a function\nextra context from React');
 
     if (!diagnosticError) throw new Error('Expected RSC stream diagnostic metadata to build an error');
-    expect(rscStreamDiagnosticMatchesError(diagnosticError, streamError)).toBe(true);
+    expect(rscStreamDiagnosticMatchesError(diagnosticError, streamError)).toBe(false);
   });
 
   it('does not match diagnostics to unrelated ordinary React errors', () => {

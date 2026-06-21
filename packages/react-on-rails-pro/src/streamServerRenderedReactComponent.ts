@@ -88,10 +88,10 @@ const streamRenderReactComponent = (
   // RSC bundle diagnostic(s) captured this render — the deferred-render-phase half of #3475. React's
   // onError carries no component key, so the matching rule resolves the ambiguity conservatively:
   //   - 0 diagnostics captured -> no enrichment (return the error unchanged).
-  //   - diagnostics whose `Original error` matches this React error -> merge those diagnostics.
-  //   - 2+ matching diagnostics -> merge a COMBINED diagnostic listing all matching candidates,
-  //                                never a single false pinpoint.
-  //   - captured diagnostics that do not match this React error -> restore them for a later error.
+  //   - generic React RSC stream error -> merge all captured diagnostics as candidates.
+  //   - ordinary React errors -> no enrichment; restore captured diagnostics for a later RSC error.
+  //   - 2+ diagnostics on the generic path -> merge a COMBINED diagnostic listing all candidates,
+  //                                          never a single false pinpoint.
   //
   // Misattribution guard (codex P2): the diagnostics are *consumed* (cleared) here, not just read, so
   // each captured diagnostic is merged into at most one surfaced matching error. An unrelated failure
