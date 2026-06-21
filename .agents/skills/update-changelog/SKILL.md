@@ -383,7 +383,7 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Verify the working tree only has changelog changes; if there are other uncommitted changes, warn the user and stop
    - Verify the current branch is `main` (`git branch --show-current`); if not, warn the user and stop
    - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
-   - Stage only the changelog (`git add <changelog path>`) and commit with message `Update changelog for VERSION` (using the stamped version)
+   - Stage only the changelog after resolving the repo's changelog path from `AGENTS.md`: set `CHANGELOG_PATH="${CHANGELOG_PATH:?set CHANGELOG_PATH from AGENTS.md}"`, run `git add "${CHANGELOG_PATH}"`, and commit with message `Update changelog for VERSION` (using the stamped version)
    - Push and open a PR with the changelog diff as the body
    - If the push or PR creation fails, the changelog is already stamped locally — fix the issue (e.g., authentication, branch protection), then run `git push -u origin <branch>` and `gh pr create` manually
    - Remind the user to run the repo's release task (no args) after merge to publish and auto-create the GitHub release
@@ -493,10 +493,11 @@ Read the resulting stable section as if you're a user upgrading from the previou
 
 ## Examples
 
-Run this command to see real formatting examples from the codebase (substitute the repo's changelog path):
+Run this command to see real formatting examples from the codebase after resolving the repo's changelog path from `AGENTS.md`:
 
 ```bash
-grep -A 3 "^#### " <changelog path> | head -30
+CHANGELOG_PATH="${CHANGELOG_PATH:?set CHANGELOG_PATH from AGENTS.md}"
+grep -A 3 "^#### " "${CHANGELOG_PATH}" | head -30
 ```
 
 These examples illustrate the entry **structure** only; use the repo's exact PR-and-author link format from the changelog seam (here shown as `<owner>/<repo>` / `username`).

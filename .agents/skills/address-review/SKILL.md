@@ -643,8 +643,8 @@ else
       echo "Inspect and fix ${issue_body_file} before retrying." >&2
       exit 1
     fi
-    # Replace <follow-up prefix> with the repo's follow-up issue prefix (see `AGENTS.md` -> **Agent Workflow Configuration**).
-    FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "<follow-up prefix> Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
+    FOLLOW_UP_PREFIX="${FOLLOW_UP_PREFIX:?set FOLLOW_UP_PREFIX from AGENTS.md -> Agent Workflow Configuration}"
+    FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "${FOLLOW_UP_PREFIX} Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
     TRACKING_OUTCOME="new issue ${FOLLOW_UP_URL}"
   fi
 

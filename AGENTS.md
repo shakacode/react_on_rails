@@ -7,13 +7,25 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 ## Reusable Workflows
 
 - `AGENTS.md`: canonical entry point for agent instructions and workflow discovery
-- `.agents/skills/`: agent skills; `.claude/skills` is a symlink here so Claude Code exposes the same workflows as slash commands
-- `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
+- Shared agent workflow skills may be installed in the user's or agent's normal
+  skill directory and reused across repos; they must resolve repo-specific
+  values through this repo's `AGENTS.md` seam.
+- `.agents/skills/`: repo-local skill copies/overrides plus repo-specific skills;
+  `.claude/skills` is a symlink here so Claude Code exposes the same workflows as
+  slash commands in this checkout.
+- `.agents/workflows/`: repo-local workflow files for Codex, GPT, and other
+  non-Claude tools when this checkout needs local copies or overrides.
 - If a tool or skill picker only exposes installed/global skills, treat those
-  skills as launchers. After fetching, prefer repo-local `.agents/skills/...`
-  and `.agents/workflows/...` files when they exist; installed/global skills do
-  not override this repo's policy.
-- `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing these agent workflows with other repositories via git subtree and keeping them updated
+  skills as launchers. Installed/global skills never override this repo's
+  `AGENTS.md`; repo-local files win only when this repo explicitly names or
+  keeps a local copy/override.
+- `.agents/bin/agent-workflow-seam-doctor`: validates that installed/shared
+  workflow skills can resolve this repo's seam.
+- `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing
+  these agent workflows with other repositories through user-installed skills
+  plus a repo-local seam
+- `internal/contributor-info/portable-agent-workflows-seam-design.md`: design
+  rationale for the user-installed skill + seam model
 - `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
 - `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing
@@ -56,19 +68,28 @@ unless the user explicitly asks to reproduce an old SHA, continue an existing PR
 branch, bisect, or work offline. Creating a new worktree does not fetch from
 GitHub by itself.
 
-After fetching, verify repo-local workflow files before falling back to installed
-skills. If `.agents/skills/...` or `.agents/workflows/pr-processing.md` is
-missing in the checkout but present on `origin/main`, update the worktree before
-continuing; if it is still missing, report the repo workflow state as `UNKNOWN`
-instead of silently using a global skill fallback.
+After fetching, verify the `## Agent Workflow Configuration` seam before relying
+on installed/shared skills for issue, PR, or batch work:
+
+```bash
+.agents/bin/agent-workflow-seam-doctor
+```
+
+If a workflow explicitly needs a repo-local `.agents/skills/...` or
+`.agents/workflows/...` file and that file is missing in the checkout but present
+on `origin/main`, update the worktree before continuing; if it is still missing,
+report the repo workflow state as `UNKNOWN` instead of silently using a global
+skill fallback.
 
 ## Agent Workflow Configuration
 
-The shared `.agents/skills/` and `.agents/workflows/` files are repo-agnostic: they carry
-the workflow logic but defer every repo-specific command, branch, label, path, and policy
-to this section. When a skill says "run the repo's local validation" or "use the hosted-CI
-trigger," the concrete value is here. Adopting repos replace these values with their own and
-the shared workflow files stay byte-identical across repos (see
+Shared workflow skills are repo-agnostic whether they are installed in the
+user/agent environment or present as repo-local compatibility copies: they carry
+the workflow logic but defer every repo-specific command, branch, label, path,
+and policy to this section. When a skill says "run the repo's local validation"
+or "use the hosted-CI trigger," the concrete value is here. Adopting repos
+replace these values with their own and validate the seam with
+`.agents/bin/agent-workflow-seam-doctor` (see
 [`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md)).
 
 - **Base branch**: `main` (fetch and compare via `origin/main`).

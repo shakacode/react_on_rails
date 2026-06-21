@@ -1006,7 +1006,7 @@ Configuration**) for hosted-CI decisions. Its subcommands provide the audit trai
 - Use the trigger's help subcommand when the command syntax or current behavior is unclear.
 - Put one trigger command per PR comment; the workflow handles only the first command in a comment.
 - Agents and batch coordinators should not add or remove the hosted-CI-ready label directly when the trigger command would create a clearer audit trail.
-- A human/local user-token path such as the repo's hosted-CI request helper or `gh pr edit --add-label <hosted-CI-ready label>` can start label-triggered workflows. A label added by a GitHub workflow's `GITHUB_TOKEN` cannot, so automation must use the trigger's run-hosted subcommand or otherwise dispatch the hosted-CI-capable workflows for the exact current head SHA.
+- A human/local user-token path such as the repo's hosted-CI request helper or `gh pr edit --add-label "${HOSTED_CI_READY_LABEL:?set HOSTED_CI_READY_LABEL from AGENTS.md}"` can start label-triggered workflows. A label added by a GitHub workflow's `GITHUB_TOKEN` cannot, so automation must use the trigger's run-hosted subcommand or otherwise dispatch the hosted-CI-capable workflows for the exact current head SHA.
 - For fork PRs, comment-command hosted CI does not dispatch same-repository workflows or add the persistent label. Report that a trusted base-repository branch or maintainer-run path is needed for package-specific or secret-backed CI.
 
 ## CI Polling And Live State

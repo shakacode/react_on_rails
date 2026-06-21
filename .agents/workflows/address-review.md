@@ -273,8 +273,8 @@ Execution flow when terminal access is available:
    - Follow-up issues are expensive; default to no new issue.
    - Present one deferred-work bundle and ask the user to choose: link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle.
    - Create at most one follow-up issue per PR by default. More than one follow-up issue requires explicit user approval.
-   - Every new follow-up issue title must begin with the exact follow-up issue prefix (see `AGENTS.md` → **Agent Workflow Configuration**). For this workflow, use title `<follow-up prefix> Review feedback from PR #N`.
-   - Build the issue body as a Markdown temp file and create the issue with `gh issue create --repo "${REPO}" --title "<follow-up prefix> Review feedback from PR #N" --body-file "${issue_body_file}"`
+   - Every new follow-up issue title must begin with the exact follow-up issue prefix (see `AGENTS.md` → **Agent Workflow Configuration**). Resolve it into `FOLLOW_UP_PREFIX` before creating the issue; for this workflow, the title is `"${FOLLOW_UP_PREFIX} Review feedback from PR #N"`.
+   - Build the issue body as a Markdown temp file and create the issue with `gh issue create --repo "${REPO}" --title "${FOLLOW_UP_PREFIX:?set FOLLOW_UP_PREFIX from AGENTS.md} Review feedback from PR #N" --body-file "${issue_body_file}"`
    - Do not pass multi-line Markdown through `--body`; this can leak literal `\n` text into the GitHub issue.
    - Before creating the issue, inspect the body file and fix or abort if it contains literal `\n` escape sequences instead of real newlines, ignoring fenced code blocks and inline code spans.
    - For `f+i`, include discuss items, optional items worth tracking, and non-trivial skipped items (must-fix is already addressed)

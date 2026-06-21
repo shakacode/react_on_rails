@@ -1,0 +1,222 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Validate that portable agent workflows can resolve their repo-specific seam.
+
+require "json"
+require "optparse"
+
+module AgentWorkflowSeamDoctor
+  SECTION = "Agent Workflow Configuration"
+  SECTION_HEADING = /^##\s+#{Regexp.escape(SECTION)}\s*$/
+  REQUIRED_KEYS = [
+    "Base branch",
+    "Pre-push local validation",
+    "CI change detector",
+    "Hosted-CI trigger",
+    "Benchmark labels",
+    "Follow-up issue prefix",
+    "Changelog",
+    "Lint / format",
+    "Merge ledger",
+    "Docs checks",
+    "Tests",
+    "Build / type checks",
+    "Review gate",
+    "Approval-exempt change categories",
+    "Coordination backend"
+  ].freeze
+
+  SEAM_PLACEHOLDER = /
+    <[^>\n]*
+    (?:
+      follow-up\ prefix |
+      hosted[-\ ]CI |
+      benchmark\ label |
+      changelog\ path |
+      base\ branch |
+      local\ validation |
+      CI\ change\ detector |
+      merge\ ledger |
+      review\ gate |
+      coordination\ backend
+    )
+    [^>\n]*>
+  /ix
+  EXECUTABLE_FENCE_LANGS = ["", "bash", "sh", "shell", "zsh", "ruby", "python", "js", "javascript"].freeze
+  COMMAND_LIKE = %r{
+    (?:\b(?:bash|bundle|codex|gh|git|node|npm|pnpm|rake|ruby|script|sh|yarn)\b) |
+    (?:\b(?:bin|script|\.agents)/)
+  }x
+
+  module_function
+
+  def check(root)
+    issues = []
+    agents_path = File.join(root, "AGENTS.md")
+
+    return ["missing AGENTS.md"] unless File.file?(agents_path)
+
+    config = parse_config(File.read(agents_path))
+    if config.nil?
+      issues << "missing AGENTS.md section: #{SECTION}"
+    else
+      issues.concat(missing_key_issues(config))
+    end
+
+    shared_markdown_paths(root).each do |path|
+      issues.concat(executable_placeholder_issues(root, path))
+    end
+
+    issues
+  end
+
+  def parse_config(text)
+    section = extract_section(text)
+    return nil if section.nil?
+
+    section.each_line.with_object({}) do |line, config|
+      match = line.match(/^\s*-\s+\*\*(.+?)\*\*:\s*(.*)$/)
+      next if match.nil?
+
+      key = match[1].strip
+      value = match[2].strip
+      config[key] = value
+    end
+  end
+
+  def extract_section(text)
+    lines = text.lines
+    start_index = lines.index { |line| line.match?(SECTION_HEADING) }
+    return nil if start_index.nil?
+
+    body = []
+    lines[(start_index + 1)..].to_a.each do |line|
+      break if line.match?(/^##\s+/)
+
+      body << line
+    end
+    body.join
+  end
+
+  def missing_key_issues(config)
+    REQUIRED_KEYS.filter_map do |key|
+      value = config[key]
+      if value.nil?
+        "missing #{SECTION} key: #{key}"
+      elsif unresolved_template_value?(value)
+        "unresolved #{SECTION} value for key: #{key}"
+      end
+    end
+  end
+
+  def unresolved_template_value?(value)
+    stripped = value.strip
+    stripped.empty? || stripped.match?(/\A<[^>]+>\.?\z/)
+  end
+
+  def shared_markdown_paths(root)
+    [
+      File.join(root, ".agents/skills/**/*.md"),
+      File.join(root, ".agents/workflows/**/*.md")
+    ].flat_map { |pattern| Dir.glob(pattern) }.sort
+  end
+
+  def executable_placeholder_issues(root, path)
+    issues = []
+    in_fence = false
+    executable_fence = false
+
+    File.readlines(path).each_with_index do |line, index|
+      line_number = index + 1
+      fence_state = update_fence_state(line, in_fence)
+      if fence_state
+        in_fence, executable_fence = fence_state
+        next
+      end
+
+      placeholders = placeholders_from_line(line, in_fence:, executable_fence:)
+      placeholders.each { |placeholder| issues << placeholder_issue(root, path, line_number, placeholder) }
+    end
+
+    issues
+  end
+
+  def update_fence_state(line, in_fence)
+    fence = line.match(/^\s*```([[:alnum:]_-]*)\s*$/)
+    return nil if fence.nil?
+
+    return [false, false] if in_fence
+
+    language = fence[1].to_s.downcase
+    [true, EXECUTABLE_FENCE_LANGS.include?(language)]
+  end
+
+  def placeholders_from_line(line, in_fence:, executable_fence:)
+    placeholders = []
+
+    placeholders.concat(line.scan(SEAM_PLACEHOLDER)) if in_fence && executable_fence && executable_line?(line)
+
+    inline_code_snippets(line).each do |snippet|
+      next unless command_like?(snippet)
+
+      placeholders.concat(snippet.scan(SEAM_PLACEHOLDER))
+    end
+
+    placeholders
+  end
+
+  def executable_line?(line)
+    stripped = line.strip
+    !stripped.empty? && !stripped.start_with?("#", "//")
+  end
+
+  def inline_code_snippets(line)
+    line.scan(/`([^`]+)`/).flatten
+  end
+
+  def command_like?(snippet)
+    snippet.match?(COMMAND_LIKE)
+  end
+
+  def placeholder_issue(root, path, line_number, placeholder)
+    relative_path = path.delete_prefix("#{File.expand_path(root)}/")
+    "unresolved executable placeholder #{placeholder} in #{relative_path}:#{line_number}"
+  end
+
+  def format_text(issues)
+    if issues.empty?
+      "PASS agent workflow seam is complete\n"
+    else
+      out = +"FAIL agent workflow seam has #{issues.length} issue(s)\n"
+      issues.each { |issue| out << "- #{issue}\n" }
+      out
+    end
+  end
+
+  def format_json(issues)
+    "#{JSON.pretty_generate({
+                              'status' => issues.empty? ? 'PASS' : 'FAIL',
+                              'issues' => issues
+                            })}\n"
+  end
+end
+
+if $PROGRAM_NAME == __FILE__
+  options = { root: Dir.pwd, json: false }
+  parser = OptionParser.new do |opts|
+    opts.banner = "Usage: agent-workflow-seam-doctor [--root DIR] [--json]"
+    opts.on("--root DIR", "Repository root to inspect") { |value| options[:root] = value }
+    opts.on("--json", "Print JSON output") { options[:json] = true }
+    opts.on("-h", "--help", "Show help") do
+      puts opts
+      exit 0
+    end
+  end
+  parser.parse!
+
+  root = File.expand_path(options.fetch(:root))
+  issues = AgentWorkflowSeamDoctor.check(root)
+  print(options[:json] ? AgentWorkflowSeamDoctor.format_json(issues) : AgentWorkflowSeamDoctor.format_text(issues))
+  exit(issues.empty? ? 0 : 1)
+end
