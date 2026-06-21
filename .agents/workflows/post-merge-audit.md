@@ -206,8 +206,12 @@ After confirmation, audit each known worked issue, QA lane, or advisory
   `.agents/workflows/continuous-evaluation-loop.md` for the intent-achievement
   definitions; classify QA lanes with the QA-coverage result `satisfied`,
   `blocked`, `waived`, `in_progress`, `not applicable`, or `unknown`. Use
-  `not applicable` when QA was correctly omitted with `QA required: no` and a
-  documented rationale
+  `satisfied` when required QA evidence is current, adequately scoped, and has no
+  untriaged release-blocking finding; `blocked` when a release-blocking QA
+  finding still needs a fix or waiver; `waived` when an explicit waiver exists;
+  `in_progress` when required QA is not complete; `not applicable` when QA was
+  correctly omitted with `QA required: no` and a documented rationale; and
+  `unknown` when evidence is missing, stale, or incomplete
 - for healthy `in_progress` worked-issue lanes, evidenced `realized` outcomes,
   evidenced `satisfied` or `waived` QA lanes, and evidenced `not applicable` QA
   omissions, record no action in the worked-issue/QA table; treat required QA

@@ -119,7 +119,9 @@ For each included PR:
   PR/head SHA or audited range it applies to, is current for that head/range, covers the changed
   surfaces, and does not leave release-blocking findings untriaged. If private
   coordination claim/heartbeat state is `UNKNOWN`, verify the documented
-  fallback evidence is complete before treating QA coverage as satisfied.
+  fallback evidence is complete before treating QA coverage as satisfied. If
+  fallback evidence is absent or incomplete, classify the QA lane as `unknown`
+  and surface it as a readiness blocker.
 - Cross-PR interactions: compare changed files, shared behavior, assumptions, and release-sensitive areas across the batch.
 - Decision log: inspect any `Codex Decision Log` or equivalent section and verify the decisions still hold after the merge.
 
@@ -141,8 +143,13 @@ still-open lanes:
   `realized`, `partial`, `missed`, `regressed`, `stalled`, or `unknown`) and
   explain any `UNKNOWN` evidence needed to resolve the issue outcome. For QA
   lanes, use the QA-coverage result `satisfied`, `blocked`, `waived`,
-  `in_progress`, `not applicable`, or `unknown`. Use `not applicable` when QA
-  was correctly omitted with `QA required: no` and a documented rationale.
+  `in_progress`, `not applicable`, or `unknown`. Use `satisfied` when required
+  QA evidence is current, adequately scoped, and has no untriaged
+  release-blocking finding; `blocked` when a release-blocking QA finding still
+  needs a fix or waiver; `waived` when an explicit waiver exists; `in_progress`
+  when required QA is not complete; `not applicable` when QA was correctly
+  omitted with `QA required: no` and a documented rationale; and `unknown` when
+  evidence is missing, stale, or incomplete.
 - Post-merge intake: record healthy `in_progress` worked-issue lanes and
   evidenced `realized` worked-issue outcomes, `satisfied` or `waived` QA lanes,
   and `not applicable` QA omissions in the coverage table as no-action items;

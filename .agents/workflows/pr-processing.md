@@ -456,7 +456,7 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 ```markdown
 ### QA Evidence
 
-- QA lane: <agent id, branch/worktree, claim status, last heartbeat status or UNKNOWN>
+- QA lane: <agent id, branch/worktree, claim status, last heartbeat status; each sub-value may be UNKNOWN when private state is unavailable>
 - Scope checked: <changed areas, PRs, release phase, and why this QA depth was enough>
 - Tested at: <PR/head SHA(s), audited range, or "not applicable: no PR/code changes">
 - Automated checks: <commands, CI links, or "covered by worker validation: ...">
@@ -1426,12 +1426,16 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    `missed`, `regressed`, `stalled`, or `unknown` using
    `.agents/workflows/continuous-evaluation-loop.md`; and classify QA lanes with
    the QA-coverage result `satisfied`, `blocked`, `waived`, `in_progress`,
-   `not applicable`, or `unknown`. Use `not applicable` when QA was correctly
-   omitted with `QA required: no` and a documented rationale. Treat healthy
-   active/live worked-issue lanes as `in_progress` no-action items unless they
-   have a stalled, regressed, partial, missed, or unknown signal; treat required
-   QA lanes still `in_progress` during readiness/release audits as QA coverage
-   findings and readiness blockers.
+   `not applicable`, or `unknown`. Use `satisfied` when the required QA evidence
+   is current, adequately scoped, and has no untriaged release-blocking finding;
+   `blocked` when a release-blocking QA finding still needs a fix or waiver;
+   `waived` when an explicit waiver exists; `in_progress` when required QA is
+   not complete; `not applicable` when QA was correctly omitted with
+   `QA required: no` and a documented rationale; and `unknown` when evidence is
+   missing, stale, or incomplete. Treat healthy active/live worked-issue lanes as
+   `in_progress` no-action items unless they have a stalled, regressed, partial,
+   missed, or unknown signal; treat required QA lanes still `in_progress` during
+   readiness/release audits as QA coverage findings and readiness blockers.
 6. For each included merged PR, inspect reviews, comments, checks, merge time,
    changed files, validation evidence, QA evidence, changelog coverage, and
    cross-PR interactions.
