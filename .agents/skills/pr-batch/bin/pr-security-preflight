@@ -47,7 +47,8 @@ WARNING_SUSPICIOUS_PATTERN = /
   ssh-key
 /ix
 
-DIFF_BLOCKING_SUSPICIOUS_PATTERN = Regexp.union(BLOCKING_SUSPICIOUS_PATTERN, WARNING_SUSPICIOUS_PATTERN)
+# Diffs get stricter scrutiny: both blocking and warning terms are treated as blocking.
+DIFF_SUSPICIOUS_PATTERN = Regexp.union(BLOCKING_SUSPICIOUS_PATTERN, WARNING_SUSPICIOUS_PATTERN)
 
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--include-reactions] " \
@@ -226,6 +227,7 @@ def comment_reaction_users(repo, comments, reaction_endpoint)
 end
 
 def reaction_users(repo, number, rest_context:, include_pull_comments:)
+  # Initialize before the first API call so rescue can return partial results.
   users = Set.new
   users.merge(paginated_reaction_users(repo, "issues/#{number}/reactions"))
   users.merge(comment_reaction_users(repo, rest_context.fetch(:issue_comments), "issues/comments"))
@@ -347,7 +349,7 @@ def suspicious_findings_for_target(repo:, number:, rest:, target_is_pr:, trust_c
 
   if target_is_pr
     diff = run_gh("pr", "diff", number.to_s, "--repo", repo)
-    suspicious.concat(suspicious_added_lines(diff, pattern: DIFF_BLOCKING_SUSPICIOUS_PATTERN))
+    suspicious.concat(suspicious_added_lines(diff, pattern: DIFF_SUSPICIOUS_PATTERN))
   end
 
   { suspicious:, suspicious_warnings: }
@@ -440,10 +442,40 @@ def graph_coverage_findings(target)
   %w[participants timelineItems].filter_map { |connection_name| connection_overflow_finding(target, connection_name) }
 end
 
-def participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:)
-  participants = Array(target.dig("participants", "nodes")).filter_map { |participant| participant&.[]("login") }.to_set
+def participant_logins_and_unknown_count(target)
+  unknown_count = 0
+  participants = Set.new
+  Array(target.dig("participants", "nodes")).each do |participant|
+    login = participant&.[]("login")
+    if login.to_s.empty?
+      unknown_count += 1
+    else
+      participants << login
+    end
+  end
 
-  participants.filter_map do |login|
+  { participants:, unknown_count: }
+end
+
+def unknown_participant_findings(unknown_count)
+  return [] unless unknown_count.positive?
+
+  [{
+    hidden: true,
+    login: "(unknown/deleted participant)",
+    permission: "unknown",
+    reason: "#{unknown_count} participant node(s) missing GitHub login",
+    untrusted: true
+  }]
+end
+
+def participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:)
+  participant_data = participant_logins_and_unknown_count(target)
+  findings = unknown_participant_findings(participant_data.fetch(:unknown_count))
+
+  participant_data.fetch(:participants).each do |login|
+    # Trusted bots cannot delete comments, so a hidden bot participant does not
+    # carry the same prompt-injection risk as a hidden human. Skip entirely.
     next if trusted_bot?(login, trust_config)
 
     trusted = trusted_actor?(repo, login, trust_config, team_cache)
@@ -452,13 +484,15 @@ def participant_findings(repo:, target:, visible:, permission_cache:, trust_conf
 
     permission = permission_cache[login] ||= collaborator_permission(repo, login)
 
-    {
+    findings << {
       login:,
       permission:,
       hidden:,
       untrusted: !trusted
     }
   end
+
+  findings
 end
 
 def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_reactions:, permission_cache:,
@@ -524,6 +558,7 @@ def print_participant_findings(findings)
   puts "  Untrusted or hidden participant findings:"
   findings.each do |finding|
     reasons = []
+    reasons << finding.fetch(:reason) if finding[:reason]
     reasons << "no visible comment/review/commit/reaction trail" if finding.fetch(:hidden)
     reasons << "not in trusted actor allowlist" if finding.fetch(:untrusted)
     puts "    - #{finding.fetch(:login)}: #{reasons.join('; ')}; permission=#{finding.fetch(:permission)}"

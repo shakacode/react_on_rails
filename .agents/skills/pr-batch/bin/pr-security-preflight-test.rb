@@ -61,13 +61,51 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
     end
   end
 
-  def test_deleted_account_participant_login_is_ignored
+  def test_deleted_account_participant_login_blocks
     with_fake_gh("deleted-account-participant") do |env, trust_config_path, _log_path|
+      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "(unknown/deleted participant):"
+      assert_includes out, "participant node(s) missing GitHub login"
+    end
+  end
+
+  def test_hidden_trusted_bot_participant_is_allowed
+    with_fake_gh("trusted-bot-participant") do |env, trust_config_path, _log_path|
+      File.write(trust_config_path, <<~YAML)
+        trusted_users: []
+        trusted_bots:
+          - coderabbitai
+        trusted_teams: []
+      YAML
+
       out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
 
       assert status.success?, out
       assert_includes out, "SECURITY_PREFLIGHT_OK"
       assert_includes out, "Untrusted or hidden participant findings: none"
+    end
+  end
+
+  def test_human_login_matching_bot_base_name_is_not_trusted_as_bot
+    with_fake_gh("human-bot-basename-participant") do |env, trust_config_path, _log_path|
+      File.write(trust_config_path, <<~YAML)
+        trusted_users: []
+        trusted_bots:
+          - claude
+        trusted_teams: []
+      YAML
+
+      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "claude: no visible comment/review/commit/reaction trail"
+      assert_includes out, "not in trusted actor allowlist"
     end
   end
 
@@ -174,6 +212,10 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
           cat <<'JSON'
       {"number":123,"title":"Test PR","html_url":"https://github.com/owner/repo/pull/123","body":"","user":{"login":"justin808"},"pull_request":{}}
       JSON
+        elif [ "$mode" = "reaction-only-participant" ] || [ "$mode" = "trusted-hidden-participant" ] || [ "$mode" = "trusted-bot-participant" ] || [ "$mode" = "human-bot-basename-participant" ]; then
+          cat <<'JSON'
+      {"number":123,"title":"Test issue","html_url":"https://github.com/owner/repo/issues/123","body":"Document GITHUB_TOKEN use.","user":{"login":"issue-author"}}
+      JSON
         else
           cat <<'JSON'
       {"number":123,"title":"Test issue","html_url":"https://github.com/owner/repo/issues/123","body":"Document GITHUB_TOKEN use.","user":{"login":"justin808"}}
@@ -202,6 +244,14 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
         elif [ "$mode" = "reaction-only-participant" ]; then
           cat <<'JSON'
       {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      JSON
+        elif [ "$mode" = "trusted-bot-participant" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"coderabbitai[bot]","url":"https://github.com/apps/coderabbitai","__typename":"Bot"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      JSON
+        elif [ "$mode" = "human-bot-basename-participant" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"claude","url":"https://github.com/claude","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
       JSON
         else
           cat <<'JSON'
@@ -235,6 +285,11 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
 
       if [ "$1" = "api" ] && [ "$2" = "repos/owner/repo/collaborators/justin808/permission" ]; then
         printf '{"permission":"admin"}'
+        exit 0
+      fi
+
+      if [ "$1" = "api" ] && [ "$2" = "repos/owner/repo/collaborators/claude/permission" ]; then
+        printf '{"permission":"none"}'
         exit 0
       fi
 
