@@ -88,6 +88,20 @@ run_case \
   "true" \
   "true"
 
+run_case \
+  "allows merge queue generator checks even without hosted PR state" \
+  0 \
+  "merge_group" \
+  "true" \
+  "false"
+
+run_case \
+  "allows non pull request events with unset event name" \
+  0 \
+  "" \
+  "true" \
+  "false"
+
 if [ "$TESTS_FAILED" -ne 0 ]; then
   echo
   echo "$TESTS_FAILED of $TESTS_RUN tests failed"
