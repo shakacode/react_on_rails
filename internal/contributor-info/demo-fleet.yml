@@ -65,6 +65,8 @@ defaults:
       npm:
         - react-on-rails
         - react-on-rails-pro
+        - react-on-rails-pro-node-renderer
+        - react-on-rails-rsc
         - shakapacker
       gem:
         - react_on_rails
@@ -87,6 +89,23 @@ repos:
       - { ecosystem: npm, name: shakapacker }
       - { ecosystem: gem, name: cpflow }
     needs_pro: true
+    smoke: [/]
+    verify: true
+
+  - name: shakacode/react-on-rails-demo-flagship
+    tier: hard_gate
+    headline: Flagship Pro + RSC happy path
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: react_on_rails_pro }
+      - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
+      - { ecosystem: npm, name: react-on-rails-rsc }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
+    needs_pro: true
+    package_manager: npm
     smoke: [/]
     verify: true
 

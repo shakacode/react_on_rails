@@ -58,8 +58,8 @@ in sync, and do not mix demo repo commits into this monorepo. Use the JavaScript
 (`packageManager` field or lockfile), then run focused validation such as:
 
 - `bundle install`
-- `npm ci` or `npm install` when npm is the demo's package manager
-- asset build
+- the lockfile install command for the declared package manager (`npm ci` for the current flagship)
+- `bin/shakapacker` or the equivalent asset build command documented by the demo repo
 - `bin/smoke` or Docker smoke validation
 
 ## Canonical Agent Policy
