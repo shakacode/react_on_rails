@@ -87,8 +87,8 @@ Before implementation or worker launch, produce:
    backend is available, or require the launched coordinator to record QA
    claim/heartbeat state as `UNKNOWN` and use allowed fallback evidence
    (complete QA Evidence fields with `UNKNOWN` only for unavailable private
-   claim/heartbeat sub-values); for low-risk omitted QA, record the `not
-required` status and rationale in the final QA Evidence block.
+   claim/heartbeat sub-values); for low-risk omitted QA, record the final QA
+   Evidence block with `not required` status and rationale.
 8. A permission and trust preflight result.
 9. A conflict check for overlapping files or dependent PRs.
 10. A final `/goal` prompt when the user asked for Goal mode.

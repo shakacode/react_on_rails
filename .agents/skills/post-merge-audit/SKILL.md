@@ -212,7 +212,7 @@ The audit should usually produce an issue plan for non-OK findings, but not crea
   `satisfied`, `waived`, and `not applicable` rows in the worked-issue/QA-lane
   coverage table so the coordinator can see they were checked.
 - **Changelog only**: for missing changelog entries; prefer one bundled changelog issue or a recommendation to run `/update-changelog`, not one issue per entry.
-- **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, follow-up task, non-OK worked-issue outcome (`partial`, `missed`, `regressed`, or `unknown`), or non-OK QA coverage outcome (`blocked` or `unknown`) that needs follow-up.
+- **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, follow-up task, non-OK worked-issue outcome (`partial`, `missed`, `regressed`, or `unknown`), or non-OK QA coverage outcome (`blocked`, `unknown`, or release-audit `in_progress`) that needs follow-up.
 - **Parent issue**: create one parent issue only to group two or more related
   _child fix_ issues from the same audit. Do **not** create a standalone
   audit-snapshot tracker (a `Post-<range> audit` / `Post-rc.N catch-up audit`

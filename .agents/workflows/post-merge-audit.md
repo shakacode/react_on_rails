@@ -220,7 +220,10 @@ After confirmation, audit each known worked issue, QA lane, or advisory
   user explicitly approves tracking the stalled lane as an issue; for any other
   non-OK worked-issue class (`partial`, `missed`, `regressed`, or `unknown`),
   merged or not, prepare a post-merge audit issue-plan entry or an explicit
-  coordinator action naming the missing evidence or decision
+  coordinator action naming the missing evidence or decision; for non-OK QA
+  coverage outcomes (`blocked`, `unknown`, or release-audit `in_progress`),
+  prepare a post-merge audit issue-plan entry or approved coordinator action
+  naming the missing evidence, fix, or waiver decision
 
 Also audit each included merged PR for:
 - risky behavior change
@@ -367,7 +370,9 @@ Rules:
 - Search existing open issues for each fingerprint and affected PR number before creating anything.
 - Do not create duplicate child issues. If an issue already exists, link it in the parent issue plan instead.
 - If there are two or more related child issues, create one parent issue first.
-- Create one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
+- Create one child issue per independently actionable fix PR, revert
+  consideration, maintainer question, follow-up task, or approved non-OK
+  worked-issue/QA coverage follow-up.
 - For release-gate audits, append the audit report to the release-gate audit
   ledger before creating approved follow-up issues; include the resulting ledger
   comment URL in every parent and child issue body.
