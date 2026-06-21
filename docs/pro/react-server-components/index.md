@@ -115,6 +115,7 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 - [How RSC Works](./how-react-server-components-work.md) — bundling process, RSC payload format, and client references
 - [RSC Rendering Flow](./rendering-flow.md) — detailed rendering lifecycle, bundle types, and architecture
 - [Flight Protocol Syntax](./flight-protocol-syntax.md) — the wire format for streaming RSC data
+- [React on Rails Pro vs. Next.js](./nextjs-comparison.md) — how both implement RSC, and the one architectural difference that explains the rest
 - [RSC Inside Client Components](./inside-client-components.md) — composing server and client components
 - [RSC Payloads as Route Data](./rsc-payload-route-data.md) — browser helper for client router loaders
 - [Purpose and Benefits](./purpose-and-benefits.md) — waterfall loading patterns, bundle size, and selective hydration
