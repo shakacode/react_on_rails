@@ -109,7 +109,7 @@ Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to th
 BASE_REF="${BASE_REF:?set BASE_REF, e.g. v17.0.0.rc.1}"
 BASE_BRANCH="${BASE_BRANCH:?set BASE_BRANCH from AGENTS.md -> Agent Workflow Configuration}"
 TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/${BASE_BRANCH}}"
-UPDATE_CHANGELOG_SKILL_DIR="${UPDATE_CHANGELOG_SKILL_DIR:-.agents/skills/update-changelog}"
+UPDATE_CHANGELOG_SKILL_DIR="${UPDATE_CHANGELOG_SKILL_DIR:?set UPDATE_CHANGELOG_SKILL_DIR to the installed or repo-local update-changelog skill directory}"
 
 # JSON array of {pr, sha, subject}; pr is an integer, or the string "UNKNOWN".
 "${UPDATE_CHANGELOG_SKILL_DIR}/bin/changelog-merged-prs" "${BASE_REF}..${TARGET_REF}"
@@ -295,7 +295,7 @@ When a new version is released:
 
 #### Step 1: Fetch and read current state
 
-- **CRITICAL**: Run `git fetch origin main` to ensure you have the latest commits
+- Resolve `BASE_BRANCH` from `AGENTS.md` -> **Agent Workflow Configuration**, then run `git fetch origin "${BASE_BRANCH}"` to ensure you have the latest commits
 - After fetching, use `origin/${BASE_BRANCH}` for all comparisons, not the local base branch
 - Read the current changelog to understand the existing structure
 
