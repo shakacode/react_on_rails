@@ -54,8 +54,13 @@ Additional examples are valuable when they teach distinct repo-generation patter
 compete with the flagship Pro/RSC path.
 
 When updating the demo, make the change in a separate checkout/branch of `react-on-rails-demo-flagship`, keep its lockfiles
-in sync, and run its focused validation (`bundle install`, `npm install` or `npm ci`, asset build, and `bin/smoke` or
-Docker smoke as appropriate). Do not mix demo repo commits into this monorepo.
+in sync, and do not mix demo repo commits into this monorepo. Use the JavaScript package manager declared by the demo repo
+(`packageManager` field or lockfile), then run focused validation such as:
+
+- `bundle install`
+- `npm ci` or `npm install` when npm is the demo's package manager
+- asset build
+- `bin/smoke` or Docker smoke validation
 
 ## Canonical Agent Policy
 
@@ -155,6 +160,9 @@ rake shakapacker:update_version[9.6.1]  # Update shakapacker across the monorepo
 Use `rake shakapacker:update_version[VERSION]` to update shakapacker across the entire monorepo. This single command updates all Gemfiles, package.json files, Gemfile.lock files, and pnpm-lock.yaml. Do **not** manually edit individual version references — always use the rake task to keep everything in sync.
 
 The task handles Ruby version switching for apps that require a different Ruby version (set `RUBY_VERSION_MANAGER` to `rvm`, `rbenv`, `asdf`, or `mise` if needed; defaults to `rvm`). It continues gracefully if a single lock file update fails (e.g., due to a missing Ruby version).
+
+After Shakapacker version or default updates, check the External Flagship Demo Coordination section to decide whether the
+flagship demo needs the same change.
 
 ## Testing
 
