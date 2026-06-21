@@ -34,6 +34,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useRSC } from './RSCProvider.tsx';
+import { shouldClearRefetchErrorOnSuccessfulVersionChange } from './RSCRouteSuccessfulVersion.ts';
 import { RSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import { isServerComponentFetchError, ServerComponentFetchError } from './ServerComponentFetchError.ts';
 import { createRSCPayloadKey } from './utils.ts';
@@ -174,7 +175,8 @@ type RefetchErrorState = [string, ServerComponentFetchError];
 
 const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
   ({ componentName, componentProps, onRefetchError }, ref) => {
-    const { getComponent, refetchComponent, getRefetchVersion, successfulVersions } = useRSC();
+    const { getComponent, refetchComponent, getRefetchVersion, retainComponent, successfulVersions } =
+      useRSC();
     const currentRouteKey = useMemo(
       () => createRSCPayloadKey(componentName, componentProps),
       [componentName, componentProps],
@@ -188,6 +190,9 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
     const latestPropsRef = useRef<[string, unknown]>([componentName, componentProps]);
     const onRefetchErrorRef = useRef(onRefetchError);
     const latestRefetchRequestRef = useRef(0);
+    // Version 0 means "evicted or not yet seen"; it lets a later monotonic
+    // success token clear a stale refetch error after the key reloads.
+    const previousSuccessfulVersionRef = useRef({ key: currentRouteKey, version: successfulVersion });
     const isMountedRef = useRef(false);
     useLayoutEffect(() => {
       isMountedRef.current = true;
@@ -201,8 +206,18 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
     useLayoutEffect(() => {
       onRefetchErrorRef.current = onRefetchError;
     }, [onRefetchError]);
+    useLayoutEffect(
+      () => retainComponent(componentName, componentProps),
+      [componentName, componentProps, retainComponent],
+    );
     useLayoutEffect(() => {
-      setRefetchErrorState(null);
+      const previous = previousSuccessfulVersionRef.current;
+      const current = { key: currentRouteKey, version: successfulVersion };
+      previousSuccessfulVersionRef.current = current;
+
+      if (shouldClearRefetchErrorOnSuccessfulVersionChange(previous, current)) {
+        setRefetchErrorState(null);
+      }
     }, [currentRouteKey, successfulVersion]);
 
     const refetch = useCallback((): Promise<ReactNode> => {
