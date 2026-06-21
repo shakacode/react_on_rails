@@ -161,9 +161,9 @@ cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 | `docs/oss/`                                      | OSS documentation — published to the [ShakaCode website](https://reactonrails.com/docs/) |
 | `docs/pro/`                                      | Pro documentation — installation, configuration, RSC, node renderer, caching             |
 | `internal/contributor-info/`                     | Internal contributor docs (not published to the website)                                 |
-| `internal/planning/`                             | Internal planning docs, drafts, and historical analysis                                  |
+| `internal/planning/`                             | Internal planning docs, designs, and drafts                                              |
 | `internal/react_on_rails_pro/contributors-info/` | Internal Pro contributor docs (not published to the website)                             |
-| `analysis/`                                      | Investigation and analysis documents (kebab-case `.md` files)                            |
+| `internal/analysis/`                             | Investigation and analysis documents (kebab-case `.md` files)                            |
 
 ## Code Style
 
