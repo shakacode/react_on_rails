@@ -82,7 +82,20 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
       assert_equal 2, status.exitstatus
       assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
       assert_includes out, "(unknown/deleted participant):"
-      assert_includes out, "participant node(s) missing GitHub login"
+      assert_includes out, "participant node(s) unavailable or missing GitHub login"
+      refute_includes out, "(unknown/deleted participant): no visible comment/review/commit/reaction trail"
+    end
+  end
+
+  def test_missing_participant_nodes_block
+    with_fake_gh("missing-participant-nodes") do |env, trust_config_path, _log_path|
+      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "(unknown/deleted participant):"
+      assert_includes out, "3 participant node(s) unavailable or missing GitHub login"
     end
   end
 
@@ -258,6 +271,10 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
         elif [ "$mode" = "deleted-account-participant" ]; then
           cat <<'JSON'
       {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"justin808"},"participants":{"totalCount":2,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"},{"login":null,"url":"https://github.com/ghost","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      JSON
+        elif [ "$mode" = "missing-participant-nodes" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"justin808"},"participants":{"totalCount":3,"pageInfo":{"hasNextPage":false}},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
       JSON
         elif [ "$mode" = "reaction-only-participant" ]; then
           cat <<'JSON'

@@ -51,8 +51,8 @@ WARNING_SUSPICIOUS_PATTERN = /
 DIFF_SUSPICIOUS_PATTERN = Regexp.union(BLOCKING_SUSPICIOUS_PATTERN, WARNING_SUSPICIOUS_PATTERN)
 
 parser = OptionParser.new do |opts|
-  opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--include-reactions] " \
-                "[--fail-on-high-risk-files] NUMBER [...]"
+  opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--trust-config PATH] " \
+                "[--include-reactions] [--fail-on-high-risk-files] NUMBER [...]"
   opts.on("--repo OWNER/REPO", "GitHub repository, defaulting to gh repo view") { |repo| options[:repo] = repo }
   opts.on("--trust-config PATH", "Trusted GitHub actor allowlist") { |path| options[:trust_config] = path }
   include_reactions_help = "Fetch reaction users as visible actors (extra GitHub API calls). " \
@@ -450,9 +450,16 @@ def graph_coverage_findings(target)
 end
 
 def participant_logins_and_unknown_count(target)
+  participant_connection = target.fetch("participants")
+  participant_nodes = participant_connection["nodes"]
+  unless participant_nodes.is_a?(Array)
+    missing_count = [participant_connection["totalCount"].to_i, 1].max
+    return { participants: Set.new, unknown_count: missing_count }
+  end
+
   unknown_count = 0
   participants = Set.new
-  Array(target.dig("participants", "nodes")).each do |participant|
+  participant_nodes.each do |participant|
     login = participant&.[]("login")
     if login.to_s.empty?
       unknown_count += 1
@@ -468,10 +475,10 @@ def unknown_participant_findings(unknown_count)
   return [] unless unknown_count.positive?
 
   [{
-    hidden: true,
+    hidden: false,
     login: "(unknown/deleted participant)",
     permission: "unknown",
-    reason: "#{unknown_count} participant node(s) missing GitHub login",
+    reason: "#{unknown_count} participant node(s) unavailable or missing GitHub login",
     untrusted: true
   }]
 end
