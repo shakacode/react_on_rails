@@ -316,11 +316,11 @@ contract unless a maintainer explicitly narrows the run.
   sharper scope, or better batching would reduce future churn; they are not a
   hard failure by themselves. A human decision point is any question, option
   selection, or confirmation directed at a maintainer that required direct input,
-  excluding push confirmations that are mandatory sub-steps of an action the
-  maintainer already selected, such as the required push confirmation after
-  committing action `f`. A standalone "should I push this nit fix?" question
-  counts. Report it as `Decision points: N` in the FYI section of the batch
-  handoff.
+  excluding git confirmations that safety rules or explicit local-only /
+  inspect-before-push instructions require after the maintainer already selected
+  the action, such as a required confirmation before a destructive force-push. A
+  standalone "should I push this ordinary PR-iteration fix?" question counts.
+  Report it as `Decision points: N` in the FYI section of the batch handoff.
 - **Confidence notes**: delegated merge authority exists only when the current
   user or batch goal grants it and the release-mode rules permit it. Before a
   delegated merge, the worker or coordinator writes a confidence note in the
