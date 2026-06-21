@@ -103,11 +103,12 @@ Use `classification-sweep` before every RC/release changelog edit, and whenever 
 
 ### Exact PR-Listing Command
 
-Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to the release tag, `origin/main`, or upper bound being audited. Then run the committed `changelog-merged-prs` helper to list merged PRs in first-parent order. It extracts PR numbers from squash titles (the `(#NNNN)` suffix) and `Merge pull request #NNNN` subjects, falls back to GitHub's commit-to-PR API for commits that lack an inline PR number, dedups by PR number, and emits an explicit `UNKNOWN` row for any commit that still cannot be mapped.
+Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to the release tag, the configured base branch from `AGENTS.md`, or another upper bound being audited. Then run the committed `changelog-merged-prs` helper to list merged PRs in first-parent order. It extracts PR numbers from squash titles (the `(#NNNN)` suffix) and `Merge pull request #NNNN` subjects, falls back to GitHub's commit-to-PR API for commits that lack an inline PR number, dedups by PR number, and emits an explicit `UNKNOWN` row for any commit that still cannot be mapped.
 
 ```bash
 BASE_REF="${BASE_REF:?set BASE_REF, e.g. v17.0.0.rc.1}"
-TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/main}"
+BASE_BRANCH="${BASE_BRANCH:-main}" # Resolve from AGENTS.md -> Agent Workflow Configuration.
+TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/${BASE_BRANCH}}"
 UPDATE_CHANGELOG_SKILL_DIR="${UPDATE_CHANGELOG_SKILL_DIR:-.agents/skills/update-changelog}"
 
 # JSON array of {pr, sha, subject}; pr is an integer, or the string "UNKNOWN".
@@ -271,7 +272,7 @@ After adding an entry to the `### [Unreleased]` section, ensure the version diff
 The format at the bottom should be:
 
 ```markdown
-[unreleased]: https://github.com/<owner>/<repo>/compare/v16.2.0.beta.19...main
+[unreleased]: https://github.com/<owner>/<repo>/compare/v16.2.0.beta.19...BASE_BRANCH
 [16.2.0.beta.19]: https://github.com/<owner>/<repo>/compare/v16.1.1...v16.2.0.beta.19
 ```
 
@@ -295,7 +296,7 @@ When a new version is released:
 #### Step 1: Fetch and read current state
 
 - **CRITICAL**: Run `git fetch origin main` to ensure you have the latest commits
-- After fetching, use `origin/main` for all comparisons, NOT local `main` branch
+- After fetching, use `origin/${BASE_BRANCH}` for all comparisons, not the local base branch
 - Read the current changelog to understand the existing structure
 
 #### Step 2: Reconcile tags with changelog sections (DO THIS FIRST)
@@ -329,9 +330,9 @@ When a new version is released:
 
 #### Step 3: Add new entries for post-tag commits
 
-1. Run `git log --oneline LATEST_TAG..origin/main` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
-2. Extract PR numbers: `git log --oneline LATEST_TAG..origin/main | grep -oE "#[0-9]+" | sort -u`
-3. If Step 2 found no missing tagged versions, verify no tag is ahead of main: `git log --oneline origin/main..LATEST_TAG` should be empty. If not, entries in "Unreleased" may belong to that tagged version — Step 2 should have caught this, so re-check.
+1. Resolve `BASE_BRANCH` from `AGENTS.md` -> **Agent Workflow Configuration**, then run `git log --oneline "LATEST_TAG..origin/${BASE_BRANCH}"` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
+2. Extract PR numbers: `git log --oneline "LATEST_TAG..origin/${BASE_BRANCH}" | grep -oE "#[0-9]+" | sort -u`
+3. If Step 2 found no missing tagged versions, verify no tag is ahead of the base branch: `git log --oneline "origin/${BASE_BRANCH}..LATEST_TAG"` should be empty. If not, entries in "Unreleased" may belong to that tagged version — Step 2 should have caught this, so re-check.
 4. For each PR number, check if it's already in the changelog: `CHANGELOG_PATH="${CHANGELOG_PATH:?set CHANGELOG_PATH from AGENTS.md -> Agent Workflow Configuration}"; grep "PR ${PR_NUMBER:?set PR_NUMBER}" "${CHANGELOG_PATH}"`
 5. For PRs not yet in the changelog:
    - Get PR details: `gh pr view NUMBER --json title,body,author` (add `--repo OWNER/REPO` when not in the repo)

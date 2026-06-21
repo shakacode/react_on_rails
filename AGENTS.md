@@ -112,14 +112,16 @@ checker with `--shared <installed-skill-root>` (see
 - **Changelog**: `/CHANGELOG.md`, user-visible changes only. Entry format, the `**[Pro]**`
   scope tag, the version-stamping task (`bundle exec rake "update_changelog[...]"`), and the
   classification taxonomy are in the **Changelog** section.
-- **Lint / format**: `bundle exec rake lint` (package lint), `bundle exec rake autofix` (fix),
+- **Lint / format**: `(cd react_on_rails && bundle exec rake lint)` (package lint),
+  `(cd react_on_rails && bundle exec rake autofix)` (fix),
   `pnpm start format.listDifferent` (Prettier check), `bin/check-links` (markdown links). Full
   list in the **Commands** section.
 - **Merge ledger**: `script/pr-merge-ledger <PR> --strict` — machine-checkable per-PR
   merge-readiness check emitting changelog classification and a `complete_allowed` verdict.
 - **Docs checks**: `script/check-docs-sidebar` (sidebar coverage), `bin/check-links` (links).
 - **Tests**: unit/integration/e2e per the **Testing** and **Commands** sections
-  (`bundle exec rake run_rspec:*`, `pnpm run test`, `pnpm test:e2e`).
+  (`bundle exec rake run_rspec:*`, `pnpm run test`,
+  `(cd react_on_rails/spec/dummy && pnpm test:e2e)`).
 - **Build / type checks**: `pnpm run build`, `pnpm run type-check`, `bundle exec rake rbs:validate`,
   `actionlint`, `yamllint .github/` — see the **Commands** section.
 - **Review gate**: `claude-review` is the preferred independent review check; see the
