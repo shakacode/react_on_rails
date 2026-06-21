@@ -22,6 +22,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - When the user wants a generated whole-surface issue/PR inventory, dependency graph, and capacity-aware batch split, use `.agents/skills/triage/SKILL.md`; a short invocation is `$triage` or "Run triage"
 - When the user wants to choose issues or PRs for a future Codex batch, use `.agents/skills/plan-pr-batch/SKILL.md` to produce a ready `$pr-batch` goal; a short invocation is `$plan-pr-batch` or "Plan a Codex batch"
 - When the user wants a multi-issue or multi-PR Codex batch, use `.agents/skills/pr-batch/SKILL.md`; a short invocation is `$pr-batch` or "Run a Codex batch"
+- When the user wants to stop or cancel an in-flight Codex/Claude batch (for example to relaunch it with updated skills), follow the **Cancelling Or Stopping A Batch** protocol in `.agents/workflows/pr-processing.md#cancelling-or-stopping-a-batch`; there is no short skill invocation for this coordinator action
 - When the user wants to audit merged batch work, missed reviews, release-candidate risk, or possible bad merges, use `.agents/skills/post-merge-audit/SKILL.md`; reusable prompts live in `.agents/workflows/post-merge-audit.md`
 - When the user wants an adversarial PR review, red-team review, Claude/Codex comparison review, or a stricter pre-merge gate, use `.agents/skills/adversarial-pr-review/SKILL.md`; reusable prompts live in `.agents/workflows/adversarial-pr-review.md`
 - When the user assigns an issue, PR, review-fix pass, or merge queue to an agent, follow `.agents/workflows/pr-processing.md`
@@ -315,11 +316,11 @@ contract unless a maintainer explicitly narrows the run.
   sharper scope, or better batching would reduce future churn; they are not a
   hard failure by themselves. A human decision point is any question, option
   selection, or confirmation directed at a maintainer that required direct input,
-  excluding push confirmations that are mandatory sub-steps of an action the
-  maintainer already selected, such as the required push confirmation after
-  committing action `f`. A standalone "should I push this nit fix?" question
-  counts. Report it as `Decision points: N` in the FYI section of the batch
-  handoff.
+  excluding git confirmations that safety rules or explicit local-only /
+  inspect-before-push instructions require after the maintainer already selected
+  the action, such as a required confirmation before a destructive force-push. A
+  standalone "should I push this ordinary PR-iteration fix?" question counts.
+  Report it as `Decision points: N` in the FYI section of the batch handoff.
 - **Confidence notes**: delegated merge authority exists only when the current
   user or batch goal grants it and the release-mode rules permit it. Before a
   delegated merge, the worker or coordinator writes a confidence note in the
@@ -466,6 +467,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 
 - **Default: no CI-expansion label.** For docs-only changes, focused tests, small isolated fixes, and refactors with no cross-package behavior change, rely on `ci-required / required-pr-gate` plus local verification during review.
 - **Use `ready-for-hosted-ci`** (or ask a maintainer to comment `+ci-run-hosted`) when the PR is ready for hosted GitHub Actions confirmation. This runs the hosted workflows for the current head SHA, but `script/ci-changes-detector` still chooses the applicable suites. Opening a draft PR or requesting code review does not by itself mean hosted CI should run.
+- **Generator-sensitive PRs require hosted CI.** When `script/ci-changes-detector` sets `run_generators=true`, `ci-required / required-pr-gate` fails on ordinary pull requests until hosted CI is requested with `+ci-run-hosted`, `bin/request-hosted-ci`, or a maintainer/user-token `ready-for-hosted-ci` label. This keeps generator changes from merging after only the lightweight gate; merge queue and release-target branches already run hosted CI automatically.
 - **Use `force-full-hosted-ci`** only when a maintainer intentionally wants to bypass optimized suite selection and run every hosted suite, for example while validating CI detector changes, package manager or runtime floor changes, release/build/publishing logic, broad generator output, or another cross-cutting change where path selection itself is part of the risk. Prefer `+ci-force-full`, which also applies `ready-for-hosted-ci` and dispatches the workflows for the current head SHA.
 - **Use `benchmark`** (or a suite-specific `benchmark-core` / `benchmark-pro` / `benchmark-pro-node-renderer`) for performance-sensitive changes: server rendering paths, Node renderer, caching, bundle generation, asset serving/precompile behavior, concurrency/pooling, or anything expected to affect throughput, latency, memory, or bundle size. Benchmarks are opt-in on PRs: without a `benchmark*` label no suite runs, because per-PR benchmark numbers are informational only and noise-dominated on shared CI runners. They still run on push to `main` to keep the Bencher dashboard and PR-comparison baseline current, but automatic regression-issue filing is disabled by default (#4071): on shared runners those alerts were ±50-125% noise that filed false-positive issues (#4038-#4044), so the trustworthy signal now comes from the dedicated local runner (`benchmarks/run-local-benchmark.rb`, #4073). Set the repo variable `BENCHMARK_REGRESSION_ISSUES_ENABLED=true` to restore automatic filing. `ready-for-hosted-ci` and `force-full-hosted-ci` do not trigger benchmarks; use benchmark labels separately when performance evidence matters. Use `hosted-ci-no-benchmarks` only to suppress an explicit benchmark label on CI/tooling PRs that cannot move runtime performance.
 - **Remove hosted readiness when no longer needed** with `+ci-stop-hosted` if the PR returns to active iteration. Use `+ci-stop-full` when only the force-full override should be removed and optimized hosted CI should remain.

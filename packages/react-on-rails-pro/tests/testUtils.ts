@@ -48,6 +48,11 @@ export const createNodeReadableStream = () => {
 
 export const getNodeVersion = () => parseInt(process.version.slice(1), 10);
 
+export const flushMacrotasks = () =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+
 const webStreamEncoder = new TextEncoder();
 
 export const createWebStreamFromText = (text: string) =>

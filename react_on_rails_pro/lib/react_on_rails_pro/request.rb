@@ -87,13 +87,19 @@ module ReactOnRailsPro
       # - When the block finishes, we close the output (END_STREAM flag)
       # - Node's handleRequestClosed then calls asyncPropsManager.endStream()
       #
-      def render_code_with_incremental_updates(path, js_code, async_props_block:)
+      def render_code_with_incremental_updates(path, js_code, async_props_block:, pull_enabled: false, push_props: nil)
         Rails.logger.info { "[ReactOnRailsPro] Perform incremental rendering request #{path}" }
 
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+        if !push_props.nil? && !pull_enabled
+          raise ArgumentError, "push_props can only be provided when pull_enabled is true"
+        end
 
         warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
-        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, tasks|
+        ReactOnRailsPro::StreamRequest.create(
+          first_chunk_warn_callback: warn_cb,
+          pull_enabled:
+        ) do |send_bundle, tasks|
           if send_bundle
             Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
             upload_assets
@@ -106,10 +112,14 @@ module ReactOnRailsPro
             headers: [["content-type", "application/x-ndjson"]]
           )
 
-          # Create emitter — output has the same interface as the old HTTPX request
-          # object (<< for writing, close for END_STREAM), so AsyncPropsEmitter works unchanged.
-          emitter = ReactOnRailsPro::AsyncPropsEmitter.new(pool.rsc_bundle_hash, output)
-          initial_data = build_initial_incremental_request(js_code, emitter)
+          emitter = ReactOnRailsPro::AsyncPropsEmitter.new(
+            pool.rsc_bundle_hash,
+            output,
+            pull_enabled:
+          )
+          initial_data = build_initial_incremental_request(
+            js_code, emitter, pull_enabled:, push_props:
+          )
 
           # Send the initial render request as first NDJSON line
           output << "#{initial_data.to_json}\n"
@@ -124,7 +134,7 @@ module ReactOnRailsPro
             output.close
           end)
 
-          response
+          { pull_result: true, response:, emitter: pull_enabled ? emitter : nil }
         end
       end
 
@@ -342,11 +352,16 @@ module ReactOnRailsPro
         ReactOnRailsPro::Utils.common_form_data
       end
 
-      def build_initial_incremental_request(js_code, emitter)
-        common_form_data.merge(
+      def build_initial_incremental_request(js_code, emitter, pull_enabled: false, push_props: nil)
+        data = common_form_data.merge(
           renderingRequest: js_code,
           onRequestClosedUpdateChunk: emitter.end_stream_chunk
         )
+        if pull_enabled
+          data[:pullEnabled] = true
+          data[:pushProps] = Array(push_props)
+        end
+        data
       end
 
       def create_connection

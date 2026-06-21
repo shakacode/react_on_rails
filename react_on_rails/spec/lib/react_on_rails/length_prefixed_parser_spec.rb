@@ -4,9 +4,9 @@ require_relative "../../react_on_rails/spec_helper"
 require_relative "../../../lib/react_on_rails/length_prefixed_parser"
 
 RSpec.describe ReactOnRails::LengthPrefixedParser do
-  def length_prefixed_payload(content, payload_type: "string")
+  def length_prefixed_payload(content, payload_type: "string", metadata: {})
     raw_content = payload_type == "object" ? content.to_json : content
-    metadata = { "payloadType" => payload_type, "consoleReplayScript" => "" }.to_json
+    metadata = { "payloadType" => payload_type, "consoleReplayScript" => "" }.merge(metadata).to_json
 
     "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
   end
@@ -77,6 +77,79 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
       expect { described_class.parse_one_chunk_result(two_chunks) }.to raise_error(
         ReactOnRails::Error,
         /expected exactly one length-prefixed chunk but found 2/
+      )
+    end
+  end
+
+  describe "control messages (messageType)" do
+    def control_message_payload(metadata, include_payload_type: true)
+      metadata_with_type = include_payload_type ? metadata.merge("payloadType" => "string") : metadata
+      meta_json = metadata_with_type.to_json
+      "#{meta_json}\t0\n"
+    end
+
+    it "yields metadata with messageType but without html or payloadType keys" do
+      payload = control_message_payload({ "messageType" => "propRequest", "propName" => "users" })
+      result = []
+      parser = described_class.new
+      parser.feed(payload) { |chunk| result << chunk }
+
+      expect(result.size).to eq(1)
+      expect(result.first).to include("messageType" => "propRequest", "propName" => "users")
+      expect(result.first).not_to have_key("html")
+      expect(result.first).not_to have_key("payloadType")
+    end
+
+    it "handles production control messages without payloadType" do
+      payload = control_message_payload(
+        { "messageType" => "propRequest", "propName" => "users" },
+        include_payload_type: false
+      )
+      result = []
+      parser = described_class.new
+      parser.feed(payload) { |chunk| result << chunk }
+
+      expect(result.size).to eq(1)
+      expect(result.first).to eq("messageType" => "propRequest", "propName" => "users")
+    end
+
+    it "handles renderComplete control messages" do
+      payload = control_message_payload({ "messageType" => "renderComplete" })
+      result = []
+      parser = described_class.new
+      parser.feed(payload) { |chunk| result << chunk }
+
+      expect(result.size).to eq(1)
+      expect(result.first).to eq("messageType" => "renderComplete")
+    end
+
+    it "correctly interleaves control messages with normal HTML chunks" do
+      html_chunk = length_prefixed_payload("<div>Hello</div>")
+      control_chunk = control_message_payload({ "messageType" => "propRequest", "propName" => "settings" })
+      html_chunk2 = length_prefixed_payload("<p>World</p>")
+
+      parser = described_class.new
+      results = []
+      parser.feed(html_chunk + control_chunk + html_chunk2) { |chunk| results << chunk }
+
+      expect(results.size).to eq(3)
+      expect(results[0]).to include("html" => "<div>Hello</div>")
+      expect(results[1]).to include("messageType" => "propRequest", "propName" => "settings")
+      expect(results[1]).not_to have_key("html")
+      expect(results[2]).to include("html" => "<p>World</p>")
+    end
+
+    it "treats unsupported messageType metadata as a normal chunk" do
+      payload = length_prefixed_payload("<div>traceable</div>", metadata: { "messageType" => "trace" })
+      result = []
+      parser = described_class.new
+      parser.feed(payload) { |chunk| result << chunk }
+
+      expect(result).to contain_exactly(
+        include(
+          "messageType" => "trace",
+          "html" => "<div>traceable</div>"
+        )
       )
     end
   end

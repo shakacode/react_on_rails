@@ -113,7 +113,14 @@
               "type": ["string", "null"]
             },
             "review_decision": {
-              "enum": ["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED", "UNKNOWN"]
+              "description": "Aggregate review decision, normalized from GitHub reviewDecision.",
+              "enum": [
+                "APPROVED",
+                "CHANGES_REQUESTED",
+                "REVIEW_REQUIRED",
+                "NOT_REQUIRED",
+                "UNKNOWN"
+              ]
             }
           }
         },
@@ -151,7 +158,14 @@
               "enum": ["known", "UNKNOWN"]
             },
             "review_decision": {
-              "enum": ["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED", "UNKNOWN"]
+              "description": "Mirrors pr.review_decision for review-object diagnostics.",
+              "enum": [
+                "APPROVED",
+                "CHANGES_REQUESTED",
+                "REVIEW_REQUIRED",
+                "NOT_REQUIRED",
+                "UNKNOWN"
+              ]
             },
             "latest_by_reviewer": {
               "type": "array",
