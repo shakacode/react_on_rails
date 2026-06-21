@@ -216,8 +216,8 @@ Execution flow when terminal access is available:
    - After the triage list, present this quick-action menu:
      ```
      Quick actions:
-     f     — Fix must-fix items, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prompt for skipped rationale replies and discuss decisions
-     f+i   — Fix must-fix, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prepare one deferred-work bundle for discuss/remaining optional items (and non-trivial skipped items)
+      f     — Fix must-fix items, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prompt for skipped rationale replies and discuss decisions
+      f+i   — Fix must-fix, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prepare one deferred-work bundle for discuss/remaining optional items (and non-trivial skipped items)
       f+o   — Fix must-fix + address all optional items explicitly inline (no autonomous filter; fix or promote each optional)
       a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations (local-only; no GitHub posts)
       d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
