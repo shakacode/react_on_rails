@@ -32,11 +32,16 @@ shared_examples "base_generator_common" do
     assert_file "Procfile.dev-prod-assets", /\$\{PORT:-3001\}/
   end
 
-  it "creates react_on_rails_default layout with a polished title and empty pack tags" do
+  it "creates react_on_rails_default layout with a polished title and pack tags" do
     assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
       expect(content).to include("<title>React on Rails</title>")
-      expect(content).to include("<%= stylesheet_pack_tag %>")
       expect(content).to include("<%= javascript_pack_tag %>")
+      if content.include?("react_on_rails_tailwind")
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+      else
+        expect(content).to include("<%= stylesheet_pack_tag %>")
+      end
     end
   end
 

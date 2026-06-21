@@ -115,21 +115,24 @@ describe InstallGenerator, type: :generator do
 
   def assert_tailwind_ssr_setup(config_dir:, extension:)
     assert_tailwind_dependencies
-    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+    assert_tailwind_stylesheet
+    assert_tailwind_pack_entry
     assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
 
     assert_tailwind_component(extension)
     assert_tailwind_bundler_config(config_dir)
-    assert_tailwind_ssr_stylesheet_placeholder
+    assert_tailwind_hello_world_view
+    assert_tailwind_layout_owned_pack
   end
 
   def assert_tailwind_redux_setup(config_dir:, extension:)
     assert_tailwind_dependencies
-    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+    assert_tailwind_stylesheet
+    assert_tailwind_pack_entry
     assert_no_file "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css"
 
     assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{extension}" do |content|
-      expect(content).to include("../../../stylesheets/application.css")
+      expect(content).not_to include("application.css")
     end
 
     assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.#{extension}" do |content|
@@ -141,13 +144,28 @@ describe InstallGenerator, type: :generator do
     end
 
     assert_tailwind_bundler_config(config_dir)
+    assert_tailwind_layout_owned_pack
   end
 
   def assert_tailwind_component(extension)
     assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{extension}" do |content|
-      expect(content).to include("../../../stylesheets/application.css")
+      expect(content).not_to include("application.css")
       expect(content).to include("React on Rails + Tailwind CSS")
       expect(content).to include("rounded-lg")
+    end
+  end
+
+  def assert_tailwind_stylesheet(path: "app/javascript/stylesheets/application.css",
+                                 source_directive: '@import "tailwindcss" source("../..");')
+    assert_file path do |content|
+      expect(content).to include(source_directive)
+    end
+  end
+
+  def assert_tailwind_pack_entry(path: "app/javascript/packs/react_on_rails_tailwind.js",
+                                 import_path: "../stylesheets/application.css")
+    assert_file path do |content|
+      expect(content).to eq("import '#{import_path}';\n")
     end
   end
 
@@ -162,32 +180,40 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  def assert_tailwind_ssr_stylesheet_placeholder
-    assert_file "app/views/hello_world/index.html.erb" do |content|
-      expect(content).to include('react_component("HelloWorld", props: @hello_world_props, prerender: true)')
-    end
-
+  def assert_tailwind_layout_owned_pack
     assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
-      stylesheet_index = content.index("<%= stylesheet_pack_tag %>")
+      prepend_index = content.index('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+      stylesheet_index = content.index('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
       javascript_index = content.index("<%= javascript_pack_tag %>")
 
+      expect(prepend_index).not_to be_nil
       expect(stylesheet_index).not_to be_nil
       expect(javascript_index).not_to be_nil
+      expect(prepend_index).to be < stylesheet_index
       expect(stylesheet_index).to be < javascript_index
-      expect(content).to include("React on Rails injects component CSS/JS here")
+      expect(content).to include("Tailwind is layout-owned")
+      expect(content).not_to include("<!-- Empty pack tags")
+    end
+  end
+
+  def assert_tailwind_hello_world_view
+    assert_file "app/views/hello_world/index.html.erb" do |content|
+      expect(content).to include('react_component("HelloWorld", props: @hello_world_props, prerender: true)')
     end
   end
 
   def assert_tailwind_rsc_setup(config_dir:, extension:)
     assert_tailwind_dependencies
-    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+    assert_tailwind_stylesheet
+    assert_tailwind_pack_entry
 
     assert_file "app/javascript/src/HelloServer/components/LikeButton.#{extension}" do |content|
-      expect(content).to include("../../../stylesheets/application.css")
+      expect(content).not_to include("application.css")
       expect(content).to start_with("'use client';")
     end
 
     assert_tailwind_bundler_config(config_dir)
+    assert_tailwind_layout_owned_pack
   end
 
   def simulate_managed_stock_webpack_files(options = {})
@@ -512,13 +538,19 @@ describe InstallGenerator, type: :generator do
 
     it "keeps Tailwind assets and imports anchored to the configured source path" do
       assert_file "client/app/server-bundle.js"
-      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_file "client/app/react_on_rails_tailwind.js", "import './stylesheets/application.css';\n"
+      assert_file "client/app/stylesheets/application.css" do |content|
+        expect(content).to include('@import "tailwindcss" source(none);')
+        expect(content).to include('@source "..";')
+        expect(content).to include('@source "../../../app";')
+      end
       assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx" do |content|
-        expect(content).to include("import '../../../stylesheets/application.css';")
+        expect(content).not_to include("application.css")
       end
 
       assert_no_file "client/app/packs/server-bundle.js"
       assert_no_file "app/javascript/stylesheets/application.css"
+      assert_no_file "app/javascript/packs/react_on_rails_tailwind.js"
     end
   end
 
@@ -581,13 +613,20 @@ describe InstallGenerator, type: :generator do
     end
 
     it "generates Tailwind assets under the configured Shakapacker source path" do
-      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_file "client/app/entrypoints/react_on_rails_tailwind.js",
+                  "import '../stylesheets/application.css';\n"
+      assert_file "client/app/stylesheets/application.css" do |content|
+        expect(content).to include('@import "tailwindcss" source(none);')
+        expect(content).to include('@source "..";')
+        expect(content).to include('@source "../../../app";')
+      end
       assert_no_file "app/javascript/stylesheets/application.css"
+      assert_no_file "app/javascript/packs/react_on_rails_tailwind.js"
     end
 
-    it "injects the stylesheet import into the generated client component" do
+    it "keeps the generated client component free of global stylesheet imports" do
       assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx" do |content|
-        expect(content).to include("import '../../../stylesheets/application.css';")
+        expect(content).not_to include("application.css")
       end
     end
   end
@@ -646,13 +685,19 @@ describe InstallGenerator, type: :generator do
     end
 
     it "generates Tailwind assets under the configured Shakapacker source path" do
-      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_file "client/app/entrypoints/react_on_rails_tailwind.js",
+                  "import '../stylesheets/application.css';\n"
+      assert_file "client/app/stylesheets/application.css" do |content|
+        expect(content).to include('@import "tailwindcss" source(none);')
+        expect(content).to include('@source "..";')
+        expect(content).to include('@source "../../../app";')
+      end
       assert_no_file "app/javascript/stylesheets/application.css"
     end
 
-    it "injects the stylesheet import into the generated Redux client component" do
+    it "keeps the generated Redux client component free of global stylesheet imports" do
       assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx" do |content|
-        expect(content).to include("import '../../../stylesheets/application.css';")
+        expect(content).not_to include("application.css")
       end
     end
   end
@@ -706,9 +751,16 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "injects the stylesheet import into the generated RSC client component" do
+    it "keeps Tailwind owned by the layout pack instead of the generated RSC client component" do
+      assert_file "client/app/entrypoints/react_on_rails_tailwind.js",
+                  "import '../stylesheets/application.css';\n"
+      assert_file "client/app/stylesheets/application.css" do |content|
+        expect(content).to include('@import "tailwindcss" source(none);')
+        expect(content).to include('@source "..";')
+        expect(content).to include('@source "../../../app";')
+      end
       assert_file "client/app/src/HelloServer/components/LikeButton.jsx" do |content|
-        expect(content).to include("import '../../../stylesheets/application.css';")
+        expect(content).not_to include("application.css")
       end
     end
   end
@@ -887,13 +939,92 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "#copy_or_update_tailwind_layout" do
+    let(:base_generator) { base_generator_fixture(tailwind: true) }
+    let(:layout_path) { "app/views/layouts/react_on_rails_default.html.erb" }
+
+    before do
+      prepare_destination
+    end
+
+    it "updates the recognizable generated default layout" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+        expect(content).to include("<%= javascript_pack_tag %>")
+        expect(content).not_to include("<!-- Empty pack tags")
+      end
+    end
+
+    it "does not rewrite customized layouts without --force" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag "application" %>
+            <%= javascript_pack_tag "application" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "does not rewrite existing layouts in --skip mode" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+
+      base_generator_fixture(tailwind: true, skip: true).send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+  end
+
   context "with --tailwind --no-rspack" do
     before(:all) { run_generator_test_with_args(%w[--tailwind --no-rspack], package_json: true) }
 
     include_examples "base_generator_common", application_js: true
     include_examples "no_redux_generator"
 
-    it "generates a Tailwind v4 SSR setup for Webpack with extracted CSS enabled" do
+    it "generates a layout-owned Tailwind v4 SSR setup for Webpack" do
       assert_tailwind_ssr_setup(config_dir: "config/webpack", extension: "jsx")
     end
   end
@@ -904,7 +1035,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator_common", application_js: true
     include_examples "no_redux_generator"
 
-    it "generates a Tailwind v4 SSR setup for Rspack with extracted CSS enabled" do
+    it "generates a layout-owned Tailwind v4 SSR setup for Rspack" do
       assert_tailwind_ssr_setup(config_dir: "config/rspack", extension: "tsx")
     end
   end
@@ -3073,24 +3204,6 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  describe "RSC Tailwind client component import insertion" do
-    let(:components_dir) { "app/javascript/src/HelloServer/components" }
-    let(:client_component_path) { "#{components_dir}/LikeButton.jsx" }
-
-    it "anchors after quote and semicolon variants of the use client directive" do
-      simulate_existing_file(client_component_path, "\"use client\"\n\nexport default function LikeButton() {}\n")
-
-      Dir.chdir(destination_root) do
-        expect(rsc_generator_fixture(tailwind: true).send(:add_tailwind_import_to_rsc_client_component, components_dir))
-          .to be(true)
-      end
-
-      expect(File.read(File.join(destination_root, client_component_path))).to start_with(
-        "\"use client\"\nimport '../../../stylesheets/application.css';\n\n"
-      )
-    end
-  end
-
   context "with --rsc --rspack" do
     before(:all) { run_generator_test_with_args(%w[--rsc --rspack], package_json: true) }
 
@@ -3780,7 +3893,7 @@ describe InstallGenerator, type: :generator do
 
       expect(File).not_to receive(:read).with(File.join(destination_root, client_entry))
       expect(redux_generator).to receive(:say_status)
-        .with(:pretend, "Would add Tailwind stylesheet import to #{client_entry}", :yellow)
+        .with(:pretend, "Tailwind stylesheet is linked from the React on Rails layout", :yellow)
 
       redux_generator.send(:copy_base_files)
     end

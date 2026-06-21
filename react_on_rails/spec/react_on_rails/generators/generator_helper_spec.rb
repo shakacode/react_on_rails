@@ -406,6 +406,55 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
+  describe "Tailwind layout pack helpers" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+      reset_shakapacker_memoization!
+    end
+
+    it "uses the default Shakapacker entry path for the Tailwind pack" do
+      expect(tailwind_pack_path).to eq("app/javascript/packs/react_on_rails_tailwind.js")
+      expect(tailwind_stylesheet_path).to eq("app/javascript/stylesheets/application.css")
+      expect(relative_tailwind_stylesheet_import_path).to eq("../stylesheets/application.css")
+    end
+
+    it "prefixes same-directory Tailwind stylesheet imports for root entry paths" do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        development:
+          source_path: client/app
+          source_entry_path: /
+      YAML
+      reset_shakapacker_memoization!
+
+      expect(tailwind_pack_path).to eq("client/app/react_on_rails_tailwind.js")
+      expect(tailwind_stylesheet_path).to eq("client/app/stylesheets/application.css")
+      expect(relative_tailwind_stylesheet_import_path).to eq("./stylesheets/application.css")
+    end
+
+    it "scans Rails app for the default generated stylesheet location" do
+      expect(tailwind_css_source_directives).to eq('@import "tailwindcss" source("../..");')
+    end
+
+    it "uses explicit Tailwind source roots when Shakapacker source_path is outside Rails app" do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        development:
+          source_path: client/app
+          source_entry_path: entrypoints
+      YAML
+      reset_shakapacker_memoization!
+
+      expect(tailwind_css_source_directives).to eq(<<~CSS.strip)
+        @import "tailwindcss" source(none);
+        @source "..";
+        @source "../../../app";
+      CSS
+    end
+  end
+
   describe "#active_precompile_hook_configured?" do
     it "treats quoted and unquoted command strings beside a placeholder as active" do
       expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
