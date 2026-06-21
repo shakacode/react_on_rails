@@ -25,7 +25,7 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
     end
   end
 
-  def test_warning_terms_in_added_pr_diff_lines_block_and_fetch_diff_once
+  def test_suspicious_terms_in_pr_diff_block_and_fetch_diff_once
     with_fake_gh("warning-diff") do |env, trust_config_path, log_path|
       out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
 
@@ -71,6 +71,38 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
     end
   end
 
+  def test_include_reactions_fetches_reaction_users_as_visible
+    with_fake_gh("reaction-only-participant") do |env, trust_config_path, log_path|
+      out_without_reactions, status_without_reactions = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "123"
+      )
+
+      refute status_without_reactions.success?, out_without_reactions
+      assert_includes out_without_reactions, "justin808: no visible comment/review/commit/reaction trail"
+      assert_equal 0, reaction_api_call_count(log_path)
+
+      out_with_reactions, status_with_reactions = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "--include-reactions",
+        "123"
+      )
+
+      assert status_with_reactions.success?, out_with_reactions
+      assert_includes out_with_reactions, "SECURITY_PREFLIGHT_OK"
+      assert_includes out_with_reactions, "Untrusted or hidden participant findings: none"
+      assert_equal 1, reaction_api_call_count(log_path)
+    end
+  end
+
   private
 
   def run_script(env, *)
@@ -104,6 +136,10 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
     File.readlines(log_path).count do |line|
       line.include?("pr diff 123 --repo owner/repo") && !line.include?("--name-only")
     end
+  end
+
+  def reaction_api_call_count(log_path)
+    File.readlines(log_path).count { |line| line.include?("issues/123/reactions?per_page=100") }
   end
 
   def fake_gh_script(log_path)
@@ -144,6 +180,10 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
           cat <<'JSON'
       {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"justin808"},"participants":{"totalCount":2,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"},{"login":null,"url":"https://github.com/ghost","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
       JSON
+        elif [ "$mode" = "reaction-only-participant" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      JSON
         else
           cat <<'JSON'
       {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"justin808"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
@@ -152,6 +192,8 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
         exit 0
       fi
 
+      # These fake responses model `gh api --paginate --slurp`, which wraps
+      # raw GitHub REST pages in an outer array. An empty first page is `[[]]`.
       if [ "$1" = "api" ] && [ "$2" = "repos/owner/repo/issues/123/comments?per_page=100" ]; then
         printf '[[]]'
         exit 0
@@ -174,6 +216,11 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
 
       if [ "$1" = "api" ] && [ "$2" = "repos/owner/repo/collaborators/justin808/permission" ]; then
         printf '{"permission":"admin"}'
+        exit 0
+      fi
+
+      if [ "$1" = "api" ] && [ "$3" = "Accept: application/vnd.github+json" ] && [ "$4" = "repos/owner/repo/issues/123/reactions?per_page=100" ]; then
+        printf '[[{"user":{"login":"justin808"}}]]'
         exit 0
       fi
 
