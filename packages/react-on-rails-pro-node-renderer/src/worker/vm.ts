@@ -496,6 +496,7 @@ export type ExecutionContext = {
   ) => Promise<RenderResult>;
   getVMContext: (bundleFilePath: string) => VMContext | undefined;
   release: () => void;
+  sharedExecutionContext: Map<string, unknown>;
 };
 
 /**
@@ -661,6 +662,7 @@ export async function buildExecutionContext(
       released = true;
       retainedSourceMapRegistrations.forEach(releaseSourceMapRegistration);
     },
+    sharedExecutionContext,
   };
 }
 

@@ -13,7 +13,13 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import AsyncPropsManager, { getOrCreateAsyncPropsManager } from '../src/AsyncPropsManager.ts';
+import AsyncPropsManager, {
+  getOrCreateAsyncPropsManager,
+  PULL_ENABLED_KEY,
+  PUSH_PROPS_KEY,
+  PROP_REQUEST_EMITTER_KEY,
+  MAX_PULL_PROP_NAME_LENGTH,
+} from '../src/AsyncPropsManager.ts';
 
 describe('Access AsyncPropManager prop before setting it', () => {
   let manager: AsyncPropsManager;
@@ -98,7 +104,7 @@ describe('Access non sent AsyncPropManager prop', () => {
     const manager = new AsyncPropsManager();
     manager.endStream();
     await expect(manager.getProp('Non Existing Prop')).rejects.toThrow(
-      /The async prop "Non Existing Prop" is not received/,
+      /The async prop "Non Existing Prop" was not received/,
     );
   });
 
@@ -106,7 +112,7 @@ describe('Access non sent AsyncPropManager prop', () => {
     const manager = new AsyncPropsManager();
     const getPropPromise = manager.getProp('wrongProp');
     manager.endStream();
-    await expect(getPropPromise).rejects.toThrow(/The async prop "wrongProp" is not received/);
+    await expect(getPropPromise).rejects.toThrow(/The async prop "wrongProp" was not received/);
   });
 
   it('throws an error if a prop is set after closing the stream', () => {
@@ -146,8 +152,8 @@ describe('Accessing AsyncPropManager prop in complex scenarios', () => {
 
     // Non existing props
     manager.endStream();
-    await expect(nonExistingPropPromise).rejects.toThrow(/The async prop "nonExistingProp" is not received/);
-    await expect(manager.getProp('wrongProp')).rejects.toThrow(/The async prop "wrongProp" is not received/);
+    await expect(nonExistingPropPromise).rejects.toThrow(/The async prop "nonExistingProp" was not received/);
+    await expect(manager.getProp('wrongProp')).rejects.toThrow(/The async prop "wrongProp" was not received/);
 
     // Setting after closing
     expect(() => manager.setProp('wrongProp', 'Nothing')).toThrow(
@@ -284,6 +290,201 @@ describe('getOrCreateAsyncPropsManager lazy initialization', () => {
 
     // First prop should resolve, second should reject
     await expect(prop1Promise).resolves.toBe('received');
-    await expect(prop2Promise).rejects.toThrow(/The async prop "prop2" is not received/);
+    await expect(prop2Promise).rejects.toThrow(/The async prop "prop2" was not received/);
+  });
+});
+
+describe('rejectProp', () => {
+  it('rejects a pending prop with server rejection error', async () => {
+    const manager = new AsyncPropsManager();
+    const getPropPromise = manager.getProp('pendingProp');
+
+    manager.rejectProp('pendingProp', 'fetch failed');
+
+    await expect(getPropPromise).rejects.toThrow(/rejected by server/);
+  });
+
+  it('returns an already-rejected promise when getProp is called after rejectProp', async () => {
+    const manager = new AsyncPropsManager();
+
+    manager.rejectProp('rejectedProp', 'fetch failed');
+
+    await expect(manager.getProp('rejectedProp')).rejects.toThrow(/rejected by server/);
+  });
+
+  it('is a no-op when the prop was already resolved via setProp', async () => {
+    const manager = new AsyncPropsManager();
+
+    manager.setProp('resolvedProp', 'Original Value');
+    manager.rejectProp('resolvedProp', 'fetch failed');
+
+    await expect(manager.getProp('resolvedProp')).resolves.toBe('Original Value');
+  });
+
+  it('is a no-op after endStream', () => {
+    const manager = new AsyncPropsManager();
+    manager.endStream();
+
+    expect(() => manager.rejectProp('endedProp', 'fetch failed')).not.toThrow();
+  });
+
+  it('is a no-op when rejectProp is called twice on the same prop', async () => {
+    const manager = new AsyncPropsManager();
+    const promise = manager.getProp('foo');
+
+    manager.rejectProp('foo', 'first reason');
+    manager.rejectProp('foo', 'second reason');
+
+    await expect(promise).rejects.toThrow(/first reason/);
+    await expect(promise).rejects.not.toThrow(/second reason/);
+  });
+
+  it('rejectProp after endStream does not change the endStream rejection reason', async () => {
+    const manager = new AsyncPropsManager();
+    const promise = manager.getProp('foo');
+
+    manager.endStream();
+    manager.rejectProp('foo', 'late rejection');
+
+    await expect(promise).rejects.toThrow(/The async prop "foo" was not received/);
+    await expect(promise).rejects.not.toThrow(/late rejection/);
+  });
+});
+
+describe('Pull mode propRequest emission', () => {
+  let sharedExecutionContext: Map<string, unknown>;
+  let propRequestEmitter: jest.Mock;
+  let manager: AsyncPropsManager;
+
+  beforeEach(() => {
+    propRequestEmitter = jest.fn();
+    sharedExecutionContext = new Map<string, unknown>([
+      [PULL_ENABLED_KEY, true],
+      [PUSH_PROPS_KEY, new Set(['pushProp'])],
+      [PROP_REQUEST_EMITTER_KEY, propRequestEmitter],
+    ]);
+    manager = getOrCreateAsyncPropsManager(sharedExecutionContext);
+  });
+
+  it('emits a propRequest when getProp is called for a non-push prop', () => {
+    manager.getProp('lazyProp');
+
+    expect(propRequestEmitter).toHaveBeenCalledWith('lazyProp');
+  });
+
+  it('does not emit duplicate propRequest for the same prop', () => {
+    manager.getProp('lazyProp');
+    manager.getProp('lazyProp');
+
+    expect(propRequestEmitter).toHaveBeenCalledTimes(1);
+    expect(propRequestEmitter).toHaveBeenCalledWith('lazyProp');
+  });
+
+  it('does not emit propRequest for push props', () => {
+    manager.getProp('pushProp');
+
+    expect(propRequestEmitter).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized prop names before emitting propRequest', async () => {
+    const propName = 'x'.repeat(MAX_PULL_PROP_NAME_LENGTH + 1);
+
+    await expect(manager.getProp(propName)).rejects.toThrow(
+      `Async prop name length ${MAX_PULL_PROP_NAME_LENGTH + 1} exceeds ${MAX_PULL_PROP_NAME_LENGTH} characters`,
+    );
+    await expect(manager.getProp(propName)).rejects.not.toThrow(propName);
+    expect(propRequestEmitter).not.toHaveBeenCalled();
+  });
+
+  it('allows oversized push props without emitting propRequest', async () => {
+    const propName = 'x'.repeat(MAX_PULL_PROP_NAME_LENGTH + 1);
+    sharedExecutionContext.set(PUSH_PROPS_KEY, new Set([propName]));
+
+    manager.setProp(propName, 'Resolved Value');
+
+    await expect(manager.getProp(propName)).resolves.toBe('Resolved Value');
+    expect(propRequestEmitter).not.toHaveBeenCalled();
+  });
+
+  it('does not emit propRequest for already-resolved props', async () => {
+    manager.setProp('lazyProp', 'Resolved Value');
+
+    await expect(manager.getProp('lazyProp')).resolves.toBe('Resolved Value');
+    expect(propRequestEmitter).not.toHaveBeenCalled();
+  });
+
+  it('buffers propRequests when no emitter is available', () => {
+    const bufferedContext = new Map<string, unknown>([
+      [PULL_ENABLED_KEY, true],
+      [PUSH_PROPS_KEY, new Set(['pushProp'])],
+    ]);
+    const bufferedManager = getOrCreateAsyncPropsManager(bufferedContext);
+
+    expect(() => bufferedManager.getProp('buffered')).not.toThrow();
+
+    bufferedContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
+    bufferedManager.catchUpPropRequests();
+    bufferedManager.catchUpPropRequests();
+
+    expect(propRequestEmitter).toHaveBeenCalledWith('buffered');
+    expect(propRequestEmitter).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps over-cap buffered propRequests eligible for catch-up when the emitter is installed', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const bufferedContext = new Map<string, unknown>([
+      [PULL_ENABLED_KEY, true],
+      [PUSH_PROPS_KEY, new Set(['pushProp'])],
+    ]);
+    const bufferedManager = getOrCreateAsyncPropsManager(bufferedContext);
+
+    try {
+      Array.from({ length: 501 }, (_, i) => `buffered-${i}`).forEach((propName) => {
+        bufferedManager.getProp(propName);
+      });
+
+      bufferedContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
+      bufferedManager.catchUpPropRequests();
+
+      expect(propRequestEmitter).toHaveBeenCalledTimes(501);
+      expect(propRequestEmitter).toHaveBeenCalledWith('buffered-500');
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('buffered propRequest cap reached'));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('1 over-cap propRequest(s)'));
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('catchUpPropRequests emits for props requested before pull mode was enabled', () => {
+    const delayedContext = new Map<string, unknown>();
+    const delayedManager = getOrCreateAsyncPropsManager(delayedContext);
+
+    delayedManager.getProp('early');
+
+    delayedContext.set(PULL_ENABLED_KEY, true);
+    delayedContext.set(PUSH_PROPS_KEY, new Set(['pushProp']));
+    delayedContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
+    delayedManager.catchUpPropRequests();
+
+    expect(propRequestEmitter).toHaveBeenCalledWith('early');
+  });
+
+  it('keeps legacy pull catch-up methods for older node renderers', () => {
+    const legacyContext = new Map<string, unknown>();
+    const legacyManager = getOrCreateAsyncPropsManager(legacyContext);
+
+    legacyManager.getProp('early');
+
+    legacyContext.set(PULL_ENABLED_KEY, true);
+    legacyContext.set(PUSH_PROPS_KEY, new Set(['pushProp']));
+    legacyContext.set(PROP_REQUEST_EMITTER_KEY, propRequestEmitter);
+    legacyManager.flushPendingPullRequests();
+    expect(propRequestEmitter).toHaveBeenCalledWith('early');
+    expect(propRequestEmitter).toHaveBeenCalledTimes(1);
+
+    legacyManager.emitPendingPullRequests();
+
+    expect(propRequestEmitter).toHaveBeenCalledWith('early');
+    expect(propRequestEmitter).toHaveBeenCalledTimes(1);
   });
 });

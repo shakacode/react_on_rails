@@ -33,6 +33,7 @@ type PageFixture = {
 export type RedisReceiverControllerFixture = {
   sendRedisValue: (key: string, value: unknown) => Promise<void>;
   sendRedisItemValue: (itemIndex: number, value: unknown) => Promise<void>;
+  rejectRedisValue: (key: string, reason: string) => Promise<void>;
   endRedisStream: () => Promise<void>;
   matchPageSnapshot: (snapshotPath: string) => Promise<void>;
   waitForConsoleMessage: (msg: string) => Promise<void>;
@@ -80,6 +81,11 @@ const redisReceiverPageController = redisControlledTest.extend<RedisReceiverCont
   sendRedisItemValue: async ({ sendRedisValue }, use) => {
     await use(async (itemIndex, value) => {
       await sendRedisValue(`Item${itemIndex}`, value);
+    });
+  },
+  rejectRedisValue: async ({ redisClient, redisRequestId }, use) => {
+    await use(async (key, reason) => {
+      await redisClient.xAdd(`stream:${redisRequestId}`, '*', { [`!${key}`]: reason });
     });
   },
   endRedisStream: async ({ redisClient, redisRequestId }, use) => {
@@ -175,8 +181,44 @@ const redisReceiverPageAfterNavigationTest = redisReceiverPageController.extend<
   ],
 });
 
+const lazyPropsRedisPageTest = redisReceiverPageController.extend<PageFixture>({
+  pagePath: [
+    async ({ nonBlockingNavigateWithRequestId }, use) => {
+      const pagePath = '/lazy_props_redis_for_testing';
+      await nonBlockingNavigateWithRequestId(pagePath);
+      await use(pagePath);
+    },
+    { auto: true },
+  ],
+});
+
+const mixedPropsRedisPageTest = redisReceiverPageController.extend<PageFixture>({
+  pagePath: [
+    async ({ nonBlockingNavigateWithRequestId }, use) => {
+      const pagePath = '/mixed_props_redis_for_testing';
+      await nonBlockingNavigateWithRequestId(pagePath);
+      await use(pagePath);
+    },
+    { auto: true },
+  ],
+});
+
+const rejectionPropsRedisPageTest = redisReceiverPageController.extend<PageFixture>({
+  pagePath: [
+    async ({ nonBlockingNavigateWithRequestId }, use) => {
+      const pagePath = '/rejection_props_redis_for_testing';
+      await nonBlockingNavigateWithRequestId(pagePath);
+      await use(pagePath);
+    },
+    { auto: true },
+  ],
+});
+
 export {
   asyncPropsAtRouterPageTest,
+  lazyPropsRedisPageTest,
+  mixedPropsRedisPageTest,
+  rejectionPropsRedisPageTest,
   redisReceiverPageController,
   redisReceiverPageTest,
   redisReceiverInsideRouterPageTest,

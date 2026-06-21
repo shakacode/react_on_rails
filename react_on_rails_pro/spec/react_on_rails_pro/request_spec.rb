@@ -365,10 +365,12 @@ describe ReactOnRailsPro::Request do
       bidi_response = mock_response(status: 200, chunks: [to_length_prefixed("chunk")])
       allow(mock_connection).to receive(:post_bidi).and_return([mock_output, bidi_response])
 
-      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new) do |bundle_timestamp, _output|
+      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new) do |bundle_timestamp, _output, pull_enabled: false|
         instance_double(
           ReactOnRailsPro::AsyncPropsEmitter,
-          end_stream_chunk: { bundleTimestamp: bundle_timestamp, updateChunk: "mocked_js" }
+          end_stream_chunk: { bundleTimestamp: bundle_timestamp, updateChunk: "mocked_js" },
+          pull_enabled?: pull_enabled,
+          render_complete!: nil
         )
       end
     end
@@ -401,6 +403,37 @@ describe ReactOnRailsPro::Request do
         parsed = JSON.parse(data.chomp)
         parsed.key?("renderingRequest") && parsed["renderingRequest"] == js_code
       end)
+    end
+
+    it "uses the explicit pull flag for pure-pull async props" do
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block:,
+        pull_enabled: true
+      )
+
+      stream.each_chunk(&:itself)
+
+      parsed = JSON.parse(output_writes.first.chomp)
+      expect(parsed["pullEnabled"]).to be true
+      expect(parsed["pushProps"]).to eq([])
+      expect(ReactOnRailsPro::AsyncPropsEmitter)
+        .to have_received(:new).with("rsc_bundle.js", mock_output, pull_enabled: true)
+    end
+
+    it "rejects push props when pull mode is disabled" do
+      expect do
+        described_class.render_code_with_incremental_updates(
+          "/render-incremental",
+          js_code,
+          async_props_block:,
+          pull_enabled: false,
+          push_props: []
+        )
+      end.to raise_error(ArgumentError, "push_props can only be provided when pull_enabled is true")
+
+      expect(mock_connection).not_to have_received(:post_bidi)
     end
 
     it "passes AsyncPropsEmitter to async_props_block" do

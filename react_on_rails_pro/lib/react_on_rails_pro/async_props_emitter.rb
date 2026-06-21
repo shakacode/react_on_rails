@@ -28,15 +28,40 @@ module ReactOnRailsPro
   # Global variables in Node.js VM persist across requests, causing data leakage.
   # sharedExecutionContext is scoped to a single HTTP request (ExecutionContext).
   #
-  # @example Usage in view
+  # PULL MODE:
+  # When pull_enabled is true, React components can request props lazily via
+  # getProp(). Those requests arrive as propRequest chunks on the response stream.
+  # `pull_requests` exposes an Async::Queue that yields prop names as they arrive.
+  # The user's block can dequeue and resolve them dynamically.
+  #
+  # @example Push-only usage (existing)
   #   stream_react_component_with_async_props("Dashboard") do |emit|
-  #     emit.call("users", User.all.to_a)      # Sends immediately
-  #     emit.call("posts", Post.recent.to_a)   # Sends when ready
+  #     emit.call("users", User.all.to_a)
+  #     emit.call("posts", Post.recent.to_a)
+  #   end
+  #
+  # @example Pull mode usage
+  #   stream_react_component_with_async_props("Dashboard", push_props: %w[stats]) do |emit|
+  #     emit.call("stats", compute_stats)
+  #     while (prop_name = emit.pull_requests.dequeue)
+  #       emit.call(prop_name, fetch_prop(prop_name))
+  #     end
   #   end
   class AsyncPropsEmitter
-    def initialize(bundle_timestamp, request_stream)
+    SANITIZED_REJECTION_REASON = "Async prop rejected by server"
+
+    attr_reader :pull_requests
+
+    def initialize(bundle_timestamp, request_stream, pull_enabled: false)
       @bundle_timestamp = bundle_timestamp
       @request_stream = request_stream
+      @pushed_props = Set.new
+      @pull_enabled = pull_enabled
+      @pull_requests = PullRequestQueue.new(@pushed_props) if pull_enabled
+    end
+
+    def pull_enabled?
+      @pull_enabled
     end
 
     # Sends an async prop to the Node renderer.
@@ -45,22 +70,46 @@ module ReactOnRailsPro
     def call(prop_name, prop_value)
       update_chunk = generate_update_chunk(prop_name, prop_value)
       @request_stream << "#{update_chunk.to_json}\n"
+      @pushed_props.add(prop_name)
     rescue StandardError => e
+      # Continue streaming: one failed async prop write should not abort the
+      # entire render. The prop is not marked as pushed unless the write
+      # succeeds, so pull mode can request it again instead of silently hanging.
       Rails.logger.error do
         backtrace = e.backtrace&.first(5)&.join("\n")
         "[ReactOnRailsPro::AsyncProps] Failed to send async prop '#{prop_name}': " \
           "#{e.class} - #{e.message}\n#{backtrace}"
       end
-      # Continue - don't abort entire render because one prop failed
     end
 
-    # Generates the chunk that should be executed when the request stream closes
-    # This tells the asyncPropsManager to end the stream
+    # Rejects an async prop on the Node side so React can show an error boundary.
+    def reject(prop_name, reason)
+      update_chunk = generate_reject_chunk(prop_name, reason)
+      @request_stream << "#{update_chunk.to_json}\n"
+      # Once the reject chunk is written, Ruby treats the prop as settled too.
+      # That keeps duplicate pull requests filtered even if the JS manager is recreated.
+      @pushed_props.add(prop_name)
+    rescue StandardError => e
+      Rails.logger.error do
+        backtrace = e.backtrace&.first(5)&.join("\n")
+        "[ReactOnRailsPro::AsyncProps] Failed to reject async prop '#{prop_name}': " \
+          "#{e.class} - #{e.message}\n#{backtrace}"
+      end
+    end
+
+    # Generates the chunk that should be executed when the request stream closes.
+    # This tells the asyncPropsManager to end the stream.
     def end_stream_chunk
       {
         bundleTimestamp: @bundle_timestamp,
         updateChunk: generate_end_stream_js
       }
+    end
+
+    # Called by stream_request when the response stream signals render complete.
+    # Closes the pull_requests queue so dequeue returns nil.
+    def render_complete!
+      @pull_requests&.close
     end
 
     private
@@ -69,6 +118,13 @@ module ReactOnRailsPro
       {
         bundleTimestamp: @bundle_timestamp,
         updateChunk: generate_set_prop_js(prop_name, value)
+      }
+    end
+
+    def generate_reject_chunk(prop_name, reason)
+      {
+        bundleTimestamp: @bundle_timestamp,
+        updateChunk: generate_reject_prop_js(prop_name, reason)
       }
     end
 
@@ -81,6 +137,25 @@ module ReactOnRailsPro
       JS
     end
 
+    def generate_reject_prop_js(prop_name, reason)
+      <<~JS.strip
+        (function(){
+          var asyncPropsManager = ReactOnRails.getOrCreateAsyncPropsManager(sharedExecutionContext);
+          asyncPropsManager.rejectProp(#{prop_name.to_json}, #{sanitized_rejection_reason(reason).to_json});
+        })()
+      JS
+    end
+
+    # Always return the generic message regardless of the internal reason. Raw
+    # Rails-side details such as SQL errors, file paths, or credentials must not
+    # reach the browser. The raw reason is still emitted to debug logs for
+    # operators; keep it below info level because staging log aggregators may
+    # persist those details.
+    def sanitized_rejection_reason(reason)
+      Rails.logger.debug { "[ReactOnRailsPro::AsyncProps] Prop rejected (internal reason): #{reason}" }
+      SANITIZED_REJECTION_REASON
+    end
+
     def generate_end_stream_js
       <<~JS.strip
         (function(){
@@ -88,6 +163,48 @@ module ReactOnRailsPro
           asyncPropsManager.endStream();
         })()
       JS
+    end
+  end
+
+  # Queue of prop names requested by React (pull mode).
+  # Wraps Async::Queue with automatic filtering of already-pushed props.
+  # dequeue returns nil after the queue is closed (render complete).
+  class PullRequestQueue
+    def initialize(pushed_props)
+      @queue = Async::Queue.new
+      @pushed_props = pushed_props
+      @closed = false
+    end
+
+    # Enqueue a propRequest from the Node renderer.
+    # Silently drops requests for props that have already been pushed.
+    def enqueue(prop_name)
+      # @pushed_props is mutated by AsyncPropsEmitter#call. In fiber-concurrent
+      # code this has a narrow TOCTOU window; duplicate requests are filtered on
+      # the TypeScript side via AsyncPropsManager's pullRequested flag.
+      return if @closed || @pushed_props.include?(prop_name)
+
+      @queue.enqueue(prop_name)
+    rescue Async::Queue::ClosedError
+      # Queue closed between the @closed guard and enqueue; safe to ignore.
+    end
+
+    # Blocks until a prop name is available, or returns nil if closed.
+    def dequeue
+      @queue.dequeue
+    rescue Async::Queue::ClosedError
+      nil
+    end
+
+    def close
+      return if @closed
+
+      @queue.close
+      @closed = true
+    end
+
+    def closed?
+      @closed
     end
   end
 end

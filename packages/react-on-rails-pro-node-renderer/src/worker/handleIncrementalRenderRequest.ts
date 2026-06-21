@@ -13,12 +13,22 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import { PassThrough } from 'stream';
+
 import type { ResponseResult } from '../shared/utils';
 import { handleRenderRequest } from './handleRenderRequest';
 import log from '../shared/log';
 import { getRequestBundleFilePath, isErrorRenderResult } from '../shared/utils';
 import { subSpan } from '../shared/tracing.js';
 import type { ExecutionContext } from './vm';
+import { formatPropRequestChunk, formatRenderCompleteChunk } from './streamingUtils';
+
+// These keys must match the constants in AsyncPropsManager.ts (react-on-rails-pro package)
+export const PULL_ENABLED_KEY = 'pullEnabled';
+export const PUSH_PROPS_KEY = 'pushProps';
+export const PROP_REQUEST_EMITTER_KEY = 'propRequestEmitter';
+export const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
+export const MAX_PULL_PROP_NAME_LENGTH = 256;
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
@@ -30,6 +40,15 @@ export type IncrementalRenderSink = {
 export type UpdateChunk = {
   bundleTimestamp: string | number;
   updateChunk: string;
+};
+
+type AsyncPropsManagerPullBridge = {
+  catchUpPropRequests: () => void;
+};
+
+type LegacyAsyncPropsManagerPullBridge = {
+  flushPendingPullRequests: () => void;
+  emitPendingPullRequests: () => void;
 };
 
 class InvalidIncrementalRenderChunkError extends Error {
@@ -52,6 +71,47 @@ function assertIsUpdateChunk(value: unknown): asserts value is UpdateChunk {
   }
 }
 
+function isAsyncPropsManagerPullBridge(value: unknown): value is AsyncPropsManagerPullBridge {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<AsyncPropsManagerPullBridge>;
+  return typeof candidate.catchUpPropRequests === 'function';
+}
+
+function isLegacyAsyncPropsManagerPullBridge(value: unknown): value is LegacyAsyncPropsManagerPullBridge {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<LegacyAsyncPropsManagerPullBridge>;
+  return (
+    typeof candidate.flushPendingPullRequests === 'function' &&
+    typeof candidate.emitPendingPullRequests === 'function'
+  );
+}
+
+/** @internal Used by protocol regression tests. */
+export function catchUpAsyncPropsManagerPullBridge(value: unknown): boolean {
+  if (isAsyncPropsManagerPullBridge(value)) {
+    value.catchUpPropRequests();
+    return true;
+  }
+
+  if (isLegacyAsyncPropsManagerPullBridge(value)) {
+    // Current AsyncPropsManager keeps both methods as aliases of
+    // catchUpPropRequests() for older node renderers. Calling both is
+    // intentionally harmless: buffered requests drain on the first call and
+    // pullRequested flags prevent duplicate emissions on the second.
+    value.flushPendingPullRequests();
+    value.emitPendingPullRequests();
+    return true;
+  }
+
+  return false;
+}
+
 export type IncrementalRenderInitialRequest = {
   firstRequestChunk: unknown;
   bundleTimestamp: string | number;
@@ -61,6 +121,8 @@ export type IncrementalRenderInitialRequest = {
 export type FirstIncrementalRenderRequestChunk = {
   renderingRequest: string;
   onRequestClosedUpdateChunk?: UpdateChunk;
+  pullEnabled?: boolean;
+  pushProps?: string[];
 };
 
 function assertFirstIncrementalRenderRequestChunk(
@@ -78,6 +140,18 @@ function assertFirstIncrementalRenderRequestChunk(
   // Validate onRequestClosedUpdateChunk if present (optional field)
   if ('onRequestClosedUpdateChunk' in chunk && chunk.onRequestClosedUpdateChunk) {
     assertIsUpdateChunk(chunk.onRequestClosedUpdateChunk);
+  }
+
+  if ('pullEnabled' in chunk && chunk.pullEnabled !== undefined && typeof chunk.pullEnabled !== 'boolean') {
+    throw new Error('Invalid first incremental render request chunk: pullEnabled must be a boolean');
+  }
+
+  if (
+    'pushProps' in chunk &&
+    chunk.pushProps !== undefined &&
+    (!Array.isArray(chunk.pushProps) || chunk.pushProps.some((propName) => typeof propName !== 'string'))
+  ) {
+    throw new Error('Invalid first incremental render request chunk: pushProps must be a string array');
   }
 }
 
@@ -139,9 +213,84 @@ export async function handleIncrementalRenderRequest(
       return { response };
     }
 
+    // Set up pull mode if enabled: inject propRequest emitter into sharedExecutionContext
+    // so AsyncPropsManager (inside VM) can emit propRequests to the response stream.
+    let finalResponse = response;
+    const { pullEnabled, pushProps } = firstRequestChunk;
+    if (pullEnabled && response.stream) {
+      const sourceStream = response.stream;
+      const { sharedExecutionContext } = executionContext;
+      sharedExecutionContext.set(PULL_ENABLED_KEY, true);
+      sharedExecutionContext.set(PUSH_PROPS_KEY, new Set(pushProps || []));
+
+      // Create injectable PassThrough — sits after the length-prefixed transform.
+      // Both HTML chunks (from React) and propRequest chunks (from us) flow through it.
+      const injectableStream = new PassThrough();
+      const writeRenderCompleteAndEnd = () => {
+        if (injectableStream.destroyed || injectableStream.writableEnded) return;
+        try {
+          injectableStream.write(formatRenderCompleteChunk());
+        } catch (err) {
+          log.warn({ msg: 'Failed to write renderComplete chunk', err });
+        }
+        injectableStream.end();
+      };
+
+      // Register event handlers BEFORE pipe() to guarantee we catch 'end'
+      // even if the source stream has already buffered all its data.
+      sourceStream.on('end', () => {
+        if (injectableStream.writableNeedDrain) {
+          injectableStream.once('drain', writeRenderCompleteAndEnd);
+          return;
+        }
+        writeRenderCompleteAndEnd();
+      });
+      sourceStream.on('error', (err) => {
+        injectableStream.destroy(err);
+      });
+      // Fastify destroys the returned stream when the browser/Rails client disconnects.
+      // Propagate that premature teardown back through the pull wrapper so upstream
+      // React/RSC work and async prop fetches abort just like the non-pull path.
+      injectableStream.once('close', () => {
+        if (!injectableStream.writableEnded && !sourceStream.destroyed) {
+          sourceStream.destroy();
+        }
+      });
+
+      // { end: false } prevents pipe from auto-closing injectableStream when
+      // the source ends — we write renderComplete in the 'end' handler above.
+      sourceStream.pipe(injectableStream, { end: false });
+
+      // Set the emitter callback — AsyncPropsManager calls this from inside the VM
+      sharedExecutionContext.set(PROP_REQUEST_EMITTER_KEY, (propName: string) => {
+        if (injectableStream.destroyed || injectableStream.writableEnded) {
+          log.warn({ msg: 'Skipping propRequest after stream closed', propName });
+          return;
+        }
+        if (propName.length > MAX_PULL_PROP_NAME_LENGTH) {
+          log.warn({
+            msg: 'Skipping oversized propRequest',
+            propNameLength: propName.length,
+            maxPropNameLength: MAX_PULL_PROP_NAME_LENGTH,
+          });
+          return;
+        }
+        try {
+          injectableStream.write(formatPropRequestChunk(propName));
+        } catch (err) {
+          log.error({ msg: 'Failed to write propRequest chunk', propName, err });
+        }
+      });
+
+      const manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY);
+      catchUpAsyncPropsManagerPullBridge(manager);
+
+      finalResponse = { ...response, stream: injectableStream };
+    }
+
     // Return the result with a sink that uses the execution context
     return {
-      response,
+      response: finalResponse,
       sink: {
         executionContext,
         add: async (chunk: unknown) => {

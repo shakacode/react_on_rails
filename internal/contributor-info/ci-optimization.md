@@ -26,11 +26,19 @@ The `required-pr-gate` job intentionally stays lightweight:
 - validates workflow YAML can be loaded by Ruby
 - syntax-checks CI shell helpers
 - runs `script/ci-changes-detector`
+- fails ordinary pull requests with generator-sensitive changes until hosted CI
+  is requested
 - checks basic repository structure
 
 Repository branch protection should require `ci-required / required-pr-gate`.
 Do not require heavyweight hosted jobs for ordinary review pushes unless the
 repository intentionally wants every PR update to allocate hosted runners.
+Generator-sensitive changes are the standing exception: when
+`script/ci-changes-detector` sets `run_generators=true`, the required gate
+blocks ordinary pull requests until `+ci-run-hosted`, `bin/request-hosted-ci`,
+or a maintainer/user-token `ready-for-hosted-ci` label requests hosted CI.
+Merge queue, push-to-main, and release-target runs already satisfy hosted
+eligibility.
 
 ## Hosted CI Modes
 
