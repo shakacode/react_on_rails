@@ -144,7 +144,7 @@ end
 def trusted_bot?(login, trust_config)
   normalized = normalized_login(login)
 
-  normalized.end_with?("[bot]") && trust_config.fetch(:trusted_bots).include?(normalized_bot_login(normalized))
+  normalized.end_with?("[bot]") && trust_config.fetch(:trusted_bots).include?(normalized.delete_suffix("[bot]"))
 end
 
 def collaborator_permission(repo, login)
