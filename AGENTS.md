@@ -19,8 +19,10 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   skills as launchers. Installed/global skills never override this repo's
   `AGENTS.md`; repo-local files win only when this repo explicitly names or
   keeps a local copy/override.
-- `.agents/bin/agent-workflow-seam-doctor`: validates that installed/shared
-  workflow skills can resolve this repo's seam.
+- `.agents/bin/agent-workflow-seam-doctor`: validates that repo-local or
+  installed/shared workflow skills can resolve this repo's seam; pass
+  `--shared <installed-skill-root>` when checking user-installed skills outside
+  this checkout.
 - `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing
   these agent workflows with other repositories through user-installed skills
   plus a repo-local seam
@@ -72,7 +74,7 @@ After fetching, verify the `## Agent Workflow Configuration` seam before relying
 on installed/shared skills for issue, PR, or batch work:
 
 ```bash
-.agents/bin/agent-workflow-seam-doctor
+.agents/bin/agent-workflow-seam-doctor --shared .agents
 ```
 
 If a workflow explicitly needs a repo-local `.agents/skills/...` or
@@ -89,7 +91,8 @@ the workflow logic but defer every repo-specific command, branch, label, path,
 and policy to this section. When a skill says "run the repo's local validation"
 or "use the hosted-CI trigger," the concrete value is here. Adopting repos
 replace these values with their own and validate the seam with
-`.agents/bin/agent-workflow-seam-doctor` (see
+`.agents/bin/agent-workflow-seam-doctor --shared .agents` or the installed
+checker with `--shared <installed-skill-root>` (see
 [`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md)).
 
 - **Base branch**: `main` (fetch and compare via `origin/main`).

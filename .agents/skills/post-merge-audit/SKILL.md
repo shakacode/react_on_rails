@@ -27,10 +27,11 @@ containing a `codex-claim` HTML comment (`<!-- codex-claim v1 ... -->`) with
 key/value fields in the "Public claim comment" format from
 `.agents/workflows/pr-processing.md`.
 
-When this repository includes `.agents/skills/post-merge-audit/bin/post-merge-audit-scope`, run it first:
+When this repository includes the `post-merge-audit-scope` helper, run it first:
 
 ```bash
-.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json
+POST_MERGE_AUDIT_SKILL_DIR="${POST_MERGE_AUDIT_SKILL_DIR:-.agents/skills/post-merge-audit}"
+"${POST_MERGE_AUDIT_SKILL_DIR}/bin/post-merge-audit-scope" --json
 ```
 
 The resolver is read-only. It resolves the default release-candidate base, the head SHA, squash-aware merged PRs, prior `post-merge-audit-finding` fingerprints, PRs with open finding markers, and the `to_audit` list. Open finding markers create carry-over PRs that are subtracted from `to_audit`; closed markers remain fingerprint context only. Use the output as the initial merged-PR scope table, then verify assumptions before deep audit.

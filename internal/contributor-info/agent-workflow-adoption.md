@@ -28,7 +28,9 @@ for the design rationale.
    platform's normal user-skill installation mechanism. Until the shared skill
    pack has a dedicated release channel, treat the React on Rails shared skills
    as the source material for installation, not as files to customize inside the
-   consumer repo.
+   consumer repo. Install each skill's `bin/` helper scripts with its `SKILL.md`;
+   shared workflows such as PR batching, review triage, and changelog updates
+   call those helpers.
 
 3. **Add the seam to `AGENTS.md`.** Add an `## Agent Workflow Configuration`
    section using the template below, filled with the target repo's real values.
@@ -37,12 +39,15 @@ for the design rationale.
 4. **Keep repo-local skills local.** Add only repo-specific skills, tiny
    compatibility launchers, or local validation helpers to the repo. Do not copy
    shared workflow text into the repo unless the execution environment cannot
-   load user-installed skills.
+   load user-installed skills. If an agent surface can load installed skill
+   Markdown but cannot execute the installed skill's `bin/` helpers, keep a
+   local helper copy or compatibility launcher for that skill.
 
 5. **Validate the seam.** Run `agent-workflow-seam-doctor` from the shared skill
-   pack, or `.agents/bin/agent-workflow-seam-doctor` in repos that keep a local
-   copy of the checker. Then run one dry workflow pass that resolves the seam
-   values without making changes.
+   pack with `--shared` pointing at the installed shared-skill root, or
+   `.agents/bin/agent-workflow-seam-doctor` in repos that keep local shared
+   copies. Then run one dry workflow pass that resolves the seam values without
+   making changes.
 
 6. **Make `AGENTS.md` canonical.** It owns commands, testing, style, git/PR
    safety, release policy, and documentation boundaries. Tool-specific files
@@ -82,18 +87,19 @@ equivalent manually"; the workflow structure still transfers.
 Run the seam doctor after adding or changing the seam:
 
 ```bash
-agent-workflow-seam-doctor
+agent-workflow-seam-doctor --shared "${SHARED_AGENT_SKILLS_ROOT:?set installed shared skill root}"
 ```
 
 For repos that keep the checker in the checkout:
 
 ```bash
-.agents/bin/agent-workflow-seam-doctor
+.agents/bin/agent-workflow-seam-doctor --shared .agents
 ```
 
 The checker should pass before agents rely on installed shared skills. It fails
-when required seam keys are missing or executable snippets still contain
-unresolved seam placeholders such as `<follow-up prefix>`.
+when required seam keys are missing or executable snippets in the repo-local or
+installed shared skill Markdown still contain unresolved seam placeholders such
+as `<follow-up prefix>`.
 
 ## Shared Vs Repo-Local Skills
 
@@ -115,7 +121,7 @@ updates reviewed in that repo. If a repo chooses that route:
 - document the source and version of the pinned copy
 - do not customize shared files in place
 - keep repo-specific values in `AGENTS.md`, not in the pinned files
-- run the seam doctor after every sync or update
+- run the seam doctor with `--shared` after every sync or update
 
 Do not make repo pinning the default adoption step.
 
@@ -142,7 +148,7 @@ fallback until a public backend spec exists.
 
 ## Validation Checklist
 
-- `agent-workflow-seam-doctor` passes.
+- `agent-workflow-seam-doctor --shared <installed-or-pinned-shared-skill-root>` passes.
 - Markdown formatting and link checks pass for edited docs.
 - Skill `bin/` unit tests pass when the repo carries local helper scripts.
 - A dry run of `$pr-batch` stops with an exact target list and goal prompt
@@ -162,7 +168,7 @@ fallback until a public backend spec exists.
 
 ## Validation
 
-- `agent-workflow-seam-doctor`
+- `agent-workflow-seam-doctor --shared <installed-or-pinned-shared-skill-root>`
 - markdown formatting + link check
 - dry-run `$pr-batch` and PR-review triage without code changes
 ```

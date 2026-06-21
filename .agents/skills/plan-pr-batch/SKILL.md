@@ -72,7 +72,7 @@ Plan a PR batch
      diff and the Files API must independently agree on the path set — a
      fail-safe against a silent under-report scheduling two colliding items into
      the same wave:
-     `.agents/skills/plan-pr-batch/bin/pr-file-touch-map N --repo OWNER/REPO --cross-check`
+     `PLAN_PR_BATCH_SKILL_DIR="${PLAN_PR_BATCH_SKILL_DIR:-.agents/skills/plan-pr-batch}"; "${PLAN_PR_BATCH_SKILL_DIR}/bin/pr-file-touch-map" N --repo OWNER/REPO --cross-check`
      It prints `{pr, repo, source, changed_files, paths, renames}`:
      - `source` is `verified` (cross-check: both sources agreed — the only value
        safe to place in a parallel worktree lane), `local-diff` / `files-api`

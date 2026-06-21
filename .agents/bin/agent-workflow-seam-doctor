@@ -6,6 +6,7 @@
 require "json"
 require "optparse"
 
+# rubocop:disable Metrics/ModuleLength
 module AgentWorkflowSeamDoctor
   SECTION = "Agent Workflow Configuration"
   SECTION_HEADING = /^##\s+#{Regexp.escape(SECTION)}\s*$/
@@ -27,7 +28,7 @@ module AgentWorkflowSeamDoctor
     "Coordination backend"
   ].freeze
 
-  SEAM_PLACEHOLDER = /
+  SEAM_PLACEHOLDER = %r{
     <[^>\n]*
     (?:
       follow-up\ prefix |
@@ -37,12 +38,18 @@ module AgentWorkflowSeamDoctor
       base\ branch |
       local\ validation |
       CI\ change\ detector |
+      lint\ /\ format |
+      docs\ checks |
+      tests?\ commands? |
+      unit\ /\ integration\ /\ e2e\ commands |
+      build\ /\ type\ checks? |
       merge\ ledger |
       review\ gate |
+      approval[-\ ]exempt\ change\ categor(?:y|ies) |
       coordination\ backend
     )
     [^>\n]*>
-  /ix
+  }ix
   EXECUTABLE_FENCE_LANGS = ["", "bash", "sh", "shell", "zsh", "ruby", "python", "js", "javascript"].freeze
   COMMAND_LIKE = %r{
     (?:\b(?:bash|bundle|codex|gh|git|node|npm|pnpm|rake|ruby|script|sh|yarn)\b) |
@@ -51,7 +58,7 @@ module AgentWorkflowSeamDoctor
 
   module_function
 
-  def check(root)
+  def check(root, shared_roots: [])
     issues = []
     agents_path = File.join(root, "AGENTS.md")
 
@@ -64,7 +71,7 @@ module AgentWorkflowSeamDoctor
       issues.concat(missing_key_issues(config))
     end
 
-    shared_markdown_paths(root).each do |path|
+    shared_markdown_paths(root, shared_roots:).each do |path|
       issues.concat(executable_placeholder_issues(root, path))
     end
 
@@ -75,14 +82,32 @@ module AgentWorkflowSeamDoctor
     section = extract_section(text)
     return nil if section.nil?
 
-    section.each_line.with_object({}) do |line, config|
-      match = line.match(/^\s*-\s+\*\*(.+?)\*\*:\s*(.*)$/)
-      next if match.nil?
+    config = {}
+    current_key = nil
 
-      key = match[1].strip
-      value = match[2].strip
-      config[key] = value
+    section.each_line do |line|
+      if (match = line.match(/^\s*-\s+\*\*(.+?)\*\*:\s*(.*)$/))
+        current_key = match[1].strip
+        config[current_key] = match[2].strip
+        next
+      end
+
+      if config_continuation?(line, current_key)
+        config[current_key] = [config[current_key], line.strip].reject(&:empty?).join(" ")
+      elsif config_key_finished?(line)
+        current_key = nil
+      end
     end
+
+    config
+  end
+
+  def config_continuation?(line, current_key)
+    current_key && line.match?(/^\s{2,}\S/) && !line.match?(/^\s*-\s+/)
+  end
+
+  def config_key_finished?(line)
+    !line.strip.empty? || line.empty?
   end
 
   def extract_section(text)
@@ -115,11 +140,21 @@ module AgentWorkflowSeamDoctor
     stripped.empty? || stripped.match?(/\A<[^>]+>\.?\z/)
   end
 
-  def shared_markdown_paths(root)
-    [
+  def shared_markdown_paths(root, shared_roots: [])
+    repo_patterns = [
       File.join(root, ".agents/skills/**/*.md"),
       File.join(root, ".agents/workflows/**/*.md")
-    ].flat_map { |pattern| Dir.glob(pattern) }.sort
+    ]
+    shared_patterns = shared_roots.flat_map do |shared_root|
+      expanded = File.expand_path(shared_root)
+      [
+        File.join(expanded, "**/*.md")
+      ]
+    end
+
+    (repo_patterns + shared_patterns).flat_map { |pattern| Dir.glob(pattern) }.map do |path|
+      File.expand_path(path)
+    end.uniq.sort
   end
 
   def executable_placeholder_issues(root, path)
@@ -143,7 +178,7 @@ module AgentWorkflowSeamDoctor
   end
 
   def update_fence_state(line, in_fence)
-    fence = line.match(/^\s*```([[:alnum:]_-]*)\s*$/)
+    fence = line.match(/^\s*```([[:alnum:]_-]*)(?:\s.*)?$/)
     return nil if fence.nil?
 
     return [false, false] if in_fence
@@ -201,12 +236,16 @@ module AgentWorkflowSeamDoctor
                             })}\n"
   end
 end
+# rubocop:enable Metrics/ModuleLength
 
 if $PROGRAM_NAME == __FILE__
-  options = { root: Dir.pwd, json: false }
+  options = { root: Dir.pwd, json: false, shared_roots: [] }
   parser = OptionParser.new do |opts|
-    opts.banner = "Usage: agent-workflow-seam-doctor [--root DIR] [--json]"
+    opts.banner = "Usage: agent-workflow-seam-doctor [--root DIR] [--shared DIR] [--json]"
     opts.on("--root DIR", "Repository root to inspect") { |value| options[:root] = value }
+    opts.on("--shared DIR", "Installed shared skill/workflow root to scan; repeatable") do |value|
+      options[:shared_roots] << value
+    end
     opts.on("--json", "Print JSON output") { options[:json] = true }
     opts.on("-h", "--help", "Show help") do
       puts opts
@@ -216,7 +255,7 @@ if $PROGRAM_NAME == __FILE__
   parser.parse!
 
   root = File.expand_path(options.fetch(:root))
-  issues = AgentWorkflowSeamDoctor.check(root)
+  issues = AgentWorkflowSeamDoctor.check(root, shared_roots: options.fetch(:shared_roots))
   print(options[:json] ? AgentWorkflowSeamDoctor.format_json(issues) : AgentWorkflowSeamDoctor.format_text(issues))
   exit(issues.empty? ? 0 : 1)
 end

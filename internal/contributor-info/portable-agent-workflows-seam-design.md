@@ -71,8 +71,9 @@ repo:
 
 - verifies that `AGENTS.md` has the required seam keys
 - fails on unresolved template values in the seam
-- scans shared skill/workflow Markdown for executable snippets that still
-  contain unresolved seam placeholders such as `<follow-up prefix>`
+- scans repo-local and explicitly supplied installed shared skill/workflow
+  Markdown for executable snippets that still contain unresolved seam
+  placeholders such as `<follow-up prefix>`
 
 It does not reject ordinary command parameters such as `<PR>` or `<sha>`. Those
 are task inputs, not repo-seam values.
@@ -102,11 +103,17 @@ Shared skills should contain portable procedure and safety rules:
 - post-merge and adversarial audits
 - CI routing helpers
 
+Shared skill installation must include each skill's `bin/` helpers with its
+`SKILL.md`, and workflow text should call helpers relative to the installed
+skill directory or through a repo-local compatibility launcher. A repo that can
+load installed skill Markdown but cannot execute installed helper scripts should
+pin the helper scripts locally.
+
 Repo-local content should contain concrete policy and domain knowledge:
 
 - `AGENTS.md`
 - repo-specific destructive or domain-heavy skills
-- local scripts such as seam validators
+- local scripts such as seam validators or helper launchers
 - compatibility copies only when a tool cannot load installed skills
 
 ## Phasing

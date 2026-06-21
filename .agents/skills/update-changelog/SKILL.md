@@ -108,12 +108,13 @@ Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to th
 ```bash
 BASE_REF="${BASE_REF:?set BASE_REF, e.g. v17.0.0.rc.1}"
 TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/main}"
+UPDATE_CHANGELOG_SKILL_DIR="${UPDATE_CHANGELOG_SKILL_DIR:-.agents/skills/update-changelog}"
 
 # JSON array of {pr, sha, subject}; pr is an integer, or the string "UNKNOWN".
-.agents/skills/update-changelog/bin/changelog-merged-prs "${BASE_REF}..${TARGET_REF}"
+"${UPDATE_CHANGELOG_SKILL_DIR}/bin/changelog-merged-prs" "${BASE_REF}..${TARGET_REF}"
 
 # Or --text for pr<TAB>sha<TAB>subject rows (UNKNOWN in the pr column):
-.agents/skills/update-changelog/bin/changelog-merged-prs "${BASE_REF}..${TARGET_REF}" --text
+"${UPDATE_CHANGELOG_SKILL_DIR}/bin/changelog-merged-prs" "${BASE_REF}..${TARGET_REF}" --text
 ```
 
 The helper defaults the repo to `gh repo view`; pass `--repo OWNER/REPO` to override. Run `changelog-merged-prs --help` for the full output contract and `--self-check` to validate the parser and a read-only `gh` smoke test. Each row is a merged PR for the range; rows with `"pr": "UNKNOWN"` are commits that could not be mapped to a merged PR on the default branch.
@@ -331,7 +332,7 @@ When a new version is released:
 1. Run `git log --oneline LATEST_TAG..origin/main` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
 2. Extract PR numbers: `git log --oneline LATEST_TAG..origin/main | grep -oE "#[0-9]+" | sort -u`
 3. If Step 2 found no missing tagged versions, verify no tag is ahead of main: `git log --oneline origin/main..LATEST_TAG` should be empty. If not, entries in "Unreleased" may belong to that tagged version — Step 2 should have caught this, so re-check.
-4. For each PR number, check if it's already in the changelog: `grep "PR XXX" <changelog path>`
+4. For each PR number, check if it's already in the changelog: `CHANGELOG_PATH="${CHANGELOG_PATH:?set CHANGELOG_PATH from AGENTS.md -> Agent Workflow Configuration}"; grep "PR ${PR_NUMBER:?set PR_NUMBER}" "${CHANGELOG_PATH}"`
 5. For PRs not yet in the changelog:
    - Get PR details: `gh pr view NUMBER --json title,body,author` (add `--repo OWNER/REPO` when not in the repo)
    - **Never ask the user for PR details** - get them from git history or the GitHub API

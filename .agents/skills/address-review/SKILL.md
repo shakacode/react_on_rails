@@ -156,7 +156,8 @@ Include the review body as a general comment when it contains actionable feedbac
 **If only PR number is provided (full-PR scan), fetch all review data with the helper:**
 
 ```bash
-.agents/skills/address-review/bin/fetch-pr-review-data "${PR_NUMBER}" --repo "${REPO}" > review-data.json
+ADDRESS_REVIEW_SKILL_DIR="${ADDRESS_REVIEW_SKILL_DIR:-.agents/skills/address-review}"
+"${ADDRESS_REVIEW_SKILL_DIR}/bin/fetch-pr-review-data" "${PR_NUMBER}" --repo "${REPO}" > review-data.json
 ```
 
 This single read-only call replaces the per-endpoint `gh api ... | jq` blocks and the `reviewThreads` GraphQL query. It emits one normalized JSON document:
