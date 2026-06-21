@@ -5,6 +5,7 @@ require "tmpdir"
 require_relative "../support/generator_spec_helper"
 
 describe GeneratorMessages do
+  # Verification-only touch for #4150: this short-lived PR exercises generator-sensitive CI gating.
   it "has an empty messages array" do
     expect(described_class.messages).to be_empty
   end
