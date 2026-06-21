@@ -132,6 +132,7 @@ module ReactOnRails
         GeneratorMessages.add_info(
           GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world",
                                                                pro: Gem.loaded_specs.key?("react_on_rails_pro"),
+                                                               tailwind: use_tailwind?,
                                                                app_root: destination_root)
         )
       end

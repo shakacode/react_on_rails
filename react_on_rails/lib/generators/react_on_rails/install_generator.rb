@@ -751,6 +751,7 @@ module ReactOnRails
                                      shakapacker_just_installed: shakapacker_just_installed?,
                                      landing_page: options.new_app? && new_app_root_route_available?,
                                      ci_workflow_generated: @ci_workflow_generated == true,
+                                     tailwind: use_tailwind?,
                                      app_root: destination_root
                                    ))
         GeneratorMessages.add_info(rsc_verification_message) if use_rsc?
