@@ -4,6 +4,10 @@
 trusted_users:
   - justin808
 
+# Bot entries are base bot names. GitHub API logins usually include the
+# `[bot]` suffix; humans with the same base login are not trusted by this list.
+# Trusted bots are exempt from hidden-participant blocking, so keep this list
+# limited to bot identities whose generated PR content is safe to process.
 trusted_bots:
   - chatgpt-codex-connector
   - claude
