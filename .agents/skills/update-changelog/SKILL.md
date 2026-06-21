@@ -168,7 +168,7 @@ When a revert lands in the selected RC/release window, re-run the sweep or revis
 
 Each changelog entry MUST follow the repo's exact entry format (the PR-and-author link format defined by the repo's changelog; see `AGENTS.md` → **Agent Workflow Configuration**). Match the existing entries in the changelog and follow these portable structural rules:
 
-- Start with a dash and space: `- `
+- Start with a dash followed by a space
 - Use **bold** for the main description
 - End the bold description with a period before the link
 - Always link to the PR using the repo's PR-link format — **NO hash symbol** before the PR number
