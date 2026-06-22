@@ -94,6 +94,7 @@ module ReactOnRails
           expect(default).not_to include("react-intl")
           expect(default).not_to include("defineMessages")
           expect(File.mtime(default_path)).not_to eq(ref_time)
+          expect(File.mtime(translations_path)).not_to eq(ref_time)
         end
       end
     end
