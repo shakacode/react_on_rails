@@ -179,6 +179,7 @@ module AgentWorkflowSeamDoctor
     [
       File.join(expanded, "skills/**/*.md"),
       File.join(expanded, "workflows/**/*.md"),
+      # Also support passing an installed skill root directly, without a parent skills/ directory.
       File.join(expanded, "**/SKILL.md")
     ]
   end
@@ -189,7 +190,7 @@ module AgentWorkflowSeamDoctor
     executable_fence = false
     fence_delimiter = nil
 
-    File.readlines(path).each_with_index do |line, index|
+    File.binread(path).force_encoding("UTF-8").scrub.each_line.with_index do |line, index|
       line_number = index + 1
       fence_state = update_fence_state(line, in_fence, fence_delimiter)
       if fence_state
@@ -205,7 +206,7 @@ module AgentWorkflowSeamDoctor
   end
 
   def update_fence_state(line, in_fence, fence_delimiter)
-    fence = line.match(/^\s*(```|~~~)([[:alnum:]_-]*)(?:\s.*)?$/)
+    fence = line.match(/^ {0,3}(```|~~~)([[:alnum:]_-]*)(?:\s.*)?$/)
     return nil if fence.nil?
 
     delimiter = fence[1]

@@ -313,6 +313,17 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
     end
   end
 
+  def test_four_space_indented_fence_does_not_open_executable_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "    ```bash\n    gh issue create --title \"<follow-up prefix> Review feedback\"\n    ```\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
   def test_inline_code_in_executable_fence_is_not_reported_twice
     with_repo do |root|
       write_agents(root)
@@ -369,6 +380,18 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
 
       refute status.success?
       assert_includes out, ".agents/workflows/example.md"
+    end
+  end
+
+  def test_invalid_utf8_markdown_does_not_crash_scanner
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "No commands here.\n")
+      File.binwrite(File.join(root, ".agents/skills/example/invalid.md"), "Latin-1 byte: \xE9\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
     end
   end
 end
