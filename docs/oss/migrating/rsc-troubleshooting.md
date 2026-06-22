@@ -340,7 +340,11 @@ the page source — it is not an open defect. It applies to React 19+ installati
 versions do not support the `data-precedence` stylesheet groups used for this hoisting and
 render-blocking behavior.
 
-For RSC pages, React on Rails Pro injects one `<link rel="stylesheet" data-precedence="rsc-css">` per `'use client'` reference's CSS. These links are **render-blocking** for the streamed RSC tree: React delays committing the streamed content until the referenced stylesheets are ready, which prevents a flash of unstyled content (FOUC) as the tree streams in.
+For RSC pages, React on Rails Pro injects one
+`<link rel="stylesheet" data-precedence="rsc-css">` per `'use client'` reference's CSS. These links are
+**render-blocking** for the streamed RSC tree: React delays committing the streamed content until the
+referenced stylesheets are ready, which prevents a flash of unstyled content (FOUC) as the tree streams
+in.
 
 ### Per-reference broadcast multiplication (fixed in the 19.2 line)
 
@@ -363,8 +367,10 @@ version with the fix. Key constraints:
 - **Do not** use the default React 19.0.x generator pin from
   [Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md)
   for this duplicate-CSS fix; that guide remains the baseline 19.0.x RSC setup path.
-- Use release notes or maintainer-provided 19.2 compatibility guidance for the exact React, React
-  DOM, React on Rails Pro, and `react-on-rails-rsc` versions.
+- Use the
+  [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases) or
+  maintainer-provided 19.2 compatibility guidance for the exact React, React DOM, React on Rails Pro,
+  and `react-on-rails-rsc` versions.
 
 On a supported, coordinated version set this is resolved — the shared CSS is emitted once.
 

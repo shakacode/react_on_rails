@@ -5952,14 +5952,15 @@ stylesheets — including the Rails-layout `stylesheet_pack_tag` links that have
 attribute.
 
 This matters when an RSC CSS Module contains an **unscoped global selector**. CSS Module _class names_
-are scoped, but selectors such as `html`, `body`, or `:root` still apply globally. Because the
-`data-precedence="rsc-css"` group lands last, an unscoped selector inside a CSS Module can override
-your global styles unexpectedly once that stylesheet is delivered:
+are scoped, but selectors such as `html`, `body`, `:root`, the universal selector `*`, bare
+pseudo-elements like `::before` or `::placeholder`, and attribute selectors like `[data-theme]` still
+apply globally. Because the `data-precedence="rsc-css"` group lands last, an unscoped selector inside a
+CSS Module can override your global styles unexpectedly once that stylesheet is delivered:
 
 ```css
 /* WRONG: a Bootstrap-style bare element selector inside an RSC CSS Module.
    It is NOT scoped, and the rsc-css group lands at the end of <head>, so this
-   can win source-order ties against a global html rule and reset the root
+   will win source-order ties against a global html rule and reset the root
    font-size site-wide. */
 html {
   font-size: 14px;
