@@ -23,9 +23,14 @@ import { Readable } from 'stream';
 import transformRSCStream from '../src/transformRSCNodeStream.ts';
 import {
   buildRSCStreamDiagnosticError,
+  combineRSCStreamDiagnosticErrors,
+  extractMergedRSCStreamDiagnosticMessage,
   extractModulePathFromStack,
   mergeRSCStreamDiagnosticError,
   MERGED_DIAGNOSTIC_FLAG,
+  REACT_STREAM_ERROR_SEPARATOR,
+  RSC_STREAM_DIAGNOSTIC_ERROR_NAME,
+  rscStreamDiagnosticMatchesError,
 } from '../src/rscDiagnostics.ts';
 
 const encodeLengthPrefixedChunk = (metadata: Record<string, unknown>, content: string) => {
@@ -88,9 +93,111 @@ describe('RSC diagnostics', () => {
     expect(mergedError.name).toBe('ReactOnRailsRSCStreamError');
     expect(mergedError.message).toContain('Original error: useState is not a function');
     expect(mergedError.message).toContain(
-      'React stream error: An error occurred in the Server Components render.',
+      `${REACT_STREAM_ERROR_SEPARATOR} An error occurred in the Server Components render.`,
     );
     expect(mergedError.stack).toContain('CommentsToggle.jsx:12:15');
+  });
+
+  it('extracts the diagnostic side when diagnostic text contains the React stream separator', () => {
+    const diagnosticError = new Error(
+      '[ReactOnRails] RSC bundle rendering failed.\n' +
+        `Original error: user text includes${REACT_STREAM_ERROR_SEPARATOR} inside it`,
+    );
+    const genericStreamError = new Error('An error occurred in the Server Components render.');
+
+    const mergedError = mergeRSCStreamDiagnosticError(genericStreamError, diagnosticError);
+
+    expect(extractMergedRSCStreamDiagnosticMessage(mergedError)).toBe(diagnosticError.message);
+  });
+
+  it('extracts the diagnostic side when stream text contains the React stream separator', () => {
+    const diagnosticError = new Error('[ReactOnRails] RSC bundle rendering failed.');
+    const streamError = new Error(`stream text includes${REACT_STREAM_ERROR_SEPARATOR} inside it`);
+
+    const mergedError = mergeRSCStreamDiagnosticError(streamError, diagnosticError);
+
+    expect(extractMergedRSCStreamDiagnosticMessage(mergedError)).toBe(diagnosticError.message);
+  });
+
+  it.each(['stream message with trailing whitespace \n', '   '])(
+    'extracts the diagnostic side by matching the raw stream suffix %#',
+    (streamMessage) => {
+      const diagnosticError = new Error('[ReactOnRails] RSC bundle rendering failed.');
+      const streamError = new Error(streamMessage);
+
+      const mergedError = mergeRSCStreamDiagnosticError(streamError, diagnosticError);
+
+      expect(extractMergedRSCStreamDiagnosticMessage(mergedError)).toBe(diagnosticError.message);
+    },
+  );
+
+  it('preserves merged-looking messages without an Error cause', () => {
+    const error = new Error(
+      `[ReactOnRails] RSC bundle rendering failed.${REACT_STREAM_ERROR_SEPARATOR} inside user text` +
+        `${REACT_STREAM_ERROR_SEPARATOR} React suffix without structural cause`,
+    );
+
+    expect(extractMergedRSCStreamDiagnosticMessage(error)).toBe(error.message);
+  });
+
+  it('matches React generic Server Components render errors', () => {
+    const genericStreamError = new Error('An error occurred in the Server Components render.');
+
+    // NOTE: if this assertion breaks after a React upgrade, update GENERIC_RSC_STREAM_ERROR_PREFIXES.
+    expect(rscStreamDiagnosticMatchesError(genericStreamError)).toBe(true);
+  });
+
+  it('matches production-expanded React generic Server Components render errors', () => {
+    const genericStreamError = new Error(
+      'An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details.',
+    );
+
+    // NOTE: if this assertion breaks after a React upgrade, update GENERIC_RSC_STREAM_ERROR_PREFIXES.
+    expect(rscStreamDiagnosticMatchesError(genericStreamError)).toBe(true);
+  });
+
+  it('matches React generic Server Components render errors with newline-delimited details', () => {
+    const genericStreamError = new Error(
+      'An error occurred in the Server Components render.\nThe specific message is omitted in production builds.',
+    );
+
+    // NOTE: if this assertion breaks after a React upgrade, update GENERIC_RSC_STREAM_ERROR_PREFIXES.
+    expect(rscStreamDiagnosticMatchesError(genericStreamError)).toBe(true);
+  });
+
+  it('does not match React generic Server Components render prefixes without a separator boundary', () => {
+    const genericLookalikeError = new Error('An error occurred in the Server Components render.SomeSuffix');
+
+    expect(rscStreamDiagnosticMatchesError(genericLookalikeError)).toBe(false);
+  });
+
+  it('does not match ordinary stream errors that share the diagnostic first line', () => {
+    const streamError = new Error('useState is not a function\nextra context from React');
+
+    expect(rscStreamDiagnosticMatchesError(streamError)).toBe(false);
+  });
+
+  it('keeps built RSC diagnostics from matching ordinary same-message stream errors', () => {
+    const diagnosticError = buildRSCStreamDiagnosticError(
+      {
+        renderingError: {
+          message: 'useState is not a function',
+          stack:
+            'TypeError: useState is not a function\n    at CommentsToggle (/app/CommentsToggle.tsx:10:5)',
+        },
+      },
+      { componentName: 'CommentsToggle' },
+    );
+    const streamError = new Error('useState is not a function\nextra context from React');
+
+    if (!diagnosticError) throw new Error('Expected RSC stream diagnostic metadata to build an error');
+    expect(rscStreamDiagnosticMatchesError(streamError)).toBe(false);
+  });
+
+  it('does not match unrelated ordinary React errors', () => {
+    const unrelatedStreamError = new Error('Unrelated Suspense failure');
+
+    expect(rscStreamDiagnosticMatchesError(unrelatedStreamError)).toBe(false);
   });
 
   it('keeps diagnostic merges idempotent when a merged error reaches another catch handler', () => {
@@ -238,6 +345,109 @@ describe('RSC diagnostics', () => {
 
     expect(Object.keys(mergedError)).not.toContain(MERGED_DIAGNOSTIC_FLAG);
     expect(Object.prototype.hasOwnProperty.call(mergedError, MERGED_DIAGNOSTIC_FLAG)).toBe(true);
+  });
+
+  describe('combineRSCStreamDiagnosticErrors', () => {
+    const makeDiagnostic = (componentName: string) =>
+      buildRSCStreamDiagnosticError(
+        {
+          hasErrors: true,
+          renderingError: {
+            message: `boom in ${componentName}`,
+            stack: `Error: boom\n    at ${componentName} (/app/components/${componentName}.jsx:3:5)`,
+          },
+        },
+        { componentName },
+      ) as Error;
+
+    it('returns undefined when no diagnostics are provided', () => {
+      expect(combineRSCStreamDiagnosticErrors([])).toBeUndefined();
+    });
+
+    it('returns the single diagnostic unchanged when exactly one is provided', () => {
+      const diagnostic = makeDiagnostic('CommentsToggle');
+      expect(combineRSCStreamDiagnosticErrors([diagnostic])).toBe(diagnostic);
+    });
+
+    it('throws in dev/test when given an already-merged diagnostic', () => {
+      const diagnostic = makeDiagnostic('CommentsToggle');
+      const merged = mergeRSCStreamDiagnosticError(
+        new Error('An error occurred in the Server Components render.'),
+        diagnostic,
+      );
+
+      expect(() => combineRSCStreamDiagnosticErrors([merged])).toThrow(
+        'received an already-merged error as input',
+      );
+    });
+
+    it('drops already-merged diagnostics in production before combining candidates', () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      process.env.NODE_ENV = 'production';
+      try {
+        const diagnostic = makeDiagnostic('CommentsToggle');
+        const merged = mergeRSCStreamDiagnosticError(
+          new Error('An error occurred in the Server Components render.'),
+          diagnostic,
+        );
+        const otherDiagnostic = makeDiagnostic('PostsPage');
+
+        expect(combineRSCStreamDiagnosticErrors([merged, otherDiagnostic])).toBe(otherDiagnostic);
+        expect(consoleError).toHaveBeenCalledWith(
+          '[ReactOnRails] combineRSCStreamDiagnosticErrors: received an already-merged error as input; pass only raw diagnostics from buildRSCStreamDiagnosticError',
+        );
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+        consoleError.mockRestore();
+      }
+    });
+
+    it('lists every captured component as a candidate when two or more are provided', () => {
+      const combined = combineRSCStreamDiagnosticErrors([
+        makeDiagnostic('CommentsToggle'),
+        makeDiagnostic('PostsPage'),
+      ]) as Error;
+
+      expect(combined.name).toBe(RSC_STREAM_DIAGNOSTIC_ERROR_NAME);
+      expect(combined.message).toContain('one of these 2 RSC components failed');
+      // Never a single false pinpoint — both candidates are named.
+      expect(combined.message).toContain('Candidate 1:');
+      expect(combined.message).toContain('Component: CommentsToggle');
+      expect(combined.message).toContain('Module: /app/components/CommentsToggle.jsx');
+      expect(combined.message).toContain('Candidate 2:');
+      expect(combined.message).toContain('Component: PostsPage');
+      expect(combined.message).toContain('Module: /app/components/PostsPage.jsx');
+    });
+
+    it('reduces the combined stack to the header line so monitors do not misattribute the origin', () => {
+      const combined = combineRSCStreamDiagnosticErrors([
+        makeDiagnostic('CommentsToggle'),
+        makeDiagnostic('PostsPage'),
+      ]) as Error;
+
+      expect(combined.stack?.split('\n')[0]).toBe(`${combined.name}: ${combined.message.split('\n')[0]}`);
+      expect(combined.stack).not.toContain('rscDiagnostics');
+      // Candidate stacks are preserved for debugging.
+      expect(combined.stack).toContain('\n\nCandidate 1 stack:');
+      expect(combined.stack).toContain('Candidate 1 stack:');
+      expect(combined.stack).toContain('Candidate 2 stack:');
+    });
+
+    it('merges cleanly into a generic React stream error via mergeRSCStreamDiagnosticError', () => {
+      const combined = combineRSCStreamDiagnosticErrors([
+        makeDiagnostic('CommentsToggle'),
+        makeDiagnostic('PostsPage'),
+      ]);
+      const reactStreamError = new Error('An error occurred in the Server Components render.');
+
+      const merged = mergeRSCStreamDiagnosticError(reactStreamError, combined);
+
+      expect(merged.message).toContain('one of these 2 RSC components failed');
+      expect(merged.message).toContain(
+        `${REACT_STREAM_ERROR_SEPARATOR} An error occurred in the Server Components render.`,
+      );
+    });
   });
 
   it('treats a merged diagnostic as idempotent even when the message format changes', () => {

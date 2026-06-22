@@ -274,11 +274,15 @@ describe('html streaming', () => {
       expect(chunksWithError).toHaveLength(1);
       expect(chunksWithError[0].isShellReady).toBeTruthy();
       expect(chunksWithError[0].renderingError).toMatchObject({
-        message: 'Async error from AsyncHelloWorldHooks',
+        message: expect.stringContaining('Async error from AsyncHelloWorldHooks'),
         stack: expect.stringMatching(
           /Error: Async error from AsyncHelloWorldHooks\s*at AsyncHelloWorldHooks/,
         ),
       });
+      // Component-specific async errors stay un-enriched to avoid matching unrelated RSC diagnostics.
+      // Generic React RSC stream-error enrichment is covered in streamServerRenderedReactComponent tests.
+      const { message: renderingErrorMessage } = chunksWithError[0].renderingError;
+      expect(renderingErrorMessage).not.toContain('[ReactOnRails] RSC bundle rendering failed.');
       expect(jsonChunks.filter((chunk) => chunk.renderingError)).toHaveLength(1);
     },
     10000,
