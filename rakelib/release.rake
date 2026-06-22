@@ -460,6 +460,7 @@ def npm_publish_base_args(actual_gem_version:, actual_npm_version:, current_bran
   is_release_branch = current_branch.to_s.start_with?("release/")
 
   npm_base_args << "--no-git-checks" if is_prerelease || is_release_branch
+  # `--publish-branch` is pnpm-specific; `publish_npm_with_retry` shells out to `pnpm publish`.
   npm_base_args += ["--publish-branch", current_branch] if !is_prerelease && is_release_branch
 
   npm_base_args
@@ -612,7 +613,8 @@ def ensure_release_branch_head_matches_remote!(monorepo_root:, ci_branch:, remot
       allow_override:,
       dry_run:
     )
-    return false
+    # Strict mode aborts above; override/dry-run mode should still evaluate remote CI after warning.
+    return true
   end
 
   local_sha = head_output.strip
@@ -630,7 +632,8 @@ def ensure_release_branch_head_matches_remote!(monorepo_root:, ci_branch:, remot
     allow_override:,
     dry_run:
   )
-  false
+  # Strict mode aborts above; override/dry-run mode should still evaluate remote CI after warning.
+  true
 end
 
 def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
@@ -668,7 +671,7 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false, 
   # is changelog/docs/comment-only (e.g. the pre-release `update-changelog`
   # commit), CI path-skips the runtime suite there, so its checks tell us
   # nothing about release health — walk back to the last runtime-bearing commit.
-  sha = main_ci_evaluation_sha(monorepo_root:, head_sha: remote_sha)
+  sha = main_ci_evaluation_sha(monorepo_root:, head_sha: remote_sha, ref: "origin/#{ci_branch}")
 
   repo_slug = github_repo_slug(monorepo_root)
   api_path = "repos/#{repo_slug}/commits/#{sha}/check-runs"
@@ -726,13 +729,13 @@ def parse_gh_jsonl(output)
   end
 end
 
-# Choose which origin/main commit the CI gate should evaluate. Starting at
+# Choose which remote ref commit the CI gate should evaluate. Starting at
 # `head_sha`, walk back over commits that `script/ci-changes-detector` classifies
 # as non-runtime-only (changelog/docs/source-comment changes — exactly the
 # commits on which CI path-skips the runtime suite) and return the first commit
 # that ran the full suite. The walk stops at HEAD when a commit isn't provably
 # non-runtime-only, so the behavior degrades to the original "evaluate HEAD" gate.
-def main_ci_evaluation_sha(monorepo_root:, head_sha:)
+def main_ci_evaluation_sha(monorepo_root:, head_sha:, ref: "origin/main")
   return head_sha if ci_evaluate_head_only?
 
   current = head_sha
@@ -747,15 +750,15 @@ def main_ci_evaluation_sha(monorepo_root:, head_sha:)
     current = parent
   end
 
-  log_main_ci_walkback(head_sha:, evaluated_sha: current, skipped:) unless skipped.empty?
+  log_main_ci_walkback(head_sha:, evaluated_sha: current, skipped:, ref:) unless skipped.empty?
   current
 end
 
-def log_main_ci_walkback(head_sha:, evaluated_sha:, skipped:)
-  puts "ℹ️ origin/main HEAD #{head_sha[0, 8]} is non-runtime-only " \
+def log_main_ci_walkback(head_sha:, evaluated_sha:, skipped:, ref:)
+  puts "ℹ️ #{ref} HEAD #{head_sha[0, 8]} is non-runtime-only " \
        "(changelog/docs/comments); CI path-skips the full suite on such commits."
   puts "   Skipped #{skipped.length} non-runtime commit(s): #{skipped.map { |s| s[0, 8] }.join(', ')}"
-  puts "   Evaluating main CI on #{evaluated_sha[0, 8]} — the most recent commit that ran the full suite."
+  puts "   Evaluating CI on #{evaluated_sha[0, 8]} — the most recent commit that ran the full suite."
   puts "   (Set RELEASE_CI_EVALUATE_HEAD=true to force strict HEAD evaluation.)"
 end
 

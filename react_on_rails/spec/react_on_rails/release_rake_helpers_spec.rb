@@ -1969,9 +1969,29 @@ RSpec.describe "release.rake helper methods" do
     # These tests focus on the fetch/parse behavior for a resolved SHA. The
     # commit-selection walk-back is covered separately in
     # `#main_ci_evaluation_sha`; stub it to the identity here so the gh check-runs
-    # path stays pinned to the SHA from `git rev-parse origin/main`.
+    # path stays pinned to the SHA from `git rev-parse origin/<branch>`.
     before do
       allow(self).to receive(:main_ci_evaluation_sha) { |**kwargs| kwargs[:head_sha] }
+    end
+
+    def stub_release_branch_refs(remote_sha:, local_sha:)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "origin/release/17.0.0")
+        .and_return(["#{remote_sha}\n", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["#{local_sha}\n", success_status])
+    end
+
+    def stub_check_runs_for_sha(sha:, check_runs:)
+      allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--paginate", "--jq", ".check_runs[]",
+              "repos/shakacode/react_on_rails/commits/#{sha}/check-runs")
+        .and_return([check_runs.map(&:to_json).join("\n"), success_status])
     end
 
     it "aborts if `git fetch origin main` fails" do
@@ -2146,6 +2166,36 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, %r{Local HEAD does not match origin/release/17.0.0})
     end
 
+    it "continues querying CI after a release branch HEAD mismatch under override" do
+      stub_release_branch_refs(remote_sha: "remote123", local_sha: "local456")
+      stub_check_runs_for_sha(
+        sha: "remote123",
+        check_runs: [{ "name" => "Lint", "status" => "completed", "conclusion" => "success" }]
+      )
+
+      result = nil
+      expect do
+        result = fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0", allow_override: true)
+      end.to output(%r{CI STATUS OVERRIDE enabled.*Local HEAD does not match origin/release/17.0.0}m).to_stdout
+      expect(result[:sha]).to eq("remote123")
+      expect(result[:check_runs].first["name"]).to eq("Lint")
+    end
+
+    it "continues querying CI after a release branch HEAD mismatch in dry-run mode" do
+      stub_release_branch_refs(remote_sha: "remote123", local_sha: "local456")
+      stub_check_runs_for_sha(
+        sha: "remote123",
+        check_runs: [{ "name" => "Lint", "status" => "completed", "conclusion" => "success" }]
+      )
+
+      result = nil
+      expect do
+        result = fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0", dry_run: true)
+      end.to output(%r{DRY RUN.*Local HEAD does not match origin/release/17.0.0}m).to_stdout
+      expect(result[:sha]).to eq("remote123")
+      expect(result[:check_runs].first["name"]).to eq("Lint")
+    end
+
     it "aborts referencing the release branch when its fetch fails" do
       allow(Open3).to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
@@ -2183,7 +2233,22 @@ RSpec.describe "release.rake helper methods" do
 
       result = nil
       expect { result = main_ci_evaluation_sha(monorepo_root:, head_sha: "head") }
-        .to output(/Evaluating main CI on parent/).to_stdout
+        .to output(/Evaluating CI on parent/).to_stdout
+      expect(result).to eq("parent")
+    end
+
+    it "labels release branch walkback output with the evaluated ref" do
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "head").and_return(true)
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "parent").and_return(false)
+      allow(self).to receive(:git_parent_sha)
+        .with(monorepo_root:, sha: "head").and_return("parent")
+
+      result = nil
+      expect do
+        result = main_ci_evaluation_sha(monorepo_root:, head_sha: "head", ref: "origin/release/17.0.0")
+      end.to output(%r{origin/release/17.0.0 HEAD head.*Evaluating CI on parent}m).to_stdout
       expect(result).to eq("parent")
     end
 
@@ -2433,10 +2498,10 @@ RSpec.describe "release.rake helper methods" do
     it "url-encodes the ci_branch when querying branch protection" do
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--jq", expected_jq,
-              "repos/shakacode/react_on_rails/branches/release%2F17.0.0%23rc/protection/required_status_checks")
+              "repos/shakacode/react_on_rails/branches/release%2F17.0.0/protection/required_status_checks")
         .and_return([{ contexts: %w[Lint], checks: [] }.to_json, success_status])
 
-      expect(required_check_names_for_main(monorepo_root:, ci_branch: "release/17.0.0#rc")).to eq(
+      expect(required_check_names_for_main(monorepo_root:, ci_branch: "release/17.0.0")).to eq(
         contexts: %w[Lint],
         checks: []
       )
