@@ -602,6 +602,37 @@ CI_PASSING_CONCLUSIONS = %w[success skipped neutral].freeze
 MAIN_CI_NONRUNTIME_WALK_LIMIT = 25
 
 # rubocop:disable Metrics/MethodLength
+def ensure_release_branch_head_matches_remote!(monorepo_root:, ci_branch:, remote_sha:, allow_override:, dry_run:)
+  return true unless ci_branch.start_with?("release/")
+
+  head_output, head_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
+  unless head_status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to resolve local HEAD before release CI status check.\n\n#{head_output}",
+      allow_override:,
+      dry_run:
+    )
+    return false
+  end
+
+  local_sha = head_output.strip
+  return true if local_sha == remote_sha
+
+  handle_main_ci_status_violation!(
+    message: <<~MESSAGE,
+      ❌ Local HEAD does not match origin/#{ci_branch} before release CI status check.
+
+      Local HEAD: #{local_sha}
+      origin/#{ci_branch}: #{remote_sha}
+
+      Push, reset, or rebase the release branch so the commit being tagged is the same commit whose CI is being validated.
+    MESSAGE
+    allow_override:,
+    dry_run:
+  )
+  false
+end
+
 def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
   fetch_output, fetch_status = Open3.capture2e(
     "git", "-C", monorepo_root, "fetch", "origin", ci_branch, "--quiet"
@@ -624,11 +655,20 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false, 
     )
     return nil
   end
+  remote_sha = sha_output.strip
+  return nil unless ensure_release_branch_head_matches_remote!(
+    monorepo_root:,
+    ci_branch:,
+    remote_sha:,
+    allow_override:,
+    dry_run:
+  )
+
   # Evaluate the most recent commit that actually ran the full suite. When HEAD
   # is changelog/docs/comment-only (e.g. the pre-release `update-changelog`
   # commit), CI path-skips the runtime suite there, so its checks tell us
   # nothing about release health — walk back to the last runtime-bearing commit.
-  sha = main_ci_evaluation_sha(monorepo_root:, head_sha: sha_output.strip)
+  sha = main_ci_evaluation_sha(monorepo_root:, head_sha: remote_sha)
 
   repo_slug = github_repo_slug(monorepo_root)
   api_path = "repos/#{repo_slug}/commits/#{sha}/check-runs"

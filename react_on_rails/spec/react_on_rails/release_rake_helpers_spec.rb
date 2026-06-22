@@ -2115,6 +2115,9 @@ RSpec.describe "release.rake helper methods" do
       allow(Open3).to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "origin/release/17.0.0")
         .and_return(["rcsha123\n", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["rcsha123\n", success_status])
       allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--paginate", "--jq", ".check_runs[]",
@@ -2125,6 +2128,22 @@ RSpec.describe "release.rake helper methods" do
       result = fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0")
       expect(result[:sha]).to eq("rcsha123")
       expect(result[:check_runs].first["name"]).to eq("Lint")
+    end
+
+    it "aborts when the local release branch is ahead of the fetched remote branch" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "origin/release/17.0.0")
+        .and_return(["remote123\n", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["local456\n", success_status])
+
+      expect do
+        fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0")
+      end.to raise_error(SystemExit, %r{Local HEAD does not match origin/release/17.0.0})
     end
 
     it "aborts referencing the release branch when its fetch fails" do
