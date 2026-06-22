@@ -472,9 +472,7 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 - QA required rationale: <one-line reason for the decision and selected QA depth>
 - QA lane status: <satisfied | blocked | waived | in_progress | unknown | not applicable; use not applicable when QA required is no; readiness/release audits treat in_progress/unknown as blockers>
 - Release-blocking status: <clear | blocked | waived | not applicable; use not applicable when QA required is no; map QA lane status satisfied->clear, blocked->blocked, waived->waived, and in_progress/unknown->blocked>
-- Process-gap disposition: <script | schema | checklist+replay | park | not applicable (no recurring process miss found); use not
-  applicable when QA found no recurring process miss; see the top-level Process Gap Disposition
-  section for value definitions>
+- Process-gap disposition: <script | schema | checklist+replay | park | not applicable (no recurring process miss found); see the top-level Process Gap Disposition section for value definitions>
 ```
 
 Examples:

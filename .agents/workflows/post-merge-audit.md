@@ -195,9 +195,9 @@ After confirmation, audit each known worked issue, QA lane, or advisory
   disposition satisfied the issue or QA-lane intent and acceptance criteria
 - whether the final issue state is correct: merged, closed, still open,
   parked, blocked, no-PR, done-unmerged, or UNKNOWN
-- for QA lanes, whether the final lane state is correct: clear, blocked,
-  waived, done, still healthy `in_progress`, `not applicable` when QA was not
-  required, or UNKNOWN
+- for QA lanes, whether the QA lane status is correct: `satisfied`, `blocked`,
+  `waived`, still healthy `in_progress`, `not applicable` when QA was not
+  required, or `unknown`
 - whether review comments, handoff expectations, confidence notes, validation
   evidence, QA evidence, decision-point count, and Process Gap Disposition
   fields were handled when required
