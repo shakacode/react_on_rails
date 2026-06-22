@@ -1,3 +1,8 @@
+---
+sidebar_label: 'RoR Pro vs Next.js RSC'
+description: 'How React on Rails Pro and Next.js implement React Server Components: the shared five-step contract, ownership trade-offs, bundler differences, and capability comparison.'
+---
+
 # React on Rails Pro and Next.js: RSC Architectures Compared
 
 > **Pro Feature** — React Server Components require [React on Rails Pro](../react-on-rails-pro.md) with the node renderer.
@@ -19,7 +24,7 @@ This page explains the shared contract first, then the one architectural decisio
 real difference between the two.
 
 > **Accuracy note.** React on Rails Pro details are verified against this repository. Next.js details
-> are described at the **conceptual** level and reflect the App Router as of **Next.js 16.x (2026)**.
+> are described at the **conceptual** level and reflect the App Router as of **2026**.
 > Next's internals evolve quickly; treat specific Next.js names here as illustrative of an idea, not
 > as a stable API.
 
@@ -40,9 +45,9 @@ re-described, because the browser already downloaded them.
 **React on Rails Pro and Next.js tell this exact same story.** They differ in the _building_:
 
 - **Next.js is a purpose-built RSC restaurant.** The kitchen, the menu (routing), the waiters (client
-  router), and the lunchbox machine (the **Turbopack** bundler) were all designed together, in Rust,
-  to serve this one meal as fast as possible. You move in and everything is wired up — but it is
-  _their_ building and _their_ rules.
+  router), and the lunchbox machine (the **Turbopack** bundler, written in Rust) were all designed
+  together to serve this one meal as fast as possible. You move in and everything is wired up — but it
+  is _their_ building and _their_ rules.
 - **React on Rails Pro is a world-class React station you bolt onto your existing Rails restaurant.**
   Your Rails app already has its kitchen, menu, and staff (controllers, routes, auth, database). React
   on Rails Pro adds an RSC station that reuses a general-purpose lunchbox machine (webpack or Rspack,
@@ -68,10 +73,10 @@ Both systems run the identical five-step flow. The names differ; the shape does 
    whole new page.
 
 <p align="center">
-  <img src="images/rsc-end-to-end-flow.png" alt="End-to-end React Server Components flow shared by React on Rails Pro and Next.js: source files (Server Components plus 'use client' Client Components) build into multiple bundles using the react-server condition; an RSC render produces a Flight payload with client components left as references; an SSR render turns that payload into HTML while the same payload is inlined into the HTML as script data pushes; the HTML and payload stream to the browser, which hydrates; and a client navigation fetches only a new Flight payload for what changed. The bottom rows list the equivalent React on Rails Pro and Next.js function names." width="840" />
+  <img src="images/rsc-end-to-end-flow.png" alt="Diagram comparing the RSC lifecycle in React on Rails Pro and Next.js." width="840" />
 </p>
 
-_The shared end-to-end shape, with React on Rails Pro and Next.js function names side by side. The Flight-payload and inlined-`<script>` boxes are simplified pseudocode, not the literal wire format; the function names are illustrative as of Next.js 16.x (2026)._
+_The shared end-to-end shape, with React on Rails Pro and Next.js function names side by side. The Flight-payload and inlined-`<script>` boxes are simplified pseudocode, not the literal wire format; the function names are illustrative as of 2026._
 
 The same five steps, with each system's function names in two columns:
 
@@ -110,7 +115,7 @@ Everything else follows from one architectural choice — **where the RSC machin
   REACT ON RAILS PRO                          NEXT.JS
   ──────────────────                          ───────
   RSC is BOLTED ONTO a general-purpose        RSC is BUILT INTO the bundler and
-  bundler with JavaScript plugins/loaders:    framework, in Rust:
+  bundler with JavaScript plugins/loaders:    framework, with Turbopack in Rust:
     • react-on-rails-rsc loader + plugin        • client references, the react-server
     • the react-server-dom-webpack runtime        condition, and manifest emission are
     • a dedicated RSC webpack/rspack config       native bundler features (Turbopack)
