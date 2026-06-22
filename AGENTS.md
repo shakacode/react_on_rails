@@ -192,6 +192,49 @@ see
   External adopters use the structured public claim-comment fallback in
   [`.agents/workflows/pr-processing.md`](.agents/workflows/pr-processing.md).
 
+## Agent Coordination Reads
+
+`agent-coord doctor --json` is the lightweight backend health check. Use
+`agent-coord doctor --deep --json` only for a full backend JSON audit: it parses
+every claim, heartbeat, and batch JSON state record, so it is slower and broader
+than the default health probe. Use `doctor --deep --json` only for full backend
+audit sweeps that intentionally parse all coordination records, not routine
+preflight checks. If the active shell may have cached an old install, run
+`hash -r 2>/dev/null || true` in a POSIX-style shell such as bash or zsh, or
+that shell's rehash equivalent, then confirm via
+`command -v agent-coord || which agent-coord`.
+
+Before dependency-sensitive actions, use targeted private coordination reads.
+The direct `agent-coord` subcommands are:
+
+```bash
+# Specific issue/PR lane
+agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json
+
+# Batch lane/dependency state
+agent-coord status --batch-id <batch-id> --json
+```
+
+When the repo workflow calls for bounded reads, pass the same targeted status
+subcommand through `.agents/skills/pr-batch/bin/agent-coord-bounded` so a slow
+private read becomes explicit degraded state instead of an indefinite wait:
+
+```bash
+# Specific issue/PR lane
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --repo shakacode/react_on_rails --target <issue-or-pr> --json
+
+# Batch lane/dependency state
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id <batch-id> --json
+```
+
+Do not use broad `agent-coord status` for routine lane checks. Broad private
+coordination reads are audit-only; if they time out, exit 1 (unexpected error),
+or exit 2, report private coordination as `UNKNOWN`/degraded and use structured
+public claim comments only as advisory evidence. Any non-zero exit other than
+`CLAIM_REFUSED` (exit 3) is treated as `UNKNOWN`/degraded. If targeted status
+exits 0, private coordination state is authoritative. Refused claims
+(`CLAIM_REFUSED` / exit 3) remain hard stops for machine agents.
+
 ## Commands
 
 ```bash
@@ -594,7 +637,7 @@ The **merge gate is a function of the target branch's release phase**. Resolve t
 | **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`.                                                                                                             |
 | **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial-pr-review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion**. No confidence-only auto-merge. |
 
-**Reading the phase.** The active phase per release line is published through the `shakacode/agent-coordination` backend so agents read the current gate without being told. Read it from the machine-readable `agent-coord` status output for the PR's target branch; treat it as available only when bounded `agent-coord doctor` and `agent-coord status` probes exit 0 (the private backend README and `agent-coord --help` are authoritative for the exact field). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is the tool that is unavailable here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
+**Reading the phase.** The active phase per release line is published through the `shakacode/agent-coordination` backend so agents read the current gate without being told. For a PR or issue lane, read it with targeted `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json` after `agent-coord doctor --json`; for batch dependency state, use `agent-coord status --batch-id <batch-id> --json`. Treat published phase as available only when the targeted status exits 0 (the private backend README and `agent-coord --help` are authoritative for the exact field). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is unavailable or degraded here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
 
 ## Review Workflow
 

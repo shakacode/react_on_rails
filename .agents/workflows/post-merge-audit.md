@@ -35,10 +35,11 @@ self-contained. Keep state-machine changes mirrored across this workflow,
   discovery cannot verify backend setup or access, record `UNKNOWN (setup)` or
   `UNKNOWN (access)` with the exact command/error and report that batch id
   confirmation is still needed after backend recovery.
-- For named batch/run audits, run bounded `agent-coord doctor`, then bounded
-  `agent-coord status`, and inspect the named batch entry as the primary
-  worked-issue scope when available. If coordination state cannot be verified,
-  record `worked_issue_scope: UNKNOWN (setup)` or
+- For named batch/run audits, run bounded `agent-coord doctor --json`, then
+  bounded `agent-coord status --batch-id <batch-id> --json`, and inspect the
+  named batch entry as the primary worked-issue scope when available. If
+  coordination state cannot be verified, record
+  `worked_issue_scope: UNKNOWN (setup)` or
   `worked_issue_scope: UNKNOWN (access)` with the exact command/error. Use
   structured public `codex-claim` comments (GitHub comments containing a
   `codex-claim` HTML comment with key/value fields in the "Public claim
@@ -106,32 +107,35 @@ First, produce the exact worked-issue scope and merged-PR range:
 - when no coordinated batch/run is in scope, skip `agent-coord` and record
   `worked_issue_scope: not applicable`
 - when batch work is in scope but the batch id is `UNKNOWN`, run bounded
-  `agent-coord doctor`, then bounded `agent-coord status` to list candidate
-  batch/run ids and lanes. Record `worked_issue_scope: UNKNOWN (needs batch
-  confirmation)` and ask me to confirm a candidate batch/run id before treating
-  any candidate lane list as the worked-issue scope.
+  `agent-coord doctor --json`, then broad `agent-coord status` (via
+  `agent-coord-bounded`) only as audit/discovery to list candidate batch/run ids
+  and lanes. Record
+  `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask me to confirm
+  a candidate batch/run id before treating any candidate lane list as the
+  worked-issue scope.
   If candidate discovery cannot verify backend setup or access, record
   `worked_issue_scope: UNKNOWN (setup)` or
   `worked_issue_scope: UNKNOWN (access)` instead of
   `UNKNOWN (needs batch confirmation)`, with the exact command/error.
 - when a batch id is known:
-  - run bounded `agent-coord doctor`, then bounded `agent-coord status`, then inspect
-    `<BATCH_ID>` in the status output
+  - run `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 doctor --json`, then
+    `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id <batch-id> --json`,
+    then inspect `<BATCH_ID>` in the status output
   - list every worked issue/lane from claims, heartbeats, branches, and
     dependency metadata
   - for each worked issue, include the lane owner, branch, heartbeat/final
     state, linked PR if known, and whether the final state is merged, open,
     blocked, parked, no-PR, done-unmerged, or UNKNOWN
-- if `agent-coord` is missing or bounded `agent-coord doctor` fails/times out,
+- if `agent-coord` is missing or bounded `agent-coord doctor --json` fails/times out,
   record `worked_issue_scope: UNKNOWN (setup)` with the exact command/error and
   use structured public `codex-claim` comments as advisory coverage when
   available before continuing with GitHub/git evidence for the merged-PR range
-- if bounded `agent-coord doctor` passes but bounded `agent-coord status`
-  fails/times out, record `worked_issue_scope: UNKNOWN (access)` with the exact
-  command/error and use structured public `codex-claim` comments as advisory
-  coverage when available before continuing with GitHub/git evidence for the
-  merged-PR range
-- if bounded `agent-coord doctor` and bounded `agent-coord status` both succeed
+- if bounded `agent-coord doctor --json` passes but targeted batch status fails,
+  exits 2, or times out,
+  record `worked_issue_scope: UNKNOWN (access)` with the exact command/error and
+  use structured public `codex-claim` comments as advisory coverage when
+  available before continuing with GitHub/git evidence for the merged-PR range
+- if bounded `agent-coord doctor --json` and targeted batch status both succeed
   but the named batch entry contains no worked issues or lanes, record
   `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
   scan structured public `codex-claim` comments as advisory recovery rows for

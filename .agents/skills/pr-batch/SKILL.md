@@ -323,18 +323,19 @@ canonical source for coordination state and worker rules. Keep this skill as a
 routing entry point; do not duplicate the full protocol here.
 
 In short: exact lane assignments beat labels; private `agent-coord` state is the
-source of truth when bounded `agent-coord doctor` and lane-scoped
-`agent-coord status` probes exit 0; agent-run preflights use
+source of truth when bounded `agent-coord doctor --json` and targeted
+lane-scoped status probes exit 0; agent-run preflights use
 `.agents/skills/pr-batch/bin/agent-coord-bounded` instead of unbounded
 full-backend reads; `CLAIM_REFUSED` / exit code 3 hard-stops machine agents;
 workers heartbeat at phase transitions; coordinators create private batch files
-before dependency lanes start; dependency-sensitive lanes run bounded
-`agent-coord status` before rebase, push, readiness, and closeout; exact
-independent lanes may proceed in `private_state: claim-only` after a successful
-direct bounded claim when status is degraded; and structured public claim
-comments are only advisory fallback state when a private claim cannot be started
-or definitively fails before mutation; timed-out claims stop as
-`UNKNOWN (claim outcome)` for backend reconciliation.
+before dependency lanes start; dependency-sensitive lanes run bounded targeted
+status before rebase, push, readiness, and closeout; broad `agent-coord status`
+is audit-only; exact independent lanes may proceed in
+`private_state: claim-only` after a successful direct bounded claim when status
+is degraded; and structured public claim comments are only advisory fallback
+state when a private claim cannot be started or definitively fails before
+mutation; timed-out claims stop as `UNKNOWN (claim outcome)` for backend
+reconciliation.
 
 ## Worker Rules
 

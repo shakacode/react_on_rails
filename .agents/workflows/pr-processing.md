@@ -39,14 +39,17 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      ```bash
      .agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 doctor --json
      .agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --repo OWNER/REPO --target TARGET --json
+     .agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id BATCH_ID --json
      ```
 
      A timeout exit such as `124`, setup failure, auth failure, or non-zero
-     status means private state is `UNKNOWN` / degraded for that read. Machine
-     agents must hard-stop when a claim is refused with `CLAIM_REFUSED` / exit
-     code 3 and report the holder plus heartbeat liveness. `agent-coord status`
-     is a preflight view; the claim operation is the backend's compare-and-swap
-     gate, so the claim result is the source of truth for races.
+     targeted status other than `CLAIM_REFUSED` / exit code 3 means private
+     state is `UNKNOWN` / degraded for that read. Machine agents must hard-stop
+     when a claim is refused with `CLAIM_REFUSED` / exit code 3 and report the
+     holder plus heartbeat liveness. Targeted
+     `agent-coord status` is a preflight view; the claim operation is the
+     backend's compare-and-swap gate, so the claim result is the source of truth
+     for races.
 
    - If bounded doctor/status is degraded but the lane is an exact independent
      assignment with no `depends_on` refs, a coordinator may attempt the bounded
@@ -188,9 +191,9 @@ runbook is
 Worker path:
 
 1. Determine the PR's target branch and resolve its phase. Prefer the published
-   phase from bounded `agent-coord` status for that branch (available only when
-   bounded `agent-coord doctor` and `agent-coord status` probes exit 0). If the
-   backend is up but has no published phase entry for that line, derive the
+   phase from bounded targeted `agent-coord` status for that branch (available
+   only when `agent-coord doctor --json` and targeted status probes exit 0). If
+   the backend is up but has no published phase entry for that line, derive the
    phase from the target branch (the same rule below); never treat a missing
    entry as `beta` for a `release/*` target. If the backend is `UNKNOWN`, derive it: `main` ->
    `beta`; `release/*` -> `rc`, or `final` when the applicable tracker is in
@@ -674,21 +677,23 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
 - For concurrent or multi-machine batches, use the repo's private coordination
   backend when available. Each lane gets a stable agent id such as
   `mobile-codex-batch2` or `desktop-claude-fable-lane1`.
-- Treat the backend as available when bounded `agent-coord doctor` and
-  lane-scoped `agent-coord status` probes exit 0. Use
+- Treat the backend as available when bounded `agent-coord doctor --json` and
+  targeted lane-scoped status probes exit 0. Use
   `.agents/skills/pr-batch/bin/agent-coord-bounded` for agent-run preflights;
   do not run unbounded full-backend `doctor` / `status` in a worker lane. A
   timeout exit such as `124`, missing command, auth failure, doctor failure, or
-  status non-zero means private state is `UNKNOWN` / degraded for that read.
-  Use advisory public claim comments where dependency rules allow it. A refused
-  `agent-coord claim` after a successful status check returns `CLAIM_REFUSED` /
-  exit code 3 and remains a hard stop.
+  targeted status non-zero (exit 2 means degraded/UNKNOWN) means private state
+  is `UNKNOWN` / degraded for that read. Use advisory public claim comments
+  where dependency rules allow it. Broad `agent-coord status` is audit-only; do
+  not use it for routine lane checks. A refused `agent-coord claim` after a
+  successful status check returns `CLAIM_REFUSED` / exit code 3 and remains a
+  hard stop.
 - Acquire an `agent-coord claim` for each issue/PR lane before creating that
   lane's worktree or branch. A refused claim is a hard stop for machine agents:
   report the holder, heartbeat liveness, and target instead of creating a
   competing branch.
-  `agent-coord status` is advisory preflight, while `agent-coord claim` is the
-  backend's compare-and-swap gate for concurrent claim races.
+  targeted `agent-coord status` is advisory preflight, while `agent-coord claim`
+  is the backend's compare-and-swap gate for concurrent claim races.
 - For exact independent lanes that have no `depends_on` refs, degraded
   bounded doctor/status does not automatically block work. A coordinator may
   attempt the bounded `agent-coord claim` directly. If the direct claim
@@ -812,8 +817,11 @@ hatch**, not a single kill switch:
   abandons still-local work without pushing, runs `agent-coord release` for the
   lane, records the cancelled lane as its final state, and exits without leaving
   a half-pushed branch or corrupted worktree. The one-phase-transition latency
-  bound holds only for workers that successfully check `agent-coord status` at
-  each phase transition; a worker deep inside one target may not stop until its
+  bound holds only for workers that successfully check targeted status at each
+  phase transition: `agent-coord status --batch-id <batch-id> --json` for batch
+  workers or
+  `agent-coord status --repo <owner/repo> --target <issue-or-pr> --json` for
+  single-lane workers. A worker deep inside one target may not stop until its
   next checkpoint, and a wedged worker requires the hard escape hatch.
 - **Hard escape hatch.** For a wedged or unresponsive worker that is not reaching a
   checkpoint, use this sequence:
@@ -1330,18 +1338,21 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    work is in scope. If no coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
-   - run bounded `agent-coord doctor`, then bounded `agent-coord status` to list
+   - run bounded `agent-coord doctor --json`, then broad `agent-coord status`
+     (via `agent-coord-bounded`) only as an audit/discovery read to list
      candidate batch/run ids and lanes
    - record `worked_issue_scope: UNKNOWN (needs batch confirmation)`
    - ask the user to confirm a candidate before treating any candidate lane list
      as worked-issue scope
 
-   When the batch/run id is known, run bounded `agent-coord doctor` and bounded
-   `agent-coord status`, then inspect the named batch entry to identify the
-   worked issue set from claims, heartbeats, branches, and dependency metadata.
-   If `agent-coord` is missing or bounded `agent-coord doctor` fails/times out,
-   record `worked_issue_scope: UNKNOWN (setup)`. If bounded doctor passes but
-   bounded `agent-coord status` fails/times out, record
+   When the batch/run id is known, run bounded `agent-coord doctor --json` and
+   bounded `agent-coord status --batch-id <batch-id> --json`, then inspect the
+   named batch entry to identify the worked issue set from claims, heartbeats,
+   branches, and dependency metadata. If `agent-coord` is missing or bounded
+   `agent-coord doctor --json` fails/times out, record
+   `worked_issue_scope: UNKNOWN (setup)`. If bounded
+   `agent-coord doctor --json` passes but targeted batch status fails, exits 2,
+   or times out, record
    `worked_issue_scope: UNKNOWN (access)`. In all UNKNOWN cases, include the
    exact command/error and use structured public
    `codex-claim` comments as an advisory fallback for possible no-PR, blocked,
@@ -1357,7 +1368,7 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    issues and open PRs active within the audit time window, and use each claim's
    `batch:` field only to surface candidate ids until the user confirms one.
 
-   If bounded `agent-coord doctor` and bounded `agent-coord status` both succeed
+   If bounded `agent-coord doctor --json` and targeted batch status both succeed
    but the named batch entry contains no worked issues or lanes, record
    `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
    scan structured public `codex-claim` comments as advisory recovery rows for
