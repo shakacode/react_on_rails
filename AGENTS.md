@@ -42,8 +42,8 @@ Update that demo repo when changes in this monorepo affect the recommended user-
 - Pro installation, licensing, or "license optional for evaluation/demo/non-production" messaging
 - React, React DOM, `react-on-rails-rsc`, Shakapacker, Rspack, or Node renderer version pins/defaults
 - Auto-bundling behavior for `.client.` / `.server.` files or the `'use client'` directive
-- Streaming SSR/RSC helper usage, Node renderer configuration, Docker, or deployment defaults, including changes to
-  smoke-validation steps the demo repo depends on
+- Streaming SSR/RSC helper usage, Node renderer configuration, Docker, or deployment defaults, including changes that
+  affect `bin/smoke` or Docker smoke-validation steps the demo repo runs during verification
 
 Why: the flagship demo is the external proof that the Pro/RSC happy path works in a real Rails app. If this monorepo
 changes the recommended path but the demo stays stale, agents and users will copy the wrong setup.
@@ -53,9 +53,12 @@ README should document how to turn Pro/RSC off for comparison, but the default a
 Additional examples are valuable when they teach distinct repo-generation patterns, but they should not dilute or
 compete with the flagship Pro/RSC path.
 
-When updating the demo, make the change in a separate checkout/branch of `react-on-rails-demo-flagship`, keep its lockfiles
-in sync, and do not mix demo repo commits into this monorepo. Use the JavaScript package manager declared by the demo repo
-(`packageManager` field or lockfile), then run focused validation such as:
+The machine-readable catalog of demos, tiers, and packages is `internal/contributor-info/demo-fleet.yml`.
+
+When updating the demo, make the change in a separate checkout/branch of `react-on-rails-demo-flagship`, regenerate and
+commit lockfiles when dependency changes alter them, and do not mix demo repo commits into this monorepo. Use the
+JavaScript package manager declared by the demo repo (`packageManager` field or lockfile), then run focused validation
+such as:
 
 - `bundle install`
 - the lockfile install command for the declared package manager (`npm ci` for the current flagship)

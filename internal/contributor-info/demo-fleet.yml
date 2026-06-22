@@ -104,9 +104,13 @@ repos:
       - { ecosystem: npm, name: react-on-rails-rsc }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      # No cpflow package until a CPFlow review-app pipeline exists for this repo.
     needs_pro: true
     package_manager: npm
+    # Recorded for future review-app wiring; skipped while cpflow_app_name is null.
     smoke: [/]
+    review_app:
+      cpflow_app_name: null
     verify: true
 
   - name: shakacode/react-on-rails-demo-hacker-news-rsc
