@@ -77,8 +77,13 @@ module ReactOnRails
       def obsolete?
         return true if exist_files.length != files.length # Some files missing
         return true if exist_files.empty?
+        return true if generated_files_obsolete?
 
         files_are_outdated
+      end
+
+      def generated_files_obsolete?
+        false
       end
 
       def exist_files

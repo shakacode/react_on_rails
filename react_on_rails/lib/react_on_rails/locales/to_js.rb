@@ -10,6 +10,12 @@ module ReactOnRails
       def file_format
         "js"
       end
+
+      def generated_files_obsolete?
+        default_source = File.read(file("default"))
+
+        default_source.match?(/^\s*import\s+\{\s*defineMessages\s*\}\s+from\s+["']react-intl["'];?/)
+      end
     end
   end
 end

@@ -72,6 +72,29 @@ module ReactOnRails
           expect(File.mtime(translations_path)).not_to eq(future_time)
           expect(File.mtime(translations_path)).to be > initial_mtime
         end
+
+        it "updates files when the generated default uses the old react-intl template" do
+          ref_time = Time.current + 1.minute
+          File.write(default_path, <<~JS)
+            import { defineMessages } from "react-intl";
+
+            const defaultLocale = 'en';
+
+            const defaultMessages = defineMessages({});
+
+            export { defaultMessages, defaultLocale };
+          JS
+          FileUtils.touch(translations_path, mtime: ref_time)
+          FileUtils.touch(default_path, mtime: ref_time)
+
+          described_class.new
+
+          default = File.read(default_path)
+          expect(default).to include('const defaultLocale = "en";')
+          expect(default).not_to include("react-intl")
+          expect(default).not_to include("defineMessages")
+          expect(File.mtime(default_path)).not_to eq(ref_time)
+        end
       end
     end
 
