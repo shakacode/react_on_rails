@@ -287,8 +287,8 @@ What is specific to React on Rails is where this code lives.
 A minimal announcer inside a router island, reusing the shared live region from section 9:
 
 ```jsx
-// import { useEffect, useRef } from 'react';
-// import { useLocation } from 'react-router-dom'; // or your router's equivalent
+import { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom'; // or your router's equivalent
 
 // Inside a React Router / TanStack Router island
 function RouteAnnouncer() {
@@ -372,7 +372,10 @@ When Rails flash messages and React toasts each create their own live region, sc
 Fix this by creating one persistent live region in the Rails layout. Rails can render the first message there, and React islands can update the same region later.
 
 ```erb
-<div id="app-live-region" role="status" aria-atomic="true"></div>
+<%# Seed any first-load flash so it is present in the initial HTML response %>
+<div id="app-live-region" role="status" aria-atomic="true">
+  <%= flash[:notice] || flash[:alert] %>
+</div>
 ```
 
 `role="status"` already implies `aria-live="polite"`, so that is not repeated. `aria-atomic="true"` is set explicitly so screen readers announce the whole message rather than only the changed text node.
