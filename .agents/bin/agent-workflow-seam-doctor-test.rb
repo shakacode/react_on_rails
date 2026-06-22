@@ -152,6 +152,23 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
     end
   end
 
+  def test_template_style_placeholder_in_seam_value_fails
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge(
+        "CI change detector" => "<CI change detector command, or \"n/a\">",
+        "Benchmark labels" => "<benchmark labels, or \"n/a\">"
+      )
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "unresolved Agent Workflow Configuration value for key: CI change detector"
+      assert_includes out, "unresolved Agent Workflow Configuration value for key: Benchmark labels"
+    end
+  end
+
   def test_blank_separator_stops_wrapped_seam_value
     with_repo do |root|
       write_agents(root)
@@ -279,6 +296,23 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
     end
   end
 
+  def test_mismatched_fence_delimiter_does_not_close_executable_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ```bash
+        ~~~
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ```
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+
   def test_inline_code_in_executable_fence_is_not_reported_twice
     with_repo do |root|
       write_agents(root)
@@ -337,6 +371,10 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
       assert_includes out, ".agents/workflows/example.md"
     end
   end
+end
+
+class AgentWorkflowSeamDoctorSharedRootTest < Minitest::Test
+  include AgentWorkflowSeamDoctorTestHelpers
 
   def test_shared_root_placeholder_is_scanned
     with_repo do |root|
@@ -355,6 +393,73 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
 
         refute status.success?
         assert_includes out, "skills/shared/SKILL.md"
+      end
+    end
+  end
+
+  def test_missing_shared_root_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "No commands here.\n")
+      missing_root = File.join(root, "missing-shared-root")
+
+      out, status = run_doctor(root, "--shared", missing_root)
+
+      refute status.success?
+      assert_includes out, "missing shared root: #{missing_root}"
+    end
+  end
+
+  def test_shared_root_without_skill_or_workflow_markdown_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "No commands here.\n")
+
+      Dir.mktmpdir("agent-workflow-shared-root") do |shared_root|
+        File.write(File.join(shared_root, "README.md"), "Shared pack docs.\n")
+
+        out, status = run_doctor(root, "--shared", shared_root)
+
+        refute status.success?
+        assert_includes out, "shared root has no skill/workflow Markdown: #{shared_root}"
+      end
+    end
+  end
+
+  def test_shared_root_general_markdown_is_not_scanned
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "No commands here.\n")
+
+      Dir.mktmpdir("agent-workflow-shared-root") do |shared_root|
+        File.write(File.join(shared_root, "README.md"), "`gh issue create --title \"<follow-up prefix>\"`\n")
+        FileUtils.mkdir_p(File.join(shared_root, "skills/clean"))
+        File.write(File.join(shared_root, "skills/clean/SKILL.md"), "Clean shared skill.\n")
+
+        out, status = run_doctor(root, "--shared", shared_root)
+
+        assert status.success?, out
+      end
+    end
+  end
+
+  def test_installed_skill_root_is_scanned
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "No commands here.\n")
+
+      Dir.mktmpdir("agent-workflow-installed-skills") do |shared_root|
+        FileUtils.mkdir_p(File.join(shared_root, "shared"))
+        File.write(File.join(shared_root, "shared/SKILL.md"), <<~MARKDOWN)
+          ```bash
+          gh issue create --title "<follow-up prefix> Review"
+          ```
+        MARKDOWN
+
+        out, status = run_doctor(root, "--shared", shared_root)
+
+        refute status.success?
+        assert_includes out, "shared/SKILL.md"
       end
     end
   end

@@ -63,21 +63,21 @@ Copy this into the consumer repo's `AGENTS.md` and replace every value.
 
 Portable shared skills resolve every repo-specific value through this section.
 
-- **Base branch**: <main | master | release branch policy>.
-- **Pre-push local validation**: <command an agent runs before pushing, or "n/a">.
-- **CI change detector**: <command, or "n/a">.
-- **Hosted-CI trigger**: <comment command, label, helper command, or "n/a">.
-- **Benchmark labels**: <labels, or "n/a">.
-- **Follow-up issue prefix**: <for example, `Follow-up:`>.
-- **Changelog**: <path + policy + entry format, or "n/a">.
-- **Lint / format**: <lint, autofix, and format-check commands>.
-- **Merge ledger**: <machine-checkable merge-readiness command, or "n/a">.
-- **Docs checks**: <docs sidebar/link/style commands, or "n/a">.
+- **Base branch**: <base branch>.
+- **Pre-push local validation**: <local validation command, or "n/a">.
+- **CI change detector**: <CI change detector command, or "n/a">.
+- **Hosted-CI trigger**: <hosted-CI trigger, or "n/a">.
+- **Benchmark labels**: <benchmark labels, or "n/a">.
+- **Follow-up issue prefix**: <follow-up prefix, for example `Follow-up:`>.
+- **Changelog**: <changelog path and policy, or "n/a">.
+- **Lint / format**: <lint / format commands>.
+- **Merge ledger**: <merge ledger command, or "n/a">.
+- **Docs checks**: <docs checks, or "n/a">.
 - **Tests**: <unit / integration / e2e commands>.
-- **Build / type checks**: <build, type-check, signature-validation commands, or "n/a">.
-- **Review gate**: <preferred independent review check name, or "n/a">.
-- **Approval-exempt change categories**: <categories allowed on trusted assignments>.
-- **Coordination backend**: <shared backend for multi-batch work, or public claim-comment fallback>.
+- **Build / type checks**: <build / type checks, or "n/a">.
+- **Review gate**: <review gate, or "n/a">.
+- **Approval-exempt change categories**: <approval-exempt change categories>.
+- **Coordination backend**: <coordination backend>.
 ```
 
 Anything marked `n/a` means the matching shared guidance degrades to "do the

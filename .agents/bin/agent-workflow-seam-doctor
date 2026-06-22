@@ -34,7 +34,7 @@ module AgentWorkflowSeamDoctor
     (?:
       follow-up\ prefix |
       hosted[-\ ]CI |
-      benchmark\ label |
+      benchmark\ labels? |
       changelog\ path |
       main\ branch |
       base\ branch |
@@ -75,6 +75,8 @@ module AgentWorkflowSeamDoctor
     else
       issues.concat(missing_key_issues(config))
     end
+
+    issues.concat(shared_root_issues(shared_roots))
 
     shared_markdown_paths(root, shared_roots:).each do |path|
       issues.concat(executable_placeholder_issues(root, path))
@@ -150,28 +152,48 @@ module AgentWorkflowSeamDoctor
       File.join(root, ".agents/skills/**/*.md"),
       File.join(root, ".agents/workflows/**/*.md")
     ]
-    shared_patterns = shared_roots.flat_map do |shared_root|
-      expanded = File.expand_path(shared_root)
-      [
-        File.join(expanded, "**/*.md")
-      ]
-    end
+    shared_patterns = shared_roots.flat_map { |shared_root| shared_markdown_patterns(shared_root) }
 
     (repo_patterns + shared_patterns).flat_map { |pattern| Dir.glob(pattern) }.map do |path|
       File.expand_path(path)
     end.uniq.sort
   end
 
+  def shared_root_issues(shared_roots)
+    shared_roots.filter_map do |shared_root|
+      expanded = File.expand_path(shared_root)
+      if !File.directory?(expanded)
+        "missing shared root: #{expanded}"
+      elsif shared_markdown_paths_for_root(expanded).empty?
+        "shared root has no skill/workflow Markdown: #{expanded}"
+      end
+    end
+  end
+
+  def shared_markdown_paths_for_root(shared_root)
+    shared_markdown_patterns(shared_root).flat_map { |pattern| Dir.glob(pattern) }.uniq.sort
+  end
+
+  def shared_markdown_patterns(shared_root)
+    expanded = File.expand_path(shared_root)
+    [
+      File.join(expanded, "skills/**/*.md"),
+      File.join(expanded, "workflows/**/*.md"),
+      File.join(expanded, "**/SKILL.md")
+    ]
+  end
+
   def executable_placeholder_issues(root, path)
     issues = []
     in_fence = false
     executable_fence = false
+    fence_delimiter = nil
 
     File.readlines(path).each_with_index do |line, index|
       line_number = index + 1
-      fence_state = update_fence_state(line, in_fence)
+      fence_state = update_fence_state(line, in_fence, fence_delimiter)
       if fence_state
-        in_fence, executable_fence = fence_state
+        in_fence, executable_fence, fence_delimiter = fence_state
         next
       end
 
@@ -182,14 +204,16 @@ module AgentWorkflowSeamDoctor
     issues
   end
 
-  def update_fence_state(line, in_fence)
-    fence = line.match(/^\s*(?:```|~~~)([[:alnum:]_-]*)(?:\s.*)?$/)
+  def update_fence_state(line, in_fence, fence_delimiter)
+    fence = line.match(/^\s*(```|~~~)([[:alnum:]_-]*)(?:\s.*)?$/)
     return nil if fence.nil?
 
-    return [false, false] if in_fence
+    delimiter = fence[1]
+    return nil if in_fence && delimiter != fence_delimiter
+    return [false, false, nil] if in_fence
 
-    language = fence[1].to_s.downcase
-    [true, EXECUTABLE_FENCE_LANGS.include?(language)]
+    language = fence[2].to_s.downcase
+    [true, EXECUTABLE_FENCE_LANGS.include?(language), delimiter]
   end
 
   def placeholders_from_line(line, in_fence:, executable_fence:)
