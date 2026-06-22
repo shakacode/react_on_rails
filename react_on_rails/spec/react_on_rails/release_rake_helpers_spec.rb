@@ -714,6 +714,16 @@ RSpec.describe "release.rake helper methods" do
       ).to eq(["--tag", "rc", "--no-git-checks"])
     end
 
+    it "skips git checks for prereleases from main" do
+      expect(
+        npm_publish_base_args(
+          actual_gem_version: "17.0.0.rc.1",
+          actual_npm_version: "17.0.0-rc.1",
+          current_branch: "main"
+        )
+      ).to eq(["--tag", "rc", "--no-git-checks"])
+    end
+
     it "skips git checks and allows stable npm publish from a release branch" do
       expect(
         npm_publish_base_args(
