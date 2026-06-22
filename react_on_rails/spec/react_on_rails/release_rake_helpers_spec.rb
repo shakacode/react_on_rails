@@ -1045,7 +1045,9 @@ RSpec.describe "release.rake helper methods" do
             dry_run: false,
             ci_branch: "release/17.0.0"
           )
-        end.to output(%r{Checking CI status on origin/release/17.0.0}).to_stdout
+        end.to output(
+          %r{Checking CI status on origin/release/17.0.0.*CI on origin/release/17.0.0 is healthy on #{short_sha}}m
+        ).to_stdout
       end
 
       it "evaluates only required checks for an RC cut (prerelease) from the release branch" do
@@ -2164,6 +2166,22 @@ RSpec.describe "release.rake helper methods" do
       expect do
         fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0")
       end.to raise_error(SystemExit, %r{Local HEAD does not match origin/release/17.0.0})
+    end
+
+    it "aborts when local HEAD cannot be resolved for a release branch" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "origin/release/17.0.0")
+        .and_return(["remote123\n", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["fatal: ambiguous argument HEAD\n", failure_status])
+
+      expect do
+        fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0")
+      end.to raise_error(SystemExit, /Unable to resolve local HEAD before release CI status check/)
     end
 
     it "continues querying CI after a release branch HEAD mismatch under override" do
