@@ -1,0 +1,148 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "optparse"
+require "shellwords"
+require "tempfile"
+
+DEFAULT_TIMEOUT_SECONDS = ENV.fetch("AGENT_COORD_BOUNDED_TIMEOUT_SECONDS", "20")
+
+def parse_timeout(value, source)
+  timeout = Float(value)
+  return timeout if timeout.positive? && timeout.finite?
+
+  warn "#{source} must be a positive finite number"
+  exit 64
+rescue ArgumentError
+  warn "#{source} must be a positive finite number"
+  exit 64
+end
+
+def wait_for_child(pid, deadline)
+  while Time.now < deadline
+    waited = Process.waitpid2(pid, Process::WNOHANG)
+    return waited[1] if waited
+
+    sleep 0.05
+  end
+
+  nil
+rescue Errno::ECHILD
+  nil
+end
+
+def signal_process_group(pid, signal)
+  Process.kill(signal, -pid)
+rescue Errno::ESRCH
+  nil
+end
+
+def terminate_process_group(pid, signal: "TERM", grace_seconds: 1, kill_grace_seconds: 1)
+  signal_process_group(pid, signal)
+  status = wait_for_child(pid, Time.now + grace_seconds)
+
+  # The direct child may exit before helper processes in its process group.
+  signal_process_group(pid, "KILL")
+  status ||= wait_for_child(pid, Time.now + kill_grace_seconds)
+
+  status
+end
+
+def exit_code_for_status(status)
+  return 1 unless status
+  return 128 + status.termsig if status.signaled?
+
+  status.exitstatus || 1
+end
+
+options = {}
+
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: agent-coord-bounded [--timeout SECONDS] <agent-coord-args...>"
+  opts.on("--timeout SECONDS", Float, "Seconds before reporting private state as degraded") do |value|
+    options[:timeout] = value
+    options[:timeout_source] = "--timeout"
+  end
+  opts.on("-h", "--help", "Show this help") do
+    puts opts
+    exit 0
+  end
+end
+
+begin
+  parser.order!(ARGV)
+rescue OptionParser::ParseError => e
+  warn e.message
+  warn parser
+  exit 64
+end
+
+if ARGV.empty?
+  warn parser
+  exit 64
+end
+
+timeout = parse_timeout(
+  options.fetch(:timeout, DEFAULT_TIMEOUT_SECONDS),
+  options.fetch(:timeout_source, "AGENT_COORD_BOUNDED_TIMEOUT_SECONDS")
+)
+
+command = ["agent-coord", *ARGV]
+stdout_file = Tempfile.new("agent-coord-bounded-stdout")
+stderr_file = Tempfile.new("agent-coord-bounded-stderr")
+begin
+  interrupted_signal = nil
+
+  %w[INT TERM HUP].each do |signal|
+    next unless Signal.list.key?(signal)
+
+    Signal.trap(signal) { interrupted_signal ||= signal }
+  end
+
+  started_at = Time.now
+  begin
+    pid = Process.spawn(*command, out: stdout_file.path, err: stderr_file.path, pgroup: true)
+  rescue SystemCallError => e
+    warn "agent-coord-bounded: unable to start #{Shellwords.join(command)}: #{e.message}"
+    exit 127
+  end
+  status = nil
+  timed_out = false
+
+  loop do
+    if interrupted_signal
+      terminate_process_group(pid, signal: interrupted_signal)
+      exit(128 + Signal.list.fetch(interrupted_signal))
+    end
+
+    waited = Process.waitpid2(pid, Process::WNOHANG)
+    if waited
+      status = waited[1]
+      break
+    end
+
+    if Time.now - started_at >= timeout
+      timed_out = true
+      break
+    end
+
+    sleep 0.05
+  end
+
+  terminate_process_group(pid) if timed_out
+
+  if timed_out
+    warn "agent-coord-bounded: timed out after #{timeout}s: #{Shellwords.join(command)}"
+    exit 124 # stdout intentionally suppressed; partial output would mislead callers.
+  end
+
+  stdout_file.rewind
+  stderr_file.rewind
+  print stdout_file.read
+  $stderr.print(stderr_file.read)
+
+  exit(exit_code_for_status(status))
+ensure
+  stdout_file.close!
+  stderr_file.close!
+end
