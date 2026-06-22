@@ -9,7 +9,8 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `AGENTS.md`: canonical entry point for agent instructions and workflow discovery
 - Shared agent workflow skills may be installed in the user's or agent's normal
   skill directory and reused across repos; they must resolve repo-specific
-  values through this repo's `AGENTS.md` seam.
+  values through this repo's `AGENTS.md` seam. The canonical shared source is
+  [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows).
 - `.agents/skills/`: repo-local skill copies/overrides plus repo-specific skills;
   `.claude/skills` is a symlink here so Claude Code exposes the same workflows as
   slash commands in this checkout.
@@ -21,7 +22,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   keeps a local copy/override.
 - `.agents/bin/agent-workflow-seam-doctor`: validates that repo-local or
   installed/shared workflow skills can resolve this repo's seam; pass
-  `--shared <installed-skill-root>` when checking user-installed skills outside
+  `--shared <agent-workflows-root>` when checking user-installed skills outside
   this checkout.
 - `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing
   these agent workflows with other repositories through user-installed skills
@@ -78,7 +79,8 @@ on installed/shared skills for issue, PR, or batch work:
 ```
 
 When checking user-installed shared skills outside this checkout, add
-`--shared <installed-skill-root>`.
+`--shared <agent-workflows-root>`; for example, a clone of
+`https://github.com/shakacode/agent-workflows`.
 
 If a workflow explicitly needs a repo-local `.agents/skills/...` or
 `.agents/workflows/...` file and that file is missing in the checkout but present
@@ -94,9 +96,12 @@ the workflow logic but defer every repo-specific command, branch, label, path,
 and policy to this section. When a skill says "run the repo's local validation"
 or "use the hosted-CI trigger," the concrete value is here. Adopting repos
 replace these values with their own and validate the seam with
-`.agents/bin/agent-workflow-seam-doctor`, plus `--shared <installed-skill-root>`
-when checking user-installed shared skills outside the checkout (see
-[`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md)).
+`.agents/bin/agent-workflow-seam-doctor`, plus `--shared <agent-workflows-root>`
+when checking user-installed shared skills outside the checkout. The shared
+source lives at
+[`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows);
+see
+[`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
 
 - **Base branch**: `main` (fetch and compare via `origin/main`).
 - **Pre-push local validation**: `bin/ci-local` (optimized by default; `--changed` narrow,

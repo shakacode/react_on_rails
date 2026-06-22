@@ -24,13 +24,13 @@ for the design rationale.
    files, protected-branch requirements, review bots, and which checks are cheap
    locally versus reserved for hosted CI.
 
-2. **Install or enable the shared skills for the user/agent.** Use the agent
-   platform's normal user-skill installation mechanism. Until the shared skill
-   pack has a dedicated release channel, treat the React on Rails shared skills
-   as the source material for installation, not as files to customize inside the
-   consumer repo. Install each skill's `bin/` helper scripts with its `SKILL.md`;
-   shared workflows such as PR batching, review triage, and changelog updates
-   call those helpers.
+2. **Install or enable the shared skills for the user/agent.** Clone
+   [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows)
+   and use its `bin/install-agent-workflows`, or use the agent platform's normal
+   user-skill installation mechanism. Install `skills/`, `workflows/`, and the
+   shared `bin/` helpers together; shared workflows such as PR batching, review
+   triage, and changelog updates call helper scripts relative to their installed
+   skill directories.
 
 3. **Add the seam to `AGENTS.md`.** Add an `## Agent Workflow Configuration`
    section using the template below, filled with the target repo's real values.
@@ -43,8 +43,9 @@ for the design rationale.
    Markdown but cannot execute the installed skill's `bin/` helpers, keep a
    local helper copy or compatibility launcher for that skill.
 
-5. **Validate the seam.** Run `agent-workflow-seam-doctor` from the shared skill
-   pack with `--shared` pointing at the installed shared-skill root, or
+5. **Validate the seam.** Run `agent-workflow-seam-doctor` from the shared
+   `shakacode/agent-workflows` pack with `--shared` pointing at the cloned or
+   installed shared-pack root, or
    `.agents/bin/agent-workflow-seam-doctor` in repos that keep local shared
    copies. Then run one dry workflow pass that resolves the seam values without
    making changes.
@@ -87,7 +88,7 @@ equivalent manually"; the workflow structure still transfers.
 Run the seam doctor after adding or changing the seam:
 
 ```bash
-agent-workflow-seam-doctor --shared "${SHARED_AGENT_SKILLS_ROOT:?set installed shared skill root}"
+agent-workflow-seam-doctor --shared "${AGENT_WORKFLOWS_ROOT:?set path to shakacode/agent-workflows}"
 ```
 
 For repos that keep the checker in the checkout:
@@ -148,7 +149,7 @@ fallback until a public backend spec exists.
 
 ## Validation Checklist
 
-- `agent-workflow-seam-doctor --shared <installed-or-pinned-shared-skill-root>` passes.
+- `agent-workflow-seam-doctor --shared <path-to-shakacode/agent-workflows>` passes.
 - Markdown formatting and link checks pass for edited docs.
 - Skill `bin/` unit tests pass when the repo carries local helper scripts.
 - A dry run of `$pr-batch` stops with an exact target list and goal prompt
@@ -168,7 +169,7 @@ fallback until a public backend spec exists.
 
 ## Validation
 
-- `agent-workflow-seam-doctor --shared <installed-or-pinned-shared-skill-root>`
+- `agent-workflow-seam-doctor --shared <path-to-shakacode/agent-workflows>`
 - markdown formatting + link check
 - dry-run `$pr-batch` and PR-review triage without code changes
 ```

@@ -20,8 +20,9 @@ repo-specific values the portable skills need.
 ## Architecture
 
 ```text
-shared agent skill pack
+shakacode/agent-workflows
   skills/... and workflows/...        portable process, installed per user/agent
+  bin/...                             install and validation helpers
 
 consumer repo
   AGENTS.md                           canonical policy plus Agent Workflow Configuration seam
@@ -31,11 +32,12 @@ consumer repo
   .agents/workflows/...               repo-local workflow files only when the repo needs them
 ```
 
-The default distribution path is the user's normal skill installation mechanism.
-For example, an agent may install the shared `pr-batch`, `verify`,
-`address-review`, and changelog skills once and use them in any repo. The skill
-then reads the target repo's `AGENTS.md` seam to resolve concrete commands and
-policy.
+The default distribution path is
+[`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows) plus
+the user's normal skill installation mechanism. For example, an agent may
+install the shared `pr-batch`, `verify`, `address-review`, and changelog skills
+once and use them in any repo. The skill then reads the target repo's
+`AGENTS.md` seam to resolve concrete commands and policy.
 
 Repository-pinned copies remain an optional escape hatch for environments that
 need exact workflow text in the checkout, such as cloud agents that cannot use a
@@ -118,11 +120,11 @@ Repo-local content should contain concrete policy and domain knowledge:
 
 ## Phasing
 
-1. Current PR: add the React on Rails seam, genericize shared workflow text to
+1. React on Rails seam PR: add the repo seam, genericize shared workflow text to
    resolve values through that seam, add `agent-workflow-seam-doctor`, and update
    the adoption guide around user-installed shared skills.
-2. Shared pack: publish or document the shared skill pack installation path for
-   the agent surfaces ShakaCode uses.
+2. Shared pack: publish `shakacode/agent-workflows`, install it in the agent
+   surfaces ShakaCode uses, and run its `bin/validate` before shared updates.
 3. Consumer repos: install or enable the shared skills for the user/agent, add
    the repo seam, run the seam doctor, and dry-run one workflow.
 4. Optional pinning: revisit repository-pinned copies only for repos or agents
@@ -132,5 +134,6 @@ Repo-local content should contain concrete policy and domain knowledge:
 
 - `ruby .agents/bin/agent-workflow-seam-doctor-test.rb`
 - `.agents/bin/agent-workflow-seam-doctor`
+- `agent-workflow-seam-doctor --shared <path-to-shakacode/agent-workflows>`
 - Markdown format and link checks for edited documentation
 - a dry run of one shared workflow against the repo seam
