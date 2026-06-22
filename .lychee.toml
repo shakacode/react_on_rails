@@ -62,6 +62,7 @@ exclude = [
   '^https://(www\.)?mycfsapp\.com',     # SSL hostname mismatch
   '^https://(www\.)?scoutapp\.com',     # SSL hostname mismatch
   '^https://solargraph\.org',           # SSL HandshakeFailure
+  '^https://undici\.nodejs\.org/?$',    # TLS handshake failures from CI
 
   # ============================================================================
   # BADGE AND CI SERVICES
@@ -117,6 +118,7 @@ exclude = [
   '^https?://(www\.)?pivotaltracker\.com',  # Timeout in CI
   '^https?://(www\.)?undeveloped\.com',  # Timeout in CI
   '^https://devchat\.tv',  # Ruby Rogues podcast - times out in CI
+  '^https?://chris\.beams\.io/posts/git-commit/?$',  # Timeout in CI
   '^https?://chlg\.co',  # URL shortener - times out in CI
   '^https?://contributor-covenant\.org',  # Timeout in CI
   '^https://www\.diva-portal\.org/smash/get/diva2:1903931/FULLTEXT01\.pdf$',  # Intermittent timeout in CI
