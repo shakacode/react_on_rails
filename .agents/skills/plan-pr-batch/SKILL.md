@@ -205,7 +205,7 @@ Execution rules:
   coordinator confirmation before editing.
 - Sequenced lanes may share declared files only in the stated order.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
-- For coordination, respect coordination claims and dependencies: assign stable agent ids, run `agent-coord doctor --json` then targeted `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json` or `agent-coord status --batch-id <batch-id> --json`, claim before branch/worktree creation when available, heartbeat at phase changes, and stop on unmet `blocked_on` refs or dependency state `UNKNOWN`.
+- For coordination, respect coordination claims and dependencies: use targeted agent-coord checks from the repo workflow, claim before branching when available, heartbeat at phase changes, and stop/report UNKNOWN for unmet or unverifiable dependencies.
 - Use local validation, self-review, review-comment, CI, and readiness gates from the repo workflow. For PRs, merge only when `merge_authority` is `auto_merge_when_gates_pass` or a later explicit approval exists, current release mode permits it, and confidence/readiness gates pass; document confidence data in the PR description.
 - Final handoff must include links, tests, blockers, next action, confidence or UNKNOWN facts, `merge_authority`, and explicit final-state sections: `merged`, `ready-gates-clean`, `ready-no-merge-authority`, `waiting-on-checks-or-review`, `external-gate-failing`, `blocked-user-input`, or `no-pr-evidence`.
 ```
