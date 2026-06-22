@@ -206,9 +206,11 @@ export default function EmailField({ error }) {
 When a component can appear more than once on a page, pass a unique prefix into it — the container `id` you set with the top-level `id:` option (section 2) works well — and build your ARIA ids from that. Use the same value for `id:` and the prefix prop so they stay in sync:
 
 ```erb
-<%# Each mount gets a unique id; the same value is threaded in as the prefix prop %>
-<%= react_component("EmailField", props: { id_prefix: "signup-email" }, id: "signup-email") %>
-<%= react_component("EmailField", props: { id_prefix: "contact-email" }, id: "contact-email") %>
+<%# Each mount gets a unique id; the same value is threaded in as the prefix prop.
+    Prop keys are passed through verbatim (React on Rails does not camelize them),
+    so use the same `idPrefix` key the component reads. %>
+<%= react_component("EmailField", props: { idPrefix: "signup-email" }, id: "signup-email") %>
+<%= react_component("EmailField", props: { idPrefix: "contact-email" }, id: "contact-email") %>
 ```
 
 ```jsx
@@ -393,7 +395,7 @@ Guidance:
   "LocalizedNav",
   props: {
     locale: I18n.locale.to_s,
-    dir: rtl_subtags.any? { |s| I18n.locale.to_s.start_with?(s) } ? "rtl" : "ltr"
+    dir: rtl_subtags.include?(I18n.locale.to_s.split("-").first) ? "rtl" : "ltr"
   },
   prerender: true
 ) %>
@@ -426,15 +428,15 @@ Use tools such as `jest-axe`, `vitest-axe`, `axe-core`, `pa11y`, Lighthouse, Cap
 
 When an accessibility bug appears only after the JavaScript bundle loads, debug the Rails output and the hydrated React output separately.
 
-| Symptom                                           | Likely cause                                                                   | Where to look                                       |
-| ------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------- |
-| Screen reader reads stale or duplicated labels    | Duplicate IDs from a component mounted more than once                          | Section 4; switch to `useId`                        |
-| `aria-describedby` points at nothing after load   | ID differs between server and client                                           | Non-deterministic ID generation                     |
-| Button is announced but does nothing              | Control rendered before hydration attached handlers                            | Section 3; add no-JS fallback or pending state      |
-| Hydration warning and visual flicker              | Server markup differs from client markup                                       | Dates, random values, locale, browser-only branches |
-| Streamed content is read in the wrong order       | DOM order differs from logical reading order                                   | Section 5; align `Suspense` boundaries              |
-| Announcement is missed or doubled while streaming | Live-region text changed before content committed, or changed twice            | Section 5; update after commit and guard repeats    |
-| Content is missing for no-JS users                | `prerender: false`, or SSR failed and the page fell back to client-only output | Sections 1 and 3; check server-side rendering logs  |
+| Symptom                                           | Likely cause                                                                   | Where to look                                                                                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Screen reader reads stale or duplicated labels    | Duplicate IDs from a component mounted more than once                          | Section 4; pass a per-mount `idPrefix` (`useId` alone collides across roots on the OSS / Pro non-RSC paths) |
+| `aria-describedby` points at nothing after load   | ID differs between server and client                                           | Non-deterministic ID generation                                                                             |
+| Button is announced but does nothing              | Control rendered before hydration attached handlers                            | Section 3; add no-JS fallback or pending state                                                              |
+| Hydration warning and visual flicker              | Server markup differs from client markup                                       | Dates, random values, locale, browser-only branches                                                         |
+| Streamed content is read in the wrong order       | DOM order differs from logical reading order                                   | Section 5; align `Suspense` boundaries                                                                      |
+| Announcement is missed or doubled while streaming | Live-region text changed before content committed, or changed twice            | Section 5; update after commit and guard repeats                                                            |
+| Content is missing for no-JS users                | `prerender: false`, or SSR failed and the page fell back to client-only output | Sections 1 and 3; check server-side rendering logs                                                          |
 
 **Portals and modals (SSR note).** If a dialog's DOM is created only after hydration, keyboard and screen reader users do not get a usable dialog in the first response. Fix this by not showing the dialog until JavaScript is ready, or by rendering an accessible non-portal fallback. After hydration, follow the [APG dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/) or use a vetted dialog component.
 
