@@ -91,7 +91,8 @@ If you omit an `id`, React on Rails auto-assigns one to the container.
 <%= react_component(
   "InlineBadge",
   props: { text: "New" },
-  html_options: { tag: "span", class: "badge", id: "account-badge" }
+  id: "account-badge",
+  html_options: { tag: "span", class: "badge" }
 ) %>
 ```
 
@@ -125,17 +126,18 @@ export default function HeaderNav() {
 }
 ```
 
-- **Use `html_options` for container attributes.** Put `id`, `class`, `style`, `role`, and `aria-*` attributes there when they belong on the container.
+- **Set the container `id` with the top-level `id:` option, not inside `html_options`.** React on Rails overwrites `html_options[:id]` with the value from the top-level `id:` option (or an auto-generated id), so an `id` placed inside `html_options` is ignored. Put `class`, `style`, `role`, and `aria-*` in `html_options`; put `id` at the top level. (`role="status"` already implies `aria-live="polite"`, so it is not repeated here.)
 
 ```erb
 <%= react_component(
   "SaveStatus",
   props: { state: "saving" },
-  html_options: { id: "save-status", role: "status", "aria-live": "polite" }
+  id: "save-status",
+  html_options: { role: "status" }
 ) %>
 ```
 
-- **Keep container IDs and internal IDs separate.** The helper can create the container `id`. Your component still needs stable IDs for labels, descriptions, and ARIA relationships inside the island. See section 4.
+- **Keep container IDs and internal IDs separate.** The container `id` comes from the top-level `id:` option (or is auto-generated). Your component still needs its own stable IDs for labels, descriptions, and ARIA relationships inside the island. See section 4.
 - **Server and client must agree.** Do not set a wrapper role or ARIA attribute in ERB that the hydrated React tree contradicts.
 
 The markup inside the component follows normal web accessibility rules: native elements first, labels for inputs, names for icon-only buttons, visible focus, and correct keyboard behavior. For those rules, use [WAI-ARIA APG](https://www.w3.org/WAI/ARIA/apg/patterns/) and [MDN Accessibility](https://developer.mozilla.org/en-US/docs/Web/Accessibility).
@@ -199,6 +201,15 @@ export default function EmailField({ error }) {
 }
 ```
 
+**`useId` is not enough when you mount the same component more than once.** `useId` keeps an id stable between the server render and hydration _within one mount_, but React only guarantees uniqueness _across_ separate roots when each root is given a distinct [`identifierPrefix`](https://react.dev/reference/react-dom/client/hydrateRoot#parameters). React on Rails does not set a per-mount `identifierPrefix`, so two mounts of the same component can produce the same `useId` value (for example `«r0»`) and collide. When a component can appear more than once on a page, pass a unique prefix into it — the container `id` you set with the top-level `id:` option (section 2) works well — and build your ARIA ids from that:
+
+```jsx
+export default function EmailField({ idPrefix, error }) {
+  const errorId = `${idPrefix}-email-error`;
+  // ...use `${idPrefix}-email` for the input id, etc.
+}
+```
+
 ---
 
 ## 5. Pro streaming SSR and Suspense
@@ -210,18 +221,19 @@ Fix this by making each streamed `Suspense` boundary match the reading order of 
 Guidance:
 
 - Keep streamed chunks in the same order a user should read them.
-- Mark loading regions as busy while content is still pending.
-- Use `aria-live="polite"` only for content that should be announced when it arrives.
-- Set live-region text after the real content commits. Otherwise the announcement can be missed or repeated.
+- Mark loading regions as busy with `aria-busy` while content is still pending.
+- Do not wrap a large streamed subtree (such as a full result list) in `aria-live` — that queues the entire subtree for announcement and overwhelms screen-reader users. Instead, announce a short message like "Results loaded" in the page's shared live region (section 9) once the content commits.
+- Reserve `aria-live` for small, deliberately announced status text, and set that text after the real content commits so the announcement is not missed or repeated.
 - Do not move focus when a late chunk arrives. Preserve the user's current focus.
 - Mark skeleton placeholders as decorative.
 
 ```jsx
 function ResultsRegion({ loading, children }) {
+  // `aria-busy` signals loading; a plain <div> avoids implying a landmark.
   return (
-    <section aria-busy={loading ? 'true' : 'false'} aria-live="polite">
+    <div aria-busy={loading ? 'true' : 'false'}>
       {loading ? <div aria-hidden="true" className="skeleton" /> : children}
-    </section>
+    </div>
   );
 }
 ```
@@ -312,8 +324,10 @@ When Rails flash messages and React toasts each create their own live region, sc
 Fix this by creating one persistent live region in the Rails layout. Rails can render the first message there, and React islands can update the same region later.
 
 ```erb
-<div id="app-live-region" role="status" aria-live="polite"></div>
+<div id="app-live-region" role="status" aria-atomic="true"></div>
 ```
+
+`role="status"` already implies `aria-live="polite"`, so that is not repeated. `aria-atomic="true"` is set explicitly so screen readers announce the whole message rather than only the changed text node.
 
 Guidance:
 
@@ -367,11 +381,12 @@ Guidance:
 - Do not re-detect locale on the client if Rails already knows it.
 
 ```erb
+<% rtl_subtags = %w[ar he fa ur yi ug dv ps sd ckb] # extend as your app needs %>
 <%= react_component(
   "LocalizedNav",
   props: {
     locale: I18n.locale.to_s,
-    dir: I18n.locale.to_s.start_with?("ar") ? "rtl" : "ltr"
+    dir: rtl_subtags.any? { |s| I18n.locale.to_s.start_with?(s) } ? "rtl" : "ltr"
   },
   prerender: true
 ) %>
