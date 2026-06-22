@@ -381,6 +381,7 @@ the confidence note, and then handed back a recommendation instead of merging.
 If the gate is met and you are confident, **merge — do not re-ask for permission
 you were already given.** A blocker means a named, unmet gate (failed check,
 unresolved MUST-FIX thread, release-phase restriction), not residual caution.
+
 When `merge_authority` is `ask`, surface exactly
 one final merge decision if gates are clean and merge is allowed; if approval is
 declined or not granted by handoff, record `ready-no-merge-authority` and do not

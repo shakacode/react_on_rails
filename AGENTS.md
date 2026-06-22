@@ -501,15 +501,24 @@ contract unless a maintainer explicitly narrows the run.
   the action, such as a required confirmation before a destructive force-push. A
   standalone "should I push this ordinary PR-iteration fix?" question counts.
   Report it as `Decision points: N` in the FYI section of the batch handoff.
-- **Confidence notes**: delegated merge authority exists only when the current
-  user or batch goal grants it and the release-mode rules permit it. But when it
-  _does_ exist and the gate is met, exercising it is the expected close-out — an
-  authorized, gate-satisfied, confident merge that is downgraded to a "ready to
-  merge" recommendation is an unfinished task, not a safe default. Before a
-  delegated merge, the worker or coordinator writes a confidence note in the
-  issue, PR body, or batch handoff covering validated commands, evidence links,
-  remaining `UNKNOWN` facts, and residual risk. When merge authority is not
-  delegated, use the same format for merge-readiness evidence without merging:
+- **Confidence notes**: `merge_authority` has three states:
+  `auto_merge_when_gates_pass` is the only autonomous merge grant when the
+  current user or batch goal grants it and the release-mode rules permit it;
+  `ask` requires one confirmation before merging; and `none` grants no merge
+  authority. When `auto_merge_when_gates_pass` applies and the gate is met,
+  exercising it is the expected close-out — an authorized, gate-satisfied,
+  confident merge that is downgraded to a "ready to merge" recommendation is an
+  unfinished task, not a safe default. Before a merge under
+  `auto_merge_when_gates_pass` or after an `ask` confirmation, the worker or
+  coordinator documents the merge qualifications in the PR description:
+  - which release-mode gate applied and that it was satisfied
+  - the confidence note: validated commands, evidence links, remaining
+    `UNKNOWN` facts, and residual risk
+  - the finalizer, when accelerated-RC requires one
+
+  When merge authority is not granted, use the same confidence-note format for
+  merge-readiness evidence without merging:
+
   ```text
   Confidence note:
   - Validated: <commands or checks run and outcomes>
