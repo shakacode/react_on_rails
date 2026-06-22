@@ -754,9 +754,9 @@ RSC CSS Module — scope every rule to a class. Keep global resets like `html { 
 dedicated global stylesheet loaded through the Rails layout, not in a CSS Module that rides along
 with a `'use client'` reference.
 
-For teams that want a strict no-type-selector convention, including rejecting scoped descendants such
-as `.card a`, add a per-file override so CI catches element selectors in CSS Modules before they
-reach production.
+For teams that want the strictest no-type-selector convention, including rejecting scoped descendants
+such as `.card a`, add a per-file override so CI catches element selectors in CSS Modules before they
+reach production:
 
 Example `.stylelintrc.json`:
 
@@ -772,8 +772,8 @@ Example `.stylelintrc.json`:
 ```
 
 If your CSS Module convention intentionally permits scoped descendants such as `.card a`, use
-`selector-max-type: [0, { "ignore": ["descendant"] }]` instead of a bare `0` — this still blocks
-bare top-level selectors like `html` or `body` while allowing `.card a`:
+`selector-max-type: [0, { "ignore": ["descendant"] }]` instead — this still blocks bare top-level
+selectors like `html` or `body` while allowing `.card a`:
 
 ```json
 {
@@ -785,8 +785,6 @@ bare top-level selectors like `html` or `body` while allowing `.card a`:
   ]
 }
 ```
-
-If you need zero type selectors everywhere (the strictest convention), keep `"selector-max-type": 0`.
 
 ```css
 /* ProductCard.module.css -- CORRECT: class-scoped rules only */

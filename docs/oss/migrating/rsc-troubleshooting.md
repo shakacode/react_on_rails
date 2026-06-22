@@ -357,12 +357,11 @@ Earlier versions re-broadcast shared vendor and common CSS _per client reference
 If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, use a coordinated
 React 19.2-compatible release set once stable Pro metadata is available. Key constraints:
 
-- The fix landed in `react-on-rails-rsc` 19.2.0-rc.3. A stable, coordinated Pro release
-  incorporating 19.2.x is pending; watch the
+- The fix landed in `react-on-rails-rsc` 19.2.0-rc.3. Check the
   [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases)
-  and the Pro release notes for the version set that satisfies the Pro peer metadata.
-  Do not install the rc prerelease in production — it is not accepted by the current stable Pro
-  peer metadata.
+  and the Pro release notes to determine whether a stable, coordinated release incorporating 19.2.x
+  is available and accepted by your Pro peer metadata. Do not install the rc prerelease in production
+  unless the Pro release notes name a matching package or peer range.
 - **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
   React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
   can fail at startup.
