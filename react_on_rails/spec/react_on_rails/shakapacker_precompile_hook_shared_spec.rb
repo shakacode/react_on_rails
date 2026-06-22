@@ -189,6 +189,12 @@ RSpec.describe "Shakapacker precompile hook shared script" do
     it "merges and lets caller keys extend the base env" do
       expect(utf8_subprocess_env("FOO" => "bar")).to include("FOO" => "bar", "RUBYOPT" => a_string_matching(/-EUTF-8/))
     end
+
+    it "does not duplicate -EUTF-8 when RUBYOPT already requests it" do
+      with_env("RUBYOPT" => "-EUTF-8") do
+        expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8")
+      end
+    end
   end
 
   describe "valid_rsc_registration_entry_path?" do
@@ -388,7 +394,10 @@ RSpec.describe "Shakapacker precompile hook shared script" do
           "CLIENT_BUNDLE_ONLY" => nil,
           "SERVER_BUNDLE_ONLY" => nil,
           "RSC_BUNDLE_ONLY" => "true",
-          "RSC_REFERENCE_DISCOVERY_BUILD" => "true"
+          "RSC_REFERENCE_DISCOVERY_BUILD" => "true",
+          # The discovery build also forces a UTF-8 locale so the shakapacker child does not crash
+          # under a C/POSIX locale parsing a Gemfile with non-ASCII bytes (see utf8_subprocess_env).
+          "RUBYOPT" => a_string_matching(/-EUTF-8/)
         ),
         "/rails/root/bin/shakapacker",
         exception: true

@@ -46,10 +46,12 @@ end
 # set as a belt-and-suspenders for tools that read the locale directly. This is the subprocess-boundary
 # companion to the UTF-8-safe File.read calls in this script. `extra` keys override/extend the base env.
 def utf8_subprocess_env(extra = {})
+  rubyopt = ENV.fetch("RUBYOPT", "")
+  rubyopt = "#{rubyopt} -EUTF-8".strip unless rubyopt.include?("-EUTF-8")
   {
     "LANG" => ENV.fetch("LANG", "C.UTF-8"),
     "LC_ALL" => ENV.fetch("LC_ALL", "C.UTF-8"),
-    "RUBYOPT" => [ENV.fetch("RUBYOPT", nil), "-EUTF-8"].compact.join(" ").strip
+    "RUBYOPT" => rubyopt
   }.merge(extra)
 end
 
