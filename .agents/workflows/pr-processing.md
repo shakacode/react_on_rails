@@ -814,10 +814,12 @@ hatch**, not a single kill switch:
   abandons still-local work without pushing, runs `agent-coord release` for the
   lane, records the cancelled lane as its final state, and exits without leaving
   a half-pushed branch or corrupted worktree. The one-phase-transition latency
-  bound holds only for workers that successfully check targeted
-  `agent-coord status --batch-id <batch-id> --json` at each phase transition; a
-  worker deep inside one target may not stop until its next checkpoint, and a
-  wedged worker requires the hard escape hatch.
+  bound holds only for workers that successfully check targeted status at each
+  phase transition: `agent-coord status --batch-id <batch-id> --json` for batch
+  workers or
+  `agent-coord status --repo <owner/repo> --target <issue-or-pr> --json` for
+  single-lane workers. A worker deep inside one target may not stop until its
+  next checkpoint, and a wedged worker requires the hard escape hatch.
 - **Hard escape hatch.** For a wedged or unresponsive worker that is not reaching a
   checkpoint, use this sequence:
   1. Ensure cancellation is recorded in the backend, or record that backend state
@@ -1333,19 +1335,21 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    work is in scope. If no coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
-   - run `agent-coord doctor --deep --json`, then broad `agent-coord status` only
-     as an audit to list candidate batch/run ids and lanes
+   - run bounded `agent-coord doctor --json`, then broad `agent-coord status`
+     (via `agent-coord-bounded`) only as an audit/discovery read to list
+     candidate batch/run ids and lanes
    - record `worked_issue_scope: UNKNOWN (needs batch confirmation)`
    - ask the user to confirm a candidate before treating any candidate lane list
      as worked-issue scope
 
    When the batch/run id is known, run bounded `agent-coord doctor --json` and
-   `agent-coord status --batch-id <batch-id> --json`, then inspect the named
-   batch entry to identify the worked issue set from claims, heartbeats,
+   bounded `agent-coord status --batch-id <batch-id> --json`, then inspect the
+   named batch entry to identify the worked issue set from claims, heartbeats,
    branches, and dependency metadata. If `agent-coord` is missing or bounded
    `agent-coord doctor --json` fails/times out, record
-   `worked_issue_scope: UNKNOWN (setup)`. If doctor passes but targeted batch
-   status fails, exits 2, or times out, record
+   `worked_issue_scope: UNKNOWN (setup)`. If bounded
+   `agent-coord doctor --json` passes but targeted batch status fails, exits 2,
+   or times out, record
    `worked_issue_scope: UNKNOWN (access)`. In all UNKNOWN cases, include the
    exact command/error and use structured public
    `codex-claim` comments as an advisory fallback for possible no-PR, blocked,
