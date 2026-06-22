@@ -491,20 +491,35 @@ def git_head_sha!(monorepo_root:, context:)
   abort "❌ Unable to resolve local HEAD before #{context}.\n\n#{head_output.strip}"
 end
 
-def non_runtime_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
-  return [] if tag_sha == head_sha
-
-  _ancestor_output, ancestor_status = Open3.capture2e(
+def rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
+  ancestor_output, ancestor_status = Open3.capture2e(
     "git", "-C", monorepo_root, "merge-base", "--is-ancestor", tag_sha, head_sha
   )
-  return nil unless ancestor_status.success?
+  return true if ancestor_status.success?
 
+  if ancestor_status.respond_to?(:exitstatus) && ancestor_status.exitstatus != 1
+    abort "❌ Unable to verify RC tag ancestry before release branch promotion.\n\n#{ancestor_output.strip}"
+  end
+
+  false
+end
+
+def commit_shas_after_rc_tag!(monorepo_root:, tag_sha:, head_sha:)
   list_output, list_status = Open3.capture2e(
     "git", "-C", monorepo_root, "rev-list", "--reverse", "#{tag_sha}..#{head_sha}"
   )
-  return nil unless list_status.success?
+  unless list_status.success?
+    abort "❌ Unable to list commits after RC tag before release branch promotion.\n\n#{list_output.strip}"
+  end
 
-  commits = list_output.lines.map(&:strip).reject(&:empty?)
+  list_output.lines.map(&:strip).reject(&:empty?)
+end
+
+def non_runtime_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
+  return [] if tag_sha == head_sha
+  return nil unless rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
+
+  commits = commit_shas_after_rc_tag!(monorepo_root:, tag_sha:, head_sha:)
   return nil unless commits.all? { |sha| commit_non_runtime_only?(monorepo_root:, sha:) }
 
   commits

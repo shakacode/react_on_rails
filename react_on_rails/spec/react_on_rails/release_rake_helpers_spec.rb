@@ -2580,6 +2580,7 @@ RSpec.describe "release.rake helper methods" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:success_status) { instance_double(Process::Status, success?: true) }
     let(:failure_status) { instance_double(Process::Status, success?: false) }
+    let(:git_error_status) { instance_double(Process::Status, success?: false, exitstatus: 128) }
 
     it "does not inspect tags for stable releases from main" do
       expect(Open3).not_to receive(:capture2e)
@@ -2771,6 +2772,66 @@ RSpec.describe "release.rake helper methods" do
       expect(Open3)
         .to have_received(:capture2e)
         .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+    end
+
+    it "aborts when the RC tag ancestry check errors" do
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+        .and_return(["tagsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["headsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+        .and_return(["fatal: bad object tagsha", git_error_status])
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.3",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /Unable to verify RC tag ancestry/)
+    end
+
+    it "aborts when commits after the RC tag cannot be listed" do
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+        .and_return(["tagsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["headsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-list", "--reverse", "tagsha..headsha")
+        .and_return(["fatal: invalid range", failure_status])
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.3",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /Unable to list commits after RC tag/)
     end
 
     it "aborts when runtime-bearing commits follow the current RC tag" do
