@@ -200,10 +200,10 @@ Items:
   Done when: final state satisfies requested `merge_authority`, with PR/no-PR evidence or no-fix rationale.
 
 Execution rules:
-- Run `git fetch --prune origin main` first. Verify repo-local `.agents/skills/pr-batch/SKILL.md` and `.agents/workflows/pr-processing.md`; update from `origin/main` if present, else report repo workflow state as `UNKNOWN`.
+- Run `git fetch --prune origin main` first. Verify repo-local `.agents/skills/pr-batch/SKILL.md` and `.agents/workflows/pr-processing.md` before editing. If a required file is missing locally but present on `origin/main`, update that specific file before continuing; if it is still missing, report repo workflow state as `UNKNOWN`.
 - Follow `.agents/skills/pr-batch/SKILL.md`; if autoloading is unavailable, copy its safety/review/simplify/CI/readiness gates.
 - Dispatch one subagent per independent item, current file-disjoint wave only. Hold serial and `UNKNOWN` discovery lanes until no active editor lane can collide.
-- Workers edit only owned File-touch map paths. If an `UNKNOWN`, unlisted, or other-lane path is needed, stop and report discovered paths for coordinator confirmation.
+- Workers edit only owned File-touch map paths. If an `UNKNOWN`, unlisted, or other-lane path is needed, stop before editing it and report discovered paths for coordinator confirmation.
 - Sequenced lanes may share declared files only in the stated order.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN facts.
 - For coordination, respect coordination claims and dependencies: stable agent ids, `agent-coord doctor` then `status`, claim before branch/worktree creation when available, heartbeat at phase changes, and stop on unmet `blocked_on` refs or dependency state `UNKNOWN`.
