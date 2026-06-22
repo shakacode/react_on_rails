@@ -862,7 +862,7 @@ end
 
 def required_check_names_for_main(monorepo_root:, repo_slug: nil, ci_branch: "main")
   repo_slug ||= github_repo_slug(monorepo_root)
-  encoded_branch = URI.encode_www_form_component(ci_branch.to_s)
+  encoded_branch = ci_branch.to_s.gsub("/", "%2F")
   api_path = "repos/#{repo_slug}/branches/#{encoded_branch}/protection/required_status_checks"
   # Keep legacy `contexts` separate from modern `checks` entries. Modern
   # required checks can be pinned to a GitHub App via `app_id`; legacy contexts
@@ -987,8 +987,8 @@ def format_ci_status_run_line(run, kind:)
   url.strip.empty? ? "  #{icon} #{detail}: #{run['name']}" : "  #{icon} #{detail}: #{run['name']}\n      #{url}"
 end
 
-def format_main_ci_status_violation(kind:, short_sha:, runs:, branch: "main") # rubocop:disable Metrics/CyclomaticComplexity
-  ref = "origin/#{branch}"
+def format_main_ci_status_violation(kind:, short_sha:, runs:, ci_branch: "main") # rubocop:disable Metrics/CyclomaticComplexity
+  ref = "origin/#{ci_branch}"
   header = case kind
            when :in_progress
              "⏳ CI is still in progress on #{ref} (commit #{short_sha})."
@@ -1119,7 +1119,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
 
   if check_runs.empty? && legacy_status_runs.empty?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :no_checks, short_sha:, runs: nil, branch: ci_branch),
+      message: format_main_ci_status_violation(kind: :no_checks, short_sha:, runs: nil, ci_branch:),
       allow_override:,
       dry_run:
     )
@@ -1144,7 +1144,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   end
   if failed.any?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :failed, short_sha:, runs: failed, branch: ci_branch),
+      message: format_main_ci_status_violation(kind: :failed, short_sha:, runs: failed, ci_branch:),
       allow_override:,
       dry_run:
     )
@@ -1169,7 +1169,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     missing_names = missing_required[:labels]
     if missing_required[:count] == required_check_count(required_names)
       handle_main_ci_status_violation!(
-        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha:, runs: nil, branch: ci_branch) +
+        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha:, runs: nil, ci_branch:) +
                  "\nRequired: #{required_labels.join(', ')}",
         allow_override:,
         dry_run:
@@ -1178,7 +1178,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     elsif missing_names.any?
       handle_main_ci_status_violation!(
         message: format_main_ci_status_violation(kind: :missing_required_checks, short_sha:, runs: nil,
-                                                 branch: ci_branch) +
+                                                 ci_branch:) +
                  "\nRequired: #{required_labels.join(', ')}\nMissing: #{missing_names.join(', ')}",
         allow_override:,
         dry_run:
@@ -1190,7 +1190,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   in_progress = evaluated.select { |run| CI_INCOMPLETE_STATUSES.include?(run["status"]) }
   if in_progress.any?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :in_progress, short_sha:, runs: in_progress, branch: ci_branch),
+      message: format_main_ci_status_violation(kind: :in_progress, short_sha:, runs: in_progress, ci_branch:),
       allow_override:,
       dry_run:
     )
@@ -1207,7 +1207,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   end
   if unknown.any?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :unknown_status, short_sha:, runs: unknown, branch: ci_branch),
+      message: format_main_ci_status_violation(kind: :unknown_status, short_sha:, runs: unknown, ci_branch:),
       allow_override:,
       dry_run:
     )

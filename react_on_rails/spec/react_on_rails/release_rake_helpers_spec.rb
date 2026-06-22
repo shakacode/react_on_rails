@@ -981,6 +981,28 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to output(/Main CI is healthy on #{short_sha} \(2 checks\)/).to_stdout
       end
+
+      it "uses the default main branch helper path when ci_branch is omitted" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:)
+          .and_return(required_checks(checks: [required_check("Lint")]))
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(%r{Checking CI status on origin/main.*Main CI is healthy on #{short_sha}}m).to_stdout
+
+        expect(self).to have_received(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+        expect(self).to have_received(:required_check_names_for_main).with(monorepo_root:)
+      end
     end
 
     context "when releasing from a release branch (ci_branch override)" do
