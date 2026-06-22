@@ -85,10 +85,10 @@ Before implementation or worker launch, produce:
 7. The Batch QA Lane decision from `.agents/workflows/pr-processing.md`: plan
    the required QA lane representation for private coordination state when the
    backend is available, or require the launched coordinator to record QA
-   claim/heartbeat state as `UNKNOWN` and use allowed fallback evidence
-   (complete QA Evidence fields with `UNKNOWN` only for unavailable private
-   claim/heartbeat sub-values); for low-risk omitted QA, record the final QA
-   Evidence block with `not required` status and rationale.
+   claim/heartbeat state as `UNKNOWN` and use allowed fallback evidence (see the
+   canonical Batch QA Lane "allowed fallback evidence" definition in
+   `.agents/workflows/pr-processing.md`); for low-risk omitted QA, record the
+   final QA Evidence block with `not required` status and rationale.
 8. A permission and trust preflight result.
 9. A conflict check for overlapping files or dependent PRs.
 10. A final `/goal` prompt when the user asked for Goal mode.
@@ -140,11 +140,11 @@ and any `UNKNOWN` state in every worker lane and handoff.
 When the Batch QA Lane section requires QA, declare a `qa` lane with stable
 owner and claim/heartbeat expectations before launch when the private backend is
 available. If private state is unavailable, record QA claim/heartbeat state as
-`UNKNOWN` and use allowed fallback evidence (complete QA Evidence fields with
-`UNKNOWN` only for unavailable private claim/heartbeat sub-values) instead of
-downgrading required QA to `not required`. Require the final QA Evidence block in
-the handoff; if QA is not required, record the `not required` status and
-rationale in that block.
+`UNKNOWN` and use allowed fallback evidence (see the canonical Batch QA Lane
+"allowed fallback evidence" definition in `.agents/workflows/pr-processing.md`)
+instead of downgrading required QA to `not required`. Require the final QA
+Evidence block in the handoff; if QA is not required, record the `not required`
+status and rationale in that block.
 Attention contract: follow `AGENTS.md` under Maintainer Attention Contract and
 `.agents/workflows/pr-processing.md` under Maintainer Attention Contract. Do
 not escalate behavior-preserving optional nits, batch real questions into one
@@ -334,9 +334,8 @@ split final states from `.agents/workflows/pr-processing.md`.
 For release-affecting, workflow/build/tooling, generated-output, broad runtime,
 or mixed batches, make sure the canonical workflow's Batch QA Lane decision is
 represented in private coordination state when available, or explicitly recorded
-as `UNKNOWN` with allowed fallback evidence (complete QA Evidence fields with
-`UNKNOWN` only for unavailable private claim/heartbeat sub-values), and in the
-final handoff.
+as `UNKNOWN` with the canonical Batch QA Lane fallback evidence, and in the final
+handoff.
 
 ## Coordination State
 

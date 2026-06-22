@@ -446,9 +446,11 @@ Coordinate QA with the same primitives as other batch lanes:
 - The QA owner gets a stable agent id, branch/worktree ownership when files may be edited, and
   `agent-coord claim` / `agent-coord heartbeat` updates at lane start, evidence refresh, blocked state,
   resumed state, and done state. If private state is unavailable, record claim and heartbeat state as
-  `UNKNOWN` and use the public claim-comment fallback only where the dependency rules allow it. This is
-  the "allowed fallback evidence" referenced by the skills: complete the QA Evidence fields and use
-  `UNKNOWN` only for the private claim/heartbeat sub-values that cannot be verified.
+  `UNKNOWN` and use the public claim-comment fallback only where the dependency rules allow it. Even in
+  fallback mode, required QA needs a concrete owner and branch/worktree; only private claim/heartbeat
+  sub-values may be `UNKNOWN`. This is the "allowed fallback evidence" referenced by the skills:
+  complete the QA Evidence fields and use `UNKNOWN` only for the private claim/heartbeat sub-values that
+  cannot be verified.
 - QA may run in parallel with audit or closeout once changed areas and candidate PRs are known, but it
   must not push dependent changes while declared `blocked_on` refs remain unmet.
 - QA findings are triaged like other batch findings: release-blocking issues stop readiness or
@@ -460,7 +462,7 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 ```markdown
 ### QA Evidence
 
-- QA lane: <agent id, branch/worktree, claim status, last heartbeat status; each sub-value may be UNKNOWN when private state is unavailable>
+- QA lane: <agent id, branch/worktree, claim status, last heartbeat status; required QA needs concrete owner/worktree; only private claim/heartbeat may be UNKNOWN>
 - Scope checked: <changed areas, PRs, release phase, and why this QA depth was enough>
 - Tested at: <PR/head SHA(s), audited range, or "not applicable: no PR/code changes">
 - Automated checks: <commands, CI links, or "covered by worker validation: ...">
@@ -468,7 +470,7 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 - Findings: <none, fixed in PR(s), waived with link, or follow-up recommended with tracking outcome/link>
 - QA required: <yes | no>
 - QA required rationale: <one-line reason for the decision and selected QA depth>
-- QA lane status: <satisfied | blocked | waived | in_progress | unknown | not applicable; use not applicable when QA required is no>
+- QA lane status: <satisfied | blocked | waived | in_progress | unknown | not applicable; use not applicable when QA required is no; readiness/release audits treat in_progress/unknown as blockers>
 - Release-blocking status: <clear | blocked | waived | not applicable; use not applicable when QA required is no; map QA lane status satisfied->clear, blocked->blocked, waived->waived, and in_progress/unknown->blocked>
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable (no recurring process miss found); use not
   applicable when QA found no recurring process miss; see the top-level Process Gap Disposition
@@ -488,6 +490,22 @@ Examples:
 - Findings: none
 - QA required: yes
 - QA required rationale: release-affecting generated output needed independent coverage
+- QA lane status: satisfied
+- Release-blocking status: clear
+- Process-gap disposition: not applicable (no recurring process miss found)
+```
+
+```markdown
+### QA Evidence
+
+- QA lane: codex-qa, branch qa/batch-tooling, claim UNKNOWN (private backend unavailable), heartbeat UNKNOWN (private backend unavailable)
+- Scope checked: workflow/tooling changes for PRs #6 and #7; QA conducted independently of private coordination state
+- Tested at: PR #6 abc1111 and PR #7 def2222
+- Automated checks: worker validation plus `pnpm start format.listDifferent`
+- Manual checks: smoke test of generated example on Node 20
+- Findings: none
+- QA required: yes
+- QA required rationale: CI/tooling batch requires independent QA coverage
 - QA lane status: satisfied
 - Release-blocking status: clear
 - Process-gap disposition: not applicable (no recurring process miss found)
