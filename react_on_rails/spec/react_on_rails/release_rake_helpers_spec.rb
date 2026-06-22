@@ -2547,6 +2547,35 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#ensure_release_branch_matches_target_base!" do
+    it "allows prerelease cuts from the matching release branch" do
+      expect do
+        ensure_release_branch_matches_target_base!(
+          current_branch: "release/17.0.0",
+          target_gem_version: "17.0.0.rc.0"
+        )
+      end.not_to raise_error
+    end
+
+    it "allows prerelease cuts from non-release branches" do
+      expect do
+        ensure_release_branch_matches_target_base!(
+          current_branch: "jg/some-fix",
+          target_gem_version: "17.0.0.rc.0"
+        )
+      end.not_to raise_error
+    end
+
+    it "rejects prerelease cuts from a mismatched release branch" do
+      expect do
+        ensure_release_branch_matches_target_base!(
+          current_branch: "release/16.7.1",
+          target_gem_version: "17.0.0.rc.0"
+        )
+      end.to raise_error(SystemExit, /Release branch must match the target release line/)
+    end
+  end
+
   describe "#ensure_release_branch_promotes_tagged_rc!" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:success_status) { instance_double(Process::Status, success?: true) }

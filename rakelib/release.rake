@@ -436,10 +436,34 @@ end
 # version exactly — that is how the release train promotes the last good RC to
 # its final tag in place, without re-cutting from `main` (see
 # internal/contributor-info/release-train-runbook.md). The exact-version match
-# prevents promoting, say, `17.0.0` from `release/16.7.1`. Prereleases are not
-# routed through this guard; they release from any branch.
+# prevents promoting, say, `17.0.0` from `release/16.7.1`. Prereleases use the
+# target-base release branch guard below so feature-branch prereleases remain
+# allowed, but `release/X.Y.Z` branches cannot cut another release line.
 def stable_release_branch_allowed?(current_branch:, target_gem_version:)
   ["main", "release/#{target_gem_version}"].include?(current_branch)
+end
+
+def release_base_version(gem_version)
+  version = parse_gem_version_components(gem_version)
+
+  "#{version[:major]}.#{version[:minor]}.#{version[:patch]}"
+end
+
+def ensure_release_branch_matches_target_base!(current_branch:, target_gem_version:)
+  return unless current_branch.start_with?("release/")
+
+  expected_release_branch = "release/#{release_base_version(target_gem_version)}"
+  return if current_branch == expected_release_branch
+
+  abort <<~ERROR
+    ❌ Release branch must match the target release line.
+
+    Current branch: #{current_branch}
+    Target version: #{target_gem_version}
+    Expected branch: #{expected_release_branch}
+
+    Use the matching release branch for this target version, or run prereleases from a non-release branch.
+  ERROR
 end
 
 def same_release_base?(first_version, second_version)
@@ -2066,6 +2090,11 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       version_input:
     )
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
+
+    ensure_release_branch_matches_target_base!(
+      current_branch:,
+      target_gem_version: resolved_target_gem_version
+    )
 
     unless is_prerelease || stable_release_branch_allowed?(current_branch:,
                                                            target_gem_version: resolved_target_gem_version)
