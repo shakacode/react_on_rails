@@ -307,16 +307,6 @@ async function delayCompiledJavaScript(page: Page): Promise<JavaScriptController
   };
 }
 
-// Rspack RSC content does not render on react-on-rails-rsc@19.2.0-rc.1 (the Rspack
-// build cannot locate the client runtime, so the RSC module map is not created).
-// Tracked in react_on_rails_rsc#105. These skips fire ONLY under the Rspack gate
-// (SHAKAPACKER_ASSETS_BUNDLER=rspack); the webpack RSC path still runs them. The
-// client-only reveal tests below are unaffected and keep running. Remove the skips
-// when react-on-rails-rsc@19.2.0-rc.2 fixes the Rspack module map.
-const RSPACK_RSC_BROKEN_192 = process.env.SHAKAPACKER_ASSETS_BUNDLER === 'rspack';
-const RSPACK_RSC_SKIP_REASON =
-  'Rspack RSC content does not render on react-on-rails-rsc@19.2.0-rc.1 (module map not created) — react_on_rails_rsc#105; unskip at rc.2.';
-
 test.describe('RSC and streaming FOUC acceptance coverage', () => {
   test.describe('resource reveal ordering', () => {
     test.beforeEach(async ({ page }) => {
@@ -330,7 +320,6 @@ test.describe('RSC and streaming FOUC acceptance coverage', () => {
     test('streamed RSC content is visible and styled when its CSS is loaded, even while JS is delayed', async ({
       page,
     }) => {
-      test.skip(RSPACK_RSC_BROKEN_192, RSPACK_RSC_SKIP_REASON);
       const css = await controlCssBySentinel(page, RSC_SENTINEL);
       const scripts = await delayCompiledJavaScript(page);
 
@@ -346,7 +335,6 @@ test.describe('RSC and streaming FOUC acceptance coverage', () => {
     });
 
     test('streamed RSC content does not appear before its CSS when JS is available', async ({ page }) => {
-      test.skip(RSPACK_RSC_BROKEN_192, RSPACK_RSC_SKIP_REASON);
       const css = await controlCssBySentinel(page, RSC_SENTINEL, { holdTarget: true });
 
       await page.goto(RSC_FOUC_PATH, { waitUntil: 'commit' });
@@ -360,7 +348,6 @@ test.describe('RSC and streaming FOUC acceptance coverage', () => {
     });
 
     test('streamed RSC content still waits for CSS if JS finishes first', async ({ page }) => {
-      test.skip(RSPACK_RSC_BROKEN_192, RSPACK_RSC_SKIP_REASON);
       const css = await controlCssBySentinel(page, RSC_SENTINEL, { holdTarget: true });
       const scripts = await delayCompiledJavaScript(page);
 
@@ -416,7 +403,6 @@ test.describe('RSC and streaming FOUC acceptance coverage', () => {
   });
 
   test('RSC and client-only probe pages only load the CSS chunks they use', async ({ browser }) => {
-    test.skip(RSPACK_RSC_BROKEN_192, RSPACK_RSC_SKIP_REASON);
     const rscPage = await browser.newPage();
     try {
       await recordProbePaints(rscPage, [RSC_PROBE_TARGET]);

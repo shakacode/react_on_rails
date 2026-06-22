@@ -26,18 +26,8 @@ const UNWRAPPED_STREAM_PAYLOAD_KEY =
   'SimpleComponent-fun4a7ngv9-UnwrappedStreamRSCRouteDemo-react-component-0';
 const RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST = 'REACT_ON_RAILS_RSC_ROUTE_SSR_FALSE_BAILOUT';
 
-// Rspack RSC content does not render on react-on-rails-rsc@19.2.0-rc.1 (the Rspack
-// build cannot locate the client runtime, so the RSC module map is not created).
-// Tracked in react_on_rails_rsc#105. These skips fire ONLY under the Rspack gate
-// (SHAKAPACKER_ASSETS_BUNDLER=rspack); the webpack RSC path still runs them. Remove
-// the skips when react-on-rails-rsc@19.2.0-rc.2 fixes the Rspack module map.
-const RSPACK_RSC_BROKEN_192 = process.env.SHAKAPACKER_ASSETS_BUNDLER === 'rspack';
-const RSPACK_RSC_SKIP_REASON =
-  'Rspack RSC content does not render on react-on-rails-rsc@19.2.0-rc.1 (module map not created) — react_on_rails_rsc#105; unskip at rc.2.';
-
 test.describe('RSCRoute ssr=false', () => {
   test('server-renders sibling routes while deferring the ssr=false route', async ({ page, request }) => {
-    test.skip(RSPACK_RSC_BROKEN_192, RSPACK_RSC_SKIP_REASON);
     const response = await request.get(MIXED_ROUTE_PATH);
     expect(response.ok()).toBe(true);
     const html = await response.text();
@@ -85,7 +75,6 @@ test.describe('RSCRoute ssr=false', () => {
     page,
     request,
   }) => {
-    test.skip(RSPACK_RSC_BROKEN_192, RSPACK_RSC_SKIP_REASON);
     const response = await request.get(UNWRAPPED_ROUTE_PATH);
     expect(response.ok()).toBe(true);
     const html = await response.text();
@@ -136,7 +125,6 @@ test.describe('RSCRoute ssr=false', () => {
     page,
     request,
   }) => {
-    test.skip(RSPACK_RSC_BROKEN_192, RSPACK_RSC_SKIP_REASON);
     const response = await request.get(UNWRAPPED_STREAM_ROUTE_PATH);
     expect(response.ok()).toBe(true);
     const html = await response.text();
