@@ -210,6 +210,7 @@ module AgentWorkflowSeamDoctor
     return nil if fence.nil?
 
     delimiter = fence[1]
+    # Mismatched closers stay inside the current fence.
     return nil if in_fence && delimiter != fence_delimiter
     return [false, false, nil] if in_fence
 
@@ -246,8 +247,13 @@ module AgentWorkflowSeamDoctor
   end
 
   def placeholder_issue(root, path, line_number, placeholder)
-    relative_path = path.delete_prefix("#{File.expand_path(root)}/")
-    "unresolved executable placeholder #{placeholder} in #{relative_path}:#{line_number}"
+    expanded_root = File.expand_path(root)
+    location = if path.start_with?("#{expanded_root}/")
+                 path.delete_prefix("#{expanded_root}/")
+               else
+                 "[shared] #{path}"
+               end
+    "unresolved executable placeholder #{placeholder} in #{location}:#{line_number}"
   end
 
   def format_text(issues)

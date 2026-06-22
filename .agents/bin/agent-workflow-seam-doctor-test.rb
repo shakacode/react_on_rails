@@ -415,6 +415,7 @@ class AgentWorkflowSeamDoctorSharedRootTest < Minitest::Test
         out, status = run_doctor(root, "--shared", shared_root)
 
         refute status.success?
+        assert_includes out, "[shared]"
         assert_includes out, "skills/shared/SKILL.md"
       end
     end
