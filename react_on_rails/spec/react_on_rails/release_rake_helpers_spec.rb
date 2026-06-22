@@ -2593,6 +2593,51 @@ RSpec.describe "release.rake helper methods" do
       expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "rev-parse", "HEAD")
     end
 
+    it "allows non-runtime finalization commits after the current RC tag" do
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+        .and_return(["tagsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["headsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-list", "--reverse", "tagsha..headsha")
+        .and_return(["changelogsha\nnotessha\n", success_status])
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "changelogsha")
+        .and_return(true)
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "notessha")
+        .and_return(true)
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.3",
+          target_gem_version: "17.0.0"
+        )
+      end.to output(/non-runtime-only commit\(s\) after v17\.0\.0\.rc\.3/).to_stdout
+
+      expect(Open3)
+        .to have_received(:capture2e)
+        .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+      expect(Open3)
+        .to have_received(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-list", "--reverse", "tagsha..headsha")
+    end
+
     it "aborts when a stable release branch is not currently on an RC version" do
       expect(Open3).not_to receive(:capture2e)
 
@@ -2657,6 +2702,10 @@ RSpec.describe "release.rake helper methods" do
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
         .and_return(["headsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+        .and_return(["", failure_status])
 
       expect do
         ensure_release_branch_promotes_tagged_rc!(
@@ -2672,6 +2721,44 @@ RSpec.describe "release.rake helper methods" do
         .to have_received(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
       expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+      expect(Open3)
+        .to have_received(:capture2e)
+        .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+    end
+
+    it "aborts when runtime-bearing commits follow the current RC tag" do
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+        .and_return(["tagsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["headsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-list", "--reverse", "tagsha..headsha")
+        .and_return(["runtimesha\n", success_status])
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "runtimesha")
+        .and_return(false)
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.3",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /Runtime-bearing commits require a new RC/)
     end
   end
 

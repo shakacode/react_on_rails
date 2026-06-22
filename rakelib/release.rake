@@ -467,6 +467,25 @@ def git_head_sha!(monorepo_root:, context:)
   abort "❌ Unable to resolve local HEAD before #{context}.\n\n#{head_output.strip}"
 end
 
+def non_runtime_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
+  return [] if tag_sha == head_sha
+
+  _ancestor_output, ancestor_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "merge-base", "--is-ancestor", tag_sha, head_sha
+  )
+  return nil unless ancestor_status.success?
+
+  list_output, list_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "rev-list", "--reverse", "#{tag_sha}..#{head_sha}"
+  )
+  return nil unless list_status.success?
+
+  commits = list_output.lines.map(&:strip).reject(&:empty?)
+  return nil unless commits.all? { |sha| commit_non_runtime_only?(monorepo_root:, sha:) }
+
+  commits
+end
+
 def ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
   unless release_prerelease_version?(current_checkout_version)
     abort <<~ERROR
@@ -519,14 +538,22 @@ def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, c
 
   return if tag_sha == head_sha
 
+  non_runtime_commits = non_runtime_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
+  if non_runtime_commits
+    puts "ℹ️ Stable release branch promotion includes #{non_runtime_commits.length} " \
+         "non-runtime-only commit(s) after #{rc_tag}; preserving accepted RC runtime content."
+    return
+  end
+
   abort <<~ERROR
-    ❌ Stable release branch promotion must run from the accepted RC tag.
+    ❌ Stable release branch promotion must run from the accepted RC tag or metadata-only finalization commits.
 
     Current branch: #{current_branch}
     Current version: #{current_checkout_version}
     Expected tag: #{rc_tag} (#{tag_sha})
     Local HEAD: #{head_sha}
 
+    Changelog/docs/comment-only commits after #{rc_tag} are allowed. Runtime-bearing commits require a new RC.
     Cut a new RC from this branch tip, or reset the branch to #{rc_tag} before promoting #{target_gem_version}.
   ERROR
 end
