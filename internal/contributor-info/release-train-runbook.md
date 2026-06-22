@@ -112,7 +112,8 @@ bundle exec rake "release[17.0.0.rc.0]"   # bumps version.rb, tags v17.0.0.rc.0,
 > `origin/main` otherwise. Cutting an RC from `release/X.Y.Z` therefore validates the release-branch
 > tip, not `main`. (The non-runtime walk-back still applies, so a changelog/version-only tip is skipped
 > back to the last runtime-bearing commit on that branch.) The ShakaPerf release gate likewise runs on
-> the current branch ref.
+> the current branch ref. If the release branch was just pushed, wait for at least one CI run on that
+> branch before cutting the first RC; otherwise the branch-tip gate can stop with a `no_checks` result.
 
 A maintainer opens (or updates) the release tracker per [`rc-testing-plan.md`](rc-testing-plan.md) and
 sets the mode to `accelerated-rc` or `strict-rc`. Publish the phase as `rc` for this release line so

@@ -510,6 +510,16 @@ def remote_git_tag_exists?(monorepo_root:, tag:)
   abort "❌ Unable to verify remote git tag #{tag.inspect} before release branch promotion."
 end
 
+def fetch_remote_release_tag!(monorepo_root:, tag:, tag_type:)
+  tag_ref = "refs/tags/#{tag}"
+  fetch_output, fetch_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "fetch", "--force", "--no-tags", "--quiet", "origin", "#{tag_ref}:#{tag_ref}"
+  )
+  return if fetch_status.success?
+
+  abort "❌ Unable to fetch remote #{tag_type} tag before release branch promotion.\n\n#{fetch_output.strip}"
+end
+
 def remote_release_tags(monorepo_root:, pattern:)
   output, status = Open3.capture2e(
     "git", "-C", monorepo_root, "ls-remote", "--tags", "--refs", "origin", "refs/tags/#{pattern}"
@@ -583,7 +593,7 @@ end
 
 def ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
   version = parse_gem_version_components(current_checkout_version)
-  unless version[:prerelease_type]
+  if version[:prerelease_type].nil?
     abort <<~ERROR
       ❌ Stable release branch promotion must start from a tagged RC.
 
@@ -594,8 +604,6 @@ def ensure_release_branch_current_version_is_rc!(current_branch:, current_checko
       Cut and verify an RC on this release branch before promoting #{target_gem_version}.
     ERROR
   end
-
-  return if version[:prerelease_type] == "rc" && same_release_base?(current_checkout_version, target_gem_version)
 
   unless version[:prerelease_type] == "rc"
     abort <<~ERROR
@@ -610,6 +618,8 @@ def ensure_release_branch_current_version_is_rc!(current_branch:, current_checko
     ERROR
   end
 
+  return if same_release_base?(current_checkout_version, target_gem_version)
+
   abort <<~ERROR
     ❌ Stable release branch promotion must use an RC for the target version.
 
@@ -621,10 +631,47 @@ def ensure_release_branch_current_version_is_rc!(current_branch:, current_checko
   ERROR
 end
 
+def stable_release_tag_retry?(monorepo_root:, stable_tag:, head_sha:, current_branch:, current_checkout_version:,
+                              target_gem_version:)
+  local_tag_sha = peeled_git_tag_sha(monorepo_root:, tag: stable_tag)
+  remote_tag_exists = remote_git_tag_exists?(monorepo_root:, tag: stable_tag)
+
+  if remote_tag_exists
+    fetch_remote_release_tag!(monorepo_root:, tag: stable_tag, tag_type: "stable")
+    local_tag_sha = peeled_git_tag_sha(monorepo_root:, tag: stable_tag)
+    unless local_tag_sha
+      abort <<~ERROR
+        ❌ Stable release branch promotion: stable tag was found on the remote but could not be resolved locally after fetching.
+
+        Expected tag: #{stable_tag}
+        Current branch: #{current_branch}
+        Current version: #{current_checkout_version}
+        Target version: #{target_gem_version}
+
+        Try running `git fetch --force origin refs/tags/#{stable_tag}:refs/tags/#{stable_tag}` and retrying.
+      ERROR
+    end
+  end
+
+  return false unless local_tag_sha
+  return true if local_tag_sha == head_sha
+
+  abort <<~ERROR
+    ❌ Stable release branch promotion is already tagged at a different commit.
+
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    Stable tag: #{stable_tag} (#{local_tag_sha})
+    Local HEAD: #{head_sha}
+
+    Rerun only when the existing stable tag points at the current release branch HEAD.
+  ERROR
+end
+
 def release_branch_promotion_rc_tag!(monorepo_root:, current_branch:, current_checkout_version:, target_gem_version:)
   if release_prerelease_version?(current_checkout_version)
     ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
-    return "v#{current_checkout_version}"
+    return { rc_tag: "v#{current_checkout_version}", stable_tag_retry: false }
   end
 
   if current_checkout_version != target_gem_version
@@ -639,21 +686,24 @@ def release_branch_promotion_rc_tag!(monorepo_root:, current_branch:, current_ch
     ERROR
   end
 
+  head_sha = git_head_sha!(monorepo_root:, context: "release branch promotion")
   stable_tag = "v#{target_gem_version}"
-  if peeled_git_tag_sha(monorepo_root:, tag: stable_tag) || remote_git_tag_exists?(monorepo_root:, tag: stable_tag)
-    abort <<~ERROR
-      ❌ Stable release branch promotion is already tagged.
-
-      Current branch: #{current_branch}
-      Current version: #{current_checkout_version}
-      Stable tag: #{stable_tag}
-
-      Do not rerun the release promotion after the stable tag exists.
-    ERROR
+  # A concurrent stable-tag push after this check is still caught by the later
+  # `git push --tags`; this guard only decides whether a known tag is retry-safe.
+  stable_tag_retry = stable_release_tag_retry?(
+    monorepo_root:,
+    stable_tag:,
+    head_sha:,
+    current_branch:,
+    current_checkout_version:,
+    target_gem_version:
+  )
+  if stable_tag_retry
+    puts "ℹ️ Stable tag #{stable_tag} already points at local HEAD; continuing idempotent release retry."
   end
 
   rc_tag = latest_remote_rc_tag_for_version(monorepo_root:, target_gem_version:)
-  return rc_tag if rc_tag
+  return { rc_tag:, stable_tag_retry: } if rc_tag
 
   abort <<~ERROR
     ❌ Stable release branch promotion retry must descend from a remote RC tag.
@@ -680,13 +730,7 @@ def ensure_remote_rc_tag!(monorepo_root:, rc_tag:, current_branch:, current_chec
 end
 
 def fetch_remote_rc_tag!(monorepo_root:, rc_tag:)
-  tag_ref = "refs/tags/#{rc_tag}"
-  fetch_output, fetch_status = Open3.capture2e(
-    "git", "-C", monorepo_root, "fetch", "--force", "--no-tags", "--quiet", "origin", "#{tag_ref}:#{tag_ref}"
-  )
-  return if fetch_status.success?
-
-  abort "❌ Unable to fetch remote RC tag before release branch promotion.\n\n#{fetch_output.strip}"
+  fetch_remote_release_tag!(monorepo_root:, tag: rc_tag, tag_type: "RC")
 end
 
 def abort_not_ancestor_release_branch_promotion!(current_branch:, current_checkout_version:, target_gem_version:,
@@ -749,14 +793,15 @@ end
 def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, current_checkout_version:,
                                               target_gem_version:)
   # RC cuts target prerelease versions, so only stable promotions match release/<final>.
-  return unless current_branch == "release/#{target_gem_version}"
+  return { stable_tag_retry: false } unless current_branch == "release/#{target_gem_version}"
 
-  rc_tag = release_branch_promotion_rc_tag!(
+  promotion = release_branch_promotion_rc_tag!(
     monorepo_root:,
     current_branch:,
     current_checkout_version:,
     target_gem_version:
   )
+  rc_tag = promotion.fetch(:rc_tag)
 
   ensure_remote_rc_tag!(monorepo_root:, rc_tag:, current_branch:, current_checkout_version:, target_gem_version:)
   fetch_remote_rc_tag!(monorepo_root:, rc_tag:)
@@ -764,18 +809,20 @@ def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, c
   tag_sha = peeled_git_tag_sha(monorepo_root:, tag: rc_tag)
   unless tag_sha
     abort <<~ERROR
-      ❌ Stable release branch promotion must start from a tagged RC.
+      ❌ Stable release branch promotion: RC tag was found on the remote but could not be resolved locally after fetching.
 
       Expected tag: #{rc_tag}
       Current branch: #{current_branch}
       Current version: #{current_checkout_version}
       Target version: #{target_gem_version}
+
+      Try running `git fetch --force origin refs/tags/#{rc_tag}:refs/tags/#{rc_tag}` and retrying.
     ERROR
   end
 
   head_sha = git_head_sha!(monorepo_root:, context: "release branch promotion")
 
-  return if tag_sha == head_sha
+  return promotion if tag_sha == head_sha
 
   commits_after_rc_tag = release_branch_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
   handle_release_branch_commits_after_rc_tag!(
@@ -787,6 +834,7 @@ def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, c
     tag_sha:,
     head_sha:
   )
+  promotion
 end
 
 # The branch whose tip CI the release gate should validate. For a release cut or
@@ -1707,11 +1755,19 @@ def extract_changelog_section(changelog_path:, version:)
 end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_override:, fetch_tags: true)
+def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_override:, fetch_tags: true,
+                                     allow_existing_target_tag: false)
   tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags:)
   latest_tagged_version = tagged_versions.max_by { |version| Gem::Version.new(version) }
+  target_version = Gem::Version.new(target_gem_version)
 
-  if latest_tagged_version && Gem::Version.new(target_gem_version) <= Gem::Version.new(latest_tagged_version)
+  if latest_tagged_version && target_version <= Gem::Version.new(latest_tagged_version)
+    if allow_existing_target_tag && target_version == Gem::Version.new(latest_tagged_version)
+      puts "ℹ️ VERSION POLICY: Existing target tag #{target_gem_version} points at this release branch HEAD; " \
+           "continuing idempotent release retry."
+      return
+    end
+
     handle_version_policy_violation!(
       message: "❌ Requested version #{target_gem_version} " \
                "must be greater than latest tagged version #{latest_tagged_version}.",
@@ -2382,8 +2438,9 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       ERROR
     end
 
+    release_branch_promotion = { stable_tag_retry: false }
     unless is_prerelease
-      ensure_release_branch_promotes_tagged_rc!(
+      release_branch_promotion = ensure_release_branch_promotes_tagged_rc!(
         monorepo_root: release_root,
         current_branch:,
         current_checkout_version:,
@@ -2407,7 +2464,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       monorepo_root: release_root,
       target_gem_version: resolved_target_gem_version,
       allow_override: allow_version_policy_override,
-      fetch_tags: true
+      fetch_tags: true,
+      allow_existing_target_tag: release_branch_promotion.fetch(:stable_tag_retry)
     )
 
     confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root) unless is_dry_run

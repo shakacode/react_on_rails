@@ -872,6 +872,22 @@ RSpec.describe "release.rake helper methods" do
       end.to output(/Skipping all downstream checks for same-base prerelease bump/).to_stdout
     end
 
+    it "allows an existing target tag for an idempotent release branch retry" do
+      allow(self).to receive(:tagged_release_gem_versions)
+        .with("/tmp/repo", fetch_tags: false)
+        .and_return(["16.4.0"])
+
+      expect do
+        validate_release_version_policy!(
+          monorepo_root: "/tmp/repo",
+          target_gem_version: "16.4.0",
+          allow_override: false,
+          fetch_tags: false,
+          allow_existing_target_tag: true
+        )
+      end.to output(/Existing target tag 16\.4\.0/).to_stdout
+    end
+
     it "raises when the changelog-implied bump does not match the requested stable release version" do
       allow(self).to receive(:tagged_release_gem_versions).with("/tmp/repo", fetch_tags: false).and_return(["16.3.0"])
       allow(self).to receive(:extract_changelog_section)
@@ -886,6 +902,19 @@ RSpec.describe "release.rake helper methods" do
           fetch_tags: false
         )
       end.to raise_error(SystemExit, /Version bump mismatch/)
+    end
+  end
+
+  describe "#remote_git_tag_exists?" do
+    it "aborts when git ls-remote fails with an unexpected exit code" do
+      error_status = instance_double(Process::Status, success?: false, exitstatus: 128)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "ls-remote", "--exit-code", "--tags", "origin", "refs/tags/v17.0.0")
+        .and_return(["fatal: unable to connect to origin", error_status])
+
+      expect do
+        remote_git_tag_exists?(monorepo_root: "/tmp/repo", tag: "v17.0.0")
+      end.to raise_error(SystemExit, /Unable to verify remote git tag/)
     end
   end
 
@@ -2742,9 +2771,14 @@ RSpec.describe "release.rake helper methods" do
     let(:not_ancestor_status) { instance_double(Process::Status, success?: false, exitstatus: 1) }
     let(:git_error_status) { instance_double(Process::Status, success?: false, exitstatus: 128) }
     let(:remote_rc_tag_ref) { "refs/tags/v17.0.0.rc.3" }
+    let(:remote_stable_tag_ref) { "refs/tags/v17.0.0" }
     let(:remote_rc_tag_fetch_args) do
       ["git", "-C", monorepo_root, "fetch", "--force", "--no-tags", "--quiet",
        "origin", "#{remote_rc_tag_ref}:#{remote_rc_tag_ref}"]
+    end
+    let(:remote_stable_tag_fetch_args) do
+      ["git", "-C", monorepo_root, "fetch", "--force", "--no-tags", "--quiet",
+       "origin", "#{remote_stable_tag_ref}:#{remote_stable_tag_ref}"]
     end
 
     before do
@@ -2888,11 +2922,46 @@ RSpec.describe "release.rake helper methods" do
       end.to output(/metadata-only commit\(s\) after v17\.0\.0\.rc\.3/).to_stdout
     end
 
-    it "aborts an already-bumped final release branch retry when the stable tag exists" do
+    it "allows an already-bumped final release branch retry when the stable tag points at HEAD" do
+      stub_remote_rc_tag_fetch
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["headsha\n", success_status])
       allow(Open3)
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0^{}")
-        .and_return(["stabletagsha\n", success_status])
+        .and_return(["", failure_status], ["headsha\n", success_status])
+      allow(self)
+        .to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(true)
+      allow(Open3)
+        .to receive(:capture2e)
+        .with(*remote_stable_tag_fetch_args)
+        .and_return(["", success_status])
+      allow(self)
+        .to receive(:latest_remote_rc_tag_for_version)
+        .with(monorepo_root:, target_gem_version: "17.0.0")
+        .and_return("v17.0.0.rc.3")
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+        .and_return(["tagsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-list", "--reverse", "tagsha..headsha")
+        .and_return(["versionbumpsha\n", success_status])
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "versionbumpsha")
+        .and_return(false)
+      allow(self).to receive(:release_finalization_metadata_commit?)
+        .with(monorepo_root:, sha: "versionbumpsha")
+        .and_return(true)
 
       expect do
         ensure_release_branch_promotes_tagged_rc!(
@@ -2901,7 +2970,31 @@ RSpec.describe "release.rake helper methods" do
           current_checkout_version: "17.0.0",
           target_gem_version: "17.0.0"
         )
-      end.to raise_error(SystemExit, /already tagged/)
+      end.to output(/Stable tag v17\.0\.0 already points at local HEAD.*metadata-only commit\(s\)/m).to_stdout
+    end
+
+    it "aborts an already-bumped final release branch retry when the stable tag points elsewhere" do
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["headsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0^{}")
+        .and_return(["stabletagsha\n", success_status])
+      allow(self)
+        .to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(false)
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /already tagged at a different commit/)
 
       expect(self).not_to have_received(:latest_remote_rc_tag_for_version)
     end
