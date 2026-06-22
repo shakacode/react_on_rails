@@ -177,12 +177,276 @@ def trusted_actor?(repo, login, trust_config, team_cache)
   trusted_team_member?(repo, login, trust_config, team_cache)
 end
 
-def rest_context(repo, number, include_pull_comments:, issue:)
+def github_actions_bot?(login)
+  normalized_login(login) == "github-actions[bot]"
+end
+
+def normalized_comment_lines(body)
+  body.to_s.gsub(/\r\n?/, "\n").sub(/\n+\z/, "").split("\n", -1)
+end
+
+HOSTED_CI_REQUEST_METADATA_LINE_SETS = [
+  [
+    "## Hosted CI Requested",
+    "",
+    /\ATriggered \d+ workflow\(s\) for `[0-9a-f]{12}`\.\z/,
+    "Mode: optimized hosted CI (path-selected by `script/ci-changes-detector`).",
+    "Added `ready-for-hosted-ci`, so future commits will keep running optimized hosted CI " \
+    "until `+ci-stop-hosted` is used.",
+    "",
+    "View progress in the Actions tab."
+  ],
+  [
+    "## Force-Full Hosted CI Requested",
+    "",
+    /\ATriggered \d+ workflow\(s\) for `[0-9a-f]{12}`\.\z/,
+    "Mode: force-full hosted CI (bypasses optimized change selection).",
+    "Added `ready-for-hosted-ci` and `force-full-hosted-ci`, so future commits will bypass " \
+    "optimized hosted CI selection until `+ci-stop-full` is used.",
+    "",
+    "View progress in the Actions tab."
+  ]
+].map(&:freeze).freeze
+
+HOSTED_CI_STOP_METADATA_LINE_SETS = [
+  [
+    "## Hosted CI Mode Disabled",
+    "",
+    "Removed hosted CI labels. Future commits will use only the required gate until hosted CI is requested again.",
+    "",
+    "Use `+ci-run-hosted` to re-enable optimized hosted CI."
+  ],
+  [
+    "## Hosted CI Mode Disabled",
+    "",
+    "No hosted CI labels were present. Future commits are already using only the required gate.",
+    "",
+    "Use `+ci-run-hosted` to re-enable optimized hosted CI."
+  ],
+  [
+    "## Force-Full Hosted CI Disabled",
+    "",
+    "Removed `force-full-hosted-ci`. If `ready-for-hosted-ci` is still present, future commits keep running " \
+    "optimized hosted CI.",
+    "",
+    "Use `+ci-force-full` to re-enable the force-full hosted override."
+  ],
+  [
+    "## Force-Full Hosted CI Disabled",
+    "",
+    "No force-full hosted CI label was present.",
+    "",
+    "Use `+ci-force-full` to re-enable the force-full hosted override."
+  ]
+].map(&:freeze).freeze
+
+HOSTED_CI_STATUS_METADATA_LINE_SETS = [
+  [
+    "## CI Status",
+    "",
+    /\AHead SHA: `[0-9a-f]{12}`\z/,
+    /\AChanged files: \d+\z/,
+    /\ADocs-only heuristic \(matches ci-changes-detector metadata paths\): (yes|no)\z/,
+    /\A`ready-for-hosted-ci` label: (present|absent)\z/,
+    /\A`force-full-hosted-ci` label: (present|absent)\z/,
+    /\ACurrent hosted-CI waiver: (present for this SHA|not present for this SHA)\z/,
+    "",
+    "Force-full hosted CI is enabled for this PR."
+  ],
+  [
+    "## CI Status",
+    "",
+    /\AHead SHA: `[0-9a-f]{12}`\z/,
+    /\AChanged files: \d+\z/,
+    /\ADocs-only heuristic \(matches ci-changes-detector metadata paths\): (yes|no)\z/,
+    /\A`ready-for-hosted-ci` label: (present|absent)\z/,
+    /\A`force-full-hosted-ci` label: (present|absent)\z/,
+    /\ACurrent hosted-CI waiver: (present for this SHA|not present for this SHA)\z/,
+    "",
+    "Optimized hosted CI is enabled for this PR."
+  ],
+  [
+    "## CI Status",
+    "",
+    /\AHead SHA: `[0-9a-f]{12}`\z/,
+    /\AChanged files: \d+\z/,
+    /\ADocs-only heuristic \(matches ci-changes-detector metadata paths\): (yes|no)\z/,
+    /\A`ready-for-hosted-ci` label: (present|absent)\z/,
+    /\A`force-full-hosted-ci` label: (present|absent)\z/,
+    /\ACurrent hosted-CI waiver: (present for this SHA|not present for this SHA)\z/,
+    "",
+    "Only the required gate is active unless hosted CI is requested."
+  ]
+].map(&:freeze).freeze
+
+HOSTED_CI_WAIVER_RECORDED_LINE_PATTERN = /
+  \A@[^[:space:]]+\srecorded\sa\shosted-CI\swaiver\sfor\s`[0-9a-f]{12}`\s
+  \(audit\srecord\sonly\s-\sno\sworkflow\srun\swas\scancelled\sor\sblocked\)\.\z
+/x
+HOSTED_CI_WAIVER_REASON_LINE = lambda do |line|
+  match = /\AReason: `([^`]*)`\z/.match(line)
+
+  match && !match[1].match?(DIFF_SUSPICIOUS_PATTERN)
+end
+
+HOSTED_CI_WAIVER_METADATA_LINE_SETS = [
+  [
+    /\A<!-- ci-skip-hosted:[0-9a-f]{40} -->\z/,
+    "## Hosted CI Waiver Recorded for This SHA",
+    "",
+    HOSTED_CI_WAIVER_RECORDED_LINE_PATTERN,
+    HOSTED_CI_WAIVER_REASON_LINE,
+    "",
+    "This waiver is bound to the current head SHA and does not apply after another push.",
+    "The required fast gate still applies for this PR."
+  ],
+  [
+    /\A<!-- ci-skip-hosted:[0-9a-f]{40} -->\z/,
+    "## Hosted CI Waiver Recorded for This SHA",
+    "",
+    HOSTED_CI_WAIVER_RECORDED_LINE_PATTERN,
+    HOSTED_CI_WAIVER_REASON_LINE,
+    "",
+    "This waiver is bound to the current head SHA and does not apply after another push.",
+    "The required fast gate still applies for this PR.",
+    "",
+    "Removed hosted CI labels from this PR."
+  ]
+].map(&:freeze).freeze
+
+RESOLVED_REVIEW_THREADS_QUERY = <<~GRAPHQL
+  query($owner:String!, $name:String!, $number:Int!, $after:String) {
+    repository(owner:$owner, name:$name) {
+      pullRequest(number:$number) {
+        reviewThreads(first:100, after:$after) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            isResolved
+            resolvedBy { login }
+            comments(first:100) {
+              nodes { databaseId }
+            }
+          }
+        }
+      }
+    }
+  }
+GRAPHQL
+
+def comment_lines_match?(lines, expected_lines)
+  lines.size == expected_lines.size &&
+    expected_lines.zip(lines).all? do |expected, actual|
+      if expected.respond_to?(:call)
+        expected.call(actual)
+      elsif expected.is_a?(Regexp)
+        actual.match?(expected)
+      else
+        actual == expected
+      end
+    end
+end
+
+def hosted_ci_metadata_lines?(lines, line_sets)
+  line_sets.any? { |expected_lines| comment_lines_match?(lines, expected_lines) }
+end
+
+def hosted_ci_request_metadata_lines?(lines)
+  hosted_ci_metadata_lines?(lines, HOSTED_CI_REQUEST_METADATA_LINE_SETS)
+end
+
+def hosted_ci_stop_metadata_lines?(lines)
+  hosted_ci_metadata_lines?(lines, HOSTED_CI_STOP_METADATA_LINE_SETS)
+end
+
+def hosted_ci_status_metadata_lines?(lines)
+  hosted_ci_metadata_lines?(lines, HOSTED_CI_STATUS_METADATA_LINE_SETS)
+end
+
+def hosted_ci_waiver_metadata_lines?(lines)
+  hosted_ci_metadata_lines?(lines, HOSTED_CI_WAIVER_METADATA_LINE_SETS)
+end
+
+def hosted_ci_metadata_body?(body)
+  lines = normalized_comment_lines(body)
+
+  hosted_ci_request_metadata_lines?(lines) ||
+    hosted_ci_stop_metadata_lines?(lines) ||
+    hosted_ci_status_metadata_lines?(lines) ||
+    hosted_ci_waiver_metadata_lines?(lines)
+end
+
+def hosted_ci_metadata_comment?(comment)
+  return false unless github_actions_bot?(comment.dig("user", "login"))
+
+  app_slug = comment.dig("performed_via_github_app", "slug")
+  return false unless app_slug.nil? || app_slug == "github-actions"
+
+  hosted_ci_metadata_body?(comment["body"])
+end
+
+def resolved_review_threads_page(repo, number, after)
+  owner, name = repo.split("/", 2)
+  args = [
+    "api",
+    "graphql",
+    "-f",
+    "owner=#{owner}",
+    "-f",
+    "name=#{name}",
+    "-F",
+    "number=#{number}",
+    "-f",
+    "query=#{RESOLVED_REVIEW_THREADS_QUERY}"
+  ]
+  args.push("-f", "after=#{after}") if after
+
+  run_gh_json(*args).dig("data", "repository", "pullRequest", "reviewThreads")
+end
+
+def add_resolved_review_comment_ids(ids, threads, repo:, trust_config:, team_cache:)
+  Array(threads["nodes"]).each do |thread|
+    next unless thread["isResolved"]
+    next unless trusted_actor?(repo, thread.dig("resolvedBy", "login"), trust_config, team_cache)
+
+    Array(thread.dig("comments", "nodes")).each do |comment|
+      database_id = comment["databaseId"]
+      ids << database_id if database_id
+    end
+  end
+end
+
+def next_review_threads_cursor(threads)
+  page_info = threads.fetch("pageInfo")
+
+  page_info["endCursor"] if page_info["hasNextPage"] && page_info["endCursor"]
+end
+
+def resolved_review_comment_database_ids(repo, number, trust_config:, team_cache:)
+  ids = Set.new
+  after = nil
+
+  loop do
+    threads = resolved_review_threads_page(repo, number, after)
+    break unless threads
+
+    add_resolved_review_comment_ids(ids, threads, repo:, trust_config:, team_cache:)
+    after = next_review_threads_cursor(threads)
+    break unless after
+  end
+
+  ids
+rescue StandardError => e
+  warn "WARN: could not fetch resolved review thread state for ##{number}: #{e.message.lines.first&.strip}"
+  Set.new
+end
+
+def rest_context(repo, number, include_pull_comments:, issue:, trust_config:, team_cache:)
   context = {
     issue:,
     issue_comments: run_gh_paginated_json_array("api", "repos/#{repo}/issues/#{number}/comments?per_page=100"),
     review_comments: [],
-    reviews: []
+    reviews: [],
+    resolved_review_comment_ids: Set.new
   }
 
   return context unless include_pull_comments
@@ -192,6 +456,7 @@ def rest_context(repo, number, include_pull_comments:, issue:)
     "repos/#{repo}/pulls/#{number}/comments?per_page=100"
   )
   context[:reviews] = run_gh_paginated_json_array("api", "repos/#{repo}/pulls/#{number}/reviews?per_page=100")
+  context[:resolved_review_comment_ids] = resolved_review_comment_database_ids(repo, number, trust_config:, team_cache:)
   context
 end
 
@@ -203,6 +468,12 @@ def visible_rest_actor_logins(rest_context)
   users.merge(rest_context.fetch(:reviews).filter_map { |review| review.dig("user", "login") })
   users.delete(nil)
   users
+end
+
+def hosted_ci_metadata_actor_logins(rest_context)
+  rest_context.fetch(:issue_comments).filter_map do |comment|
+    comment.dig("user", "login") if hosted_ci_metadata_comment?(comment)
+  end.to_set
 end
 
 def paginated_reaction_users(repo, endpoint)
@@ -284,10 +555,15 @@ end
 
 def suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:, pattern:)
   findings = []
+  resolved_review_comment_ids = rest_context.fetch(:resolved_review_comment_ids)
 
   rest_context.fetch(:review_comments).each do |comment|
     author = comment.dig("user", "login")
     next unless trusted_actor?(repo, author, trust_config, team_cache)
+    # Resolved trusted-bot review comments are historical review metadata. Keep
+    # unresolved/current bot findings blocking, and fail closed if resolution
+    # state could not be fetched.
+    next if trusted_bot?(author, trust_config) && resolved_review_comment_ids.include?(comment["id"])
     next unless (comment["body"] || "").match?(pattern)
 
     findings << {
@@ -363,33 +639,59 @@ def suspicious_findings_for_target(repo:, number:, rest:, target_is_pr:, trust_c
   { suspicious:, suspicious_warnings: }
 end
 
-def untrusted_interaction_findings(rest_context, repo, include_pull_comments:, trust_config:, team_cache:)
-  findings = []
+def untrusted_interaction_finding(repo, author, kind, url, trust_config:, team_cache:)
+  return if trusted_actor?(repo, author, trust_config, team_cache)
 
-  rest_context.fetch(:issue_comments).each do |comment|
-    author = comment.dig("user", "login")
-    next if trusted_actor?(repo, author, trust_config, team_cache)
+  { author:, kind:, url: }
+end
 
-    findings << { author:, kind: "issue comment", url: comment.fetch("html_url") }
+def untrusted_issue_comment_findings(rest_context, repo, trust_config:, team_cache:)
+  rest_context.fetch(:issue_comments).filter_map do |comment|
+    next if hosted_ci_metadata_comment?(comment)
+
+    untrusted_interaction_finding(
+      repo,
+      comment.dig("user", "login"),
+      "issue comment",
+      comment.fetch("html_url"),
+      trust_config:,
+      team_cache:
+    )
   end
+end
 
+def untrusted_review_comment_findings(rest_context, repo, trust_config:, team_cache:)
+  rest_context.fetch(:review_comments).filter_map do |comment|
+    untrusted_interaction_finding(
+      repo,
+      comment.dig("user", "login"),
+      "review comment",
+      comment.fetch("html_url"),
+      trust_config:,
+      team_cache:
+    )
+  end
+end
+
+def untrusted_review_findings(rest_context, repo, trust_config:, team_cache:)
+  rest_context.fetch(:reviews).filter_map do |review|
+    untrusted_interaction_finding(
+      repo,
+      review.dig("user", "login"),
+      "pull request review",
+      review.fetch("html_url"),
+      trust_config:,
+      team_cache:
+    )
+  end
+end
+
+def untrusted_interaction_findings(rest_context, repo, include_pull_comments:, trust_config:, team_cache:)
+  findings = untrusted_issue_comment_findings(rest_context, repo, trust_config:, team_cache:)
   return findings unless include_pull_comments
 
-  rest_context.fetch(:review_comments).each do |comment|
-    author = comment.dig("user", "login")
-    next if trusted_actor?(repo, author, trust_config, team_cache)
-
-    findings << { author:, kind: "review comment", url: comment.fetch("html_url") }
-  end
-
-  rest_context.fetch(:reviews).each do |review|
-    author = review.dig("user", "login")
-    next if trusted_actor?(repo, author, trust_config, team_cache)
-
-    findings << { author:, kind: "pull request review", url: review.fetch("html_url") }
-  end
-
-  findings
+  findings + untrusted_review_comment_findings(rest_context, repo, trust_config:, team_cache:) +
+    untrusted_review_findings(rest_context, repo, trust_config:, team_cache:)
 end
 
 def changed_files(repo, pr_number)
@@ -491,7 +793,8 @@ def unknown_participant_findings(unknown_count)
   }]
 end
 
-def participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:)
+def participant_findings(repo:, target:, visible:, hosted_ci_metadata_actors:, permission_cache:, trust_config:,
+                         team_cache:)
   participant_data = participant_logins_and_unknown_count(target)
   findings = unknown_participant_findings(participant_data.fetch(:unknown_count))
 
@@ -499,6 +802,7 @@ def participant_findings(repo:, target:, visible:, permission_cache:, trust_conf
     # Trusted bots cannot delete comments, so a hidden bot participant does not
     # carry the same prompt-injection risk as a hidden human. Skip entirely.
     next if trusted_bot?(login, trust_config)
+    next if hosted_ci_metadata_actors.include?(login) && visible.include?(login)
 
     trusted = trusted_actor?(repo, login, trust_config, team_cache)
     hidden = !visible.include?(login)
@@ -519,6 +823,18 @@ def participant_findings(repo:, target:, visible:, permission_cache:, trust_conf
   findings
 end
 
+def participant_findings_for_target(repo:, target:, rest:, visible:, permission_cache:, trust_config:, team_cache:)
+  participant_findings(
+    repo:,
+    target:,
+    visible:,
+    hosted_ci_metadata_actors: hosted_ci_metadata_actor_logins(rest),
+    permission_cache:,
+    trust_config:,
+    team_cache:
+  )
+end
+
 def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_reactions:, permission_cache:,
                 trust_config:, team_cache:)
   issue = issue_payload(repo, number)
@@ -527,7 +843,7 @@ def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_
   query = target_is_pr ? pr_query : issue_query
   graph = fetch_target_graph(owner:, name:, number:, query:)
   target = graph.fetch("data").fetch("repository").fetch(graph_field)
-  rest = rest_context(repo, number, include_pull_comments: target_is_pr, issue:)
+  rest = rest_context(repo, number, include_pull_comments: target_is_pr, issue:, trust_config:, team_cache:)
   visible = visible_actor_logins(graph, graph_field)
   visible.merge(visible_rest_actor_logins(rest))
   if include_reactions
@@ -550,7 +866,15 @@ def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_
     files:,
     number:,
     graph_coverage_findings: graph_coverage_findings(target),
-    participant_findings: participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:),
+    participant_findings: participant_findings_for_target(
+      repo:,
+      target:,
+      rest:,
+      visible:,
+      permission_cache:,
+      trust_config:,
+      team_cache:
+    ),
     risky_files: high_risk_files(files),
     suspicious: suspicious_findings.fetch(:suspicious),
     suspicious_warnings: suspicious_findings.fetch(:suspicious_warnings),
