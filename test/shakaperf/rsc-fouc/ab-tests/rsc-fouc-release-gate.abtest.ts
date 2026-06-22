@@ -2,7 +2,12 @@ import { abTest, installRequestBlocking } from 'shaka-shared';
 
 const RSC_CSS_PROBE_SELECTOR = '[data-testid="rsc-css-probe"]';
 const RSC_CSS_PROBE_PATH = '/rsc_posts_page_over_http?posts_count=0';
-const RSC_STYLESHEET_SELECTOR = 'link[rel="stylesheet"][data-precedence="ror-rsc"]';
+// The Pro RSC renderer emits client-reference stylesheets as
+// `<link rel="stylesheet" data-precedence="rsc-css">` (see
+// packages/react-on-rails-pro/src/injectRSCPayload.ts). The earlier
+// `precedence="ror-rsc"` wrapper this gate originally targeted was reverted in
+// #3860; keep this selector in sync with the value the renderer actually emits.
+const RSC_STYLESHEET_SELECTOR = 'link[rel="stylesheet"][data-precedence="rsc-css"]';
 // A styled probe must have a real CSS-module background, not the default unstyled page background.
 // If the intended probe style ever matches one of these defaults, change the Pro dummy probe color first.
 // This avoids pinning the gate to cosmetic RGB changes in the dummy component.
