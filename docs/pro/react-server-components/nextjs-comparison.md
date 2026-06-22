@@ -189,9 +189,9 @@ Rails, which you already have.
 | Server Components + Flight streaming       | Yes                                                                                                          | Yes                                            |
 | SSR + hydration with **no** double-fetch   | Yes (inlined `REACT_ON_RAILS_RSC_PAYLOADS`)                                                                  | Yes (inlined `__next_f`)                       |
 | Refetch RSC on client navigation           | Yes (`/rsc_payload/:name` endpoint)                                                                          | Yes (segment-level diff)                       |
-| Segment-level navigation diffing           | Component-level — **Rails owns routing**                                                                     | Yes — built into the framework router          |
+| Segment-level navigation diffing           | Component-level as of 2026 — **Rails owns routing**                                                          | Yes — built into the framework router          |
 | Built-in link prefetching                  | Not built-in as of 2026 — use Rails/Turbo or a client router                                                 | Yes (viewport + hover)                         |
-| Server-side mutations                      | **By design:** Rails controllers/endpoints own data and RPC                                                  | "Server Actions" (RPC + re-render in one trip) |
+| Server-side mutations                      | Rails controllers/endpoints own mutations (no server-action shorthand as of 2026)                            | "Server Actions" (RPC + re-render in one trip) |
 | Static shell + streamed dynamic holes      | [Async props](../../oss/migrating/rsc-data-fetching.md) stream slow data (related goal, different mechanism) | Partial Prerendering (PPR)                     |
 | Stream each slow prop independently        | Yes (async props)                                                                                            | Partial (Suspense/PPR cover a related need)    |
 | Use your existing Rails app/routes/auth/DB | Yes — the entire point                                                                                       | No — Next owns the server                      |
