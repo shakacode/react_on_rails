@@ -14,7 +14,10 @@ The default model is:
 
 See
 [`portable-agent-workflows-seam-design.md`](portable-agent-workflows-seam-design.md)
-for the design rationale.
+for the design rationale. See
+[`shakacode/agent-workflows/docs/installation-and-upgrades.md`](https://github.com/shakacode/agent-workflows/blob/main/docs/installation-and-upgrades.md)
+for host install paths, upgrade commands, status states, rollback behavior, and
+Codex/Claude notes.
 
 ## One-Time Adoption
 
@@ -26,11 +29,12 @@ for the design rationale.
 
 2. **Install or enable the shared skills for the user/agent.** Clone
    [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows)
-   and use its `bin/install-agent-workflows`, or use the agent platform's normal
-   user-skill installation mechanism. Install `skills/`, `workflows/`, and the
-   shared `bin/` helpers together; shared workflows such as PR batching, review
-   triage, and changelog updates call helper scripts relative to their installed
-   skill directories.
+   and use its `bin/install-agent-workflows --host codex` or
+   `bin/install-agent-workflows --host claude`, or use the agent platform's
+   normal user-skill installation mechanism. Install `skills/`, `workflows/`,
+   and the shared `bin/` helpers together; shared workflows such as PR batching,
+   review triage, and changelog updates call helper scripts relative to their
+   installed skill directories.
 
 3. **Add the seam to `AGENTS.md`.** Add an `## Agent Workflow Configuration`
    section using the template below, filled with the target repo's real values.
@@ -105,6 +109,32 @@ when required seam keys are missing or executable snippets in the repo-local or
 installed shared skill Markdown still contain unresolved seam placeholders such
 as `<follow-up prefix>`.
 
+## Keeping The Installed Pack Current
+
+Use `agent-workflows-status` to check the installed pack against the recorded
+source clone:
+
+```bash
+agent-workflows-status --host codex
+```
+
+Stable status tokens are `UP_TO_DATE`, `UPGRADE_AVAILABLE`, `NOT_INSTALLED`, and
+`CHECK_FAILED`. Add `--fetch` only when a network check against `origin` is
+intended.
+
+Use `upgrade-agent-workflows` to update the source clone, reinstall, and run the
+seam doctor against this repo:
+
+```bash
+upgrade-agent-workflows \
+  --host codex \
+  --consumer-root /path/to/react_on_rails
+```
+
+The upgrade helper backs up the current install and restores it if reinstall or
+consumer seam validation fails. Use `--host claude` for Claude Code installs and
+`--no-fetch` when the source clone has already been updated locally.
+
 ## Shared Vs Repo-Local Skills
 
 Shared portable skills include PR batching, review handling, post-merge audit,
@@ -152,6 +182,8 @@ fallback until a public backend spec exists.
 
 ## Validation Checklist
 
+- `agent-workflows-status --host <codex|claude>` reports `UP_TO_DATE`, or the
+  upgrade decision is recorded.
 - `agent-workflow-seam-doctor --shared <path-to-shakacode/agent-workflows>` passes.
 - Markdown formatting and link checks pass for edited docs.
 - Skill `bin/` unit tests pass when the repo carries local helper scripts.

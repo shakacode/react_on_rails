@@ -6,7 +6,9 @@ For high-concurrency issue or PR batches, use `.agents/skills/pr-batch/SKILL.md`
 
 ```text
 $pr-batch
+Run an agent batch
 Run a Codex batch
+Run a Claude batch
 ```
 
 For assistants without skill support, follow the high-concurrency batch launch rules below before using the rest of this workflow.
