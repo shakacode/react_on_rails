@@ -548,10 +548,6 @@ def latest_remote_rc_tag_for_version(monorepo_root:, target_gem_version:)
   candidates.max_by { |_tag, version| version }&.first
 end
 
-def git_head_sha!(monorepo_root:, context:)
-  current_git_sha!(monorepo_root, context:)
-end
-
 def rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
   ancestor_output, ancestor_status = Open3.capture2e(
     "git", "-C", monorepo_root, "merge-base", "--is-ancestor", tag_sha, head_sha
@@ -605,7 +601,9 @@ def ensure_release_branch_current_version_is_rc!(current_branch:, current_checko
     ERROR
   end
 
-  unless version[:prerelease_type] == "rc"
+  return if version[:prerelease_type] == "rc" && same_release_base?(current_checkout_version, target_gem_version)
+
+  if version[:prerelease_type] != "rc"
     abort <<~ERROR
       ❌ Stable release branch promotion must use an RC prerelease.
 
@@ -617,8 +615,6 @@ def ensure_release_branch_current_version_is_rc!(current_branch:, current_checko
       Promote only from an accepted RC for #{target_gem_version}.
     ERROR
   end
-
-  return if same_release_base?(current_checkout_version, target_gem_version)
 
   abort <<~ERROR
     ❌ Stable release branch promotion must use an RC for the target version.
@@ -686,7 +682,7 @@ def release_branch_promotion_rc_tag!(monorepo_root:, current_branch:, current_ch
     ERROR
   end
 
-  head_sha = git_head_sha!(monorepo_root:, context: "release branch promotion")
+  head_sha = current_git_sha!(monorepo_root, context: "release branch promotion")
   stable_tag = "v#{target_gem_version}"
   # A concurrent stable-tag push after this check is still caught by the later
   # `git push --tags`; this guard only decides whether a known tag is retry-safe.
@@ -754,7 +750,8 @@ def abort_runtime_bearing_release_branch_promotion!(current_branch:, current_che
     Expected tag: #{rc_tag} (#{tag_sha})
     Local HEAD: #{head_sha}
 
-    Changelog/docs/comment-only commits after #{rc_tag} are allowed. Runtime-bearing commits require a new RC.
+    Changelog/docs/comment-only and final release metadata-only commits after #{rc_tag} are allowed.
+    Runtime-bearing commits require a new RC.
     Cut a new RC from this branch tip, or reset the branch to #{rc_tag} before promoting #{target_gem_version}.
   ERROR
 end
@@ -820,7 +817,7 @@ def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, c
     ERROR
   end
 
-  head_sha = git_head_sha!(monorepo_root:, context: "release branch promotion")
+  head_sha = current_git_sha!(monorepo_root, context: "release branch promotion")
 
   return promotion if tag_sha == head_sha
 
@@ -1128,18 +1125,18 @@ def parse_gh_jsonl(output)
 end
 
 # Choose which remote ref commit the CI gate should evaluate. Starting at
-# `head_sha`, walk back over commits that `script/ci-changes-detector` classifies
-# as non-runtime-only (changelog/docs/source-comment changes — exactly the
-# commits on which CI path-skips the runtime suite) and return the first commit
-# that ran the full suite. The walk stops at HEAD when a commit isn't provably
-# non-runtime-only, so the behavior degrades to the original "evaluate HEAD" gate.
+# `head_sha`, walk back over commits that do not prove release health: commits
+# that `script/ci-changes-detector` classifies as non-runtime-only, plus final
+# release metadata-only commits on `release/*` branches. The walk stops at HEAD
+# when a commit is not provably skippable, so the behavior degrades to the
+# original "evaluate HEAD" gate.
 def main_ci_evaluation_sha(monorepo_root:, head_sha:, ref: "origin/main")
   return head_sha if ci_evaluate_head_only?
 
   current = head_sha
   skipped = []
   MAIN_CI_NONRUNTIME_WALK_LIMIT.times do
-    break unless commit_non_runtime_only?(monorepo_root:, sha: current)
+    break unless main_ci_walkback_commit?(monorepo_root:, sha: current, ref:)
 
     parent = git_parent_sha(monorepo_root:, sha: current)
     break if parent.nil?
@@ -1153,11 +1150,18 @@ def main_ci_evaluation_sha(monorepo_root:, head_sha:, ref: "origin/main")
 end
 
 def log_main_ci_walkback(head_sha:, evaluated_sha:, skipped:, ref:)
-  puts "ℹ️ #{ref} HEAD #{head_sha[0, 8]} is non-runtime-only " \
-       "(changelog/docs/comments); CI path-skips the full suite on such commits."
-  puts "   Skipped #{skipped.length} non-runtime commit(s): #{skipped.map { |s| s[0, 8] }.join(', ')}"
+  puts "ℹ️ #{ref} HEAD #{head_sha[0, 8]} is release-gate metadata or non-runtime-only; " \
+       "CI can skip the full runtime suite on such commits."
+  puts "   Skipped #{skipped.length} release-gate commit(s): #{skipped.map { |s| s[0, 8] }.join(', ')}"
   puts "   Evaluating CI on #{evaluated_sha[0, 8]} — the most recent commit that ran the full suite."
   puts "   (Set RELEASE_CI_EVALUATE_HEAD=true to force strict HEAD evaluation.)"
+end
+
+def main_ci_walkback_commit?(monorepo_root:, sha:, ref:)
+  return true if commit_non_runtime_only?(monorepo_root:, sha:)
+  return false unless ref.to_s.start_with?("origin/release/")
+
+  release_finalization_metadata_commit?(monorepo_root:, sha:)
 end
 
 # Whether `sha`'s changes are *provably* non-runtime-only per the canonical CI
@@ -1204,7 +1208,9 @@ def release_finalization_metadata_commit?(monorepo_root:, sha:)
       RELEASE_FINALIZATION_METADATA_PATHS.include?(path) &&
       release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
   end
-rescue StandardError
+rescue StandardError => e
+  warn "⚠️ Unable to inspect release finalization metadata for #{sha}: #{e.class}: #{e.message}; " \
+       "treating commit as runtime-bearing."
   false
 end
 

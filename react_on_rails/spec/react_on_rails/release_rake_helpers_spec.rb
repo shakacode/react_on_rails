@@ -2266,6 +2266,7 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:commit_non_runtime_only?)
         .with(monorepo_root:, sha: "head").and_return(false)
 
+      expect(self).not_to receive(:release_finalization_metadata_commit?)
       expect(self).not_to receive(:git_parent_sha)
       expect(main_ci_evaluation_sha(monorepo_root:, head_sha: "head")).to eq("head")
     end
@@ -2274,6 +2275,8 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:commit_non_runtime_only?)
         .with(monorepo_root:, sha: "head").and_return(true)
       allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "parent").and_return(false)
+      allow(self).to receive(:release_finalization_metadata_commit?)
         .with(monorepo_root:, sha: "parent").and_return(false)
       allow(self).to receive(:git_parent_sha)
         .with(monorepo_root:, sha: "head").and_return("parent")
@@ -2299,6 +2302,25 @@ RSpec.describe "release.rake helper methods" do
       expect(result).to eq("parent")
     end
 
+    it "walks back over final release metadata on release branches" do
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "head").and_return(false)
+      allow(self).to receive(:release_finalization_metadata_commit?)
+        .with(monorepo_root:, sha: "head").and_return(true)
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "parent").and_return(false)
+      allow(self).to receive(:release_finalization_metadata_commit?)
+        .with(monorepo_root:, sha: "parent").and_return(false)
+      allow(self).to receive(:git_parent_sha)
+        .with(monorepo_root:, sha: "head").and_return("parent")
+
+      result = nil
+      expect do
+        result = main_ci_evaluation_sha(monorepo_root:, head_sha: "head", ref: "origin/release/17.0.0")
+      end.to output(/Skipped 1 release-gate commit\(s\): head.*Evaluating CI on parent/m).to_stdout
+      expect(result).to eq("parent")
+    end
+
     it "walks back over a chain of consecutive non-runtime-only commits" do
       runtime = { "c0" => true, "c1" => true, "c2" => true, "c3" => false }
       parents = { "c0" => "c1", "c1" => "c2", "c2" => "c3" }
@@ -2307,7 +2329,7 @@ RSpec.describe "release.rake helper methods" do
 
       result = nil
       expect { result = main_ci_evaluation_sha(monorepo_root:, head_sha: "c0") }
-        .to output(/Skipped 3 non-runtime commit\(s\): c0, c1, c2/).to_stdout
+        .to output(/Skipped 3 release-gate commit\(s\): c0, c1, c2/).to_stdout
       expect(result).to eq("c3")
     end
 
@@ -2341,7 +2363,7 @@ RSpec.describe "release.rake helper methods" do
 
       result = nil
       expect { result = main_ci_evaluation_sha(monorepo_root:, head_sha: "c") }
-        .to output(/Skipped #{MAIN_CI_NONRUNTIME_WALK_LIMIT} non-runtime/o).to_stdout
+        .to output(/Skipped #{MAIN_CI_NONRUNTIME_WALK_LIMIT} release-gate/o).to_stdout
       expect(result).to eq("c#{'-p' * MAIN_CI_NONRUNTIME_WALK_LIMIT}")
     end
   end
@@ -2553,6 +2575,16 @@ RSpec.describe "release.rake helper methods" do
 
       stub_metadata_changes(sha: "badsha", output: "fatal: bad revision", status: failure_status)
       expect(release_finalization_metadata_commit?(monorepo_root:, sha: "badsha")).to be false
+    end
+
+    it "warns and treats raised inspection errors as runtime-bearing" do
+      allow(Open3).to receive(:capture2e).and_raise(Errno::ENOENT, "git")
+
+      result = nil
+      expect do
+        result = release_finalization_metadata_commit?(monorepo_root:, sha: "raisingsha")
+      end.to output(/Unable to inspect release finalization metadata.*raisingsha.*runtime-bearing/).to_stderr
+      expect(result).to be false
     end
   end
 
