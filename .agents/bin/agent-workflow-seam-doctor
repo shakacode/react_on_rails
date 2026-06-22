@@ -206,7 +206,7 @@ module AgentWorkflowSeamDoctor
   end
 
   def update_fence_state(line, in_fence, fence_delimiter)
-    fence = line.match(/^ {0,3}(```|~~~)([[:alnum:]_-]*)(?:\s.*)?$/)
+    fence = line.match(/^ {0,3}(`{3,}|~{3,})([[:alnum:]_-]*)(?:\s.*)?$/)
     return nil if fence.nil?
 
     delimiter = fence[1]
