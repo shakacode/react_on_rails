@@ -70,8 +70,10 @@ Both systems run the identical five-step flow. The names differ; the shape does 
    data pushes, so the browser does not have to re-fetch it to hydrate.
 4. **Hydrate.** The browser rebuilds the React tree from the inlined payload and wires up
    interactivity (`hydrateRoot`).
-5. **Refetch on navigation.** Later navigations fetch **only a new payload** for what changed — not a
-   whole new page.
+5. **Refetch on RSC navigation.** Later RSC-aware client navigations fetch **only a new payload** for
+   what changed. In React on Rails Pro, that means `RSCRoute`/registered server component flows that
+   call `fetchRSC` against `/rsc_payload/...`; ordinary Rails or Turbo links still request a full
+   Rails page with SSR plus the embedded payload.
 
 <p align="center">
   <img src="images/rsc-end-to-end-flow.png" alt="Diagram showing the five-step RSC lifecycle, with React on Rails Pro and Next.js function names side by side." width="840" />
