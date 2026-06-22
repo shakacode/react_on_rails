@@ -18,7 +18,10 @@
  */
 
 import { PassThrough, Transform } from 'stream';
-import { RailsContextWithServerComponentMetadata } from 'react-on-rails/types';
+import type {
+  GenerateRSCPayloadFunction,
+  RailsContextWithServerComponentMetadata,
+} from 'react-on-rails/types';
 import RSCRequestTracker from '../src/RSCRequestTracker.ts';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
 
@@ -26,7 +29,9 @@ const HIGHWATER_MARK = 16 * 1024; // Node.js default PassThrough highWaterMark: 
 
 const createTracker = () => {
   const railsContext = {} as RailsContextWithServerComponentMetadata;
-  return new RSCRequestTracker(railsContext);
+  const generateRSCPayload = (globalThis as { generateRSCPayload?: GenerateRSCPayloadFunction })
+    .generateRSCPayload;
+  return new RSCRequestTracker(railsContext, generateRSCPayload);
 };
 
 // Helper: create a PassThrough that we control manually as the "source" RSC stream.
@@ -46,6 +51,25 @@ const pushChunks = (stream: PassThrough, totalBytes: number, chunkSize = 1024) =
   }
   stream.push(null);
   return count * chunkSize;
+};
+
+const toLengthPrefixedPayload = (content: string): Buffer => {
+  const contentBuffer = Buffer.from(content, 'utf8');
+  const metadata = JSON.stringify({ consoleReplayScript: '', hasErrors: false, isShellReady: true });
+  return Buffer.concat([
+    Buffer.from(`${metadata}\t${contentBuffer.length.toString(16).padStart(8, '0')}\n`, 'utf8'),
+    contentBuffer,
+  ]);
+};
+
+const pushLengthPrefixedChunks = (stream: PassThrough, totalBytes: number, chunkSize = 1024) => {
+  const chunk = toLengthPrefixedPayload('a'.repeat(chunkSize));
+  const count = Math.ceil(totalBytes / chunkSize);
+  for (let i = 0; i < count; i++) {
+    stream.push(chunk);
+  }
+  stream.push(null);
+  return count * chunk.length;
 };
 
 const collectStreamData = async (stream: NodeJS.ReadableStream): Promise<Buffer> => {
@@ -205,6 +229,104 @@ describe('RSCRequestTracker', () => {
     }, 5000);
   });
 
+  describe('captured RSC diagnostics (#3475)', () => {
+    it('starts with no captured diagnostics', () => {
+      const tracker = createTracker();
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([]);
+    });
+
+    it('records diagnostics keyed by component name', () => {
+      const tracker = createTracker();
+      const firstError = new Error('first');
+      const secondError = new Error('second');
+
+      tracker.recordRSCDiagnostic('CommentsToggle', firstError);
+      tracker.recordRSCDiagnostic('PostsPage', secondError);
+
+      const captured = tracker.consumeCapturedRSCDiagnostics();
+      expect(captured).toEqual([
+        { componentName: 'CommentsToggle', diagnosticError: firstError },
+        { componentName: 'PostsPage', diagnosticError: secondError },
+      ]);
+
+      tracker.restoreCapturedRSCDiagnostics(captured);
+
+      // Restoring copies the array entries back into tracker storage — mutating the consumed array
+      // afterwards must not add new tracker entries.
+      captured.push({ componentName: 'Injected', diagnosticError: new Error('nope') });
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([
+        { componentName: 'CommentsToggle', diagnosticError: firstError },
+        { componentName: 'PostsPage', diagnosticError: secondError },
+      ]);
+    });
+
+    it('clears captured diagnostics on clear()', () => {
+      const tracker = createTracker();
+      tracker.recordRSCDiagnostic('CommentsToggle', new Error('boom'));
+      expect(tracker.consumeCapturedRSCDiagnostics()).toHaveLength(1);
+      tracker.recordRSCDiagnostic('CommentsToggle', new Error('boom'));
+
+      tracker.clear();
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([]);
+    });
+
+    it('suppresses a true duplicate (same component name AND same message) recorded twice', () => {
+      const tracker = createTracker();
+      const firstError = new Error('boom in CommentsToggle');
+      const duplicateError = new Error('boom in CommentsToggle');
+
+      // Same component fetched in two Suspense trees fires onDiagnosticError twice for the SAME
+      // failure (identical message). Only the first record is kept, so the 2+ enrichment path never
+      // lists the same component twice with the same text.
+      tracker.recordRSCDiagnostic('CommentsToggle', firstError);
+      tracker.recordRSCDiagnostic('CommentsToggle', duplicateError);
+
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([
+        { componentName: 'CommentsToggle', diagnosticError: firstError },
+      ]);
+    });
+
+    it('retains distinct diagnostics for the same component name when the errors differ (codex P2)', () => {
+      const tracker = createTracker();
+      const firstError = new Error('boom in CommentsToggle instance A');
+      const secondError = new Error('boom in CommentsToggle instance B');
+
+      // Two instances of the same component can each fail with a DIFFERENT error. These are genuinely
+      // distinct diagnostics — deduping on component name alone would drop the second and lose error
+      // information. Both must be retained.
+      tracker.recordRSCDiagnostic('CommentsToggle', firstError);
+      tracker.recordRSCDiagnostic('CommentsToggle', secondError);
+
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([
+        { componentName: 'CommentsToggle', diagnosticError: firstError },
+        { componentName: 'CommentsToggle', diagnosticError: secondError },
+      ]);
+    });
+
+    it('consumeCapturedRSCDiagnostics returns the captures and clears them (misattribution guard)', () => {
+      const tracker = createTracker();
+      const diagnosticError = new Error('boom');
+      tracker.recordRSCDiagnostic('CommentsToggle', diagnosticError);
+
+      const consumed = tracker.consumeCapturedRSCDiagnostics();
+      expect(consumed).toEqual([{ componentName: 'CommentsToggle', diagnosticError }]);
+
+      // After consumption a second consumer (e.g. an unrelated later error) finds nothing to merge,
+      // so the stale diagnostic cannot be reattached — this is the codex P2 fix (#3475).
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual([]);
+    });
+
+    it('restoreCapturedRSCDiagnostics restores consumed captures without re-deduping', () => {
+      const tracker = createTracker();
+      const diagnosticError = new Error('boom');
+      const captured = [{ componentName: 'CommentsToggle', diagnosticError }];
+
+      tracker.restoreCapturedRSCDiagnostics(captured);
+
+      expect(tracker.consumeCapturedRSCDiagnostics()).toEqual(captured);
+    });
+  });
+
   // Integration tests: RSCRequestTracker + injectRSCPayload wired together.
   //
   // These test the rendering pipeline when the RSC payload exceeds the default
@@ -227,9 +349,9 @@ describe('RSCRequestTracker', () => {
       // It waits for the first HTML chunk, then starts consuming stream2 (from tracker).
       const resultStream = injectRSCPayload(htmlStream, tracker, 'app-node');
 
-      // Push a small RSC payload (under 16KB) — no backpressure risk
+      // Push a small length-prefixed RSC payload (under 16KB) — no backpressure risk
       const payload = '{"type":"div","props":{"children":"hello"}}';
-      source.push(payload);
+      source.push(toLengthPrefixedPayload(payload));
       source.push(null);
 
       const result = (await collectStreamData(resultStream)).toString();
@@ -257,7 +379,7 @@ describe('RSCRequestTracker', () => {
       // This exceeds the default 16KB highWaterMark.
       const chunkCount = 64;
       const chunkSize = 1024;
-      const chunk = 'z'.repeat(chunkSize);
+      const chunk = toLengthPrefixedPayload('z'.repeat(chunkSize));
       for (let i = 0; i < chunkCount; i++) {
         source.push(chunk);
       }
@@ -286,7 +408,7 @@ describe('RSCRequestTracker', () => {
       // Drip-feed 32KB over 32ms — simulates a real RSC stream producing chunks over time
       const chunkSize = 1024;
       const chunkCount = 32;
-      const chunk = 'q'.repeat(chunkSize);
+      const chunk = toLengthPrefixedPayload('q'.repeat(chunkSize));
       let pushed = 0;
       const pushInterval = setInterval(() => {
         if (pushed >= chunkCount) {
@@ -342,7 +464,7 @@ describe('RSCRequestTracker', () => {
       const resultStream = injectRSCPayload(htmlStream, tracker, 'blog-node');
 
       // Push 128KB as 1KB chunks
-      const totalBytes = pushChunks(source, HIGHWATER_MARK * 8);
+      pushLengthPrefixedChunks(source, HIGHWATER_MARK * 8);
 
       const result = (await collectStreamData(resultStream)).toString();
 
@@ -366,7 +488,7 @@ describe('RSCRequestTracker', () => {
       // Drip-feed 128KB over ~128ms
       const chunkSize = 1024;
       const chunkCount = 128;
-      const chunk = 'r'.repeat(chunkSize);
+      const chunk = toLengthPrefixedPayload('r'.repeat(chunkSize));
       let pushed = 0;
       const pushInterval = setInterval(() => {
         if (pushed >= chunkCount) {

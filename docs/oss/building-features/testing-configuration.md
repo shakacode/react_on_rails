@@ -727,7 +727,7 @@ class ActiveSupport::TestCase
 end
 ```
 
-Alternatively, you can use a [Minitest plugin](https://github.com/seattlerb/minitest/blob/master/lib/minitest/test.rb#L119) to run the check in `before_setup`:
+Alternatively, you can use a [Minitest plugin](https://github.com/minitest/minitest/blob/master/lib/minitest/test.rb#L119) to run the check in `before_setup`:
 
 ```ruby
 module MyMinitestPlugin
