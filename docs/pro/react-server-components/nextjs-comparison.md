@@ -70,10 +70,11 @@ Both systems run the identical five-step flow. The names differ; the shape does 
    data pushes, so the browser does not have to re-fetch it to hydrate.
 4. **Hydrate.** The browser rebuilds the React tree from the inlined payload and wires up
    interactivity (`hydrateRoot`).
-5. **Refetch on RSC navigation.** Later RSC-aware client navigations fetch **only a new payload** for
-   what changed. In React on Rails Pro, that means `RSCRoute`/registered server component flows that
-   call `fetchRSC` against `/rsc_payload/...`; ordinary Rails or Turbo links still request a full
-   Rails page with SSR plus the embedded payload.
+5. **Refetch on RSC navigation.** Later RSC-aware client navigations fetch a **payload-only response**
+   instead of a whole page. In React on Rails Pro, `RSCRoute`/registered server component flows call
+   `fetchRSC` against `/rsc_payload/...` and receive a fresh Flight payload for that target
+   component, not a subtree delta; ordinary Rails or Turbo links still request a full Rails page with
+   SSR plus the embedded payload.
 
 <p align="center">
   <img src="images/rsc-end-to-end-flow.png" alt="Diagram showing the five-step RSC lifecycle, with React on Rails Pro and Next.js function names side by side." width="840" />
@@ -98,8 +99,8 @@ The same five steps, with each system's function names in two columns:
             │                                            │
   4. Hydrate     ── browser rebuilds the tree from the inlined payload → hydrateRoot
             │                                            │
-  5. Navigate    ── fetch ONLY a new payload for what changed
-     GET /rsc_payload/:name (default)             GET <url>?_rsc  (segment diff)
+  5. Navigate    ── fetch payload-only RSC data, with different granularity
+     GET /rsc_payload/:name (component payload)   GET <url>?_rsc  (segment diff)
 ```
 
 The single most illuminating parallel: the **inlined-payload global**. React on Rails Pro pushes
@@ -174,6 +175,9 @@ Two consequences matter for React on Rails Pro:
 | RSC runtime                          | `react-server-dom-webpack` | reuses `react-server-dom-webpack` | `react-server-dom-turbopack`    |
 | Used by React on Rails (Shakapacker) | yes                        | yes (preferred for speed)         | no (Turbopack is Next-internal) |
 | Used by Next.js                      | legacy/fallback            | experimental (as of 2026)         | default                         |
+
+Bundler support labels in this table are as of 2026; check each framework's release notes before
+treating "experimental," "legacy," or "default" as permanent.
 
 ## Comparing capabilities
 
