@@ -659,7 +659,9 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false, 
     return nil
   end
   remote_sha = sha_output.strip
-  return nil unless ensure_release_branch_head_matches_remote!(
+  # Strict mode aborts on mismatch. Override/dry-run mode warns and continues so
+  # the releaser still sees the remote CI state instead of silently skipping it.
+  ensure_release_branch_head_matches_remote!(
     monorepo_root:,
     ci_branch:,
     remote_sha:,
