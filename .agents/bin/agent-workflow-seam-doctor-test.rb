@@ -279,6 +279,10 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
       assert_includes out, "<follow-up prefix>"
     end
   end
+end
+
+class AgentWorkflowSeamDoctorFenceTest < Minitest::Test
+  include AgentWorkflowSeamDoctorTestHelpers
 
   def test_executable_placeholder_in_tilde_code_fence_fails
     with_repo do |root|
@@ -296,6 +300,22 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
     end
   end
 
+  def test_executable_placeholder_in_long_code_fence_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ````bash
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ````
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+
   def test_mismatched_fence_delimiter_does_not_close_executable_fence
     with_repo do |root|
       write_agents(root)
@@ -304,6 +324,23 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
         ~~~
         gh issue create --title "<follow-up prefix> Review feedback from PR #123"
         ```
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+
+  def test_shorter_closing_fence_does_not_close_long_executable_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ````bash
+        ```
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ````
       MARKDOWN
 
       out, status = run_doctor(root)

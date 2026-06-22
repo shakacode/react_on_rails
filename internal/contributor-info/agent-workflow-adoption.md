@@ -36,10 +36,13 @@ for the design rationale.
    section using the template below, filled with the target repo's real values.
    This is the only place portable skills resolve repo-specific values.
 
-4. **Keep repo-local skills local.** Add only repo-specific skills, tiny
-   compatibility launchers, or local validation helpers to the repo. Do not copy
-   shared workflow text into the repo unless the execution environment cannot
-   load user-installed skills. If an agent surface can load installed skill
+4. **Keep repo-local skills local, but keep workflow references reachable.** Add
+   only repo-specific skills, tiny compatibility launchers, or local validation
+   helpers to the repo. Do not copy shared workflow text into the repo unless
+   the execution environment cannot load user-installed skills. Do not run an
+   installed-skill-only setup with only `skills/`: install `workflows/` too, or
+   keep repo-local workflow copies/launchers for skills that still reference
+   `.agents/workflows/...`. If an agent surface can load installed skill
    Markdown but cannot execute the installed skill's `bin/` helpers, keep a
    local helper copy or compatibility launcher for that skill.
 
