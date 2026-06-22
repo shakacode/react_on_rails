@@ -516,6 +516,7 @@ def commit_shas_after_rc_tag!(monorepo_root:, tag_sha:, head_sha:)
 end
 
 def non_runtime_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
+  # Keep direct callers tolerant of equal SHAs; the primary promotion path returns before calling this helper.
   return [] if tag_sha == head_sha
   return nil unless rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
 
