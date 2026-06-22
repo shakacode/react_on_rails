@@ -44,15 +44,14 @@ Memorable invocation: `$verify-pr-fix <PR>` or "manually verify this fix and rep
    the exact behavioral change and the smallest observable signal that distinguishes broken from fixed
    (an orphaned process, an HTTP 500 vs 200, a hydration mismatch, a cache key collision, an exit code).
 3. **Choose the cheapest faithful reproduction**, in this order:
-   - **Full app run** when feasible — highest fidelity. For this repo that often means the dummy apps:
-     `cd react_on_rails/spec/dummy` (OSS) or the Pro dummy under `react_on_rails_pro/`, plus
-     `pnpm test:e2e` / Playwright for browser-visible behavior (see
-     `.claude/docs/playwright-e2e-testing.md` and `.claude/docs/manual-dev-environment-testing.md`).
+   - **Full app run** when feasible — highest fidelity. This often means the repo's integration test
+     app(s) plus the end-to-end/browser test command (see `AGENTS.md` → **Agent Workflow
+     Configuration**) for browser-visible behavior, plus any repo-specific e2e/manual-testing docs.
    - **Minimal faithful harness** when the full app is too heavy to stand up quickly (needs a license,
      real bundles, a renderer, external services). Build it on the **same real API** the product uses and
-     label it mechanism-level. Example from PR #3882: driving Node's real `cluster` module the
-     node-renderer uses, rather than booting the whole renderer.
-   - For renderer/process changes, see `.claude/docs/validating-node-renderer-changes.md`.
+     label it mechanism-level. For example, drive the same underlying runtime/process API the product
+     uses (such as Node's real `cluster` module a renderer uses) rather than booting the whole subsystem.
+   - For renderer/process-level changes, follow any repo-specific validation docs (see `AGENTS.md`).
 4. **Reproduce the bug (the "before").** Run the reproduction against pre-fix behavior. Get pre-fix code by
    the least invasive means: check out the parent commit in a scratch worktree, `git stash` an uncommitted
    change, check out one file at its pre-fix revision (`git checkout <fix-commit>~1 -- <file>`), or (for a
@@ -64,7 +63,7 @@ Memorable invocation: `$verify-pr-fix <PR>` or "manually verify this fix and rep
    now-passing result and confirm the specific signal flipped (orphans 6/6 -> 0/6, exit code, status, DOM).
    Confirm `git status` is clean so the "after" really ran against post-fix code.
 6. **Capture evidence.** Save real terminal output. For UI/browser changes take screenshots via Playwright
-   MCP (see `.claude/docs/playwright-e2e-testing.md`). For a shareable visual of terminal results you may
+   MCP. For a shareable visual of terminal results you may
    render the captured output with the visualize tool, but the render must reproduce real output verbatim —
    never stage numbers.
 7. **Clean up.** Kill spawned processes, remove scratch dirs/worktrees, and confirm nothing leaked
@@ -81,21 +80,19 @@ Memorable invocation: `$verify-pr-fix <PR>` or "manually verify this fix and rep
 - **Process / renderer lifecycle** (signals, workers, teardown, ports): drive the real `cluster`/child
   process API; assert with `ps`/`pgrep`/`kill -0` on captured PIDs and on the master's exit code. Emulate
   the real supervisor (e.g. Foreman: signal only the master PID, SIGKILL after its ~5s window).
-- **SSR / hydration / RSC** (render output, FOUC, streaming, cache keys): boot the relevant dummy app,
-  hit the affected route, compare server HTML vs hydrated DOM, watch the renderer log, diff cache keys.
-  Browser-visible? Screenshot before/after with Playwright MCP.
+- **Rendering / hydration / framework output** (render output, FOUC, streaming, cache keys): boot the
+  relevant integration test app, hit the affected route, compare server-rendered output vs hydrated DOM,
+  watch the renderer log, diff cache keys. Browser-visible? Screenshot before/after with Playwright MCP.
 - **Generators / installers / scaffolding**: run the generator into a temp app and diff the produced files
   against expectation; for behavioral output, boot the generated app.
 - **Caching / dedupe / digests**: construct the colliding or repeated inputs and assert hit/miss and that
   failed renders are not cached.
-- **Types-only changes**: usually covered by `pnpm run type-check`; behavioral reproduction is normally not
-  warranted — say so rather than staging a fake one.
+- **Types-only changes**: usually covered by the repo's type-check command (see `AGENTS.md` → **Agent
+  Workflow Configuration**); behavioral reproduction is normally not warranted — say so rather than staging
+  a fake one.
 
 ## Environment notes
 
-- **Pro RSpec encoding**: `react_on_rails_pro`'s `Gemfile.loader` can die with
-  `invalid byte sequence in US-ASCII`. Run Pro specs with a UTF-8 locale:
-  `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 RUBYOPT="-EUTF-8" bundle exec rspec <file>`.
 - **Pre-fix-on-one-file tactic** (cheap before/after for an already-merged PR): when the fix is in a single
   file and the PR added regression specs, run the post-fix spec against the pre-fix file —
   `git checkout <fix-commit>~1 -- <file>`, run the spec (it should fail on exactly the new tests), then
@@ -106,7 +103,7 @@ Memorable invocation: `$verify-pr-fix <PR>` or "manually verify this fix and rep
 
 ## When NOT to use this skill
 
-- Docs, comments, CHANGELOG, CI/workflow plumbing, benchmark tooling, refactors with no behavioral change,
+- Docs, comments, changelog, CI/workflow plumbing, benchmark tooling, refactors with no behavioral change,
   license-header enforcement, and pure type narrowing rarely have a user-observable runtime symptom to
   reproduce. Route those to `$verify` (local checks) or a review skill instead, and say why a behavioral
   repro adds nothing.

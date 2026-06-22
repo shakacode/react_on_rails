@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Generate a whole-surface issue/PR inventory, dependency graph, and capacity-aware pr-batch split from live GitHub plus agent-coordination state.
+description: Generate a whole-surface issue/PR inventory, dependency graph, and capacity-aware pr-batch split from live GitHub plus coordination-backend state.
 argument-hint: '[repo, scope, or batch objective]'
 ---
 

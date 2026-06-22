@@ -47,10 +47,11 @@ Gather live evidence from git, GitHub, and agent-coord, not chat memory:
      unresolved review threads, merge state, and mergedAt
 3. Git history for merged work since the previous approved loop cursor, release
    candidate, or coordinator-supplied base/head range.
-4. Per-PR merge ledger output if a merge-ledger helper such as
-   `script/pr-merge-ledger` is added to the repo or supplied by the private
-   coordination backend. Use ledger violations as mechanical review-state
-   evidence; if no helper is available, record `merge_ledger: UNKNOWN`.
+4. Per-PR merge ledger output if the repo's machine-checkable per-PR merge ledger
+   (see `AGENTS.md` → **Agent Workflow Configuration**) is available or a
+   merge-ledger helper is supplied by the private coordination backend. Use ledger
+   violations as mechanical review-state evidence; if no helper is available,
+   record `merge_ledger: UNKNOWN`.
 
 5. Post-merge audit findings or prior loop reports for the same PRs, if the
    coordinator supplies them. Do not treat prior reports as authoritative without
