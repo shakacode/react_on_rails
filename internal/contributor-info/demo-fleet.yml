@@ -65,6 +65,8 @@ defaults:
       npm:
         - react-on-rails
         - react-on-rails-pro
+        - react-on-rails-pro-node-renderer
+        - react-on-rails-rsc
         - shakapacker
       gem:
         - react_on_rails
@@ -88,6 +90,29 @@ repos:
       - { ecosystem: gem, name: cpflow }
     needs_pro: true
     smoke: [/]
+    verify: true
+
+  - name: shakacode/react-on-rails-demo-flagship
+    tier: hard_gate
+    headline: Flagship Pro + RSC happy path
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: react_on_rails_pro }
+      - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
+      - { ecosystem: npm, name: react-on-rails-rsc }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
+      # No cpflow package until a CPFlow review-app pipeline exists for this repo.
+    needs_pro: true
+    package_manager: npm
+    # Recorded for future review-app wiring; skipped while cpflow_app_name is null.
+    smoke: [/]
+    review_app:
+      workflow: cpflow-review-app.yml
+      status_check: cpflow/review-app
+      cpflow_app_name: null # Set after a CPFlow review-app pipeline exists.
     verify: true
 
   - name: shakacode/react-on-rails-demo-hacker-news-rsc
