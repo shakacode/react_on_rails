@@ -772,15 +772,15 @@ Example `.stylelintrc.json`:
 ```
 
 If your CSS Module convention intentionally permits scoped descendants such as `.card a`, use
-`selector-max-type` with `ignore: ["descendant"]` instead of `0` — this still blocks bare top-level
-selectors like `html` or `body` while allowing `.card a`:
+`selector-max-type: [0, { "ignore": ["descendant"] }]` instead of a bare `0` — this still blocks
+bare top-level selectors like `html` or `body` while allowing `.card a`:
 
 ```json
 {
   "overrides": [
     {
       "files": ["**/*.module.css", "**/*.module.scss", "**/*.module.sass"],
-      "rules": { "selector-max-type": [1, { "ignore": ["descendant"] }] }
+      "rules": { "selector-max-type": [0, { "ignore": ["descendant"] }] }
     }
   ]
 }
