@@ -110,7 +110,6 @@ const sidebars: SidebarsConfig = {
           items: [
             'building-features/dev-server-and-testing',
             'building-features/testing-configuration',
-            'building-features/accessibility',
             'building-features/extensible-precompile-pattern',
             'building-features/process-managers',
             'building-features/debugging',
