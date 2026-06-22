@@ -442,6 +442,95 @@ def stable_release_branch_allowed?(current_branch:, target_gem_version:)
   ["main", "release/#{target_gem_version}"].include?(current_branch)
 end
 
+def same_release_base?(first_version, second_version)
+  first_components = parse_gem_version_components(first_version)
+  second_components = parse_gem_version_components(second_version)
+
+  %i[major minor patch].all? do |component|
+    first_components[component] == second_components[component]
+  end
+end
+
+def peeled_git_tag_sha(monorepo_root:, tag:)
+  tag_output, tag_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/#{tag}^{}"
+  )
+  return tag_output.strip if tag_status.success?
+
+  nil
+end
+
+def git_head_sha!(monorepo_root:, context:)
+  head_output, head_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
+  return head_output.strip if head_status.success?
+
+  abort "❌ Unable to resolve local HEAD before #{context}.\n\n#{head_output.strip}"
+end
+
+def ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
+  unless release_prerelease_version?(current_checkout_version)
+    abort <<~ERROR
+      ❌ Stable release branch promotion must start from a tagged RC.
+
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Target version: #{target_gem_version}
+
+      Cut and verify an RC on this release branch before promoting #{target_gem_version}.
+    ERROR
+  end
+
+  return if same_release_base?(current_checkout_version, target_gem_version)
+
+  abort <<~ERROR
+    ❌ Stable release branch promotion must use an RC for the target version.
+
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    Target version: #{target_gem_version}
+
+    Promote only from the accepted RC for #{target_gem_version}.
+  ERROR
+end
+
+def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, current_checkout_version:,
+                                              target_gem_version:)
+  return unless current_branch == "release/#{target_gem_version}"
+
+  ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
+
+  fetch_output, fetch_status = Open3.capture2e("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+  abort "❌ Unable to fetch tags before release branch promotion.\n\n#{fetch_output.strip}" unless fetch_status.success?
+
+  rc_tag = "v#{current_checkout_version}"
+  tag_sha = peeled_git_tag_sha(monorepo_root:, tag: rc_tag)
+  unless tag_sha
+    abort <<~ERROR
+      ❌ Stable release branch promotion must start from a tagged RC.
+
+      Expected tag: #{rc_tag}
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Target version: #{target_gem_version}
+    ERROR
+  end
+
+  head_sha = git_head_sha!(monorepo_root:, context: "release branch promotion")
+
+  return if tag_sha == head_sha
+
+  abort <<~ERROR
+    ❌ Stable release branch promotion must run from the accepted RC tag.
+
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    Expected tag: #{rc_tag} (#{tag_sha})
+    Local HEAD: #{head_sha}
+
+    Cut a new RC from this branch tip, or reset the branch to #{rc_tag} before promoting #{target_gem_version}.
+  ERROR
+end
+
 # The branch whose tip CI the release gate should validate. For a release cut or
 # promoted from a `release/X.Y.Z` branch, validate that branch's tip (the frozen,
 # stabilized commit set the tag is being applied to); otherwise validate `main`.
@@ -1967,6 +2056,15 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         For pre-release versions (beta, alpha, rc, etc.), you can release from any branch:
           rake release[#{resolved_target_gem_version.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]
       ERROR
+    end
+
+    unless is_prerelease
+      ensure_release_branch_promotes_tagged_rc!(
+        monorepo_root: release_root,
+        current_branch:,
+        current_checkout_version:,
+        target_gem_version: resolved_target_gem_version
+      )
     end
 
     # Validate the tip of the branch we are actually releasing from: the

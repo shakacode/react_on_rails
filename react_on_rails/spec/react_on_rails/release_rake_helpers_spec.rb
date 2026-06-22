@@ -2529,6 +2529,134 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#ensure_release_branch_promotes_tagged_rc!" do
+    let(:monorepo_root) { "/tmp/repo" }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
+
+    it "does not inspect tags for stable releases from main" do
+      expect(Open3).not_to receive(:capture2e)
+
+      ensure_release_branch_promotes_tagged_rc!(
+        monorepo_root:,
+        current_branch: "main",
+        current_checkout_version: "17.0.0",
+        target_gem_version: "17.0.1"
+      )
+    end
+
+    it "allows a matching release branch when HEAD is the current RC tag" do
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+        .and_return(["abc123\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["abc123\n", success_status])
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.3",
+          target_gem_version: "17.0.0"
+        )
+      end.not_to raise_error
+
+      expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+      expect(Open3)
+        .to have_received(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+      expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+    end
+
+    it "aborts when a stable release branch is not currently on an RC version" do
+      expect(Open3).not_to receive(:capture2e)
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /must start from a tagged RC/)
+    end
+
+    it "aborts when the current RC is for a different final version" do
+      expect(Open3).not_to receive(:capture2e)
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.1.rc.1",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /must use an RC for the target version/)
+    end
+
+    it "aborts when the current RC tag is missing" do
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+        .and_return(["", failure_status])
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.3",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /Expected tag: v17.0.0.rc.3/)
+
+      expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+      expect(Open3)
+        .to have_received(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+    end
+
+    it "aborts when the release branch tip differs from the current RC tag" do
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+        .and_return(["tagsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["headsha\n", success_status])
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.3",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /must run from the accepted RC tag/)
+
+      expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+      expect(Open3)
+        .to have_received(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+      expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+    end
+  end
+
   describe "#release_ci_branch" do
     it "returns the release branch itself when on a release branch" do
       expect(release_ci_branch("release/17.0.0")).to eq("release/17.0.0")
