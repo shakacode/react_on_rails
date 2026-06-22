@@ -8113,6 +8113,29 @@ What is specific to React on Rails is where this code lives.
 - Keep one route announcer for the page. Do not create one announcer per island.
 - Make sure skip links still point to the current main content after navigation.
 
+A minimal announcer inside a router island, reusing the shared live region from section 9:
+
+```jsx
+// Inside a React Router / TanStack Router island
+function RouteAnnouncer() {
+  const { pathname } = useLocation(); // or the router's location hook
+
+  useEffect(() => {
+    const region = document.getElementById('app-live-region');
+    if (region) {
+      // Clear first, then set on the next tick so the change is announced
+      region.textContent = '';
+      requestAnimationFrame(() => {
+        region.textContent = `Navigated to ${document.title}`;
+      });
+    }
+    document.querySelector('main')?.focus(); // <main tabIndex={-1}>
+  }, [pathname]);
+
+  return null;
+}
+```
+
 For the general SPA pattern, see [Gatsby's user testing of accessible client-side routing](https://www.gatsbyjs.com/blog/2019-07-11-user-testing-accessible-client-routing/) and [Deque's SPA accessibility tips](https://www.deque.com/blog/accessibility-tips-in-single-page-applications/).
 
 ---
@@ -8172,6 +8195,7 @@ Fix this by creating one persistent live region in the Rails layout. Rails can r
 Guidance:
 
 - The live region should exist before the message text is inserted.
+- When updating the region, clear it first and set the new text on the next tick (`region.textContent = ''; requestAnimationFrame(() => { region.textContent = message; })`). Some older screen readers (e.g. JAWS, NVDA in certain modes) do not announce text injected into a region that was empty on first load; the clear-then-set pattern avoids that silent failure.
 - Use the same region for Rails flash, React toasts, and async status such as "Saving", "Saved", and "Failed".
 - Use `role="alert"` only for urgent messages that require interruption.
 - Do not auto-dismiss messages before users have time to read them.
