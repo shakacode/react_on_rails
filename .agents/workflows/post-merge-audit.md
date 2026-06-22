@@ -297,9 +297,9 @@ worked-issue intent class or QA-coverage result.
 | #1237 | UNKNOWN (advisory) / no coord data | codex-claim comment URL (advisory) | UNKNOWN | unknown | coordination state needed to confirm |
 | #1238 | batch-abc:issue-1238 / codex/done-no-merge | no-PR evidence comment URL | done-unmerged | realized | none |
 | qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | done | satisfied | none |
-| qa | not required / no branch | handoff comment URL (inline QA Evidence block) | not applicable | not applicable | low-risk docs-only batch |
-| qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | blocked | blocked | release regression remains unresolved |
-| qa | batch-abc:qa / codex/qa-lane | maintainer waiver URL | done | waived | explicit maintainer waiver accepted residual risk |
+| qa | not required / no branch | handoff comment URL (inline QA Evidence block) | not applicable | not applicable | none |
+| qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | blocked | blocked | fix or waiver needed before release |
+| qa | batch-abc:qa / codex/qa-lane | maintainer waiver URL | done | waived | none |
 ```
 
 ## Comparison Prompt

@@ -325,7 +325,7 @@ confidence notes, decision-point counts per PR, QA Evidence blocks that include
 merge-ledger summaries.
 Do not call a target `complete` while its ledger has `UNKNOWN` fields or
 `complete_allowed: false`.
-Do not report a batch that requires QA ready while required QA coverage/scope
+Do not report a batch that requires QA as ready while required QA coverage/scope
 evidence is missing, `blocked`, `in_progress`, or still `UNKNOWN`; the only
 allowed fallback is a QA lane whose private coordination claim/heartbeat is
 `UNKNOWN` while documented QA evidence is otherwise complete.

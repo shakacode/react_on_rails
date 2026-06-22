@@ -822,10 +822,11 @@ Do not put hosted-CI uncertainty in Immediate at final readiness after local
 validation and the final push. Request hosted CI and log it in FYI.
 Do not report a PR/target as `complete` while `script/pr-merge-ledger <PR>
 --strict` reports `UNKNOWN` fields, review-thread/review-object violations, or
-`complete_allowed: false`. Do not report any batch that requires QA ready while
-required QA coverage/scope evidence is missing, marked `blocked` or
-`in_progress`, or still `UNKNOWN`; a QA lane whose only `UNKNOWN` is private
-coordination claim/heartbeat state may use the documented fallback evidence.
+`complete_allowed: false`. Do not report any batch that requires QA as ready
+while required QA coverage/scope evidence is missing, stale, scope-mismatched,
+marked `blocked` or `in_progress`, or still `UNKNOWN`; a QA lane whose only
+`UNKNOWN` is private coordination claim/heartbeat state may use the documented
+fallback evidence.
 
 ### Coordination State
 
