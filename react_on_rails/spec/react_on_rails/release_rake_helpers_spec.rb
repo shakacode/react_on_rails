@@ -1166,6 +1166,25 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to output(%r{CI on origin/release/17.0.0 is healthy on #{short_sha} \(1 required check\)}).to_stdout
       end
+
+      it "hints to wait for release branch CI when no check runs are visible" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "release/17.0.0")
+          .and_return(sha:, check_runs: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false,
+            ci_branch: "release/17.0.0"
+          )
+        end.to raise_error(
+          SystemExit,
+          %r{No CI check runs visible on origin/release/17.0.0.*wait for at least one CI run to complete}m
+        )
+      end
     end
 
     context "when a check has failed on a stable release" do
@@ -2533,6 +2552,16 @@ RSpec.describe "release.rake helper methods" do
     let(:success_status) { instance_double(Process::Status, success?: true) }
     let(:failure_status) { instance_double(Process::Status, success?: false) }
 
+    it "keeps workspace package metadata paths in sync with package manifests" do
+      repo_root = File.expand_path("../../..", __dir__)
+      package_paths = Dir.glob(File.join(repo_root, "packages", "*", "package.json")).map do |path|
+        path.delete_prefix("#{repo_root}/")
+      end
+
+      expect(package_paths).not_to be_empty
+      expect(RELEASE_FINALIZATION_METADATA_PATHS).to include(*package_paths)
+    end
+
     def stub_metadata_changes(sha:, output:, status: success_status)
       allow(Open3).to receive(:capture2e)
         .with("git", "-C", monorepo_root, "diff-tree", "--no-commit-id", "--name-status", "-r", "#{sha}^", sha)
@@ -2655,17 +2684,18 @@ RSpec.describe "release.rake helper methods" do
       expect(release_finalization_metadata_commit?(monorepo_root:, sha: "deletesha")).to be false
     end
 
-    it "warns and rejects allowlisted metadata paths without a content handler" do
+    it "raises for allowlisted metadata paths without a content handler" do
       path = "internal/release-metadata.txt"
       stub_const("RELEASE_FINALIZATION_METADATA_PATHS", RELEASE_FINALIZATION_METADATA_PATHS + [path])
       stub_metadata_changes(sha: "unhandledsha", output: "M\t#{path}\n")
       stub_metadata_file(sha: "unhandledsha", path:, before: "17.0.0.rc.5\n", after: "17.0.0\n")
 
-      result = nil
       expect do
-        result = release_finalization_metadata_commit?(monorepo_root:, sha: "unhandledsha")
-      end.to output(%r{Unhandled release finalization metadata path type.*internal/release-metadata\.txt}).to_stderr
-      expect(result).to be false
+        release_finalization_metadata_commit?(monorepo_root:, sha: "unhandledsha")
+      end.to raise_error(
+        UnhandledReleaseFinalizationMetadataPathError,
+        %r{Unhandled release finalization metadata path type.*internal/release-metadata\.txt}
+      )
     end
 
     it "rejects empty diffs and git failures" do

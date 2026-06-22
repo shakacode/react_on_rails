@@ -20,6 +20,8 @@ class RaisingMessageHandler
   end
 end
 
+class UnhandledReleaseFinalizationMetadataPathError < StandardError; end
+
 NPM_REGISTRY_URL = "https://registry.npmjs.org/"
 NPM_PUBLISH_VERIFY_ATTEMPTS = 6
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
@@ -1230,6 +1232,8 @@ def release_finalization_metadata_commit?(monorepo_root:, sha:)
       RELEASE_FINALIZATION_METADATA_PATHS.include?(path) &&
       release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
   end
+rescue UnhandledReleaseFinalizationMetadataPathError
+  raise
 rescue StandardError => e
   warn "⚠️ Unable to inspect release finalization metadata for #{sha}: #{e.class}: #{e.message}; " \
        "treating commit as runtime-bearing."
@@ -1256,7 +1260,8 @@ def release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
   elsif path.end_with?("Gemfile.lock")
     normalized_release_gemfile_lock(before) == normalized_release_gemfile_lock(after)
   else
-    raise "Unhandled release finalization metadata path type: #{path.inspect}"
+    raise UnhandledReleaseFinalizationMetadataPathError,
+          "Unhandled release finalization metadata path type: #{path.inspect}"
   end
 end
 
@@ -1530,8 +1535,14 @@ def format_main_ci_status_violation(kind:, short_sha:, runs:, ci_branch: "main")
            when :in_progress
              "⏳ CI is still in progress on #{ref} (commit #{short_sha})."
            when :no_checks
-             "❌ No CI check runs visible on #{ref} (commit #{short_sha}). " \
-             "CI may not have started yet, or the GitHub Checks API is unavailable."
+             message = "❌ No CI check runs visible on #{ref} (commit #{short_sha}). " \
+                       "CI may not have started yet, or the GitHub Checks API is unavailable."
+             if ci_branch.start_with?("release/")
+               "#{message} If this release branch was just pushed, wait for at least one CI run to complete " \
+                 "before retrying."
+             else
+               message
+             end
            when :no_required_checks
              "❌ No required CI check runs found on #{ref} (commit #{short_sha})."
            when :missing_required_checks
