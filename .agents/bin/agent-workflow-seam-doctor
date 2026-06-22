@@ -27,7 +27,7 @@ module AgentWorkflowSeamDoctor
     "Approval-exempt change categories",
     "Coordination backend"
   ].freeze
-  CONFIG_KEY_PATTERN = /^\s*-\s+\*\*(.+?)\*\*:\s*(.*)$/
+  CONFIG_KEY_PATTERN = /^-\s+\*\*(.+?)\*\*:\s*(.*)$/
 
   SEAM_PLACEHOLDER = %r{
     <[^>\n]*

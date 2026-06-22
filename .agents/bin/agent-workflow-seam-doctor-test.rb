@@ -126,7 +126,7 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
   def test_nested_bullet_seam_values_pass
     with_repo do |root|
       seam = REQUIRED_SEAM.merge(
-        "Tests" => "\n  - unit: `bundle exec rake run_rspec:gem`\n  - e2e: `pnpm test:e2e`"
+        "Tests" => "\n  - **Unit**: `bundle exec rake run_rspec:gem`\n  - **E2E**: `pnpm test:e2e`"
       )
       write_agents(root, seam)
       write_skill(root, "No commands here.\n")
