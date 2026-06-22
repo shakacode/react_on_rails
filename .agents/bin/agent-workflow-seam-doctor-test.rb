@@ -332,6 +332,10 @@ class AgentWorkflowSeamDoctorFenceTest < Minitest::Test
       assert_includes out, "<follow-up prefix>"
     end
   end
+end
+
+class AgentWorkflowSeamDoctorFenceLengthTest < Minitest::Test
+  include AgentWorkflowSeamDoctorTestHelpers
 
   def test_shorter_closing_fence_does_not_close_long_executable_fence
     with_repo do |root|
@@ -341,6 +345,23 @@ class AgentWorkflowSeamDoctorFenceTest < Minitest::Test
         ```
         gh issue create --title "<follow-up prefix> Review feedback from PR #123"
         ````
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+
+  def test_shorter_closing_tilde_fence_does_not_close_long_tilde_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ~~~~bash
+        ~~~
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ~~~~
       MARKDOWN
 
       out, status = run_doctor(root)
@@ -365,6 +386,43 @@ class AgentWorkflowSeamDoctorFenceTest < Minitest::Test
       assert status.success?, out
     end
   end
+
+  def test_longer_closing_tilde_fence_closes_long_tilde_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ~~~~bash
+        echo ok
+        ~~~~~
+        <follow-up prefix>
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
+  def test_closing_fence_with_info_string_stays_inside_executable_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ````bash
+        ````bash
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ````
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+end
+
+class AgentWorkflowSeamDoctorFenceContentTest < Minitest::Test
+  include AgentWorkflowSeamDoctorTestHelpers
 
   def test_four_space_indented_fence_does_not_open_executable_fence
     with_repo do |root|
