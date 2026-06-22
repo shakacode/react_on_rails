@@ -36,11 +36,15 @@ module AgentWorkflowSeamDoctor
       hosted[-\ ]CI |
       benchmark\ label |
       changelog\ path |
+      main\ branch |
       base\ branch |
       local\ validation |
       CI\ change\ detector |
       lint\ /\ format |
       docs\ checks |
+      unit\ command |
+      integration\ command |
+      e2e\ command |
       tests?\ commands? |
       unit\ /\ integration\ /\ e2e\ commands |
       build\ /\ type\ checks? |
@@ -117,7 +121,7 @@ module AgentWorkflowSeamDoctor
     return nil if start_index.nil?
 
     body = []
-    lines[(start_index + 1)..].to_a.each do |line|
+    lines[(start_index + 1)..].each do |line|
       break if line.match?(/^##\s+/)
 
       body << line
@@ -138,7 +142,7 @@ module AgentWorkflowSeamDoctor
 
   def unresolved_template_value?(value)
     stripped = value.strip
-    stripped.empty? || stripped.match?(/\A<[^>]+>\.?\z/)
+    stripped.empty? || stripped.match?(SEAM_PLACEHOLDER)
   end
 
   def shared_markdown_paths(root, shared_roots: [])
@@ -179,7 +183,7 @@ module AgentWorkflowSeamDoctor
   end
 
   def update_fence_state(line, in_fence)
-    fence = line.match(/^\s*```([[:alnum:]_-]*)(?:\s.*)?$/)
+    fence = line.match(/^\s*(?:```|~~~)([[:alnum:]_-]*)(?:\s.*)?$/)
     return nil if fence.nil?
 
     return [false, false] if in_fence

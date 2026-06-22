@@ -137,6 +137,21 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
     end
   end
 
+  def test_embedded_placeholder_in_wrapped_seam_value_fails
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge(
+        "Tests" => "\n  - unit: <unit command>\n  - e2e: `pnpm test:e2e`"
+      )
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "unresolved Agent Workflow Configuration value for key: Tests"
+    end
+  end
+
   def test_blank_separator_stops_wrapped_seam_value
     with_repo do |root|
       write_agents(root)
@@ -166,6 +181,20 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
       parsed = JSON.parse(out)
       assert_equal "PASS", parsed.fetch("status")
       assert_empty parsed.fetch("issues")
+    end
+  end
+
+  def test_json_output_format_on_failure
+    with_repo do |root|
+      File.write(File.join(root, "AGENTS.md"), "# AGENTS.md\n\n## Commands\n")
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root, "--json")
+
+      refute status.success?
+      parsed = JSON.parse(out)
+      assert_equal "FAIL", parsed.fetch("status")
+      refute_empty parsed.fetch("issues")
     end
   end
 
@@ -225,6 +254,22 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
         ```bash title="copyable"
         gh issue create --title "<follow-up prefix> Review feedback from PR #123"
         ```
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+
+  def test_executable_placeholder_in_tilde_code_fence_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ~~~bash
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ~~~
       MARKDOWN
 
       out, status = run_doctor(root)

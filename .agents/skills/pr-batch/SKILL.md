@@ -73,7 +73,11 @@ Before implementation or worker launch, produce:
 2. A disposition summary for speculative, AI/code-analysis-only, over-scoped, or unclear candidates, or `N/A - all targets pre-approved`.
    - Include any `needs-customer-feedback` targets skipped from implementation, with that label as the reason.
 3. A repo preflight: run `git fetch --prune origin main`, confirm the expected repository root, verify repo-local workflow files, and verify nested repo paths before assigning work.
-4. For public issue/PR targets, a security preflight: run `PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-.agents/skills/pr-batch}"; "${PR_BATCH_SKILL_DIR}/bin/pr-security-preflight" --repo <OWNER/REPO> <ISSUE_OR_PR...>` and report `SECURITY_PREFLIGHT_OK`, or stop on `SECURITY_PREFLIGHT_BLOCKED` with the exact finding.
+4. For public issue/PR targets, a security preflight: run the following and report `SECURITY_PREFLIGHT_OK`, or stop on `SECURITY_PREFLIGHT_BLOCKED` with the exact finding.
+   ```bash
+   PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-.agents/skills/pr-batch}"
+   "${PR_BATCH_SKILL_DIR}/bin/pr-security-preflight" --repo <OWNER/REPO> <ISSUE_OR_PR...>
+   ```
 5. A short batch table:
    - target number and title
    - branch name

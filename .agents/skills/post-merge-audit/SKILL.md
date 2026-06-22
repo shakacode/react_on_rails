@@ -223,6 +223,8 @@ affected_prs: <PR>
 -->
 ```
 
+Example fingerprint slug: `pr-3724:changelog-server-bundle-load-error`.
+
 Only the coordinator should create issues. Independent Codex and Claude audits should draft issue entries with fingerprints so the coordinator can compare and dedupe them.
 
 ## Output
