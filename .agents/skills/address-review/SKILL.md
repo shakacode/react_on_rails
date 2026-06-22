@@ -14,9 +14,7 @@ Apply the Maintainer Attention Contract from `AGENTS.md` for all broad
 code-changing actions. Skill-specific routing:
 
 - Autonomous low-risk optional handling with the behavior-preserving filter
-  applies to `f` and `f+i` **only when `RELEASE_PHASE=beta`** (Step 2.5). On a
-  `release/*` base (`rc` / `final`), the autonomous optional-nit rule is
-  suppressed: `OPTIONAL` items need explicit selection.
+  applies to `f` and `f+i`.
 - Action `f+o` selects every current `OPTIONAL` item for inline handling without
   the autonomous defer/decline filter; promote only items that need judgment,
   change behavior, or expand scope to `DISCUSS`.
@@ -83,58 +81,6 @@ SPECIFIC_TARGET=<0-or-1>
 ```
 
 Every subsequent snippet uses `${REPO}`, `${PR_NUMBER}`, `${COMMENT_ID}`, `${REVIEW_ID}`, and `${SPECIFIC_TARGET}` as shell variables; setting them once here means no manual substitution is required later. If `gh repo view` fails (and no URL was supplied), ensure `gh` CLI is installed and authenticated (`gh auth status`).
-
-## Step 2.5: Resolve the Release Phase from the PR Base Branch
-
-The merge gate is a function of the PR target branch's **release phase** (`beta` / `rc` / `final`); see
-`AGENTS.md` → _Release-Train Branching And Phase Gating_ and
-[`internal/contributor-info/release-train-runbook.md`](../../../internal/contributor-info/release-train-runbook.md).
-A direct `/address-review <PR>` invocation may have no orchestrator to inject the phase. When the base
-branch resolves to `main`, derive `beta`; do not guess whether a `release/*` base is `rc` or `final` from
-the branch name alone — use an injected/published `RELEASE_PHASE` or fail closed and ask for confirmation.
-If the `gh pr view` lookup itself fails (auth, network, wrong repo), do **not** fall back to `beta`: stop
-and ask the user to confirm the base branch / phase before continuing (PR #4018 thread Kr6wb).
-
-```bash
-if ! BASE_REF=$(gh pr view "${PR_NUMBER}" --repo "${REPO}" --json baseRefName -q .baseRefName 2>/dev/null); then
-  echo "Unable to resolve PR base branch; confirm RELEASE_PHASE before continuing." >&2
-  exit 1
-fi
-if [ -z "${BASE_REF}" ]; then
-  echo "Unable to resolve PR base branch; confirm RELEASE_PHASE before continuing." >&2
-  exit 1
-fi
-case "${BASE_REF}" in
-  release/*)
-    if [ -z "${RELEASE_PHASE:-}" ]; then
-      echo "PR targets ${BASE_REF}; resolve the published phase or confirm RELEASE_PHASE=rc/final before continuing." >&2
-      exit 1
-    fi
-    case "${RELEASE_PHASE}" in
-      rc|final) ;;
-      *)
-        echo "Invalid RELEASE_PHASE='${RELEASE_PHASE}' for ${BASE_REF}; expected rc or final." >&2
-        exit 1
-        ;;
-    esac
-    ;;
-  main)      RELEASE_PHASE="beta" ;;
-  *)         RELEASE_PHASE="beta" ;; # feature/topic branches derive to beta
-esac
-```
-
-- **`RELEASE_PHASE=beta`** (base `main` or a non-`release/*` branch): default behavior. The autonomous
-  low-risk optional-nit rule for `f` / `f+i` applies as written below.
-- For a `release/*` base, set `RELEASE_PHASE` from `agent-coord` status or the applicable release
-  tracker before running this snippet; if that signal is unavailable, stop and ask for confirmation.
-- **`RELEASE_PHASE=rc` or `final`** (base `release/*`): apply the stricter gate. **Suppress the
-  autonomous optional-nit rule** — do not fix or defer `OPTIONAL` nits without explicit selection
-  (`f+o`, `o <nums>`, `all optional`); on a stabilizing/promotion branch even "behavior-preserving"
-  edits expand the frozen diff. Require the `rc`/`final` evidence before signaling merge-ready:
-  adversarial-pr-review and **zero open MUST-FIX**; for `final`, also no new features and human sign-off
-  on the promotion. State the resolved phase in the triage summary so the stricter posture is visible.
-- If `gh pr view` fails or returns an empty base, stop and ask the user to confirm the base branch /
-  phase before continuing; do not assume `beta`.
 
 ## Step 3: Determine Scan Window and Summary Cutoff
 
@@ -305,8 +251,8 @@ After the triage list, present a **quick-action menu**:
 
 ```text
 Quick actions:
-  f     — Fix must-fix items, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prompt for skipped rationale replies and discuss decisions
-  f+i   — Fix must-fix, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prepare one deferred-work bundle for discuss/remaining optional items (and non-trivial skipped items)
+  f     — Fix must-fix items, autonomously handle low-risk optional nits, then prompt for skipped rationale replies and discuss decisions
+  f+i   — Fix must-fix, autonomously handle low-risk optional nits, then prepare one deferred-work bundle for discuss/remaining optional items (and non-trivial skipped items)
   f+o   — Fix must-fix + address all optional items explicitly inline (no autonomous filter; fix or promote each optional)
   a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations (local-only — no GitHub posts)
   d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
@@ -324,12 +270,8 @@ If a range is malformed, reversed, or out of bounds, show a validation message a
 
 This Claude slash command keeps optional polish out of the blocking merge gate.
 The autonomous low-risk optional-nit rule applies only to action `f` and the
-initial action `f+i` phase, **and only when `RELEASE_PHASE=beta`** (Step 2.5):
-fix behavior-preserving nits inline when they stay in
-scope, or log them as deferred/declined with rationale. On a `release/*` base
-(`rc` / `final`), do not apply the autonomous nit rule at all — `OPTIONAL` items
-require explicit selection, and merge-readiness additionally requires
-adversarial-pr-review and zero open MUST-FIX. Post-triage actions `a`,
+initial action `f+i` phase: fix behavior-preserving nits inline when they stay in
+scope, or log them as deferred/declined with rationale. Post-triage actions `a`,
 `f+o`, explicit `o <nums>`, and `all optional` remain inline code-changing
 choices for the selected optional items; if a selected optional item cannot be
 fixed safely, report it as unresolved instead of silently deferring it through
@@ -355,15 +297,11 @@ The first items below are the **pre-reply subflow**, ending at the
 commit/push-before-reply gate. The later items are the post-push
 reply/resolve steps.
 
-1. Address all `MUST-FIX` items (make code changes, run checks). If there are no `MUST-FIX` items, continue to autonomous optional handling **only when `RELEASE_PHASE=beta`** (Step 2.5); otherwise skip straight to the reply/resolve steps.
-2. **Only when `RELEASE_PHASE=beta`** (Step 2.5): autonomously handle `OPTIONAL`
-   nits that are behavior-preserving, low-risk,
+1. Address all `MUST-FIX` items (make code changes, run checks). If there are no `MUST-FIX` items, continue to autonomous optional handling.
+2. Autonomously handle `OPTIONAL` nits that are behavior-preserving, low-risk,
    in scope, and before the final-candidate debounce point. Apply them inline
    when the fix is straightforward; otherwise record them as deferred or
-   declined with rationale. Do not ask the user to approve those nits. When
-   `RELEASE_PHASE` is `rc`, `final`, or `unknown`, skip this step entirely —
-   `OPTIONAL` items then require explicit selection (`f+o`, `o <nums>`,
-   `all optional`). This
+   declined with rationale. Do not ask the user to approve those nits. This
    replaces the old explicit opt-in gate for low-risk optionals; broader
    optional work still requires `a`, `f+o`, `f+i`, `m`, explicit `o <nums>` /
    `all optional`, or direct selection of those optional items. For
@@ -898,8 +836,8 @@ SKIPPED (1):
 5. src/helper.rb:45 - Same nil guard issue (@greptile-apps[bot]) - duplicate of #1
 
 Quick actions:
-  f     — Fix #1, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prompt for skipped rationale replies and discuss decisions
-  f+i   — Fix #1, handle low-risk optional nits only when `RELEASE_PHASE=beta`, then prepare one deferred-work bundle for #2 and remaining optional items #3-4
+  f     — Fix #1, autonomously handle low-risk optional nits, then prompt for skipped rationale replies and discuss decisions
+  f+i   — Fix #1, autonomously handle low-risk optional nits, then prepare one deferred-work bundle for #2 and remaining optional items #3-4
   f+o   — Fix #1 plus address all optional items #3-4 explicitly inline (no autonomous filter)
   a     — Apply: fix #1 plus optional items #3-4, stage files, and recommend a decision for #2
   d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.

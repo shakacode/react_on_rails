@@ -307,13 +307,10 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
 Agents that act on the gate: `pr-batch`, `address-review` (nit-autonomy + MUST-FIX handling),
 `adversarial-pr-review` (required at `rc`/`final`), and `pr-processing` (the worker path). None carries a
 skill-level phase **table** of its own — the table lives only in `AGENTS.md` and this runbook. `pr-batch`
-and `adversarial-pr-review` add a one-line pointer back here and to `AGENTS.md`. `address-review`
-**derives the phase directly from the PR's base branch** (Step 2.5 of its skill): a `release/*` base
-suppresses the beta-tier autonomous optional-nit rule and requires the `rc`/`final` evidence, because a
-direct `/address-review <PR>` invocation has no orchestrator to inject the phase for it (PR #4018 thread
-Kr6wb). `pr-processing` still inherits the gate through the `AGENTS.md` Maintainer Attention Contract it
-already follows. If the gate tiers ever change, update `AGENTS.md` and this runbook (the canonical
-source) rather than adding per-skill phase tables.
+and `adversarial-pr-review` add a one-line pointer back here and to `AGENTS.md`; `address-review` and
+`pr-processing` inherit the same gate through the `AGENTS.md` Maintainer Attention Contract they already
+follow. If the gate tiers ever change, update `AGENTS.md` and this runbook (the canonical source) rather
+than adding per-skill phase tables.
 
 ### Phase vs. release mode
 
