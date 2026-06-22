@@ -389,13 +389,22 @@ Guidance:
 - Apply the same rule to RSC output: server-rendered content and hydrated client components should use the same locale and direction.
 - Do not re-detect locale on the client if Rails already knows it.
 
+In production, prefer a single source of truth for direction — many i18n setups
+expose it (for example `rails-i18n` locale files carry direction metadata), and a
+shared helper avoids duplicating a language list. The snippet below is a minimal,
+**non-exhaustive** illustration; the `rtl_subtags` list omits many RTL locales
+(`ks`, `ku-Arab`, `pa-Arab`, …) and should not be copied verbatim into an app
+that needs broad coverage.
+
 ```erb
-<% rtl_subtags = %w[ar he fa ur yi ug dv ps sd ckb] # extend as your app needs %>
+<%# Minimal example only — derive `dir` from your i18n metadata in real apps. %>
+<% rtl_subtags = %w[ar he fa ur yi ug dv ps sd ckb] %>
+<% primary_subtag = I18n.locale.to_s.split(/[-_]/).first  # handles ar-EG and ar_EG %>
 <%= react_component(
   "LocalizedNav",
   props: {
     locale: I18n.locale.to_s,
-    dir: rtl_subtags.include?(I18n.locale.to_s.split("-").first) ? "rtl" : "ltr"
+    dir: rtl_subtags.include?(primary_subtag) ? "rtl" : "ltr"
   },
   prerender: true
 ) %>
