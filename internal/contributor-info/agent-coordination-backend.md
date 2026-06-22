@@ -41,14 +41,31 @@ The workflow docs assume `agent-coord` is available on `PATH`.
 alias `agent_coord` into `$HOME/.local/bin` by default. Add that directory to the
 active shell `PATH` if the shell has not reloaded its profile yet.
 
-Treat the backend as available when `agent-coord doctor` and `agent-coord status`
-exit 0. If the command is missing, auth fails, the private repo cannot be read,
-or either command exits non-zero, report private state as `UNKNOWN` and use
-structured public claim comments as an advisory fallback where dependency rules
-allow it. A successful status check followed by a refused `agent-coord claim`
-with exit code 3 / `CLAIM_REFUSED` is not unavailability; it is a hard stop.
-`agent-coord status` is a preflight view; `agent-coord claim` is the backend's
-compare-and-swap gate for concurrent claim races.
+Treat the backend as available when bounded `agent-coord doctor` and
+lane-scoped `agent-coord status` probes exit 0. In React on Rails batch
+workflows, run agent preflights through
+`.agents/skills/pr-batch/bin/agent-coord-bounded` so a slow full-backend read
+becomes explicit degraded state instead of an indefinite wait. If the command is
+missing, auth fails, the private repo cannot be read, a bounded probe times out,
+or either command exits non-zero, report private state as `UNKNOWN` / degraded.
+Use structured public claim comments as an advisory fallback only where
+dependency rules allow it. A successful status check followed by a refused
+`agent-coord claim` with exit code 3 / `CLAIM_REFUSED` is not unavailability; it
+is a hard stop. `agent-coord status` is a preflight view; `agent-coord claim` is
+the backend's compare-and-swap gate for concurrent claim races.
+
+For exact independent lanes with no `depends_on` refs, a coordinator may attempt
+a bounded direct `agent-coord claim` when doctor/status is degraded. A successful
+claim can proceed as `private_state: claim-only`, with normal heartbeats and
+handoff evidence that status was degraded. If the claim is refused, hard-stop.
+If the claim times out, stop with `private_state: UNKNOWN (claim outcome)` and
+reconcile private state before fallback or branching because the mutating claim
+may already have landed. Use the advisory public claim fallback only when the
+private claim cannot be started or fails with a definitive non-timeout
+setup/auth error, and only after checking for existing unexpired `codex-claim`
+comments on the same target. Dependency-sensitive lanes do not use claim-only or
+public fallback when status is unavailable; they stop with dependency state
+`UNKNOWN`.
 
 Do not use an unverified private clone for hard-stop gates. If the local private
 CLI or README no longer matches this public pointer and the operator cannot
@@ -239,15 +256,15 @@ the private backend repo. This public pointer carries only the contract:
   The private backend README and `agent-coord config show --json` are
   authoritative for the exact field name and cancel status values if they differ
   from this pointer.
-- Treat cancellation state as available only when `agent-coord doctor` and
-  `agent-coord status` exit 0, exactly as for claim, heartbeat, and phase state.
-  Otherwise report it as `UNKNOWN`. If cancellation was already recorded before
-  the outage, a coordinator can continue the process-level escape hatch; if not,
-  stop worker processes and wait to reconcile claims and cancellation state in
-  the private backend before relaunch. A coordinator or maintainer may post an
-  advisory GitHub comment as a human-facing incident note, but workers do not
-  treat comments as a drain signal. Arbitrary public comments cannot initiate
-  this fallback.
+- Treat cancellation state as available only when bounded `agent-coord doctor`
+  and `agent-coord status` probes exit 0, exactly as for claim, heartbeat, and
+  phase state. Otherwise report it as `UNKNOWN`. If cancellation was already
+  recorded before the outage, a coordinator can continue the process-level
+  escape hatch; if not, stop worker processes and wait to reconcile claims and
+  cancellation state in the private backend before relaunch. A coordinator or
+  maintainer may post an advisory GitHub comment as a human-facing incident
+  note, but workers do not treat comments as a drain signal. Arbitrary public
+  comments cannot initiate this fallback.
 - A cancelled worker drains at its next safe checkpoint and then runs
   `agent-coord release` for the lane. See
   [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md)
@@ -291,12 +308,12 @@ public pointer carries only the contract:
   `release/*` target to `beta`. The private backend README, `agent-coord --help`,
   and `agent-coord config show --json` are authoritative for the exact field and
   subcommand if they differ from this pointer.
-- Treat the published phase as available only when `agent-coord doctor` and
-  `agent-coord status` exit 0, exactly as for claim and heartbeat state.
-  Otherwise report the phase as `UNKNOWN` and use the `AGENTS.md` fallback:
-  derive it from the target branch (`main` -> `beta`; `release/*` -> `rc`, or
-  `final` when the applicable tracker is in `final-release` mode — the only
-  machine-readable signal in the fallback path).
+- Treat the published phase as available only when bounded `agent-coord doctor`
+  and `agent-coord status` probes exit 0, exactly as for claim and heartbeat
+  state. Otherwise report the phase as `UNKNOWN` and use the `AGENTS.md`
+  fallback: derive it from the target branch (`main` -> `beta`; `release/*` ->
+  `rc`, or `final` when the applicable tracker is in `final-release` mode — the
+  only machine-readable signal in the fallback path).
 - The release tracker remains the human source of truth for mode and go/no-go.
   The published phase is the fast machine path. If the published phase and the
   tracker disagree, treat it as a `release-mode-conflict` per `AGENTS.md`, report
