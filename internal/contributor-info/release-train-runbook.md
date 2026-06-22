@@ -282,6 +282,7 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
   from this pointer.
 - Treat the published phase as available only when `agent-coord doctor --json` and targeted status exit 0,
   exactly as for claim/heartbeat state. Otherwise report the phase as `UNKNOWN` and use the fallback.
+  Do not use broad `agent-coord status` for routine phase reads; broad reads are audit-only.
 - The **release tracker remains the human source of truth** for mode and go/no-go; the published phase
   is the fast machine path so agents do not have to parse the tracker on every PR. If the published
   phase and the tracker disagree, treat it like a release-mode conflict: do not auto-merge, and report
