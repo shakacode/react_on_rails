@@ -33,6 +33,17 @@ import {
   transformRenderStreamChunksToResultObject,
 } from './streamingUtils.ts';
 import handleError from './handleError.ts';
+import {
+  combineRSCStreamDiagnosticErrors,
+  extractMergedRSCStreamDiagnosticMessage,
+  MERGED_DIAGNOSTIC_FLAG,
+  mergeRSCStreamDiagnosticError,
+  rscStreamDiagnosticMatchesError,
+} from './rscDiagnostics.ts';
+
+type MaybeMergedRSCStreamDiagnosticError = Error & {
+  [MERGED_DIAGNOSTIC_FLAG]?: true;
+};
 
 const streamRenderReactComponent = (
   reactRenderingResult: StreamableComponentResult,
@@ -71,6 +82,67 @@ const streamRenderReactComponent = (
   const sendErrorHtml = (error: Error) => {
     const errorHtmlStream = handleError({ e: error, name: componentName, serverSide: true });
     pipeToTransform(errorHtmlStream);
+  };
+
+  // Enriches an error surfaced by React's render path (onError / the outer catch) with the original
+  // RSC bundle diagnostic(s) captured this render — the deferred-render-phase half of #3475. React's
+  // onError carries no component key, so the matching rule resolves the ambiguity conservatively:
+  //   - 0 diagnostics captured -> no enrichment (return the error unchanged).
+  //   - generic React RSC stream error -> merge all captured diagnostics as candidates and restore
+  //     them, so later generic callbacks in the same render are still enriched.
+  //   - ordinary React errors -> no enrichment; restore captured diagnostics for a later RSC error.
+  //   - 2+ diagnostics on the generic path -> merge a COMBINED diagnostic listing all candidates,
+  //                                          never a single false pinpoint.
+  //
+  // Misattribution guard (codex P2): the diagnostics are *consumed* (cleared) here, not just read, so
+  // each captured diagnostic is merged into at most one surfaced matching error. An unrelated failure
+  // that surfaces earlier or later in the same render — a different Suspense boundary throwing, a
+  // serialization error, an addPostSSRHook throw — does not consume or attach a non-matching RSC
+  // diagnostic, so the actual RSC failure can still be enriched when it surfaces.
+  // @react-version-invariant
+  // React delivers `onError` synchronously during render, so the consume/restore cycle below
+  // completes before another `onError` or the later `.catch` microtask can observe the tracker.
+  //
+  // An error already enriched on the synchronous reject path in getReactServerComponent.server.ts is
+  // returned untouched. We still consume the current tracker, drop diagnostics already represented by
+  // that merged error, and put the rest back so a later generic deferred error can still be enriched.
+  const enrichWithCapturedRSCDiagnostics = (error: Error): Error => {
+    if ((error as MaybeMergedRSCStreamDiagnosticError)[MERGED_DIAGNOSTIC_FLAG]) {
+      const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
+      // The only current pre-merge path is the synchronous reject in
+      // getReactServerComponent.server.ts, which merges a single diagnostic; its extracted
+      // message matches one captured entry and removes that entry from the restore set. If a future
+      // path pre-merges a combined diagnostic, revisit this filter and remove each represented raw
+      // diagnostic: the combined message will not equal any individual captured entry and could
+      // leave diagnostics available for an unrelated later error.
+      const mergedDiagnosticMessage = extractMergedRSCStreamDiagnosticMessage(error);
+      streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(
+        captured.filter((entry) => entry.diagnosticError.message !== mergedDiagnosticMessage),
+      );
+      return error;
+    }
+    const captured = streamingTrackers.rscRequestTracker.consumeCapturedRSCDiagnostics();
+    if (captured.length === 0) {
+      return error;
+    }
+
+    const matchingCaptured = rscStreamDiagnosticMatchesError(error) ? captured : [];
+    if (matchingCaptured.length === 0) {
+      streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(captured);
+      return error;
+    }
+    // Current matching is all-or-none: a generic React RSC stream error is the correlation signal
+    // and every captured diagnostic is a candidate. Keep those candidates available for subsequent
+    // generic callbacks in the same render; otherwise a later generic error could become the final
+    // Rails-facing renderingError with no diagnostic context.
+    streamingTrackers.rscRequestTracker.restoreCapturedRSCDiagnostics(captured);
+
+    const diagnosticError = combineRSCStreamDiagnosticErrors(
+      matchingCaptured.map((entry) => entry.diagnosticError),
+    );
+    // `combineRSCStreamDiagnosticErrors` returns undefined only for an empty list; matchingCaptured
+    // is non-empty here because of the guard above.
+    return mergeRSCStreamDiagnosticError(error, diagnosticError);
   };
 
   // Returns the suffix to append to an error's stack so React 19.1+'s owner stack (the component
@@ -117,7 +189,16 @@ const streamRenderReactComponent = (
           if (augmentedStack) {
             error.stack = augmentedStack;
           }
-          sendErrorHtml(error);
+          sendErrorHtml(
+            // onError fires before onShellError and sets renderState.error to the enriched error.
+            // Reuse it when present; otherwise enrich the shell error here as a defensive fallback for
+            // nonstandard or future React callback ordering.
+            //
+            // Current shell-error coverage throws synchronously, so onError sets renderState.error
+            // first. If this fallback is reached after the tracker was already consumed,
+            // enrichWithCapturedRSCDiagnostics returns the original error unchanged.
+            renderState.error instanceof Error ? renderState.error : enrichWithCapturedRSCDiagnostics(error),
+          );
         },
         onShellReady() {
           renderState.isShellReady = true;
@@ -147,13 +228,17 @@ const streamRenderReactComponent = (
           // Append the owner stack to this error's stack (issue #3887). onError fires for every
           // render error and sets renderState.error, which is serialized into the Rails-side
           // renderingError metadata (message + stack) — so this is what carries owner stacks to
-          // PrerenderError/SmartError for ALL streaming errors.
+          // PrerenderError/SmartError for ALL streaming errors. Done before enrichment so the owner
+          // stack travels with the React error inside the merged diagnostic's `cause`.
           const augmentedStack = ownerStackAugmentedStack(error);
           if (augmentedStack) {
             error.stack = augmentedStack;
           }
 
-          reportError(error);
+          // Recover the original RSC bundle diagnostic for failures that propagate through the
+          // deferred render phase (a Suspense boundary resolving a lazy element) rather than
+          // rejecting the stream parse synchronously (#3475).
+          reportError(enrichWithCapturedRSCDiagnostics(error));
           return undefined;
         },
         onAllReady() {
@@ -186,7 +271,28 @@ const streamRenderReactComponent = (
       });
     })
     .catch((e: unknown) => {
-      const error = convertToError(e);
+      // Enrich here too so a deferred RSC failure that surfaces as a rejection (rather than through
+      // renderToPipeableStream's onError) still recovers its bundle diagnostic (#3475).
+      //
+      // Only enrich when onError has not already reported an error (`renderState.hasErrors` is still
+      // false). The normal paths are effectively mutually exclusive: a rejected render promise lands
+      // here before `renderToPipeableStream` is called, while a deferred RSC component failure reaches
+      // React's `onError` after `renderToPipeableStream` starts. If onError fired, it already consumed
+      // the captured diagnostics and attributed them to the correlated error; reaching the .catch
+      // afterwards means this rejection is a *different* failure (or downstream fallout), so enriching
+      // it would risk re-attaching an unrelated RSC diagnostic. Consumption in
+      // enrichWithCapturedRSCDiagnostics already prevents reuse, but this gate also avoids
+      // double-reporting the same render's failure.
+      //
+      // Ordering invariant: `reportError` sets `renderState.hasErrors = true` synchronously, and
+      // `onError` runs synchronously inside React's render before this `.catch` rejection settles in a
+      // later microtask — so if `onError` reported an error, `hasErrors` is already true when read here.
+      // If React changes that ordering, the first path to consume the diagnostics wins and the second
+      // sees an empty capture list, avoiding double-enrichment.
+      const convertedError = convertToError(e);
+      const error = renderState.hasErrors
+        ? convertedError // onError already handled this render error; don't re-enrich (a no-op, but explicit).
+        : enrichWithCapturedRSCDiagnostics(convertedError);
       reportError(error);
       sendErrorHtml(error);
     });

@@ -45,6 +45,41 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - When the user wants to manually verify a bug-fix PR by reproducing the failure before the fix and confirming it is gone after (with captured evidence or screenshots, optionally posted to the PR and issue), use `.agents/skills/verify-pr-fix/SKILL.md`; a short invocation is `$verify-pr-fix` or "manually verify this fix"
 - Default simplify model: `claude-opus-4-8`
 
+## External Flagship Demo Coordination
+
+The public [`shakacode/react-on-rails-demo-flagship`](https://github.com/shakacode/react-on-rails-demo-flagship)
+repo is the single clone-and-run flagship example for React on Rails Pro, React Server Components, React 19,
+streaming SSR, the Node renderer, Shakapacker, and Rspack.
+
+Update that demo repo when changes in this monorepo affect the recommended user-facing Pro/RSC path, including:
+
+- React on Rails Pro or RSC generator output (`--pro`, `--rsc`, `react_on_rails:pro`, `react_on_rails:rsc`)
+- Pro installation, licensing, or "license optional for evaluation/demo/non-production" messaging
+- React, React DOM, `react-on-rails-rsc`, Shakapacker, Rspack, or Node renderer version pins/defaults
+- Auto-bundling behavior for `.client.` / `.server.` files or the `'use client'` directive
+- Streaming SSR/RSC helper usage, Node renderer configuration, Docker, or deployment defaults, including changes that
+  affect `bin/smoke` or Docker smoke-validation steps the demo repo runs during verification
+
+Why: the flagship demo is the external proof that the Pro/RSC happy path works in a real Rails app. If this monorepo
+changes the recommended path but the demo stays stale, agents and users will copy the wrong setup.
+
+Keep one flagship demo for now. Do not create a separate OSS-only flagship unless the user explicitly asks. The demo's
+README should document how to turn Pro/RSC off for comparison, but the default app should remain Pro + RSC.
+Additional examples are valuable when they teach distinct repo-generation patterns, but they should not dilute or
+compete with the flagship Pro/RSC path.
+
+The machine-readable catalog of demos, tiers, and packages is `internal/contributor-info/demo-fleet.yml`.
+
+When updating the demo, make the change in a separate checkout/branch of `react-on-rails-demo-flagship`, regenerate and
+commit lockfiles when dependency changes alter them, and do not mix demo repo commits into this monorepo. Use the
+JavaScript package manager declared by the demo repo (`packageManager` field or lockfile), then run focused validation
+such as:
+
+- `bundle install`
+- the lockfile install command for the declared package manager (`npm ci` for the current flagship)
+- `bin/shakapacker` or the equivalent asset build command documented by the demo repo
+- `bin/smoke` or Docker smoke validation
+
 ## Canonical Agent Policy
 
 `AGENTS.md` is the canonical source for repository-wide agent rules:
@@ -208,6 +243,9 @@ rake shakapacker:update_version[9.6.1]  # Update shakapacker across the monorepo
 Use `rake shakapacker:update_version[VERSION]` to update shakapacker across the entire monorepo. This single command updates all Gemfiles, package.json files, Gemfile.lock files, and pnpm-lock.yaml. Do **not** manually edit individual version references — always use the rake task to keep everything in sync.
 
 The task handles Ruby version switching for apps that require a different Ruby version (set `RUBY_VERSION_MANAGER` to `rvm`, `rbenv`, `asdf`, or `mise` if needed; defaults to `rvm`). It continues gracefully if a single lock file update fails (e.g., due to a missing Ruby version).
+
+After Shakapacker version or default updates, check the External Flagship Demo Coordination section to decide whether the
+flagship demo needs the same change.
 
 ## Testing
 
@@ -541,7 +579,7 @@ The **merge gate is a function of the target branch's release phase**. Resolve t
 | **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`.                                                                                                             |
 | **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial-pr-review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion**. No confidence-only auto-merge. |
 
-**Reading the phase.** The active phase per release line is published through the `shakacode/agent-coordination` backend so agents read the current gate without being told. Read it from the machine-readable `agent-coord` status output for the PR's target branch; treat it as available only when `agent-coord doctor` and `agent-coord status` exit 0 (the private backend README and `agent-coord --help` are authoritative for the exact field). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is the tool that is unavailable here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
+**Reading the phase.** The active phase per release line is published through the `shakacode/agent-coordination` backend so agents read the current gate without being told. Read it from the machine-readable `agent-coord` status output for the PR's target branch; treat it as available only when bounded `agent-coord doctor` and `agent-coord status` probes exit 0 (the private backend README and `agent-coord --help` are authoritative for the exact field). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is the tool that is unavailable here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
 
 ## Review Workflow
 

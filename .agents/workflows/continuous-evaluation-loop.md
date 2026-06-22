@@ -25,13 +25,14 @@ role, not a maker role.
 
 Gather live evidence from git, GitHub, and agent-coord, not chat memory:
 
-1. `agent-coord status --batch-id <batch-id>` when a batch id is known, or full
-   `agent-coord status` for a repo-wide sweep. Record active, stale, dead
-   (lost-heartbeat), blocked, done, released, and done-unmerged lanes plus
-   `blocked_on` refs.
-   If `agent-coord` is not installed, `agent-coord doctor` exits non-zero, or
-   the selected `agent-coord status` command fails, record coordination state as
-   `UNKNOWN` and rely on GitHub state plus git history only.
+1. Bounded `agent-coord status --batch-id <batch-id>` when a batch id is known,
+   or bounded full `agent-coord status` for a repo-wide sweep. Record active,
+   stale, dead (lost-heartbeat), blocked, done, released, and done-unmerged
+   lanes plus `blocked_on` refs.
+   If `agent-coord` is not installed, bounded `agent-coord doctor` exits
+   non-zero or times out, or the selected bounded `agent-coord status` command
+   fails/times out, record coordination state as `UNKNOWN` and rely on GitHub
+   state plus git history only.
 
    Note: `agent-coord` lane state is operational status only. The Classification
    section defines separate intent-achievement classes; a `done` or `released`

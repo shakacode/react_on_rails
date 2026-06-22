@@ -545,19 +545,15 @@ describe('RSCRoute successful-version error reset', () => {
     const result = await renderInAct(<Root revision={0} />);
     expect(getServerComponent).toHaveBeenCalledTimes(CACHE_CAP + 1);
 
-    await act(async () => {
-      pending.forEach((d) => {
+    for (const d of pending) {
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => {
         const { id } = d.args.componentProps as { id: number };
         d.resolve(<span data-testid={`payload-${id}`}>{`payload ${id}`}</span>);
+        await d.promise;
       });
-      await Promise.all(pending.map((d) => d.promise));
-    });
-    await act(async () => {
-      await flushMacrotasks();
-    });
-    await waitFor(() => expect(screen.getByTestId('payload-0')).toHaveTextContent('payload 0'), {
-      timeout: 10_000,
-    });
+    }
+    await waitFor(() => expect(screen.getByTestId('payload-0')).toHaveTextContent('payload 0'));
     expect(fetchCount(0)).toBe(1);
     expect(fetchCount(CACHE_CAP)).toBe(1);
 
