@@ -44,8 +44,9 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
-   - run `agent-coord doctor --deep --json`, then broad `agent-coord status`
-     only as an audit to list candidate batch/run ids and lanes
+   - run bounded `agent-coord doctor --json`, then bounded broad
+     `agent-coord status` only as an audit/discovery read to list candidate
+     batch/run ids and lanes
    - record `worked_issue_scope: UNKNOWN (needs batch confirmation)`
    - ask for confirmation before treating any candidate as the worked-issue
      scope
@@ -54,15 +55,15 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    `UNKNOWN (setup)` or `UNKNOWN (access)` takes precedence over
    `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
    is still needed after backend recovery. When a batch/run id is known, run
-   bounded `agent-coord doctor --json` and
+   bounded `agent-coord doctor --json` and bounded
    `agent-coord status --batch-id <batch-id> --json`, then inspect the named
    batch entry; use claims, heartbeats, and batch metadata as the primary
    worked-issue scope. If `agent-coord` is missing or bounded
    `agent-coord doctor --json` fails/times out, record
    `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
-   doctor passes but targeted batch status fails, exits 2, or times out, record
-   `worked_issue_scope: UNKNOWN (access)` with the exact command/error. In both
-   UNKNOWN cases, use structured public `codex-claim`
+   bounded `agent-coord doctor --json` passes but targeted batch status fails,
+   exits 2, or times out, record `worked_issue_scope: UNKNOWN (access)` with the
+   exact command/error. In both UNKNOWN cases, use structured public `codex-claim`
    comments as an advisory fallback for possible no-PR, blocked, parked, or
    done-unmerged lanes before reducing scope to merged PRs. Keep advisory rows
    marked `UNKNOWN` as needed, and do not infer confirmed completeness from

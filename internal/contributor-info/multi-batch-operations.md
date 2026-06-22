@@ -336,7 +336,9 @@ coordination state:
 Before kickoff:
 
 - confirm exact issue/PR targets and trusted scope;
-- run targeted `agent-coord status --batch-id <batch-id> --json`;
+- run targeted `agent-coord status --repo <repo> --target <issue-or-pr> --json`
+  for each exact target before routing, then
+  `agent-coord status --batch-id <batch-id> --json` for dependency lanes;
 - assign agent ids using `<machine-or-profile>-<batch>-<lane>`;
 - route packages so concurrent batches do not overlap;
 - reserve conductor.build only for single-PR focus or finishing;
