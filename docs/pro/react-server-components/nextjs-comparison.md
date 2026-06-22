@@ -143,10 +143,10 @@ This is the part teams comparing the two most often ask about. The Flight **algo
 everywhere — it lives once inside React's private packages. Only one small thing differs per bundler:
 the runtime primitive for **"load chunk #47 on demand."**
 
-| Bundler          | Runtime require         | Chunk load                  |
-| ---------------- | ----------------------- | --------------------------- |
-| webpack / Rspack | `__webpack_require__`   | `__webpack_chunk_load__`    |
-| Turbopack        | `__turbopack_require__` | `__turbopack_load_by_url__` |
+| Bundler          | Runtime require         | Chunk load                                |
+| ---------------- | ----------------------- | ----------------------------------------- |
+| webpack / Rspack | `__webpack_require__`   | `__webpack_chunk_load__`                  |
+| Turbopack        | `__turbopack_require__` | `__turbopack_load_*` (internal, unstable) |
 
 That single difference is the _entire_ reason a `react-server-dom-<bundler>` runtime family exists.
 Two consequences matter for React on Rails Pro:
@@ -171,7 +171,7 @@ Two consequences matter for React on Rails Pro:
 | webpack-API compatible               | yes (the reference)        | yes — near drop-in                | no — its own config             |
 | RSC runtime                          | `react-server-dom-webpack` | reuses `react-server-dom-webpack` | `react-server-dom-turbopack`    |
 | Used by React on Rails (Shakapacker) | yes                        | yes (preferred for speed)         | no (Turbopack is Next-internal) |
-| Used by Next.js                      | legacy/fallback            | experimental                      | default                         |
+| Used by Next.js                      | legacy/fallback            | experimental (as of 2026)         | default                         |
 
 ## Comparing capabilities
 
