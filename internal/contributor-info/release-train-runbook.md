@@ -273,14 +273,12 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
 
 - The backend exposes a **phase** value (`beta` | `rc` | `final`) per release line / target branch.
   For PR/issue lanes, read it from
-  `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json` (the tool
-  resolves phase from the PR's target branch internally). There is no separate `none` value; a missing
-  entry (no published phase for that line) means "no explicit override is published" — derive the phase
-  from the target branch exactly as in the backend-UNKNOWN fallback below (`main` → `beta`;
-  `release/*` → `rc`, or `final` in `final-release` mode). A missing entry must never down-gate a
-  `release/*` target to `beta`. The private backend README, `agent-coord --help`, and
-  `agent-coord config show --json` are authoritative for the exact field and subcommand if they differ
-  from this pointer.
+  `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json`; the private
+  backend README, `agent-coord --help`, and `agent-coord config show --json` are authoritative for the
+  exact phase field. There is no separate `none` value; a missing entry (no published phase for that
+  line) means "no explicit override is published" — derive the phase from the target branch exactly as
+  in the backend-UNKNOWN fallback below (`main` → `beta`; `release/*` → `rc`, or `final` in
+  `final-release` mode). A missing entry must never down-gate a `release/*` target to `beta`.
 - Treat the published phase as available only when `agent-coord doctor --json` and targeted status exit 0,
   exactly as for claim/heartbeat state. Otherwise report the phase as `UNKNOWN` and use the fallback.
   Do not use broad `agent-coord status` for routine phase reads; broad reads are audit-only.

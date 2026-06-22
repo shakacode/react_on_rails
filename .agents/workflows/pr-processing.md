@@ -41,9 +41,10 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
      ```
 
      A timeout exit such as `124`, setup failure, auth failure, or non-zero
-     targeted status means private state is `UNKNOWN` / degraded for that read.
-     Machine agents must hard-stop when a claim is refused with `CLAIM_REFUSED`
-     / exit code 3 and report the holder plus heartbeat liveness. Targeted
+     targeted status other than `CLAIM_REFUSED` / exit code 3 means private
+     state is `UNKNOWN` / degraded for that read. Machine agents must hard-stop
+     when a claim is refused with `CLAIM_REFUSED` / exit code 3 and report the
+     holder plus heartbeat liveness. Targeted
      `agent-coord status` is a preflight view; the claim operation is the
      backend's compare-and-swap gate, so the claim result is the source of truth
      for races.
