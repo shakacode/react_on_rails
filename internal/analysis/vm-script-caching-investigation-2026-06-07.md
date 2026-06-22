@@ -42,7 +42,7 @@ The render template in react_on_rails_pro does real work (React rendering and pr
 
 ## Reproducibility Note
 
-The original local experiment bundle was an ephemeral `tmp/` path and was not retained. A narrow standalone reproduction script is now committed as [`analysis/vm-script-caching-repro-2026-06-13.mjs`](vm-script-caching-repro-2026-06-13.mjs). It is intended to reproduce the shape of the microbenchmark, not to establish portable production throughput. The example reproduction output below was captured on an Apple M5 Max host, not the original Apple M1 host.
+The original local experiment bundle was an ephemeral `tmp/` path and was not retained. A narrow standalone reproduction script is now committed as [`internal/analysis/vm-script-caching-repro-2026-06-13.mjs`](vm-script-caching-repro-2026-06-13.mjs). It is intended to reproduce the shape of the microbenchmark, not to establish portable production throughput. The example reproduction output below was captured on an Apple M5 Max host, not the original Apple M1 host.
 
 ## Key Results
 
@@ -172,7 +172,7 @@ Adding `vm.Script` caching without stronger evidence would:
 
 Benchmark scripts and raw data are captured in this committed analysis note:
 
-- Reproduction script: [`analysis/vm-script-caching-repro-2026-06-13.mjs`](vm-script-caching-repro-2026-06-13.mjs)
+- Reproduction script: [`internal/analysis/vm-script-caching-repro-2026-06-13.mjs`](vm-script-caching-repro-2026-06-13.mjs)
 - Example reproduction output: see the section below.
 - Original raw benchmark output: see the two later sections, with caveats.
 - Original local experiment bundle: intentionally not retained because it was an ephemeral `tmp/` path.

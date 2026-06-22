@@ -11,6 +11,11 @@ module ReactOnRails
   # Used by both streaming (Pro) and non-streaming (OSS) paths.
   # Strict protocol parser — any format violation raises an error.
   class LengthPrefixedParser
+    # Keep aligned with ReactOnRailsPro::StreamRequest::CONTROL_MESSAGE_TYPES,
+    # which routes these same control frames during bidirectional streaming.
+    CONTROL_MESSAGE_TYPES = %w[propRequest renderComplete].freeze
+    private_constant :CONTROL_MESSAGE_TYPES
+
     # Parses a complete length-prefixed result string that must contain exactly one chunk.
     # Used by the non-streaming rendering path where ExecJS/node renderer returns a single result.
     # Returns a single Hash: { "html" => String|nil, "consoleReplayScript" => "...", ... }
@@ -126,6 +131,20 @@ module ReactOnRails
 
       raw_content = @buf.byteslice(0, @content_len).force_encoding(Encoding::UTF_8)
       @buf = @buf.byteslice(@content_len, @buf.bytesize - @content_len)
+
+      # Control messages (propRequest, renderComplete) have no HTML payload;
+      # raw_content is therefore empty and intentionally unused. Those two
+      # messageType values are reserved by the wire format. Other messageType
+      # metadata is treated as ordinary chunk metadata so future tracing or
+      # diagnostics annotations cannot be swallowed accidentally.
+      if CONTROL_MESSAGE_TYPES.include?(@metadata["messageType"])
+        @metadata.delete("payloadType")
+        result = @metadata
+        @metadata = nil
+        @state = :header
+        yield result
+        return true
+      end
 
       # Reconstruct html type based on payloadType:
       #   "object" → JSON-serialized value (ServerRenderHash or null), needs JSON.parse

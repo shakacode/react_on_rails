@@ -30,6 +30,41 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - When the user wants to manually verify a bug-fix PR by reproducing the failure before the fix and confirming it is gone after (with captured evidence or screenshots, optionally posted to the PR and issue), use `.agents/skills/verify-pr-fix/SKILL.md`; a short invocation is `$verify-pr-fix` or "manually verify this fix"
 - Default simplify model: `claude-opus-4-8`
 
+## External Flagship Demo Coordination
+
+The public [`shakacode/react-on-rails-demo-flagship`](https://github.com/shakacode/react-on-rails-demo-flagship)
+repo is the single clone-and-run flagship example for React on Rails Pro, React Server Components, React 19,
+streaming SSR, the Node renderer, Shakapacker, and Rspack.
+
+Update that demo repo when changes in this monorepo affect the recommended user-facing Pro/RSC path, including:
+
+- React on Rails Pro or RSC generator output (`--pro`, `--rsc`, `react_on_rails:pro`, `react_on_rails:rsc`)
+- Pro installation, licensing, or "license optional for evaluation/demo/non-production" messaging
+- React, React DOM, `react-on-rails-rsc`, Shakapacker, Rspack, or Node renderer version pins/defaults
+- Auto-bundling behavior for `.client.` / `.server.` files or the `'use client'` directive
+- Streaming SSR/RSC helper usage, Node renderer configuration, Docker, or deployment defaults, including changes that
+  affect `bin/smoke` or Docker smoke-validation steps the demo repo runs during verification
+
+Why: the flagship demo is the external proof that the Pro/RSC happy path works in a real Rails app. If this monorepo
+changes the recommended path but the demo stays stale, agents and users will copy the wrong setup.
+
+Keep one flagship demo for now. Do not create a separate OSS-only flagship unless the user explicitly asks. The demo's
+README should document how to turn Pro/RSC off for comparison, but the default app should remain Pro + RSC.
+Additional examples are valuable when they teach distinct repo-generation patterns, but they should not dilute or
+compete with the flagship Pro/RSC path.
+
+The machine-readable catalog of demos, tiers, and packages is `internal/contributor-info/demo-fleet.yml`.
+
+When updating the demo, make the change in a separate checkout/branch of `react-on-rails-demo-flagship`, regenerate and
+commit lockfiles when dependency changes alter them, and do not mix demo repo commits into this monorepo. Use the
+JavaScript package manager declared by the demo repo (`packageManager` field or lockfile), then run focused validation
+such as:
+
+- `bundle install`
+- the lockfile install command for the declared package manager (`npm ci` for the current flagship)
+- `bin/shakapacker` or the equivalent asset build command documented by the demo repo
+- `bin/smoke` or Docker smoke validation
+
 ## Canonical Agent Policy
 
 `AGENTS.md` is the canonical source for repository-wide agent rules:
@@ -129,6 +164,9 @@ Use `rake shakapacker:update_version[VERSION]` to update shakapacker across the 
 
 The task handles Ruby version switching for apps that require a different Ruby version (set `RUBY_VERSION_MANAGER` to `rvm`, `rbenv`, `asdf`, or `mise` if needed; defaults to `rvm`). It continues gracefully if a single lock file update fails (e.g., due to a missing Ruby version).
 
+After Shakapacker version or default updates, check the External Flagship Demo Coordination section to decide whether the
+flagship demo needs the same change.
+
 ## Testing
 
 - **Prefer local testing over CI iteration** — don't push "hopeful" fixes. Apply the **15-minute rule**: if 15 more minutes of local testing would catch the issue before CI does, spend the 15 minutes.
@@ -161,9 +199,9 @@ cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 | `docs/oss/`                                      | OSS documentation — published to the [ShakaCode website](https://reactonrails.com/docs/) |
 | `docs/pro/`                                      | Pro documentation — installation, configuration, RSC, node renderer, caching             |
 | `internal/contributor-info/`                     | Internal contributor docs (not published to the website)                                 |
-| `internal/planning/`                             | Internal planning docs, drafts, and historical analysis                                  |
+| `internal/planning/`                             | Internal planning docs, designs, and drafts                                              |
 | `internal/react_on_rails_pro/contributors-info/` | Internal Pro contributor docs (not published to the website)                             |
-| `analysis/`                                      | Investigation and analysis documents (kebab-case `.md` files)                            |
+| `internal/analysis/`                             | Investigation and analysis documents (kebab-case `.md` files)                            |
 
 ## Code Style
 
@@ -316,11 +354,11 @@ contract unless a maintainer explicitly narrows the run.
   sharper scope, or better batching would reduce future churn; they are not a
   hard failure by themselves. A human decision point is any question, option
   selection, or confirmation directed at a maintainer that required direct input,
-  excluding push confirmations that are mandatory sub-steps of an action the
-  maintainer already selected, such as the required push confirmation after
-  committing action `f`. A standalone "should I push this nit fix?" question
-  counts. Report it as `Decision points: N` in the FYI section of the batch
-  handoff.
+  excluding git confirmations that safety rules or explicit local-only /
+  inspect-before-push instructions require after the maintainer already selected
+  the action, such as a required confirmation before a destructive force-push. A
+  standalone "should I push this ordinary PR-iteration fix?" question counts.
+  Report it as `Decision points: N` in the FYI section of the batch handoff.
 - **Confidence notes**: delegated merge authority exists only when the current
   user or batch goal grants it and the release-mode rules permit it. Before a
   delegated merge, the worker or coordinator writes a confidence note in the
@@ -467,6 +505,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 
 - **Default: no CI-expansion label.** For docs-only changes, focused tests, small isolated fixes, and refactors with no cross-package behavior change, rely on `ci-required / required-pr-gate` plus local verification during review.
 - **Use `ready-for-hosted-ci`** (or ask a maintainer to comment `+ci-run-hosted`) when the PR is ready for hosted GitHub Actions confirmation. This runs the hosted workflows for the current head SHA, but `script/ci-changes-detector` still chooses the applicable suites. Opening a draft PR or requesting code review does not by itself mean hosted CI should run.
+- **Generator-sensitive PRs require hosted CI.** When `script/ci-changes-detector` sets `run_generators=true`, `ci-required / required-pr-gate` fails on ordinary pull requests until hosted CI is requested with `+ci-run-hosted`, `bin/request-hosted-ci`, or a maintainer/user-token `ready-for-hosted-ci` label. This keeps generator changes from merging after only the lightweight gate; merge queue and release-target branches already run hosted CI automatically.
 - **Use `force-full-hosted-ci`** only when a maintainer intentionally wants to bypass optimized suite selection and run every hosted suite, for example while validating CI detector changes, package manager or runtime floor changes, release/build/publishing logic, broad generator output, or another cross-cutting change where path selection itself is part of the risk. Prefer `+ci-force-full`, which also applies `ready-for-hosted-ci` and dispatches the workflows for the current head SHA.
 - **Use `benchmark`** (or a suite-specific `benchmark-core` / `benchmark-pro` / `benchmark-pro-node-renderer`) for performance-sensitive changes: server rendering paths, Node renderer, caching, bundle generation, asset serving/precompile behavior, concurrency/pooling, or anything expected to affect throughput, latency, memory, or bundle size. Benchmarks are opt-in on PRs: without a `benchmark*` label no suite runs, because per-PR benchmark numbers are informational only and noise-dominated on shared CI runners. They still run on push to `main` to keep the Bencher dashboard and PR-comparison baseline current, but automatic regression-issue filing is disabled by default (#4071): on shared runners those alerts were ±50-125% noise that filed false-positive issues (#4038-#4044), so the trustworthy signal now comes from the dedicated local runner (`benchmarks/run-local-benchmark.rb`, #4073). Set the repo variable `BENCHMARK_REGRESSION_ISSUES_ENABLED=true` to restore automatic filing. `ready-for-hosted-ci` and `force-full-hosted-ci` do not trigger benchmarks; use benchmark labels separately when performance evidence matters. Use `hosted-ci-no-benchmarks` only to suppress an explicit benchmark label on CI/tooling PRs that cannot move runtime performance.
 - **Remove hosted readiness when no longer needed** with `+ci-stop-hosted` if the PR returns to active iteration. Use `+ci-stop-full` when only the force-full override should be removed and optimized hosted CI should remain.

@@ -23,13 +23,28 @@ import {
 import { extractErrorMessage } from './utils.ts';
 
 /**
- * RSC Request Tracker - manages RSC payload generation and tracking for a single request.
+ * A captured RSC bundle diagnostic for a single component, recorded during stream parse.
+ *
+ * Kept render-scoped on the tracker so it survives past the `getReactServerComponentOnServer`
+ * call that captured it. This is what lets the deferred-render path (where React surfaces the
+ * failure through `renderToPipeableStream`'s `onError` rather than rejecting the stream parse)
+ * recover the original diagnostic — see #3475.
+ */
+export interface CapturedRSCDiagnostic {
+  componentName: string;
+  diagnosticError: Error;
+}
+
+/**
+ * RSC Request Tracker — manages RSC payload generation and stream tracking per request.
  *
  * This class provides a local alternative to the global RSC payload management,
  * allowing each request to have its own isolated tracker without sharing state.
  * It includes both tracking functionality for the server renderer and fetching
  * functionality for components.
  */
+// Internal request-scoped helper. Default-exported only for sibling Pro modules and tests; it is not
+// exposed through the package export map.
 class RSCRequestTracker {
   private streams: RSCPayloadStreamInfo[] = [];
 
@@ -45,6 +60,8 @@ class RSCRequestTracker {
   private cleared = false;
 
   private callbacks: RSCPayloadCallback[] = [];
+
+  private capturedRSCDiagnostics: CapturedRSCDiagnostic[] = [];
 
   private railsContext: RailsContextWithServerComponentMetadata;
 
@@ -102,6 +119,80 @@ class RSCRequestTracker {
     this.sourceStreams = [];
     this.streams = [];
     this.callbacks = [];
+    this.capturedRSCDiagnostics = [];
+  }
+
+  /**
+   * Records an RSC bundle diagnostic captured while parsing a component's payload stream.
+   *
+   * Called from `getReactServerComponentOnServer` when `transformRSCStream` surfaces a
+   * `renderingError` via `onDiagnosticError`. Storing it here (render-scoped) lets the surfacing
+   * site recover it even when the failure propagates through React's deferred render phase rather
+   * than rejecting the stream parse synchronously (#3475).
+   *
+   * @param componentName - Name of the server component the diagnostic belongs to
+   * @param diagnosticError - The diagnostic built by `buildRSCStreamDiagnosticError`
+   */
+  recordRSCDiagnostic(componentName: string, diagnosticError: Error): void {
+    // Suppress only *true* duplicates — same component name AND same diagnostic message. The same
+    // server component fetched in two Suspense trees within one render can fire `onDiagnosticError`
+    // twice for the identical failure; without a guard the 2+ enrichment path would list "one of
+    // these 2 RSC components failed" naming the same component twice with the same text. But two
+    // instances of the same component can also fail with *different* errors, and those are genuinely
+    // distinct diagnostics that must both be retained (codex P2) — deduping on name alone would drop
+    // the second and lose error information. Keying on name + message keeps distinct failures while
+    // collapsing exact repeats. (`transformRSCStream` is already first-wins per stream parse, so a
+    // single payload never double-records; this guards the cross-instance case only.)
+    // The stack is intentionally excluded: the user-visible module path and original error are already
+    // normalized into the diagnostic message, so stack-only frame noise should not defeat deduping.
+    const isDuplicate = this.capturedRSCDiagnostics.some(
+      (entry) =>
+        entry.componentName === componentName && entry.diagnosticError.message === diagnosticError.message,
+    );
+    if (isDuplicate) {
+      return;
+    }
+    this.capturedRSCDiagnostics.push({ componentName, diagnosticError });
+  }
+
+  /**
+   * Returns all RSC bundle diagnostics captured this render **and clears them**, so a single
+   * captured diagnostic is merged into at most one surfaced error.
+   *
+   * This is the misattribution guard for the deferred-render enrichment (#3475). React's `onError`
+   * carries no component key, so the enrichment site cannot prove a given error came from the
+   * captured RSC component. The enrichment site consumes first so a matched diagnostic is attached at
+   * most once, then restores any non-matching diagnostics for later errors in the same render. This
+   * prevents a different Suspense boundary, serialization error, or addPostSSRHook throw from stealing
+   * a lone RSC diagnostic before the actual RSC failure surfaces.
+   *
+   * @returns The captured diagnostics (empty if none were captured or they were already consumed)
+   */
+  consumeCapturedRSCDiagnostics(): CapturedRSCDiagnostic[] {
+    const captured = this.capturedRSCDiagnostics; // ownership transferred: caller owns this array after return.
+    this.capturedRSCDiagnostics = [];
+    return captured;
+  }
+
+  /**
+   * Restores consumed diagnostics that were not matched to the current surfaced error.
+   *
+   * These entries already came from `capturedRSCDiagnostics`, so they have passed
+   * `recordRSCDiagnostic`'s dedup filter. Push them back directly to preserve the exact consumed
+   * set without re-running deduplication during restore.
+   *
+   * @internal Only restore arrays previously returned by `consumeCapturedRSCDiagnostics`.
+   *
+   * @param captured - Previously consumed diagnostics to make available for a later surfaced error
+   */
+  restoreCapturedRSCDiagnostics(captured: CapturedRSCDiagnostic[]): void {
+    // Direct push without re-running the dedup filter in `recordRSCDiagnostic` is safe because
+    // @react-version-invariant
+    // React delivers onError synchronously: there is no microtask gap between
+    // `consumeCapturedRSCDiagnostics()` and this restore where a new record can interleave. RSC
+    // payload parsing also completes before the deferred render phase where onError fires. If
+    // either invariant changes, re-add the dedup check here.
+    this.capturedRSCDiagnostics.push(...captured);
   }
 
   /**

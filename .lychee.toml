@@ -62,6 +62,7 @@ exclude = [
   '^https://(www\.)?mycfsapp\.com',     # SSL hostname mismatch
   '^https://(www\.)?scoutapp\.com',     # SSL hostname mismatch
   '^https://solargraph\.org',           # SSL HandshakeFailure
+  '^https://undici\.nodejs\.org',       # TLS handshake in CI from Undici docs links
 
   # ============================================================================
   # BADGE AND CI SERVICES
@@ -72,7 +73,7 @@ exclude = [
   # ============================================================================
   # SITES THAT RETURN 5xx FROM CI
   # ============================================================================
-  '^https://reactrails\.com',              # Works locally but 504s from CI
+  '^https://(www\.)?reactrails\.com',      # Works locally but 504s from CI
   '^https://shakacode\.controlplane\.com', # Connection refused from CI
   '^https://storybook\.js\.org',           # Intermittent connection resets from CI
   '^https://redux\.js\.org/?$',            # Intermittent connection resets from CI
@@ -83,6 +84,7 @@ exclude = [
   '^https://lodash\.com',                    # Connection reset from CI
   '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI
   '^https://www\.developerway\.com/posts/react-server-components-performance$', # Returns 503 from CI
+  '^https://webaim\.org/techniques/css/invisiblecontent/?$', # Returns 504 from CI
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE
@@ -117,6 +119,7 @@ exclude = [
   '^https?://(www\.)?pivotaltracker\.com',  # Timeout in CI
   '^https?://(www\.)?undeveloped\.com',  # Timeout in CI
   '^https://devchat\.tv',  # Ruby Rogues podcast - times out in CI
+  '^https?://chris\.beams\.io/posts/git-commit/?$',  # Timeout in CI
   '^https?://chlg\.co',  # URL shortener - times out in CI
   '^https?://contributor-covenant\.org',  # Timeout in CI
   '^https://www\.diva-portal\.org/smash/get/diva2:1903931/FULLTEXT01\.pdf$',  # Intermittent timeout in CI

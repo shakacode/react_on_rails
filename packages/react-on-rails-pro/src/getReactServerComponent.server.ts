@@ -32,6 +32,7 @@ const createFromReactOnRailsNodeStream = async (
   reactServerManifestFileName: string,
   reactClientManifestFileName: string,
   componentName: string,
+  onDiagnosticCaptured: (diagnosticError: Error) => void,
 ) => {
   if (!clientRendererPromise) {
     clientRendererPromise = Promise.all([
@@ -53,16 +54,19 @@ const createFromReactOnRailsNodeStream = async (
     componentName,
     onDiagnosticError(error) {
       rscDiagnosticError = error;
+      // Record the diagnostic on the render-scoped tracker so it survives past this function.
+      // This is what lets the deferred-render path recover it (see below and #3475).
+      onDiagnosticCaptured(error);
     },
   });
 
-  // Note: this try/catch enriches any error that rejects `createFromNodeStream` — stream read
-  // failures, malformed Flight data, or synchronous render errors. It does NOT catch errors
-  // React surfaces through its error-boundary / Suspense mechanism during the deferred render
-  // phase (e.g. when a Suspense boundary resolves a lazy element); those never reject this
-  // promise. In that case `rscDiagnosticError` (a local that goes out of scope when this
-  // function returns) is discarded and the caller sees only the generic React error. Enriching
-  // the deferred-render path is tracked in #3475.
+  // This try/catch enriches any error that rejects `createFromNodeStream` — stream read failures,
+  // malformed Flight data, or synchronous render errors. It does NOT catch errors React surfaces
+  // through its error-boundary / Suspense mechanism during the deferred render phase (e.g. when a
+  // Suspense boundary resolves a lazy element); those never reject this promise — they surface in
+  // `renderToPipeableStream`'s `onError`. The synchronous enrichment here stays in place; the
+  // deferred-render path is enriched separately in `streamServerRenderedReactComponent`'s `onError`
+  // by reading the diagnostic recorded above via `onDiagnosticCaptured` (#3475).
   try {
     return await createFromNodeStream<React.ReactNode>(transformedStream);
   } catch (error: unknown) {
@@ -111,6 +115,10 @@ const getReactServerComponent =
       railsContext.reactServerClientManifestFileName,
       railsContext.reactClientManifestFileName,
       componentName,
+      // Optional chaining: `recordRSCDiagnostic` is an additive capability (#3475). When an older or
+      // custom railsContext doesn't supply it, diagnostic recording degrades to a no-op rather than
+      // crashing — the synchronous-reject enrichment in `createFromReactOnRailsNodeStream` still works.
+      (diagnosticError) => railsContext.recordRSCDiagnostic?.(componentName, diagnosticError),
     );
   };
 
