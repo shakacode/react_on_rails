@@ -35,6 +35,7 @@ exclude = [
   # ============================================================================
   '^https://(www\.)?npmjs\.(org|com)',  # Returns 403 for automated requests
   '^https://medium\.com',  # Returns 403 for automated requests
+  '^https://(www\.)?w3\.org/WAI',  # W3C WAI returns 403 for automated requests; scoped to /WAI so other w3.org links are still checked
   '^https://careersatdoordash\.com',  # Cloudflare bot challenge returns 403
   '^https://www\.linkedin\.com',
   '^https://reactrails\.slack\.com',
