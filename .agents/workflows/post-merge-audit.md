@@ -118,9 +118,9 @@ First, produce the exact worked-issue scope and merged-PR range:
   `worked_issue_scope: UNKNOWN (access)` instead of
   `UNKNOWN (needs batch confirmation)`, with the exact command/error.
 - when a batch id is known:
-  - run bounded `agent-coord doctor --json`, then
-    `agent-coord status --batch-id <batch-id> --json`, then inspect
-    `<BATCH_ID>` in the status output
+  - run `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 doctor --json`, then
+    `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id <batch-id> --json`,
+    then inspect `<BATCH_ID>` in the status output
   - list every worked issue/lane from claims, heartbeats, branches, and
     dependency metadata
   - for each worked issue, include the lane owner, branch, heartbeat/final
