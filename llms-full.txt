@@ -8030,7 +8030,15 @@ export default function EmailField({ error }) {
 }
 ```
 
-**`useId` is not enough when you mount the same component more than once.** `useId` keeps an id stable between the server render and hydration _within one mount_, but React only guarantees uniqueness _across_ separate roots when each root is given a distinct [`identifierPrefix`](https://react.dev/reference/react-dom/client/hydrateRoot#parameters). React on Rails does not set a per-mount `identifierPrefix`, so two mounts of the same component can produce the same `useId` value (for example `«r0»`) and collide. When a component can appear more than once on a page, pass a unique prefix into it — the container `id` you set with the top-level `id:` option (section 2) works well — and build your ARIA ids from that:
+**With the open-source package, `useId` is not enough when you mount the same component more than once on a page.** `useId` keeps an id stable between the server render and hydration _within one mount_, but React only guarantees uniqueness _across_ separate roots when each root is given a distinct [`identifierPrefix`](https://react.dev/reference/react-dom/client/hydrateRoot#parameters). The open-source React on Rails package does not set a per-mount `identifierPrefix`, so two mounts of the same component can produce the same `useId` value (for example `«r0»`) and collide. (React on Rails Pro sets `identifierPrefix` to the container DOM id automatically for RSC-wrapped and streaming roots, so `useId` is already safe there; the Pro non-RSC path has the same caveat as open source.)
+
+When a component can appear more than once on a page, pass a unique prefix into it — the container `id` you set with the top-level `id:` option (section 2) works well — and build your ARIA ids from that. Use the same value for `id:` and the prefix prop so they stay in sync:
+
+```erb
+<%# Each mount gets a unique id; the same value is threaded in as the prefix prop %>
+<%= react_component("EmailField", props: { id_prefix: "signup-email" }, id: "signup-email") %>
+<%= react_component("EmailField", props: { id_prefix: "contact-email" }, id: "contact-email") %>
+```
 
 ```jsx
 export default function EmailField({ idPrefix, error }) {
@@ -8060,7 +8068,7 @@ Guidance:
 function ResultsRegion({ loading, children }) {
   // `aria-busy` signals loading; a plain <div> avoids implying a landmark.
   return (
-    <div aria-busy={loading ? 'true' : 'false'}>
+    <div aria-busy={loading ? 'true' : undefined}>
       {loading ? <div aria-hidden="true" className="skeleton" /> : children}
     </div>
   );
@@ -8101,7 +8109,7 @@ What is specific to React on Rails is where this code lives.
 - Keep one route announcer for the page. Do not create one announcer per island.
 - Make sure skip links still point to the current main content after navigation.
 
-For the general SPA pattern, see [Gatsby/Fable's user testing of accessible client-side routing](https://www.gatsbyjs.com/blog/2019-07-11-user-testing-accessible-client-routing/) and [Deque's SPA accessibility tips](https://www.deque.com/blog/accessibility-tips-in-single-page-applications/).
+For the general SPA pattern, see [Gatsby's user testing of accessible client-side routing](https://www.gatsbyjs.com/blog/2019-07-11-user-testing-accessible-client-routing/) and [Deque's SPA accessibility tips](https://www.deque.com/blog/accessibility-tips-in-single-page-applications/).
 
 ---
 
@@ -8118,12 +8126,11 @@ Guidance:
 - Keep each label connected to its input with matching `for` and `id`.
 - Keep `aria-describedby` pointed at the error message after hydration.
 - If the server prerenders an error state, the hydrated React output must use the same IDs and text.
+- If the form island can be mounted more than once on a page, pass a unique `idPrefix` prop (section 4) instead of relying on `useId` alone, so the OSS path does not produce colliding field IDs.
 
 ```jsx
-import { useId } from 'react';
-
-function NameField({ value, error }) {
-  const id = useId();
+function NameField({ idPrefix, value, error }) {
+  const id = `${idPrefix}-name`;
   const errorId = `${id}-error`;
 
   return (
