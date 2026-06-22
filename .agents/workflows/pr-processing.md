@@ -490,7 +490,8 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 - QA required: <yes | no>
 - QA required rationale: <one-line reason for the decision and selected QA depth>
 - QA lane status: <satisfied | blocked | waived | in_progress | unknown | not applicable; use not applicable when QA required is no; readiness/release audits treat in_progress/unknown as blockers>
-- Release-blocking status: <clear | blocked | waived | not applicable; use not applicable when QA required is no; map QA lane status satisfied->clear, blocked->blocked, waived->waived, and in_progress/unknown->blocked>
+- Release-blocking status: <clear | blocked | waived | not applicable>
+  Derive this from QA lane status: satisfied->clear, blocked->blocked, waived->waived, not applicable->not applicable, and in_progress/unknown->blocked.
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable (no recurring process miss found); see the top-level Process Gap Disposition section for value definitions>
 ```
 
@@ -710,7 +711,18 @@ write does not trigger current-head `pull_request` workflows. Also apply the
 merge-endgame debounce and waiver-soak rule under **Merge Endgame Debounce And
 Waiver Soak** before the final merge/readiness decision.
 
-After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, run `script/pr-merge-ledger <PR> --strict` with explicit changelog classification and P0/P1/P2/Must-Fix dispositions, verify current QA Evidence when the Batch QA Lane requires QA, update stale release-mode classification, refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it, request hosted CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs only when `merge_authority` and the current release mode allow it.
+After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation:
+
+- Re-fetch live PR status.
+- Wait for current-head checks and reviews.
+- Triage, resolve, or explicitly waive current unresolved review threads.
+- Run `script/pr-merge-ledger <PR> --strict` with explicit changelog classification and P0/P1/P2/Must-Fix dispositions.
+- Verify current QA Evidence when the Batch QA Lane requires QA.
+- Update stale release-mode classification.
+- Refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it.
+- Request hosted CI when uncertainty remains.
+- Re-fetch and wait for the newly requested current-head checks.
+- Merge eligible ready PRs only when `merge_authority` and the current release mode allow it.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
