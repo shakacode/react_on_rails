@@ -564,6 +564,23 @@ Examples:
 ```markdown
 ### QA Evidence
 
+- QA lane: codex-qa, branch qa/batch-release, claim active, heartbeat live
+- Scope checked: release-affecting generator output for PRs #9 and #10; testing in progress
+- Tested at: PR #9 abc1234 (manual smoke not yet run); PR #10 def5678 (pending)
+- Automated checks: worker validation complete; hosted CI link pending
+- Manual checks: in progress: generated-example smoke on Node 20 not yet completed
+- Findings: none so far; final verdict pending manual checks
+- QA required: yes
+- QA required rationale: release-affecting generated output needs independent coverage
+- QA lane status: in_progress
+- Release-blocking status: blocked
+  Derive this from QA lane status: in_progress->blocked during readiness/release audits.
+- Process-gap disposition: not applicable (no recurring process miss found)
+```
+
+```markdown
+### QA Evidence
+
 - QA lane: codex-qa, branch qa/batch-rc, claim active, heartbeat done
 - Scope checked: release-affecting CI config for PR #8
 - Tested at: PR #8 123abcd

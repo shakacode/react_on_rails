@@ -153,7 +153,8 @@ still-open lanes:
   evidence is missing, stale, or incomplete.
 - Post-merge intake: record healthy `in_progress` worked-issue lanes and
   evidenced `realized` worked-issue outcomes, `satisfied` or `waived` QA lanes,
-  and `not applicable` QA omissions in the coverage table as no-action items;
+  and `not applicable` QA omissions in the coverage table as no-action items
+  during active batch phase;
   treat required QA lanes still `in_progress` during readiness/release audits as
   QA coverage findings; route
   `stalled` lanes back to the batch coordinator as resume/reassign/drop

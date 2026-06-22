@@ -288,6 +288,8 @@ placeholders; replace them with the real batch id and issues):
 
 `Final state` is the operational lane outcome. `Classification` is the
 worked-issue intent class or QA-coverage result.
+Use `qa` for a single QA lane. Use `qa:<scope-label>` for scoped QA sub-lanes,
+matching the coordinator lane name.
 
 | Issue | Lane/branch | Evidence | Final state | Classification | UNKNOWN facts |
 | --- | --- | --- | --- | --- | --- |
@@ -300,6 +302,7 @@ worked-issue intent class or QA-coverage result.
 | qa | not required / no branch | handoff comment URL (inline QA Evidence block) | not applicable | not applicable | none |
 | qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | blocked | blocked | fix or waiver needed before release |
 | qa | batch-abc:qa / codex/qa-lane | maintainer waiver URL | done | waived | none |
+| qa:ci | batch-abc:qa:ci / codex/qa-ci-lane | QA Evidence block URL | done | satisfied | none |
 ```
 
 ## Comparison Prompt

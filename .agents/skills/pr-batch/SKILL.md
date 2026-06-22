@@ -326,9 +326,9 @@ merge-ledger summaries.
 Do not call a target `complete` while its ledger has `UNKNOWN` fields or
 `complete_allowed: false`.
 Do not report a batch that requires QA as ready while required QA coverage/scope
-evidence is missing, `blocked`, `in_progress`, or still `UNKNOWN`; the only
-allowed fallback is a QA lane whose private coordination claim/heartbeat is
-`UNKNOWN` while documented QA evidence is otherwise complete.
+evidence is missing, stale, scope-mismatched, `blocked`, `in_progress`, or still
+`UNKNOWN`; the only allowed fallback is a QA lane whose private coordination
+claim/heartbeat is `UNKNOWN` while documented QA evidence is otherwise complete.
 Record the selected `merge_authority` value in the handoff and use the canonical
 split final states from `.agents/workflows/pr-processing.md`.
 For release-affecting, workflow/build/tooling, generated-output, broad runtime,
