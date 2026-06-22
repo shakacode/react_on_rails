@@ -118,7 +118,10 @@ Then:
 
 1. Build both variants in production mode on the same data and configuration.
 2. Drive both with the **same throttled Lighthouse config** (Slow 4G + 4x CPU).
-3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six paired samples is only a weak smoke-test floor: with the usual two-sided exact Wilcoxon signed-rank test, even near-unanimous movement at n=6 may not reach p < 0.05.
+3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six paired
+   samples is only a weak smoke-test floor: with the two-sided exact Wilcoxon signed-rank test, you
+   need unanimous agreement across all six pairs to reach p < 0.05 — one dissenting sample pushes
+   you above it.
 4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as strong directional evidence of a real shift when the paired samples consistently move in the same direction.
 
 We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.

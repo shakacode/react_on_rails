@@ -13533,7 +13533,10 @@ Then:
 
 1. Build both variants in production mode on the same data and configuration.
 2. Drive both with the **same throttled Lighthouse config** (Slow 4G + 4x CPU).
-3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six paired samples is only a weak smoke-test floor: with the usual two-sided exact Wilcoxon signed-rank test, even near-unanimous movement at n=6 may not reach p < 0.05.
+3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six paired
+   samples is only a weak smoke-test floor: with the two-sided exact Wilcoxon signed-rank test, you
+   need unanimous agreement across all six pairs to reach p < 0.05 — one dissenting sample pushes
+   you above it.
 4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as strong directional evidence of a real shift when the paired samples consistently move in the same direction.
 
 We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
@@ -27867,23 +27870,23 @@ Earlier versions re-broadcast shared vendor and common CSS _per client reference
 - [react_on_rails_rsc#110](https://github.com/shakacode/react_on_rails_rsc/pull/110)
 - [react_on_rails_rsc#113](https://github.com/shakacode/react_on_rails_rsc/pull/113)
 
-If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, upgrade to a
-coordinated React 19.2-compatible release set that includes a stable `react-on-rails-rsc` 19.2.x
-version with the fix. Key constraints:
+If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, use a coordinated
+React 19.2-compatible release set once stable Pro metadata is available. Key constraints:
 
-- Use a stable coordinated 19.2.x-or-newer set that satisfies the Pro peer metadata. Treat
-  `react-on-rails-rsc` 19.2.0-rc.3 as the upstream fix landing point, not as a general Pro install
-  target; prereleases are not accepted by the current stable Pro peer metadata.
+- The fix landed in `react-on-rails-rsc` 19.2.0-rc.3. A stable, coordinated Pro release
+  incorporating 19.2.x is pending; watch the
+  [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases)
+  and the Pro release notes for the version set that satisfies the Pro peer metadata.
+  Do not install the rc prerelease in production — it is not accepted by the current stable Pro
+  peer metadata.
 - **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
   React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
   can fail at startup.
 - **Do not** use the default React 19.0.x generator pin from
   [Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md)
   for this duplicate-CSS fix; that guide remains the baseline 19.0.x RSC setup path.
-- Use the
-  [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases) or
-  maintainer-provided 19.2 compatibility guidance for the exact React, React DOM, React on Rails Pro,
-  and `react-on-rails-rsc` versions.
+- Use maintainer-provided 19.2 compatibility guidance for the exact React, React DOM, React on Rails
+  Pro, and `react-on-rails-rsc` versions.
 
 On a supported, coordinated version set this is resolved — the shared CSS is emitted once.
 

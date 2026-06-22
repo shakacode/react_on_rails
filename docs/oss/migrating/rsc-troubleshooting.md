@@ -354,23 +354,23 @@ Earlier versions re-broadcast shared vendor and common CSS _per client reference
 - [react_on_rails_rsc#110](https://github.com/shakacode/react_on_rails_rsc/pull/110)
 - [react_on_rails_rsc#113](https://github.com/shakacode/react_on_rails_rsc/pull/113)
 
-If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, upgrade to a
-coordinated React 19.2-compatible release set that includes a stable `react-on-rails-rsc` 19.2.x
-version with the fix. Key constraints:
+If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, use a coordinated
+React 19.2-compatible release set once stable Pro metadata is available. Key constraints:
 
-- Use a stable coordinated 19.2.x-or-newer set that satisfies the Pro peer metadata. Treat
-  `react-on-rails-rsc` 19.2.0-rc.3 as the upstream fix landing point, not as a general Pro install
-  target; prereleases are not accepted by the current stable Pro peer metadata.
+- The fix landed in `react-on-rails-rsc` 19.2.0-rc.3. A stable, coordinated Pro release
+  incorporating 19.2.x is pending; watch the
+  [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases)
+  and the Pro release notes for the version set that satisfies the Pro peer metadata.
+  Do not install the rc prerelease in production — it is not accepted by the current stable Pro
+  peer metadata.
 - **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
   React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
   can fail at startup.
 - **Do not** use the default React 19.0.x generator pin from
   [Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md)
   for this duplicate-CSS fix; that guide remains the baseline 19.0.x RSC setup path.
-- Use the
-  [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases) or
-  maintainer-provided 19.2 compatibility guidance for the exact React, React DOM, React on Rails Pro,
-  and `react-on-rails-rsc` versions.
+- Use maintainer-provided 19.2 compatibility guidance for the exact React, React DOM, React on Rails
+  Pro, and `react-on-rails-rsc` versions.
 
 On a supported, coordinated version set this is resolved — the shared CSS is emitted once.
 
