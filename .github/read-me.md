@@ -185,7 +185,8 @@ Hosted workflows use the shared `.github/actions/hosted-ci-selectors` action and
 job-level conditions:
 
 - Ordinary PR updates run the required gate only unless `ready-for-hosted-ci`,
-  `force-full-hosted-ci`, or a release-target base branch allows hosted jobs.
+  `force-full-hosted-ci`, a release-target base branch, or a release-branch push
+  allows hosted jobs.
 - Generator-sensitive PRs are stricter: if change detection sets
   `run_generators=true`, `ci-required / required-pr-gate` fails on ordinary PRs
   until hosted CI is requested.
@@ -193,12 +194,13 @@ job-level conditions:
   selects applicable suites.
 - `force-full-hosted-ci` or `workflow_dispatch` with `force_full_hosted: true`
   bypasses optimized selection and marks every suite as applicable.
-- Pushes to `main`, merge queue, and release-target PRs may use broad
-  version/dependency matrices, but still respect detector outputs unless
-  force-full hosted CI is active.
+- Pushes to `main`, pushes to release branches, merge queue, and release-target
+  PRs may use broad version/dependency matrices, but still respect detector
+  outputs unless force-full hosted CI is active.
 
-Release-target base branches are centralized in the selector action:
-`release/*`, `releases/*`, and `release-*`.
+Release-target names are centralized in the selector action: `release/*`,
+`releases/*`, and `release-*` for PR base branches. Release-train push events
+use `refs/heads/release/*`.
 
 ## Hosted Workflow Maintenance Checklist
 
@@ -210,8 +212,8 @@ dispatcher, and docs together:
 2. Include `pull_request` events for normal PR updates and label changes:
    `opened`, `synchronize`, `reopened`, `ready_for_review`, `labeled`, and
    `unlabeled`.
-3. Include `push` to `main`, `merge_group`, and `workflow_dispatch` when the
-   workflow is part of merge or release confidence.
+3. Include `push` to `main` and release branches, `merge_group`, and
+   `workflow_dispatch` when the workflow is part of merge or release confidence.
 4. Avoid workflow-level `paths` or `paths-ignore` when branch protection or
    hosted CI policy depends on the workflow starting. Use job-level conditions
    after checkout and change detection.

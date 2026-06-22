@@ -510,7 +510,7 @@ React on Rails uses a small required PR gate plus opt-in hosted validation. Cont
 ### CI Behavior
 
 - **Required PR gate**: Always starts for PRs and keeps the merge signal cheap.
-- **Optimized hosted CI**: Runs path-selected hosted suites after `+ci-run-hosted`, `ready-for-hosted-ci`, release-target PRs, merge queue, `main`, or manual dispatch.
+- **Optimized hosted CI**: Runs path-selected hosted suites after `+ci-run-hosted`, `ready-for-hosted-ci`, release-target PRs, merge queue, `main`, `release/*` pushes, or manual dispatch.
 - **Force-full hosted CI**: Runs every hosted suite only after `+ci-force-full`, `force-full-hosted-ci`, or a manual `force_full_hosted: true` dispatch.
 - **Docs-only changes**: Expensive hosted suites skip when only documentation/metadata paths change (`*.md`, `*.mdx`, `*.markdown`, `*.rst`, `*.txt`, `docs/`, `internal/`, `.github/ISSUE_TEMPLATE/`, or `.lychee.toml`)
 

@@ -9,7 +9,8 @@ CI should give fast feedback during review without weakening merge safety:
 1. Local machines catch routine failures before a push.
 2. Every PR update gets a stable required check: `ci-required / required-pr-gate`.
 3. Hosted GitHub Actions run only after local validation, on merge queue, on
-   `main`, on release-target PRs, or by explicit manual dispatch.
+   `main`, on `release/*` pushes, on release-target PRs, or by explicit manual
+   dispatch.
 4. Optimized hosted CI stays path-selected by `script/ci-changes-detector`.
 5. Force-full hosted CI is a separate maintainer decision that bypasses
    optimized suite selection.
@@ -37,8 +38,8 @@ Generator-sensitive changes are the standing exception: when
 `script/ci-changes-detector` sets `run_generators=true`, the required gate
 blocks ordinary pull requests until `+ci-run-hosted`, `bin/request-hosted-ci`,
 or a maintainer/user-token `ready-for-hosted-ci` label requests hosted CI.
-Merge queue, push-to-main, and release-target runs already satisfy hosted
-eligibility.
+Merge queue, push-to-main, `release/*` pushes, and release-target PRs already
+satisfy hosted eligibility.
 
 ## Hosted CI Modes
 
@@ -47,6 +48,7 @@ Hosted workflows start cheap detector jobs, then use job-level conditions.
 Optimized hosted CI runs when one of these is true:
 
 - the event is a push to `main`
+- the event is a push to `release/*`
 - the event is `merge_group`
 - the workflow is manually dispatched
 - the PR targets a release branch (`release/*`, `releases/*`, or `release-*`)

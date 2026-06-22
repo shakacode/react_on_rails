@@ -996,27 +996,43 @@ CI_PASSING_CONCLUSIONS = %w[success skipped neutral].freeze
 # stopped. A real chain of docs/changelog commits is far shorter than this.
 MAIN_CI_NONRUNTIME_WALK_LIMIT = 25
 
+def ci_branch_fetch_refspec(ci_branch)
+  return ci_branch unless ci_branch.start_with?("release/")
+
+  "+refs/heads/#{ci_branch}:refs/remotes/origin/#{ci_branch}"
+end
+
+def handle_release_branch_identity_violation!(message:, dry_run:)
+  if dry_run
+    puts "⚠️ DRY RUN: #{message.sub(/\A❌\s*/, '')}"
+    return
+  end
+
+  abort message
+end
+
 # rubocop:disable Metrics/MethodLength
 # Abort in strict mode when a release branch local HEAD differs from the remote.
-# In override/dry-run mode, warn and continue so the releaser still sees remote CI state.
-def ensure_release_branch_head_matches_remote!(monorepo_root:, ci_branch:, remote_sha:, allow_override:, dry_run:)
+# In dry-run mode, warn and continue so the releaser still sees remote CI state.
+# The normal CI override must not bypass this: otherwise the release could tag a
+# local commit whose remote release-branch CI belongs to a different SHA.
+def ensure_release_branch_head_matches_remote!(monorepo_root:, ci_branch:, remote_sha:, dry_run:)
   return unless ci_branch.start_with?("release/")
 
   head_output, head_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
   unless head_status.success?
-    handle_main_ci_status_violation!(
+    handle_release_branch_identity_violation!(
       message: "❌ Unable to resolve local HEAD before release CI status check.\n\n#{head_output}",
-      allow_override:,
       dry_run:
     )
-    # Strict mode aborts above; override/dry-run mode should still evaluate remote CI after warning.
+    # Strict mode aborts above; dry-run mode should still evaluate remote CI after warning.
     return
   end
 
   local_sha = head_output.strip
   return if local_sha == remote_sha
 
-  handle_main_ci_status_violation!(
+  handle_release_branch_identity_violation!(
     message: <<~MESSAGE,
       ❌ Local HEAD does not match origin/#{ci_branch} before release CI status check.
 
@@ -1025,42 +1041,44 @@ def ensure_release_branch_head_matches_remote!(monorepo_root:, ci_branch:, remot
 
       Push, reset, or rebase the release branch so the commit being tagged is the same commit whose CI is being validated.
     MESSAGE
-    allow_override:,
     dry_run:
   )
-  # Strict mode aborts above; override/dry-run mode should still evaluate remote CI after warning.
+  # Strict mode aborts above; dry-run mode should still evaluate remote CI after warning.
 end
 
 def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
+  release_branch = ci_branch.start_with?("release/")
+  fetch_refspec = ci_branch_fetch_refspec(ci_branch)
   fetch_output, fetch_status = Open3.capture2e(
-    "git", "-C", monorepo_root, "fetch", "origin", ci_branch, "--quiet"
+    "git", "-C", monorepo_root, "fetch", "origin", fetch_refspec, "--quiet"
   )
   unless fetch_status.success?
-    handle_main_ci_status_violation!(
-      message: "❌ Unable to fetch origin/#{ci_branch} for CI status check.\n\n#{fetch_output}",
-      allow_override:,
-      dry_run:
-    )
+    message = "❌ Unable to fetch origin/#{ci_branch} for CI status check.\n\n#{fetch_output}"
+    if release_branch
+      handle_release_branch_identity_violation!(message:, dry_run:)
+    else
+      handle_main_ci_status_violation!(message:, allow_override:, dry_run:)
+    end
     return nil
   end
 
   sha_output, sha_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "origin/#{ci_branch}")
   unless sha_status.success?
-    handle_main_ci_status_violation!(
-      message: "❌ Unable to resolve origin/#{ci_branch} HEAD.\n\n#{sha_output}",
-      allow_override:,
-      dry_run:
-    )
+    message = "❌ Unable to resolve origin/#{ci_branch} HEAD.\n\n#{sha_output}"
+    if release_branch
+      handle_release_branch_identity_violation!(message:, dry_run:)
+    else
+      handle_main_ci_status_violation!(message:, allow_override:, dry_run:)
+    end
     return nil
   end
   remote_sha = sha_output.strip
-  # Strict mode aborts on mismatch. Override/dry-run mode warns and continues so
+  # Strict mode aborts on mismatch. Dry-run mode warns and continues so
   # the releaser still sees the remote CI state instead of silently skipping it.
   ensure_release_branch_head_matches_remote!(
     monorepo_root:,
     ci_branch:,
     remote_sha:,
-    allow_override:,
     dry_run:
   )
 
@@ -1767,9 +1785,18 @@ end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_override:, fetch_tags: true,
-                                     allow_existing_target_tag: false)
+                                     allow_existing_target_tag: false,
+                                     release_branch_final_promotion: false)
   tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags:)
-  latest_tagged_version = tagged_versions.max_by { |version| Gem::Version.new(version) }
+  tagged_version_order_candidates = if release_branch_final_promotion
+                                      tagged_versions.select do |version|
+                                        !release_prerelease_version?(version) ||
+                                          same_release_base?(version, target_gem_version)
+                                      end
+                                    else
+                                      tagged_versions
+                                    end
+  latest_tagged_version = tagged_version_order_candidates.max_by { |version| Gem::Version.new(version) }
   target_version = Gem::Version.new(target_gem_version)
 
   if latest_tagged_version && target_version <= Gem::Version.new(latest_tagged_version)
@@ -1801,8 +1828,12 @@ def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_
     end
   end
 
-  latest_stable_version = tagged_versions.reject { |version| release_prerelease_version?(version) }
-                                         .max_by { |version| Gem::Version.new(version) }
+  stable_versions = tagged_versions.reject { |version| release_prerelease_version?(version) }
+  if release_branch_final_promotion
+    target_version = Gem::Version.new(target_gem_version)
+    stable_versions = stable_versions.select { |version| Gem::Version.new(version) < target_version }
+  end
+  latest_stable_version = stable_versions.max_by { |version| Gem::Version.new(version) }
   return unless latest_stable_version
 
   actual_bump_type = version_bump_type(previous_stable_gem_version: latest_stable_version,
@@ -2471,12 +2502,14 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       ci_branch:
     )
 
+    release_branch_final_promotion = !is_prerelease && current_branch == "release/#{resolved_target_gem_version}"
     validate_release_version_policy!(
       monorepo_root: release_root,
       target_gem_version: resolved_target_gem_version,
       allow_override: allow_version_policy_override,
       fetch_tags: true,
-      allow_existing_target_tag: release_branch_promotion.fetch(:stable_tag_retry)
+      allow_existing_target_tag: release_branch_promotion.fetch(:stable_tag_retry),
+      release_branch_final_promotion:
     )
 
     confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root) unless is_dry_run

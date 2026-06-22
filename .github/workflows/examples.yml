@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'release/**'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group:
@@ -24,6 +25,8 @@ on:
 
 jobs:
   detect-changes:
+    # Branch deletion push events have no checkoutable release ref.
+    if: github.event_name != 'push' || github.event.deleted != true
     permissions:
       contents: read
       actions: read

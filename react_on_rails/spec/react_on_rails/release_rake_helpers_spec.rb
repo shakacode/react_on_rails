@@ -888,6 +888,72 @@ RSpec.describe "release.rake helper methods" do
       end.to output(/Existing target tag 16\.4\.0/).to_stdout
     end
 
+    it "keeps ordinary stable releases above the globally latest tag" do
+      allow(self).to receive(:tagged_release_gem_versions)
+        .with("/tmp/repo", fetch_tags: false)
+        .and_return(["16.9.9", "17.1.0.beta.1"])
+
+      expect do
+        validate_release_version_policy!(
+          monorepo_root: "/tmp/repo",
+          target_gem_version: "17.0.0",
+          allow_override: false,
+          fetch_tags: false
+        )
+      end.to raise_error(SystemExit, /latest tagged version 17.1.0.beta.1/)
+    end
+
+    it "allows release branch final promotion when another release line has newer prerelease tags" do
+      allow(self).to receive(:tagged_release_gem_versions)
+        .with("/tmp/repo", fetch_tags: false)
+        .and_return(["16.9.9", "17.0.0.rc.3", "17.1.0.beta.1"])
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return("#### Breaking Changes\n- Major release\n")
+
+      expect do
+        validate_release_version_policy!(
+          monorepo_root: "/tmp/repo",
+          target_gem_version: "17.0.0",
+          allow_override: false,
+          fetch_tags: false,
+          release_branch_final_promotion: true
+        )
+      end.not_to raise_error
+    end
+
+    it "rejects release branch final promotion when a newer stable tag already exists" do
+      allow(self).to receive(:tagged_release_gem_versions)
+        .with("/tmp/repo", fetch_tags: false)
+        .and_return(["16.9.9", "17.0.0.rc.3", "17.1.0"])
+
+      expect do
+        validate_release_version_policy!(
+          monorepo_root: "/tmp/repo",
+          target_gem_version: "17.0.0",
+          allow_override: false,
+          fetch_tags: false,
+          release_branch_final_promotion: true
+        )
+      end.to raise_error(SystemExit, /latest tagged version 17.1.0/)
+    end
+
+    it "rejects release branch final promotion when the final tag already exists" do
+      allow(self).to receive(:tagged_release_gem_versions)
+        .with("/tmp/repo", fetch_tags: false)
+        .and_return(["16.9.9", "17.0.0.rc.3", "17.0.0", "17.1.0.beta.1"])
+
+      expect do
+        validate_release_version_policy!(
+          monorepo_root: "/tmp/repo",
+          target_gem_version: "17.0.0",
+          allow_override: false,
+          fetch_tags: false,
+          release_branch_final_promotion: true
+        )
+      end.to raise_error(SystemExit, /latest tagged version 17.0.0/)
+    end
+
     it "raises when the changelog-implied bump does not match the requested stable release version" do
       allow(self).to receive(:tagged_release_gem_versions).with("/tmp/repo", fetch_tags: false).and_return(["16.3.0"])
       allow(self).to receive(:extract_changelog_section)
@@ -2005,9 +2071,13 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:main_ci_evaluation_sha) { |**kwargs| kwargs[:head_sha] }
     end
 
+    def release_branch_fetch_refspec
+      "+refs/heads/release/17.0.0:refs/remotes/origin/release/17.0.0"
+    end
+
     def stub_release_branch_refs(remote_sha:, local_sha:)
       allow(Open3).to receive(:capture2e)
-        .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
+        .with("git", "-C", monorepo_root, "fetch", "origin", release_branch_fetch_refspec, "--quiet")
         .and_return(["", success_status])
       allow(Open3).to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "origin/release/17.0.0")
@@ -2161,7 +2231,7 @@ RSpec.describe "release.rake helper methods" do
 
     it "fetches and evaluates a release branch tip when ci_branch is overridden" do
       allow(Open3).to receive(:capture2e)
-        .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
+        .with("git", "-C", monorepo_root, "fetch", "origin", release_branch_fetch_refspec, "--quiet")
         .and_return(["", success_status])
       allow(Open3).to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "origin/release/17.0.0")
@@ -2183,7 +2253,7 @@ RSpec.describe "release.rake helper methods" do
 
     it "aborts when the local release branch is ahead of the fetched remote branch" do
       allow(Open3).to receive(:capture2e)
-        .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
+        .with("git", "-C", monorepo_root, "fetch", "origin", release_branch_fetch_refspec, "--quiet")
         .and_return(["", success_status])
       allow(Open3).to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "origin/release/17.0.0")
@@ -2199,7 +2269,7 @@ RSpec.describe "release.rake helper methods" do
 
     it "aborts when local HEAD cannot be resolved for a release branch" do
       allow(Open3).to receive(:capture2e)
-        .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
+        .with("git", "-C", monorepo_root, "fetch", "origin", release_branch_fetch_refspec, "--quiet")
         .and_return(["", success_status])
       allow(Open3).to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "origin/release/17.0.0")
@@ -2213,19 +2283,12 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /Unable to resolve local HEAD before release CI status check/)
     end
 
-    it "continues querying CI after a release branch HEAD mismatch under override" do
+    it "does not let the CI override bypass release branch HEAD mismatches" do
       stub_release_branch_refs(remote_sha: "remote123", local_sha: "local456")
-      stub_check_runs_for_sha(
-        sha: "remote123",
-        check_runs: [{ "name" => "Lint", "status" => "completed", "conclusion" => "success" }]
-      )
 
-      result = nil
       expect do
-        result = fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0", allow_override: true)
-      end.to output(%r{CI STATUS OVERRIDE enabled.*Local HEAD does not match origin/release/17.0.0}m).to_stdout
-      expect(result[:sha]).to eq("remote123")
-      expect(result[:check_runs].first["name"]).to eq("Lint")
+        fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0", allow_override: true)
+      end.to raise_error(SystemExit, %r{Local HEAD does not match origin/release/17.0.0})
     end
 
     it "continues querying CI after a release branch HEAD mismatch in dry-run mode" do
@@ -2245,12 +2308,35 @@ RSpec.describe "release.rake helper methods" do
 
     it "aborts referencing the release branch when its fetch fails" do
       allow(Open3).to receive(:capture2e)
-        .with("git", "-C", monorepo_root, "fetch", "origin", "release/17.0.0", "--quiet")
+        .with("git", "-C", monorepo_root, "fetch", "origin", release_branch_fetch_refspec, "--quiet")
         .and_return(["fetch failed: network down", failure_status])
 
       expect do
         fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0")
       end.to raise_error(SystemExit, %r{Unable to fetch origin/release/17.0.0})
+    end
+
+    it "does not let the CI override bypass release branch fetch failures" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", release_branch_fetch_refspec, "--quiet")
+        .and_return(["fetch failed: network down", failure_status])
+
+      expect do
+        fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0", allow_override: true)
+      end.to raise_error(SystemExit, %r{Unable to fetch origin/release/17.0.0})
+    end
+
+    it "does not let the CI override bypass release branch remote HEAD resolution failures" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", release_branch_fetch_refspec, "--quiet")
+        .and_return(["", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "origin/release/17.0.0")
+        .and_return(["fatal: ambiguous argument origin/release/17.0.0\n", failure_status])
+
+      expect do
+        fetch_main_ci_checks(monorepo_root:, ci_branch: "release/17.0.0", allow_override: true)
+      end.to raise_error(SystemExit, %r{Unable to resolve origin/release/17.0.0 HEAD})
     end
   end
 
@@ -2965,6 +3051,97 @@ RSpec.describe "release.rake helper methods" do
           target_gem_version: "17.0.0"
         )
       end.to output(/metadata-only commit\(s\) after v17\.0\.0\.rc\.3/).to_stdout
+    end
+
+    it "allows an already-bumped final release branch retry after metadata-only RC follow-ups" do
+      stub_remote_rc_tag_fetch
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0^{}")
+        .and_return(["", failure_status])
+      allow(self)
+        .to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(false)
+      allow(self)
+        .to receive(:latest_remote_rc_tag_for_version)
+        .with(monorepo_root:, target_gem_version: "17.0.0")
+        .and_return("v17.0.0.rc.3")
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+        .and_return(["tagsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["headsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-list", "--reverse", "tagsha..headsha")
+        .and_return(["changelogsha\n", success_status])
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "changelogsha")
+        .and_return(true)
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0",
+          target_gem_version: "17.0.0"
+        )
+      end.to output(/metadata-only commit\(s\) after v17\.0\.0\.rc\.3/).to_stdout
+    end
+
+    it "aborts an already-bumped final release branch retry when HEAD has runtime commits after the RC" do
+      stub_remote_rc_tag_fetch
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0^{}")
+        .and_return(["", failure_status])
+      allow(self)
+        .to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(false)
+      allow(self)
+        .to receive(:latest_remote_rc_tag_for_version)
+        .with(monorepo_root:, target_gem_version: "17.0.0")
+        .and_return("v17.0.0.rc.3")
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+        .and_return(["tagsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "HEAD")
+        .and_return(["headsha\n", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "merge-base", "--is-ancestor", "tagsha", "headsha")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-list", "--reverse", "tagsha..headsha")
+        .and_return(["runtimesha\n", success_status])
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "runtimesha")
+        .and_return(false)
+      allow(self).to receive(:release_finalization_metadata_commit?)
+        .with(monorepo_root:, sha: "runtimesha")
+        .and_return(false)
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /Runtime-bearing commits require a new RC/)
     end
 
     it "allows an already-bumped final release branch retry when the stable tag points at HEAD" do

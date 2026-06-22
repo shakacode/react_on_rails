@@ -9,8 +9,8 @@ concurrency:
 
 on:
   push:
-    branches: [main]
-    # Always trigger on main; non-runtime detection handles skipping heavy jobs
+    branches: [main, 'release/**']
+    # Always trigger on main/release branches; non-runtime detection handles skipping heavy jobs
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group:
@@ -24,6 +24,8 @@ on:
 
 jobs:
   detect-changes:
+    # Branch deletion push events have no checkoutable release ref.
+    if: github.event_name != 'push' || github.event.deleted != true
     permissions:
       contents: read
       actions: read

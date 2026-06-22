@@ -193,7 +193,9 @@ bundle exec rake "release[17.0.0]"   # version.rb rc.3 -> 17.0.0, tags v17.0.0, 
 > cannot promote `17.0.0` from `release/16.7.1`. There is no re-cut from `main` and no manual tag dance —
 > promote the RC in place. The CI gate validates the `release/X.Y.Z` tip (see the step-1 note), and the
 > task still pushes the version-bump commit, runs the ShakaPerf release gate on the branch ref, tags
-> `vX.Y.Z`, and publishes, exactly as it does from `main`.
+> `vX.Y.Z`, and publishes, exactly as it does from `main`. Release-branch final promotion may ignore
+> newer prerelease tags from another line (for example `17.1.0.beta.1` while promoting `17.0.0`), but a
+> newer stable tag still blocks promotion so npm `latest` cannot move backward.
 
 The invariant that makes this safe (verified by the dry-run): the **final's runtime code tree equals
 the last good RC's** — only version/changelog **metadata** differs, never runtime source. Under unified
