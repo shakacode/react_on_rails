@@ -54,12 +54,12 @@ state instead of an indefinite wait:
 ```
 
 Use broad `agent-coord status` only for audit-mode triage sweeps and post-merge
-batch discovery that state broad status is audit/discovery-only. If the command
-is missing, auth fails, the private repo cannot be read, a bounded probe times
-out, or targeted status exits non-zero (exit 2 means degraded/UNKNOWN), report
-private state as `UNKNOWN` / degraded. Use structured public claim comments as
-an advisory fallback only where dependency rules allow it. A successful status
-check followed by a refused `agent-coord claim` with exit code 3 /
+batch discovery; treat those reads as advisory/discovery-only, not authoritative
+lane state. If the command is missing, auth fails, the private repo cannot be
+read, a bounded probe times out, or targeted status exits non-zero (exit 2 means
+degraded/UNKNOWN), report private state as `UNKNOWN` / degraded. Use structured
+public claim comments as an advisory fallback only where dependency rules allow
+it. A successful status check followed by a refused `agent-coord claim` with exit code 3 /
 `CLAIM_REFUSED` is not unavailability; it is a hard stop. Targeted
 `agent-coord status` is a preflight view; `agent-coord claim` is the backend's
 compare-and-swap gate for concurrent claim races.

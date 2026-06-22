@@ -182,9 +182,11 @@ see
 `agent-coord doctor --json` is the lightweight backend health check. Use
 `agent-coord doctor --deep --json` only for a full backend JSON audit: it parses
 every claim, heartbeat, and batch JSON state record, so it is slower and broader
-than the default health probe. If the active shell may have cached an old
-install, run `hash -r 2>/dev/null || true` in a POSIX-style shell such as bash
-or zsh, or that shell's rehash equivalent, then confirm via
+than the default health probe. Use `doctor --deep --json` only for full backend
+audit sweeps that intentionally parse all coordination records, not routine
+preflight checks. If the active shell may have cached an old install, run
+`hash -r 2>/dev/null || true` in a POSIX-style shell such as bash or zsh, or
+that shell's rehash equivalent, then confirm via
 `command -v agent-coord || which agent-coord`.
 
 Before dependency-sensitive actions, use targeted private coordination reads:
