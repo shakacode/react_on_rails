@@ -40,7 +40,7 @@ should use this PR branch or `main` for the current workflow docs.
    bin/agent-coord bootstrap
    export PATH="$HOME/.local/bin:$PATH"
    hash -r 2>/dev/null || true
-   which agent-coord
+   command -v agent-coord || which agent-coord
    agent-coord doctor --json
    agent-coord config show --json
    agent-coord status --batch-id <batch-id> --json
@@ -52,10 +52,11 @@ should use this PR branch or `main` for the current workflow docs.
    also installs `agent_coord` as an underscore alias for launchers or prompts
    that use that spelling.
 
-4. If `doctor --json` or targeted status exits non-zero, exits 2, or times out,
-   report private state as `UNKNOWN` and use the structured public claim comment
-   fallback where dependency rules allow it. Do not start a dependency-sensitive
-   lane when the lane declares `depends_on` and private status cannot be checked.
+4. If `doctor --json` fails, or targeted status exits non-zero (exit 2 means
+   degraded/UNKNOWN) or times out, report private state as `UNKNOWN` and use the
+   structured public claim comment fallback where dependency rules allow it. Do
+   not start a dependency-sensitive lane when the lane declares `depends_on` and
+   private status cannot be checked.
 5. Before dependent lanes start, the coordinator creates or updates
    `batches/<batch-id>.json` in the private backend so targeted batch status can
    render `blocked_on` refs.
@@ -93,8 +94,9 @@ should use this PR branch or `main` for the current workflow docs.
    `blocked_on`, set the worker heartbeat to `--status blocked`, report the
    blocked refs, and move to independent work.
 9. Final handoff from the second machine must include the agent id, batch id,
-   branch/PR URL, validation run, current targeted `agent-coord status` summary,
-   blockers, and `UNKNOWN` for anything not verified live.
+   branch/PR URL, validation run, current
+   `agent-coord status --batch-id <batch-id> --json` summary, blockers, and
+   `UNKNOWN` for anything not verified live.
 
 ## Baseline Topology
 
@@ -175,7 +177,9 @@ Use this lifecycle for every lane:
 
 1. **Kickoff**: the coordinator runs targeted status when a batch id or target
    is known, confirms the target repo, and chooses non-overlapping lane owners.
-   Broad `agent-coord status` is audit-only.
+   If no batch id or target is known yet, run `agent-coord doctor --json` to
+   confirm backend health, then assign targets or a batch id before any status
+   read. Broad `agent-coord status` is audit-only.
 2. **Claim**: the lane owner takes an `agent-coord claim` for the repo and
    issue/PR target before creating a branch, worktree, or conductor session.
 3. **Heartbeat**: the owner sends `agent-coord heartbeat` at every phase
