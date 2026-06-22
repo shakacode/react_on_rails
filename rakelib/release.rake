@@ -451,6 +451,20 @@ def release_ci_branch(current_branch)
   current_branch.to_s.start_with?("release/") ? current_branch : "main"
 end
 
+def npm_publish_base_args(actual_gem_version:, actual_npm_version:, current_branch:)
+  npm_base_args = []
+  npm_dist_tag = npm_dist_tag_for_version(actual_npm_version)
+  npm_base_args += ["--tag", npm_dist_tag] unless npm_dist_tag == "latest"
+
+  if release_prerelease_version?(actual_gem_version)
+    npm_base_args << "--no-git-checks"
+  elsif current_branch.to_s.start_with?("release/")
+    npm_base_args += ["--publish-branch", current_branch]
+  end
+
+  npm_base_args
+end
+
 def npm_dist_tag_for_version(npm_version)
   prerelease_part = npm_version.to_s.split("-", 2)[1]
   return "latest" if prerelease_part.nil? || prerelease_part.empty?
@@ -2035,7 +2049,6 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       puts "Publishing PUBLIC packages to npmjs.org..."
       puts "=" * 80
 
-      npm_base_args = []
       current_npm_otp = npm_otp
 
       if current_npm_otp
@@ -2047,11 +2060,16 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
 
       npm_dist_tag = npm_dist_tag_for_version(actual_npm_version)
       puts "NPM target: #{actual_npm_version} (dist-tag: #{npm_dist_tag})"
-      npm_base_args += ["--tag", npm_dist_tag] unless npm_dist_tag == "latest"
+      npm_base_args = npm_publish_base_args(
+        actual_gem_version:,
+        actual_npm_version:,
+        current_branch:
+      )
 
       if release_prerelease_version?(actual_gem_version)
-        npm_base_args << "--no-git-checks"
         puts "Pre-release version detected - skipping git branch checks for NPM publish"
+      elsif current_branch.start_with?("release/")
+        puts "Release branch detected - allowing NPM publish from #{current_branch}"
       end
 
       current_npm_otp = publish_npm_with_retry(

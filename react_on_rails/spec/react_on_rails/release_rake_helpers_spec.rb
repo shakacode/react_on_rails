@@ -703,6 +703,38 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#npm_publish_base_args" do
+    it "skips git checks for prereleases" do
+      expect(
+        npm_publish_base_args(
+          actual_gem_version: "17.0.0.rc.1",
+          actual_npm_version: "17.0.0-rc.1",
+          current_branch: "release/17.0.0"
+        )
+      ).to eq(["--tag", "rc", "--no-git-checks"])
+    end
+
+    it "allows stable npm publish from a release branch" do
+      expect(
+        npm_publish_base_args(
+          actual_gem_version: "17.0.0",
+          actual_npm_version: "17.0.0",
+          current_branch: "release/17.0.0"
+        )
+      ).to eq(["--publish-branch", "release/17.0.0"])
+    end
+
+    it "uses default npm publish checks for stable main releases" do
+      expect(
+        npm_publish_base_args(
+          actual_gem_version: "17.0.0",
+          actual_npm_version: "17.0.0",
+          current_branch: "main"
+        )
+      ).to eq([])
+    end
+  end
+
   describe "#with_publishable_package_json" do
     it "preserves the original publish failure when package.json restore also fails" do
       Dir.mktmpdir do |dir|

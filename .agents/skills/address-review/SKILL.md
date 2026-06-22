@@ -133,8 +133,8 @@ esac
   edits expand the frozen diff. Require the `rc`/`final` evidence before signaling merge-ready:
   adversarial-pr-review and **zero open MUST-FIX**; for `final`, also no new features and human sign-off
   on the promotion. State the resolved phase in the triage summary so the stricter posture is visible.
-- If `gh pr view` fails, report that the phase could not be resolved and default to `beta` only when the
-  base is known to be `main`; otherwise ask the user to confirm the phase before applying nit-autonomy.
+- If `gh pr view` fails or returns an empty base, stop and ask the user to confirm the base branch /
+  phase before continuing; do not assume `beta`.
 
 ## Step 3: Determine Scan Window and Summary Cutoff
 

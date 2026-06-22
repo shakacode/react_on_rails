@@ -119,6 +119,7 @@ Execution flow when terminal access is available:
    - `RELEASE_PHASE=beta` (base `main` or a non-`release/*` branch): the autonomous low-risk optional-nit rule for `f` / `f+i` applies as written below.
    - For a `release/*` base, set `RELEASE_PHASE` from `agent-coord` status or the applicable release tracker before running this snippet; if that signal is unavailable, stop and ask for confirmation.
    - `RELEASE_PHASE=rc` or `final` (base `release/*`): **suppress the autonomous optional-nit rule** — `OPTIONAL` items require explicit selection (`f+o`, `o <nums>`, `all optional`) because edits expand the frozen diff — and require adversarial-pr-review + zero open MUST-FIX before merge-ready (for `final`, also no new features and human sign-off on the promotion). State the resolved phase in the triage summary.
+   - If `gh pr view` fails or returns an empty base, stop and ask the user to confirm the base branch / phase before continuing; do not assume `beta`.
 
 3. Determine scan window and summary cutoff:
    - For full-PR scans (plain PR number or PR URL with no specific review/comment anchor), default to reviewing only feedback posted after the latest PR summary comment created by this workflow.
