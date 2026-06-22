@@ -23,6 +23,7 @@ not the React protocol; it is **who owns the surrounding framework**.
 This page explains the shared contract first, then the one architectural decision that explains every
 real difference between the two.
 
+> [!NOTE]
 > **Accuracy note.** React on Rails Pro details are verified against this repository. Next.js details
 > are described at the **conceptual** level and reflect the App Router as of **2026**.
 > Next's internals evolve quickly; treat specific Next.js names here as illustrative of an idea, not
@@ -73,7 +74,7 @@ Both systems run the identical five-step flow. The names differ; the shape does 
    whole new page.
 
 <p align="center">
-  <img src="images/rsc-end-to-end-flow.png" alt="Diagram comparing the RSC lifecycle in React on Rails Pro and Next.js." width="840" />
+  <img src="images/rsc-end-to-end-flow.png" alt="Diagram showing the five-step RSC lifecycle, with React on Rails Pro and Next.js function names side by side." width="840" />
 </p>
 
 _The shared end-to-end shape, with React on Rails Pro and Next.js function names side by side. The Flight-payload and inlined-`<script>` boxes are simplified pseudocode, not the literal wire format; the function names are illustrative as of 2026._
