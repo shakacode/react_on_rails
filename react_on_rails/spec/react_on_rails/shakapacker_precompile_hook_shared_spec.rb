@@ -101,6 +101,94 @@ RSpec.describe "Shakapacker precompile hook shared script" do
         expect(Dir).to have_received(:chdir).with(rails_root)
       end
     end
+
+    it "forces a UTF-8 locale for the i18n locale-generation subprocess" do
+      Dir.mktmpdir(nil, "/tmp") do |rails_root|
+        initializer_path = File.join(rails_root, "config", "initializers", "react_on_rails.rb")
+        FileUtils.mkdir_p(File.dirname(initializer_path))
+        File.write(initializer_path, <<~RUBY)
+          # ⚠️ i18n enabled
+          ReactOnRails.configure do |config|
+            config.i18n_dir = Rails.root.join("client", "app", "i18n", "generated")
+          end
+        RUBY
+
+        allow(self).to receive_messages(find_rails_root: rails_root, puts: nil)
+        # Run the chdir block so the subprocess invocation is reached, but stub `system`
+        # so we capture its env hash instead of actually shelling out to `bundle exec rake`.
+        allow(Dir).to receive(:chdir).and_yield
+        captured_env = nil
+        allow(self).to receive(:system) do |env, *_args|
+          captured_env = env
+          true
+        end
+
+        with_default_external(Encoding::US_ASCII) do
+          expect { generate_locales_if_needed }.not_to raise_error
+        end
+
+        # Without a forced UTF-8 locale, the spawned `bundle exec` dies parsing a Gemfile with
+        # non-ASCII bytes ("invalid byte sequence in US-ASCII"), aborting the whole precompile.
+        expect(captured_env).to include("RUBYOPT" => a_string_matching(/-EUTF-8/))
+        expect(captured_env).to include("LANG" => a_string_matching(/UTF-8/i))
+        expect(captured_env).to include("LC_ALL" => a_string_matching(/UTF-8/i))
+        expect(self).to have_received(:system).with(hash_including("RUBYOPT"), "bundle", "exec", "rake",
+                                                    "react_on_rails:locale", exception: true)
+      end
+    end
+
+    it "forces a UTF-8 locale for the pack-generation subprocess" do
+      Dir.mktmpdir(nil, "/tmp") do |rails_root|
+        initializer_path = File.join(rails_root, "config", "initializers", "react_on_rails.rb")
+        FileUtils.mkdir_p(File.dirname(initializer_path))
+        File.write(initializer_path, <<~RUBY)
+          # ⚠️ auto bundling enabled
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+          end
+        RUBY
+
+        allow(self).to receive_messages(find_rails_root: rails_root, puts: nil)
+        allow(Dir).to receive(:chdir).and_yield
+        captured_env = nil
+        allow(self).to receive(:system) do |env, *_args|
+          captured_env = env
+          true
+        end
+
+        with_default_external(Encoding::US_ASCII) do
+          expect { generate_packs_if_needed }.not_to raise_error
+        end
+
+        expect(captured_env).to include("RUBYOPT" => a_string_matching(/-EUTF-8/))
+        expect(self).to have_received(:system).with(hash_including("RUBYOPT"), "bundle", "exec", "rails",
+                                                    "react_on_rails:generate_packs", exception: true)
+      end
+    end
+  end
+
+  describe "#utf8_subprocess_env" do
+    it "defaults LANG/LC_ALL to a UTF-8 locale and appends -EUTF-8 to RUBYOPT when unset" do
+      with_env("LANG" => nil, "LC_ALL" => nil, "RUBYOPT" => nil) do
+        env = utf8_subprocess_env
+        expect(env["LANG"]).to match(/UTF-8/i)
+        expect(env["LC_ALL"]).to match(/UTF-8/i)
+        expect(env["RUBYOPT"]).to eq("-EUTF-8")
+      end
+    end
+
+    it "preserves an existing UTF-8 locale and appends to an existing RUBYOPT" do
+      with_env("LANG" => "en_US.UTF-8", "LC_ALL" => "en_US.UTF-8", "RUBYOPT" => "-W0") do
+        env = utf8_subprocess_env
+        expect(env["LANG"]).to eq("en_US.UTF-8")
+        expect(env["LC_ALL"]).to eq("en_US.UTF-8")
+        expect(env["RUBYOPT"]).to eq("-W0 -EUTF-8")
+      end
+    end
+
+    it "merges and lets caller keys extend the base env" do
+      expect(utf8_subprocess_env("FOO" => "bar")).to include("FOO" => "bar", "RUBYOPT" => a_string_matching(/-EUTF-8/))
+    end
   end
 
   describe "valid_rsc_registration_entry_path?" do
