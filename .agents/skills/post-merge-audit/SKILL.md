@@ -44,9 +44,9 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
-   - run bounded `agent-coord doctor --json`, then bounded broad
-     `agent-coord status` only as an audit/discovery read to list candidate
-     batch/run ids and lanes
+   - run bounded `agent-coord doctor --json`, then broad `agent-coord status`
+     (via `agent-coord-bounded`) only as an audit/discovery read to list
+     candidate batch/run ids and lanes
    - record `worked_issue_scope: UNKNOWN (needs batch confirmation)`
    - ask for confirmation before treating any candidate as the worked-issue
      scope

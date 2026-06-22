@@ -107,8 +107,9 @@ First, produce the exact worked-issue scope and merged-PR range:
 - when no coordinated batch/run is in scope, skip `agent-coord` and record
   `worked_issue_scope: not applicable`
 - when batch work is in scope but the batch id is `UNKNOWN`, run bounded
-  `agent-coord doctor --json`, then bounded broad `agent-coord status` only as
-  audit/discovery to list candidate batch/run ids and lanes. Record
+  `agent-coord doctor --json`, then broad `agent-coord status` (via
+  `agent-coord-bounded`) only as audit/discovery to list candidate batch/run ids
+  and lanes. Record
   `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask me to confirm
   a candidate batch/run id before treating any candidate lane list as the
   worked-issue scope.
