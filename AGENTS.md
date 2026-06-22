@@ -508,13 +508,20 @@ contract unless a maintainer explicitly narrows the run.
   authority. When `auto_merge_when_gates_pass` applies and the gate is met,
   exercising it is the expected close-out — an authorized, gate-satisfied,
   confident merge that is downgraded to a "ready to merge" recommendation is an
-  unfinished task, not a safe default. Before a merge under
+  unfinished task, not a safe default. Before exercising merge authority,
+  complete the confidence note: validations and evidence are recorded, no
+  unresolved MUST-FIX threads remain, and any remaining `UNKNOWN` facts or
+  residual risk do not affect merge safety. Before a merge under
   `auto_merge_when_gates_pass` or after an `ask` confirmation, the worker or
   coordinator documents the merge qualifications in the PR description:
   - which release-mode gate applied and that it was satisfied
   - the confidence note: validated commands, evidence links, remaining
     `UNKNOWN` facts, and residual risk
   - the finalizer, when accelerated-RC requires one
+
+  This intentionally narrows merge-authority evidence to the PR description so
+  the merge decision is auditable from a single location. Use the issue or batch
+  handoff only for no-merge readiness evidence.
 
   When merge authority is not granted, use the same confidence-note format for
   merge-readiness evidence without merging:

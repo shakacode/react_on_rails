@@ -16,11 +16,7 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`.
 ## Behavioral Defaults
 
 - When confident in your changes, **commit and push without asking for permission**. Always monitor CI after pushing, and use the `+ci-*` PR comment commands from `AGENTS.md` when asking maintainers to run, stop, or waive hosted CI.
-- **When `merge_authority` is `auto_merge_when_gates_pass` and the release-mode gate is satisfied, completing the merge is the expected action — finish the job.** If the current user or batch goal granted that value, the merge gate for the target's release phase is met, and you are confident, **merge.** Stopping at "here is my merge-readiness recommendation" when you were authorized to merge is a failure to complete the task, not caution.
-  - `ask` requires one confirmation before merging; `none` grants no merge authority.
-  - The many "do not auto-merge" rules in `AGENTS.md` select *which* merges are eligible (release phase, finalizer, soak window, unresolved threads); they do not turn an eligible, authorized, confident merge into a hand-off.
-  - When a gate genuinely is not met, say which one and why — don't silently downgrade to a recommendation.
-  - Whenever you merge under `auto_merge_when_gates_pass` or after an `ask` confirmation, **document the merge qualifications in the pull request description**: which release-mode gate applied and that it was satisfied, the confidence note (see `AGENTS.md` → Confidence notes for the format), and the finalizer when accelerated-RC requires one. The merge decision must be auditable from the PR alone.
+- **When `merge_authority` is `auto_merge_when_gates_pass` and the release-mode gate is satisfied, merge; do not stop at a recommendation.** `ask` requires one confirmation before merging, and `none` grants no merge authority. See `AGENTS.md` → Confidence notes for the full tri-state rule, confidence threshold, and required PR-description evidence.
 - Check `main` CI status at session start (injected by `.claude/hooks/main-ci-status.sh`) and again before `gh pr create` or pushing to `main`. See `AGENTS.md` → "Main branch health" for the decision framework when `main` is red.
 
 ## Git Safety
