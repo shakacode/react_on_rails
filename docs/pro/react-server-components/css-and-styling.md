@@ -721,12 +721,13 @@ output.
 This pitfall applies to React 19+ installations, where React manages stylesheet precedence groups
 via the `data-precedence` attribute. React 18 does not hoist these stylesheet groups.
 
-Each `'use client'` reference's CSS is emitted as a
-`<link rel="stylesheet" data-precedence="rsc-css">` tag. React places every
-`data-precedence="rsc-css"` link at the **end** of `<head>`, after framework and vendor CSS, so
-when specificity is equal, these stylesheets win source-order ties against precedence-less
-stylesheets — including the Rails-layout `stylesheet_pack_tag` links that have no `data-precedence`
-attribute.
+The RSC manifest stylesheet pipeline emits each collected CSS href as a
+`<link rel="stylesheet" data-precedence="rsc-css">` tag. Today, collection is manifest-wide rather
+than filtered to only the client references rendered by a specific request; see
+[Known limitations](#known-limitations). React places every `data-precedence="rsc-css"` link at the
+**end** of `<head>`, after framework and vendor CSS, so when specificity is equal, these stylesheets
+win source-order ties against precedence-less stylesheets — including the Rails-layout
+`stylesheet_pack_tag` links that have no `data-precedence` attribute.
 
 This matters when an RSC CSS Module contains an **unscoped global selector**. CSS Module _class names_
 are scoped, but selectors such as `html`, `body`, `:root`, the universal selector `*`, bare
@@ -802,7 +803,7 @@ html {
 ```
 
 See [RSC stylesheet injection troubleshooting](../../oss/migrating/rsc-troubleshooting.md#rsc-stylesheet-injection-render-blocking-links-and-cascade-order)
-for the render-blocking and per-reference injection behavior behind these links.
+for the render-blocking, manifest-wide injection, and cascade behavior behind these links.
 
 See [React Performance Tracks and Profiling](../../oss/building-features/performance-tracks-and-profiling.md#measuring-an-rsc-conversion-with-a-paired-ab)
 to measure the end-to-end performance impact of RSC changes with a paired A/B comparison.
