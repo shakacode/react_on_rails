@@ -206,16 +206,29 @@ module AgentWorkflowSeamDoctor
   end
 
   def update_fence_state(line, in_fence, fence_delimiter)
-    fence = line.match(/^ {0,3}(```|~~~)([[:alnum:]_-]*)(?:\s.*)?$/)
+    line = line.chomp
+
+    if in_fence
+      closing_fence = line.match(/^ {0,3}(`{3,}|~{3,})[ \t]*$/)
+      return nil if closing_fence.nil?
+
+      delimiter = closing_fence[1]
+      # Mismatched closers stay inside the current fence.
+      return nil unless closing_fence_delimiter?(delimiter, fence_delimiter)
+
+      return [false, false, nil]
+    end
+
+    fence = line.match(/^ {0,3}(`{3,}|~{3,})(?:[ \t]*([[:alnum:]_-]+))?(?:[ \t].*)?$/)
     return nil if fence.nil?
 
     delimiter = fence[1]
-    # Mismatched closers stay inside the current fence.
-    return nil if in_fence && delimiter != fence_delimiter
-    return [false, false, nil] if in_fence
-
     language = fence[2].to_s.downcase
     [true, EXECUTABLE_FENCE_LANGS.include?(language), delimiter]
+  end
+
+  def closing_fence_delimiter?(delimiter, fence_delimiter)
+    delimiter[0] == fence_delimiter[0] && delimiter.length >= fence_delimiter.length
   end
 
   def placeholders_from_line(line, in_fence:, executable_fence:)

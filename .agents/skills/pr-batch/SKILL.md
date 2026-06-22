@@ -1,6 +1,6 @@
 ---
 name: pr-batch
-description: Plan and safely launch batches of issue or PR work, especially when using Codex subagents, multiple worktrees, or multiple machines. Use when the user asks to run a Codex batch, process several issues or PRs, split work across agents or machines, or turn filters into a PR-processing plan and /goal prompt.
+description: Plan and safely launch batches of issue or PR work, especially when using Codex or Claude subagents, multiple worktrees, or multiple machines. Use when the user asks to run an agent batch, Codex batch, Claude batch, process several issues or PRs, split work across agents or machines, or turn filters into a PR-processing plan and /goal prompt.
 argument-hint: '[exact issue/PR numbers or filters]'
 ---
 
@@ -16,7 +16,9 @@ Memorable invocation:
 
 ```text
 $pr-batch
+Run an agent batch
 Run a Codex batch
+Run a Claude batch
 ```
 
 Run `git fetch --prune origin main`, then use `.agents/workflows/pr-processing.md` as the deeper operating model for each issue, PR, review-fix pass, or merge-readiness item. If repo-local `.agents/skills/...` or `.agents/workflows/pr-processing.md` is missing in the checkout but present on `origin/main`, update the worktree before launching workers; if it remains missing, report repo workflow state as `UNKNOWN`.

@@ -279,6 +279,10 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
       assert_includes out, "<follow-up prefix>"
     end
   end
+end
+
+class AgentWorkflowSeamDoctorFenceTest < Minitest::Test
+  include AgentWorkflowSeamDoctorTestHelpers
 
   def test_executable_placeholder_in_tilde_code_fence_fails
     with_repo do |root|
@@ -287,6 +291,22 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
         ~~~bash
         gh issue create --title "<follow-up prefix> Review feedback from PR #123"
         ~~~
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+
+  def test_executable_placeholder_in_long_code_fence_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ````bash
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ````
       MARKDOWN
 
       out, status = run_doctor(root)
@@ -312,6 +332,139 @@ class AgentWorkflowSeamDoctorPlaceholderTest < Minitest::Test
       assert_includes out, "<follow-up prefix>"
     end
   end
+end
+
+class AgentWorkflowSeamDoctorFenceLengthTest < Minitest::Test
+  include AgentWorkflowSeamDoctorTestHelpers
+
+  def test_shorter_closing_fence_does_not_close_long_executable_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ````bash
+        ```
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ````
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+
+  def test_shorter_closing_tilde_fence_does_not_close_long_tilde_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ~~~~bash
+        ~~~
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ~~~~
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+
+  def test_longer_closing_fence_closes_long_executable_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ````bash
+        echo ok
+        `````
+        <follow-up prefix>
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
+  def test_longer_closing_tilde_fence_closes_long_tilde_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ~~~~bash
+        echo ok
+        ~~~~~
+        <follow-up prefix>
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
+  def test_closing_fence_with_info_string_stays_inside_executable_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ````bash
+        ````bash
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ````
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+
+  def test_crlf_closing_fence_closes_executable_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "```bash\r\necho ok\r\n```\r\n<follow-up prefix>\r\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
+  def test_spaced_info_string_on_long_non_executable_fence_is_not_executable
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ```` markdown
+        <follow-up prefix>
+        ````
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
+  def test_spaced_info_string_on_long_executable_fence_is_executable
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ```` bash
+        gh issue create --title "<follow-up prefix> Review feedback from PR #123"
+        ````
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<follow-up prefix>"
+    end
+  end
+end
+
+class AgentWorkflowSeamDoctorFenceContentTest < Minitest::Test
+  include AgentWorkflowSeamDoctorTestHelpers
 
   def test_four_space_indented_fence_does_not_open_executable_fence
     with_repo do |root|
