@@ -110,7 +110,9 @@ repos:
     # Recorded for future review-app wiring; skipped while cpflow_app_name is null.
     smoke: [/]
     review_app:
-      cpflow_app_name: null
+      workflow: cpflow-review-app.yml
+      status_check: cpflow/review-app
+      cpflow_app_name: null # Set after a CPFlow review-app pipeline exists.
     verify: true
 
   - name: shakacode/react-on-rails-demo-hacker-news-rsc

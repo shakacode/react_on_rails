@@ -62,7 +62,7 @@ exclude = [
   '^https://(www\.)?mycfsapp\.com',     # SSL hostname mismatch
   '^https://(www\.)?scoutapp\.com',     # SSL hostname mismatch
   '^https://solargraph\.org',           # SSL HandshakeFailure
-  '^https://undici\.nodejs\.org/?$',    # TLS handshake in CI from Undici docs link
+  '^https://undici\.nodejs\.org',       # TLS handshake in CI from Undici docs links
 
   # ============================================================================
   # BADGE AND CI SERVICES
