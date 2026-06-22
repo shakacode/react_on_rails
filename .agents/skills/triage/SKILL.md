@@ -37,7 +37,7 @@ from live `agent-coord` state and operator config.
    for a whole-surface triage sweep, use
    `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 doctor --deep --json`
    and broad
-   `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status` as
+   `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --json` as
    audit-only reads. If backend state cannot be checked, exits 2, or times out,
    record `UNKNOWN`.
 5. Read registered capacity profiles and enabled inbox config from the private

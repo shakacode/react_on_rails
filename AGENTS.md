@@ -189,7 +189,8 @@ preflight checks. If the active shell may have cached an old install, run
 that shell's rehash equivalent, then confirm via
 `command -v agent-coord || which agent-coord`.
 
-Before dependency-sensitive actions, use targeted private coordination reads:
+Before dependency-sensitive actions, use targeted private coordination reads.
+The direct `agent-coord` subcommands are:
 
 ```bash
 # Specific issue/PR lane
@@ -201,13 +202,23 @@ agent-coord status --batch-id <batch-id> --json
 
 When the repo workflow calls for bounded reads, pass the same targeted status
 subcommand through `.agents/skills/pr-batch/bin/agent-coord-bounded` so a slow
-private read becomes explicit degraded state instead of an indefinite wait. Do
-not use broad `agent-coord status` for routine lane checks. Broad private
-coordination reads are audit-only; if they time out or exit 2, report private
-coordination as `UNKNOWN`/degraded and use structured public claim comments only
-as advisory evidence. If targeted status exits 0, private coordination state is
-authoritative. Refused claims (`CLAIM_REFUSED` / exit 3) remain hard stops for
-machine agents.
+private read becomes explicit degraded state instead of an indefinite wait:
+
+```bash
+# Specific issue/PR lane
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --repo shakacode/react_on_rails --target <issue-or-pr> --json
+
+# Batch lane/dependency state
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id <batch-id> --json
+```
+
+Do not use broad `agent-coord status` for routine lane checks. Broad private
+coordination reads are audit-only; if they time out, exit 1 (unexpected error),
+or exit 2, report private coordination as `UNKNOWN`/degraded and use structured
+public claim comments only as advisory evidence. Any non-zero exit other than
+`CLAIM_REFUSED` (exit 3) is treated as `UNKNOWN`/degraded. If targeted status
+exits 0, private coordination state is authoritative. Refused claims
+(`CLAIM_REFUSED` / exit 3) remain hard stops for machine agents.
 
 ## Commands
 
