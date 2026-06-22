@@ -592,8 +592,6 @@ def ensure_release_branch_current_version_is_rc!(current_branch:, current_checko
     ERROR
   end
 
-  return if same_release_base?(current_checkout_version, target_gem_version)
-
   abort <<~ERROR
     ❌ Stable release branch promotion must use an RC for the target version.
 
@@ -732,6 +730,7 @@ end
 
 def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, current_checkout_version:,
                                               target_gem_version:)
+  # RC cuts target prerelease versions, so only stable promotions match release/<final>.
   return unless current_branch == "release/#{target_gem_version}"
 
   rc_tag = release_branch_promotion_rc_tag!(
@@ -740,9 +739,6 @@ def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, c
     current_checkout_version:,
     target_gem_version:
   )
-
-  fetch_output, fetch_status = Open3.capture2e("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
-  abort "❌ Unable to fetch tags before release branch promotion.\n\n#{fetch_output.strip}" unless fetch_status.success?
 
   ensure_remote_rc_tag!(monorepo_root:, rc_tag:, current_branch:, current_checkout_version:, target_gem_version:)
   fetch_remote_rc_tag!(monorepo_root:, rc_tag:)
