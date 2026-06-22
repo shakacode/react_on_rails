@@ -55,8 +55,8 @@ Suggested hidden fingerprint:
 ```markdown
 <!-- post-merge-audit-finding v1
 audit: <AUDIT_ID>
-fingerprint: pr-3724:changelog-server-bundle-load-error
-affected_prs: 3724
+fingerprint: pr-<PR>:<short-issue-slug>
+affected_prs: <PR>
 -->
 ```
 
@@ -250,7 +250,9 @@ Also audit each included merged PR for:
   `.agents/workflows/pr-processing.md`; do not treat private coordination
   claim/heartbeat `UNKNOWN` as blocking when the documented fallback evidence is
   complete
-- changes touching CI, Pro, build config, generators, SSR, RSC, shared types, or release-sensitive docs
+- changes touching CI, packaged/commercial code, build config, code generators,
+  performance- or framework-sensitive paths, shared types, or release-sensitive
+  docs (per `AGENTS.md`)
 - anything that could have bad consequences after merge
 
 Classify each PR:

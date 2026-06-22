@@ -7,13 +7,28 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 ## Reusable Workflows
 
 - `AGENTS.md`: canonical entry point for agent instructions and workflow discovery
-- `.agents/skills/`: agent skills; `.claude/skills` is a symlink here so Claude Code exposes the same workflows as slash commands
-- `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
+- Shared agent workflow skills may be installed in the user's or agent's normal
+  skill directory and reused across repos; they must resolve repo-specific
+  values through this repo's `AGENTS.md` seam. The canonical shared source is
+  [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows).
+- `.agents/skills/`: repo-local skill copies/overrides plus repo-specific skills;
+  `.claude/skills` is a symlink here so Claude Code exposes the same workflows as
+  slash commands in this checkout.
+- `.agents/workflows/`: repo-local workflow files for Codex, GPT, and other
+  non-Claude tools when this checkout needs local copies or overrides.
 - If a tool or skill picker only exposes installed/global skills, treat those
-  skills as launchers. After fetching, prefer repo-local `.agents/skills/...`
-  and `.agents/workflows/...` files when they exist; installed/global skills do
-  not override this repo's policy.
-- `internal/contributor-info/agent-workflow-adoption.md`: guide for copying these agent workflows into other repositories
+  skills as launchers. Installed/global skills never override this repo's
+  `AGENTS.md`; repo-local files win only when this repo explicitly names or
+  keeps a local copy/override.
+- `.agents/bin/agent-workflow-seam-doctor`: validates that repo-local or
+  installed/shared workflow skills can resolve this repo's seam; pass
+  `--shared <agent-workflows-root>` when checking user-installed skills outside
+  this checkout.
+- `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing
+  these agent workflows with other repositories through user-installed skills
+  plus a repo-local seam
+- `internal/contributor-info/portable-agent-workflows-seam-design.md`: design
+  rationale for the user-installed skill + seam model
 - `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
 - `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing
@@ -91,11 +106,76 @@ unless the user explicitly asks to reproduce an old SHA, continue an existing PR
 branch, bisect, or work offline. Creating a new worktree does not fetch from
 GitHub by itself.
 
-After fetching, verify repo-local workflow files before falling back to installed
-skills. If `.agents/skills/...` or `.agents/workflows/pr-processing.md` is
-missing in the checkout but present on `origin/main`, update the worktree before
-continuing; if it is still missing, report the repo workflow state as `UNKNOWN`
-instead of silently using a global skill fallback.
+After fetching, verify the `## Agent Workflow Configuration` seam before relying
+on installed/shared skills for issue, PR, or batch work:
+
+```bash
+.agents/bin/agent-workflow-seam-doctor
+```
+
+When checking user-installed shared skills outside this checkout, add
+`--shared <agent-workflows-root>`; for example, a clone of
+`https://github.com/shakacode/agent-workflows`.
+
+If a workflow explicitly needs a repo-local `.agents/skills/...` or
+`.agents/workflows/...` file and that file is missing in the checkout but present
+on `origin/main`, update the worktree before continuing; if it is still missing,
+report the repo workflow state as `UNKNOWN` instead of silently using a global
+skill fallback.
+
+## Agent Workflow Configuration
+
+Shared workflow skills are repo-agnostic whether they are installed in the
+user/agent environment or present as repo-local compatibility copies: they carry
+the workflow logic but defer every repo-specific command, branch, label, path,
+and policy to this section. When a skill says "run the repo's local validation"
+or "use the hosted-CI trigger," the concrete value is here. Adopting repos
+replace these values with their own and validate the seam with
+`.agents/bin/agent-workflow-seam-doctor`, plus `--shared <agent-workflows-root>`
+when checking user-installed shared skills outside the checkout. The shared
+source lives at
+[`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows);
+see
+[`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
+
+- **Base branch**: `main` (fetch and compare via `origin/main`).
+- **Pre-push local validation**: `bin/ci-local` (optimized by default; `--changed` narrow,
+  `--all` broad, `--fast` quick). The script owns base discovery — do not pass a base ref.
+  Broad suites: `bundle exec rake all_but_examples` vs `bundle exec rake`. Contract:
+  [`internal/contributor-info/local-ci-contract.md`](internal/contributor-info/local-ci-contract.md).
+- **CI change detector**: `script/ci-changes-detector origin/main` (inspect suite routing).
+- **Hosted-CI trigger**: `+ci-*` PR-comment commands (`+ci-status`, `+ci-run-hosted`,
+  `+ci-force-full`, `+ci-stop-hosted`, `+ci-stop-full`, `+ci-skip-hosted [reason]`, `+ci-help`);
+  labels `ready-for-hosted-ci` and `force-full-hosted-ci`; human helper `bin/request-hosted-ci`.
+  Decision rules are in the **Review Workflow → PR CI Labels** section.
+- **Benchmark labels**: `benchmark`, `benchmark-core`, `benchmark-pro`,
+  `benchmark-pro-node-renderer`, and `hosted-ci-no-benchmarks` (suppress). Opt-in on PRs.
+- **Follow-up issue prefix**: `Follow-up:`. Default to no new issue; see the **Maintainer
+  Attention Contract** section.
+- **Changelog**: `/CHANGELOG.md`, user-visible changes only. Entry format, the `**[Pro]**`
+  scope tag, the version-stamping task (`bundle exec rake "update_changelog[...]"`), and the
+  classification taxonomy are in the **Changelog** section.
+- **Lint / format**: `(cd react_on_rails && bundle exec rake lint)` (package lint),
+  `(cd react_on_rails && bundle exec rake autofix)` (fix),
+  `pnpm start format.listDifferent` (Prettier check), `bin/check-links` (markdown links). Full
+  list in the **Commands** section.
+- **Merge ledger**: `script/pr-merge-ledger <PR> --strict` — machine-checkable per-PR
+  merge-readiness check emitting changelog classification and a `complete_allowed` verdict.
+- **Docs checks**: `script/check-docs-sidebar` (sidebar coverage), `bin/check-links` (links).
+- **Tests**: unit/integration/e2e per the **Testing** and **Commands** sections
+  (`bundle exec rake run_rspec:*`, `pnpm run test`,
+  `(cd react_on_rails/spec/dummy && pnpm test:e2e)`).
+- **Build / type checks**: `pnpm run build`, `pnpm run type-check`, `bundle exec rake rbs:validate`,
+  `actionlint`, `yamllint .github/` — see the **Commands** section.
+- **Review gate**: `claude-review` is the preferred independent review check; see the
+  **Review Workflow** section.
+- **Approval-exempt change categories**: workflow, build-config, package-script, dependency,
+  lockfile, and Pro edits on trusted assignments — allowed with focused scope, validation, and
+  clear PR evidence (not standing pre-approval). See the **Boundaries → Always** section.
+- **Coordination backend**: ShakaCode-internal repos share the private
+  `shakacode/agent-coordination` backend (claims/heartbeats namespaced by full repo name).
+  External adopters use the structured public claim-comment fallback in
+  [`.agents/workflows/pr-processing.md`](.agents/workflows/pr-processing.md).
 
 ## Commands
 
@@ -183,6 +263,10 @@ Run specific test files:
 bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb
 cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 ```
+
+**Pro RSpec encoding**: `react_on_rails_pro`'s `Gemfile.loader` can die with
+`invalid byte sequence in US-ASCII`. Run Pro specs with a UTF-8 locale:
+`LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 RUBYOPT="-EUTF-8" bundle exec rspec <file>`.
 
 ## Project Structure
 
@@ -693,3 +777,14 @@ Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, b
 
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash before PR number)
 - **Pro-only changes** use an inline `**[Pro]**` tag prefix within the standard category sections (e.g., `- **[Pro]** **Feature name**: Description...`); do NOT create separate `#### Pro` subsections
+- **Version stamping**: `bundle exec rake "update_changelog[release|rc|beta|<version>]"` stamps version headers, collapses prereleases, and rewrites compare links. The GitHub release is created from the changelog by `bundle exec rake release[...]`.
+
+### Changelog classification taxonomy
+
+The `update-changelog` skill classifies each merged PR by `Category`. Allowed values (copy exactly, including spaces, hyphens, and casing):
+
+- `product code`: OSS gem/npm package runtime, generators, public types, public config, or user-facing examples.
+- `Pro runtime`: proprietary Pro package/runtime behavior, RSC integration, Node renderer behavior, Pro-generated config, Pro package compatibility.
+- `perf-reliability`: runtime performance/reliability fixes, benchmark/regression systems, crash recovery, and failure classification. Applies regardless of result.
+- `release-process`: release tasks, CI selection, dependency pins used only for releasing/testing, changelog mechanics, PR batch mechanics, agent skills, GitHub Actions, and maintainer workflow.
+- `internal`: docs/planning, tests, fixtures, refactors, cleanup, diagnostics, and non-user-facing maintenance.

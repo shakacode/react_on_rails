@@ -126,8 +126,8 @@ Execution flow when terminal access is available:
      `gh api repos/${REPO}/pulls/${PR_NUMBER}/reviews/${REVIEW_ID} | jq '{id: .id, body: .body, state: .state, user: .user.login, created_at: .submitted_at, html_url: .html_url}'`
      `gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/reviews/${REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, created_at: .created_at, html_url: .html_url}]'`
    - If the review body contains actionable feedback, include it as an additional general comment. Review summary bodies cannot use the `/replies` endpoint; post those responses as general PR comments (see step 8).
-   - Full PR — fetch all review data with the helper (replaces the per-endpoint `gh api ... | jq` blocks and the `reviewThreads` GraphQL query):
-     `.agents/skills/address-review/bin/fetch-pr-review-data "${PR_NUMBER}" --repo "${REPO}" > review-data.json`
+  - Full PR — fetch all review data with the helper (replaces the per-endpoint `gh api ... | jq` blocks and the `reviewThreads` GraphQL query):
+    `ADDRESS_REVIEW_SKILL_DIR="${ADDRESS_REVIEW_SKILL_DIR:-.agents/skills/address-review}"; "${ADDRESS_REVIEW_SKILL_DIR}/bin/fetch-pr-review-data" "${PR_NUMBER}" --repo "${REPO}" > review-data.json`
      It emits one JSON document: `review_cutoff_at` (see step 3); `review_summaries` (`{id, type: "review_summary", body, state, user, created_at, html_url}`, non-empty bodies only); `inline_comments` (`{id, node_id, type: "review", path, body, line, start_line, user, in_reply_to_id, created_at, html_url, thread_id, is_resolved}`, with `thread_id`/`is_resolved` already joined by `node_id` — no separate GraphQL query needed); `issue_comments` (`{id, node_id, type: "issue", body, user, created_at, html_url}`, including summary/status markers for filtering); and `review_threads` (`{thread_id, is_resolved, comments: [{node_id, id}]}`).
    - Treat actionable review summary bodies as additional general comments. Like specific review bodies, they cannot use the `/replies` endpoint and must be answered as general PR comments (see step 8).
    - When `REVIEW_CUTOFF_AT` is set for a full-PR scan:
@@ -273,8 +273,8 @@ Execution flow when terminal access is available:
    - Follow-up issues are expensive; default to no new issue.
    - Present one deferred-work bundle and ask the user to choose: link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle.
    - Create at most one follow-up issue per PR by default. More than one follow-up issue requires explicit user approval.
-   - Every new follow-up issue title must begin with the exact prefix `Follow-up:`. For this workflow, use title `Follow-up: Review feedback from PR #N`.
-   - Build the issue body as a Markdown temp file and create the issue with `gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #N" --body-file "${issue_body_file}"`
+   - Every new follow-up issue title must begin with the exact follow-up issue prefix (see `AGENTS.md` → **Agent Workflow Configuration**). Resolve it into `FOLLOW_UP_PREFIX` before creating the issue; for this workflow, the title is `"${FOLLOW_UP_PREFIX} Review feedback from PR #N"`.
+   - Build the issue body as a Markdown temp file and create the issue with `gh issue create --repo "${REPO}" --title "${FOLLOW_UP_PREFIX:?set FOLLOW_UP_PREFIX from AGENTS.md} Review feedback from PR #N" --body-file "${issue_body_file}"`
    - Do not pass multi-line Markdown through `--body`; this can leak literal `\n` text into the GitHub issue.
    - Before creating the issue, inspect the body file and fix or abort if it contains literal `\n` escape sequences instead of real newlines, ignoring fenced code blocks and inline code spans.
    - For `f+i`, include discuss items, optional items worth tracking, and non-trivial skipped items (must-fix is already addressed)

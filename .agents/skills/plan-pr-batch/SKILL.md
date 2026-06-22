@@ -34,7 +34,8 @@ Plan a PR batch
    - For every bare number, run both `gh pr view N` and `gh issue view N` when type is ambiguous.
    - For filters, run focused `gh pr list` or `gh issue list` commands and keep the query in the report.
    - Record title, URL, state, branch/author for PRs, labels, linked PR/issue refs, and blockers. If a fact cannot be verified, write `UNKNOWN`.
-   - Treat the private `shakacode/agent-coordination` backend as available when
+   - Treat the repo's private coordination backend (see `AGENTS.md` →
+     **Agent Workflow Configuration**) as available when
      `agent-coord doctor` and `agent-coord status` exit 0. If available, run
      `agent-coord status` and
      exclude/report targets that already have active live or stale private
@@ -83,7 +84,7 @@ Plan a PR batch
      diff and the Files API must independently agree on the path set — a
      fail-safe against a silent under-report scheduling two colliding items into
      the same wave:
-     `.agents/skills/plan-pr-batch/bin/pr-file-touch-map N --repo OWNER/REPO --cross-check`
+     `PLAN_PR_BATCH_SKILL_DIR="${PLAN_PR_BATCH_SKILL_DIR:-.agents/skills/plan-pr-batch}"; "${PLAN_PR_BATCH_SKILL_DIR}/bin/pr-file-touch-map" N --repo OWNER/REPO --cross-check`
      It prints `{pr, repo, source, changed_files, paths, renames}`:
      - `source` is `verified` (cross-check: both sources agreed — the only value
        safe to place in a parallel worktree lane), `local-diff` / `files-api`
