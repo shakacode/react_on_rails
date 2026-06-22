@@ -85,7 +85,7 @@ If you omit an `id`, React on Rails auto-assigns one to the container.
 <%= react_component("AccountMenu", props: { signed_in: true }) %>
 ```
 
-- **Wrapper element and `tag`.** The default container is a `<div>`. That is usually fine because a plain `<div>` has no landmark or widget meaning. If the container itself needs attributes, pass them through `html_options`. To change the container element, put `tag` inside `html_options`.
+- **Wrapper element and `tag`.** The default container is a `<div>`. That is usually fine because a plain `<div>` has no landmark or widget meaning. If the container itself needs attributes, pass them through `html_options`. To change the container element, put `tag` inside `html_options`. (The `tag` option applies to `react_component` only — the `react_component_hash` helper always renders a `<div>` container.)
 
 ```erb
 <%= react_component(
@@ -263,6 +263,8 @@ Guidance:
 - Use Rails-owned data consistently. If an accessible name depends on locale, permissions, or user state, make sure the server-rendered content and any hydrated client component receive the same value.
 - If a form returns server-side validation errors, surface those errors with the same accessible pattern described in section 8.
 
+The accessibility guidance above is what is specific to the server/client split. For the RSC helper names, the config flag that enables RSC mode, and how to register server vs. client components — which are version-dependent — see the [React on Rails Pro React Server Components docs](../../pro/react-server-components/index.md).
+
 ---
 
 ## 7. Routing, page transitions, and focus
@@ -437,15 +439,15 @@ Use tools such as `jest-axe`, `vitest-axe`, `axe-core`, `pa11y`, Lighthouse, Cap
 
 When an accessibility bug appears only after the JavaScript bundle loads, debug the Rails output and the hydrated React output separately.
 
-| Symptom                                           | Likely cause                                                                   | Where to look                                                                                               |
-| ------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| Screen reader reads stale or duplicated labels    | Duplicate IDs from a component mounted more than once                          | Section 4; pass a per-mount `idPrefix` (`useId` alone collides across roots on the OSS / Pro non-RSC paths) |
-| `aria-describedby` points at nothing after load   | ID differs between server and client                                           | Non-deterministic ID generation                                                                             |
-| Button is announced but does nothing              | Control rendered before hydration attached handlers                            | Section 3; add no-JS fallback or pending state                                                              |
-| Hydration warning and visual flicker              | Server markup differs from client markup                                       | Dates, random values, locale, browser-only branches                                                         |
-| Streamed content is read in the wrong order       | DOM order differs from logical reading order                                   | Section 5; align `Suspense` boundaries                                                                      |
-| Announcement is missed or doubled while streaming | Live-region text changed before content committed, or changed twice            | Section 5; update after commit and guard repeats                                                            |
-| Content is missing for no-JS users                | `prerender: false`, or SSR failed and the page fell back to client-only output | Sections 1 and 3; check server-side rendering logs                                                          |
+| Symptom                                           | Likely cause                                                                   | Where to look                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen reader reads stale or duplicated labels    | Duplicate IDs from a component mounted more than once                          | Section 4; pass a per-mount `idPrefix` (`useId` alone collides across roots on the OSS / Pro non-RSC paths)                                                                                                                                                                                    |
+| `aria-describedby` points at nothing after load   | ID differs between server and client                                           | Non-deterministic ID generation                                                                                                                                                                                                                                                                |
+| Button is announced but does nothing              | Control rendered before hydration attached handlers                            | Section 3; add no-JS fallback or pending state                                                                                                                                                                                                                                                 |
+| Hydration warning and visual flicker              | Server markup differs from client markup                                       | Dates, random values, locale, browser-only branches                                                                                                                                                                                                                                            |
+| Streamed content is read in the wrong order       | DOM order differs from logical reading order                                   | Section 5; align `Suspense` boundaries                                                                                                                                                                                                                                                         |
+| Announcement is missed or doubled while streaming | Live-region text changed before content committed, or changed twice            | Section 5; update after commit and guard repeats                                                                                                                                                                                                                                               |
+| Content is missing for no-JS users                | `prerender: false`, or SSR failed and the page fell back to client-only output | Sections 1 and 3; check the Rails log for `ReactOnRails::PrerenderError` and the Node render-server output (stdout of the JS server process). `config.raise_on_prerender_error` (on by default in development) surfaces these failures instead of silently falling back to client-only output. |
 
 **Portals and modals (SSR note).** If a dialog's DOM is created only after hydration, keyboard and screen reader users do not get a usable dialog in the first response. Fix this by not showing the dialog until JavaScript is ready, or by rendering an accessible non-portal fallback. After hydration, follow the [APG dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/) or use a vetted dialog component.
 
