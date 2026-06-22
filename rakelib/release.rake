@@ -484,6 +484,44 @@ def peeled_git_tag_sha(monorepo_root:, tag:)
   nil
 end
 
+def remote_git_tag_exists?(monorepo_root:, tag:)
+  _output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "ls-remote", "--exit-code", "--tags", "origin", "refs/tags/#{tag}"
+  )
+  return true if status.success?
+  return false if status.exitstatus == 2
+
+  abort "❌ Unable to verify remote git tag #{tag.inspect} before release branch promotion."
+end
+
+def remote_release_tags(monorepo_root:, pattern:)
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "ls-remote", "--tags", "--refs", "origin", "refs/tags/#{pattern}"
+  )
+  unless status.success?
+    abort "❌ Unable to list remote release tags before release branch promotion.\n\n#{output.strip}"
+  end
+
+  output.lines.filter_map do |line|
+    ref = line.split(/\s+/, 2).last.to_s.strip
+    ref.delete_prefix("refs/tags/") if ref.start_with?("refs/tags/")
+  end
+end
+
+def latest_remote_rc_tag_for_version(monorepo_root:, target_gem_version:)
+  candidates = remote_release_tags(monorepo_root:, pattern: "v#{target_gem_version}*").filter_map do |tag|
+    gem_version = parse_release_tag_to_gem_version(tag)
+    next unless gem_version
+
+    version = parse_gem_version_components(gem_version)
+    next unless release_base_version(gem_version) == target_gem_version && version[:prerelease_type] == "rc"
+
+    [tag, Gem::Version.new(gem_version)]
+  end
+
+  candidates.max_by { |_tag, version| version }&.first
+end
+
 def git_head_sha!(monorepo_root:, context:)
   head_output, head_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
   return head_output.strip if head_status.success?
@@ -553,16 +591,129 @@ def ensure_release_branch_current_version_is_rc!(current_branch:, current_checko
   ERROR
 end
 
+def release_branch_promotion_rc_tag!(monorepo_root:, current_branch:, current_checkout_version:, target_gem_version:)
+  if release_prerelease_version?(current_checkout_version)
+    ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
+    return "v#{current_checkout_version}"
+  end
+
+  unless current_checkout_version == target_gem_version
+    ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
+  end
+
+  stable_tag = "v#{target_gem_version}"
+  if peeled_git_tag_sha(monorepo_root:, tag: stable_tag) || remote_git_tag_exists?(monorepo_root:, tag: stable_tag)
+    abort <<~ERROR
+      ❌ Stable release branch promotion is already tagged.
+
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Stable tag: #{stable_tag}
+
+      Do not rerun the release promotion after the stable tag exists.
+    ERROR
+  end
+
+  rc_tag = latest_remote_rc_tag_for_version(monorepo_root:, target_gem_version:)
+  return rc_tag if rc_tag
+
+  abort <<~ERROR
+    ❌ Stable release branch promotion retry must descend from a remote RC tag.
+
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    Target version: #{target_gem_version}
+
+    Push and verify an RC tag for #{target_gem_version} before retrying the already-bumped final promotion.
+  ERROR
+end
+
+def ensure_remote_rc_tag!(monorepo_root:, rc_tag:, current_branch:, current_checkout_version:, target_gem_version:)
+  return if remote_git_tag_exists?(monorepo_root:, tag: rc_tag)
+
+  abort <<~ERROR
+    ❌ Stable release branch promotion must start from a remote RC tag.
+
+    Expected remote tag: #{rc_tag}
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    Target version: #{target_gem_version}
+  ERROR
+end
+
+def abort_not_ancestor_release_branch_promotion!(current_branch:, current_checkout_version:, target_gem_version:,
+                                                 rc_tag:, tag_sha:, head_sha:)
+  abort "❌ Stable release branch promotion must descend from the accepted RC tag.\n\n" \
+        "Current branch: #{current_branch}\n" \
+        "Current version: #{current_checkout_version}\n" \
+        "Expected tag: #{rc_tag} (#{tag_sha})\n" \
+        "Local HEAD: #{head_sha}\n\n" \
+        "The release branch tip is not reachable from #{rc_tag}. Reset this release branch to #{rc_tag}, " \
+        "or cut a new RC from this branch tip before promoting #{target_gem_version}."
+end
+
+def abort_runtime_bearing_release_branch_promotion!(current_branch:, current_checkout_version:, target_gem_version:,
+                                                    rc_tag:, tag_sha:, head_sha:)
+  abort <<~ERROR
+    ❌ Stable release branch promotion must run from the accepted RC tag or metadata-only finalization commits.
+
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    Expected tag: #{rc_tag} (#{tag_sha})
+    Local HEAD: #{head_sha}
+
+    Changelog/docs/comment-only commits after #{rc_tag} are allowed. Runtime-bearing commits require a new RC.
+    Cut a new RC from this branch tip, or reset the branch to #{rc_tag} before promoting #{target_gem_version}.
+  ERROR
+end
+
+def handle_release_branch_commits_after_rc_tag!(commits_after_rc_tag:, current_branch:, current_checkout_version:,
+                                                target_gem_version:, rc_tag:, tag_sha:, head_sha:)
+  case commits_after_rc_tag[:status]
+  when :none
+    nil
+  when :non_runtime_only
+    puts "ℹ️ Stable release branch promotion includes #{commits_after_rc_tag[:commits].length} " \
+         "non-runtime-only commit(s) after #{rc_tag}; preserving accepted RC runtime content."
+  when :not_ancestor
+    abort_not_ancestor_release_branch_promotion!(
+      current_branch:,
+      current_checkout_version:,
+      target_gem_version:,
+      rc_tag:,
+      tag_sha:,
+      head_sha:
+    )
+  when :runtime_bearing
+    abort_runtime_bearing_release_branch_promotion!(
+      current_branch:,
+      current_checkout_version:,
+      target_gem_version:,
+      rc_tag:,
+      tag_sha:,
+      head_sha:
+    )
+  else
+    raise "Unexpected release branch RC status: #{commits_after_rc_tag[:status].inspect}"
+  end
+end
+
 def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, current_checkout_version:,
                                               target_gem_version:)
   return unless current_branch == "release/#{target_gem_version}"
 
-  ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
+  rc_tag = release_branch_promotion_rc_tag!(
+    monorepo_root:,
+    current_branch:,
+    current_checkout_version:,
+    target_gem_version:
+  )
 
   fetch_output, fetch_status = Open3.capture2e("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
   abort "❌ Unable to fetch tags before release branch promotion.\n\n#{fetch_output.strip}" unless fetch_status.success?
 
-  rc_tag = "v#{current_checkout_version}"
+  ensure_remote_rc_tag!(monorepo_root:, rc_tag:, current_branch:, current_checkout_version:, target_gem_version:)
+
   tag_sha = peeled_git_tag_sha(monorepo_root:, tag: rc_tag)
   unless tag_sha
     abort <<~ERROR
@@ -580,33 +731,15 @@ def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, c
   return if tag_sha == head_sha
 
   commits_after_rc_tag = release_branch_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
-  if commits_after_rc_tag[:status] == :non_runtime_only
-    puts "ℹ️ Stable release branch promotion includes #{commits_after_rc_tag[:commits].length} " \
-         "non-runtime-only commit(s) after #{rc_tag}; preserving accepted RC runtime content."
-    return
-  end
-
-  if commits_after_rc_tag[:status] == :not_ancestor
-    abort "❌ Stable release branch promotion must descend from the accepted RC tag.\n\n" \
-          "Current branch: #{current_branch}\n" \
-          "Current version: #{current_checkout_version}\n" \
-          "Expected tag: #{rc_tag} (#{tag_sha})\n" \
-          "Local HEAD: #{head_sha}\n\n" \
-          "The release branch tip is not reachable from #{rc_tag}. Reset this release branch to #{rc_tag}, " \
-          "or cut a new RC from this branch tip before promoting #{target_gem_version}."
-  end
-
-  abort <<~ERROR
-    ❌ Stable release branch promotion must run from the accepted RC tag or metadata-only finalization commits.
-
-    Current branch: #{current_branch}
-    Current version: #{current_checkout_version}
-    Expected tag: #{rc_tag} (#{tag_sha})
-    Local HEAD: #{head_sha}
-
-    Changelog/docs/comment-only commits after #{rc_tag} are allowed. Runtime-bearing commits require a new RC.
-    Cut a new RC from this branch tip, or reset the branch to #{rc_tag} before promoting #{target_gem_version}.
-  ERROR
+  handle_release_branch_commits_after_rc_tag!(
+    commits_after_rc_tag:,
+    current_branch:,
+    current_checkout_version:,
+    target_gem_version:,
+    rc_tag:,
+    tag_sha:,
+    head_sha:
+  )
 end
 
 # The branch whose tip CI the release gate should validate. For a release cut or
@@ -1073,7 +1206,7 @@ def normalize_required_checks_payload(parsed)
   contexts.empty? && checks.empty? ? nil : { contexts:, checks: }
 end
 
-def required_check_names_for_main(monorepo_root:, repo_slug: nil, ci_branch: "main")
+def required_check_names_for_branch(monorepo_root:, repo_slug: nil, ci_branch: "main")
   repo_slug ||= github_repo_slug(monorepo_root)
   encoded_branch = URI.encode_www_form_component(ci_branch.to_s)
   api_path = "repos/#{repo_slug}/branches/#{encoded_branch}/protection/required_status_checks"
@@ -1290,7 +1423,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   required_args = { monorepo_root: }
   required_args[:repo_slug] = repo_slug if repo_slug
   required_args[:ci_branch] = ci_branch
-  required_names = required_check_names_for_main(**required_args)
+  required_names = required_check_names_for_branch(**required_args)
   required_status_contexts = required_names ? legacy_status_contexts_for_required_checks(required_names) : []
   legacy_status_runs = []
   legacy_status_fetch_unknown = false
