@@ -254,8 +254,9 @@ def verify_gh_auth(monorepo_root:)
   puts "✓ GitHub CLI authenticated with write access to #{repo_slug}"
 end
 
-def current_git_sha!(monorepo_root)
+def current_git_sha!(monorepo_root, context: nil)
   output, status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
+  abort "❌ Unable to resolve local HEAD before #{context}.\n\n#{output.strip}" if !status.success? && context
   abort "❌ Unable to resolve current git SHA.\n\n#{output}" unless status.success?
 
   output.strip
@@ -523,10 +524,7 @@ def latest_remote_rc_tag_for_version(monorepo_root:, target_gem_version:)
 end
 
 def git_head_sha!(monorepo_root:, context:)
-  head_output, head_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
-  return head_output.strip if head_status.success?
-
-  abort "❌ Unable to resolve local HEAD before #{context}.\n\n#{head_output.strip}"
+  current_git_sha!(monorepo_root, context:)
 end
 
 def rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
@@ -566,7 +564,8 @@ def release_branch_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
 end
 
 def ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
-  unless release_prerelease_version?(current_checkout_version)
+  version = parse_gem_version_components(current_checkout_version)
+  unless version[:prerelease_type]
     abort <<~ERROR
       ❌ Stable release branch promotion must start from a tagged RC.
 
@@ -575,6 +574,21 @@ def ensure_release_branch_current_version_is_rc!(current_branch:, current_checko
       Target version: #{target_gem_version}
 
       Cut and verify an RC on this release branch before promoting #{target_gem_version}.
+    ERROR
+  end
+
+  return if version[:prerelease_type] == "rc" && same_release_base?(current_checkout_version, target_gem_version)
+
+  unless version[:prerelease_type] == "rc"
+    abort <<~ERROR
+      ❌ Stable release branch promotion must use an RC prerelease.
+
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Current prerelease type: #{version[:prerelease_type]}
+      Target version: #{target_gem_version}
+
+      Promote only from an accepted RC for #{target_gem_version}.
     ERROR
   end
 
@@ -597,8 +611,16 @@ def release_branch_promotion_rc_tag!(monorepo_root:, current_branch:, current_ch
     return "v#{current_checkout_version}"
   end
 
-  unless current_checkout_version == target_gem_version
-    ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
+  if current_checkout_version != target_gem_version
+    abort <<~ERROR
+      ❌ Unexpected stable checkout version before release branch promotion.
+
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Target version: #{target_gem_version}
+
+      Expected either an RC prerelease for #{target_gem_version} or the target stable version for an in-place retry.
+    ERROR
   end
 
   stable_tag = "v#{target_gem_version}"
@@ -641,6 +663,16 @@ def ensure_remote_rc_tag!(monorepo_root:, rc_tag:, current_branch:, current_chec
   ERROR
 end
 
+def fetch_remote_rc_tag!(monorepo_root:, rc_tag:)
+  tag_ref = "refs/tags/#{rc_tag}"
+  fetch_output, fetch_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "fetch", "--force", "--no-tags", "--quiet", "origin", "#{tag_ref}:#{tag_ref}"
+  )
+  return if fetch_status.success?
+
+  abort "❌ Unable to fetch remote RC tag before release branch promotion.\n\n#{fetch_output.strip}"
+end
+
 def abort_not_ancestor_release_branch_promotion!(current_branch:, current_checkout_version:, target_gem_version:,
                                                  rc_tag:, tag_sha:, head_sha:)
   abort "❌ Stable release branch promotion must descend from the accepted RC tag.\n\n" \
@@ -674,7 +706,7 @@ def handle_release_branch_commits_after_rc_tag!(commits_after_rc_tag:, current_b
     nil
   when :non_runtime_only
     puts "ℹ️ Stable release branch promotion includes #{commits_after_rc_tag[:commits].length} " \
-         "non-runtime-only commit(s) after #{rc_tag}; preserving accepted RC runtime content."
+         "metadata-only commit(s) after #{rc_tag}; preserving accepted RC runtime content."
   when :not_ancestor
     abort_not_ancestor_release_branch_promotion!(
       current_branch:,
@@ -713,6 +745,7 @@ def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, c
   abort "❌ Unable to fetch tags before release branch promotion.\n\n#{fetch_output.strip}" unless fetch_status.success?
 
   ensure_remote_rc_tag!(monorepo_root:, rc_tag:, current_branch:, current_checkout_version:, target_gem_version:)
+  fetch_remote_rc_tag!(monorepo_root:, rc_tag:)
 
   tag_sha = peeled_git_tag_sha(monorepo_root:, tag: rc_tag)
   unless tag_sha

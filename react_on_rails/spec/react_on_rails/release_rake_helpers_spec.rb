@@ -2605,6 +2605,11 @@ RSpec.describe "release.rake helper methods" do
     let(:failure_status) { instance_double(Process::Status, success?: false) }
     let(:not_ancestor_status) { instance_double(Process::Status, success?: false, exitstatus: 1) }
     let(:git_error_status) { instance_double(Process::Status, success?: false, exitstatus: 128) }
+    let(:remote_rc_tag_ref) { "refs/tags/v17.0.0.rc.3" }
+    let(:remote_rc_tag_fetch_args) do
+      ["git", "-C", monorepo_root, "fetch", "--force", "--no-tags", "--quiet",
+       "origin", "#{remote_rc_tag_ref}:#{remote_rc_tag_ref}"]
+    end
 
     before do
       allow(self).to receive(:remote_git_tag_exists?).and_call_original
@@ -2613,6 +2618,10 @@ RSpec.describe "release.rake helper methods" do
         .with(monorepo_root:, tag: "v17.0.0.rc.3")
         .and_return(true)
       allow(self).to receive(:latest_remote_rc_tag_for_version).and_call_original
+    end
+
+    def stub_remote_rc_tag_fetch
+      allow(Open3).to receive(:capture2e).with(*remote_rc_tag_fetch_args).and_return(["", success_status])
     end
 
     it "does not inspect tags for stable releases from main" do
@@ -2631,6 +2640,7 @@ RSpec.describe "release.rake helper methods" do
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
         .and_return(["", success_status])
+      stub_remote_rc_tag_fetch
       allow(Open3)
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
@@ -2650,6 +2660,7 @@ RSpec.describe "release.rake helper methods" do
       end.not_to raise_error
 
       expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+      expect(Open3).to have_received(:capture2e).with(*remote_rc_tag_fetch_args)
       expect(Open3)
         .to have_received(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
@@ -2680,6 +2691,7 @@ RSpec.describe "release.rake helper methods" do
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
         .and_return(["", success_status])
+      stub_remote_rc_tag_fetch
       allow(Open3)
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
@@ -2710,7 +2722,7 @@ RSpec.describe "release.rake helper methods" do
           current_checkout_version: "17.0.0.rc.3",
           target_gem_version: "17.0.0"
         )
-      end.to output(/non-runtime-only commit\(s\) after v17\.0\.0\.rc\.3/).to_stdout
+      end.to output(/metadata-only commit\(s\) after v17\.0\.0\.rc\.3/).to_stdout
 
       expect(Open3)
         .to have_received(:capture2e)
@@ -2725,6 +2737,7 @@ RSpec.describe "release.rake helper methods" do
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
         .and_return(["", success_status])
+      stub_remote_rc_tag_fetch
       allow(Open3)
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0^{}")
@@ -2764,7 +2777,7 @@ RSpec.describe "release.rake helper methods" do
           current_checkout_version: "17.0.0",
           target_gem_version: "17.0.0"
         )
-      end.to output(/non-runtime-only commit\(s\) after v17\.0\.0\.rc\.3/).to_stdout
+      end.to output(/metadata-only commit\(s\) after v17\.0\.0\.rc\.3/).to_stdout
     end
 
     it "aborts an already-bumped final release branch retry when the stable tag exists" do
@@ -2799,7 +2812,20 @@ RSpec.describe "release.rake helper methods" do
           current_checkout_version: "17.0.1",
           target_gem_version: "17.0.0"
         )
-      end.to raise_error(SystemExit, /must start from a tagged RC/)
+      end.to raise_error(SystemExit, /Unexpected stable checkout version/)
+    end
+
+    it "aborts when a release branch final promotion starts from a non-RC prerelease" do
+      expect(Open3).not_to receive(:capture2e)
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.beta.1",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /must use an RC prerelease/)
     end
 
     it "aborts when the current RC is for a different final version" do
@@ -2820,6 +2846,7 @@ RSpec.describe "release.rake helper methods" do
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
         .and_return(["", success_status])
+      stub_remote_rc_tag_fetch
       allow(Open3)
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
@@ -2835,9 +2862,30 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /Expected tag: v17.0.0.rc.3/)
 
       expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+      expect(Open3).to have_received(:capture2e).with(*remote_rc_tag_fetch_args)
       expect(Open3)
         .to have_received(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
+    end
+
+    it "aborts when the accepted remote RC tag cannot be force-fetched" do
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3)
+        .to receive(:capture2e)
+        .with(*remote_rc_tag_fetch_args)
+        .and_return(["would clobber existing tag", failure_status])
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.3",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /Unable to fetch remote RC tag/)
     end
 
     it "aborts when the current RC tag exists only locally" do
@@ -2865,6 +2913,7 @@ RSpec.describe "release.rake helper methods" do
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
         .and_return(["", success_status])
+      stub_remote_rc_tag_fetch
       allow(Open3)
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
@@ -2902,6 +2951,7 @@ RSpec.describe "release.rake helper methods" do
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
         .and_return(["", success_status])
+      stub_remote_rc_tag_fetch
       allow(Open3)
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
@@ -2930,6 +2980,7 @@ RSpec.describe "release.rake helper methods" do
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
         .and_return(["", success_status])
+      stub_remote_rc_tag_fetch
       allow(Open3)
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
@@ -2962,6 +3013,7 @@ RSpec.describe "release.rake helper methods" do
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
         .and_return(["", success_status])
+      stub_remote_rc_tag_fetch
       allow(Open3)
         .to receive(:capture2e)
         .with("git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.3^{}")
