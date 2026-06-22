@@ -6,17 +6,17 @@ per-approach setup guidance for every major CSS strategy.
 
 ## Quick reference
 
-| Approach                                                      | Server Component                           | Client Component (RSC)         | Traditional SSR      | FOUC prevention          |
-| ------------------------------------------------------------- | ------------------------------------------ | ------------------------------ | -------------------- | ------------------------ |
-| [Global CSS](#global-css)                                     | Use class names; CSS loads from layout     | Works                          | Works                | Rails layout `<link>`    |
-| [CSS Modules](#css-modules)                                   | `exportOnlyLocals` renders class names     | Full extraction + manifest CSS | Full extraction      | Manifest `<link>` tags   |
-| [SCSS Modules](#sassscss)                                     | Same as CSS Modules                        | Same as CSS Modules            | Same as CSS Modules  | Manifest `<link>` tags   |
-| [Tailwind CSS](#tailwind-css)                                 | Use utility classes; CSS loads from layout | Use utility classes            | Use utility classes  | Rails layout `<link>`    |
-| [Inline styles](#inline-styles)                               | Works (serialized in RSC payload)          | Works                          | Works                | N/A (no external CSS)    |
-| [Vanilla Extract](#vanilla-extract)                           | Needs client-boundary wrapper              | Works with build plugin        | Works                | Manifest `<link>` tags   |
-| [styled-components](#styled-components)                       | Not supported                              | Works behind `'use client'`    | Works with SSR setup | None (runtime injection) |
-| [Emotion](#emotion)                                           | Not supported                              | Works behind `'use client'`    | Works with SSR setup | None (runtime injection) |
-| [Other static extraction](#other-static-extraction-libraries) | Expected to work via layout CSS            | Expected to work               | Expected to work     | Depends on setup         |
+| Approach                                                      | Server Component                           | Client Component (RSC)      | Traditional SSR      | FOUC prevention          |
+| ------------------------------------------------------------- | ------------------------------------------ | --------------------------- | -------------------- | ------------------------ |
+| [Global CSS](#global-css)                                     | Use class names; CSS loads from layout     | Works                       | Works                | Rails layout `<link>`    |
+| [CSS Modules](#css-modules)                                   | `exportOnlyLocals` renders class names     | Full extraction + chunk CSS | Full extraction      | RSC client-chunk links   |
+| [SCSS Modules](#sassscss)                                     | Same as CSS Modules                        | Same as CSS Modules         | Same as CSS Modules  | RSC client-chunk links   |
+| [Tailwind CSS](#tailwind-css)                                 | Use utility classes; CSS loads from layout | Use utility classes         | Use utility classes  | Rails layout `<link>`    |
+| [Inline styles](#inline-styles)                               | Works (serialized in RSC payload)          | Works                       | Works                | N/A (no external CSS)    |
+| [Vanilla Extract](#vanilla-extract)                           | Needs client-boundary wrapper              | Works with build plugin     | Works                | RSC client-chunk links   |
+| [styled-components](#styled-components)                       | Not supported                              | Works behind `'use client'` | Works with SSR setup | None (runtime injection) |
+| [Emotion](#emotion)                                           | Not supported                              | Works behind `'use client'` | Works with SSR setup | None (runtime injection) |
+| [Other static extraction](#other-static-extraction-libraries) | Expected to work via layout CSS            | Expected to work            | Expected to work     | Depends on setup         |
 
 Status: entries marked with specific verification notes below. See the [full compatibility matrix](#compatibility-matrix) for details.
 
@@ -36,21 +36,22 @@ client pack and loaded via `stylesheet_pack_tag` in the Rails layout `<head>`:
 
 This works for all rendering modes because Rails always renders the layout HTML around the component.
 
-### Path 2: RSC manifest stylesheet injection
+### Path 2: RSC client-chunk stylesheet injection
 
 For CSS imported by `'use client'` components inside an RSC tree, React on Rails Pro has a dedicated
 FOUC prevention pipeline:
 
-1. **Build time:** The RSC manifest plugin (`RSCWebpackPlugin` for webpack, `RSCRspackPlugin` for Rspack)
-   records the CSS files associated with each `'use client'` module in `react-client-manifest.json`.
-   Each module entry has a `css` array listing its extracted stylesheet paths.
+1. **Build time:** The RSC manifest identifies client references, while the client build records emitted
+   `clientN` chunk assets in `loadable-stats.json`. React on Rails Pro uses those stats to map each
+   RSC client chunk name to its extracted CSS files.
 
-2. **Render time:** When the node renderer generates an RSC payload, `resolveCssHrefs` reads
-   `react-client-manifest.json` and collects every CSS href from every `'use client'` module entry,
-   deduplicating and prefixing with `moduleLoading.prefix` for CDN deployments.
+2. **Render time:** When the node renderer streams Flight data, `injectRSCPayload` scans the current
+   payload for the client chunk names referenced by rendered client references. It injects only CSS
+   hrefs for those chunk names, deduplicating hrefs across the stream.
 
-3. **Stream injection:** `proRSC.ts` wraps the rendered RSC tree with
-   `<link rel="stylesheet" href="..." data-precedence="rsc-css">` elements for each collected CSS href.
+3. **Stream injection:** `injectRSCPayload` emits
+   `<link rel="stylesheet" href="..." data-precedence="rsc-css">` elements before the streamed reveal
+   HTML that needs those client chunks.
 
 4. **Browser behavior:** React 19 hoists `<link rel="stylesheet" data-precedence="...">` elements
    into `<head>`, deduplicates them across the RSC stream, and blocks tree commit until the
@@ -58,9 +59,10 @@ FOUC prevention pipeline:
    available.
 
 > [!NOTE]
-> The manifest CSS hrefs are collected manifest-wide, not per-request. This means CSS for all
-> `'use client'` modules is linked even if only some are rendered on a specific page. This
-> trades minimal CSS for guaranteed no-FOUC behavior.
+> RSC CSS collection is request/chunk driven, not a blanket scan of every client reference in the
+> manifest. The injected CSS can still be broader than a single component when a rendered client chunk
+> contains shared, vendor, or page-specific global CSS. Keep client boundaries thin so the chunks
+> referenced by a page do not drag unrelated CSS into the render-blocking `rsc-css` group.
 
 > [!CAUTION]
 > These stylesheet links are render-blocking. Broad `'use client'` entry points that import
@@ -501,7 +503,7 @@ JavaScript executes, which can cause a flash of unstyled content on RSC pages.
 ### Emotion
 
 Emotion is a runtime CSS-in-JS library similar to styled-components. The same architectural
-constraints apply: runtime `<style>` injection, no manifest CSS recording, no RSC FOUC prevention.
+constraints apply: runtime `<style>` injection, no extracted CSS chunk recording, no RSC FOUC prevention.
 
 ```tsx
 // app/javascript/components/EmotionCard.tsx
@@ -721,13 +723,11 @@ output.
 This pitfall applies to React 19+ installations, where React manages stylesheet precedence groups
 via the `data-precedence` attribute. React 18 does not hoist these stylesheet groups.
 
-The RSC manifest stylesheet pipeline emits each collected CSS href as a
-`<link rel="stylesheet" data-precedence="rsc-css">` tag. Today, collection is manifest-wide rather
-than filtered to only the client references rendered by a specific request; see
-[Known limitations](#known-limitations). React places every `data-precedence="rsc-css"` link at the
-**end** of `<head>`, after framework and vendor CSS, so when specificity is equal, these stylesheets
-win source-order ties against precedence-less stylesheets — including the Rails-layout
-`stylesheet_pack_tag` links that have no `data-precedence` attribute.
+The RSC client-chunk stylesheet pipeline emits each CSS href referenced by the current Flight payload
+as a `<link rel="stylesheet" data-precedence="rsc-css">` tag. React places every
+`data-precedence="rsc-css"` link at the **end** of `<head>`, after framework and vendor CSS, so when
+specificity is equal, these stylesheets win source-order ties against precedence-less stylesheets —
+including the Rails-layout `stylesheet_pack_tag` links that have no `data-precedence` attribute.
 
 This matters when an RSC CSS Module contains an **unscoped global selector**. CSS Module _class names_
 are scoped, but selectors such as `html`, `body`, `:root`, the universal selector `*`, bare
@@ -803,26 +803,26 @@ html {
 ```
 
 See [RSC stylesheet injection troubleshooting](../../oss/migrating/rsc-troubleshooting.md#rsc-stylesheet-injection-render-blocking-links-and-cascade-order)
-for the render-blocking, manifest-wide injection, and cascade behavior behind these links.
+for the render-blocking, client-chunk-driven injection, and cascade behavior behind these links.
 
 See [React Performance Tracks and Profiling](../../oss/building-features/performance-tracks-and-profiling.md#measuring-an-rsc-conversion-with-a-paired-ab)
 to measure the end-to-end performance impact of RSC changes with a paired A/B comparison.
 
 ## Known limitations
 
-- RSC stylesheet links are derived from the full client manifest, not filtered to the specific
-  client references rendered by a given request. This favors correctness over minimal CSS, but the
-  resulting links are render-blocking for the streamed RSC tree.
+- RSC stylesheet links are filtered by client chunk names found in the current Flight payload, not by
+  blindly linking every client manifest entry. The links can still include any CSS bundled into those
+  referenced chunks, so broad client boundaries or shared chunks can make more CSS render-blocking than
+  a single component appears to need.
 - Older `react-client-manifest.json` files without `css` arrays (pre `react-on-rails-rsc@19.0.5-rc.6`)
   cannot produce RSC stylesheet links. Rebuild all three bundles after upgrading.
-- For client-side RSC navigation (`RSCRoute`), the RSC payload still needs stylesheet links.
-  Verify this path separately for route-heavy apps.
+- For client-side RSC navigation (`RSCRoute`), the RSC payload still needs stylesheet links. Verify
+  this path separately for route-heavy apps.
 - **Rspack FOUC gap:** The `RSCRspackPlugin` emits the same manifest schema as the webpack plugin
-  for component references, but at the time of writing, the Rspack plugin's `getGroupChunks()`
-  filters to `.js` files only and does not collect `.css` files into the manifest's `css` arrays.
-  This means `resolveCssHrefs` returns an empty array for Rspack builds, and the FOUC prevention
-  pipeline is silently inactive. CSS for `'use client'` components still works via the Rails layout
-  `stylesheet_pack_tag`, but without per-component stylesheet injection. See
+  for component references, but at the time of writing, Rspack builds can omit CSS assets for RSC
+  client chunks from the stats consumed by `injectRSCPayload`. When that map is empty, the FOUC
+  prevention pipeline is silently inactive. CSS for `'use client'` components still works via the
+  Rails layout `stylesheet_pack_tag`, but without client-chunk stylesheet injection. See
   [Rspack compatibility](./rspack-compatibility.md) for details.
 - **Rspack CSS Module class name divergence:** When using Rspack with CSS Modules, avoid
   `[contenthash]` in `localIdentName`. Rspack client and server builds may produce different

@@ -341,9 +341,8 @@ versions do not support the `data-precedence` stylesheet groups used for this ho
 render-blocking behavior.
 
 For RSC pages, React on Rails Pro injects
-`<link rel="stylesheet" data-precedence="rsc-css">` tags for CSS hrefs collected from the RSC client
-manifest. Current collection is manifest-wide rather than filtered to only the client references
-rendered by a specific request. These links are **render-blocking** for the streamed RSC tree: React
+`<link rel="stylesheet" data-precedence="rsc-css">` tags for CSS hrefs whose client chunk names appear
+in the current Flight payload. These links are **render-blocking** for the streamed RSC tree: React
 delays committing the streamed content until the referenced stylesheets are ready, which prevents a
 flash of unstyled content (FOUC) as the tree streams in.
 
