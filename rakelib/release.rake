@@ -456,11 +456,11 @@ def npm_publish_base_args(actual_gem_version:, actual_npm_version:, current_bran
   npm_dist_tag = npm_dist_tag_for_version(actual_npm_version)
   npm_base_args += ["--tag", npm_dist_tag] unless npm_dist_tag == "latest"
 
-  if release_prerelease_version?(actual_gem_version)
-    npm_base_args << "--no-git-checks"
-  elsif current_branch.to_s.start_with?("release/")
-    npm_base_args += ["--publish-branch", current_branch]
-  end
+  is_prerelease = release_prerelease_version?(actual_gem_version)
+  is_release_branch = current_branch.to_s.start_with?("release/")
+
+  npm_base_args << "--no-git-checks" if is_prerelease || is_release_branch
+  npm_base_args += ["--publish-branch", current_branch] if !is_prerelease && is_release_branch
 
   npm_base_args
 end
