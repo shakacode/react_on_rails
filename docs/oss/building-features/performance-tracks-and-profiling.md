@@ -118,7 +118,10 @@ Then:
 
 1. Build both variants in production mode on the same data and configuration.
 2. Drive both with the **same throttled Lighthouse config** (Slow 4G + 4x CPU).
-3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six paired samples is the practical floor for the Wilcoxon signed-rank test; 10 to 15 gives reliable power across the range of effect sizes you will encounter.
+3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six paired
+   samples is only a weak smoke-test floor: with the two-sided exact Wilcoxon signed-rank test, you
+   need unanimous agreement across all six pairs to reach p < 0.05 — one dissenting sample pushes
+   you above it.
 4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as strong directional evidence of a real shift when the paired samples consistently move in the same direction.
 
 We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
@@ -161,4 +164,4 @@ The FAQ run did not capture TBT or Lighthouse score. The captured signals pointe
 
 A CSS broadcast fix (react_on_rails_rsc [#108](https://github.com/shakacode/react_on_rails_rsc/pull/108) → [#110](https://github.com/shakacode/react_on_rails_rsc/pull/110) / [#113](https://github.com/shakacode/react_on_rails_rsc/pull/113), shipped in `react-on-rails-rsc` 19.2.0-rc.3) was correct, but it was a **second-order** effect. The dominant driver was the client JS tail, not CSS delivery. Chasing the CSS fix first would have spent effort without moving the metrics that mattered.
 
-The lesson to take from this: **measure paired and throttled, then decompose FCP/TBT versus LCP before choosing a fix.** A related second-order CSS concern worth knowing about is the end-of-`<head>` rsc-css precedence trap described in [CSS and styling for RSC](../../pro/react-server-components/css-and-styling.md) — but confirm with the decomposition that CSS delivery is actually on your critical path before you spend time there.
+The lesson to take from this: **measure paired and throttled, then decompose FCP/TBT versus LCP before choosing a fix.** A related second-order CSS concern worth knowing about is the end-of-`<head>` rsc-css precedence trap described in [CSS and styling for RSC](../../pro/react-server-components/css-and-styling.md#rsc-stylesheet-cascade-order-end-of-head-precedence) — but confirm with the decomposition that CSS delivery is actually on your critical path before you spend time there.
