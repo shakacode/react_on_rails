@@ -862,7 +862,7 @@ end
 
 def required_check_names_for_main(monorepo_root:, repo_slug: nil, ci_branch: "main")
   repo_slug ||= github_repo_slug(monorepo_root)
-  encoded_branch = ci_branch.to_s.gsub("/", "%2F")
+  encoded_branch = URI.encode_www_form_component(ci_branch.to_s)
   api_path = "repos/#{repo_slug}/branches/#{encoded_branch}/protection/required_status_checks"
   # Keep legacy `contexts` separate from modern `checks` entries. Modern
   # required checks can be pinned to a GitHub App via `app_id`; legacy contexts
@@ -1224,7 +1224,8 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   qualifier = is_prerelease && required_names ? "required " : ""
   healthy_count = required_names ? required_check_count(required_names) : evaluated.length
   noun = healthy_count == 1 ? "check" : "checks"
-  puts "✓ Main CI is healthy on #{short_sha} (#{healthy_count} #{qualifier}#{noun})"
+  ci_label = ci_branch == "main" ? "Main CI" : "CI on origin/#{ci_branch}"
+  puts "✓ #{ci_label} is healthy on #{short_sha} (#{healthy_count} #{qualifier}#{noun})"
 end
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
