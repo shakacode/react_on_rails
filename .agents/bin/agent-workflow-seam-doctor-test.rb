@@ -350,6 +350,22 @@ class AgentWorkflowSeamDoctorFenceTest < Minitest::Test
     end
   end
 
+  def test_longer_closing_fence_closes_long_executable_fence
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ````bash
+        echo ok
+        `````
+        <follow-up prefix>
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
   def test_four_space_indented_fence_does_not_open_executable_fence
     with_repo do |root|
       write_agents(root)
