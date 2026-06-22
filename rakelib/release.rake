@@ -719,8 +719,10 @@ CI_PASSING_CONCLUSIONS = %w[success skipped neutral].freeze
 MAIN_CI_NONRUNTIME_WALK_LIMIT = 25
 
 # rubocop:disable Metrics/MethodLength
+# Abort in strict mode when a release branch local HEAD differs from the remote.
+# In override/dry-run mode, warn and continue so the releaser still sees remote CI state.
 def ensure_release_branch_head_matches_remote!(monorepo_root:, ci_branch:, remote_sha:, allow_override:, dry_run:)
-  return true unless ci_branch.start_with?("release/")
+  return unless ci_branch.start_with?("release/")
 
   head_output, head_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
   unless head_status.success?
@@ -730,11 +732,11 @@ def ensure_release_branch_head_matches_remote!(monorepo_root:, ci_branch:, remot
       dry_run:
     )
     # Strict mode aborts above; override/dry-run mode should still evaluate remote CI after warning.
-    return true
+    return
   end
 
   local_sha = head_output.strip
-  return true if local_sha == remote_sha
+  return if local_sha == remote_sha
 
   handle_main_ci_status_violation!(
     message: <<~MESSAGE,
@@ -749,7 +751,6 @@ def ensure_release_branch_head_matches_remote!(monorepo_root:, ci_branch:, remot
     dry_run:
   )
   # Strict mode aborts above; override/dry-run mode should still evaluate remote CI after warning.
-  true
 end
 
 def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")

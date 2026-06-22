@@ -2593,6 +2593,24 @@ RSpec.describe "release.rake helper methods" do
       expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "rev-parse", "HEAD")
     end
 
+    it "aborts when git fetch --tags fails before release branch promotion" do
+      allow(Open3)
+        .to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+        .and_return(["network error", failure_status])
+
+      expect do
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.3",
+          target_gem_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /Unable to fetch tags before release branch promotion/)
+
+      expect(Open3).to have_received(:capture2e).with("git", "-C", monorepo_root, "fetch", "--tags", "--quiet")
+    end
+
     it "allows non-runtime finalization commits after the current RC tag" do
       allow(Open3)
         .to receive(:capture2e)
