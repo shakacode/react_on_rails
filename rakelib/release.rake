@@ -29,6 +29,8 @@ SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 600
 SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
 SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
 SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 50 * 60
+# Keep in sync with every package.json, Gemfile.lock, and version file that the
+# release task rewrites while promoting an RC to a final release.
 RELEASE_FINALIZATION_METADATA_PATHS = [
   "Gemfile.lock",
   "package.json",
@@ -1203,6 +1205,8 @@ def release_finalization_metadata_commit?(monorepo_root:, sha:)
 
   changes = output.lines.map { |line| release_finalization_metadata_path(line) }
 
+  # Empty diffs are not metadata commits. Non-modification entries map to nil
+  # via release_finalization_metadata_path and fail the all? block below.
   changes.any? && changes.all? do |path|
     path &&
       RELEASE_FINALIZATION_METADATA_PATHS.include?(path) &&
@@ -1234,7 +1238,7 @@ def release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
   elsif path.end_with?("Gemfile.lock")
     normalized_release_gemfile_lock(before) == normalized_release_gemfile_lock(after)
   else
-    false
+    raise "Unhandled release finalization metadata path type: #{path.inspect}"
   end
 end
 
@@ -1248,10 +1252,11 @@ end
 def package_json_version_only_change?(before, after)
   before_json = JSON.parse(before)
   after_json = JSON.parse(after)
-  before_version = before_json.delete("version")
-  after_version = after_json.delete("version")
+  before_version = before_json["version"]
+  after_version = after_json["version"]
 
-  !!(before_version && after_version && before_version != after_version && before_json == after_json)
+  !!(before_version && after_version && before_version != after_version &&
+     before_json.except("version") == after_json.except("version"))
 rescue JSON::ParserError
   false
 end

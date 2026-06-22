@@ -2569,6 +2569,19 @@ RSpec.describe "release.rake helper methods" do
       expect(release_finalization_metadata_commit?(monorepo_root:, sha: "deletesha")).to be false
     end
 
+    it "warns and rejects allowlisted metadata paths without a content handler" do
+      path = "internal/release-metadata.txt"
+      stub_const("RELEASE_FINALIZATION_METADATA_PATHS", RELEASE_FINALIZATION_METADATA_PATHS + [path])
+      stub_metadata_changes(sha: "unhandledsha", output: "M\t#{path}\n")
+      stub_metadata_file(sha: "unhandledsha", path:, before: "17.0.0.rc.5\n", after: "17.0.0\n")
+
+      result = nil
+      expect do
+        result = release_finalization_metadata_commit?(monorepo_root:, sha: "unhandledsha")
+      end.to output(%r{Unhandled release finalization metadata path type.*internal/release-metadata\.txt}).to_stderr
+      expect(result).to be false
+    end
+
     it "rejects empty diffs and git failures" do
       stub_metadata_changes(sha: "emptysha", output: "")
       expect(release_finalization_metadata_commit?(monorepo_root:, sha: "emptysha")).to be false
