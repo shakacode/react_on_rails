@@ -29,6 +29,21 @@ SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 600
 SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
 SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
 SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 50 * 60
+RELEASE_FINALIZATION_METADATA_PATHS = [
+  "Gemfile.lock",
+  "package.json",
+  "packages/create-react-on-rails-app/package.json",
+  "packages/react-on-rails/package.json",
+  "packages/react-on-rails-pro/package.json",
+  "packages/react-on-rails-pro-node-renderer/package.json",
+  "react_on_rails/Gemfile.lock",
+  "react_on_rails/lib/react_on_rails/version.rb",
+  "react_on_rails/spec/dummy/Gemfile.lock",
+  "react_on_rails_pro/Gemfile.lock",
+  "react_on_rails_pro/lib/react_on_rails_pro/version.rb",
+  "react_on_rails_pro/spec/dummy/Gemfile.lock",
+  "react_on_rails_pro/spec/execjs-compatible-dummy/Gemfile.lock"
+].freeze
 
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
@@ -557,8 +572,11 @@ def release_branch_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
   return { status: :not_ancestor, commits: [] } unless rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
 
   commits = commit_shas_after_rc_tag!(monorepo_root:, tag_sha:, head_sha:)
-  non_runtime_only = commits.all? { |sha| commit_non_runtime_only?(monorepo_root:, sha:) }
-  return { status: :runtime_bearing, commits: } unless non_runtime_only
+  metadata_only = commits.all? do |sha|
+    commit_non_runtime_only?(monorepo_root:, sha:) ||
+      release_finalization_metadata_commit?(monorepo_root:, sha:)
+  end
+  return { status: :runtime_bearing, commits: } unless metadata_only
 
   { status: :non_runtime_only, commits: }
 end
@@ -1123,6 +1141,73 @@ def commit_non_runtime_only?(monorepo_root:, sha:)
   end
 rescue StandardError
   false
+end
+
+def release_finalization_metadata_commit?(monorepo_root:, sha:)
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "diff-tree", "--no-commit-id", "--name-status", "-r", "#{sha}^", sha
+  )
+  return false unless status.success?
+
+  changes = output.lines.map { |line| release_finalization_metadata_path(line) }
+
+  changes.any? && changes.all? do |path|
+    path &&
+      RELEASE_FINALIZATION_METADATA_PATHS.include?(path) &&
+      release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
+  end
+rescue StandardError
+  false
+end
+
+def release_finalization_metadata_path(change_line)
+  status_code, path, extra = change_line.chomp.split("\t", 3)
+  return nil unless status_code == "M"
+  return nil if path.nil? || extra
+
+  path
+end
+
+def release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
+  before = git_file_at_commit(monorepo_root:, ref: "#{sha}^", path:)
+  after = git_file_at_commit(monorepo_root:, ref: sha, path:)
+  return false if before.nil? || after.nil?
+
+  if path.end_with?("package.json")
+    package_json_version_only_change?(before, after)
+  elsif path.end_with?("version.rb")
+    normalized_version_file(before) == normalized_version_file(after)
+  elsif path.end_with?("Gemfile.lock")
+    normalized_release_gemfile_lock(before) == normalized_release_gemfile_lock(after)
+  else
+    false
+  end
+end
+
+def git_file_at_commit(monorepo_root:, ref:, path:)
+  output, status = Open3.capture2e("git", "-C", monorepo_root, "show", "#{ref}:#{path}")
+  return nil unless status.success?
+
+  output
+end
+
+def package_json_version_only_change?(before, after)
+  before_json = JSON.parse(before)
+  after_json = JSON.parse(after)
+  before_version = before_json.delete("version")
+  after_version = after_json.delete("version")
+
+  !!(before_version && after_version && before_version != after_version && before_json == after_json)
+rescue JSON::ParserError
+  false
+end
+
+def normalized_version_file(content)
+  content.gsub(/(\bVERSION = )"[^"]+"/, '\1"__RELEASE_VERSION__"')
+end
+
+def normalized_release_gemfile_lock(content)
+  content.gsub(/\b(react_on_rails(?:_pro)? \((?:= )?)[^)]+(\))/, '\1__RELEASE_VERSION__\2')
 end
 
 # First parent of `sha`, or nil at a root commit (or on any git failure) so the

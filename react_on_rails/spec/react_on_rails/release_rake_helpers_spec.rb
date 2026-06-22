@@ -2391,6 +2391,142 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#release_finalization_metadata_commit?" do
+    let(:monorepo_root) { "/tmp/repo" }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
+
+    def stub_metadata_changes(sha:, output:, status: success_status)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "diff-tree", "--no-commit-id", "--name-status", "-r", "#{sha}^", sha)
+        .and_return([output, status])
+    end
+
+    def stub_metadata_file(sha:, path:, before:, after:)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "show", "#{sha}^:#{path}")
+        .and_return([before, success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "show", "#{sha}:#{path}")
+        .and_return([after, success_status])
+    end
+
+    def package_json_metadata(version:, react_version: "19.0.7")
+      "#{JSON.pretty_generate({ 'name' => 'react-on-rails', 'version' => version,
+                                'dependencies' => { 'react' => react_version } })}\n"
+    end
+
+    def version_file_metadata(version:, protocol_version: "1")
+      <<~RUBY
+        module ReactOnRails
+          VERSION = "#{version}"
+          PROTOCOL_VERSION = "#{protocol_version}"
+        end
+      RUBY
+    end
+
+    def gemfile_lock_metadata(release_version:, rack_version: "3.0.0")
+      <<~LOCK
+        GEM
+          specs:
+            rack (#{rack_version})
+            react_on_rails (#{release_version})
+            react_on_rails_pro (#{release_version})
+
+        DEPENDENCIES
+          react_on_rails (= #{release_version})
+          react_on_rails_pro
+      LOCK
+    end
+
+    it "allows commits that modify only release finalization metadata" do
+      metadata_files = {
+        "react_on_rails/lib/react_on_rails/version.rb" => [
+          version_file_metadata(version: "17.0.0.rc.5"),
+          version_file_metadata(version: "17.0.0")
+        ],
+        "react_on_rails_pro/lib/react_on_rails_pro/version.rb" => [
+          version_file_metadata(version: "17.0.0.rc.5"),
+          version_file_metadata(version: "17.0.0")
+        ],
+        "package.json" => [
+          package_json_metadata(version: "17.0.0-rc.5"),
+          package_json_metadata(version: "17.0.0")
+        ],
+        "packages/react-on-rails/package.json" => [
+          package_json_metadata(version: "17.0.0-rc.5"),
+          package_json_metadata(version: "17.0.0")
+        ],
+        "react_on_rails_pro/spec/execjs-compatible-dummy/Gemfile.lock" => [
+          gemfile_lock_metadata(release_version: "17.0.0.rc.5"),
+          gemfile_lock_metadata(release_version: "17.0.0")
+        ]
+      }
+
+      stub_metadata_changes(
+        sha: "finalsha",
+        output: metadata_files.keys.map { |path| "M\t#{path}" }.join("\n")
+      )
+      metadata_files.each do |path, (before, after)|
+        stub_metadata_file(sha: "finalsha", path:, before:, after:)
+      end
+
+      expect(release_finalization_metadata_commit?(monorepo_root:, sha: "finalsha")).to be true
+    end
+
+    it "rejects commits that include runtime paths" do
+      stub_metadata_changes(
+        sha: "runtimesha",
+        output: [
+          "M\treact_on_rails/lib/react_on_rails/engine.rb",
+          "M\treact_on_rails/lib/react_on_rails/version.rb"
+        ].join("\n")
+      )
+
+      expect(release_finalization_metadata_commit?(monorepo_root:, sha: "runtimesha")).to be false
+    end
+
+    it "rejects package metadata when fields besides version change" do
+      path = "packages/react-on-rails/package.json"
+      stub_metadata_changes(sha: "packagesha", output: "M\t#{path}\n")
+      stub_metadata_file(
+        sha: "packagesha",
+        path:,
+        before: package_json_metadata(version: "17.0.0-rc.5"),
+        after: package_json_metadata(version: "17.0.0", react_version: "19.0.8")
+      )
+
+      expect(release_finalization_metadata_commit?(monorepo_root:, sha: "packagesha")).to be false
+    end
+
+    it "rejects lockfile metadata when dependencies besides release gem versions change" do
+      path = "react_on_rails_pro/Gemfile.lock"
+      stub_metadata_changes(sha: "locksha", output: "M\t#{path}\n")
+      stub_metadata_file(
+        sha: "locksha",
+        path:,
+        before: gemfile_lock_metadata(release_version: "17.0.0.rc.5"),
+        after: gemfile_lock_metadata(release_version: "17.0.0", rack_version: "3.0.1")
+      )
+
+      expect(release_finalization_metadata_commit?(monorepo_root:, sha: "locksha")).to be false
+    end
+
+    it "rejects non-modification metadata changes" do
+      stub_metadata_changes(sha: "deletesha", output: "D\tpackage.json\n")
+
+      expect(release_finalization_metadata_commit?(monorepo_root:, sha: "deletesha")).to be false
+    end
+
+    it "rejects empty diffs and git failures" do
+      stub_metadata_changes(sha: "emptysha", output: "")
+      expect(release_finalization_metadata_commit?(monorepo_root:, sha: "emptysha")).to be false
+
+      stub_metadata_changes(sha: "badsha", output: "fatal: bad revision", status: failure_status)
+      expect(release_finalization_metadata_commit?(monorepo_root:, sha: "badsha")).to be false
+    end
+  end
+
   describe "#git_parent_sha" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:success_status) { instance_double(Process::Status, success?: true) }
@@ -2737,6 +2873,9 @@ RSpec.describe "release.rake helper methods" do
         .and_return(["versionbumpsha\n", success_status])
       allow(self).to receive(:commit_non_runtime_only?)
         .with(monorepo_root:, sha: "versionbumpsha")
+        .and_return(false)
+      allow(self).to receive(:release_finalization_metadata_commit?)
+        .with(monorepo_root:, sha: "versionbumpsha")
         .and_return(true)
 
       expect do
@@ -2966,6 +3105,9 @@ RSpec.describe "release.rake helper methods" do
         .with("git", "-C", monorepo_root, "rev-list", "--reverse", "tagsha..headsha")
         .and_return(["runtimesha\n", success_status])
       allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "runtimesha")
+        .and_return(false)
+      allow(self).to receive(:release_finalization_metadata_commit?)
         .with(monorepo_root:, sha: "runtimesha")
         .and_return(false)
 
