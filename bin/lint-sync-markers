@@ -1,0 +1,468 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "open3"
+require "pathname"
+
+MARKER = "MUST SYNC:"
+SYNC_ROOTS = %w[
+  packages/react-on-rails
+  packages/react-on-rails-pro
+].freeze
+WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
+COMMENT_MARKER_PATTERN = %r{\A\s*(?:(?://|\*)\s*|/\*+\s*)MUST\ SYNC:}
+TARGET_PATH_PATTERN = %r{
+  MUST\ SYNC:
+  .*?
+  (?:exists\ in|implementation\ exists\ in|with)
+  \s+
+  `?
+  ([A-Za-z0-9_@./+\-]+)
+  `?
+}ix
+
+MarkerRecord = Struct.new(
+  :path,
+  :line_number,
+  :target_path,
+  :block,
+  :normalized_block,
+  :block_start_line,
+  :block_end_line,
+  keyword_init: true
+)
+
+def repo_root
+  output, status = Open3.capture2e("git", "rev-parse", "--show-toplevel")
+  abort "Unable to determine repo root: #{output}" unless status.success?
+
+  output.strip
+end
+
+def git_files
+  output, status = Open3.capture2e("git", "ls-files", "-z")
+  abort "Unable to list tracked files: #{output}" unless status.success?
+
+  output.split("\0")
+end
+
+def clean_repo_path(raw_path)
+  path = Pathname.new(raw_path.delete_prefix("./")).cleanpath.to_s
+  return nil if path == "." || path == ".." || path.start_with?("../")
+
+  path
+end
+
+def target_path_from(line)
+  match = line.match(TARGET_PATH_PATTERN)
+  return nil unless match
+
+  clean_repo_path(match[1].sub(/[.,;:)\]]+\z/, ""))
+end
+
+def line_offsets(lines)
+  offset = 0
+  lines.map do |line|
+    current_offset = offset
+    offset += line.bytesize
+    current_offset
+  end
+end
+
+def sync_scope_path?(path)
+  clean_path = clean_repo_path(path)
+  clean_path && SYNC_ROOTS.any? { |root| clean_path == root || clean_path.start_with?("#{root}/") }
+end
+
+def advance_line_comment(index, byte, quote)
+  return [index, :code, quote] if byte == "\n".ord
+
+  [index, :line_comment, quote]
+end
+
+def advance_block_comment(content, index, byte, quote)
+  next_byte = content.getbyte(index + 1)
+  return [index + 1, :code, quote] if byte == "*".ord && next_byte == "/".ord
+
+  [index, :block_comment, quote]
+end
+
+def advance_string(index, byte, quote)
+  return [index + 1, :string, quote] if byte == "\\".ord
+  return [index, :code, nil] if byte == quote
+
+  [index, :string, quote]
+end
+
+def advance_template(index, byte, quote)
+  return [index + 1, :template, quote] if byte == "\\".ord
+  return [index, :code, nil] if byte == "`".ord
+
+  [index, :template, quote]
+end
+
+def advance_regex(index, byte, quote)
+  return [index + 1, :regex, quote] if byte == "\\".ord
+  return [index, :regex_char_class, quote] if byte == "[".ord
+  return [index, :code, nil] if byte == "/".ord || byte == "\n".ord
+
+  [index, :regex, quote]
+end
+
+def advance_regex_char_class(index, byte, quote)
+  return [index + 1, :regex_char_class, quote] if byte == "\\".ord
+  return [index, :regex, quote] if byte == "]".ord || byte == "\n".ord
+
+  [index, :regex_char_class, quote]
+end
+
+def advance_comment_string_or_regex(content, index, state, quote)
+  byte = content.getbyte(index)
+
+  case state
+  when :line_comment
+    advance_line_comment(index, byte, quote)
+  when :block_comment
+    advance_block_comment(content, index, byte, quote)
+  when :string
+    advance_string(index, byte, quote)
+  when :template
+    advance_template(index, byte, quote)
+  when :regex
+    advance_regex(index, byte, quote)
+  when :regex_char_class
+    advance_regex_char_class(index, byte, quote)
+  else
+    [index, state, quote]
+  end
+end
+
+def previous_significant_byte(content, index)
+  index -= 1
+  index -= 1 while index >= 0 && WHITESPACE_BYTES.include?(content.getbyte(index))
+  index >= 0 ? content.getbyte(index) : nil
+end
+
+def regex_literal_start?(content, index)
+  previous_byte = previous_significant_byte(content, index)
+  return true unless previous_byte
+
+  "([{=,:;!&|?+-*~%^<>".bytes.include?(previous_byte)
+end
+
+def comment_transition(byte, next_byte)
+  return :line_comment if byte == "/".ord && next_byte == "/".ord
+  return :block_comment if byte == "/".ord && next_byte == "*".ord
+
+  nil
+end
+
+def quote_transition(byte)
+  return :string if byte == "'".ord || byte == '"'.ord
+  return :template if byte == "`".ord
+
+  nil
+end
+
+def code_state_transition(content, index)
+  byte = content.getbyte(index)
+  transition = comment_transition(byte, content.getbyte(index + 1))
+  return transition if transition
+  return :regex if byte == "/".ord && regex_literal_start?(content, index)
+
+  quote_transition(byte)
+end
+
+def next_code_state(content, index, state, quote)
+  return advance_comment_string_or_regex(content, index, state, quote) unless state == :code
+
+  transition = code_state_transition(content, index)
+  return [index, state, quote] unless transition
+
+  new_index = %i[line_comment block_comment].include?(transition) ? index + 1 : index
+  new_quote = transition == :string ? content.getbyte(index) : quote
+  [new_index, transition, new_quote]
+end
+
+def code_state_at_offset(content, offset)
+  index = 0
+  state = :code
+  quote = nil
+
+  while index < offset
+    index, state, quote = next_code_state(content, index, state, quote)
+    index += 1
+  end
+
+  [state, quote]
+end
+
+def block_comment_line?(content, offsets, line_index)
+  state, = code_state_at_offset(content, offsets.fetch(line_index))
+  state == :block_comment
+end
+
+def skip_to_block_comment_end(content, lines, offsets, line_index)
+  return line_index unless block_comment_line?(content, offsets, line_index)
+
+  index = line_index
+  index += 1 while index + 1 < lines.length && block_comment_line?(content, offsets, index + 1)
+  index
+end
+
+def line_comment_only?(line)
+  line.strip.start_with?("//")
+end
+
+def first_code_line_after_marker(content, lines, offsets, line_index)
+  index = skip_to_block_comment_end(content, lines, offsets, line_index)
+
+  index += 1
+  while index < lines.length
+    stripped = lines[index].strip
+    break unless stripped.empty? || line_comment_only?(lines[index]) || block_comment_line?(content, offsets, index)
+
+    index += 1
+  end
+
+  index < lines.length ? index : nil
+end
+
+def valid_enclosing_block_opener?(line)
+  code = line.sub(%r{\s*//.*\z}, "").strip
+  return false unless code.end_with?("{")
+
+  code.match?(/\A(?:if|for|while|switch|try\b|catch\b|finally\b|else\b|\}\s*else\b)/)
+end
+
+def immediate_enclosing_block_line(content, lines, offsets, line_index)
+  index = line_index - 1
+  index -= 1 while index >= 0 && lines[index].strip.empty?
+  return nil if index.negative?
+  return nil if block_comment_line?(content, offsets, index) || line_comment_only?(lines[index])
+  return nil unless valid_enclosing_block_opener?(lines[index])
+  return nil unless find_code_brace_on_line(content, lines, offsets, index)
+
+  index
+end
+
+def synchronized_block_start_line(content, lines, offsets, line_index)
+  if block_comment_line?(content, offsets, line_index)
+    return first_code_line_after_marker(content, lines, offsets, line_index)
+  end
+
+  immediate_enclosing_block_line(content, lines, offsets, line_index) ||
+    first_code_line_after_marker(content, lines, offsets, line_index)
+end
+
+def find_code_brace_on_line(content, lines, offsets, line_index)
+  index = offsets.fetch(line_index)
+  end_offset = index + lines.fetch(line_index).bytesize
+  state, quote = code_state_at_offset(content, index)
+  brace_index = nil
+
+  while index < end_offset
+    index, state, quote = next_code_state(content, index, state, quote)
+    brace_index = index if state == :code && content.getbyte(index) == "{".ord
+    index += 1
+  end
+
+  brace_index
+end
+
+def find_matching_brace(content, open_index)
+  index = open_index
+  state = :code
+  quote = nil
+  depth = 0
+
+  while index < content.bytesize
+    next_index, state, quote = next_code_state(content, index, state, quote)
+    index = next_index
+    byte = content.getbyte(index)
+
+    if state == :code && byte == "{".ord
+      depth += 1
+    elsif state == :code && byte == "}".ord
+      depth -= 1
+      return index if depth.zero?
+    end
+
+    index += 1
+  end
+
+  nil
+end
+
+def line_index_for_offset(content, offset)
+  content.byteslice(0...offset).count("\n")
+end
+
+def extract_sync_block(content, lines, offsets, start_line)
+  start_offset = offsets.fetch(start_line)
+  open_index = find_code_brace_on_line(content, lines, offsets, start_line)
+  return [nil, nil, nil] unless open_index
+
+  close_index = find_matching_brace(content, open_index)
+  return [nil, nil, nil] unless close_index
+
+  end_line = line_index_for_offset(content, close_index)
+  end_offset = offsets.fetch(end_line) + lines.fetch(end_line).bytesize
+
+  [content.byteslice(start_offset...end_offset), start_line, end_line]
+end
+
+def common_indent_for(lines)
+  non_empty_lines = lines.reject(&:empty?)
+  non_empty_lines.map { |line| line[/\A[ \t]*/].bytesize }.min || 0
+end
+
+def trim_blank_edges(lines)
+  lines.shift while lines.first == ""
+  lines.pop while lines.last == ""
+  lines
+end
+
+def normalize_block(block)
+  lines = block.lines.map(&:rstrip).grep_v(COMMENT_MARKER_PATTERN)
+  lines = trim_blank_edges(lines)
+  common_indent = common_indent_for(lines)
+
+  lines.map { |line| line.sub(/\A[ \t]{0,#{common_indent}}/, "") }.join("\n")
+end
+
+def parse_markers(path, content)
+  lines = content.lines
+  offsets = line_offsets(lines)
+  records = []
+  errors = []
+
+  lines.each_with_index do |line, index|
+    next unless line.match?(COMMENT_MARKER_PATTERN)
+
+    target_path = target_path_from(line)
+    unless target_path
+      errors << "#{path}:#{index + 1}: unable to parse sync target path"
+      next
+    end
+
+    block_start_line = synchronized_block_start_line(content, lines, offsets, index)
+    unless block_start_line
+      errors << "#{path}:#{index + 1}: no synchronized block found after marker"
+      next
+    end
+
+    block, start_line, end_line = extract_sync_block(content, lines, offsets, block_start_line)
+    unless block
+      errors << "#{path}:#{index + 1}: unable to extract synchronized block"
+      next
+    end
+
+    records << MarkerRecord.new(
+      path:,
+      line_number: index + 1,
+      target_path:,
+      block:,
+      normalized_block: normalize_block(block),
+      block_start_line: start_line + 1,
+      block_end_line: end_line + 1
+    )
+  end
+
+  [records, errors]
+end
+
+def first_difference(left, right)
+  left_lines = left.lines
+  right_lines = right.lines
+  max = [left_lines.length, right_lines.length].max
+
+  max.times do |index|
+    next if left_lines[index] == right_lines[index]
+
+    return [
+      index + 1,
+      (left_lines[index] || "<missing>\n").chomp,
+      (right_lines[index] || "<missing>\n").chomp
+    ]
+  end
+
+  nil
+end
+
+def drift_message(record, candidate)
+  diff = first_difference(record.normalized_block, candidate.normalized_block)
+  detail = if diff
+             line_number, left, right = diff
+             "\n  first differing normalized line #{line_number}:" \
+               "\n    #{record.path}: #{left}" \
+               "\n    #{candidate.path}: #{right}"
+           else
+             ""
+           end
+
+  "#{record.path}:#{record.line_number} block #{record.block_start_line}-#{record.block_end_line} " \
+    "does not match #{candidate.path}:#{candidate.line_number} " \
+    "block #{candidate.block_start_line}-#{candidate.block_end_line}#{detail}"
+end
+
+ROOT = repo_root
+Dir.chdir(ROOT)
+
+records = []
+errors = []
+
+git_files.sort.each do |path|
+  next unless File.file?(path)
+  next unless sync_scope_path?(path)
+
+  content = File.binread(path)
+  next unless content.include?(MARKER)
+
+  content.force_encoding(Encoding::UTF_8)
+  unless content.valid_encoding?
+    errors << "#{path}: contains #{MARKER.inspect} but is not valid UTF-8"
+    next
+  end
+
+  file_records, file_errors = parse_markers(path, content)
+  records.concat(file_records)
+  errors.concat(file_errors)
+end
+
+records_by_path = records.group_by(&:path)
+records.each do |record|
+  unless sync_scope_path?(record.target_path)
+    errors << "#{record.path}:#{record.line_number}: target #{record.target_path} is outside sync marker scope"
+    next
+  end
+
+  if record.target_path == record.path
+    errors << "#{record.path}:#{record.line_number}: target #{record.target_path} cannot be the same file"
+    next
+  end
+
+  unless File.file?(record.target_path)
+    errors << "#{record.path}:#{record.line_number}: target #{record.target_path} does not exist"
+    next
+  end
+
+  candidates = records_by_path.fetch(record.target_path, []).select { |candidate| candidate.target_path == record.path }
+  if candidates.empty?
+    errors << "#{record.path}:#{record.line_number}: target #{record.target_path} has no reciprocal #{MARKER} marker"
+    next
+  end
+
+  next if candidates.any? { |candidate| candidate.normalized_block == record.normalized_block }
+
+  errors << drift_message(record, candidates.first)
+end
+
+if errors.any?
+  warn "Sync marker lint failed:"
+  errors.uniq.each { |error| warn "  - #{error}" }
+  exit 1
+end
+
+pair_count = records.map { |record| [record.path, record.target_path].sort }.uniq.length
+puts "Checked #{records.length} #{MARKER} markers across #{pair_count} synchronized pairs."

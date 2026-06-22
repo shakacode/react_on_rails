@@ -1,0 +1,37 @@
+name: Check Sync Markers
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bin/lint-sync-markers'
+      - 'packages/react-on-rails/**'
+      - 'packages/react-on-rails-pro/**'
+      - '.github/workflows/check-sync-markers.yml'
+  pull_request:
+    paths:
+      - 'bin/lint-sync-markers'
+      - 'packages/react-on-rails/**'
+      - 'packages/react-on-rails-pro/**'
+      - '.github/workflows/check-sync-markers.yml'
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: check-sync-markers-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-sync-markers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check sync markers
+        run: ruby bin/lint-sync-markers
