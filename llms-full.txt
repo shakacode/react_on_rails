@@ -8030,7 +8030,7 @@ export default function EmailField({ error }) {
 }
 ```
 
-**With the open-source package, `useId` is not enough when you mount the same component more than once on a page.** `useId` keeps an id stable between the server render and hydration _within one mount_, but React only guarantees uniqueness _across_ separate roots when each root is given a distinct [`identifierPrefix`](https://react.dev/reference/react-dom/client/hydrateRoot#parameters). The open-source React on Rails package does not set a per-mount `identifierPrefix`, so two mounts of the same component can produce the same `useId` value (for example `«r0»`) and collide. (React on Rails Pro sets `identifierPrefix` to the container DOM id automatically only on the default RSC-provider path — that is, when RSC support is enabled — so `useId` is already safe there. Every other path, including `stream_react_component` _without_ RSC support, has the same caveat as the open-source package.)
+**With the open-source package, `useId` is not enough when you mount the same component more than once on a page.** `useId` keeps an id stable between the server render and hydration _within one mount_, but React only guarantees uniqueness _across_ separate roots when each root is given a distinct [`identifierPrefix`](https://react.dev/reference/react-dom/client/hydrateRoot#parameters). The open-source React on Rails package does not set a per-mount `identifierPrefix`, so two mounts of the same component can produce the same `useId` value (for example `«r0»`) and collide. (React on Rails Pro sets `identifierPrefix` to the container DOM id automatically on the default RSC-provider path — when RSC support is enabled — so `useId` is already safe there. On any other path, follow the open-source guidance below and pass an explicit prefix; doing so is always safe regardless of tier.)
 
 When a component can appear more than once on a page, pass a unique prefix into it — the container `id` you set with the top-level `id:` option (section 2) works well — and build your ARIA ids from that. Use the same value for `id:` and the prefix prop so they stay in sync:
 
@@ -8116,20 +8116,34 @@ What is specific to React on Rails is where this code lives.
 A minimal announcer inside a router island, reusing the shared live region from section 9:
 
 ```jsx
+// import { useEffect, useRef } from 'react';
+// import { useLocation } from 'react-router-dom'; // or your router's equivalent
+
 // Inside a React Router / TanStack Router island
 function RouteAnnouncer() {
   const { pathname } = useLocation(); // or the router's location hook
+  const firstRender = useRef(true);
 
   useEffect(() => {
-    const region = document.getElementById('app-live-region');
-    if (region) {
-      // Clear first, then set on the next tick so the change is announced
-      region.textContent = '';
-      requestAnimationFrame(() => {
-        region.textContent = `Navigated to ${document.title}`;
-      });
+    // Skip the initial mount during hydration — only announce real navigations,
+    // and do not steal focus on first page load (see "SSR and hydration").
+    if (firstRender.current) {
+      firstRender.current = false;
+      return undefined;
     }
-    document.querySelector('main')?.focus(); // <main tabIndex={-1}>
+
+    const region = document.getElementById('app-live-region');
+    if (!region) return undefined;
+
+    // Clear first, then set on the next tick so the change is announced.
+    region.textContent = '';
+    const rafId = requestAnimationFrame(() => {
+      region.textContent = `Navigated to ${document.title}`;
+      // Move focus after the new content has painted.
+      document.querySelector('main')?.focus(); // <main tabIndex={-1}>
+    });
+
+    return () => cancelAnimationFrame(rafId);
   }, [pathname]);
 
   return null;
@@ -8191,6 +8205,24 @@ Fix this by creating one persistent live region in the Rails layout. Rails can r
 ```
 
 `role="status"` already implies `aria-live="polite"`, so that is not repeated. `aria-atomic="true"` is set explicitly so screen readers announce the whole message rather than only the changed text node.
+
+If the region holds only screen-reader announcements (not visible text), hide it **visually** — not from assistive technology. `display: none` and `visibility: hidden` suppress announcements; use the clip pattern instead:
+
+```css
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+```
+
+If the same element also renders visible flash messages, leave it visible — no hiding needed.
 
 Guidance:
 
