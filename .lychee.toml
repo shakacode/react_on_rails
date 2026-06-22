@@ -73,7 +73,7 @@ exclude = [
   # ============================================================================
   # SITES THAT RETURN 5xx FROM CI
   # ============================================================================
-  '^https://reactrails\.com',              # Works locally but 504s from CI
+  '^https://(www\.)?reactrails\.com',      # Works locally but 504s from CI
   '^https://shakacode\.controlplane\.com', # Connection refused from CI
   '^https://storybook\.js\.org',           # Intermittent connection resets from CI
   '^https://redux\.js\.org/?$',            # Intermittent connection resets from CI
@@ -84,6 +84,7 @@ exclude = [
   '^https://lodash\.com',                    # Connection reset from CI
   '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI
   '^https://www\.developerway\.com/posts/react-server-components-performance$', # Returns 503 from CI
+  '^https://webaim\.org/techniques/css/invisiblecontent/?$', # Returns 504 from CI
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE
