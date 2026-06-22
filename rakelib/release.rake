@@ -497,7 +497,7 @@ def rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
   )
   return true if ancestor_status.success?
 
-  if ancestor_status.respond_to?(:exitstatus) && ancestor_status.exitstatus != 1
+  if ancestor_status.exitstatus != 1
     abort "❌ Unable to verify RC tag ancestry before release branch promotion.\n\n#{ancestor_output.strip}"
   end
 
@@ -515,15 +515,16 @@ def commit_shas_after_rc_tag!(monorepo_root:, tag_sha:, head_sha:)
   list_output.lines.map(&:strip).reject(&:empty?)
 end
 
-def non_runtime_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
+def release_branch_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
   # Keep direct callers tolerant of equal SHAs; the primary promotion path returns before calling this helper.
-  return [] if tag_sha == head_sha
-  return nil unless rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
+  return { status: :none, commits: [] } if tag_sha == head_sha
+  return { status: :not_ancestor, commits: [] } unless rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
 
   commits = commit_shas_after_rc_tag!(monorepo_root:, tag_sha:, head_sha:)
-  return nil unless commits.all? { |sha| commit_non_runtime_only?(monorepo_root:, sha:) }
+  non_runtime_only = commits.all? { |sha| commit_non_runtime_only?(monorepo_root:, sha:) }
+  return { status: :runtime_bearing, commits: } unless non_runtime_only
 
-  commits
+  { status: :non_runtime_only, commits: }
 end
 
 def ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
@@ -578,11 +579,21 @@ def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, c
 
   return if tag_sha == head_sha
 
-  non_runtime_commits = non_runtime_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
-  if non_runtime_commits
-    puts "ℹ️ Stable release branch promotion includes #{non_runtime_commits.length} " \
+  commits_after_rc_tag = release_branch_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
+  if commits_after_rc_tag[:status] == :non_runtime_only
+    puts "ℹ️ Stable release branch promotion includes #{commits_after_rc_tag[:commits].length} " \
          "non-runtime-only commit(s) after #{rc_tag}; preserving accepted RC runtime content."
     return
+  end
+
+  if commits_after_rc_tag[:status] == :not_ancestor
+    abort "❌ Stable release branch promotion must descend from the accepted RC tag.\n\n" \
+          "Current branch: #{current_branch}\n" \
+          "Current version: #{current_checkout_version}\n" \
+          "Expected tag: #{rc_tag} (#{tag_sha})\n" \
+          "Local HEAD: #{head_sha}\n\n" \
+          "The release branch tip is not reachable from #{rc_tag}. Reset this release branch to #{rc_tag}, " \
+          "or cut a new RC from this branch tip before promoting #{target_gem_version}."
   end
 
   abort <<~ERROR
@@ -1242,14 +1253,7 @@ end
 def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:, ci_branch: "main")
   puts "\nChecking CI status on origin/#{ci_branch}..."
 
-  # Only thread the branch onward when it differs from the default so the
-  # `main` path keeps its exact call signature (and existing stubs/tests).
-  # This relies on `fetch_main_ci_checks` and `required_check_names_for_main`
-  # both defaulting `ci_branch:` to "main"; keep those defaults in sync with the
-  # default here if it ever changes.
-  branch_kwargs = ci_branch == "main" ? {} : { ci_branch: }
-
-  data = fetch_main_ci_checks(monorepo_root:, allow_override:, dry_run:, **branch_kwargs)
+  data = fetch_main_ci_checks(monorepo_root:, allow_override:, dry_run:, ci_branch:)
   # `fetch_main_ci_checks` returns nil when it surfaced a violation through
   # `handle_main_ci_status_violation!` (dry-run or override path). In that case
   # the warning has already been printed and we should not continue.
@@ -1285,7 +1289,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   #   - stable:     every check_run on the commit (broader filter; any failure blocks)
   required_args = { monorepo_root: }
   required_args[:repo_slug] = repo_slug if repo_slug
-  required_args.merge!(branch_kwargs)
+  required_args[:ci_branch] = ci_branch
   required_names = required_check_names_for_main(**required_args)
   required_status_contexts = required_names ? legacy_status_contexts_for_required_checks(required_names) : []
   legacy_status_runs = []
