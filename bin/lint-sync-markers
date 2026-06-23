@@ -230,15 +230,27 @@ def skip_trailing_block_comment(content, index)
   comment_start ? comment_start - 1 : nil
 end
 
-def skip_trailing_line_comment(content, index)
-  line_start = content.rindex("\n", index) || -1
-  line_prefix = content.byteslice((line_start + 1)..index)
-  comment_start = line_prefix.rindex("//")
+def skip_trailing_line_comment(content, index, state_cache)
+  state, = code_state_at_offset(state_cache, index)
+  return index unless state == :line_comment
 
-  comment_start ? line_start + comment_start : index
+  line_start = content.rindex("\n", index) || -1
+  cursor = line_start + 1
+
+  while cursor <= index
+    cursor_state, = code_state_at_offset(state_cache, cursor)
+    if cursor_state == :line_comment && cursor.positive? &&
+       content.getbyte(cursor - 1) == "/".ord && content.getbyte(cursor) == "/".ord
+      return cursor - 2
+    end
+
+    cursor += 1
+  end
+
+  index
 end
 
-def previous_significant_code_index(content, index)
+def previous_significant_code_index(content, index, state_cache)
   index -= 1
   loop do
     index = skip_trailing_whitespace(content, index)
@@ -252,7 +264,7 @@ def previous_significant_code_index(content, index)
       next
     end
 
-    next_index = skip_trailing_line_comment(content, index)
+    next_index = skip_trailing_line_comment(content, index, state_cache)
     if next_index != index
       index = next_index
       next
@@ -262,8 +274,8 @@ def previous_significant_code_index(content, index)
   end
 end
 
-def previous_significant_token(content, index)
-  index = previous_significant_code_index(content, index)
+def previous_significant_token(content, index, state_cache)
+  index = previous_significant_code_index(content, index, state_cache)
   return nil unless index
 
   byte = content.getbyte(index)
@@ -277,8 +289,8 @@ def previous_significant_token(content, index)
   identifier_start_byte?(content.getbyte(token_start)) ? token : byte
 end
 
-def regex_literal_start?(content, index)
-  previous_token = previous_significant_token(content, index)
+def regex_literal_start?(content, index, state_cache)
+  previous_token = previous_significant_token(content, index, state_cache)
   return true unless previous_token
 
   return REGEX_LITERAL_PRECEDING_KEYWORDS.include?(previous_token) if previous_token.is_a?(String)
@@ -300,16 +312,16 @@ def quote_transition(byte)
   nil
 end
 
-def code_state_transition(content, index)
+def code_state_transition(content, index, state_cache)
   byte = content.getbyte(index)
   transition = comment_transition(byte, content.getbyte(index + 1))
   return transition if transition
-  return :regex if byte == "/".ord && regex_literal_start?(content, index)
+  return :regex if byte == "/".ord && regex_literal_start?(content, index, state_cache)
 
   quote_transition(byte)
 end
 
-def next_code_state(content, index, state, context)
+def next_code_state(content, index, state, context, state_cache = nil)
   return advance_comment_string_or_regex(content, index, state, context) unless state == :code
 
   byte = content.getbyte(index)
@@ -322,7 +334,7 @@ def next_code_state(content, index, state, context)
     end
   end
 
-  transition = code_state_transition(content, index)
+  transition = code_state_transition(content, index, state_cache)
   return [index, state, context] unless transition
 
   new_index = %i[line_comment block_comment].include?(transition) ? index + 1 : index
@@ -330,47 +342,58 @@ def next_code_state(content, index, state, context)
   [new_index, transition, new_context]
 end
 
-def code_state_at_offset(content, offset)
+def build_code_state_cache(content)
+  states = Array.new(content.bytesize + 1)
   index = 0
   state = :code
   context = initial_lexer_context
 
-  while index < offset
-    index, state, context = next_code_state(content, index, state, context)
-    index += 1
+  while index < content.bytesize
+    states[index] = [state, context]
+    next_index, next_state, next_context = next_code_state(content, index, state, context, states)
+
+    ((index + 1)..next_index).each { |skipped_index| states[skipped_index] = [next_state, next_context] }
+    index = next_index + 1
+    state = next_state
+    context = next_context
   end
 
-  [state, context]
+  states[content.bytesize] = [state, context]
+  states
 end
 
-def block_comment_line?(content, offsets, line_index)
-  state, = code_state_at_offset(content, offsets.fetch(line_index))
+def code_state_at_offset(state_cache, offset)
+  state_cache.fetch(offset)
+end
+
+def block_comment_line?(state_cache, offsets, line_index)
+  state, = code_state_at_offset(state_cache, offsets.fetch(line_index))
   state == :block_comment
 end
 
-def marker_comment_state(content, offsets, line, line_index)
-  marker_column = line.index(MARKER)
+def marker_comment_state(state_cache, offsets, line, line_index)
+  marker_column = line.byteindex(MARKER)
   return nil unless marker_column
 
-  state, = code_state_at_offset(content, offsets.fetch(line_index) + marker_column)
+  state, = code_state_at_offset(state_cache, offsets.fetch(line_index) + marker_column)
   state
 end
 
-def comment_marker_line?(content, offsets, line, line_index)
-  %i[line_comment block_comment].include?(marker_comment_state(content, offsets, line, line_index))
+def comment_marker_line?(state_cache, offsets, line, line_index)
+  %i[line_comment block_comment].include?(marker_comment_state(state_cache, offsets, line, line_index))
 end
 
-def block_comment_start_line(content, offsets, line_index)
+def block_comment_start_line(state_cache, offsets, line_index)
   index = line_index
-  index -= 1 while index.positive? && block_comment_line?(content, offsets, index)
+  index -= 1 while index.positive? && block_comment_line?(state_cache, offsets, index)
   index
 end
 
-def skip_to_block_comment_end(content, lines, offsets, line_index)
-  return line_index unless block_comment_line?(content, offsets, line_index)
+def skip_to_block_comment_end(state_cache, lines, offsets, line_index)
+  return line_index unless block_comment_line?(state_cache, offsets, line_index)
 
   index = line_index
-  index += 1 while index + 1 < lines.length && block_comment_line?(content, offsets, index + 1)
+  index += 1 while index + 1 < lines.length && block_comment_line?(state_cache, offsets, index + 1)
   index
 end
 
@@ -378,13 +401,13 @@ def line_comment_only?(line)
   line.strip.start_with?("//")
 end
 
-def first_code_line_after_marker(content, lines, offsets, line_index)
-  index = skip_to_block_comment_end(content, lines, offsets, line_index)
+def first_code_line_after_marker(state_cache, lines, offsets, line_index)
+  index = skip_to_block_comment_end(state_cache, lines, offsets, line_index)
 
   index += 1
   while index < lines.length
     stripped = lines[index].strip
-    break unless stripped.empty? || line_comment_only?(lines[index]) || block_comment_line?(content, offsets, index)
+    break unless stripped.empty? || line_comment_only?(lines[index]) || block_comment_line?(state_cache, offsets, index)
 
     index += 1
   end
@@ -392,14 +415,14 @@ def first_code_line_after_marker(content, lines, offsets, line_index)
   index < lines.length ? index : nil
 end
 
-def code_text_on_line(content, lines, offsets, line_index)
+def code_text_on_line(content, state_cache, lines, offsets, line_index)
   index = offsets.fetch(line_index)
   end_offset = index + lines.fetch(line_index).bytesize
-  state, context = code_state_at_offset(content, index)
+  state, context = code_state_at_offset(state_cache, index)
   bytes = []
 
   while index < end_offset
-    index, state, context = next_code_state(content, index, state, context)
+    index, state, context = next_code_state(content, index, state, context, state_cache)
     bytes << content.getbyte(index) if significant_code_byte?(state, context, index)
     index += 1
   end
@@ -407,46 +430,51 @@ def code_text_on_line(content, lines, offsets, line_index)
   bytes.pack("C*")
 end
 
-def valid_enclosing_block_opener?(content, lines, offsets, line_index)
-  code = code_text_on_line(content, lines, offsets, line_index).strip
+def valid_enclosing_block_opener?(content, state_cache, lines, offsets, line_index)
+  code = code_text_on_line(content, state_cache, lines, offsets, line_index).strip
   return false unless code.end_with?("{")
 
   code.match?(/\A(?:if|for|while|switch|try\b|catch\b|finally\b|else\b|\}\s*(?:else|catch|finally)\b)/)
 end
 
-def immediate_enclosing_block_line(content, lines, offsets, line_index)
+def immediate_enclosing_block_line(content, state_cache, lines, offsets, line_index)
   index = line_index - 1
   index -= 1 while index >= 0 && lines[index].strip.empty?
   return nil if index.negative?
-  return nil if block_comment_line?(content, offsets, index) || line_comment_only?(lines[index])
-  return nil unless valid_enclosing_block_opener?(content, lines, offsets, index)
-  return nil unless find_code_brace_on_line(content, lines, offsets, index)
+  return nil if block_comment_line?(state_cache, offsets, index) || line_comment_only?(lines[index])
+  return nil unless valid_enclosing_block_opener?(content, state_cache, lines, offsets, index)
+  return nil unless find_code_brace_on_line(content, state_cache, lines, offsets, index)
 
   index
 end
 
-def synchronized_block_start_line(content, lines, offsets, line, line_index)
-  if marker_comment_state(content, offsets, line, line_index) == :block_comment
-    comment_start_line = block_comment_start_line(content, offsets, line_index)
-    guarded_start_line = immediate_enclosing_block_line(content, lines, offsets, comment_start_line)
+def synchronized_block_start_line(marker_context, line, line_index)
+  content = marker_context.fetch(:content)
+  state_cache = marker_context.fetch(:state_cache)
+  lines = marker_context.fetch(:lines)
+  offsets = marker_context.fetch(:offsets)
+
+  if marker_comment_state(state_cache, offsets, line, line_index) == :block_comment
+    comment_start_line = block_comment_start_line(state_cache, offsets, line_index)
+    guarded_start_line = immediate_enclosing_block_line(content, state_cache, lines, offsets, comment_start_line)
 
     return guarded_start_line if guarded_start_line
 
-    return first_code_line_after_marker(content, lines, offsets, line_index)
+    return first_code_line_after_marker(state_cache, lines, offsets, line_index)
   end
 
-  immediate_enclosing_block_line(content, lines, offsets, line_index) ||
-    first_code_line_after_marker(content, lines, offsets, line_index)
+  immediate_enclosing_block_line(content, state_cache, lines, offsets, line_index) ||
+    first_code_line_after_marker(state_cache, lines, offsets, line_index)
 end
 
-def find_code_brace_on_line(content, lines, offsets, line_index)
+def find_code_brace_on_line(content, state_cache, lines, offsets, line_index)
   index = offsets.fetch(line_index)
   end_offset = index + lines.fetch(line_index).bytesize
-  state, quote = code_state_at_offset(content, index)
+  state, quote = code_state_at_offset(state_cache, index)
   brace_index = nil
 
   while index < end_offset
-    index, state, quote = next_code_state(content, index, state, quote)
+    index, state, quote = next_code_state(content, index, state, quote, state_cache)
     # Use the last significant { on the line; in `if (fn({})) {`, the block opener is last.
     brace_index = index if significant_code_byte?(state, quote, index) && content.getbyte(index) == "{".ord
     index += 1
@@ -455,14 +483,13 @@ def find_code_brace_on_line(content, lines, offsets, line_index)
   brace_index
 end
 
-def find_matching_brace(content, open_index)
+def find_matching_brace(content, state_cache, open_index)
   index = open_index
-  state = :code
-  quote = initial_lexer_context
+  state, quote = code_state_at_offset(state_cache, open_index)
   depth = 0
 
   while index < content.bytesize
-    next_index, state, quote = next_code_state(content, index, state, quote)
+    next_index, state, quote = next_code_state(content, index, state, quote, state_cache)
     index = next_index
     byte = content.getbyte(index)
 
@@ -483,12 +510,12 @@ def line_index_for_offset(content, offset)
   content.byteslice(0...offset).count("\n")
 end
 
-def extract_sync_block(content, lines, offsets, start_line)
+def extract_sync_block(content, state_cache, lines, offsets, start_line)
   start_offset = offsets.fetch(start_line)
-  open_index = find_code_brace_on_line(content, lines, offsets, start_line)
+  open_index = find_code_brace_on_line(content, state_cache, lines, offsets, start_line)
   return [nil, nil, nil] unless open_index
 
-  close_index = find_matching_brace(content, open_index)
+  close_index = find_matching_brace(content, state_cache, open_index)
   return [nil, nil, nil] unless close_index
 
   end_line = line_index_for_offset(content, close_index)
@@ -519,6 +546,7 @@ end
 def marker_record_from_line(marker_context, line, index)
   path = marker_context.fetch(:path)
   content = marker_context.fetch(:content)
+  state_cache = marker_context.fetch(:state_cache)
   lines = marker_context.fetch(:lines)
   offsets = marker_context.fetch(:offsets)
   errors = marker_context.fetch(:errors)
@@ -529,13 +557,13 @@ def marker_record_from_line(marker_context, line, index)
     return nil
   end
 
-  block_start_line = synchronized_block_start_line(content, lines, offsets, line, index)
+  block_start_line = synchronized_block_start_line(marker_context, line, index)
   unless block_start_line
     errors << "#{path}:#{index + 1}: no synchronized block found after marker"
     return nil
   end
 
-  block, start_line, end_line = extract_sync_block(content, lines, offsets, block_start_line)
+  block, start_line, end_line = extract_sync_block(content, state_cache, lines, offsets, block_start_line)
   unless block
     errors << "#{path}:#{index + 1}: unable to extract synchronized block"
     return nil
@@ -555,13 +583,14 @@ end
 def parse_markers(path, content)
   lines = content.lines
   offsets = line_offsets(lines)
+  state_cache = build_code_state_cache(content)
   records = []
   errors = []
-  marker_context = { path:, content:, lines:, offsets:, errors: }
+  marker_context = { path:, content:, state_cache:, lines:, offsets:, errors: }
 
   lines.each_with_index do |line, index|
     next unless line.match?(COMMENT_MARKER_PATTERN)
-    next unless comment_marker_line?(content, offsets, line, index)
+    next unless comment_marker_line?(state_cache, offsets, line, index)
 
     record = marker_record_from_line(marker_context, line, index)
     records << record if record

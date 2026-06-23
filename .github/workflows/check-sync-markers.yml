@@ -34,5 +34,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0.5'
+
       - name: Check sync markers
         run: ruby bin/lint-sync-markers
