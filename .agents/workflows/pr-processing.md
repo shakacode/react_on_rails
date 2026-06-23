@@ -781,7 +781,7 @@ After workers finish, the coordinator must keep working through the Coordinator 
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
-Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: `merged`; `ready-gates-clean` when all readiness gates pass and the next action is a mechanical merge under an already-authorized plan; `ready-no-merge-authority` when all gates pass but `merge_authority` is `none` or `ask` without a merge approval; `waiting-on-checks-or-review`; `external-gate-failing`; `blocked-user-input` with the surfaced question/comment URL; or `no-pr-evidence` with an evidence-backed issue/PR comment URL. Do not report a target `complete` while its merge ledger has any `UNKNOWN` field or `complete_allowed: false`, or while required QA Evidence is missing, stale, mismatched to scope, `blocked`, `in_progress`, or `UNKNOWN` outside the allowed private-state fallback. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, autonomous nit outcomes, decision-point counts, confidence notes, hosted-CI uncertainty that was already handled by requesting hosted CI, and the per-PR merge-ledger summary in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, `merge_authority`, final state, merge-ledger path or JSON artifact, blockers, no-PR comments, and next actions.
+Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: `merged`; `ready-gates-clean` when all readiness gates pass and the next action is a mechanical merge under an already-authorized plan; `ready-no-merge-authority` when all gates pass but `merge_authority` is `none` or `ask` without a merge approval; `waiting-on-checks-or-review`; `external-gate-failing`; `blocked-user-input` with the surfaced question/comment URL; or `no-pr-evidence` with an evidence-backed issue/PR comment URL. Do not report a target `complete` while its merge ledger has any `UNKNOWN` field or `complete_allowed: false`, or while required QA Evidence is missing, stale, mismatched to scope, `blocked`, `in_progress`, `unknown`, or `UNKNOWN` outside the allowed private-state fallback. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, autonomous nit outcomes, decision-point counts, confidence notes, hosted-CI uncertainty that was already handled by requesting hosted CI, and the per-PR merge-ledger summary in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, `merge_authority`, final state, merge-ledger path or JSON artifact, blockers, no-PR comments, and next actions.
 ```
 
 ### Question And Decision Handling
@@ -879,7 +879,7 @@ Do not report a PR/target as `complete` while `script/pr-merge-ledger <PR>
 --strict` reports `UNKNOWN` fields, review-thread/review-object violations, or
 `complete_allowed: false`. Do not report any batch that requires QA as ready
 while required QA coverage/scope evidence is missing, stale, scope-mismatched,
-marked `blocked` or `in_progress`, or still `UNKNOWN`; a QA lane whose only
+marked `blocked`, `in_progress`, or `unknown`, or still `UNKNOWN`; a QA lane whose only
 `UNKNOWN` is private coordination claim/heartbeat state may use the documented
 fallback evidence.
 
@@ -1110,7 +1110,7 @@ The closeout lane is:
 6. Verify the batch QA evidence when the Batch QA Lane section requires QA, or
    verify the `not required` rationale for low-risk batches. Audit and release
    decisions must treat missing, stale, insufficiently scoped, blocked,
-   `in_progress`, surface-mismatched, or still-`UNKNOWN` QA coverage/scope
+   `in_progress`, `unknown`, surface-mismatched, or still-`UNKNOWN` QA coverage/scope
    evidence as a readiness blocker until fixed, waived, or carried as an explicit
    blocker. A QA lane whose only `UNKNOWN` is private coordination
    claim/heartbeat state may use the documented fallback evidence.
