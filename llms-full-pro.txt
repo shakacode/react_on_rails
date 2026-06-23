@@ -9223,7 +9223,7 @@ The same five steps, with each system's function names in two columns:
   4. Hydrate     ── browser rebuilds the tree from the inlined payload → hydrateRoot
             │                                            │
   5. Navigate    ── fetch payload-only RSC data, with different granularity
-     GET /rsc_payload/:name (component payload)   GET <url>?_rsc  (segment diff)
+     GET /rsc_payload/:name (component payload)   fetchServerResponse(...) (segment diff)
 ```
 
 The single most illuminating parallel: the **inlined-payload global**. React on Rails Pro pushes
