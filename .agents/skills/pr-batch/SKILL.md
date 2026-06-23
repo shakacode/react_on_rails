@@ -89,9 +89,19 @@ Before implementation or worker launch, produce:
    - likely outcome: implementation PR, combined investigation PR, no-PR evidence comment, or product-decision blocker
    - assigned machine or worker
 6. The selected `merge_authority` value and how it affects final closeout.
-7. A permission and trust preflight result.
-8. A conflict check for overlapping files or dependent PRs.
-9. A final `/goal` prompt when the user asked for Goal mode.
+7. The Batch QA Lane decision from `.agents/workflows/pr-processing.md`: plan
+   the required QA lane representation for private coordination state when the
+   backend is available, or require the launched coordinator to record QA
+   claim/heartbeat state as `UNKNOWN` and use allowed fallback evidence (see the
+   canonical Batch QA Lane "allowed fallback evidence" definition in
+   `.agents/workflows/pr-processing.md`); for low-risk omitted QA, record the
+   final QA Evidence block with `QA required: no`, a `QA lane status` of
+   `not_applicable`, and the rationale.
+   Use the canonical capitalization convention: uppercase `UNKNOWN` means
+   coordination/backend state, and lowercase `unknown` is the QA lane status.
+8. A permission and trust preflight result.
+9. A conflict check for overlapping files or dependent PRs.
+10. A final `/goal` prompt when the user asked for Goal mode.
 
 If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/goal` prompt. Do not begin implementation from plan approval unless the user explicitly says to launch now.
 
@@ -132,10 +142,22 @@ Targets: <exact issue/PR list>.
 Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
 merge_authority: <none | ask | auto_merge_when_gates_pass>.
+Batch QA Lane: <required: lane/owner/scope/private-state or UNKNOWN fallback | not required: rationale>.
 Coordination: follow `.agents/workflows/pr-processing.md` under Coordination
 State and Worker Rules before creating worktrees or branches. Include stable
 agent ids, `agent-coord status` / claim outcomes, batch ids, dependency refs,
 and any `UNKNOWN` state in every worker lane and handoff.
+When the Batch QA Lane section requires QA, declare a `qa` lane with stable
+owner and claim/heartbeat expectations before launch when the private backend is
+available. If private state is unavailable, record QA claim/heartbeat state as
+`UNKNOWN` and use allowed fallback evidence (see the canonical Batch QA Lane
+"allowed fallback evidence" definition in `.agents/workflows/pr-processing.md`)
+instead of downgrading required QA to `not required`. Require the final QA
+Evidence block in the handoff; if QA is not required, record the `not required`
+status and rationale in that block.
+Use the canonical capitalization convention from `.agents/workflows/pr-processing.md`:
+uppercase `UNKNOWN` means coordination/backend state, and lowercase `unknown`
+is the QA lane status.
 Attention contract: follow `AGENTS.md` under Maintainer Attention Contract and
 `.agents/workflows/pr-processing.md` under Maintainer Attention Contract. Do
 not escalate behavior-preserving optional nits, batch real questions into one
@@ -310,11 +332,22 @@ Use the canonical Batch Handoff Format in
 **Immediate maintainer attention** for true blockers and questions only, and
 **FYI / decisions made** for decisions, validations, review state, hosted-CI
 requests already handled, no-PR rationales, autonomous nit outcomes,
-confidence notes, decision-point counts per PR, and per-PR merge-ledger summaries.
+confidence notes, decision-point counts per PR, QA Evidence blocks that include
+`Tested at`, the QA required decision and rationale, QA lane status, and per-PR
+merge-ledger summaries.
 Do not call a target `complete` while its ledger has `UNKNOWN` fields or
 `complete_allowed: false`.
+Do not report a batch that requires QA as ready while required QA coverage/scope
+evidence is missing, stale, scope-mismatched, `blocked`, `in_progress`,
+`unknown`, or still `UNKNOWN`; the only allowed fallback is a QA lane whose
+private coordination claim/heartbeat is `UNKNOWN` while documented QA evidence
+is otherwise complete.
 Record the selected `merge_authority` value in the handoff and use the canonical
 split final states from `.agents/workflows/pr-processing.md`.
+For every batch that requires QA under the canonical workflow's Batch QA Lane
+decision, make sure the QA lane is represented in private coordination state
+when available, or explicitly recorded as `UNKNOWN` with the canonical Batch QA
+Lane fallback evidence, and in the final handoff.
 
 ## Coordination State
 
