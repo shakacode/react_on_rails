@@ -85,7 +85,9 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
    - Do not push "hopeful" fixes just to let CI discover basic failures.
 5. Self-review before every push or PR-ready signal.
 6. Run local validation based on changed areas.
-7. Run the pre-push AI review and simplify gate when the change is non-trivial or high-risk.
+7. Run the pre-push AI review gate when the change is non-trivial,
+   high-risk, or repeatedly churny; run the `/simplify` subgate only for the
+   canonical high-risk/extra-review cases below.
 8. Update the PR body, issue, or one concise PR comment with exact verification evidence, churn notes, and remaining gaps. Every PR body must include a self-contained why/rationale summary; link issues as supporting context, but do not require reviewers to open an issue to understand why the PR exists.
 9. Only then request review, hosted CI, or merge readiness.
 
@@ -641,7 +643,8 @@ Examples:
 If the user is using `/plan`, or asks to prepare a `/goal`, stop after producing the approved plan and exact `/goal` text. Do not begin implementation just because the plan was approved unless the user explicitly says to launch now.
 
 Keep this goal prompt aligned with `.agents/skills/pr-batch/SKILL.md`,
-including the review/audit gate paragraphs.
+including the review/audit gate paragraphs. Keep sync-maintenance comments
+outside the fenced prompt so they are not copied into generated `/goal` text.
 
 The `$pr-batch` skill links to this canonical `Coordination:` paragraph instead
 of duplicating it.
@@ -695,7 +698,7 @@ plus confidence notes in handoffs.
 
 Fetch/prune main first, confirm the expected repo root, and verify any nested repo paths before assigning work. Classify each target as an implementation PR, combined investigation PR, deliberate no-PR evidence comment, or product-decision blocker.
 
-For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main and target `main` by default. **Release-phase override:** when the work is a stabilizing fix for an active RC (the applicable release line is in the `rc`/`final` phase and the fix belongs on the release branch), branch from and open the PR against `origin/release/X.Y.Z` instead of `main`, then forward-port to `main` with `git cherry-pick -x <sha>` per the runbook — do not open the fix against `main` and rely on someone noticing it needs cherry-picking onto the RC. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, pre-push review/simplify, CI backpressure, and merge-readiness gates.
+For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main and target `main` by default. **Release-phase override:** when the work is a stabilizing fix for an active RC (the applicable release line is in the `rc`/`final` phase and the fix belongs on the release branch), branch from and open the PR against `origin/release/X.Y.Z` instead of `main`, then forward-port to `main` with `git cherry-pick -x <sha>` per the runbook — do not open the fix against `main` and rely on someone noticing it needs cherry-picking onto the RC. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, the pre-push review gate, CI backpressure, and merge-readiness gates.
 
 For non-trivial, high-risk, hosted-CI-labeled, force-full, benchmark-labeled,
 workflow/build-config, dependency/runtime-version, or broad refactor PRs (labels per `AGENTS.md` → **Agent Workflow Configuration**), commit the intended
@@ -717,17 +720,14 @@ controls. For lockfile changes, include Dependabot ecosystem and
 directory/directories compatibility, then apply the lockfile content-diff
 evidence requirement from the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`.
 
-For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
-
-<!-- Keep this /simplify block in sync with .agents/skills/pr-batch/SKILL.md and its Goal Prompt Template. -->
-
-- Preferred invocation: `claude -p '/simplify origin/<base>' --model <default-simplify-model> --max-budget-usd 20`, substituting the Default simplify model from `AGENTS.md`, adjusting `<base>` to the PR's real base branch, and using it only when that command targets the current branch diff. This maintainer-requested default pins Opus for deep simplification; update it only by maintainer request and do not silently substitute another model.
-- Fallback target form: if the preferred command cannot target the diff correctly, use the local Claude-supported range form, such as `/simplify origin/<base>...HEAD`. The target must be the PR/branch diff, for example `origin/main...HEAD`, not an empty uncommitted diff.
-- Mode: do not use plan mode unless the surrounding workflow explicitly requires a no-edit review-only run.
-- Acceptance: treat `/simplify` output as advisory. Accept only simplifications that reduce real complexity without changing behavior or widening scope; reject speculative rewrites, style churn, broad abstractions, and changes outside the PR's target issue/scope.
-- Validation loop: if accepted simplifications change files, rerun targeted validation and the review/simplify gate as appropriate.
-- Skip evidence: if `/simplify` is unavailable, times out, hits budget, rejects the pinned model flag, or cannot target the PR diff correctly, record it as skipped with exact evidence instead of blocking indefinitely.
-- Evidence/churn notes: record the primary review gate, Claude review pass if run or skipped, whether `/simplify` was run/skipped/accepted/rejected and why, and any automated review findings waived, deferred, or classified as noise.
+For `/simplify`, follow `.agents/workflows/pr-processing.md` under
+**Pre-Push AI Review And Simplify Gate** and **Canonical `/simplify` Policy**.
+Non-trivial changes require the primary local/adversarial review gate, but
+`/simplify` applies only when the change also matches the canonical
+high-risk/extra-review cases or a maintainer requests it. Use the `AGENTS.md`
+Default simplify model, target the PR/branch diff, treat output as advisory,
+rerun targeted validation for accepted changes, and record exact run/skip
+evidence.
 
 Before merge, verify the current head SHA, then wait for requested or configured
 review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex
@@ -1165,27 +1165,69 @@ If self-review finds a real issue, fix it locally before pushing. Do not post se
 For non-trivial, high-risk, or repeatedly churny changes, do more local review before
 asking GitHub reviewers or CI to spend another cycle.
 
+### Canonical `/simplify` Policy
+
+This subsection is the canonical `/simplify` source of truth. Goal templates and
+skill docs should point here instead of duplicating command details. Keep any
+sync-maintenance comments outside generated `/goal` fenced text.
+
+Applicability:
+
+- Always run the primary local/adversarial self-review gate for non-trivial,
+  high-risk, or repeatedly churny changes.
+- Run Claude's `/simplify` only when a maintainer asks for it or when the change
+  is one of the high-risk/extra-review cases: high-risk,
+  `ready-for-hosted-ci`, `force-full-hosted-ci`, benchmark labels (`benchmark`,
+  `benchmark-core`, `benchmark-pro`, or `benchmark-pro-node-renderer`),
+  workflow/build-config, dependency/runtime-version, or broad-refactor scoped.
+  A non-trivial or repeatedly churny change alone does not require `/simplify`.
+
+Execution:
+
+- Preferred invocation for a PR targeting `main`: `claude -p '/simplify origin/main' --model claude-opus-4-8 --max-budget-usd 20`. The model value is the Default simplify model from `AGENTS.md` in this checkout; update this example only when that value changes by maintainer request, and do not silently substitute another model.
+- For another base branch, replace `origin/main` with the PR's real base, for
+  example `origin/release/X.Y.Z`. Use the preferred command only when it targets
+  the current branch diff.
+- Fallback target form: if the preferred command cannot target the diff
+  correctly, use the local Claude-supported range form, such as
+  `/simplify origin/<base>...HEAD`. The target must be the PR/branch diff, for
+  example `origin/main...HEAD`, not an empty uncommitted diff.
+- Mode: do not use plan mode unless the surrounding workflow explicitly
+  requires a no-edit review-only run.
+- Acceptance: treat `/simplify` output as advisory. Accept only simplifications
+  that reduce real complexity without changing behavior or widening scope;
+  reject speculative rewrites, style churn, broad abstractions, and changes
+  outside the PR's target issue/scope.
+- Validation loop: if accepted simplifications change files, rerun targeted
+  validation and the review/simplify gate as appropriate.
+- Skip evidence: if `/simplify` is unavailable, times out, hits budget, rejects
+  the pinned model flag, or cannot target the PR diff correctly, record it as
+  skipped with exact evidence instead of blocking indefinitely.
+- Evidence/churn notes: record the primary review gate, Claude review pass if
+  run or skipped, whether `/simplify` was run/skipped/accepted/rejected and why,
+  and any automated review findings waived, deferred, or classified as noise.
+
 1. Commit the intended implementation batch locally first so every later suggestion has a
    clean before/after diff. Do not push only to trigger review.
 2. Apply the local/adversarial self-review gate on the committed branch diff, normally via
    `.agents/skills/autoreview/SKILL.md`. The default engine is `codex review --base origin/main` or
    the PR's real base.
-3. When the maintainer asks for Claude review, or when the change is high-risk, hosted-CI-labeled,
-   force-full, benchmark-labeled, workflow/build-config, dependency/runtime-version, or broad-refactor scoped, run
+3. When the maintainer asks for Claude review, or when the change is high-risk,
+   `ready-for-hosted-ci`, `force-full-hosted-ci`, benchmark labels (`benchmark`,
+   `benchmark-core`, `benchmark-pro`, or `benchmark-pro-node-renderer`),
+   workflow/build-config, dependency/runtime-version, or broad-refactor scoped, run
    one additional Claude Code review pass if the current environment provides it, for example
    `/code-review` or `/code-review ultra`. If Claude review tooling is unavailable, state that in
    the PR evidence instead of substituting an unrelated tool.
 4. Verify every Codex or Claude finding against the real code before acting. Accept only concrete
    blockers or clear simplifications that preserve behavior; reject speculative rewrites, broad
    refactors, and style churn.
-5. For those high-risk cases, run `/simplify` after all required review passes for that case are
-   clean, including Claude Code review when required, and before the final push or readiness report.
-   Keep this checklist summary in sync with the canonical `/simplify` block above. Preferred
-   invocation: `claude -p '/simplify origin/<base>' --model <default-simplify-model> --max-budget-usd 20`,
-   substituting the Default simplify model from `AGENTS.md`, adjusting `<base>` to the PR's real base branch, and only if the command targets the current branch diff.
-   Otherwise use a local range form such as `/simplify origin/<base>...HEAD`. Accept only
-   behavior-preserving simplifications that reduce real complexity; record unavailable, timed-out,
-   over-budget, stale-model, or bad-target runs as skipped with exact evidence.
+5. For the canonical high-risk/extra-review cases above, run `/simplify` after
+   all required review passes for that case are clean, including Claude Code
+   review when required, and before the final push or readiness report. Use the
+   **Canonical `/simplify` Policy** in this section for the exact command,
+   fallback target form, acceptance, validation, skip-evidence, and churn-note
+   rules.
 6. After accepting any review or `/simplify` change, rerun the targeted validation for the changed
    surface and rerun the relevant review gate before pushing, continuing until there are no
    accepted/actionable findings.
