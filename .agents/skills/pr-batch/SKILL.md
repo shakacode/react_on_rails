@@ -342,11 +342,10 @@ evidence is missing, stale, scope-mismatched, `blocked`, `in_progress`, or still
 claim/heartbeat is `UNKNOWN` while documented QA evidence is otherwise complete.
 Record the selected `merge_authority` value in the handoff and use the canonical
 split final states from `.agents/workflows/pr-processing.md`.
-For release-affecting, workflow/build/tooling, generated-output, broad runtime,
-or mixed batches, make sure the canonical workflow's Batch QA Lane decision is
-represented in private coordination state when available, or explicitly recorded
-as `UNKNOWN` with the canonical Batch QA Lane fallback evidence, and in the final
-handoff.
+For every batch that requires QA under the canonical workflow's Batch QA Lane
+decision, make sure the QA lane is represented in private coordination state
+when available, or explicitly recorded as `UNKNOWN` with the canonical Batch QA
+Lane fallback evidence, and in the final handoff.
 
 ## Coordination State
 
