@@ -10,7 +10,7 @@ SYNC_ROOTS = %w[
   packages/react-on-rails-pro
 ].freeze
 WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
-REGEX_LITERAL_PRECEDING_PUNCTUATION_BYTES = "([{=,:;!&|?+-*~%^<>".bytes.freeze
+REGEX_LITERAL_PRECEDING_PUNCTUATION_BYTES = "([{}=,:;!&|?+-*~%^<>".bytes.freeze
 REGEX_LITERAL_PRECEDING_KEYWORDS = %w[
   await
   case
@@ -36,7 +36,13 @@ TARGET_PATH_PATTERN = %r{
   ([A-Za-z0-9_@./+\-]+)
   `?
 }ix
-GUARD_HEADER_PATTERN = /\A(?:if\b|for\b|while\b|switch\b|try\b|catch\b|finally\b|else\b|\}\s*(?:else|catch|finally)\b)/
+GUARD_HEADER_PATTERN = /
+  \A
+  (?:
+    if\b|for\b|while\b|do\b|switch\b|try\b|catch\b|finally\b|else\b|
+    \}\s*(?:else|catch|finally)\b
+  )
+/x
 
 MarkerRecord = Struct.new(
   :path,
@@ -239,7 +245,12 @@ def skip_trailing_block_comment(content, index, state_cache)
 
   cursor = index - 1
   while cursor.positive?
-    return cursor - 2 if block_comment_opener_at?(content, state_cache, cursor)
+    if block_comment_opener_at?(content, state_cache, cursor)
+      previous_index = cursor - 2
+      return previous_index unless previous_index.negative?
+
+      return nil
+    end
 
     cursor -= 1
   end
@@ -360,6 +371,7 @@ def next_code_state(content, index, state, context, state_cache)
 end
 
 def build_code_state_cache(content)
+  # Dense by byte offset so later lexer-state queries are O(1) without rescanning.
   states = Array.new(content.bytesize + 1)
   index = 0
   state = :code
@@ -401,6 +413,7 @@ def comment_marker_line?(state_cache, offsets, line, line_index)
 end
 
 def block_comment_start_line(state_cache, offsets, line_index)
+  # Continuation lines start in :block_comment; the opening /* line starts in :code.
   index = line_index
   index -= 1 while index.positive? && block_comment_line?(state_cache, offsets, index)
   index
@@ -448,11 +461,13 @@ def code_text_on_line(content, state_cache, lines, offsets, line_index)
 end
 
 def guard_header_start_line(content, state_cache, lines, offsets, brace_line)
+  accumulated = []
   brace_line.downto(0) do |candidate_line|
-    code = (candidate_line..brace_line).map do |line_index|
-      code_text_on_line(content, state_cache, lines, offsets, line_index).strip
-    end.reject(&:empty?).join(" ")
-    next if code.empty?
+    line_code = code_text_on_line(content, state_cache, lines, offsets, candidate_line).strip
+    accumulated.unshift(line_code) unless line_code.empty?
+    next if accumulated.empty?
+
+    code = accumulated.join(" ")
     next unless code.end_with?("{") && code.match?(GUARD_HEADER_PATTERN)
 
     return candidate_line
@@ -581,7 +596,8 @@ def marker_record_from_line(marker_context, line, index)
 
   target_path = target_path_from(line)
   unless target_path
-    errors << "#{path}:#{index + 1}: unable to parse sync target path"
+    errors << "#{path}:#{index + 1}: unable to parse sync target path; expected linking phrase " \
+              "'exists in', 'implementation exists in', or 'with'"
     return nil
   end
 
@@ -686,9 +702,13 @@ git_files.sort.each do |path|
     next
   end
 
-  file_records, file_errors = parse_markers(path, content)
-  records.concat(file_records)
-  errors.concat(file_errors)
+  begin
+    file_records, file_errors = parse_markers(path, content)
+    records.concat(file_records)
+    errors.concat(file_errors)
+  rescue StandardError => e
+    errors << "#{path}: unexpected error during parsing (#{e.class}: #{e.message})"
+  end
 end
 
 records_by_path = records.group_by(&:path)
