@@ -42,7 +42,7 @@ handoffs, Codex/Claude comparison, and output templates.
    - correctness, regression, compatibility, security, and performance risks
    - missing or weak tests and validation evidence
    - missing changelog entries for user-visible changes
-   - release-sensitive surfaces such as CI, build config, generators, SSR, RSC, shared types, Pro/core boundaries, packaging, and docs that affect behavior
+   - release-sensitive surfaces such as CI, build config, generators, performance- or framework-sensitive runtime paths, shared types, package/core boundaries, packaging, and docs that affect behavior
    - late, stale, asynchronous, or untriaged review-agent feedback
    - AI review systems being incorrectly treated as special approval gates
    - cross-PR interactions when the PR is part of a batch

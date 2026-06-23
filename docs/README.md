@@ -32,7 +32,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 
 - [Introduction](./oss/introduction.md)
 - [Core Concepts](./oss/core-concepts/how-react-on-rails-works.md)
-- [Accessibility (a11y)](./oss/building-features/accessibility.md) — WCAG AA practices for SSR, hydration, and RSC-streamed UI
+- [Accessibility (a11y)](./oss/building-features/accessibility.md) — framework-specific a11y for SSR, hydration, and RSC-streamed UI
 - [API Reference](./oss/api-reference/view-helpers-api.md)
 - [Deployment and troubleshooting](./oss/deployment/README.md)
 - [Configuration](./oss/configuration/README.md)

@@ -156,7 +156,8 @@ Include the review body as a general comment when it contains actionable feedbac
 **If only PR number is provided (full-PR scan), fetch all review data with the helper:**
 
 ```bash
-.agents/skills/address-review/bin/fetch-pr-review-data "${PR_NUMBER}" --repo "${REPO}" > review-data.json
+ADDRESS_REVIEW_SKILL_DIR="${ADDRESS_REVIEW_SKILL_DIR:-.agents/skills/address-review}"
+"${ADDRESS_REVIEW_SKILL_DIR}/bin/fetch-pr-review-data" "${PR_NUMBER}" --repo "${REPO}" > review-data.json
 ```
 
 This single read-only call replaces the per-endpoint `gh api ... | jq` blocks and the `reviewThreads` GraphQL query. It emits one normalized JSON document:
@@ -643,7 +644,9 @@ else
       echo "Inspect and fix ${issue_body_file} before retrying." >&2
       exit 1
     fi
-    FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
+    # FOLLOW_UP_PREFIX has no safe default; resolve it from the repo seam before creating issues.
+    FOLLOW_UP_PREFIX="${FOLLOW_UP_PREFIX:?set FOLLOW_UP_PREFIX from AGENTS.md -> Agent Workflow Configuration}"
+    FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "${FOLLOW_UP_PREFIX} Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
     TRACKING_OUTCOME="new issue ${FOLLOW_UP_URL}"
   fi
 
@@ -660,7 +663,7 @@ Rules for follow-up issues:
 - Follow-up issues are expensive; default to no new issue.
 - Prefer linking an existing issue over creating a new one.
 - Create at most one follow-up issue per PR by default. More than one follow-up issue requires explicit user approval.
-- Every new follow-up issue title must begin with the exact prefix `Follow-up:`.
+- Every new follow-up issue title must begin with the repo's follow-up issue prefix (see `AGENTS.md` → **Agent Workflow Configuration**).
 - Build multi-line issue bodies with `--body-file`; never pass escaped newline strings through `--body`.
 - Only include non-trivial `SKIPPED` items (skip pure duplicates and factually incorrect suggestions)
 - For `f+i`, omit the must-fix section because must-fix items were addressed in the current PR

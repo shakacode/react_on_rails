@@ -39,9 +39,11 @@ should use this PR branch or `main` for the current workflow docs.
    bin/agent-coord --help
    bin/agent-coord bootstrap
    export PATH="$HOME/.local/bin:$PATH"
-   agent-coord doctor
+   hash -r 2>/dev/null || true
+   command -v agent-coord || which agent-coord
+   agent-coord doctor --json
    agent-coord config show --json
-   agent-coord status
+   agent-coord status --batch-id <batch-id> --json
    ```
 
    The remaining snippets assume that `PATH` entry is present in the active
@@ -50,12 +52,13 @@ should use this PR branch or `main` for the current workflow docs.
    also installs `agent_coord` as an underscore alias for launchers or prompts
    that use that spelling.
 
-4. If `doctor` or `status` exits non-zero, report private state as `UNKNOWN` and
-   use the structured public claim comment fallback where dependency rules allow
-   it. Do not start a dependency-sensitive lane when the lane declares
-   `depends_on` and private status cannot be checked.
+4. If `doctor --json` fails, or targeted status exits non-zero (exit 2 means
+   degraded/UNKNOWN) or times out, report private state as `UNKNOWN` and use the
+   structured public claim comment fallback where dependency rules allow it. Do
+   not start a dependency-sensitive lane when the lane declares `depends_on` and
+   private status cannot be checked.
 5. Before dependent lanes start, the coordinator creates or updates
-   `batches/<batch-id>.json` in the private backend so `agent-coord status` can
+   `batches/<batch-id>.json` in the private backend so targeted batch status can
    render `blocked_on` refs.
 6. Each worker claims before creating a worktree, branch, or conductor session:
 
@@ -86,12 +89,14 @@ should use this PR branch or `main` for the current workflow docs.
      --status in_progress
    ```
 
-8. Before rebase, push, readiness, or closeout, rerun `agent-coord status`. If a
-   lane shows non-empty `blocked_on`, set the worker heartbeat to
-   `--status blocked`, report the blocked refs, and move to independent work.
+8. Before rebase, push, readiness, or closeout, rerun
+   `agent-coord status --batch-id <batch-id> --json`. If a lane shows non-empty
+   `blocked_on`, set the worker heartbeat to `--status blocked`, report the
+   blocked refs, and move to independent work.
 9. Final handoff from the second machine must include the agent id, batch id,
-   branch/PR URL, validation run, current `agent-coord status` summary, blockers,
-   and `UNKNOWN` for anything not verified live.
+   branch/PR URL, validation run, current
+   `agent-coord status --batch-id <batch-id> --json` summary, blockers, and
+   `UNKNOWN` for anything not verified live.
 
 ## Baseline Topology
 
@@ -170,14 +175,18 @@ lanes or after the old claim is gone.
 
 Use this lifecycle for every lane:
 
-1. **Kickoff**: the coordinator runs `agent-coord status`, confirms the target
-   repo, and chooses non-overlapping lane owners.
+1. **Kickoff**: the coordinator runs targeted status when a batch id or target
+   is known, confirms the target repo, and chooses non-overlapping lane owners.
+   If no batch id or target is known yet, run `agent-coord doctor --json` to
+   confirm backend health, then assign targets or a batch id before any status
+   read. Broad `agent-coord status` is audit-only.
 2. **Claim**: the lane owner takes an `agent-coord claim` for the repo and
    issue/PR target before creating a branch, worktree, or conductor session.
 3. **Heartbeat**: the owner sends `agent-coord heartbeat` at every phase
    transition: item start, branch update, PR update, review pass, blocked state,
    resumed state, and done state.
-4. **Status**: the coordinator checks `agent-coord status` before starting
+4. **Status**: the coordinator checks
+   `agent-coord status --batch-id <batch-id> --json` before starting
    dependency-sensitive work, rebasing, pushing, finishing, or reassigning a
    target.
 5. **Blocked**: the owner records the blocker in coordination state and stops
@@ -253,7 +262,8 @@ one batch wait for the other lane's done heartbeat.
 
 ### Mobile Batch Host Goes Offline
 
-1. Check `agent-coord status` for the affected lane.
+1. Check targeted `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json`
+   or `agent-coord status --batch-id <batch-id> --json` for the affected lane.
 2. If the heartbeat is still live, do not take over. Wait or contact the
    operator through the coordinator channel.
 3. If the heartbeat is stale, pause dependent work and avoid starting new lanes
@@ -326,7 +336,9 @@ coordination state:
 Before kickoff:
 
 - confirm exact issue/PR targets and trusted scope;
-- run `agent-coord status`;
+- run targeted `agent-coord status --repo <repo> --target <issue-or-pr> --json`
+  for each exact target before routing, then
+  `agent-coord status --batch-id <batch-id> --json` for dependency lanes;
 - assign agent ids using `<machine-or-profile>-<batch>-<lane>`;
 - route packages so concurrent batches do not overlap;
 - reserve conductor.build only for single-PR focus or finishing;

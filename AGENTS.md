@@ -7,21 +7,38 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 ## Reusable Workflows
 
 - `AGENTS.md`: canonical entry point for agent instructions and workflow discovery
-- `.agents/skills/`: agent skills; `.claude/skills` is a symlink here so Claude Code exposes the same workflows as slash commands
-- `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
+- Shared agent workflow skills may be installed in the user's or agent's normal
+  skill directory and reused across repos; they must resolve repo-specific
+  values through this repo's `AGENTS.md` seam. The canonical shared source is
+  [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows).
+  Use that repo's `agent-workflows-status` and `upgrade-agent-workflows`
+  helpers to keep installed Codex or Claude homes current.
+- `.agents/skills/`: repo-local skill copies/overrides plus repo-specific skills;
+  `.claude/skills` is a symlink here so Claude Code exposes the same workflows as
+  slash commands in this checkout.
+- `.agents/workflows/`: repo-local workflow files for Codex, GPT, and other
+  non-Claude tools when this checkout needs local copies or overrides.
 - If a tool or skill picker only exposes installed/global skills, treat those
-  skills as launchers. After fetching, prefer repo-local `.agents/skills/...`
-  and `.agents/workflows/...` files when they exist; installed/global skills do
-  not override this repo's policy.
-- `internal/contributor-info/agent-workflow-adoption.md`: guide for copying these agent workflows into other repositories
+  skills as launchers. Installed/global skills never override this repo's
+  `AGENTS.md`; repo-local files win only when this repo explicitly names or
+  keeps a local copy/override.
+- `.agents/bin/agent-workflow-seam-doctor`: validates that repo-local or
+  installed/shared workflow skills can resolve this repo's seam; pass
+  `--shared <agent-workflows-root>` when checking user-installed skills outside
+  this checkout.
+- `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing
+  these agent workflows with other repositories through user-installed skills
+  plus a repo-local seam
+- `internal/contributor-info/portable-agent-workflows-seam-design.md`: design
+  rationale for the user-installed skill + seam model
 - `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
 - `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing
 - When deciding whether an issue or proposed fix is worth doing, use `.agents/skills/evaluate-issue/SKILL.md`; a short invocation is `$evaluate-issue` or "Is this issue worth fixing?"
 - When the user wants a ready prompt for review-only GitHub issue triage or an all-open-issues audit, use `.agents/skills/plan-issue-triage/SKILL.md`; a short invocation is `$plan-issue-triage` or "Plan an issue triage"
 - When the user wants a generated whole-surface issue/PR inventory, dependency graph, and capacity-aware batch split, use `.agents/skills/triage/SKILL.md`; a short invocation is `$triage` or "Run triage"
-- When the user wants to choose issues or PRs for a future Codex batch, use `.agents/skills/plan-pr-batch/SKILL.md` to produce a ready `$pr-batch` goal; a short invocation is `$plan-pr-batch` or "Plan a Codex batch"
-- When the user wants a multi-issue or multi-PR Codex batch, use `.agents/skills/pr-batch/SKILL.md`; a short invocation is `$pr-batch` or "Run a Codex batch"
+- When the user wants to choose issues or PRs for a future agent/Codex/Claude batch, use `.agents/skills/plan-pr-batch/SKILL.md` to produce a ready `$pr-batch` goal; a short invocation is `$plan-pr-batch` or "Plan a PR batch"
+- When the user wants a multi-issue or multi-PR agent/Codex/Claude batch, use `.agents/skills/pr-batch/SKILL.md`; a short invocation is `$pr-batch`, "Run an agent batch", "Run a Codex batch", or "Run a Claude batch"
 - When the user wants to stop or cancel an in-flight Codex/Claude batch (for example to relaunch it with updated skills), follow the **Cancelling Or Stopping A Batch** protocol in `.agents/workflows/pr-processing.md#cancelling-or-stopping-a-batch`; there is no short skill invocation for this coordinator action
 - When the user wants to audit merged batch work, missed reviews, release-candidate risk, or possible bad merges, use `.agents/skills/post-merge-audit/SKILL.md`; reusable prompts live in `.agents/workflows/post-merge-audit.md`
 - When the user wants an adversarial PR review, red-team review, Claude/Codex comparison review, or a stricter pre-merge gate, use `.agents/skills/adversarial-pr-review/SKILL.md`; reusable prompts live in `.agents/workflows/adversarial-pr-review.md`
@@ -91,11 +108,132 @@ unless the user explicitly asks to reproduce an old SHA, continue an existing PR
 branch, bisect, or work offline. Creating a new worktree does not fetch from
 GitHub by itself.
 
-After fetching, verify repo-local workflow files before falling back to installed
-skills. If `.agents/skills/...` or `.agents/workflows/pr-processing.md` is
-missing in the checkout but present on `origin/main`, update the worktree before
-continuing; if it is still missing, report the repo workflow state as `UNKNOWN`
-instead of silently using a global skill fallback.
+After fetching, verify the `## Agent Workflow Configuration` seam before relying
+on installed/shared skills for issue, PR, or batch work:
+
+```bash
+.agents/bin/agent-workflow-seam-doctor
+```
+
+When checking user-installed shared skills outside this checkout, add
+`--shared <agent-workflows-root>`; for example, a clone of
+`https://github.com/shakacode/agent-workflows`.
+
+If a workflow explicitly needs a repo-local `.agents/skills/...` or
+`.agents/workflows/...` file and that file is missing in the checkout but present
+on `origin/main`, update the worktree before continuing; if it is still missing,
+report the repo workflow state as `UNKNOWN` instead of silently using a global
+skill fallback.
+
+For user-installed shared skills, check the installed pack with:
+
+```bash
+agent-workflows-status --host codex
+```
+
+Use `--host claude` for Claude Code installs. To upgrade and validate this repo
+in one step, run:
+
+```bash
+upgrade-agent-workflows --host codex --consumer-root "$(pwd)"
+```
+
+## Agent Workflow Configuration
+
+Shared workflow skills are repo-agnostic whether they are installed in the
+user/agent environment or present as repo-local compatibility copies: they carry
+the workflow logic but defer every repo-specific command, branch, label, path,
+and policy to this section. When a skill says "run the repo's local validation"
+or "use the hosted-CI trigger," the concrete value is here. Adopting repos
+replace these values with their own and validate the seam with
+`.agents/bin/agent-workflow-seam-doctor`, plus `--shared <agent-workflows-root>`
+when checking user-installed shared skills outside the checkout. The shared
+source lives at
+[`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows);
+see
+[`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
+
+- **Base branch**: `main` (fetch and compare via `origin/main`).
+- **Pre-push local validation**: `bin/ci-local` (optimized by default; `--changed` narrow,
+  `--all` broad, `--fast` quick). The script owns base discovery — do not pass a base ref.
+  Broad suites: `bundle exec rake all_but_examples` vs `bundle exec rake`. Contract:
+  [`internal/contributor-info/local-ci-contract.md`](internal/contributor-info/local-ci-contract.md).
+- **CI change detector**: `script/ci-changes-detector origin/main` (inspect suite routing).
+- **Hosted-CI trigger**: `+ci-*` PR-comment commands (`+ci-status`, `+ci-run-hosted`,
+  `+ci-force-full`, `+ci-stop-hosted`, `+ci-stop-full`, `+ci-skip-hosted [reason]`, `+ci-help`);
+  labels `ready-for-hosted-ci` and `force-full-hosted-ci`; human helper `bin/request-hosted-ci`.
+  Decision rules are in the **Review Workflow → PR CI Labels** section.
+- **Benchmark labels**: `benchmark`, `benchmark-core`, `benchmark-pro`,
+  `benchmark-pro-node-renderer`, and `hosted-ci-no-benchmarks` (suppress). Opt-in on PRs.
+- **Follow-up issue prefix**: `Follow-up:`. Default to no new issue; see the **Maintainer
+  Attention Contract** section.
+- **Changelog**: `/CHANGELOG.md`, user-visible changes only. Entry format, the `**[Pro]**`
+  scope tag, the version-stamping task (`bundle exec rake "update_changelog[...]"`), and the
+  classification taxonomy are in the **Changelog** section.
+- **Lint / format**: `(cd react_on_rails && bundle exec rake lint)` (package lint),
+  `(cd react_on_rails && bundle exec rake autofix)` (fix),
+  `pnpm start format.listDifferent` (Prettier check), `bin/check-links` (markdown links). Full
+  list in the **Commands** section.
+- **Merge ledger**: `script/pr-merge-ledger <PR> --strict` — machine-checkable per-PR
+  merge-readiness check emitting changelog classification and a `complete_allowed` verdict.
+- **Docs checks**: `script/check-docs-sidebar` (sidebar coverage), `bin/check-links` (links).
+- **Tests**: unit/integration/e2e per the **Testing** and **Commands** sections
+  (`bundle exec rake run_rspec:*`, `pnpm run test`,
+  `(cd react_on_rails/spec/dummy && pnpm test:e2e)`).
+- **Build / type checks**: `pnpm run build`, `pnpm run type-check`, `bundle exec rake rbs:validate`,
+  `actionlint`, `yamllint .github/` — see the **Commands** section.
+- **Review gate**: `claude-review` is the preferred independent review check; see the
+  **Review Workflow** section.
+- **Approval-exempt change categories**: workflow, build-config, package-script, dependency,
+  lockfile, and Pro edits on trusted assignments — allowed with focused scope, validation, and
+  clear PR evidence (not standing pre-approval). See the **Boundaries → Always** section.
+- **Coordination backend**: ShakaCode-internal repos share the private
+  `shakacode/agent-coordination` backend (claims/heartbeats namespaced by full repo name).
+  External adopters use the structured public claim-comment fallback in
+  [`.agents/workflows/pr-processing.md`](.agents/workflows/pr-processing.md).
+
+## Agent Coordination Reads
+
+`agent-coord doctor --json` is the lightweight backend health check. Use
+`agent-coord doctor --deep --json` only for a full backend JSON audit: it parses
+every claim, heartbeat, and batch JSON state record, so it is slower and broader
+than the default health probe. Use `doctor --deep --json` only for full backend
+audit sweeps that intentionally parse all coordination records, not routine
+preflight checks. If the active shell may have cached an old install, run
+`hash -r 2>/dev/null || true` in a POSIX-style shell such as bash or zsh, or
+that shell's rehash equivalent, then confirm via
+`command -v agent-coord || which agent-coord`.
+
+Before dependency-sensitive actions, use targeted private coordination reads.
+The direct `agent-coord` subcommands are:
+
+```bash
+# Specific issue/PR lane
+agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json
+
+# Batch lane/dependency state
+agent-coord status --batch-id <batch-id> --json
+```
+
+When the repo workflow calls for bounded reads, pass the same targeted status
+subcommand through `.agents/skills/pr-batch/bin/agent-coord-bounded` so a slow
+private read becomes explicit degraded state instead of an indefinite wait:
+
+```bash
+# Specific issue/PR lane
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --repo shakacode/react_on_rails --target <issue-or-pr> --json
+
+# Batch lane/dependency state
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id <batch-id> --json
+```
+
+Do not use broad `agent-coord status` for routine lane checks. Broad private
+coordination reads are audit-only; if they time out, exit 1 (unexpected error),
+or exit 2, report private coordination as `UNKNOWN`/degraded and use structured
+public claim comments only as advisory evidence. Any non-zero exit other than
+`CLAIM_REFUSED` (exit 3) is treated as `UNKNOWN`/degraded. If targeted status
+exits 0, private coordination state is authoritative. Refused claims
+(`CLAIM_REFUSED` / exit 3) remain hard stops for machine agents.
 
 ## Commands
 
@@ -183,6 +321,10 @@ Run specific test files:
 bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb
 cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 ```
+
+**Pro RSpec encoding**: `react_on_rails_pro`'s `Gemfile.loader` can die with
+`invalid byte sequence in US-ASCII`. Run Pro specs with a UTF-8 locale:
+`LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 RUBYOPT="-EUTF-8" bundle exec rspec <file>`.
 
 ## Project Structure
 
@@ -359,12 +501,31 @@ contract unless a maintainer explicitly narrows the run.
   the action, such as a required confirmation before a destructive force-push. A
   standalone "should I push this ordinary PR-iteration fix?" question counts.
   Report it as `Decision points: N` in the FYI section of the batch handoff.
-- **Confidence notes**: delegated merge authority exists only when the current
-  user or batch goal grants it and the release-mode rules permit it. Before a
-  delegated merge, the worker or coordinator writes a confidence note in the
-  issue, PR body, or batch handoff covering validated commands, evidence links,
-  remaining `UNKNOWN` facts, and residual risk. When merge authority is not
-  delegated, use the same format for merge-readiness evidence without merging:
+- **Confidence notes**: `merge_authority` has three states:
+  `auto_merge_when_gates_pass` is the only autonomous merge grant when the
+  current user or batch goal grants it and the release-mode rules permit it;
+  `ask` requires one confirmation before merging; and `none` grants no merge
+  authority. When `auto_merge_when_gates_pass` applies and the gate is met,
+  exercising it is the expected close-out — an authorized, gate-satisfied,
+  confident merge that is downgraded to a "ready to merge" recommendation is an
+  unfinished task, not a safe default. Before exercising merge authority,
+  complete the confidence note: validations and evidence are recorded, no
+  unresolved MUST-FIX threads remain, and any remaining `UNKNOWN` facts or
+  residual risk do not affect merge safety. Before a merge under
+  `auto_merge_when_gates_pass` or after an `ask` confirmation, the worker or
+  coordinator documents the merge qualifications in the PR description:
+  - which release-mode gate applied and that it was satisfied
+  - the confidence note: validated commands, evidence links, remaining
+    `UNKNOWN` facts, and residual risk
+  - the finalizer, when accelerated-RC requires one
+
+  This intentionally narrows merge-authority evidence to the PR description so
+  the merge decision is auditable from a single location. Use the issue or batch
+  handoff only for no-merge readiness evidence.
+
+  When merge authority is not granted, use the same confidence-note format for
+  merge-readiness evidence without merging:
+
   ```text
   Confidence note:
   - Validated: <commands or checks run and outcomes>
@@ -495,7 +656,7 @@ The **merge gate is a function of the target branch's release phase**. Resolve t
 | **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`.                                                                                                             |
 | **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial-pr-review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion**. No confidence-only auto-merge. |
 
-**Reading the phase.** The active phase per release line is published through the `shakacode/agent-coordination` backend so agents read the current gate without being told. Read it from the machine-readable `agent-coord` status output for the PR's target branch; treat it as available only when `agent-coord doctor` and `agent-coord status` exit 0 (the private backend README and `agent-coord --help` are authoritative for the exact field). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is the tool that is unavailable here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
+**Reading the phase.** The active phase per release line is published through the `shakacode/agent-coordination` backend so agents read the current gate without being told. For a PR or issue lane, read it with targeted `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json` after `agent-coord doctor --json`; for batch dependency state, use `agent-coord status --batch-id <batch-id> --json`. Treat published phase as available only when the targeted status exits 0 (the private backend README and `agent-coord --help` are authoritative for the exact field). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is unavailable or degraded here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
 
 ## Review Workflow
 
@@ -693,3 +854,14 @@ Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, b
 
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash before PR number)
 - **Pro-only changes** use an inline `**[Pro]**` tag prefix within the standard category sections (e.g., `- **[Pro]** **Feature name**: Description...`); do NOT create separate `#### Pro` subsections
+- **Version stamping**: `bundle exec rake "update_changelog[release|rc|beta|<version>]"` stamps version headers, collapses prereleases, and rewrites compare links. The GitHub release is created from the changelog by `bundle exec rake release[...]`.
+
+### Changelog classification taxonomy
+
+The `update-changelog` skill classifies each merged PR by `Category`. Allowed values (copy exactly, including spaces, hyphens, and casing):
+
+- `product code`: OSS gem/npm package runtime, generators, public types, public config, or user-facing examples.
+- `Pro runtime`: proprietary Pro package/runtime behavior, RSC integration, Node renderer behavior, Pro-generated config, Pro package compatibility.
+- `perf-reliability`: runtime performance/reliability fixes, benchmark/regression systems, crash recovery, and failure classification. Applies regardless of result.
+- `release-process`: release tasks, CI selection, dependency pins used only for releasing/testing, changelog mechanics, PR batch mechanics, agent skills, GitHub Actions, and maintainer workflow.
+- `internal`: docs/planning, tests, fixtures, refactors, cleanup, diagnostics, and non-user-facing maintenance.

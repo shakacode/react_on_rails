@@ -1,22 +1,22 @@
 ---
 name: update-changelog
-description: Analyze merged PRs and update CHANGELOG.md, optionally stamping release, rc, beta, or explicit version headers. Use before releases or when changelog entries are missing.
+description: Analyze merged PRs and update the changelog, optionally stamping release, rc, beta, or explicit version headers. Use before releases or when changelog entries are missing.
 argument-hint: '[classification-sweep BASE_REF..TARGET_REF|release|rc|beta|version]'
 ---
 
 # Update Changelog
 
-You are helping to add an entry to the CHANGELOG.md file for the React on Rails project.
+You are helping to add an entry to the repo's changelog (see `AGENTS.md` → **Agent Workflow Configuration**).
 
 ## Arguments
 
 This skill accepts an optional mode argument from the invocation text:
 
 - **No argument** (`/update-changelog`): Add entries to `[Unreleased]` without stamping a version header. Use this during development.
-- **`release`** (`/update-changelog release`): Add entries and stamp a version header. Auto-compute the next version based on changes (breaking -> major, added features -> minor, fixes -> patch). Then `rake release` (with no args) will pick up this version automatically.
+- **`release`** (`/update-changelog release`): Add entries and stamp a version header. Auto-compute the next version based on changes (breaking -> major, added features -> minor, fixes -> patch). Then the repo's release task (with no args) will pick up this version automatically.
 - **`rc`** (`/update-changelog rc`): Same as `release`, but stamps an RC prerelease version (e.g., `16.5.0.rc.0`). Auto-increments the RC index if prior RCs exist for the same base version.
 - **`beta`** (`/update-changelog beta`): Same as `rc`, but stamps a beta prerelease version (e.g., `16.5.0.beta.0`).
-- **`classification-sweep`** (`/update-changelog classification-sweep BASE_REF..TARGET_REF`): Print a mechanical review table for every merged PR in the selected range before deciding which changelog entries to add. This read-only agent workflow runs git and GitHub API commands directly; it does not edit `CHANGELOG.md` and does not invoke `bundle exec rake` or any header-stamping task.
+- **`classification-sweep`** (`/update-changelog classification-sweep BASE_REF..TARGET_REF`): Print a mechanical review table for every merged PR in the selected range before deciding which changelog entries to add. This read-only agent workflow runs git and GitHub API commands directly; it does not edit the changelog and does not invoke any header-stamping task.
 - **Explicit version** (`/update-changelog 16.5.0.rc.10`): Add entries and stamp the exact version provided. Skips auto-computation — use this when you already know the target version. The version string must look like a semver version (with optional `.rc.N` or `.beta.N` suffix).
 
 ## When to Use This
@@ -39,7 +39,7 @@ This skill serves four use cases at different points in the release lifecycle:
 - Run `/update-changelog release` (or `rc`, `beta`, or an explicit version like `16.5.0.rc.10`) to add entries AND stamp the version header
 - The version is auto-computed from changes (breaking -> major, features -> minor, fixes -> patch) — skipped when an explicit version is provided
 - The skill automatically commits, pushes, and opens a PR — review and merge it
-- Then run `rake release` (no args needed -- it reads the version from CHANGELOG.md)
+- Then run the repo's release task (no args needed -- it reads the version from the changelog)
 - The release task automatically creates a GitHub release from the changelog section
 
 **After a release you forgot to update the changelog for** -- Catch-up mode:
@@ -49,7 +49,7 @@ This skill serves four use cases at different points in the release lifecycle:
 
 ### Why changelog comes BEFORE the release
 
-- `rake release` automatically creates a GitHub release if a changelog section exists -- no separate `sync_github_release` step needed
+- The repo's release task automatically creates a GitHub release if a changelog section exists -- no separate sync-GitHub-release step needed
 - The release task warns if no changelog section is found for the target version
 - A premature version header (if release fails) is harmless -- you'll release eventually
 - A missing changelog after release means the GitHub release must be created manually
@@ -103,17 +103,19 @@ Use `classification-sweep` before every RC/release changelog edit, and whenever 
 
 ### Exact PR-Listing Command
 
-Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to the release tag, `origin/main`, or upper bound being audited. Then run the committed `changelog-merged-prs` helper to list merged PRs in first-parent order. It extracts PR numbers from squash titles (the `(#NNNN)` suffix) and `Merge pull request #NNNN` subjects, falls back to GitHub's commit-to-PR API for commits that lack an inline PR number, dedups by PR number, and emits an explicit `UNKNOWN` row for any commit that still cannot be mapped.
+Set `BASE_REF` to the previous release tag or lower bound and `TARGET_REF` to the release tag, the configured base branch from `AGENTS.md`, or another upper bound being audited. Then run the committed `changelog-merged-prs` helper to list merged PRs in first-parent order. It extracts PR numbers from squash titles (the `(#NNNN)` suffix) and `Merge pull request #NNNN` subjects, falls back to GitHub's commit-to-PR API for commits that lack an inline PR number, dedups by PR number, and emits an explicit `UNKNOWN` row for any commit that still cannot be mapped.
 
 ```bash
 BASE_REF="${BASE_REF:?set BASE_REF, e.g. v17.0.0.rc.1}"
-TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/main}"
+BASE_BRANCH="${BASE_BRANCH:?set BASE_BRANCH from AGENTS.md -> Agent Workflow Configuration}"
+TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. v17.0.0.rc.2 or origin/${BASE_BRANCH}}"
+UPDATE_CHANGELOG_SKILL_DIR="${UPDATE_CHANGELOG_SKILL_DIR:-.agents/skills/update-changelog}"
 
 # JSON array of {pr, sha, subject}; pr is an integer, or the string "UNKNOWN".
-.agents/skills/update-changelog/bin/changelog-merged-prs "${BASE_REF}..${TARGET_REF}"
+"${UPDATE_CHANGELOG_SKILL_DIR}/bin/changelog-merged-prs" "${BASE_REF}..${TARGET_REF}"
 
 # Or --text for pr<TAB>sha<TAB>subject rows (UNKNOWN in the pr column):
-.agents/skills/update-changelog/bin/changelog-merged-prs "${BASE_REF}..${TARGET_REF}" --text
+"${UPDATE_CHANGELOG_SKILL_DIR}/bin/changelog-merged-prs" "${BASE_REF}..${TARGET_REF}" --text
 ```
 
 The helper defaults the repo to `gh repo view`; pass `--repo OWNER/REPO` to override. Run `changelog-merged-prs --help` for the full output contract and `--self-check` to validate the parser and a read-only `gh` smoke test. Each row is a merged PR for the range; rows with `"pr": "UNKNOWN"` are commits that could not be mapped to a merged PR on the default branch.
@@ -129,10 +131,10 @@ The fallback makes one GitHub API call per commit whose subject lacks `(#NNNN)`.
 Print the full Markdown table. No silent caps, no "top N", and no filtering to only likely changelog entries. Every row from the helper must appear, including `no-entry` rows.
 
 ```markdown
-| PR    | Title                                     | Result       | Category         | Reason                                                                                             |
-| ----- | ----------------------------------------- | ------------ | ---------------- | -------------------------------------------------------------------------------------------------- |
-| #3595 | Async RSC manifest signature verification | entry-needed | perf-reliability | Moves RSC manifest signature checks async, removing blocking filesystem work from the render path. |
-| #3597 | Document release-gate tracker workflow    | no-entry     | release-process  | Defines release-gate tracking docs; no product behavior changes.                                   |
+| PR    | Title                                  | Result       | Category         | Reason                                                                                         |
+| ----- | -------------------------------------- | ------------ | ---------------- | ---------------------------------------------------------------------------------------------- |
+| #3595 | Async manifest signature verification  | entry-needed | perf-reliability | Moves manifest signature checks async, removing blocking filesystem work from the render path. |
+| #3597 | Document release-gate tracker workflow | no-entry     | release-process  | Defines release-gate tracking docs; no product behavior changes.                               |
 ```
 
 Allowed `Result` values for mapped PRs are exactly:
@@ -142,29 +144,19 @@ Allowed `Result` values for mapped PRs are exactly:
 
 Use `UNKNOWN` only for unmapped commit rows emitted by the helper; resolve or report those rows before finishing.
 
-Allowed `Category` values are exactly:
-
-- `product code`
-- `Pro runtime`
-- `perf-reliability`
-- `release-process`
-- `internal`
+Allowed `Category` values are repo-specific: use exactly those defined in the repo's
+changelog classification taxonomy (see `AGENTS.md` → **Changelog**). Copy them exactly as
+listed there, including spaces, hyphens, and casing.
 
 Each row needs a one-line reason specific enough for review. Avoid generic reasons like "not user-visible" unless the row also says why.
-Copy category values exactly as listed, including spaces, hyphens, and casing.
 
 ### Classification Rubric
 
 - Use `entry-needed` for user-visible product behavior: public API/config/generator changes, runtime bug fixes, compatibility changes, breaking changes, security fixes, and performance or reliability changes users would care about.
-- Use `entry-needed` for Pro runtime changes that affect React Server Components, the Node renderer, caching, routing, package compatibility, generated Pro configs, or observable logging/error behavior. Pro-only is still user-visible for Pro users.
-- Use `entry-needed` for `perf-reliability` when the PR changes runtime performance, removes blocking work, improves production recovery, or makes user-visible failures diagnosable. For example, a PR that moves Pro RSC manifest signature checks from synchronous filesystem calls to async checks is `entry-needed`.
-- Use `no-entry` for docs-only, tests-only, formatting, lint, internal refactors, CI, benchmark harnesses, release automation, agent/process docs, and other contributor-only changes. Keep docs-only PRs as `entry-needed` when they correct incorrect public behavior documentation; use Category `product code` for docs-only PRs that correct public OSS behavior docs, or `Pro runtime` when they correct public Pro behavior docs.
-- Categorize by the primary surface changed, not by the changelog section it might eventually use:
-  - `product code`: OSS gem/npm package runtime, generators, public types, public config, or user-facing examples.
-  - `Pro runtime`: proprietary Pro package/runtime behavior, RSC integration, Node renderer behavior, Pro-generated config, Pro package compatibility.
-  - `perf-reliability`: runtime performance/reliability fixes, benchmark/regression systems, crash recovery, and failure classification. Category applies regardless of result. Use `entry-needed` when the change directly benefits users at runtime, such as removing blocking work from the render path. Use `no-entry` for internal benchmark harnesses or regression tooling that contributors use.
-  - `release-process`: release tasks, CI selection, dependency pins used only for releasing/testing, changelog mechanics, PR batch mechanics, agent skills, GitHub Actions, and maintainer workflow.
-  - `internal`: docs/planning, tests, fixtures, refactors, cleanup, diagnostics for contributors, and non-user-facing maintenance.
+- Use `entry-needed` for scope-specific runtime changes (for example a commercial/Pro tier) that affect users of that scope — observable runtime behavior, compatibility, generated config, or logging/error changes. A scope-only change is still user-visible to users of that scope.
+- Use `entry-needed` for `perf-reliability` when the PR changes runtime performance, removes blocking work, improves production recovery, or makes user-visible failures diagnosable. For example, a PR that moves manifest signature checks from synchronous filesystem calls to async checks is `entry-needed`.
+- Use `no-entry` for docs-only, tests-only, formatting, lint, internal refactors, CI, benchmark harnesses, release automation, agent/process docs, and other contributor-only changes. Keep docs-only PRs as `entry-needed` when they correct incorrect public behavior documentation; classify those by the public surface they document, per the repo's taxonomy.
+- Categorize by the primary surface changed, not by the changelog section it might eventually use, using the category definitions in the repo's changelog classification taxonomy (`AGENTS.md` → **Changelog**). A performance/reliability category, where the repo defines one, applies regardless of result: use `entry-needed` when the change directly benefits users at runtime (such as removing blocking work from the render path) and `no-entry` for internal benchmark harnesses or regression tooling.
 
 ### Reverts and Re-Runs
 
@@ -174,28 +166,22 @@ When a revert lands in the selected RC/release window, re-run the sweep or revis
 
 ### Entry Format
 
-Each changelog entry MUST follow this exact format:
+Each changelog entry MUST follow the repo's exact entry format (the PR-and-author link format defined by the repo's changelog; see `AGENTS.md` → **Agent Workflow Configuration**). Match the existing entries in the changelog and follow these portable structural rules:
 
-```markdown
-- **Bold description of change**. [PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username). Optional additional context or details.
-```
-
-**Important formatting rules**:
-
-- Start with a dash and space: `- `
+- Start with a dash followed by a space
 - Use **bold** for the main description
 - End the bold description with a period before the link
-- Always link to the PR: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818)` - **NO hash symbol**
-- Always link to the author: `by [username](https://github.com/username)`
+- Always link to the PR using the repo's PR-link format — **NO hash symbol** before the PR number
+- Always link to the author
 - End with a period after the author link
 - Additional details can be added after the main entry, using proper indentation for multi-line entries
 
 ### Breaking Changes Format
 
-For breaking changes, use this format:
+For breaking changes, lead the bold description, note the migration guide, append the repo's PR-and-author link, then the guide:
 
 ```markdown
-- **Feature Name**: Description of the breaking change. See migration guide below. [PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username).
+- **Feature Name**: Description of the breaking change. See migration guide below. <repo PR-and-author link, per the changelog format above>
 
 **Migration Guide:**
 
@@ -230,34 +216,28 @@ Entries should be organized under these section headings **in the following orde
 
 **Prefer standard headings.** Only use custom headings when the change needs more specific categorization.
 
-**Pro entries**: Pro-specific changes use an inline `**[Pro]**` tag prefix within the standard category sections (e.g., `- **[Pro]** **Feature name**: Description...`). Do NOT create separate `#### Pro` subsections.
+**Tagged entries**: When the repo's changelog defines an inline scope tag (such as a `**[Pro]**` prefix; see `AGENTS.md` → **Agent Workflow Configuration**), apply it within the standard category sections (e.g., `- **[Pro]** **Feature name**: Description...`). Do NOT create separate per-tag subsections.
 
 **Only include section headings that have entries.**
 
-### Version Stamping with Rake Task
+### Version Stamping with the Repo's Changelog Task
 
-When this command is invoked with `release`, `rc`, `beta`, or an explicit version (e.g., `16.5.0.rc.10`), **use the rake task to stamp the version header** after adding entries:
+When this command is invoked with `release`, `rc`, `beta`, or an explicit version (e.g., `16.5.0.rc.10`), **use the repo's changelog version-stamping task** (the changelog header/diff-link stamping task documented in `AGENTS.md` → **Agent Workflow Configuration**) to stamp the version header after adding entries, passing the mode (`release`, `rc`, or `beta`) or an explicit version.
 
-```bash
-bundle exec rake "update_changelog[release]"   # stamp next stable version
-bundle exec rake "update_changelog[rc]"        # stamp next RC version
-bundle exec rake "update_changelog[beta]"      # stamp next beta version
-```
-
-The rake task handles:
+The version-stamping task handles:
 
 - Auto-computing the next version from git tags (prerelease index is determined solely from tags, not changelog headers)
 - Inserting the version header right after `### [Unreleased]`
 - Updating version diff links at the bottom of the file
 - For `release` mode: collapsing prior `rc`/`beta` sections of the same base version into the new stable section (rc/beta modes leave prior prerelease sections intact so users can see what changed between RCs)
 
-Do NOT manually insert version headers or update diff links -- the rake task does this correctly.
+Do NOT manually insert version headers or update diff links -- the version-stamping task does this correctly.
 
 **When to use which tool:**
 
-- **`/update-changelog release` (Claude Code)**: Full automation -- analyzes commits, writes changelog entries, then calls the rake task to stamp the version header. Use before a release.
-- **`/update-changelog` (Claude Code, no args)**: Adds entries to `[Unreleased]` during development. Does not stamp a version header.
-- **`bundle exec rake "update_changelog[mode]"`**: Header-only stamping for users who want to write entries manually.
+- **`/update-changelog release`**: Full automation -- analyzes commits, writes changelog entries, then calls the version-stamping task to stamp the version header. Use before a release.
+- **`/update-changelog` (no args)**: Adds entries to `[Unreleased]` during development. Does not stamp a version header.
+- **The repo's changelog version-stamping task directly**: Header-only stamping for users who want to write entries manually.
 
 ### Finding the Most Recent Version
 
@@ -271,7 +251,7 @@ To determine the most recent version:
 
    This shows tags like `v16.2.0.beta.20`, `v16.2.0.beta.19`, etc.
 
-2. **Check the CHANGELOG.md** for version headers (note: changelog uses versions WITHOUT the `v` prefix):
+2. **Check the changelog** for version headers (note: changelog uses versions WITHOUT the `v` prefix):
    - `### [16.2.0.beta.19] - 2025-12-10` (beta version)
    - `### [16.1.1] - 2025-09-24` (stable version)
 
@@ -292,9 +272,11 @@ After adding an entry to the `### [Unreleased]` section, ensure the version diff
 The format at the bottom should be:
 
 ```markdown
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.19...main
-[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/v16.1.1...v16.2.0.beta.19
+[unreleased]: https://github.com/<owner>/<repo>/compare/v16.2.0.beta.19...main
+[16.2.0.beta.19]: https://github.com/<owner>/<repo>/compare/v16.1.1...v16.2.0.beta.19
 ```
+
+Replace `main` with the base branch value from `AGENTS.md` → **Agent Workflow Configuration** when the repo uses a different base branch.
 
 When a new version is released:
 
@@ -315,18 +297,18 @@ When a new version is released:
 
 #### Step 1: Fetch and read current state
 
-- **CRITICAL**: Run `git fetch origin main` to ensure you have the latest commits
-- After fetching, use `origin/main` for all comparisons, NOT local `main` branch
-- Read the current CHANGELOG.md to understand the existing structure
+- Resolve `BASE_BRANCH` from `AGENTS.md` -> **Agent Workflow Configuration**, then run `git fetch origin "${BASE_BRANCH}"` to ensure you have the latest commits
+- After fetching, use `origin/${BASE_BRANCH}` for all comparisons, not the local base branch
+- Read the current changelog to understand the existing structure
 
 #### Step 2: Reconcile tags with changelog sections (DO THIS FIRST)
 
 **This step catches missing version sections and is the #1 source of errors when skipped.**
 
 1. Get the latest git tag: `git tag --sort=-v:refname | head -5`
-2. Get the most recent version header in CHANGELOG.md (the first `### [VERSION] - DATE` after `### [Unreleased]`)
+2. Get the most recent version header in the changelog (the first `### [VERSION] - DATE` after `### [Unreleased]`)
 3. **Compare them.** If the latest git tag (minus the `v` prefix) does NOT appear anywhere in the changelog version headers, there are tagged releases missing from the changelog. **Important**: Don't just compare against the _top_ changelog header — a version header may exist _above_ the latest tag if it was stamped as a draft before tagging. Check whether the tag's version appears in _any_ `### [X.Y.Z]` header. For example:
-   - Latest tag: `v16.4.0.rc.4`, and no `### [16.4.0.rc.4]` header exists anywhere in CHANGELOG.md
+   - Latest tag: `v16.4.0.rc.4`, and no `### [16.4.0.rc.4]` header exists anywhere in the changelog
    - **Result: `16.4.0.rc.4` is missing and needs its own section**
    - But if `### [16.5.0.rc.0]` is the top header (a draft, not yet tagged) and `### [16.4.0.rc.4]` exists below it, then nothing is missing — the top header is simply a pre-release draft
 
@@ -350,12 +332,12 @@ When a new version is released:
 
 #### Step 3: Add new entries for post-tag commits
 
-1. Run `git log --oneline LATEST_TAG..origin/main` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
-2. Extract PR numbers: `git log --oneline LATEST_TAG..origin/main | grep -oE "#[0-9]+" | sort -u`
-3. If Step 2 found no missing tagged versions, verify no tag is ahead of main: `git log --oneline origin/main..LATEST_TAG` should be empty. If not, entries in "Unreleased" may belong to that tagged version — Step 2 should have caught this, so re-check.
-4. For each PR number, check if it's already in CHANGELOG.md: `grep "PR XXX" CHANGELOG.md`
+1. Resolve `BASE_BRANCH` from `AGENTS.md` -> **Agent Workflow Configuration**, then run `git log --oneline "LATEST_TAG..origin/${BASE_BRANCH}"` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
+2. Extract PR numbers: `git log --oneline "LATEST_TAG..origin/${BASE_BRANCH}" | grep -oE "#[0-9]+" | sort -u`
+3. If Step 2 found no missing tagged versions, verify no tag is ahead of the base branch: `git log --oneline "origin/${BASE_BRANCH}..LATEST_TAG"` should be empty. If not, entries in "Unreleased" may belong to that tagged version — Step 2 should have caught this, so re-check.
+4. For each PR number, check if it's already in the changelog: `CHANGELOG_PATH="${CHANGELOG_PATH:?set CHANGELOG_PATH from AGENTS.md -> Agent Workflow Configuration}"; grep "PR ${PR_NUMBER:?set PR_NUMBER}" "${CHANGELOG_PATH}"`
 5. For PRs not yet in the changelog:
-   - Get PR details: `gh pr view NUMBER --json title,body,author --repo shakacode/react_on_rails`
+   - Get PR details: `gh pr view NUMBER --json title,body,author` (add `--repo OWNER/REPO` when not in the repo)
    - **Never ask the user for PR details** - get them from git history or the GitHub API
    - Validate that the change is user-visible (per the criteria above). Skip CI, lint, refactoring, test-only changes.
    - Add the entry to `### [Unreleased]` under the appropriate category heading
@@ -366,13 +348,9 @@ If the user passed `release`, `rc`, `beta`, or an explicit version string as an 
 
 **For `release`, `rc`, or `beta` keywords:**
 
-1. Run the rake task to stamp the version header:
+1. Run the repo's changelog version-stamping task with the matching mode (`release`, `rc`, or `beta`) to stamp the version header.
 
-   ```bash
-   bundle exec rake "update_changelog[release]"   # or rc, or beta
-   ```
-
-2. The rake task will:
+2. The version-stamping task will:
    - Auto-compute the next version
    - Insert the header after `### [Unreleased]`
    - Update diff links at the bottom
@@ -383,11 +361,7 @@ If the user passed `release`, `rc`, `beta`, or an explicit version string as an 
 
 **For an explicit version string** (e.g., `16.5.0.rc.10`):
 
-1. Pass the explicit version directly to the rake task:
-
-   ```bash
-   bundle exec rake "update_changelog[16.5.0.rc.10]"
-   ```
+1. Pass the explicit version directly to the repo's changelog version-stamping task.
 
 2. **Verify** the stamped header and diff links match the requested version.
 
@@ -410,13 +384,13 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Which new entries were added
    - Which PRs were skipped (and why)
 5. If in `release`/`rc`/`beta` mode or explicit-version mode, **automatically commit, push, and open a PR**:
-   - Verify the working tree only has `CHANGELOG.md` changes; if there are other uncommitted changes, warn the user and stop
+   - Verify the working tree only has changelog changes; if there are other uncommitted changes, warn the user and stop
    - Verify the current branch is `main` (`git branch --show-current`); if not, warn the user and stop
    - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
-   - Stage only `CHANGELOG.md` (`git add CHANGELOG.md`) and commit with message `Update CHANGELOG.md for VERSION` (using the stamped version)
+   - Stage only the changelog after resolving the repo's changelog path from `AGENTS.md`: set `CHANGELOG_PATH="${CHANGELOG_PATH:?set CHANGELOG_PATH from AGENTS.md}"`, run `git add "${CHANGELOG_PATH}"`, and commit with message `Update changelog for VERSION` (using the stamped version)
    - Push and open a PR with the changelog diff as the body
-   - If the push or PR creation fails, the CHANGELOG is already stamped locally — fix the issue (e.g., authentication, branch protection), then run `git push -u origin <branch>` and `gh pr create` manually
-   - Remind the user to run `rake release` (no args) after merge to publish and auto-create the GitHub release
+   - If the push or PR creation fails, the changelog is already stamped locally — fix the issue (e.g., authentication, branch protection), then run `git push -u origin <branch>` and `gh pr create` manually
+   - Remind the user to run the repo's release task (no args) after merge to publish and auto-create the GitHub release
 
 ### For Prerelease Versions (RC and Beta)
 
@@ -430,9 +404,9 @@ When the user passes `rc` or `beta` as an argument:
 
 2. **Auto-compute the next prerelease version** using the process in "Auto-Computing the Next Version" above.
 
-3. **Do NOT collapse prior prereleases.** Each RC/beta is a separately-tagged release that users install — they need to see what changed between, for example, `rc.0` and `rc.1` (especially when diagnosing a regression in a specific RC). Each `bundle exec rake release` reads only the top-most `### [VERSION]` section, so as long as each RC has its own section, the corresponding GitHub release gets its own focused notes. Instead:
+3. **Do NOT collapse prior prereleases.** Each RC/beta is a separately-tagged release that users install — they need to see what changed between, for example, `rc.0` and `rc.1` (especially when diagnosing a regression in a specific RC). Each run of the repo's release task reads only the top-most `### [VERSION]` section, so as long as each RC has its own section, the corresponding GitHub release gets its own focused notes. Instead:
    - Insert the new prerelease version section immediately after `### [Unreleased]`, **above** any prior prerelease sections (preserves newest-first ordering)
-   - Any entries already under `### [Unreleased]` belong to this prerelease — the rake task moves them under the new header automatically when it inserts the version line right after `### [Unreleased]`
+   - Any entries already under `### [Unreleased]` belong to this prerelease — the version-stamping task moves them under the new header automatically when it inserts the version line right after `### [Unreleased]`
    - Leave prior prerelease sections (e.g., `### [16.5.0.rc.0]`) untouched — keep their entries and their compare links at the bottom of the file
    - Add any new user-visible changes from commits since the last prerelease tag to the new section only
    - Add a new compare link at the bottom comparing the previous prerelease tag (or the last stable tag if this is the first RC) to the new prerelease tag
@@ -447,22 +421,22 @@ When the user passes `rc` or `beta` as an argument:
 
 #### Fixed
 
-- **Fix regression introduced in rc.0**. [PR 2500](https://github.com/shakacode/react_on_rails/pull/2500) by [justin808](https://github.com/justin808).
+- **Fix regression introduced in rc.0**. [PR 2500](https://github.com/<owner>/<repo>/pull/2500) by [username](https://github.com/username).
 
 ### [16.5.0.rc.0] - 2026-03-01
 
 #### Added
 
-- **New feature**. [PR 2490](https://github.com/shakacode/react_on_rails/pull/2490) by [justin808](https://github.com/justin808).
+- **New feature**. [PR 2490](https://github.com/<owner>/<repo>/pull/2490) by [username](https://github.com/username).
 
 ### [16.4.0] - 2026-02-15
 
 ...
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.5.0.rc.1...main
-[16.5.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.0.rc.0...v16.5.0.rc.1
-[16.5.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0.rc.0
-[16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0
+[unreleased]: https://github.com/<owner>/<repo>/compare/v16.5.0.rc.1...main
+[16.5.0.rc.1]: https://github.com/<owner>/<repo>/compare/v16.5.0.rc.0...v16.5.0.rc.1
+[16.5.0.rc.0]: https://github.com/<owner>/<repo>/compare/v16.4.0...v16.5.0.rc.0
+[16.4.0]: https://github.com/<owner>/<repo>/compare/v16.3.0...v16.4.0
 ```
 
 Both RC sections remain intact with their own compare links until the stable release coalesces them. **Coalescing happens only at the stable release** — see "For Prerelease to Stable Version Release" below.
@@ -481,7 +455,7 @@ When releasing from prerelease to a stable version (e.g., `v16.5.0.rc.1` -> `v16
 - Remove the orphaned compare links at the bottom of the file for the coalesced prerelease versions
 - Add the `[16.5.0]` compare link pointing from the **previous stable tag** (e.g., `v16.4.0`) to `v16.5.0` — **not** from the latest RC tag
 - Update the `[unreleased]:` compare link to point from `v16.5.0` to `main`
-- **Before committing**, spot-check the compare-link updates above: orphaned RC compare links removed, the new `[16.5.0]` link anchored at the previous stable tag (e.g., `v16.4.0...v16.5.0`) — not the latest RC tag — and `[unreleased]` pointing from `v16.5.0` to `main`. When `bundle exec rake "update_changelog[release]"` does the coalesce, this is handled automatically; still verify the result before pushing.
+- **Before committing**, spot-check the compare-link updates above: orphaned RC compare links removed, the new `[16.5.0]` link anchored at the previous stable tag (e.g., `v16.4.0...v16.5.0`) — not the latest RC tag — and `[unreleased]` pointing from `v16.5.0` to `main`. When the repo's changelog version-stamping task (`release` mode) does the coalesce, this is handled automatically; still verify the result before pushing.
 
 #### Step 2: Curate the entries — REMOVE these
 
@@ -499,13 +473,13 @@ When releasing from prerelease to a stable version (e.g., `v16.5.0.rc.1` -> `v16
 
 1. **User-facing fixes for bugs that existed in the previous stable** — if `rc.2` fixes a bug that was in `16.4.0`, that fix matters to stable users upgrading
 
-2. **Compatibility fixes** — Ruby/Rails version support, dependency relaxations, etc.
+2. **Compatibility fixes** — language/framework version support, dependency relaxations, etc.
 
 3. **All breaking changes** — API/CLI changes, removed methods, configuration changes, generator output changes. Even if a breaking change was introduced and refined across multiple prereleases, the final breaking change description belongs in stable.
 
 4. **Performance/security improvements affecting all users**
 
-**Pro tagging:** Pro-specific changes stay in the changelog tagged inline with `**[Pro]**` — do NOT drop them just because they're Pro-only. Apply the same REMOVE/KEEP rules above based on whether they're prerelease-only iteration vs user-facing changes that ship to Pro users.
+**Scope-tag tagging:** When the repo's changelog defines an inline scope tag (such as `**[Pro]**`; see `AGENTS.md` → **Agent Workflow Configuration**), scope-tagged changes stay in the changelog with that inline tag — do NOT drop them just because they only apply to that scope. Apply the same REMOVE/KEEP rules above based on whether they're prerelease-only iteration vs user-facing changes that ship to users of that scope.
 
 #### Step 4: Investigation process for each entry
 
@@ -519,54 +493,45 @@ For each entry that doesn't obviously fall into a REMOVE or KEEP category above,
 
 Read the resulting stable section as if you're a user upgrading from the previous stable. Every entry should be something you'd want to know about. If an entry only makes sense to someone who tracked the RC cycle, drop it.
 
-**Example reference:** See [PR 2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of prerelease changelog curation with detailed investigation notes.
+**Example reference:** If the repo records a worked prerelease-curation example PR, consult it for a complete example of prerelease changelog curation with detailed investigation notes.
 
 ## Examples
 
-Run this command to see real formatting examples from the codebase:
+Run this command to see real formatting examples from the codebase after resolving the repo's changelog path from `AGENTS.md`:
 
 ```bash
-grep -A 3 "^#### " CHANGELOG.md | head -30
+CHANGELOG_PATH="${CHANGELOG_PATH:?set CHANGELOG_PATH from AGENTS.md}"
+grep -A 3 "^#### " "${CHANGELOG_PATH}" | head -30
 ```
+
+These examples illustrate the entry **structure** only; use the repo's exact PR-and-author link format from the changelog seam (here shown as `<owner>/<repo>` / `username`).
 
 ### Good Entry Example
 
 ```markdown
-- **Attribution Comment**: Added HTML comment attribution to Rails views containing React on Rails functionality. The comment automatically displays which version is in use (open source React on Rails or React on Rails Pro) and, for Pro users, shows the license status. This helps identify React on Rails usage across your application. [PR 1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Feature Name**: Added a user-visible capability and a one-sentence explanation of what it does and why it helps. [PR 1857](https://github.com/<owner>/<repo>/pull/1857) by [username](https://github.com/username).
 ```
 
 ### Entry with Sub-bullets Example
 
 ```markdown
-- **Server Bundle Security**: Added new configuration options for enhanced server bundle security and organization:
-  - `server_bundle_output_path`: Configurable directory (relative to the Rails root) for server bundle output (default: "ssr-generated"). If set to `nil`, the server bundle will be loaded from the same public directory as client bundles. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
-  - `enforce_private_server_bundles`: When enabled, ensures server bundles are only loaded from private directories outside the public folder (default: false for backward compatibility) [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
+- **Feature Name**: Added new configuration options:
+  - `option_one`: What it configures and its default. [PR 1798](https://github.com/<owner>/<repo>/pull/1798) by [username](https://github.com/username)
+  - `option_two`: What it configures and its default. [PR 1798](https://github.com/<owner>/<repo>/pull/1798) by [username](https://github.com/username)
 ```
 
 ### Breaking Change Example
 
 ```markdown
-- **React on Rails Core Package**: Several Pro-only methods have been removed from the core package and are now exclusively available in the `react-on-rails-pro` package. If you're using any of the following methods, you'll need to migrate to React on Rails Pro:
-  - `getOrWaitForComponent()`
-  - `getOrWaitForStore()`
-  - `getOrWaitForStoreGenerator()`
-  - `reactOnRailsStoreLoaded()`
-  - `streamServerRenderedReactComponent()`
-  - `serverRenderRSCReactComponent()`
+- **Area Name**: Several methods have been removed from the package. If you're using any of the following, you'll need to migrate:
+  - `methodOne()`
+  - `methodTwo()`
+  - `methodThree()`
 
 **Migration Guide:**
 
-To migrate to React on Rails Pro:
-
-1. Install the Pro package:
-   yarn add react-on-rails-pro
-
-2. Update your imports from `react-on-rails` to `react-on-rails-pro`:
-   // Before
-   import ReactOnRails from 'react-on-rails';
-
-   // After
-   import ReactOnRails from 'react-on-rails-pro';
+1. Update your imports to the new package/path
+2. Replace each removed call with its supported equivalent
 ```
 
 ## Additional Notes
@@ -576,4 +541,4 @@ To migrate to React on Rails Pro:
 - Use past tense for the description
 - Be consistent with existing formatting in the changelog
 - Always ensure the file ends with a trailing newline
-- See CHANGELOG.md lines 15-18 for additional contributor guidelines
+- See the top of the repo's changelog for any additional contributor guidelines

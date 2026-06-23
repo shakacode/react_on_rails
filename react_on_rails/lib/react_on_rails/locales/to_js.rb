@@ -11,22 +11,13 @@ module ReactOnRails
         "js"
       end
 
-      def template_translations
-        <<~JS
-          export const translations = #{@translations};
-        JS
-      end
+      def generated_files_obsolete?
+        # obsolete? only calls this after all output files exist; if the file disappears, regenerate.
+        default_source = File.read(file("default"))
 
-      def template_default
-        <<~JS
-          import { defineMessages } from 'react-intl';
-
-          const defaultLocale = '#{default_locale}';
-
-          const defaultMessages = defineMessages(#{@defaults});
-
-          export { defaultMessages, defaultLocale };
-        JS
+        default_source.match?(/^\s*import\s+\{\s*defineMessages\s*\}\s+from\s+["']react-intl["'];?/)
+      rescue Errno::ENOENT
+        true
       end
     end
   end

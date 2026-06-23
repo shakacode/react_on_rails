@@ -7823,6 +7823,537 @@ end
 ```
 
 ================================================================================
+PAGE: https://reactonrails.com/docs/building-features/accessibility
+SOURCE: docs/oss/building-features/accessibility.md
+================================================================================
+
+# Accessibility (a11y)
+
+This page covers accessibility problems caused by the Rails/React boundary in React on Rails and React on Rails Pro apps. It is not a general accessibility handbook. For WCAG rules, ARIA patterns, keyboard behavior, and screen reader basics, use [General Web Accessibility References](#general-web-accessibility-references).
+
+**Target: WCAG 2.2 Level AA.** See the [W3C quick reference](https://www.w3.org/WAI/WCAG22/quickref/) for the criteria.
+
+These React on Rails terms appear throughout this page:
+
+- A **React island** is one React component mounted inside a Rails-rendered page.
+- A **mount point** is the DOM container where React on Rails mounts that island.
+- `react_component` is the Rails view helper that writes the mount point and passes props to your component.
+- `prerender: true` tells React on Rails to render the component HTML on the server; `prerender: false` leaves only the container until JavaScript loads.
+- **SSR** means server-side rendering: the server sends real HTML in the first response.
+- **Hydration** is when React attaches client-side behavior to HTML that was rendered on the server.
+- `stream_react_component` is the React on Rails Pro helper for streaming server-rendered HTML as it becomes ready.
+- A **render-function** is JavaScript registered with React on Rails to render a component and receive request context.
+- `railsContext` is request-level data that React on Rails passes to render-functions, such as locale.
+- **React Server Components (RSC)** are React components that render on the server and do not run browser effects.
+
+## Contents
+
+**Framework-specific**
+
+1. [Rails shell vs. React island responsibilities](#1-rails-shell-vs-react-island-responsibilities)
+2. [The `react_component` accessibility contract](#2-the-react_component-accessibility-contract)
+3. [SSR and hydration](#3-ssr-and-hydration)
+4. [Stable IDs in an SSR context](#4-stable-ids-in-an-ssr-context)
+5. [Pro streaming SSR and Suspense](#5-pro-streaming-ssr-and-suspense)
+6. [React Server Components in React on Rails Pro](#6-react-server-components-in-react-on-rails-pro)
+7. [Routing, page transitions, and focus](#7-routing-page-transitions-and-focus)
+8. [Rails + React forms](#8-rails--react-forms)
+9. [Flash messages, toasts, and async status](#9-flash-messages-toasts-and-async-status)
+10. [Fragment caching and accessibility freshness](#10-fragment-caching-and-accessibility-freshness)
+11. [Internationalization through railsContext / RSC](#11-internationalization-through-railscontext--rsc)
+12. [Testing in React on Rails](#12-testing-in-react-on-rails)
+13. [Hydration and accessibility debugging](#13-hydration-and-accessibility-debugging)
+
+**General references**
+
+- [General Web Accessibility References](#general-web-accessibility-references)
+
+---
+
+## 1. Rails shell vs. React island responsibilities
+
+When Rails renders the page shell and React renders islands inside it, screen readers get one combined page. If both sides add the same page structure, users hear duplicate landmarks, duplicate headings, or missing context.
+
+Fix this by deciding which side owns each page-level item.
+
+| Concern                                              | Usually owned by                                     |
+| ---------------------------------------------------- | ---------------------------------------------------- |
+| `<html lang>`, `dir`, `<title>`, meta                | Rails layout (ERB)                                   |
+| Landmarks: `<header>`, `<nav>`, `<main>`, `<footer>` | Rails layout, usually                                |
+| Skip links                                           | Rails layout                                         |
+| The single `<h1>`                                    | Decide explicitly: layout or island                  |
+| Flash messages container + live region               | Rails layout, with React writing into it when needed |
+| Interactive widgets, focus management, live updates  | React islands                                        |
+
+Use `react_component` when Rails should place a React island on the page:
+
+```erb
+<%= react_component(
+  "ProductSummary",
+  props: { product_id: @product.id },
+  prerender: true
+) %>
+```
+
+Guidance:
+
+- If the Rails layout already has `<main>`, the island should not render another `<main>`.
+- Pick one owner for the page `<h1>`. If the island renders it, the layout should not.
+- Use `prerender: true` for content that must exist in the first HTML response.
+- Use `prerender: false` only for client-only widgets where an empty first response is acceptable.
+
+---
+
+## 2. The `react_component` accessibility contract
+
+When you call `react_component`, React on Rails writes a container element. React then mounts your component inside that container as its children. The container stays in the DOM and in the accessibility tree.
+
+If you omit an `id`, React on Rails auto-assigns one to the container.
+
+```erb
+<%= react_component("AccountMenu", props: { signed_in: true }) %>
+```
+
+- **Wrapper element and `tag`.** The default container is a `<div>`. That is usually fine because a plain `<div>` has no landmark or widget meaning. If the container itself needs attributes, pass them through `html_options`. To change the container element, put `tag` inside `html_options`. (The `tag` option applies to `react_component` only — the `react_component_hash` helper always renders a `<div>` container.)
+
+```erb
+<%= react_component(
+  "InlineBadge",
+  props: { text: "New" },
+  id: "account-badge",
+  html_options: { tag: "span", class: "badge" }
+) %>
+```
+
+- **The real wrapper pitfall is duplicate semantics.** Do not put a landmark role on the container if your component already renders the same landmark inside it.
+
+Before: this creates two navigation landmarks.
+
+```erb
+<%= react_component(
+  "HeaderNav",
+  props: {},
+  html_options: { role: "navigation", "aria-label": "Main" }
+) %>
+```
+
+```jsx
+export default function HeaderNav() {
+  return <nav aria-label="Main">...</nav>;
+}
+```
+
+After: keep the container neutral and let the component own the landmark.
+
+```erb
+<%= react_component("HeaderNav", props: {}) %>
+```
+
+```jsx
+export default function HeaderNav() {
+  return <nav aria-label="Main">...</nav>;
+}
+```
+
+- **Set the container `id` with the top-level `id:` option, not inside `html_options`.** React on Rails overwrites `html_options[:id]` with the value from the top-level `id:` option (or an auto-generated id), so an `id` placed inside `html_options` is ignored. Put `class`, `style`, `role`, and `aria-*` in `html_options`; put `id` at the top level. (`role="status"` already implies `aria-live="polite"`, so it is not repeated here.)
+
+```erb
+<%= react_component(
+  "SaveStatus",
+  props: { state: "saving" },
+  id: "save-status",
+  html_options: { role: "status" }
+) %>
+```
+
+- **Keep container IDs and internal IDs separate.** The container `id` comes from the top-level `id:` option (or is auto-generated). Your component still needs its own stable IDs for labels, descriptions, and ARIA relationships inside the island. See section 4.
+- **Server and client must agree.** Do not set a wrapper role or ARIA attribute in ERB that the hydrated React tree contradicts.
+
+The markup inside the component follows normal web accessibility rules: native elements first, labels for inputs, names for icon-only buttons, visible focus, and correct keyboard behavior. For those rules, use [WAI-ARIA APG](https://www.w3.org/WAI/ARIA/apg/patterns/) and [MDN Accessibility](https://developer.mozilla.org/en-US/docs/Web/Accessibility).
+
+---
+
+## 3. SSR and hydration
+
+When you use `prerender: false`, the first HTML response contains the container but not the component content. Screen readers and no-JS users get an empty island until the JavaScript bundle loads.
+
+Fix this by using `prerender: true` for content-bearing islands.
+
+```erb
+<%= react_component("ArticleBody", props: { article_id: @article.id }, prerender: true) %>
+<%= react_component("ColorSchemeToggle", props: {}, prerender: false) %>
+```
+
+React hydration then attaches event handlers and client behavior to the server-rendered HTML. The accessibility risk is that users can reach HTML before hydration is done.
+
+Guidance:
+
+- Keep server and client output deterministic. Do not use `Date.now()`, `Math.random()`, browser-only checks, or client-only locale detection in render output.
+- Pass request data from Rails as props, or read it from `railsContext` in a render-function, so server and client render the same text.
+- Do not hide hydration warnings with `suppressHydrationWarning` unless you have confirmed the mismatch is harmless.
+- A prerendered button is announced as a button before its `onClick` works. For critical actions, use a real form submit that works without JavaScript, or render an honest pending state until hydration finishes.
+- Do not move focus in a mount effect on first page load. Move focus only after a user action, such as route navigation or opening a dialog.
+
+For React's general hydration behavior, see [`hydrateRoot`](https://react.dev/reference/react-dom/client/hydrateRoot).
+
+---
+
+## 4. Stable IDs in an SSR context
+
+When an input points to a label or error message by `id`, the `id` must be the same on the server and client. It must also be unique on the page. If it changes during hydration, screen readers can lose the label or description.
+
+This is easy to break in React on Rails because the same component can be mounted more than once with `react_component`.
+
+Do not hard-code IDs inside reusable islands. Do not generate IDs with `Math.random()` or a module-level counter.
+
+Use React's [`useId`](https://react.dev/reference/react/useId) for IDs that must match SSR and hydration.
+
+```jsx
+import { useId } from 'react';
+
+export default function EmailField({ error }) {
+  const id = useId();
+  const errorId = `${id}-error`;
+
+  return (
+    <>
+      <label htmlFor={id}>Email</label>
+      <input
+        id={id}
+        type="email"
+        aria-invalid={error ? 'true' : undefined}
+        aria-describedby={error ? errorId : undefined}
+      />
+      {error && <p id={errorId}>{error}</p>}
+    </>
+  );
+}
+```
+
+**With the open-source package, `useId` is not enough when you mount the same component more than once on a page.** `useId` keeps an id stable between the server render and hydration _within one mount_, but React only guarantees uniqueness _across_ separate roots when each root is given a distinct [`identifierPrefix`](https://react.dev/reference/react-dom/client/hydrateRoot#parameters). The open-source React on Rails package does not set a per-mount `identifierPrefix`, so two mounts of the same component can produce the same `useId` value (for example `«r0»`) and collide. (React on Rails Pro sets `identifierPrefix` to the container DOM id automatically on the default RSC-provider path — when RSC support is enabled — so `useId` is already safe there. On any other path, follow the open-source guidance below and pass an explicit prefix; doing so is always safe regardless of tier.)
+
+When a component can appear more than once on a page, pass a unique prefix into it — the container `id` you set with the top-level `id:` option (section 2) works well — and build your ARIA ids from that. Use the same value for `id:` and the prefix prop so they stay in sync:
+
+```erb
+<%# Each mount gets a unique id; the same value is threaded in as the prefix prop.
+    Prop keys are passed through verbatim (React on Rails does not camelize them),
+    so use the same `idPrefix` key the component reads. %>
+<%= react_component("EmailField", props: { idPrefix: "signup-email" }, id: "signup-email") %>
+<%= react_component("EmailField", props: { idPrefix: "contact-email" }, id: "contact-email") %>
+```
+
+```jsx
+export default function EmailField({ idPrefix, error }) {
+  const errorId = `${idPrefix}-email-error`;
+  // ...use `${idPrefix}-email` for the input id, etc.
+}
+```
+
+---
+
+## 5. Pro streaming SSR and Suspense
+
+When you use `stream_react_component`, React on Rails Pro can send server-rendered HTML in pieces as work finishes. Screen readers still read the DOM in logical order, not your loading plan.
+
+Fix this by making each streamed `Suspense` boundary match the reading order of the page.
+
+Guidance:
+
+- Keep streamed chunks in the same order a user should read them.
+- Mark loading regions as busy with `aria-busy` while content is still pending.
+- Do not wrap a large streamed subtree (such as a full result list) in `aria-live` — that queues the entire subtree for announcement and overwhelms screen-reader users. Instead, announce a short message like "Results loaded" in the page's shared live region (section 9) once the content commits.
+- Reserve `aria-live` for small, deliberately announced status text, and set that text after the real content commits so the announcement is not missed or repeated.
+- Do not move focus when a late chunk arrives. Preserve the user's current focus.
+- Mark skeleton placeholders as decorative.
+
+```jsx
+function ResultsRegion({ loading, children }) {
+  // `aria-busy` signals loading; a plain <div> avoids implying a landmark.
+  return (
+    <div aria-busy={loading ? 'true' : undefined}>
+      {loading ? <div aria-hidden="true" className="skeleton" /> : children}
+    </div>
+  );
+}
+```
+
+---
+
+## 6. React Server Components in React on Rails Pro
+
+When part of the page is a React Server Component, that part can render HTML but cannot run browser effects. If focus movement, keyboard handlers, or live-region updates live only in a server component, they will not run in the browser.
+
+Fix this by putting browser behavior in client components and keeping server components for static, semantic HTML.
+
+Guidance:
+
+- Put focus management, keyboard handlers, live-region updates, and effect-driven ARIA in client components.
+- Use server components for headings, articles, navigation markup, and other static content that does not need hydration.
+- Use Rails-owned data consistently. If an accessible name depends on locale, permissions, or user state, make sure the server-rendered content and any hydrated client component receive the same value.
+- If a form returns server-side validation errors, surface those errors with the same accessible pattern described in section 8.
+
+The accessibility guidance above is what is specific to the server/client split. For the RSC helper names, the config flag that enables RSC mode, and how to register server vs. client components — which are version-dependent — see the [React on Rails Pro React Server Components docs](../../pro/react-server-components/index.md).
+
+---
+
+## 7. Routing, page transitions, and focus
+
+When a React island changes routes without a full page load, the browser does not automatically announce a new page. Focus may stay on a link or button from the old view.
+
+Fix this with the standard SPA pattern:
+
+- Update `document.title`.
+- Move focus to the new view's `<h1 tabIndex={-1}>` or `<main tabIndex={-1}>`.
+- Write the new page name into one visually hidden `aria-live="polite"` route announcer.
+
+What is specific to React on Rails is where this code lives.
+
+- If React Router, TanStack Router, or another client router runs inside an island, hook this behavior into that router's navigation events.
+- If Rails or Turbo changes the page, run the same behavior after the new page loads. For Turbo, that usually means the `turbo:load` event.
+- Keep one route announcer for the page. Do not create one announcer per island.
+- Make sure skip links still point to the current main content after navigation.
+
+A minimal announcer inside a router island, reusing the shared live region from section 9:
+
+```jsx
+import { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom'; // or your router's equivalent
+
+// Inside a React Router / TanStack Router island
+function RouteAnnouncer() {
+  const { pathname } = useLocation(); // or the router's location hook
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    // Skip the initial mount during hydration — only announce real navigations,
+    // and do not steal focus on first page load (see "SSR and hydration").
+    if (firstRender.current) {
+      firstRender.current = false;
+      return undefined;
+    }
+
+    const region = document.getElementById('app-live-region');
+    if (!region) return undefined;
+
+    // Clear first, then set on the next tick so the change is announced.
+    region.textContent = '';
+    const rafId = requestAnimationFrame(() => {
+      region.textContent = `Navigated to ${document.title}`;
+      // Move focus after the new content has painted.
+      document.querySelector('main')?.focus(); // <main tabIndex={-1}>
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [pathname]);
+
+  return null;
+}
+```
+
+For the general SPA pattern, see [Gatsby's user testing of accessible client-side routing](https://www.gatsbyjs.com/blog/2019-07-11-user-testing-accessible-client-routing/) and [Deque's SPA accessibility tips](https://www.deque.com/blog/accessibility-tips-in-single-page-applications/).
+
+---
+
+## 8. Rails + React forms
+
+When Rails validates a form on the server and React renders the fields, errors can land in the wrong place or lose their label relationship.
+
+Fix this by passing Rails errors into the island once, then rendering one accessible error UI in React.
+
+Guidance:
+
+- Map the Rails `errors` hash to field-level errors and one top-of-form summary.
+- Do not render the same error once in ERB and again in React.
+- Keep each label connected to its input with matching `for` and `id`.
+- Keep `aria-describedby` pointed at the error message after hydration.
+- If the server prerenders an error state, the hydrated React output must use the same IDs and text.
+- If the form island can be mounted more than once on a page, pass a unique `idPrefix` prop (section 4) instead of relying on `useId` alone, so the OSS path does not produce colliding field IDs.
+
+```jsx
+function NameField({ idPrefix, value, error }) {
+  const id = `${idPrefix}-name`;
+  const errorId = `${id}-error`;
+
+  return (
+    <div>
+      <label htmlFor={id}>Name</label>
+      <input
+        id={id}
+        name="name"
+        defaultValue={value}
+        aria-invalid={error ? 'true' : undefined}
+        aria-describedby={error ? errorId : undefined}
+      />
+      {error && <p id={errorId}>{error}</p>}
+    </div>
+  );
+}
+```
+
+For the general form rules, see the [WAI forms tutorial](https://www.w3.org/WAI/tutorials/forms/).
+
+---
+
+## 9. Flash messages, toasts, and async status
+
+When Rails flash messages and React toasts each create their own live region, screen readers may announce the same message twice or miss one.
+
+Fix this by creating one persistent live region in the Rails layout. Rails can render the first message there, and React islands can update the same region later.
+
+```erb
+<%# Seed any first-load flash so it is present in the initial HTML response %>
+<div id="app-live-region" role="status" aria-atomic="true">
+  <%= flash[:notice] || flash[:alert] %>
+</div>
+```
+
+`role="status"` already implies `aria-live="polite"`, so that is not repeated. `aria-atomic="true"` is set explicitly so screen readers announce the whole message rather than only the changed text node.
+
+If the region holds only screen-reader announcements (not visible text), hide it **visually** — not from assistive technology. `display: none` and `visibility: hidden` suppress announcements; use the clip pattern instead:
+
+```css
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+```
+
+If the same element also renders visible flash messages, leave it visible — no hiding needed.
+
+Guidance:
+
+- The live region should exist before the message text is inserted.
+- When updating the region, clear it first and set the new text on the next tick (`region.textContent = ''; requestAnimationFrame(() => { region.textContent = message; })`). Some older screen readers (e.g. JAWS, NVDA in certain modes) do not announce text injected into a region that was empty on first load; the clear-then-set pattern avoids that silent failure.
+- Use the same region for Rails flash, React toasts, and async status such as "Saving", "Saved", and "Failed".
+- Use `role="alert"` only for urgent messages that require interruption.
+- Do not auto-dismiss messages before users have time to read them.
+
+For general live-region behavior, see [MDN on live regions](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/ARIA_Live_Regions).
+
+---
+
+## 10. Fragment caching and accessibility freshness
+
+When Rails caches HTML around a `react_component` call, it can also cache accessible names, ARIA attributes, and visible controls. If the cache key is too broad, screen readers get stale or wrong information.
+
+Fix this by including every accessibility-affecting input in the cache key, or by keeping that state out of the cached fragment.
+
+Cache keys must include anything that affects:
+
+- Locale and text direction.
+- Translated visible text and accessible names.
+- Permissions and role-based controls.
+- User-specific labels, such as "Log out, Jane".
+- Feature-flagged controls and their labels.
+
+Do not cache per-request or interactive ARIA state:
+
+- `aria-expanded`
+- `aria-pressed`
+- `aria-selected`
+- `aria-current`
+- live-region text
+
+Before caching a fragment, ask: does any label, role, ARIA attribute, or visible control depend on user, request, locale, or feature flag state? If yes, put that input in the key or render that piece outside the cache.
+
+---
+
+## 11. Internationalization through railsContext / RSC
+
+When Rails and React choose locale or direction separately, the server HTML can say one thing and the hydrated client can replace it with another. Screen readers may pronounce text with the wrong language rules, and React may hit hydration mismatches.
+
+Fix this by using one request-level source for locale and direction.
+
+Guidance:
+
+- Set `<html lang>` and `dir` in the Rails layout from the request locale.
+- Use `railsContext` in render-functions when a component needs request-level data such as locale.
+- Pass the same locale and direction into islands that branch on language or layout direction.
+- Apply the same rule to RSC output: server-rendered content and hydrated client components should use the same locale and direction.
+- Do not re-detect locale on the client if Rails already knows it.
+
+In production, prefer a single source of truth for direction — many i18n setups
+expose it (for example `rails-i18n` locale files carry direction metadata), and a
+shared helper avoids duplicating a language list. The snippet below is a minimal,
+**non-exhaustive** illustration; the `rtl_subtags` list omits many RTL locales
+(`ks`, `ku-Arab`, `pa-Arab`, …) and should not be copied verbatim into an app
+that needs broad coverage.
+
+```erb
+<%# Minimal example only — derive `dir` from your i18n metadata in real apps. %>
+<% rtl_subtags = %w[ar he fa ur yi ug dv ps sd ckb] %>
+<% primary_subtag = I18n.locale.to_s.split(/[-_]/).first  # handles ar-EG and ar_EG %>
+<%= react_component(
+  "LocalizedNav",
+  props: {
+    locale: I18n.locale.to_s,
+    dir: rtl_subtags.include?(primary_subtag) ? "rtl" : "ltr"
+  },
+  prerender: true
+) %>
+```
+
+For general RTL and `dir` behavior, see [MDN on `dir`](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/dir).
+
+---
+
+## 12. Testing in React on Rails
+
+When a React on Rails page uses SSR, the first HTML response and the hydrated browser page can have different accessibility bugs. Testing only the hydrated React tree misses the no-JS baseline.
+
+Fix this by testing both states.
+
+Guidance:
+
+- Run automated checks against the server-rendered HTML from `prerender: true`.
+- Run automated checks again after hydration in a real browser.
+- Test important pages with JavaScript disabled. This confirms the accessible baseline exists before hydration.
+- For `stream_react_component`, wait for the streamed content to finish before asserting.
+- For forms, test the server-rendered error state and the hydrated error state.
+- If strict CSP blocks injected axe scripts or streaming test scripts, fix the test setup rather than weakening production accessibility checks.
+
+Use tools such as `jest-axe`, `vitest-axe`, `axe-core`, `pa11y`, Lighthouse, Capybara system tests, or Playwright with `@axe-core/playwright`. Add manual keyboard and screen reader passes for streaming, navigation, dialogs, and live-region flows.
+
+---
+
+## 13. Hydration and accessibility debugging
+
+When an accessibility bug appears only after the JavaScript bundle loads, debug the Rails output and the hydrated React output separately.
+
+| Symptom                                           | Likely cause                                                                   | Where to look                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen reader reads stale or duplicated labels    | Duplicate IDs from a component mounted more than once                          | Section 4; pass a per-mount `idPrefix` (`useId` alone collides across roots on the OSS package and every Pro path except the default RSC-provider path, which sets `identifierPrefix` automatically)                                                                                           |
+| `aria-describedby` points at nothing after load   | ID differs between server and client                                           | Non-deterministic ID generation                                                                                                                                                                                                                                                                |
+| Button is announced but does nothing              | Control rendered before hydration attached handlers                            | Section 3; add no-JS fallback or pending state                                                                                                                                                                                                                                                 |
+| Hydration warning and visual flicker              | Server markup differs from client markup                                       | Dates, random values, locale, browser-only branches                                                                                                                                                                                                                                            |
+| Streamed content is read in the wrong order       | DOM order differs from logical reading order                                   | Section 5; align `Suspense` boundaries                                                                                                                                                                                                                                                         |
+| Announcement is missed or doubled while streaming | Live-region text changed before content committed, or changed twice            | Section 5; update after commit and guard repeats                                                                                                                                                                                                                                               |
+| Content is missing for no-JS users                | `prerender: false`, or SSR failed and the page fell back to client-only output | Sections 1 and 3; check the Rails log for `ReactOnRails::PrerenderError` and the Node render-server output (stdout of the JS server process). `config.raise_on_prerender_error` (on by default in development) surfaces these failures instead of silently falling back to client-only output. |
+
+**Portals and modals (SSR note).** If a dialog's DOM is created only after hydration, keyboard and screen reader users do not get a usable dialog in the first response. Fix this by not showing the dialog until JavaScript is ready, or by rendering an accessible non-portal fallback. After hydration, follow the [APG dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/) or use a vetted dialog component.
+
+---
+
+## General Web Accessibility References
+
+Short checklist: follow the links for the actual rules. This page does not restate them.
+
+- **WCAG 2.2 AA** - the standard we target. [Quick reference](https://www.w3.org/WAI/WCAG22/quickref/).
+- **Semantic HTML** - native elements first. [MDN HTML elements](https://developer.mozilla.org/en-US/docs/Web/HTML/Element), [WAI tutorials](https://www.w3.org/WAI/tutorials/).
+- **ARIA fundamentals** - ARIA is not a substitute for native HTML. [WAI-ARIA APG](https://www.w3.org/WAI/ARIA/apg/).
+- **Complex widget keyboard patterns** - combobox, menu, dialog, tabs, and similar widgets. [APG patterns](https://www.w3.org/WAI/ARIA/apg/patterns/).
+- **Color contrast, reduced motion, target size** - PR checklist items. [WCAG contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html), [`prefers-reduced-motion`](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion), [target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html).
+- **Images, icons, media** - for alt text and captions. [WAI images tutorial](https://www.w3.org/WAI/tutorials/images/).
+- **Screen reader usage** - driving [VoiceOver](https://www.apple.com/voiceover/info/guide/), [NVDA](https://www.nvaccess.org/), and JAWS for manual testing.
+
+================================================================================
 PAGE: https://reactonrails.com/docs/building-features/forms
 SOURCE: docs/oss/building-features/forms.md
 ================================================================================
@@ -11532,485 +12063,6 @@ When running tests in Docker, consider:
 - **Support:** [justin@shakacode.com](mailto:justin@shakacode.com)
 
 ================================================================================
-PAGE: https://reactonrails.com/docs/building-features/accessibility
-SOURCE: docs/oss/building-features/accessibility.md
-================================================================================
-
-# Accessibility (a11y)
-
-Accessibility is not a feature you bolt on at the end — it is a property of every
-surface your app renders. React on Rails apps have an unusual accessibility
-surface area because the same UI can be produced three different ways: as
-server-rendered HTML (SSR), as client-hydrated React, and — in
-[React on Rails Pro](../../pro/react-on-rails-pro.md) — as
-[React Server Components (RSC)](../../pro/react-server-components/index.md)
-streamed over the wire. Each path has its own failure modes for focus, live
-regions, and progressive enhancement.
-
-This guide collects the accessibility practices that matter for React on Rails
-specifically. The baseline target is **WCAG 2.1 Level AA** (WCAG 2.2, the current
-W3C Recommendation, is a backwards-compatible superset — the guidance here meets
-both). Where a practice is RSC-specific, it is called out in the
-[Server Components](#server-components) section.
-
-> **Scope note:** Most of the general guidance below is plain web a11y that
-> applies to any React on Rails app. The Server Components section assumes the
-> Pro RSC stack. Concrete RSC streaming/Suspense behavior referenced here is
-> documented in the
-> [Pro RSC docs](../../pro/react-server-components/index.md).
-
-## General React on Rails accessibility
-
-### Color contrast (WCAG AA)
-
-Every text and interactive surface must meet WCAG AA contrast ratios:
-
-- **4.5:1** for normal text
-- **3:1** for large text (≥ 24px / 18pt, or ≥ 18.66px / 14pt bold) and for UI
-  component boundaries / focus indicators
-
-Contrast is a design-token concern, not a per-component one. If you use
-[Tailwind](./styling-with-tailwind.md), pin accessible color pairs in your theme
-rather than reaching for arbitrary values per component, and audit them with a
-contrast checker (browser DevTools, or the axe tooling described
-[below](#automated-a11y-tooling)). Do not rely on color alone to convey state —
-pair color with text or an icon.
-
-### Keyboard navigation
-
-Everything actionable must be reachable and operable with the keyboard alone:
-
-- Use native interactive elements (`<button>`, `<a href>`, `<input>`) so you get
-  focusability, Enter/Space activation, and roles for free. A `<div onClick>` is
-  not keyboard-accessible.
-- Keep a visible focus indicator. Never `outline: none` without a replacement.
-- Maintain a logical tab order that follows the visual/reading order. Avoid
-  positive `tabIndex` values.
-
-Verify keyboard behavior in an E2E test rather than by hand — see
-[Testing](#testing-accessibility).
-
-### `aria-live` for Rails flash messages and form errors
-
-Content that appears asynchronously (flash messages after a Turbo navigation,
-validation errors after a failed submit) is invisible to screen readers unless
-it lands in a **live region**. Render the live region container in the initial
-markup and update its contents — do not create the region at the moment the
-message appears, or the announcement may be missed.
-
-```erb
-<%# app/views/layouts/application.html.erb
-    This element is plain server-rendered ERB — it is not React-managed, so it
-    won't re-mount on hydration and won't trigger the double-announcement
-    described later for hydrated React live regions. %>
-<div aria-live="polite" aria-atomic="true" id="flash">
-  <% flash.each do |type, message| %>
-    <div class="flash flash--<%= type %>"><%= message %></div>
-  <% end %>
-</div>
-```
-
-Use `aria-live="polite"` for non-urgent updates (flash notices) and
-`aria-live="assertive"` (or `role="alert"`) for errors that need immediate
-attention.
-
-For React forms, the same rule applies. If you use
-[`useRailsForm`](./forms.md), the hook exposes a per-field `errors` object
-(`{ field: ["message", ...] }`). Surface validation errors in a live region and
-associate each message with its field via `aria-describedby` so the error is
-announced when focus reaches the input:
-
-```tsx
-import { useRailsForm } from 'react-on-rails/useRailsForm';
-
-function EmailField() {
-  const form = useRailsForm({ email: '' });
-
-  // Use the same guard (`?.[0]`) for the attribute and the element it points to,
-  // so `aria-describedby` never references a `<p>` that isn't in the DOM.
-  const emailError = form.errors.email?.[0];
-
-  return (
-    <div>
-      <label htmlFor="email">Email</label>
-      <input
-        id="email"
-        name="email"
-        aria-invalid={Boolean(emailError)}
-        aria-describedby={emailError ? 'email-error' : undefined}
-        value={form.data.email}
-        onChange={(e) => form.setData('email', e.target.value)}
-      />
-      {emailError && (
-        <p id="email-error" role="alert" className="error">
-          {emailError}
-        </p>
-      )}
-    </div>
-  );
-}
-```
-
-After a submit that returns a 422, move focus to a summary of errors (or to the
-first invalid field) so keyboard and screen-reader users are taken to the
-problem rather than left at the submit button.
-
-The example above conditionally mounts the `role="alert"` element, which is the
-simplest pattern and works in most modern screen readers (a newly-inserted
-`role="alert"` is announced). If you need to support older AT pairings that only
-announce **mutations** of an already-present live region, render a persistent
-empty container in the initial markup and update its text instead:
-
-```tsx
-// Always rendered; only its contents change.
-<p id="email-error" role="alert" className="error">
-  {form.errors.email?.[0] ?? ''}
-</p>
-```
-
-### Focus management on dialogs and route changes
-
-React on Rails apps commonly mix client-side routing
-([React Router](./react-router.md),
-[TanStack Router](./tanstack-router.md),
-[instant navigation](./client-side-routing-instant-navigation.md)) with
-server-rendered pages. Both transitions need explicit focus handling:
-
-- **Dialogs / modals:** on open, move focus into the dialog; trap focus while it
-  is open; on close, return focus to the element that opened it. Prefer the
-  native `<dialog>` element (opened with `showModal()`, which handles focus
-  trapping and the implicit `role="dialog"` for you) or a well-tested library —
-  hand-rolled focus trapping is easy to get wrong. Always give the dialog an
-  accessible name via `aria-labelledby`. On a custom (non-`<dialog>`) container,
-  add `role="dialog"` and `aria-modal="true"` yourself.
-- **Client-side route changes:** unlike a full page load, an SPA navigation does
-  not reset focus. On each route change, move focus to a logical landmark (the
-  new page's `<h1>` or main heading) and announce the new page title in a live
-  region, so screen-reader users know the view changed. Headings are not natively
-  focusable — add `tabIndex={-1}` to the target so `element.focus()` works
-  (`<h1 tabIndex={-1} ref={headingRef}>`), then focus it after the route renders.
-
-### `prefers-reduced-motion`
-
-Respect users who have requested reduced motion at the OS level. Gate non-
-essential animation and transitions behind the media query:
-
-```css
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-```
-
-If you use [View Transitions](./view-transitions.md) or other JS-driven motion,
-read the same preference in JS and skip the animation:
-
-```ts
-// Browser-only — `window` is undefined during SSR / in a Server Component, so
-// guard it and prefer the CSS media query above, which applies before JS runs.
-const reduceMotion =
-  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-```
-
-See [SSR and reduced motion](#ssr-reduced-motion-and-fouc) for the server/client
-boundary caveat.
-
-### Touch targets
-
-The WCAG 2.2 **AA** criterion (SC 2.5.8) effectively asks for **24×24 CSS
-pixels** — though a smaller target can still pass if it has enough spacing, since
-the rule is really about the target plus the gap to adjacent targets. Aim higher:
-**44×44 CSS pixels** (WCAG 2.1/2.2 AAA, SC 2.5.5) is widely treated as the
-practical minimum on touch devices. Apply minimum sizes with padding rather than
-shrinking the visible label, and keep adequate spacing between adjacent targets.
-
-### `eslint-plugin-jsx-a11y`
-
-React on Rails ships with
-[`eslint-plugin-jsx-a11y`](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y)
-as a dev dependency, and the lint config exercises it. It is a fast static
-backstop that catches missing `alt` text, invalid ARIA, non-interactive elements
-with handlers, and similar mistakes at author time. Keep it in your own app's
-ESLint config and treat its warnings as bugs.
-
-**Caveat — `jsx-a11y/anchor-is-valid` is disabled in this repository.** In
-`eslint.config.ts` the rule is turned `off`:
-
-```ts
-'jsx-a11y/anchor-is-valid': 'off',
-```
-
-This is a project lint choice for the React on Rails codebase, not a
-recommendation that you disable it in your app. `anchor-is-valid` guards against
-the common anti-pattern of using `<a>` as a button (e.g. `<a href="#">` or an
-anchor with only an `onClick`). In application code, keep this rule **on**: use
-`<a href>` for navigation and `<button>` for actions. If you re-enable it and use
-a framework `<Link>` component, configure the rule's `components`/`specialLink`
-options instead of suppressing it.
-
-## Server Components
-
-[React Server Components](../../pro/react-server-components/index.md) (Pro)
-change how UI reaches the browser: the server streams an RSC payload, the shell
-and Suspense fallbacks render immediately, and slow boundaries stream in and
-hydrate independently
-([selective hydration](../../pro/react-server-components/selective-hydration-in-streamed-components.md)).
-This streaming, partially-hydrated model introduces accessibility failure modes
-that do not exist in a single synchronous render.
-
-### Progressive enhancement: accessible HTML before JS
-
-The strongest accessibility guarantee RSC gives you is that meaningful HTML
-exists **before** client JavaScript runs. Lean into it:
-
-- Ensure the server-rendered markup is usable on its own — real `<a href>`
-  links, real `<form action>` targets, headings and landmarks in place — so
-  keyboard and screen-reader users are not blocked while JS loads or if it never
-  loads.
-- Keep behavior that only exists after hydration (anything driven purely by
-  `onClick` in a Client Component) as an enhancement on top of a working server
-  baseline, not the only path.
-
-### Focus management across Suspense-streamed content
-
-When a [`<Suspense>`](../../pro/react-server-components/add-streaming-and-interactivity.md)
-boundary resolves, React swaps the fallback for the real content. If the user's
-focus was inside the fallback (or the streamed content should receive focus —
-e.g. it is the result of an action), that focus is not managed for you.
-
-- Do not auto-steal focus on every boundary resolution — content streaming in
-  below the fold should not yank a reader away from where they are.
-- When streamed content **is** the user's destination (a route's main content, a
-  submitted result), move focus to its heading once it mounts, and announce the
-  change in a live region.
-- Keep skeletons and their resolved content the same size where possible to avoid
-  layout shift that moves targets out from under a pointer or magnifier.
-
-### Avoiding `aria-live` double-announcements
-
-A live region that is present in the server-rendered HTML **and** re-rendered
-during hydration can announce its contents twice — once when the SSR'd DOM is
-read, and again when React reconciles. To avoid duplicate or spurious
-announcements across the server → client boundary:
-
-- Render live-region **containers** on the server, but treat them as empty at
-  first paint; populate them only in response to client-side events after
-  hydration.
-- Do not place already-rendered server content inside an `aria-live` region that
-  will re-mount on hydration. Reserve live regions for genuinely dynamic,
-  post-hydration updates.
-- For status messages that exist purely to be announced, gate them so they are
-  emitted once, on the client, after the component is interactive.
-
-### Keyboard navigability through partially-hydrated trees
-
-With selective hydration, parts of the page become interactive at different
-times. A control that is visible but whose Client Component has not yet hydrated
-can swallow or drop keyboard input.
-
-- Server-render interactive controls as real, natively-operable elements
-  (`<button>`, `<a href>`) so they work before hydration and stay in the tab
-  order throughout.
-- Avoid disabling controls "until hydrated" if the underlying action has a
-  server-side fallback — a disabled control is removed from the keyboard flow.
-- Test tab order on a throttled connection, where the gap between paint and
-  hydration is largest (see [Testing](#testing-accessibility)).
-
-### Loading and skeleton states (`role` / `aria-busy`)
-
-Suspense fallbacks and skeletons are not just visual placeholders — communicate
-their state to assistive tech:
-
-- Mark the region that is loading with `aria-busy="true"` while its content is
-  pending, and remove it (or set `false`) once resolved.
-- Give a meaningful status, e.g. a visually-hidden `role="status"` /
-  `aria-live="polite"` message like "Loading reviews", rather than an unlabeled
-  spinner.
-- Purely decorative skeleton shapes should be hidden from assistive tech with
-  `aria-hidden="true"`.
-
-> The `sr-only` class used below visually hides text while keeping it available
-> to screen readers. It ships with [Tailwind](./styling-with-tailwind.md); without
-> Tailwind, define it yourself (see the
-> [WebAIM recipe](https://webaim.org/techniques/css/invisiblecontent/)):
-> `position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;`
-
-Drive `aria-busy` from the loading state rather than hard-coding it, so it
-clears once the content resolves. Put the busy flag and the status message on the
-fallback (which is unmounted when the boundary resolves), and leave the resolved
-content with its normal semantics:
-
-```tsx
-import React, { Suspense } from 'react';
-
-function ReviewsFallback() {
-  return (
-    <div aria-busy="true">
-      <span role="status" className="sr-only">
-        Loading reviews
-      </span>
-      {/* Wrap in a real DOM element: a custom component only honors aria-hidden
-          if it forwards the prop to its root, so the wrapper is the reliable way
-          to hide decorative skeleton shapes from assistive tech. */}
-      <div aria-hidden="true">
-        <ReviewsSkeleton />
-      </div>
-    </div>
-  );
-}
-
-function ReviewsSection() {
-  return (
-    <Suspense fallback={<ReviewsFallback />}>
-      <Reviews />
-    </Suspense>
-  );
-}
-```
-
-When the boundary resolves, React unmounts the fallback — so `aria-busy="true"`
-and the "Loading reviews" status go away with it, and `<Reviews />` renders
-without a stale busy flag.
-
-### SSR, reduced motion, and FOUC
-
-[`prefers-reduced-motion`](#prefers-reduced-motion) is only readable in the
-browser — the server cannot know the user's preference at render time. Drive
-motion suppression from **CSS media queries**, which apply in the server-rendered
-HTML before any JS runs, rather than from a JS check that only takes effect after
-hydration. A JS-gated animation can fire on first paint before the preference is
-read.
-
-Streaming SSR can also surface a flash of unstyled content (FOUC) as chunks
-arrive. Beyond the visual annoyance, FOUC can mean focus styles or contrast are
-briefly wrong. Make sure critical CSS (including focus indicators and the
-reduced-motion query) is available with the initial shell, not deferred. See the
-[Pro Streaming SSR guide](../../pro/streaming-ssr.md) for how the shell and
-script loading are ordered.
-
-## Testing accessibility
-
-Automated checks catch regressions cheaply; treat them as a floor, not a
-substitute for manual keyboard and screen-reader testing.
-
-### Playwright: ARIA and keyboard assertions
-
-React on Rails apps already run E2E tests against a real browser via
-[Playwright or Cypress](./dev-server-and-testing.md#playwright--cypress-e2e).
-Use accessible-role/name locators (which fail when the accessibility tree is
-wrong) and assert keyboard operability directly:
-
-```ts
-import { test, expect } from '@playwright/test';
-
-test('dialog is keyboard accessible', async ({ page }) => {
-  await page.goto('/');
-
-  // Locate by role + accessible name, not by CSS — this exercises the a11y tree.
-  await page.getByRole('button', { name: 'Open settings' }).click();
-
-  const dialog = page.getByRole('dialog', { name: 'Settings' });
-  await expect(dialog).toBeVisible();
-
-  // Focus should have moved into the dialog on open — assert a focused element
-  // is inside it, not merely that the dialog rendered. For a sharper failure,
-  // assert the specific control you expect, e.g.
-  // dialog.getByRole('button', { name: 'Close' }).
-  await expect(dialog.locator(':focus')).toBeVisible();
-
-  // Escape closes and returns focus to the trigger.
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Open settings' })).toBeFocused();
-});
-
-test('main nav is reachable by keyboard', async ({ page }) => {
-  await page.goto('/');
-
-  // A skip-navigation link is a WCAG 2.4.1 (Level A) requirement and the correct
-  // first tab stop, so assert it first, then the first nav item.
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: /skip to main content/i })).toBeFocused();
-
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: 'Home' })).toBeFocused();
-});
-```
-
-If your app has no skip link, the first `Tab` lands on the first nav item — but
-add one (it is a Level A requirement). A minimal skip link is a normal anchor to
-the main landmark, visually hidden until focused:
-
-```erb
-<a href="#main-content" class="skip-link">Skip to main content</a>
-<%# ... %>
-<main id="main-content" tabindex="-1"><%= yield %></main>
-```
-
-```css
-/* Hidden until focused, using the direction-independent clip pattern so it
-   also works in RTL layouts. */
-.skip-link {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-}
-.skip-link:focus {
-  position: static;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  clip: auto;
-}
-```
-
-For an example of asserting React runtime behavior from a Playwright spec in this
-project, see
-`react_on_rails/spec/dummy/e2e/playwright/e2e/react_on_rails/root_error_callbacks.spec.js`
-(referenced from
-[Debugging hydration mismatches](./debugging-hydration-mismatches.md)).
-
-### Automated a11y tooling
-
-Layer a dedicated a11y scanner on top of role-based assertions to catch contrast,
-ARIA, and structural issues across whole pages. [axe-core](https://github.com/dequelabs/axe-core)
-is the standard engine; it is **not** a React on Rails dependency, so add it to
-your own app:
-
-- **Playwright:** [`@axe-core/playwright`](https://github.com/dequelabs/axe-core-npm/tree/develop/packages/playwright)
-  to scan rendered pages in your existing E2E suite.
-- **Component/unit tests:** [`jest-axe`](https://github.com/nickcolley/jest-axe)
-  (or the Vitest equivalent) to assert individual components have no violations.
-- **CI / static:** run the scan on your key routes so a11y regressions fail the
-  build the same way a broken test would.
-
-When testing RSC pages, scan **after** streaming and hydration have settled
-(wait for your loading state to clear / `aria-busy` to drop) so the scanner sees
-the final tree, and consider a second scan of the pre-hydration HTML to confirm
-the server baseline is accessible on its own.
-
-## Related documentation
-
-- [Forms and mutations with `useRailsForm`](./forms.md) — validation error shape
-  used in the live-region example above
-- [Styling with Tailwind](./styling-with-tailwind.md) — where to centralize
-  accessible color tokens
-- [View Transitions](./view-transitions.md) — JS-driven motion and reduced-motion
-- [Dev server and testing](./dev-server-and-testing.md) — Playwright / Cypress
-  setup
-- [React Server Components (Pro)](../../pro/react-server-components/index.md) —
-  streaming, Suspense, and selective hydration model
-- [Streaming SSR (Pro)](../../pro/streaming-ssr.md) — shell and script ordering
-
-================================================================================
 PAGE: https://reactonrails.com/docs/building-features/extensible-precompile-pattern
 SOURCE: docs/oss/building-features/extensible-precompile-pattern.md
 ================================================================================
@@ -13533,7 +13585,10 @@ Then:
 
 1. Build both variants in production mode on the same data and configuration.
 2. Drive both with the **same throttled Lighthouse config** (Slow 4G + 4x CPU).
-3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six paired samples is the practical floor for the Wilcoxon signed-rank test; 10 to 15 gives reliable power across the range of effect sizes you will encounter.
+3. Collect **10 to 15 paired samples** per page so the comparison has reliable power. Six paired
+   samples is only a weak smoke-test floor: with the two-sided exact Wilcoxon signed-rank test, you
+   need unanimous agreement across all six pairs to reach p < 0.05 — one dissenting sample pushes
+   you above it.
 4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as strong directional evidence of a real shift when the paired samples consistently move in the same direction.
 
 We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
@@ -13576,7 +13631,7 @@ The FAQ run did not capture TBT or Lighthouse score. The captured signals pointe
 
 A CSS broadcast fix (react_on_rails_rsc [#108](https://github.com/shakacode/react_on_rails_rsc/pull/108) → [#110](https://github.com/shakacode/react_on_rails_rsc/pull/110) / [#113](https://github.com/shakacode/react_on_rails_rsc/pull/113), shipped in `react-on-rails-rsc` 19.2.0-rc.3) was correct, but it was a **second-order** effect. The dominant driver was the client JS tail, not CSS delivery. Chasing the CSS fix first would have spent effort without moving the metrics that mattered.
 
-The lesson to take from this: **measure paired and throttled, then decompose FCP/TBT versus LCP before choosing a fix.** A related second-order CSS concern worth knowing about is the end-of-`<head>` rsc-css precedence trap described in [CSS and styling for RSC](../../pro/react-server-components/css-and-styling.md) — but confirm with the decomposition that CSS delivery is actually on your critical path before you spend time there.
+The lesson to take from this: **measure paired and throttled, then decompose FCP/TBT versus LCP before choosing a fix.** A related second-order CSS concern worth knowing about is the end-of-`<head>` rsc-css precedence trap described in [CSS and styling for RSC](../../pro/react-server-components/css-and-styling.md#rsc-stylesheet-cascade-order-end-of-head-precedence) — but confirm with the decomposition that CSS delivery is actually on your critical path before you spend time there.
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/building-features/web-vitals-and-rum
@@ -27525,21 +27580,22 @@ This guide covers the most common problems you'll encounter when migrating to Re
 
 When something goes wrong during RSC migration, start here. This table maps symptoms to the most likely cause and the relevant section in this guide:
 
-| Symptom                                                                                                        | Most Likely Cause                                                                            | Section                                                                           |
-| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Build error: _"cannot be passed directly to Client Components"_                                                | Passing functions or class instances across the server-client boundary                       | [Serialization Boundary Issues](#serialization-boundary-issues)                   |
-| Build error: _"needs useState/useEffect"_                                                                      | Using hooks in a Server Component file                                                       | [Error Message Catalog](#error-message-catalog)                                   |
-| RSC page downloads unexpectedly large JS chunks                                                                | Chunk contamination from shared `'use client'` modules                                       | [Chunk Contamination](#chunk-contamination)                                       |
-| Component stays a Client Component after removing `'use client'`                                               | Imported by another `'use client'` file, or RSC bundle not rebuilding                        | [Accidental Client Components](#accidental-client-components)                     |
-| Hydration mismatch warnings in console                                                                         | Server/client render output differs (timestamps, browser APIs, invalid HTML)                 | [Hydration Mismatches](#hydration-mismatches)                                     |
-| `ReferenceError: performance is not defined`                                                                   | Node renderer VM context missing globals                                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
-| `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                               | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
-| `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback) |
-| `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                 | [MessageChannel Not Defined](#messagechannel-not-defined)                         |
-| SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                     |
-| Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)     |
-| 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)  |
-| Page is blank until all data loads                                                                             | Missing `stream_react_component` or Suspense boundaries                                      | [Performance Pitfalls](#performance-pitfalls)                                     |
+| Symptom                                                                                                        | Most Likely Cause                                                                            | Section                                                                                       |
+| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Build error: _"cannot be passed directly to Client Components"_                                                | Passing functions or class instances across the server-client boundary                       | [Serialization Boundary Issues](#serialization-boundary-issues)                               |
+| Build error: _"needs useState/useEffect"_                                                                      | Using hooks in a Server Component file                                                       | [Error Message Catalog](#error-message-catalog)                                               |
+| RSC page downloads unexpectedly large JS chunks                                                                | Chunk contamination from shared `'use client'` modules                                       | [Chunk Contamination](#chunk-contamination)                                                   |
+| Global CSS resets change only on RSC pages                                                                     | Bare element selectors in an RSC CSS Module winning source-order ties                        | [RSC Stylesheet Injection](#rsc-stylesheet-injection-render-blocking-links-and-cascade-order) |
+| Component stays a Client Component after removing `'use client'`                                               | Imported by another `'use client'` file, or RSC bundle not rebuilding                        | [Accidental Client Components](#accidental-client-components)                                 |
+| Hydration mismatch warnings in console                                                                         | Server/client render output differs (timestamps, browser APIs, invalid HTML)                 | [Hydration Mismatches](#hydration-mismatches)                                                 |
+| `ReferenceError: performance is not defined`                                                                   | Node renderer VM context missing globals                                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                      |
+| `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                               | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                      |
+| `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)             |
+| `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                 | [MessageChannel Not Defined](#messagechannel-not-defined)                                     |
+| SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                 |
+| Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                 |
+| 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)              |
+| Page is blank until all data loads                                                                             | Missing `stream_react_component` or Suspense boundaries                                      | [Performance Pitfalls](#performance-pitfalls)                                                 |
 
 ## Serialization Boundary Issues
 
@@ -27844,6 +27900,57 @@ export default function SSRPage({ products }) {
 The RSC path uses `InteractiveWidgetsClient` (thin wrapper) to keep ProductCard's import edge clean, while the SSR path can import the full `InteractiveWidgets` module without affecting the RSC manifest for ProductCard.
 
 > **When to apply this:** Check the manifest or Network tab after building. If an RSC page downloads chunks larger than expected, start with a thin wrapper. If contamination persists because the component is shared across RSC and non-RSC entry points, use prop injection to remove the shared import edge.
+
+## RSC Stylesheet Injection: Render-Blocking Links and Cascade Order
+
+This section documents the current RSC stylesheet injection behavior so you know what to expect in
+the page source — it is not an open defect. It applies to React 19+ installations; earlier React
+versions do not support the `data-precedence` stylesheet groups used for this hoisting and
+render-blocking behavior.
+
+For RSC pages, React on Rails Pro injects
+`<link rel="stylesheet" data-precedence="rsc-css">` tags for CSS hrefs whose client chunk names appear
+in the current Flight payload. These links are **render-blocking** for the streamed RSC tree: React
+delays committing the streamed content until the referenced stylesheets are ready, which prevents a
+flash of unstyled content (FOUC) as the tree streams in.
+
+### Per-reference broadcast multiplication (fixed in the 19.2 line)
+
+Earlier versions re-broadcast shared vendor and common CSS _per client reference_, multiplying the same `<link>` tag across every reference that depended on it. This was fixed upstream in `react-on-rails-rsc` 19.2.0-rc.3 via:
+
+- [react_on_rails_rsc#108](https://github.com/shakacode/react_on_rails_rsc/pull/108)
+- [react_on_rails_rsc#110](https://github.com/shakacode/react_on_rails_rsc/pull/110)
+- [react_on_rails_rsc#113](https://github.com/shakacode/react_on_rails_rsc/pull/113)
+
+If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, use a coordinated
+React 19.2-compatible release set once stable Pro metadata is available. Key constraints:
+
+- The fix landed in `react-on-rails-rsc` 19.2.0-rc.3. Check the
+  [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases)
+  and the Pro release notes to determine whether a stable, coordinated release incorporating 19.2.x
+  is available and accepted by your Pro peer metadata. Do not install the rc prerelease in production
+  unless the Pro release notes name a matching package or peer range.
+- **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
+  React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
+  can fail at startup.
+- **Do not** use the default React 19.0.x generator pin from
+  [Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md)
+  for this duplicate-CSS fix; that guide remains the baseline 19.0.x RSC setup path.
+- Use maintainer-provided 19.2 compatibility guidance for the exact React, React DOM, React on Rails
+  Pro, and `react-on-rails-rsc` versions.
+
+On a supported, coordinated version set this is resolved — the shared CSS is emitted once.
+
+### Cascade order
+
+The `data-precedence="rsc-css"` group lands at the **end** of `<head>`, after precedence-less
+stylesheets such as the Rails-layout `stylesheet_pack_tag` links. This means rsc-css links win
+source-order ties when specificity is equal, and bare element selectors inside RSC CSS Modules can
+override globals once their stylesheet is delivered. See [CSS cascade guidance](../../pro/react-server-components/css-and-styling.md#rsc-stylesheet-cascade-order-end-of-head-precedence)
+for the full explanation and the cautionary `html { font-size }` example.
+
+See [React Performance Tracks and Profiling](../building-features/performance-tracks-and-profiling.md#measuring-an-rsc-conversion-with-a-paired-ab)
+to measure the end-to-end performance impact of RSC changes with a paired A/B comparison.
 
 ## Accidental Client Components
 

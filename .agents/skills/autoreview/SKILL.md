@@ -34,7 +34,7 @@ This is the portable core. Hold it regardless of which engine runs.
 
 - Treat review output as **advisory**. Never blindly apply it.
 - Verify every finding by reading the real code path and adjacent files before acting.
-- Read dependency docs/source/types when a finding depends on external (gem/npm/Rails/React) behavior.
+- Read dependency docs/source/types when a finding depends on external library/framework behavior.
 - Reject unrealistic edge cases, speculative risks, broad rewrites, and fixes that over-complicate the code.
 - Prefer small fixes at the right ownership boundary; no refactor unless it clearly improves the bug class. This matches `AGENTS.md`: never refactor unrelated code.
 - Keep going until the review returns no accepted/actionable findings; once it comes back clean, stop. Do not run an extra review just to get nicer "clean" wording or a redundant second opinion.
@@ -43,7 +43,8 @@ This is the portable core. Hold it regardless of which engine runs.
 - Be patient. `codex review` runs an external model and can take several minutes on a large diff. Progress that looks quiet is usually still working; do not kill it before about 5 minutes unless it has clearly errored.
 - Do not launch multiple reviewers by default. One selected engine, one structured result, then verify it.
 - A gated second-engine pass is appropriate only when the user asks or the diff falls into the
-  `AGENTS.md` high-risk / `ready-for-hosted-ci` / `force-full-hosted-ci` / `benchmark` categories. Run it after the primary review is
+  `AGENTS.md` high-risk / hosted-CI-ready / force-full hosted-CI / benchmark categories (labels
+  per `AGENTS.md` → **Agent Workflow Configuration**). Run it after the primary review is
   clean, keep it to one extra pass, and verify its findings the same way.
 - If you reject a finding as intentional/not worth fixing, add a brief inline code comment only when it documents a real invariant or ownership decision a future reviewer should know.
 - **Do not push just to review.** Push only when the user asked for push/ship/PR. Follow `AGENTS.md` git boundaries (never force-push `main`/`master`).
@@ -90,17 +91,12 @@ Use `AGENTS.md` and `/verify` for the actual check set. Before a closeout review
 
 - Run `git diff --check origin/main...HEAD` for committed branch content, plus `git diff --check`
   and `git diff --cached --check` when there is local dirty work.
-- Run `rake autofix` when formatting or autocorrectable lint failures are present or likely. It
-  runs ESLint `--fix`, Prettier `--write`, Stylelint `--fix`, and RuboCop `-A`; let those tools
-  make formatting/autocorrect changes instead of hand-formatting.
+- Run the repo's format/autofix command (see `AGENTS.md` → **Agent Workflow Configuration**) when
+  formatting or autocorrectable lint failures are present or likely; let those autofix tools make
+  formatting/autocorrect changes instead of hand-formatting.
 - Run the narrow lint/test checks that cover the changed surface. Before committing, include the
-  CI-equivalent Ruby lint gate required by `AGENTS.md`:
-
-```bash
-(cd react_on_rails && bundle exec rubocop)     # CI-equivalent OSS Ruby lint
-# Also, only when Pro Ruby or RuboCop config changed:
-(cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion)
-```
+  CI-equivalent lint gate(s) required by `AGENTS.md`, including any package-specific lint that
+  applies only when that package's files or its linter config changed.
 
 ## Step 3 - Run the structured review
 
@@ -129,7 +125,7 @@ When the installed CLI accepts focus text with the selected target flag, keep th
 Step 1 and append the prompt there:
 
 ```bash
-codex review --base "origin/$base" "Focus on SSR/hydration regressions, generated output, and repo workflow correctness."
+codex review --base "origin/$base" "Focus on performance- or framework-sensitive regressions (per AGENTS.md), generated output, and repo workflow correctness."
 ```
 
 For longer instructions, create an ignored scratch file, for example
@@ -146,7 +142,8 @@ capacity, retry the same engine a few times rather than swapping it.
 
 ### High-risk second pass
 
-For high-risk changes listed in `AGENTS.md` under `ready-for-hosted-ci`, `force-full-hosted-ci`, or `benchmark`, or when the user asks
+For high-risk changes in the `AGENTS.md` hosted-CI-ready, force-full hosted-CI, or benchmark
+categories (labels per `AGENTS.md` → **Agent Workflow Configuration**), or when the user asks
 for a panel/second model, run one additional review after the primary review is clean:
 
 - If the primary review used `codex review`, use Claude review tooling if it is available in the
@@ -169,10 +166,10 @@ For each finding the engine returns:
    broad rewrites; note briefly why.
 3. Fix accepted findings with the smallest correct change at the right boundary.
 4. Rerun the **targeted** tests for the changed surface, then rerun the review. Use `/verify`'s
-   Scope Guide to pick the narrowest covering tests, e.g.:
-   - Ruby gem: `bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb`; also run `bundle exec rake rbs:validate` if RBS signatures changed
-   - Dummy/integration: `cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb`
-   - TS package: `pnpm --filter react-on-rails exec jest <relative-test-file>`, plus `pnpm run type-check` / `pnpm run lint` for touched TS
+   Scope Guide and the repo's commands/tests (see `AGENTS.md`) to pick the narrowest covering
+   tests for the changed surface, e.g. the unit spec for a library-code change, the
+   integration/app spec for an integration change, and the package test plus type-check/lint for
+   touched TypeScript. Also rerun any signature/type validation when typed interfaces changed.
 
 Loop Steps 3-4 until the review returns no accepted/actionable findings. Once a rerun comes
 back clean, stop; do not spend another long review cycle on redundant confirmation.
@@ -193,9 +190,9 @@ Report:
 - review engine used (`codex review` or the available Claude review command)
 - tests/proof run, with pass/fail
 - findings accepted vs rejected, briefly why
-- PR label recommendation from `AGENTS.md` (`Labels: none`, `Labels: ready-for-hosted-ci`,
-  `Labels: force-full-hosted-ci`, `Labels: benchmark`, `Labels: ready-for-hosted-ci, benchmark`, or
-  `Labels: ready-for-hosted-ci, force-full-hosted-ci`) when the work is headed to a PR
+- PR label recommendation from `AGENTS.md` (none, the hosted-CI-ready label, the force-full
+  hosted-CI label, a benchmark label, or a valid combination of these — exact label names per
+  `AGENTS.md` → **Agent Workflow Configuration**) when the work is headed to a PR
 - the final clean review result, or why a remaining finding was consciously left unfixed
 
 Do not run another review solely to improve the report wording. If the final review came back

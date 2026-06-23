@@ -1,198 +1,210 @@
 # Agent Workflow Adoption Guide
 
-Use this guide when another repository wants to adopt the React on Rails agent workflow conventions for assigned issues, PR processing, review-comment handling, local validation, and CI backpressure.
+Use this guide to make the shared agent workflows available in another
+repository without copying React on Rails policy into that repo.
 
-The goal is not to copy React on Rails blindly. The goal is to copy the reusable workflow structure, then replace every project-specific command, label, path, and boundary with the target repository's real rules.
+The default model is:
 
-## Source Files To Copy
+- shared skills are installed in the user or agent environment
+- each repo owns its `AGENTS.md` policy and `## Agent Workflow Configuration`
+  seam
+- a seam checker confirms the installed skill can resolve the repo-specific
+  values it needs
+- repo-pinned copies are optional and justified case by case
 
-### Required baseline
+See
+[`portable-agent-workflows-seam-design.md`](portable-agent-workflows-seam-design.md)
+for the design rationale. See
+[`shakacode/agent-workflows/docs/installation-and-upgrades.md`](https://github.com/shakacode/agent-workflows/blob/main/docs/installation-and-upgrades.md)
+for host install paths, upgrade commands, status states, rollback behavior, and
+Codex/Claude notes.
 
-- [AGENTS.md](../../AGENTS.md) - canonical agent entry point and repository policy.
-- [.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md) - memorable entry point for multi-issue or multi-PR batches; interviews for missing targets, trust, permissions, concurrency, and `/goal` handoff details.
-- [.agents/skills/post-merge-audit/SKILL.md](../../.agents/skills/post-merge-audit/SKILL.md) - post-merge batch audit workflow for missed review gates, missing changelog entries, cross-PR interactions, and release risk.
-- [.agents/skills/adversarial-pr-review/SKILL.md](../../.agents/skills/adversarial-pr-review/SKILL.md) - skeptical pre-merge or post-merge PR review gate for release risk, missed review comments, changelog gaps, and Codex/Claude comparison.
-- [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md) - default flow for assigned issues, existing PRs, review-fix passes, and multi-PR landing plans.
-- [.agents/workflows/post-merge-audit.md](../../.agents/workflows/post-merge-audit.md) - reusable prompts for completed-batch handoffs, independent Codex/Claude audits, comparison, approved issue creation, and Claude PR review handoffs.
-- [.agents/workflows/adversarial-pr-review.md](../../.agents/workflows/adversarial-pr-review.md) - reusable prompts for independent adversarial PR reviews and Codex/Claude comparison.
-- [.agents/workflows/address-review.md](../../.agents/workflows/address-review.md) - generic non-Claude review-comment triage and fixing workflow.
-- [.agents/skills/autoreview/SKILL.md](../../.agents/skills/autoreview/SKILL.md) - independent review skill used before commits, pushes, PRs, or merge readiness.
+## One-Time Adoption
 
-### Multi-batch coordination support
+1. **Inventory the target repo.** Identify base branch, package managers,
+   setup/build/lint/format/test/type-check/docs commands, local CI routing,
+   hosted-CI trigger, labels, changelog policy, release boundaries, generated
+   files, protected-branch requirements, review bots, and which checks are cheap
+   locally versus reserved for hosted CI.
 
-Copy these when the target repo participates in concurrent batches, cross-repo
-work, or the shared private coordination backend:
+2. **Install or enable the shared skills for the user/agent.** Clone
+   [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows)
+   and use its `bin/install-agent-workflows --host codex` or
+   `bin/install-agent-workflows --host claude`, or use the agent platform's
+   normal user-skill installation mechanism. Install `skills/`, `workflows/`,
+   and the shared `bin/` helpers together; shared workflows such as PR batching,
+   review triage, and changelog updates call helper scripts relative to their
+   installed skill directories.
 
-- [internal/contributor-info/agent-coordination-backend.md](agent-coordination-backend.md) - pointer to the private coordination backend, heartbeat rules, and local smoke-check commands.
-- [internal/contributor-info/multi-batch-operations.md](multi-batch-operations.md) - operating model for multiple batches across machines, launch surfaces, and repos.
+3. **Add the seam to `AGENTS.md`.** Add an `## Agent Workflow Configuration`
+   section using the template below, filled with the target repo's real values.
+   This is the only place portable skills resolve repo-specific values.
 
-ShakaCode-internal adopting repos should join the same private
-`shakacode/agent-coordination` repo instead of creating per-repo coordination
-stores. Claims and heartbeats are namespaced by full repo name, so one status
-table can safely include `shakacode/react_on_rails` and adopter repos such as
-`shakacode/react_on_rails_rsc`. External adopters should skip this section and
-use the structured public claim comment fallback until ShakaCode publishes a
-public backend spec or grants them access to the coordination backend spec.
-That fallback is documented in
-[pr-processing.md](../../.agents/workflows/pr-processing.md#coordination-state).
+4. **Keep repo-local skills local, but keep workflow references reachable.** Add
+   only repo-specific skills, tiny compatibility launchers, or local validation
+   helpers to the repo. Do not copy shared workflow text into the repo unless
+   the execution environment cannot load user-installed skills. Do not run an
+   installed-skill-only setup with only `skills/`: install `workflows/` too, or
+   keep repo-local workflow copies/launchers for skills that still reference
+   `.agents/workflows/...`. If an agent surface can load installed skill
+   Markdown but cannot execute the installed skill's `bin/` helpers, keep a
+   local helper copy or compatibility launcher for that skill.
 
-### Claude support
+5. **Validate the seam.** Run `agent-workflow-seam-doctor` from the shared
+   `shakacode/agent-workflows` pack with `--shared` pointing at the cloned or
+   installed shared-pack root, or
+   `.agents/bin/agent-workflow-seam-doctor` in repos that keep local shared
+   copies. Then run one dry workflow pass that resolves the seam values without
+   making changes.
 
-Copy these when the target repo uses Claude Code:
+6. **Make `AGENTS.md` canonical.** It owns commands, testing, style, git/PR
+   safety, release policy, and documentation boundaries. Tool-specific files
+   such as `CLAUDE.md` should stay thin and link back to `AGENTS.md`.
 
-- [.agents/skills/address-review/SKILL.md](../../.agents/skills/address-review/SKILL.md) - shared address-review skill exposed to Claude Code as `/address-review`.
-- [.agents/skills/adversarial-pr-review/SKILL.md](../../.agents/skills/adversarial-pr-review/SKILL.md) - shared adversarial review skill exposed to Claude Code as `/adversarial-pr-review`.
-- [REVIEW.md](../../REVIEW.md) - optional Claude Code Review instruction file for managed review behavior.
-- [.claude/prompts/address-review.md](../../.claude/prompts/address-review.md) - optional compatibility pointer to the canonical reusable prompt; copy it only if the target repo keeps Claude prompt aliases.
-- [.claude/prompts/adversarial-pr-review.md](../../.claude/prompts/adversarial-pr-review.md) - optional compatibility pointer to the canonical adversarial review prompt.
-- `.claude/skills -> ../.agents/skills` - symlink that lets Claude Code load the shared agent skills.
+## The Seam Template
 
-Keep the shared skill and `.agents/workflows/address-review.md` behavior aligned. If the target repo also copies a reusable prompt file, make it point at the canonical shared workflow instead of carrying a second full workflow copy. Tool syntax can differ; policy should not.
+Copy this into the consumer repo's `AGENTS.md` and replace every value.
 
-### Optional CI command workflow
+```markdown
+## Agent Workflow Configuration
 
-Copy these only when the target repo wants PR-comment commands such as `+ci-run-hosted`, `+ci-force-full`, `+ci-stop-hosted`, `+ci-stop-full`, `+ci-status`, and `+ci-skip-hosted`:
+Portable shared skills resolve every repo-specific value through this section.
 
-- [.github/read-me.md](../../.github/read-me.md) - maintainer-facing explanation of the CI command workflow.
-- [.github/workflows/ci-commands.yml](../../.github/workflows/ci-commands.yml) - comment-command handler.
-- [.github/actions/hosted-ci-selectors/action.yml](../../.github/actions/hosted-ci-selectors/action.yml) - helper used by workflows that react to `ready-for-hosted-ci`, `force-full-hosted-ci`, release targets, and manual force-full dispatch.
+- **Base branch**: <base branch>.
+- **Pre-push local validation**: <local validation command, or "n/a">.
+- **CI change detector**: <CI change detector command, or "n/a">.
+- **Hosted-CI trigger**: <hosted-CI trigger, or "n/a">.
+- **Benchmark labels**: <benchmark labels, or "n/a">.
+- **Follow-up issue prefix**: <follow-up prefix, for example `Follow-up:`>.
+- **Changelog**: <changelog path and policy, or "n/a">.
+- **Lint / format**: <lint / format commands>.
+- **Merge ledger**: <merge ledger command, or "n/a">.
+- **Docs checks**: <docs checks, or "n/a">.
+- **Tests**: <unit / integration / e2e commands>.
+- **Build / type checks**: <build / type checks, or "n/a">.
+- **Review gate**: <review gate, or "n/a">.
+- **Approval-exempt change categories**: <approval-exempt change categories>.
+- **Coordination backend**: <coordination backend>.
+```
 
-Do not copy the CI workflow files as a bundle unless the target repo has the same workflow names, labels, permissions, and matrix strategy. Treat these files as implementation examples to adapt.
+Anything marked `n/a` means the matching shared guidance degrades to "do the
+equivalent manually"; the workflow structure still transfers.
 
-## Adoption Steps
+## Seam Validation
 
-1. Inventory the target repo.
-   - Identify the base branch, package managers, lint commands, test commands, type checks, docs checks, release boundaries, generated files, and protected-branch requirements.
-   - Identify which checks are cheap enough to run locally and which checks should be reserved for final CI.
+Run the seam doctor after adding or changing the seam:
 
-2. Install the baseline docs.
-   - Add or replace `AGENTS.md`.
-   - Add `.agents/skills/pr-batch/SKILL.md`.
-   - Add `.agents/skills/post-merge-audit/SKILL.md`.
-   - Add `.agents/skills/adversarial-pr-review/SKILL.md`.
-   - Add `.agents/workflows/pr-processing.md`.
-   - Add `.agents/workflows/post-merge-audit.md`.
-   - Add `.agents/workflows/adversarial-pr-review.md`.
-   - Add `.agents/workflows/address-review.md`.
-   - Add `.agents/skills/autoreview/SKILL.md`, or replace the pre-push AI review gate with the target repo's direct review command.
-   - Add Claude files only if Claude Code is used in that repo.
+```bash
+agent-workflow-seam-doctor --shared "${AGENT_WORKFLOWS_ROOT:?set path to shakacode/agent-workflows}"
+```
 
-3. Rewrite `AGENTS.md` first.
-   - Make it the canonical source for commands, testing, code style, git safety, PR policy, and documentation boundaries.
-   - Remove React on Rails-specific package names, paths, Pro references, Shakapacker commands, and RSC guidance unless they truly apply.
-   - Add only stable rules. Put temporary plans in planning docs, not in `AGENTS.md`.
+For repos that keep the checker in the checkout:
 
-4. Customize the PR processing workflow.
-   - Replace `script/ci-changes-detector origin/main`, `bin/ci-local`, and the targeted command list with the target repo's real local validation commands.
-   - Keep the self-review gate, reproduction/TDD gate, local-validation-first policy, batched pushes, and follow-up issue restraint.
-   - Define the repo's high-risk categories so agents know when hosted CI or extra review is justified.
-   - Keep the pre-push review/simplify gate: commit locally before pushing, run `codex review --base origin/main` or the target repo's equivalent on the clean diff, add Claude Code review when requested or high-risk, run `/simplify` only after a review-clean commit, accept only behavior-preserving simplifications, rerun validation/review before pushing, and record the gates used in PR evidence or churn notes.
-   - Treat high-risk categories (workflow, build-config, lockfiles, release tooling) as allowed implementation scope that requires focused diffs, appropriate validation, self-review, and clear PR evidence. Do not make them standing pre-approval categories; a per-run user instruction may narrow them for that run.
-   - Keep the high-concurrency launch gates: exact target confirmation for filter-based batches, trusted-list permission preflight, untrusted GitHub content handling, and resumable coordination state.
-   - Keep the review-completion gate: configured review agents must finish for the current head SHA, and actionable review comments must be triaged before merge.
-   - Keep AI review systems advisory: CodeRabbit.ai, Claude, Cursor Bugbot, Greptile, Codex review, and similar tools should not become special approval gates unless they identify a confirmed blocker.
-   - Keep the adversarial review gate for high-risk or concurrent-batch PRs, and do not treat `/pr-review-toolkit:review-pr` as sufficient by itself.
-   - Keep the post-merge audit checks for late reviews, untriaged `Must Fix` comments, missing changelog entries, and cross-PR interactions.
-   - Keep the post-merge issue plan gate: Codex and Claude independent audits draft issue entries only; one coordinator dedupes fingerprints and creates issues only after user approval.
+```bash
+.agents/bin/agent-workflow-seam-doctor --shared .agents
+```
 
-5. Adopt cross-repo coordination when needed.
-   - Copy `agent-coordination-backend.md` and `multi-batch-operations.md` only if the target repo will participate in multi-machine, multi-batch, or cross-repo work.
-   - For ShakaCode-internal repos, point operators at the same private shakacode/agent-coordination backend used by React on Rails. External adopters should use public claim comments from `.agents/workflows/pr-processing.md` until a public backend spec is available or ShakaCode grants access to the private spec.
-   - Use full repository names in every claim and heartbeat so `owner/repo#123` remains distinct from another repo's `#123`.
-   - Keep private backend schema examples in the private coordination repo. Public/adopter repos should document only operator rules, setup pointers, and safe fallbacks.
-   - Define which packages or directories must not be split across simultaneous batches, then add that routing rule to the target repo's copy of `multi-batch-operations.md`.
+The checker should pass before agents rely on installed shared skills. It fails
+when required seam keys are missing or executable snippets in the repo-local or
+installed shared skill Markdown still contain unresolved seam placeholders such
+as `<follow-up prefix>`.
 
-6. Customize address-review behavior.
-   - Keep the summary marker `<!-- address-review-summary -->` unless the repo already has a different checkpoint marker.
-   - Keep the tiers: `MUST-FIX`, `DISCUSS`, `OPTIONAL`, and `SKIPPED`.
-   - Keep `autopilot` as an initiation mode and `a` as the post-triage apply action.
-   - Update bot assumptions, reviewer names, and any repo-specific reply or resolution rules.
+## Keeping The Installed Pack Current
 
-7. Decide whether to adopt CI comment commands.
-   - If adopted, create the labels the workflow expects, especially `ready-for-hosted-ci` and `force-full-hosted-ci`.
-   - Keep `ci-commands.yml` aligned with the target repo's actual hosted-CI trigger mechanism.
-   - Ensure each expensive workflow knows how to react to `ready-for-hosted-ci`, `force-full-hosted-ci`, or manual dispatch.
-   - If comment commands add labels from GitHub Actions, also dispatch the
-     target workflows explicitly for the current head SHA. A label added by a
-     workflow's `GITHUB_TOKEN` does not start new `pull_request` workflow runs.
-   - Update every hosted-CI-capable workflow's dispatch list and permissions
-     together; label readers that use the Issues API need `issues: read`.
-   - If not adopted, remove `+ci-*` language from `AGENTS.md` and `pr-processing.md`, and replace it with the target repo's real hosted-CI trigger.
+Use `agent-workflows-status` to check the installed pack against the recorded
+source clone:
 
-8. Validate with a dry run.
-   - Ask an agent to process a low-risk issue and stop before opening a PR.
-   - Ask an agent to run `$pr-batch` with a filter-based request and confirm it stops with an exact target list and `/goal` prompt before spawning workers.
-   - Ask an agent to triage one PR review and stop at the quick-action menu.
-   - Confirm the agent uses the target repo's commands, does not invent missing tooling, does not create follow-up issues by default, and does not push before local validation.
+```bash
+agent-workflows-status --host codex
+```
 
-## Repo-Specific Replacement Checklist
+Stable status tokens are `UP_TO_DATE`, `UPGRADE_AVAILABLE`, `NOT_INSTALLED`, and
+`CHECK_FAILED`. Add `--fetch` only when a network check against `origin` is
+intended.
 
-Update these before considering the workflow adopted:
+Use `upgrade-agent-workflows` to update the source clone, reinstall, and run the
+seam doctor against this repo:
 
-- Base branch name: `main`, `master`, or another default branch.
-- Package managers: `pnpm`, `npm`, `yarn`, `bundle`, `cargo`, `go`, `pip`, or project-specific wrappers.
-- Local setup command.
-- Build command.
-- Lint commands.
-- Unit, integration, E2E, type-check, docs, and workflow-lint commands.
-- Local change detector or equivalent path-based CI guidance.
-- Manual developer-flow checks for app startup, generated apps, examples, or test fixtures.
-- PR labels such as `ready-for-hosted-ci`, `force-full-hosted-ci`, `benchmark`, and `ready-to-merge`.
-- Batch coordination labels such as `codex-ready`, `codex-wip`, or `codex-pending-question`, if adopted; otherwise remove or replace those examples and rely on exact lane assignments plus structured claim comments.
-- Cross-repo coordination backend, agent-id format, claim/heartbeat/status lifecycle, and package-routing rules if the repo will share multi-batch operations with other repos.
-- Hosted-CI trigger mechanism if `+ci-*` is not installed.
-- Follow-up issue title convention. React on Rails uses `Follow-up:`.
-- Documentation boundaries: public docs, internal docs, generated docs, changelog policy.
-- Branch naming and merge strategy.
-- Review bots and which ones can leave actionable feedback.
-- Review bots that must finish before merge, and how to detect late or asynchronous review comments.
-- Claude Code slash commands such as `/adversarial-pr-review` or `/pr-review-toolkit:review-pr`, if the target repo uses them, and the fallback when Codex cannot execute Claude commands directly.
-- Required checks and branch-protection exceptions.
-- Tool-specific docs that must link back to `AGENTS.md`.
+```bash
+upgrade-agent-workflows \
+  --host codex \
+  --consumer-root /path/to/react_on_rails
+```
+
+The upgrade helper backs up the current install and restores it if reinstall or
+consumer seam validation fails. Use `--host claude` for Claude Code installs and
+`--no-fetch` when the source clone has already been updated locally.
+
+## Shared Vs Repo-Local Skills
+
+Shared portable skills include PR batching, review handling, post-merge audit,
+adversarial review, verification, CI routing, and changelog update workflows.
+They should avoid repo-specific commands, labels, paths, and domain examples.
+
+Repo-local skills are for domain-heavy or destructive workflows that do not make
+sense everywhere. React on Rails keeps `stress-test` local because it exercises
+RSC/SSR/demo-workspace behavior specific to this repo.
+
+## Optional Repo-Pinned Copies
+
+A repo-pinned copy is useful only when a specific environment cannot load the
+user-installed skill pack or when maintainers intentionally want shared workflow
+updates reviewed in that repo. If a repo chooses that route:
+
+- keep the pinned copy separate from repo-specific skills where possible
+- document the source and version of the pinned copy
+- do not customize shared files in place
+- keep repo-specific values in `AGENTS.md`, not in the pinned files
+- run the seam doctor with `--shared` after every sync or update
+
+Do not make repo pinning the default adoption step.
 
 ## What Not To Copy Blindly
 
-- React on Rails package paths such as `react_on_rails/`, `packages/react-on-rails/`, and `react_on_rails_pro/`.
-- Ruby, Rails, Shakapacker, RSC, SSR, and Pro-specific rules unless the target repo uses those concepts.
+- React on Rails package paths such as `react_on_rails/`,
+  `packages/react-on-rails/`, and `react_on_rails_pro/`.
+- Ruby/Rails/Shakapacker/RSC/Pro rules unless the repo actually uses them.
 - Commands that do not exist in the target repo.
-- The `+ci-*` workflow without adapting workflow names, permissions, labels, and dispatch inputs.
-- High-concurrency no-approval execution for arbitrary public issue or PR filters. Require a maintainer-approved exact target list first.
-- `codex-ready`, `codex-wip`, or `codex-pending-question` labels unless the target repo creates them and defines their meaning. Labels are dashboard hints, not durable locks.
-- Merge-readiness claims based only on green checks while reviewer comments are untriaged. Review comments can arrive separately from checks.
-- Treating AI reviewer approvals, positive issue comments, or "no actionable comments" summaries as required maintainer approvals. AI review systems are advisory unless they identify a confirmed blocker.
-- Treating `/pr-review-toolkit:review-pr` as a complete adversarial gate. Use a repo-specific adversarial workflow when release risk, review timing, changelog coverage, or untrusted PR content matters.
-- Independent Codex and Claude agents creating GitHub issues directly from their separate reports. Use draft issue entries, then dedupe and create issues from one coordinator.
-- Follow-up issue creation habits. The default should remain no new issue unless the user explicitly chooses bundled tracking.
-- PR labels that are not created and documented in the target repo.
+- Coordination labels unless the repo creates and defines them.
+- High-concurrency execution from public filters without a maintainer-approved
+  exact target list.
+- Treating AI reviewer approvals or "no actionable comments" summaries as
+  required maintainer approval. They are advisory unless they identify a
+  confirmed blocker.
 
-## Sync Policy
+## Cross-Repo Coordination
 
-`AGENTS.md` should remain the policy source of truth in each repo. Tool-specific files should be thin wrappers or prompt forms that link back to the same policy.
+For multi-machine, multi-batch, or cross-repo work, also adopt
+[`internal/contributor-info/multi-batch-operations.md`](multi-batch-operations.md).
+ShakaCode-internal repos may share the private coordination backend named in
+their seam. External adopters can use the structured public claim-comment
+fallback until a public backend spec exists.
 
-When changing policy:
+## Validation Checklist
 
-1. Update `AGENTS.md`.
-2. Update `.agents/skills/pr-batch/SKILL.md`, `.agents/skills/post-merge-audit/SKILL.md`, `.agents/skills/adversarial-pr-review/SKILL.md`, `.agents/workflows/pr-processing.md`, `.agents/workflows/post-merge-audit.md`, `.agents/workflows/adversarial-pr-review.md`, and `.agents/workflows/address-review.md`.
-3. Update Claude skill or prompt files if they exist.
-4. Run Markdown formatting and link checks.
-5. Do one dry-run batch launch, triage, or PR-processing pass before declaring the copied workflow ready.
+- `agent-workflows-status --host <codex|claude>` reports `UP_TO_DATE`, or the
+  upgrade decision is recorded.
+- `agent-workflow-seam-doctor --shared <path-to-shakacode/agent-workflows>` passes.
+- Markdown formatting and link checks pass for edited docs.
+- Skill `bin/` unit tests pass when the repo carries local helper scripts.
+- A dry run of `$pr-batch` stops with an exact target list and goal prompt
+  before spawning workers.
+- A dry run of review triage reaches the action menu and resolves base branch,
+  validation command, hosted-CI trigger, and follow-up prefix from the seam.
 
 ## Suggested Adoption PR Summary
 
 ```markdown
 ## Summary
 
-- add canonical agent instructions in `AGENTS.md`
-- add a `pr-batch` skill for safe multi-issue and multi-PR launch planning
-- add a `post-merge-audit` skill for missed review gates, changelog gaps, and release-risk checks
-- add an `adversarial-pr-review` skill for stricter Codex/Claude pre-merge and post-merge review gates
-- add reusable PR processing, post-merge audit, adversarial-review, and address-review workflows under `.agents/workflows/`
-- add Claude skill/prompt support for the same review flow
-- document local validation and hosted-CI escalation rules for this repository
+- add the `## Agent Workflow Configuration` seam to `AGENTS.md`
+- document this repo's validation, hosted-CI, changelog, and coordination values
+- enable user-installed shared agent skills to resolve this repo's policy
+- add or run the seam doctor
 
 ## Validation
 
-- markdown formatting check
-- markdown link check
-- dry-run issue or PR triage without code changes
+- `agent-workflow-seam-doctor --shared <path-to-shakacode/agent-workflows>`
+- markdown formatting + link check
+- dry-run `$pr-batch` and PR-review triage without code changes
 ```

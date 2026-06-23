@@ -27,10 +27,11 @@ containing a `codex-claim` HTML comment (`<!-- codex-claim v1 ... -->`) with
 key/value fields in the "Public claim comment" format from
 `.agents/workflows/pr-processing.md`.
 
-When this repository includes `.agents/skills/post-merge-audit/bin/post-merge-audit-scope`, run it first:
+When this repository includes the `post-merge-audit-scope` helper, run it first:
 
 ```bash
-.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json
+POST_MERGE_AUDIT_SKILL_DIR="${POST_MERGE_AUDIT_SKILL_DIR:-.agents/skills/post-merge-audit}"
+"${POST_MERGE_AUDIT_SKILL_DIR}/bin/post-merge-audit-scope" --json
 ```
 
 The resolver is read-only. It resolves the default release-candidate base, the head SHA, squash-aware merged PRs, prior `post-merge-audit-finding` fingerprints, PRs with open finding markers, and the `to_audit` list. Open finding markers create carry-over PRs that are subtracted from `to_audit`; closed markers remain fingerprint context only. Use the output as the initial merged-PR scope table, then verify assumptions before deep audit.
@@ -43,8 +44,9 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
-   - run `agent-coord doctor` then `agent-coord status` to list candidate
-     batch/run ids and lanes
+   - run bounded `agent-coord doctor --json`, then broad `agent-coord status`
+     (via `agent-coord-bounded`) only as an audit/discovery read to list
+     candidate batch/run ids and lanes
    - record `worked_issue_scope: UNKNOWN (needs batch confirmation)`
    - ask for confirmation before treating any candidate as the worked-issue
      scope
@@ -53,24 +55,26 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    `UNKNOWN (setup)` or `UNKNOWN (access)` takes precedence over
    `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
    is still needed after backend recovery. When a batch/run id is known, run
-   `agent-coord doctor` then `agent-coord status`, then inspect the named batch
-   entry; use claims, heartbeats, and batch metadata as the primary worked-issue
-   scope. If `agent-coord` is missing or `agent-coord doctor` fails, record
+   bounded `agent-coord doctor --json` and bounded
+   `agent-coord status --batch-id <batch-id> --json`, then inspect the named
+   batch entry; use claims, heartbeats, and batch metadata as the primary
+   worked-issue scope. If `agent-coord` is missing or bounded
+   `agent-coord doctor --json` fails/times out, record
    `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
-   `agent-coord doctor` passes but
-   `agent-coord status` fails, record `worked_issue_scope: UNKNOWN (access)`
-   with the exact command/error. In both UNKNOWN cases, use structured public
-   `codex-claim` comments as an advisory fallback for possible no-PR, blocked,
-   parked, or done-unmerged lanes before reducing scope to merged PRs. Keep
-   advisory rows marked `UNKNOWN` as needed, and do not infer confirmed
-   completeness from merged PRs.
+   bounded `agent-coord doctor --json` passes but targeted batch status fails,
+   exits 2, or times out, record `worked_issue_scope: UNKNOWN (access)` with the
+   exact command/error. In both UNKNOWN cases, use structured public `codex-claim`
+   comments as an advisory fallback for possible no-PR, blocked, parked, or
+   done-unmerged lanes before reducing scope to merged PRs. Keep advisory rows
+   marked `UNKNOWN` as needed, and do not infer confirmed completeness from
+   merged PRs.
    When the batch/run id itself is unknown, scope that advisory scan to issues
    and open PRs active within the audit time window; use each claim's `batch:`
    field to surface candidate batch ids, not to filter as confirmed scope until
    the user confirms the id.
 
-   If `agent-coord doctor` and `agent-coord status` both succeed but the named
-   batch entry contains no worked issues or lanes, record
+   If bounded `agent-coord doctor --json` and targeted batch status both succeed
+   but the named batch entry contains no worked issues or lanes, record
    `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
    scan structured public `codex-claim` comments as advisory recovery rows for
    possible no-PR, blocked, parked, or done-unmerged lanes, keep any recovered
@@ -102,7 +106,7 @@ For each included PR:
 - Review triage: flag any pre-merge review/comment with `Must Fix`, `MUST-FIX`, `Should Fix`, `DISCUSS`, `Changes Requested`, `blocking`, or similar actionable language when there is no later evidence it was fixed, waived, or explicitly classified.
 - Approval semantics: flag any merge that treated an AI reviewer approval, positive issue comment, or "no actionable comments" summary as required maintainer approval or a special approval gate. Also flag any AI finding that was ignored even though it identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval.
 - Adversarial review: flag any requested adversarial review that finished after merge, reviewed an older head SHA, or left untriaged `BLOCKING` or `DISCUSS` findings.
-- Changelog: if the diff or PR body indicates a user-visible behavior, API, error message, configuration, performance, security, or breaking change, verify `CHANGELOG.md` has a matching entry. When entries are missing, recommend running `/update-changelog`.
+- Changelog: if the diff or PR body indicates a user-visible behavior, API, error message, configuration, performance, security, or breaking change, verify the repo's changelog (see `AGENTS.md` → **Agent Workflow Configuration**) has a matching entry. When entries are missing, recommend running `/update-changelog`.
 - Lockfiles: if the PR changed committed lockfiles, verify the PR evidence satisfies the lockfile content-diff requirement from the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`.
 - Closing evidence: for any PR whose body or linked issue uses analysis, benchmark, or investigation
   evidence to support a `close` or `document/work around` disposition, verify the conclusion applies the
@@ -152,7 +156,7 @@ Classify each PR:
 
 - **OK**: no credible release risk found.
 - **Needs maintainer question**: a decision cannot be made safely from evidence.
-- **Needs changelog update**: user-visible change is missing from `CHANGELOG.md`; recommend `/update-changelog`.
+- **Needs changelog update**: user-visible change is missing from the repo's changelog; recommend `/update-changelog`.
 - **Needs follow-up issue**: non-blocking work remains valuable and is actionable after release.
 - **Needs fix PR**: a real defect, missing test, missing compatibility note, or bad interaction should be fixed before release.
 - **Needs revert consideration**: the merge appears risky enough that reverting may be safer than patching.
@@ -216,10 +220,12 @@ Before creating an approved issue, search existing open issues for the affected 
 ```markdown
 <!-- post-merge-audit-finding v1
 audit: <AUDIT_ID>
-fingerprint: pr-3724:changelog-server-bundle-load-error
-affected_prs: 3724
+fingerprint: pr-<PR>:<short-issue-slug>
+affected_prs: <PR>
 -->
 ```
+
+Example fingerprint slug: `pr-3724:changelog-server-bundle-load-error`.
 
 Only the coordinator should create issues. Independent Codex and Claude audits should draft issue entries with fingerprints so the coordinator can compare and dedupe them.
 
@@ -236,7 +242,8 @@ Return high-risk findings first, then:
    classification, and `UNKNOWN` facts (see the example in
    `.agents/workflows/post-merge-audit.md`).
 6. A PR-by-PR table.
-7. Exact commands and data sources used, including `agent-coord status` output
-   for the named batch or the exact reason coordination state was `UNKNOWN`.
+7. Exact commands and data sources used, including bounded `agent-coord status`
+   output for the named batch or the exact reason coordination state was
+   `UNKNOWN`.
 
 Do not create fixes, comments, labels, issues, changelog edits, reverts, or PRs until the user approves the audit report.
