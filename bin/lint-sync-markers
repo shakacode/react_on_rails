@@ -217,10 +217,54 @@ def identifier_start_byte?(byte)
     (byte >= "a".ord && byte <= "z".ord)
 end
 
-def previous_significant_token(content, index)
-  index -= 1
+def skip_trailing_whitespace(content, index)
   index -= 1 while index >= 0 && WHITESPACE_BYTES.include?(content.getbyte(index))
-  return nil if index.negative?
+  index
+end
+
+def skip_trailing_block_comment(content, index)
+  return index unless index.positive?
+  return index unless content.getbyte(index - 1) == "*".ord && content.getbyte(index) == "/".ord
+
+  comment_start = content.rindex("/*", index - 2)
+  comment_start ? comment_start - 1 : nil
+end
+
+def skip_trailing_line_comment(content, index)
+  line_start = content.rindex("\n", index) || -1
+  line_prefix = content.byteslice((line_start + 1)..index)
+  comment_start = line_prefix.rindex("//")
+
+  comment_start ? line_start + comment_start : index
+end
+
+def previous_significant_code_index(content, index)
+  index -= 1
+  loop do
+    index = skip_trailing_whitespace(content, index)
+    return nil if index.negative?
+
+    next_index = skip_trailing_block_comment(content, index)
+    return nil unless next_index
+
+    if next_index != index
+      index = next_index
+      next
+    end
+
+    next_index = skip_trailing_line_comment(content, index)
+    if next_index != index
+      index = next_index
+      next
+    end
+
+    return index
+  end
+end
+
+def previous_significant_token(content, index)
+  index = previous_significant_code_index(content, index)
+  return nil unless index
 
   byte = content.getbyte(index)
   return byte unless identifier_byte?(byte)
@@ -367,7 +411,7 @@ def valid_enclosing_block_opener?(content, lines, offsets, line_index)
   code = code_text_on_line(content, lines, offsets, line_index).strip
   return false unless code.end_with?("{")
 
-  code.match?(/\A(?:if|for|while|switch|try\b|catch\b|finally\b|else\b|\}\s*else\b)/)
+  code.match?(/\A(?:if|for|while|switch|try\b|catch\b|finally\b|else\b|\}\s*(?:else|catch|finally)\b)/)
 end
 
 def immediate_enclosing_block_line(content, lines, offsets, line_index)
@@ -403,6 +447,7 @@ def find_code_brace_on_line(content, lines, offsets, line_index)
 
   while index < end_offset
     index, state, quote = next_code_state(content, index, state, quote)
+    # Use the last significant { on the line; in `if (fn({})) {`, the block opener is last.
     brace_index = index if significant_code_byte?(state, quote, index) && content.getbyte(index) == "{".ord
     index += 1
   end
