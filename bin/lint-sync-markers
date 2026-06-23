@@ -465,7 +465,7 @@ def immediate_enclosing_block_start(content, state_cache, lines, offsets, line_i
   open_index = previous_significant_code_index(content, offsets.fetch(line_index), state_cache)
   return nil unless open_index && content.getbyte(open_index) == "{".ord
 
-  brace_line = line_index_for_offset(content, open_index)
+  brace_line = line_index_for_offset(offsets, open_index)
   header_start_line = guard_header_start_line(content, state_cache, lines, offsets, brace_line)
   return nil unless header_start_line
 
@@ -534,8 +534,9 @@ def find_matching_brace(content, state_cache, open_index)
   nil
 end
 
-def line_index_for_offset(content, offset)
-  content.byteslice(0...offset).count("\n")
+def line_index_for_offset(offsets, offset)
+  insertion_index = offsets.bsearch_index { |line_offset| line_offset > offset }
+  insertion_index ? insertion_index - 1 : offsets.length - 1
 end
 
 def extract_sync_block(content, state_cache, lines, offsets, block_start)
@@ -547,7 +548,7 @@ def extract_sync_block(content, state_cache, lines, offsets, block_start)
   close_index = find_matching_brace(content, state_cache, open_index)
   return [nil, nil, nil] unless close_index
 
-  end_line = line_index_for_offset(content, close_index)
+  end_line = line_index_for_offset(offsets, close_index)
   end_offset = offsets.fetch(end_line) + lines.fetch(end_line).bytesize
 
   [content.byteslice(start_offset...end_offset), start_line, end_line]
@@ -559,9 +560,7 @@ def common_indent_for(lines)
 end
 
 def trim_blank_edges(lines)
-  lines.shift while lines.first == ""
-  lines.pop while lines.last == ""
-  lines
+  lines.drop_while(&:empty?).reverse.drop_while(&:empty?).reverse
 end
 
 def normalize_block(block)
