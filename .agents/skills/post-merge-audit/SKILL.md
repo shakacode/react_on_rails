@@ -123,9 +123,13 @@ For each included PR:
   PR/head SHA or audited range it applies to, is current for that head/range, covers the changed
   surfaces, and does not leave release-blocking findings untriaged. If private
   coordination claim/heartbeat state is `UNKNOWN`, verify the documented
-  fallback evidence is complete before treating QA coverage as satisfied. If
-  fallback evidence is absent or incomplete, classify the QA lane as `unknown`
-  and surface it as a readiness blocker.
+  fallback evidence is complete and names a concrete QA owner and branch/worktree
+  before treating QA coverage as satisfied. Only private claim/heartbeat
+  sub-values may be `UNKNOWN` in fallback mode. If fallback evidence is absent or
+  incomplete, classify the QA lane as `unknown` and surface it as a readiness
+  blocker. Verify `Release-blocking status` is derived from QA lane status:
+  `satisfied` -> `clear`, `blocked` -> `blocked`, `waived` -> `waived`,
+  `not_applicable` -> `not_applicable`, and `in_progress` / `unknown` -> `blocked`.
 - Cross-PR interactions: compare changed files, shared behavior, assumptions, and release-sensitive areas across the batch.
 - Decision log: inspect any `Codex Decision Log` or equivalent section and verify the decisions still hold after the merge.
 
@@ -138,7 +142,7 @@ still-open lanes:
 - Final state: verify whether the issue was merged, closed, parked, blocked,
   left open intentionally, or remains `UNKNOWN`; for QA lanes, verify whether
   the QA coverage status is `satisfied`, `blocked`, `waived`, healthy
-  `in_progress`, `not applicable` when QA was not required, or `unknown`.
+  `in_progress`, `not_applicable` when QA was not required, or `unknown`.
 - Handoff expectations: check validation evidence, decision-point count,
   confidence notes, QA evidence, review/comment triage, and any Process Gap
   Disposition fields required by `.agents/workflows/pr-processing.md`.
@@ -147,24 +151,28 @@ still-open lanes:
   `realized`, `partial`, `missed`, `regressed`, `stalled`, or `unknown`) and
   explain any `UNKNOWN` evidence needed to resolve the issue outcome. For QA
   lanes, use the QA-coverage result `satisfied`, `blocked`, `waived`,
-  `in_progress`, `not applicable`, or `unknown`. Use `satisfied` when required
+  `in_progress`, `not_applicable`, or `unknown`. Use `satisfied` when required
   QA evidence is current, adequately scoped, and has no untriaged
   release-blocking finding; `blocked` when a release-blocking QA finding still
-  needs a fix or waiver; `waived` when an explicit waiver exists; `in_progress`
-  when required QA is not complete; `not applicable` when QA was correctly
-  omitted with `QA required: no` and a documented rationale; and `unknown` when
-  evidence is missing, stale, or incomplete.
+  needs a fix or waiver; `waived` when an explicit waiver exists and the auditor
+  verifies a maintainer comment URL, issue link, or PR body entry names the
+  finding, scope, and reason; `in_progress` when required QA is not complete;
+  `not_applicable` when QA was correctly omitted with `QA required: no` and a
+  documented rationale; and `unknown` when evidence is missing, stale, or
+  incomplete.
 - Post-merge intake: record healthy `in_progress` worked-issue lanes and
   evidenced `realized` worked-issue outcomes, `satisfied` or `waived` QA lanes,
-  and `not applicable` QA omissions in the coverage table as no-action items
+  and `not_applicable` QA omissions in the coverage table as no-action items
   during active batch phase;
   treat required QA lanes still `in_progress` during readiness/release audits as
   QA coverage findings; route
   `stalled` lanes back to the batch coordinator as resume/reassign/drop
   decisions unless the user explicitly approves tracking the stalled lane as an
   issue; route every other non-OK worked-issue class (`partial`, `missed`,
-  `regressed`, or `unknown`), merged or not, into the issue plan or an explicit
-  coordinator action that names the missing evidence or decision.
+  `regressed`, or `unknown`), merged or not, and every non-OK QA coverage
+  outcome (`blocked`, `unknown`, or release-audit `in_progress`) into the issue
+  plan or an explicit coordinator action that names the missing evidence or
+  decision.
 
 ## Codex And Claude Coordination
 
@@ -213,8 +221,8 @@ The audit should usually produce an issue plan for non-OK findings, but not crea
 - **No issue**: for `OK`, duplicate findings, findings fully resolved by the
   audit evidence, evidenced `realized` lanes, healthy `in_progress` worked-issue
   lanes, evidenced `satisfied` or `waived` QA lanes, or evidenced QA omissions
-  marked `not applicable`; include `realized`, worked-issue `in_progress`,
-  `satisfied`, `waived`, and `not applicable` rows in the worked-issue/QA-lane
+  marked `not_applicable`; include `realized`, worked-issue `in_progress`,
+  `satisfied`, `waived`, and `not_applicable` rows in the worked-issue/QA-lane
   coverage table so the coordinator can see they were checked.
 - **Changelog only**: for missing changelog entries; prefer one bundled changelog issue or a recommendation to run `/update-changelog`, not one issue per entry.
 - **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, follow-up task, non-OK worked-issue outcome (`partial`, `missed`, `regressed`, or `unknown`), or non-OK QA coverage outcome (`blocked`, `unknown`, or release-audit `in_progress`) that needs follow-up.

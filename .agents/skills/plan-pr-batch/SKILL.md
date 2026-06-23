@@ -72,8 +72,9 @@ Plan a PR batch
      to create when the backend is available. If private state will be
      unavailable, require the final handoff to record QA claim/heartbeat state as
      `UNKNOWN` and include allowed fallback evidence (see
-     `.agents/workflows/pr-processing.md` -> Batch QA Lane -> allowed fallback
-     evidence) instead of downgrading QA to `not required`.
+     `.agents/workflows/pr-processing.md`, the "Allowed fallback evidence:"
+     label in the **Batch QA Lane** section) instead of downgrading QA to
+     `not required`.
      When QA is omitted for low-risk work, record `not required` plus the
      rationale. Include the final QA Evidence expectations in the Batch Plan and
      generated goal prompt.

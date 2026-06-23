@@ -443,6 +443,9 @@ Workers should not turn product-decision blockers into speculative PRs. They sho
 
 ### Batch QA Lane
 
+Convention: `UNKNOWN` in capitals means coordination/backend state could not be
+verified; lowercase `unknown` is the QA lane status value.
+
 Use a QA lane when a batch needs evidence beyond each individual worker's local validation before
 coordinator closeout, release-readiness, or release-promotion decisions rely on the batch. QA is a
 sibling lane to implementation and audit work: it verifies the user-visible or operator-visible result
@@ -497,11 +500,14 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 - Findings: <none, fixed in PR(s), waived with link, or follow-up recommended with tracking outcome/link>
 - QA required: <yes | no>
 - QA required rationale: <one-line reason for the decision and selected QA depth>
-- QA lane status: <satisfied | blocked | waived | in_progress | unknown | not applicable; use not applicable when QA required is no; readiness/release audits treat in_progress/unknown as blockers>
-- Release-blocking status: <clear | blocked | waived | not applicable>
-  Derive this from QA lane status: satisfied->clear, blocked->blocked, waived->waived, not applicable->not applicable, and in_progress/unknown->blocked.
+- QA lane status: <satisfied | blocked | waived | in_progress | unknown | not_applicable; use not_applicable when QA required is no; readiness/release audits treat in_progress/unknown as blockers>
+- Release-blocking status: <clear | blocked | waived | not_applicable>
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable (no recurring process miss found); see the top-level Process Gap Disposition section for value definitions>
 ```
+
+`Release-blocking status` is derived from `QA lane status`: `satisfied` -> `clear`,
+`blocked` -> `blocked`, `waived` -> `waived`, `not_applicable` -> `not_applicable`,
+and `in_progress` / `unknown` -> `blocked`.
 
 Examples:
 
@@ -540,7 +546,7 @@ Examples:
 ```markdown
 ### QA Evidence
 
-- QA lane: not applicable: QA not required
+- QA lane: none: QA not required
 - Scope checked: docs-only typo fixes with no workflow, release, generated-output, or runtime behavior changes
 - Tested at: not applicable: no PR/code changes requiring QA
 - Automated checks: covered by worker validation: markdown format/link checks
@@ -548,8 +554,8 @@ Examples:
 - Findings: none
 - QA required: no
 - QA required rationale: low-risk docs-only batch outside required QA categories
-- QA lane status: not applicable
-- Release-blocking status: not applicable
+- QA lane status: not_applicable
+- Release-blocking status: not_applicable
 - Process-gap disposition: not applicable (no recurring process miss found)
 ```
 
@@ -583,6 +589,22 @@ Examples:
 - QA lane status: in_progress
 - Release-blocking status: blocked
 - Process-gap disposition: not applicable (no recurring process miss found)
+```
+
+```markdown
+### QA Evidence
+
+- QA lane: codex-qa, branch qa/batch-main, claim UNKNOWN (private backend unavailable), heartbeat UNKNOWN (private backend unavailable)
+- Scope checked: UNKNOWN - QA Evidence block not found in handoff or PR comments; coordination state unavailable
+- Tested at: UNKNOWN
+- Automated checks: UNKNOWN
+- Manual checks: UNKNOWN
+- Findings: UNKNOWN - evidence missing or stale; cannot confirm coverage
+- QA required: yes
+- QA required rationale: release-affecting batch; QA was planned but evidence is missing
+- QA lane status: unknown
+- Release-blocking status: blocked
+- Process-gap disposition: checklist+replay (add QA Evidence block requirement to handoff checklist)
 ```
 
 ```markdown
@@ -1613,11 +1635,11 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    `missed`, `regressed`, `stalled`, or `unknown` using
    `.agents/workflows/continuous-evaluation-loop.md`; and classify QA lanes with
    the QA-coverage result `satisfied`, `blocked`, `waived`, `in_progress`,
-   `not applicable`, or `unknown`. Use `satisfied` when the required QA evidence
+   `not_applicable`, or `unknown`. Use `satisfied` when the required QA evidence
    is current, adequately scoped, and has no untriaged release-blocking finding;
    `blocked` when a release-blocking QA finding still needs a fix or waiver;
    `waived` when an explicit waiver exists; `in_progress` when required QA is
-   not complete; `not applicable` when QA was correctly omitted with
+   not complete; `not_applicable` when QA was correctly omitted with
    `QA required: no` and a documented rationale; and `unknown` when evidence is
    missing, stale, or incomplete. Treat healthy active/live worked-issue lanes as
    `in_progress` no-action items unless they have a stalled, regressed, partial,
@@ -1642,9 +1664,13 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
 9. Produce a deduped issue plan for non-OK findings:
    - no issue for OK, duplicates, fully resolved findings, evidenced `realized`
      worked-issue lanes, evidenced `satisfied` or `waived` QA lanes, evidenced
-     `not applicable` QA omissions, or healthy `in_progress` worked-issue lanes
+     `not_applicable` QA omissions, or healthy `in_progress` worked-issue lanes
    - one bundled changelog issue or a `/update-changelog` recommendation for missing changelog entries
-   - one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task
+   - one child issue per independently actionable fix PR, revert consideration,
+     maintainer question, follow-up task, non-OK worked-issue outcome
+     (`partial`, `missed`, `regressed`, or `unknown`), or non-OK QA coverage
+     outcome (`blocked`, `unknown`, or release-audit `in_progress`) that needs
+     follow-up
    - one parent issue when there are two or more related child issues from the same audit
    - include healthy `in_progress` worked-issue lanes in the worked-issue
      coverage table so the coordinator can verify complete coverage

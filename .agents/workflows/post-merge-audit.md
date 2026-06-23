@@ -201,7 +201,7 @@ After confirmation, audit each known worked issue, QA lane, or advisory
 - whether the final issue state is correct: merged, closed, still open,
   parked, blocked, no-PR, done-unmerged, or UNKNOWN
 - for QA lanes, whether the QA lane status is correct: `satisfied`, `blocked`,
-  `waived`, still healthy `in_progress`, `not applicable` when QA was not
+  `waived`, still healthy `in_progress`, `not_applicable` when QA was not
   required, or `unknown`
 - whether review comments, handoff expectations, confidence notes, validation
   evidence, QA evidence, decision-point count, and Process Gap Disposition
@@ -210,15 +210,19 @@ After confirmation, audit each known worked issue, QA lane, or advisory
   `missed`, `regressed`, `stalled`, or `unknown`, using
   `.agents/workflows/continuous-evaluation-loop.md` for the intent-achievement
   definitions; classify QA lanes with the QA-coverage result `satisfied`,
-  `blocked`, `waived`, `in_progress`, `not applicable`, or `unknown`. Use
+  `blocked`, `waived`, `in_progress`, `not_applicable`, or `unknown`. Use
   `satisfied` when required QA evidence is current, adequately scoped, and has no
   untriaged release-blocking finding; `blocked` when a release-blocking QA
-  finding still needs a fix or waiver; `waived` when an explicit waiver exists;
-  `in_progress` when required QA is not complete; `not applicable` when QA was
-  correctly omitted with `QA required: no` and a documented rationale; and
-  `unknown` when evidence is missing, stale, or incomplete
+  finding still needs a fix or waiver; `waived` when an explicit waiver exists
+  and the auditor verifies a maintainer comment URL, issue link, or PR body entry
+  names the finding, scope, and reason; `in_progress` when required QA is not
+  complete; `not_applicable` when QA was correctly omitted with `QA required: no`
+  and a documented rationale; and `unknown` when evidence is missing, stale, or
+  incomplete. Verify `Release-blocking status` is derived from QA lane status:
+  `satisfied` -> `clear`, `blocked` -> `blocked`, `waived` -> `waived`,
+  `not_applicable` -> `not_applicable`, and `in_progress` / `unknown` -> `blocked`
 - for healthy `in_progress` worked-issue lanes, evidenced `realized` outcomes,
-  evidenced `satisfied` or `waived` QA lanes, and evidenced `not applicable` QA
+  evidenced `satisfied` or `waived` QA lanes, and evidenced `not_applicable` QA
   omissions, record no action in the worked-issue/QA table; treat required QA
   lanes still `in_progress` during readiness/release audits as QA coverage
   findings; for `stalled` lanes, recommend resume, reassign, or drop unless the
@@ -253,7 +257,7 @@ Also audit each included merged PR for:
   or still-`UNKNOWN` QA coverage/scope evidence required by
   `.agents/workflows/pr-processing.md`; do not treat private coordination
   claim/heartbeat `UNKNOWN` as blocking when the documented fallback evidence is
-  complete
+  complete and names a concrete QA owner and branch/worktree
 - changes touching CI, packaged/commercial code, build config, code generators,
   performance- or framework-sensitive paths, shared types, or release-sensitive
   docs (per `AGENTS.md`)
@@ -305,7 +309,7 @@ matching the coordinator lane name.
 | #1237 | UNKNOWN (advisory) / no coord data | codex-claim comment URL (advisory) | UNKNOWN | unknown | coordination state needed to confirm |
 | #1238 | batch-abc:issue-1238 / codex/done-no-merge | no-PR evidence comment URL | done-unmerged | realized | none |
 | qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | done | satisfied | none |
-| qa | not required / no branch | handoff comment URL (inline QA Evidence block) | not applicable | not applicable | none |
+| qa | not required / no branch | handoff comment URL (inline QA Evidence block) | not_applicable | not_applicable | none |
 | qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | blocked | blocked | fix or waiver needed before release |
 | qa | batch-abc:qa / codex/qa-lane | maintainer waiver URL | done | waived | none |
 | qa:ci | batch-abc:qa:ci / codex/qa-ci-lane | QA Evidence block URL | done | satisfied | none |
