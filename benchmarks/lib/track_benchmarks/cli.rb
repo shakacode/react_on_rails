@@ -10,7 +10,7 @@ module TrackBenchmarks
     end
 
     def run
-      branch, start_point_args = BranchArgs.branch_and_start_point_args
+      branch, start_point_args = BranchArgs.branch_and_start_point_args(env:)
       bencher_result = BencherRun.run_bencher!(bencher_runner, branch, start_point_args)
       bencher_exit_code, report = retry_without_start_point_hash(branch, start_point_args, bencher_result)
       bencher_exit_code = BencherRun.normalized_exit_code(bencher_exit_code, report)
@@ -20,14 +20,14 @@ module TrackBenchmarks
       report_markdown = Summary.rendered_report(report, suite_name, Config::DISPLAY_JSON)
       Summary.post_report_to_summary(report_markdown, suite_name)
 
-      if BranchArgs.confirmation_mode?
+      if BranchArgs.confirmation_mode?(env:)
         # Fresh-runner rerun of a main-push candidate. Owns its own exit code (confirmed /
         # cleared / inconclusive) and never posts PR comments.
         Confirmation.run(report, bencher_exit_code, report_markdown, suite_name)
       else
         post_pull_request_report(report, report_markdown)
 
-        if RegressionPayloads.main_push? && bencher_exit_code != 0
+        if RegressionPayloads.main_push?(env:) && bencher_exit_code != 0
           RegressionPayloads.report_main_push_candidate(report, report_markdown, bencher_exit_code, suite_name)
         end
       end

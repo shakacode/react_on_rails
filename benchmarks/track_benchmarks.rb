@@ -46,8 +46,11 @@ def append_step_summary(markdown)
   TrackBenchmarks::Summary.append_step_summary(markdown)
 end
 
-def post_report_to_summary(markdown)
-  TrackBenchmarks::Summary.post_report_to_summary(markdown, SUITE_NAME)
+def post_report_to_summary(markdown, suite_name = nil)
+  suite_name ||= Object.const_get(:SUITE_NAME) if Object.const_defined?(:SUITE_NAME)
+  raise ArgumentError, "suite_name is required outside script execution" unless suite_name
+
+  TrackBenchmarks::Summary.post_report_to_summary(markdown, suite_name)
 end
 
 def bencher_runner
