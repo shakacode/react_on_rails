@@ -5589,8 +5589,10 @@ three-bundle architecture.
 
 **How Tailwind works with RSC:**
 
-1. Tailwind runs as a PostCSS plugin during the client bundle build only.
-2. It scans all files listed in its `content` configuration for utility class names.
+1. Tailwind/PostCSS follows each bundle's CSS loader pipeline when CSS imports are processed, but
+   only the client bundle emits browser-loadable CSS.
+2. Tailwind scans configured source roots for utility class names. Tailwind v4 uses CSS `@source`
+   directives; Tailwind v3 uses the `content` array.
 3. The generated CSS is delivered through a layout-owned client pack.
 4. Server Components and Client Components both use Tailwind class names as plain strings.
 5. The CSS loads according to the Rails layout's Shakapacker pack tags.
