@@ -36,6 +36,7 @@ TARGET_PATH_PATTERN = %r{
   ([A-Za-z0-9_@./+\-]+)
   `?
 }ix
+GUARD_HEADER_PATTERN = /\A(?:if\b|for\b|while\b|switch\b|try\b|catch\b|finally\b|else\b|\}\s*(?:else|catch|finally)\b)/
 
 MarkerRecord = Struct.new(
   :path,
@@ -47,6 +48,7 @@ MarkerRecord = Struct.new(
   :block_end_line,
   keyword_init: true
 )
+BlockStart = Struct.new(:line_index, :open_index, keyword_init: true)
 
 def repo_root
   output, status = Open3.capture2e("git", "rev-parse", "--show-toplevel")
@@ -336,7 +338,7 @@ def code_state_transition(content, index, state_cache)
   quote_transition(byte)
 end
 
-def next_code_state(content, index, state, context, state_cache = nil)
+def next_code_state(content, index, state, context, state_cache)
   return advance_comment_string_or_regex(content, index, state, context) unless state == :code
 
   byte = content.getbyte(index)
@@ -445,25 +447,32 @@ def code_text_on_line(content, state_cache, lines, offsets, line_index)
   bytes.pack("C*")
 end
 
-def valid_enclosing_block_opener?(content, state_cache, lines, offsets, line_index)
-  code = code_text_on_line(content, state_cache, lines, offsets, line_index).strip
-  return false unless code.end_with?("{")
+def guard_header_start_line(content, state_cache, lines, offsets, brace_line)
+  brace_line.downto(0) do |candidate_line|
+    code = (candidate_line..brace_line).map do |line_index|
+      code_text_on_line(content, state_cache, lines, offsets, line_index).strip
+    end.reject(&:empty?).join(" ")
+    next if code.empty?
+    next unless code.end_with?("{") && code.match?(GUARD_HEADER_PATTERN)
 
-  code.match?(/\A(?:if\b|for\b|while\b|switch\b|try\b|catch\b|finally\b|else\b|\}\s*(?:else|catch|finally)\b)/)
+    return candidate_line
+  end
+
+  nil
 end
 
-def immediate_enclosing_block_line(content, state_cache, lines, offsets, line_index)
-  index = line_index - 1
-  index -= 1 while index >= 0 && lines[index].strip.empty?
-  return nil if index.negative?
-  return nil if block_comment_line?(state_cache, offsets, index) || line_comment_only?(lines[index])
-  return nil unless valid_enclosing_block_opener?(content, state_cache, lines, offsets, index)
-  return nil unless find_code_brace_on_line(content, state_cache, lines, offsets, index)
+def immediate_enclosing_block_start(content, state_cache, lines, offsets, line_index)
+  open_index = previous_significant_code_index(content, offsets.fetch(line_index), state_cache)
+  return nil unless open_index && content.getbyte(open_index) == "{".ord
 
-  index
+  brace_line = line_index_for_offset(content, open_index)
+  header_start_line = guard_header_start_line(content, state_cache, lines, offsets, brace_line)
+  return nil unless header_start_line
+
+  BlockStart.new(line_index: header_start_line, open_index:)
 end
 
-def synchronized_block_start_line(marker_context, line, line_index)
+def synchronized_block_start(marker_context, line, line_index)
   content = marker_context.fetch(:content)
   state_cache = marker_context.fetch(:state_cache)
   lines = marker_context.fetch(:lines)
@@ -471,15 +480,19 @@ def synchronized_block_start_line(marker_context, line, line_index)
 
   if marker_comment_state(state_cache, offsets, line, line_index) == :block_comment
     comment_start_line = block_comment_start_line(state_cache, offsets, line_index)
-    guarded_start_line = immediate_enclosing_block_line(content, state_cache, lines, offsets, comment_start_line)
+    guarded_start = immediate_enclosing_block_start(content, state_cache, lines, offsets, comment_start_line)
 
-    return guarded_start_line if guarded_start_line
+    return guarded_start if guarded_start
 
-    return first_code_line_after_marker(state_cache, lines, offsets, line_index)
+    block_line = first_code_line_after_marker(state_cache, lines, offsets, line_index)
+    return block_line && BlockStart.new(line_index: block_line)
   end
 
-  immediate_enclosing_block_line(content, state_cache, lines, offsets, line_index) ||
-    first_code_line_after_marker(state_cache, lines, offsets, line_index)
+  immediate_enclosing_block_start(content, state_cache, lines, offsets, line_index) ||
+    begin
+      block_line = first_code_line_after_marker(state_cache, lines, offsets, line_index)
+      block_line && BlockStart.new(line_index: block_line)
+    end
 end
 
 def find_code_brace_on_line(content, state_cache, lines, offsets, line_index)
@@ -525,9 +538,10 @@ def line_index_for_offset(content, offset)
   content.byteslice(0...offset).count("\n")
 end
 
-def extract_sync_block(content, state_cache, lines, offsets, start_line)
+def extract_sync_block(content, state_cache, lines, offsets, block_start)
+  start_line = block_start.line_index
   start_offset = offsets.fetch(start_line)
-  open_index = find_code_brace_on_line(content, state_cache, lines, offsets, start_line)
+  open_index = block_start.open_index || find_code_brace_on_line(content, state_cache, lines, offsets, start_line)
   return [nil, nil, nil] unless open_index
 
   close_index = find_matching_brace(content, state_cache, open_index)
@@ -572,13 +586,19 @@ def marker_record_from_line(marker_context, line, index)
     return nil
   end
 
-  block_start_line = synchronized_block_start_line(marker_context, line, index)
-  unless block_start_line
+  block_start = synchronized_block_start(marker_context, line, index)
+  unless block_start
     errors << "#{path}:#{index + 1}: no synchronized block found after marker"
     return nil
   end
 
-  block, start_line, end_line = extract_sync_block(content, state_cache, lines, offsets, block_start_line)
+  block, start_line, end_line = extract_sync_block(
+    content,
+    state_cache,
+    lines,
+    offsets,
+    block_start
+  )
   unless block
     errors << "#{path}:#{index + 1}: unable to extract synchronized block"
     return nil
