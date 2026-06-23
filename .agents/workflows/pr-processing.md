@@ -452,12 +452,16 @@ sibling lane to implementation and audit work: it verifies the user-visible or o
 of the batch, while audit verifies that the QA coverage and evidence were adequate.
 
 Create an explicit QA lane for release-affecting batches, RC or final-release preparation,
-CI/tooling changes, generated-example or generator-output changes, developer-workflow changes, broad
-runtime behavior changes, and any batch where the coordinator cannot tell from worker validation alone
-whether the intended surfaces were exercised. These required categories take precedence over low-risk
-exceptions. For docs-only, no-code process, no-PR evidence, and other low-risk batches that are not
-release-affecting, developer-workflow-affecting, or otherwise covered by the required categories above,
-QA may be recorded as `not required` with a one-line rationale instead of spawning a separate worker.
+CI/tooling changes, generated-example or generator-output changes,
+developer-workflow changes (runtime tool behavior, CLI commands, build/CI
+paths, or generated developer outputs, not process-documentation or
+agent-instruction-only edits), broad runtime behavior changes, and any batch
+where the coordinator cannot tell from worker validation alone whether the
+intended surfaces were exercised. These required categories take precedence over
+low-risk exceptions. For docs-only, no-code process, no-PR evidence, and other
+low-risk batches that are not release-affecting, developer-workflow-affecting,
+or otherwise covered by the required categories above, QA may be recorded as
+`not required` with a one-line rationale instead of spawning a separate worker.
 
 For mixed batches, apply QA to any subset that would individually qualify under the required-QA
 categories above, including release-affecting, workflow/build/tooling, generated-output,
@@ -514,6 +518,9 @@ An unresponsive QA owner or incomplete QA evidence without a concrete
 release-blocking finding is `unknown`, not a separate QA `stalled` status; it
 still maps to release-blocking `blocked` and needs coordinator action to resume,
 reassign, drop, or recover evidence.
+Valid QA lane final states in worked-issue/QA-lane coverage tables are `done`,
+`blocked`, `not_applicable`, or `UNKNOWN`; the classification column records the
+QA coverage result such as `satisfied`, `waived`, `blocked`, or `unknown`.
 
 Examples:
 
