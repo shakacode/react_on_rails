@@ -3,9 +3,10 @@
 module TrackBenchmarks
   # Runtime orchestration for benchmarks/track_benchmarks.rb.
   class Cli
-    def initialize(suite_name:, report_marker:)
+    def initialize(suite_name:, report_marker:, env: ENV)
       @suite_name = suite_name
       @report_marker = report_marker
+      @env = env
     end
 
     def run
@@ -34,7 +35,7 @@ module TrackBenchmarks
 
     private
 
-    attr_reader :suite_name, :report_marker
+    attr_reader :suite_name, :report_marker, :env
 
     def bencher_runner
       @bencher_runner ||= BencherRunner.new(benchmark_json: Config::BENCHMARK_JSON, report_json: Config::REPORT_JSON)
@@ -65,8 +66,10 @@ module TrackBenchmarks
     end
 
     def post_pull_request_report(report, report_markdown)
-      pr_event = ENV.fetch("GITHUB_EVENT_NAME", nil) == "pull_request"
-      if report.nil? && pr_event
+      event_name = env.fetch("GITHUB_EVENT_NAME", nil)
+      return unless event_name == "pull_request"
+
+      if report.nil?
         # A nil report means Bencher produced no parseable output (operational failure). On
         # a PR, replacing the comment now would delete the previous run's real report and
         # make an auth/API/network failure look like a normal un-highlighted summary, while
@@ -76,14 +79,14 @@ module TrackBenchmarks
           "Bencher produced no report for #{suite_name} (operational failure); " \
           "keeping the previous PR comment intact instead of overwriting it with an un-highlighted table."
         )
-      elsif pr_event && Summary.regression?(report) && report_markdown.empty?
+      elsif Summary.regression?(report) && report_markdown.empty?
         # A real regression but no table to render (display sidecar missing/empty). Don't
         # leave the stale PR comment looking unchanged — post the run-URL fallback (which
         # also emits ::error::) so the regression is visible in the PR thread, mirroring the
         # main-push candidate hand-off.
-        PrComments.replace(Summary.regression_handoff_summary(report_markdown)) { pr_report_poster }
+        PrComments.replace(Summary.regression_handoff_summary(report_markdown), event_name:) { pr_report_poster }
       else
-        PrComments.replace(report_markdown) { pr_report_poster }
+        PrComments.replace(report_markdown, event_name:) { pr_report_poster }
       end
     end
   end
