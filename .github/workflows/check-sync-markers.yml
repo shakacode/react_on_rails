@@ -1,9 +1,10 @@
+---
 name: Check Sync Markers
 
 permissions:
   contents: read
 
-on:
+"on":
   push:
     branches: [main]
     paths:
@@ -21,7 +22,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: check-sync-markers-${{ github.event.pull_request.number || github.ref }}
+  group: sync-markers-${{ github.event.pull_request.number || github.ref_name || github.sha }}
   cancel-in-progress: true
 
 jobs:

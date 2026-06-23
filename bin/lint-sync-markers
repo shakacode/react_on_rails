@@ -10,6 +10,22 @@ SYNC_ROOTS = %w[
   packages/react-on-rails-pro
 ].freeze
 WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
+REGEX_LITERAL_PRECEDING_PUNCTUATION_BYTES = "([{=,:;!&|?+-*~%^<>".bytes.freeze
+REGEX_LITERAL_PRECEDING_KEYWORDS = %w[
+  await
+  case
+  delete
+  do
+  else
+  in
+  instanceof
+  of
+  return
+  throw
+  typeof
+  void
+  yield
+].freeze
 COMMENT_MARKER_PATTERN = %r{\A\s*(?:(?://|\*)\s*|/\*+\s*)MUST\ SYNC:}
 TARGET_PATH_PATTERN = %r{
   MUST\ SYNC:
@@ -74,80 +90,156 @@ def sync_scope_path?(path)
   clean_path && SYNC_ROOTS.any? { |root| clean_path == root || clean_path.start_with?("#{root}/") }
 end
 
-def advance_line_comment(index, byte, quote)
-  return [index, :code, quote] if byte == "\n".ord
-
-  [index, :line_comment, quote]
+def initial_lexer_context
+  { string_quote: nil, template_depths: [], skip_code_byte: nil }
 end
 
-def advance_block_comment(content, index, byte, quote)
+def with_string_quote(context, quote_byte)
+  { string_quote: quote_byte, template_depths: context[:template_depths], skip_code_byte: context[:skip_code_byte] }
+end
+
+def clear_string_quote(context)
+  { string_quote: nil, template_depths: context[:template_depths], skip_code_byte: context[:skip_code_byte] }
+end
+
+def enter_template_interpolation(context, skip_code_byte)
+  { string_quote: nil, template_depths: context[:template_depths] + [0], skip_code_byte: }
+end
+
+def in_template_interpolation?(context)
+  context[:template_depths].any?
+end
+
+def increment_template_depth(context)
+  depths = context[:template_depths]
+
+  { string_quote: nil, template_depths: depths[0...-1] + [depths.last + 1], skip_code_byte: context[:skip_code_byte] }
+end
+
+def close_template_code_brace(context)
+  depths = context[:template_depths]
+  return [:code, context] if depths.empty?
+
+  if depths.last.zero?
+    return [:template, { string_quote: nil, template_depths: depths[0...-1], skip_code_byte: context[:skip_code_byte] }]
+  end
+
+  [
+    :code,
+    { string_quote: nil, template_depths: depths[0...-1] + [depths.last - 1], skip_code_byte: context[:skip_code_byte] }
+  ]
+end
+
+def significant_code_byte?(state, context, index)
+  state == :code && context[:skip_code_byte] != index
+end
+
+def advance_line_comment(index, byte, context)
+  return [index, :code, context] if byte == "\n".ord
+
+  [index, :line_comment, context]
+end
+
+def advance_block_comment(content, index, byte, context)
   next_byte = content.getbyte(index + 1)
-  return [index + 1, :code, quote] if byte == "*".ord && next_byte == "/".ord
+  return [index + 1, :code, context] if byte == "*".ord && next_byte == "/".ord
 
-  [index, :block_comment, quote]
+  [index, :block_comment, context]
 end
 
-def advance_string(index, byte, quote)
-  return [index + 1, :string, quote] if byte == "\\".ord
-  return [index, :code, nil] if byte == quote
+def advance_string(index, byte, context)
+  return [index + 1, :string, context] if byte == "\\".ord
+  return [index, :code, clear_string_quote(context)] if byte == context[:string_quote]
 
-  [index, :string, quote]
+  [index, :string, context]
 end
 
-def advance_template(index, byte, quote)
-  return [index + 1, :template, quote] if byte == "\\".ord
-  return [index, :code, nil] if byte == "`".ord
+def advance_template(content, index, byte, context)
+  return [index + 1, :template, context] if byte == "\\".ord
 
-  [index, :template, quote]
+  if byte == "$".ord && content.getbyte(index + 1) == "{".ord
+    return [index + 1, :code, enter_template_interpolation(context, index + 1)]
+  end
+
+  return [index, :code, context] if byte == "`".ord
+
+  [index, :template, context]
 end
 
-def advance_regex(index, byte, quote)
-  return [index + 1, :regex, quote] if byte == "\\".ord
-  return [index, :regex_char_class, quote] if byte == "[".ord
-  return [index, :code, nil] if byte == "/".ord || byte == "\n".ord
+def advance_regex(index, byte, context)
+  return [index + 1, :regex, context] if byte == "\\".ord
+  return [index, :regex_char_class, context] if byte == "[".ord
+  return [index, :code, context] if byte == "/".ord || byte == "\n".ord
 
-  [index, :regex, quote]
+  [index, :regex, context]
 end
 
-def advance_regex_char_class(index, byte, quote)
-  return [index + 1, :regex_char_class, quote] if byte == "\\".ord
-  return [index, :regex, quote] if byte == "]".ord || byte == "\n".ord
+def advance_regex_char_class(index, byte, context)
+  return [index + 1, :regex_char_class, context] if byte == "\\".ord
+  return [index, :regex, context] if byte == "]".ord || byte == "\n".ord
 
-  [index, :regex_char_class, quote]
+  [index, :regex_char_class, context]
 end
 
-def advance_comment_string_or_regex(content, index, state, quote)
+def advance_comment_string_or_regex(content, index, state, context)
   byte = content.getbyte(index)
 
   case state
   when :line_comment
-    advance_line_comment(index, byte, quote)
+    advance_line_comment(index, byte, context)
   when :block_comment
-    advance_block_comment(content, index, byte, quote)
+    advance_block_comment(content, index, byte, context)
   when :string
-    advance_string(index, byte, quote)
+    advance_string(index, byte, context)
   when :template
-    advance_template(index, byte, quote)
+    advance_template(content, index, byte, context)
   when :regex
-    advance_regex(index, byte, quote)
+    advance_regex(index, byte, context)
   when :regex_char_class
-    advance_regex_char_class(index, byte, quote)
+    advance_regex_char_class(index, byte, context)
   else
-    [index, state, quote]
+    [index, state, context]
   end
 end
 
-def previous_significant_byte(content, index)
+def identifier_byte?(byte)
+  byte == "$".ord ||
+    byte == "_".ord ||
+    (byte >= "0".ord && byte <= "9".ord) ||
+    (byte >= "A".ord && byte <= "Z".ord) ||
+    (byte >= "a".ord && byte <= "z".ord)
+end
+
+def identifier_start_byte?(byte)
+  byte == "$".ord ||
+    byte == "_".ord ||
+    (byte >= "A".ord && byte <= "Z".ord) ||
+    (byte >= "a".ord && byte <= "z".ord)
+end
+
+def previous_significant_token(content, index)
   index -= 1
   index -= 1 while index >= 0 && WHITESPACE_BYTES.include?(content.getbyte(index))
-  index >= 0 ? content.getbyte(index) : nil
+  return nil if index.negative?
+
+  byte = content.getbyte(index)
+  return byte unless identifier_byte?(byte)
+
+  token_end = index + 1
+  index -= 1 while index >= 0 && identifier_byte?(content.getbyte(index))
+  token_start = index + 1
+  token = content.byteslice(token_start...token_end)
+
+  identifier_start_byte?(content.getbyte(token_start)) ? token : byte
 end
 
 def regex_literal_start?(content, index)
-  previous_byte = previous_significant_byte(content, index)
-  return true unless previous_byte
+  previous_token = previous_significant_token(content, index)
+  return true unless previous_token
 
-  "([{=,:;!&|?+-*~%^<>".bytes.include?(previous_byte)
+  return REGEX_LITERAL_PRECEDING_KEYWORDS.include?(previous_token) if previous_token.is_a?(String)
+
+  REGEX_LITERAL_PRECEDING_PUNCTUATION_BYTES.include?(previous_token)
 end
 
 def comment_transition(byte, next_byte)
@@ -173,33 +265,61 @@ def code_state_transition(content, index)
   quote_transition(byte)
 end
 
-def next_code_state(content, index, state, quote)
-  return advance_comment_string_or_regex(content, index, state, quote) unless state == :code
+def next_code_state(content, index, state, context)
+  return advance_comment_string_or_regex(content, index, state, context) unless state == :code
+
+  byte = content.getbyte(index)
+  if in_template_interpolation?(context)
+    return [index, :code, increment_template_depth(context)] if byte == "{".ord
+
+    if byte == "}".ord
+      next_state, next_context = close_template_code_brace(context)
+      return [index, next_state, next_context]
+    end
+  end
 
   transition = code_state_transition(content, index)
-  return [index, state, quote] unless transition
+  return [index, state, context] unless transition
 
   new_index = %i[line_comment block_comment].include?(transition) ? index + 1 : index
-  new_quote = transition == :string ? content.getbyte(index) : quote
-  [new_index, transition, new_quote]
+  new_context = transition == :string ? with_string_quote(context, content.getbyte(index)) : context
+  [new_index, transition, new_context]
 end
 
 def code_state_at_offset(content, offset)
   index = 0
   state = :code
-  quote = nil
+  context = initial_lexer_context
 
   while index < offset
-    index, state, quote = next_code_state(content, index, state, quote)
+    index, state, context = next_code_state(content, index, state, context)
     index += 1
   end
 
-  [state, quote]
+  [state, context]
 end
 
 def block_comment_line?(content, offsets, line_index)
   state, = code_state_at_offset(content, offsets.fetch(line_index))
   state == :block_comment
+end
+
+def marker_comment_state(content, offsets, line, line_index)
+  marker_column = line.index(MARKER)
+  return nil unless marker_column
+
+  state, = code_state_at_offset(content, offsets.fetch(line_index) + marker_column)
+  state
+end
+
+def comment_marker_line?(content, offsets, line, line_index)
+  %i[line_comment block_comment].include?(marker_comment_state(content, offsets, line, line_index))
+end
+
+def block_comment_start_line(content, offsets, line_index)
+  index = line_index
+  index -= 1 while index.positive? && block_comment_line?(content, offsets, index)
+  index
 end
 
 def skip_to_block_comment_end(content, lines, offsets, line_index)
@@ -228,8 +348,23 @@ def first_code_line_after_marker(content, lines, offsets, line_index)
   index < lines.length ? index : nil
 end
 
-def valid_enclosing_block_opener?(line)
-  code = line.sub(%r{\s*//.*\z}, "").strip
+def code_text_on_line(content, lines, offsets, line_index)
+  index = offsets.fetch(line_index)
+  end_offset = index + lines.fetch(line_index).bytesize
+  state, context = code_state_at_offset(content, index)
+  bytes = []
+
+  while index < end_offset
+    index, state, context = next_code_state(content, index, state, context)
+    bytes << content.getbyte(index) if significant_code_byte?(state, context, index)
+    index += 1
+  end
+
+  bytes.pack("C*")
+end
+
+def valid_enclosing_block_opener?(content, lines, offsets, line_index)
+  code = code_text_on_line(content, lines, offsets, line_index).strip
   return false unless code.end_with?("{")
 
   code.match?(/\A(?:if|for|while|switch|try\b|catch\b|finally\b|else\b|\}\s*else\b)/)
@@ -240,14 +375,19 @@ def immediate_enclosing_block_line(content, lines, offsets, line_index)
   index -= 1 while index >= 0 && lines[index].strip.empty?
   return nil if index.negative?
   return nil if block_comment_line?(content, offsets, index) || line_comment_only?(lines[index])
-  return nil unless valid_enclosing_block_opener?(lines[index])
+  return nil unless valid_enclosing_block_opener?(content, lines, offsets, index)
   return nil unless find_code_brace_on_line(content, lines, offsets, index)
 
   index
 end
 
-def synchronized_block_start_line(content, lines, offsets, line_index)
-  if block_comment_line?(content, offsets, line_index)
+def synchronized_block_start_line(content, lines, offsets, line, line_index)
+  if marker_comment_state(content, offsets, line, line_index) == :block_comment
+    comment_start_line = block_comment_start_line(content, offsets, line_index)
+    guarded_start_line = immediate_enclosing_block_line(content, lines, offsets, comment_start_line)
+
+    return guarded_start_line if guarded_start_line
+
     return first_code_line_after_marker(content, lines, offsets, line_index)
   end
 
@@ -263,7 +403,7 @@ def find_code_brace_on_line(content, lines, offsets, line_index)
 
   while index < end_offset
     index, state, quote = next_code_state(content, index, state, quote)
-    brace_index = index if state == :code && content.getbyte(index) == "{".ord
+    brace_index = index if significant_code_byte?(state, quote, index) && content.getbyte(index) == "{".ord
     index += 1
   end
 
@@ -273,7 +413,7 @@ end
 def find_matching_brace(content, open_index)
   index = open_index
   state = :code
-  quote = nil
+  quote = initial_lexer_context
   depth = 0
 
   while index < content.bytesize
@@ -281,9 +421,9 @@ def find_matching_brace(content, open_index)
     index = next_index
     byte = content.getbyte(index)
 
-    if state == :code && byte == "{".ord
+    if significant_code_byte?(state, quote, index) && byte == "{".ord
       depth += 1
-    elsif state == :code && byte == "}".ord
+    elsif significant_code_byte?(state, quote, index) && byte == "}".ord
       depth -= 1
       return index if depth.zero?
     end
@@ -331,42 +471,55 @@ def normalize_block(block)
   lines.map { |line| line.sub(/\A[ \t]{0,#{common_indent}}/, "") }.join("\n")
 end
 
+def marker_record_from_line(marker_context, line, index)
+  path = marker_context.fetch(:path)
+  content = marker_context.fetch(:content)
+  lines = marker_context.fetch(:lines)
+  offsets = marker_context.fetch(:offsets)
+  errors = marker_context.fetch(:errors)
+
+  target_path = target_path_from(line)
+  unless target_path
+    errors << "#{path}:#{index + 1}: unable to parse sync target path"
+    return nil
+  end
+
+  block_start_line = synchronized_block_start_line(content, lines, offsets, line, index)
+  unless block_start_line
+    errors << "#{path}:#{index + 1}: no synchronized block found after marker"
+    return nil
+  end
+
+  block, start_line, end_line = extract_sync_block(content, lines, offsets, block_start_line)
+  unless block
+    errors << "#{path}:#{index + 1}: unable to extract synchronized block"
+    return nil
+  end
+
+  MarkerRecord.new(
+    path:,
+    line_number: index + 1,
+    target_path:,
+    block:,
+    normalized_block: normalize_block(block),
+    block_start_line: start_line + 1,
+    block_end_line: end_line + 1
+  )
+end
+
 def parse_markers(path, content)
   lines = content.lines
   offsets = line_offsets(lines)
   records = []
   errors = []
+  marker_context = { path:, content:, lines:, offsets:, errors: }
 
   lines.each_with_index do |line, index|
     next unless line.match?(COMMENT_MARKER_PATTERN)
+    next unless comment_marker_line?(content, offsets, line, index)
 
-    target_path = target_path_from(line)
-    unless target_path
-      errors << "#{path}:#{index + 1}: unable to parse sync target path"
-      next
-    end
-
-    block_start_line = synchronized_block_start_line(content, lines, offsets, index)
-    unless block_start_line
-      errors << "#{path}:#{index + 1}: no synchronized block found after marker"
-      next
-    end
-
-    block, start_line, end_line = extract_sync_block(content, lines, offsets, block_start_line)
-    unless block
-      errors << "#{path}:#{index + 1}: unable to extract synchronized block"
-      next
-    end
-
-    records << MarkerRecord.new(
-      path:,
-      line_number: index + 1,
-      target_path:,
-      block:,
-      normalized_block: normalize_block(block),
-      block_start_line: start_line + 1,
-      block_end_line: end_line + 1
-    )
+    record = marker_record_from_line(marker_context, line, index)
+    records << record if record
   end
 
   [records, errors]
@@ -431,6 +584,7 @@ git_files.sort.each do |path|
 end
 
 records_by_path = records.group_by(&:path)
+drift_pair_keys = {}
 records.each do |record|
   unless sync_scope_path?(record.target_path)
     errors << "#{record.path}:#{record.line_number}: target #{record.target_path} is outside sync marker scope"
@@ -455,7 +609,12 @@ records.each do |record|
 
   next if candidates.any? { |candidate| candidate.normalized_block == record.normalized_block }
 
-  errors << drift_message(record, candidates.first)
+  candidate = candidates.first
+  pair_key = [[record.path, record.line_number], [candidate.path, candidate.line_number]].sort
+  next if drift_pair_keys[pair_key]
+
+  drift_pair_keys[pair_key] = true
+  errors << drift_message(record, candidate)
 end
 
 if errors.any?
