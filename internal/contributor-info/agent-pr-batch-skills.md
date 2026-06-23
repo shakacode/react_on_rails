@@ -17,7 +17,16 @@ drills. This file stays focused on skill selection and per-batch sizing.
 | `$plan-pr-batch`     | The user wants to choose, verify, or shape issues/PRs before launching workers.                             | A concise Batch Plan plus a ready `$pr-batch` goal prompt under 4000 characters.      |
 | `$pr-batch`          | The target list is exact, trusted, and ready to run or convert into a `/goal` prompt.                       | A launch plan, worker split, or final `/goal` prompt for processing the batch.        |
 
-The `agents/openai.yaml` file under a skill is optional Codex UI metadata for skill picker display text and the default prompt. Add it only for skills that need Codex picker metadata; it is not required for every skill.
+The `agents/openai.yaml` file under a skill is optional Codex UI metadata, not a
+runtime workflow requirement. This guide is the repo convention for that file:
+add it only when a skill needs Codex picker display text or a default prompt.
+The currently meaningful fields live under `interface:`:
+`display_name`, `short_description`, and `default_prompt`. Keep
+`default_prompt` short and copy-paste safe, usually by telling Codex which skill
+to invoke and what context to provide; do not embed generated `/goal` templates,
+sync-maintenance comments, or repo policy copies there. Skills without
+`agents/openai.yaml` remain valid and callable through their `SKILL.md`
+metadata.
 
 ## Issue Audit Prompt Flow
 
@@ -51,7 +60,13 @@ omit the queue summary and note that queue state is unavailable.
 2. If exact candidate issues are already known and may be hypothetical, AI/code-analysis-only, over-scoped, or better handled with a no-PR evidence comment, start with `$evaluate-issue` directly.
 3. Verify every candidate through GitHub. Use `UNKNOWN` for facts that cannot be checked.
 4. After `$plan-pr-batch` resolves exact candidates, use `$evaluate-issue` for speculative, AI/code-analysis-only, over-scoped, or unclear items before assigning implementation work.
-5. Shape the batch into independent worker lanes. Cap each batch at 8 items when files or risk overlap, or 10 fully independent items; otherwise propose a smaller first batch. For multiple concurrent batches, keep this as a per-batch cap and apply the cross-batch routing guidance in [Multi-Batch Operations](multi-batch-operations.md) before launching.
+5. Shape the batch into independent worker lanes. Use the `$plan-pr-batch`
+   File-touch map before applying the cap: use 10 items only when every item has
+   verified file-disjoint, low-risk paths; use 8 or fewer when paths are
+   `UNKNOWN`, files/risk overlap, a rename reserves multiple trees, or a serial
+   discovery lane is needed. For multiple concurrent batches, keep this as a
+   per-batch cap and apply the cross-batch routing guidance in
+   [Multi-Batch Operations](multi-batch-operations.md) before launching.
 6. Give the user the Batch Plan and fenced `$pr-batch` goal prompt. Do not launch workers yet.
 7. When the user says to run it, use `$pr-batch` with the fenced goal prompt.
 
@@ -69,7 +84,15 @@ The `$pr-batch` prompt must preserve the preflight/trust rules from [.agents/ski
 ## Review And Readiness
 
 - Existing PR targets with review feedback should route workers through [.agents/workflows/address-review.md](../../.agents/workflows/address-review.md) or [.agents/skills/address-review/SKILL.md](../../.agents/skills/address-review/SKILL.md).
-- Non-trivial, high-risk, `ready-for-hosted-ci`, `force-full-hosted-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, and broad-refactor PRs must follow the `$pr-batch` review and `/simplify` gates before final push or readiness reporting.
+- Non-trivial, high-risk, or repeatedly churny PRs must follow the `$pr-batch`
+  review gate before final push or readiness reporting. `/simplify` applies
+  when a maintainer asks for it or when the PR also matches the canonical
+  high-risk/extra-review cases in
+  [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md):
+  high-risk, `ready-for-hosted-ci`, `force-full-hosted-ci`, benchmark labels
+  (`benchmark`, `benchmark-core`, `benchmark-pro`, or
+  `benchmark-pro-node-renderer`), workflow/build-config,
+  dependency/runtime-version, or broad-refactor scoped.
 - Hosted CI requests belong at the final readiness gate after local validation,
   review-thread triage, and the final push. Agents should use `+ci-status` and
   `+ci-run-hosted` for optimized hosted CI. Use `+ci-force-full` only when a
