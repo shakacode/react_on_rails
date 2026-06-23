@@ -42,8 +42,14 @@ shared_examples "base_generator_common" do |options = {}|
       expect(content).to include("<%= javascript_pack_tag %>")
 
       if tailwind
-        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
-        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+        prepend_index = content.index('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+        stylesheet_index = content.index('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+        javascript_index = content.index("<%= javascript_pack_tag %>")
+
+        expect(prepend_index).not_to be_nil
+        expect(stylesheet_index).not_to be_nil
+        expect(prepend_index).to be < stylesheet_index
+        expect(stylesheet_index).to be < javascript_index
         expect(content).not_to include("<%= stylesheet_pack_tag %>")
       else
         expect(content).to include("<%= stylesheet_pack_tag %>")

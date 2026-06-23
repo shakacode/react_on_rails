@@ -152,10 +152,12 @@ module ReactOnRails
       TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN = /
         <%=\s*stylesheet_pack_tag(?:\s|\()\s*["']react_on_rails_tailwind["']
       /x
+      TAILWIND_LAYOUT_PACK_FLUSH_PATTERN = /<%=\s*javascript_pack_tag(?:\s|\(|%>)/x
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED, :REACT_ON_RAILS_DEFAULT_LAYOUT_PATH,
                        :TAILWIND_LAYOUT_HELPER_LINES, :DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN,
-                       :TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN, :TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN
+                       :TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN, :TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN,
+                       :TAILWIND_LAYOUT_PACK_FLUSH_PATTERN
 
       def add_root_route
         return unless options.new_app?
@@ -475,8 +477,12 @@ module ReactOnRails
       end
 
       def layout_links_tailwind_pack?(content)
-        content.match?(TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN) &&
-          content.match?(TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN)
+        javascript_match = content.match(TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN)
+        stylesheet_match = content.match(TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN)
+        return false unless javascript_match && stylesheet_match
+
+        tailwind_block_end = [javascript_match.end(0), stylesheet_match.end(0)].max
+        content[tailwind_block_end..].match?(TAILWIND_LAYOUT_PACK_FLUSH_PATTERN)
       end
 
       def warn_tailwind_layout_manual_step(layout_path, reason:)
