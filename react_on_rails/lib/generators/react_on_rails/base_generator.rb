@@ -458,7 +458,8 @@ module ReactOnRails
       end
 
       def ensure_generated_layout_head_tags(layout_path)
-        content = File.read(File.join(destination_root, layout_path))
+        layout_full_path = File.join(destination_root, layout_path)
+        content = File.read(layout_full_path)
         title_match = content.match(%r{^(?<indent>[ \t]*)<title>React on Rails</title>\r?\n})
 
         if !content.match?(/<meta\s+name=["']viewport["']/) && title_match
@@ -467,6 +468,7 @@ module ReactOnRails
             %(#{title_match[:indent]}<meta name="viewport" content="width=device-width,initial-scale=1">\n),
             after: title_match[0]
           )
+          content = File.read(layout_full_path)
         end
 
         return if content.match?(/<%=\s*csp_meta_tag\s*%>/)

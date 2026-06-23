@@ -989,6 +989,33 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "does not update the recognizable generated default layout in --pretend mode" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      pretend_generator = base_generator_fixture(tailwind: true, pretend: true)
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(pretend_generator).to receive(:say_status)
+
+      pretend_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(pretend_generator).to have_received(:say_status)
+        .with(:pretend, "Would update #{layout_path} to link react_on_rails_tailwind", :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
     it "warns instead of rewriting layouts without the generated pack-tag comment" do
       original_layout = <<~ERB
         <!DOCTYPE html>
