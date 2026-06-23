@@ -9359,14 +9359,15 @@ This page is about _architecture_, not selection. For the decision itself:
 React on Rails Pro and Next.js implement the **same React Server Components contract** with the **same
 runtime family** and the **same end-to-end shape**: render Server Components to a Flight payload, SSR
 that payload to HTML, inline the payload into the HTML (`REACT_ON_RAILS_RSC_PAYLOADS` ≈ `__next_f`),
-hydrate from it without a re-fetch, then refetch just the changes on navigation. The decisive
-difference is **ownership**: Next.js builds RSC _into_ a Rust bundler (Turbopack) and a framework it
-fully controls — which buys it segment-level routing, prefetching, server actions, and Partial
-Prerendering — while React on Rails Pro _bolts_ RSC onto a general-purpose bundler (webpack or Rspack
-via Shakapacker), which buys it the ability to add world-class RSC to **any real Rails app** without
-giving up Rails. On bundlers, **Rspack is "webpack in Rust"** and reuses the webpack RSC runtime;
-**Turbopack** is the one bundler that needs a distinct runtime, purely because its chunk-loading
-primitives differ.
+hydrate from it without a re-fetch, then refetch payload-only RSC data on navigation. React on Rails
+Pro refetches the target component's Flight payload; Next.js can fetch changed route-segment diffs.
+The decisive difference is **ownership**: Next.js builds RSC _into_ a Rust bundler (Turbopack) and a
+framework it fully controls — which buys it segment-level routing, prefetching, server actions, and
+Partial Prerendering — while React on Rails Pro _bolts_ RSC onto a general-purpose bundler (webpack or
+Rspack via Shakapacker), which buys it the ability to add world-class RSC to **any real Rails app**
+without giving up Rails. On bundlers, **Rspack is "webpack in Rust"** and reuses the webpack RSC
+runtime; **Turbopack** is the one bundler that needs a distinct runtime, purely because its
+chunk-loading primitives differ.
 
 ## Related documentation
 
