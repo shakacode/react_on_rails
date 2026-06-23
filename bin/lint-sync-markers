@@ -222,12 +222,27 @@ def skip_trailing_whitespace(content, index)
   index
 end
 
-def skip_trailing_block_comment(content, index)
+def block_comment_opener_at?(content, state_cache, index)
+  return false unless index.positive?
+  return false unless content.getbyte(index - 1) == "/".ord && content.getbyte(index) == "*".ord
+
+  state, = code_state_at_offset(state_cache, index)
+  previous_state, = code_state_at_offset(state_cache, index - 1)
+  state == :block_comment && previous_state == :code
+end
+
+def skip_trailing_block_comment(content, index, state_cache)
   return index unless index.positive?
   return index unless content.getbyte(index - 1) == "*".ord && content.getbyte(index) == "/".ord
 
-  comment_start = content.rindex("/*", index - 2)
-  comment_start ? comment_start - 1 : nil
+  cursor = index - 1
+  while cursor.positive?
+    return cursor - 2 if block_comment_opener_at?(content, state_cache, cursor)
+
+    cursor -= 1
+  end
+
+  nil
 end
 
 def skip_trailing_line_comment(content, index, state_cache)
@@ -256,7 +271,7 @@ def previous_significant_code_index(content, index, state_cache)
     index = skip_trailing_whitespace(content, index)
     return nil if index.negative?
 
-    next_index = skip_trailing_block_comment(content, index)
+    next_index = skip_trailing_block_comment(content, index, state_cache)
     return nil unless next_index
 
     if next_index != index
