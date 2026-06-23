@@ -182,18 +182,29 @@ describe InstallGenerator, type: :generator do
 
   def assert_tailwind_layout_owned_pack
     assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
-      prepend_index = content.index('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
-      stylesheet_index = content.index('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
-      javascript_index = content.index("<%= javascript_pack_tag %>")
-
-      expect(prepend_index).not_to be_nil
-      expect(stylesheet_index).not_to be_nil
-      expect(javascript_index).not_to be_nil
-      expect(prepend_index).to be < stylesheet_index
-      expect(stylesheet_index).to be < javascript_index
+      expect_tailwind_pack_order(content)
+      expect_generated_layout_head_tags(content)
       expect(content).to include("Tailwind is layout-owned")
       expect(content).not_to include("<!-- Empty pack tags")
     end
+  end
+
+  def expect_tailwind_pack_order(content)
+    prepend_index = content.index('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+    stylesheet_index = content.index('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+    javascript_index = content.index("<%= javascript_pack_tag %>")
+
+    expect(prepend_index).not_to be_nil
+    expect(stylesheet_index).not_to be_nil
+    expect(javascript_index).not_to be_nil
+    expect(prepend_index).to be < stylesheet_index
+    expect(stylesheet_index).to be < javascript_index
+  end
+
+  def expect_generated_layout_head_tags(content)
+    expect(content).to include('<meta name="viewport" content="width=device-width,initial-scale=1">')
+    expect(content).to include("<%= csrf_meta_tags %>")
+    expect(content).to include("<%= csp_meta_tag %>")
   end
 
   def assert_tailwind_hello_world_view
@@ -952,6 +963,9 @@ describe InstallGenerator, type: :generator do
         <!DOCTYPE html>
         <html>
           <head>
+            <title>React on Rails</title>
+            <%= csrf_meta_tags %>
+
             <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
             <%= stylesheet_pack_tag %>
             <%= javascript_pack_tag %>
@@ -965,6 +979,9 @@ describe InstallGenerator, type: :generator do
       base_generator.send(:copy_or_update_tailwind_layout)
 
       assert_file layout_path do |content|
+        expect(content).to include('<meta name="viewport" content="width=device-width,initial-scale=1">')
+        expect(content).to include("<%= csrf_meta_tags %>")
+        expect(content).to include("<%= csp_meta_tag %>")
         expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
         expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
         expect(content).to include("<%= javascript_pack_tag %>")
@@ -972,8 +989,8 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "does not treat comments mentioning the Tailwind pack as existing wiring" do
-      simulate_existing_layout("react_on_rails_default", <<~ERB)
+    it "warns instead of rewriting layouts without the generated pack-tag comment" do
+      original_layout = <<~ERB
         <!DOCTYPE html>
         <html>
           <head>
@@ -986,14 +1003,18 @@ describe InstallGenerator, type: :generator do
           </body>
         </html>
       ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
 
       base_generator.send(:copy_or_update_tailwind_layout)
 
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
       assert_file layout_path do |content|
-        expect(content).to include("TODO: add react_on_rails_tailwind")
-        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
-        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
-        expect(content).to include("<%= javascript_pack_tag %>")
+        expect(content).to eq(original_layout)
       end
     end
 
@@ -1046,7 +1067,7 @@ describe InstallGenerator, type: :generator do
   context "with --tailwind --no-rspack" do
     before(:all) { run_generator_test_with_args(%w[--tailwind --no-rspack], package_json: true) }
 
-    include_examples "base_generator_common", application_js: true
+    include_examples "base_generator_common", application_js: true, tailwind: true
     include_examples "no_redux_generator"
 
     it "generates a layout-owned Tailwind v4 SSR setup for Webpack" do
@@ -1057,7 +1078,7 @@ describe InstallGenerator, type: :generator do
   context "with --tailwind --rspack --typescript" do
     before(:all) { run_generator_test_with_args(%w[--tailwind --rspack --typescript], package_json: true) }
 
-    include_examples "base_generator_common", application_js: true
+    include_examples "base_generator_common", application_js: true, tailwind: true
     include_examples "no_redux_generator"
 
     it "generates a layout-owned Tailwind v4 SSR setup for Rspack" do
@@ -1068,7 +1089,7 @@ describe InstallGenerator, type: :generator do
   context "with --redux --tailwind --typescript" do
     before(:all) { run_generator_test_with_args(%w[--redux --tailwind --typescript], package_json: true) }
 
-    include_examples "base_generator_common", application_js: true
+    include_examples "base_generator_common", application_js: true, tailwind: true
 
     it "wires Tailwind into the Redux SSR example" do
       assert_tailwind_redux_setup(config_dir: "config/rspack", extension: "tsx")
@@ -3221,7 +3242,7 @@ describe InstallGenerator, type: :generator do
   context "with --rsc --rspack --tailwind --typescript" do
     before(:all) { run_generator_test_with_args(%w[--rsc --rspack --tailwind --typescript], package_json: true) }
 
-    include_examples "rsc_common_files"
+    include_examples "rsc_common_files", tailwind: true
 
     it "wires Tailwind into the generated RSC client component" do
       assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"

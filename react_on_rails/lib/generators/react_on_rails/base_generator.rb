@@ -142,8 +142,8 @@ module ReactOnRails
       ].freeze
       DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN = %r{
         (?<indent>^[ \t]*)
-        (?:<!--\s*Empty\ pack\ tags\ -\ React\ on\ Rails\ injects\ component\ CSS/JS\ here\s*-->\r?\n\k<indent>)?
-        <%=\s*stylesheet_pack_tag\s*%>\r?\n
+        <!--\s*Empty\ pack\ tags\ -\ React\ on\ Rails\ injects\ component\ CSS/JS\ here\s*-->\r?\n
+        \k<indent><%=\s*stylesheet_pack_tag\s*%>\r?\n
         \k<indent><%=\s*javascript_pack_tag\s*%>
       }x
       TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN = /
@@ -432,7 +432,8 @@ module ReactOnRails
           return
         end
 
-        unless content.match?(DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN)
+        layout_match = content.match(DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN)
+        unless layout_match
           warn_tailwind_layout_manual_step(REACT_ON_RAILS_DEFAULT_LAYOUT_PATH, reason: "layout is customized")
           return
         end
@@ -444,15 +445,33 @@ module ReactOnRails
           return
         end
 
-        updated_content = content.sub(DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN) do
-          tailwind_layout_helper_block(Regexp.last_match[:indent])
+        gsub_file(REACT_ON_RAILS_DEFAULT_LAYOUT_PATH, DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN) do
+          tailwind_layout_helper_block(layout_match[:indent])
         end
-        File.write(layout_full_path, updated_content)
-        say_status :update, REACT_ON_RAILS_DEFAULT_LAYOUT_PATH
+        ensure_generated_layout_head_tags(REACT_ON_RAILS_DEFAULT_LAYOUT_PATH)
       end
 
       def tailwind_layout_helper_block(indent = "")
         TAILWIND_LAYOUT_HELPER_LINES.map { |line| "#{indent}#{line}" }.join("\n")
+      end
+
+      def ensure_generated_layout_head_tags(layout_path)
+        content = File.read(File.join(destination_root, layout_path))
+        title_match = content.match(%r{^(?<indent>[ \t]*)<title>React on Rails</title>\r?\n})
+
+        if !content.match?(/<meta\s+name=["']viewport["']/) && title_match
+          insert_into_file(
+            layout_path,
+            %(#{title_match[:indent]}<meta name="viewport" content="width=device-width,initial-scale=1">\n),
+            after: title_match[0]
+          )
+        end
+
+        return if content.match?(/<%=\s*csp_meta_tag\s*%>/)
+
+        return unless (csrf_match = content.match(/^(?<indent>[ \t]*)<%=\s*csrf_meta_tags\s*%>\r?\n/))
+
+        insert_into_file(layout_path, %(#{csrf_match[:indent]}<%= csp_meta_tag %>\n), after: csrf_match[0])
       end
 
       def layout_links_tailwind_pack?(content)
@@ -463,7 +482,7 @@ module ReactOnRails
       def warn_tailwind_layout_manual_step(layout_path, reason:)
         say_status :warning, "Could not update #{layout_path}: #{reason}.", :yellow
         say <<~MSG, :yellow
-          Add this block to the layout head before the final javascript_pack_tag call:
+          Replace the existing React on Rails pack-tag block in the layout head with:
 
           #{tailwind_layout_helper_block}
         MSG

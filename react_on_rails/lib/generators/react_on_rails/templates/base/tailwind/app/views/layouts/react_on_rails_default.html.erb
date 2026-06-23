@@ -2,7 +2,9 @@
 <html>
   <head>
     <title>React on Rails</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
 
     <!-- React on Rails injects generated packs here. Tailwind is layout-owned. -->
     <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>

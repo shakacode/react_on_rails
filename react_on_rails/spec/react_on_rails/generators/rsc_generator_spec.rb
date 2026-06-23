@@ -4009,7 +4009,7 @@ describe RscGenerator, type: :generator do
 
     include_examples "rsc_hello_server_files", "react_on_rails_default"
 
-    it "reuses the Tailwind-aware default layout" do
+    it "preserves Tailwind pack tags after regenerating the layout with --force" do
       assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
         expect(content).to include('prepend_javascript_pack_tag "react_on_rails_tailwind"')
         expect(content).to include('stylesheet_pack_tag "react_on_rails_tailwind", media: "all"')
