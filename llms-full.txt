@@ -2091,6 +2091,8 @@ Choose React on Rails when your priority is delivering substantial React UI whil
 
 If this architecture is central to your evaluation, see the dedicated guide: [Next.js with a Separate Rails Backend: Pros and Drawbacks](./nextjs-with-separate-rails-backend.md).
 
+If React Server Components are central to your evaluation, see how the two stacks implement RSC at the architecture level — and the one ownership difference that drives the rest — in [React on Rails Pro and Next.js: RSC Architectures Compared](../../pro/react-server-components/nextjs-comparison.md).
+
 ## React on Rails vs react-rails (Legacy Path)
 
 react-rails is a good baseline comparison because it also helps you render React from Rails. The main difference is how much framework and workflow support you want around that integration.

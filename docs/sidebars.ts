@@ -251,6 +251,7 @@ const sidebars: SidebarsConfig = {
             'pro/react-server-components/upgrading-existing-pro-app',
             'pro/react-server-components/per-request-data',
             'pro/react-server-components/rspack-compatibility',
+            'pro/react-server-components/nextjs-comparison',
             'pro/react-server-components/glossary',
             {
               type: 'category',
