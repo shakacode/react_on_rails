@@ -472,6 +472,8 @@ Coordinate QA with the same primitives as other batch lanes:
   example as lane `qa` or a backend-supported synthetic target such as `<batch-id>:qa`. Do not add new
   backend schema requirements in this workflow; use the current private backend README/schema for the
   exact representation.
+  For scoped QA sub-lanes, use `qa:<scope-label>` in human-facing evidence and
+  the nearest supported private-backend lane representation.
 - The QA owner gets a stable agent id, branch/worktree ownership when files may be edited, and
   `agent-coord claim` / `agent-coord heartbeat` updates at lane start, evidence refresh, blocked state,
   resumed state, and done state. If private state is unavailable, record claim and heartbeat state as

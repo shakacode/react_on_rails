@@ -95,7 +95,8 @@ Before implementation or worker launch, produce:
    claim/heartbeat state as `UNKNOWN` and use allowed fallback evidence (see the
    canonical Batch QA Lane "allowed fallback evidence" definition in
    `.agents/workflows/pr-processing.md`); for low-risk omitted QA, record the
-   final QA Evidence block with `not required` status and rationale.
+   final QA Evidence block with `QA required: no`, `QA lane status:
+not_applicable`, and the rationale.
    Use the canonical capitalization convention: uppercase `UNKNOWN` means
    coordination/backend state, and lowercase `unknown` is the QA lane status.
 8. A permission and trust preflight result.
