@@ -611,6 +611,61 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#preflight_registry_publish_conflicts!" do
+    before do
+      stub_const("NPM_RELEASE_PACKAGE_NAMES", %w[react-on-rails react-on-rails-pro])
+      stub_const("RUBYGEMS_RELEASE_GEM_NAMES", %w[react_on_rails react_on_rails_pro])
+    end
+
+    it "skips registry probes during an idempotent retry" do
+      expect(self).not_to receive(:release_registry_publish_conflicts)
+
+      preflight_registry_publish_conflicts!(
+        gem_version: "17.0.0",
+        npm_version: "17.0.0",
+        idempotent_retry: true
+      )
+    end
+
+    it "allows a first publish when no target artifacts exist" do
+      allow(self).to receive_messages(npm_package_already_published?: false, rubygem_version_published?: false)
+
+      expect do
+        preflight_registry_publish_conflicts!(
+          gem_version: "17.0.0",
+          npm_version: "17.0.0",
+          idempotent_retry: false
+        )
+      end.not_to raise_error
+      expect(self).to have_received(:npm_package_already_published?).with("react-on-rails", "17.0.0")
+      expect(self).to have_received(:npm_package_already_published?).with("react-on-rails-pro", "17.0.0")
+      expect(self).to have_received(:rubygem_version_published?).with("react_on_rails", "17.0.0")
+      expect(self).to have_received(:rubygem_version_published?).with("react_on_rails_pro", "17.0.0")
+    end
+
+    it "aborts before tagging when target artifacts already exist outside an idempotent retry" do
+      allow(self).to receive(:npm_package_already_published?) do |package_name, version|
+        expect(version).to eq("17.0.0")
+        package_name == "react-on-rails-pro"
+      end
+      allow(self).to receive(:rubygem_version_published?) do |gem_name, version|
+        expect(version).to eq("17.0.0")
+        gem_name == "react_on_rails"
+      end
+
+      expect do
+        preflight_registry_publish_conflicts!(
+          gem_version: "17.0.0",
+          npm_version: "17.0.0",
+          idempotent_retry: false
+        )
+      end.to raise_error(
+        SystemExit,
+        /react-on-rails-pro@17\.0\.0.*react_on_rails 17\.0\.0/m
+      )
+    end
+  end
+
   describe "#publish_gem_with_retry" do
     it "passes OTP via environment instead of shell interpolation" do
       expect(self).to receive(:sh_args_in_dir_for_release).with(
@@ -623,7 +678,7 @@ RSpec.describe "release.rake helper methods" do
       publish_gem_with_retry("/tmp/gem", "react_on_rails", otp: "123456", max_retries: 1)
     end
 
-    it "skips RubyGems publish when the exact gem version is already visible" do
+    it "aborts when the exact gem version is already visible outside an idempotent retry" do
       allow(self).to receive(:rubygem_version_published?)
         .with("react_on_rails", "17.0.0")
         .and_return(true)
@@ -635,6 +690,24 @@ RSpec.describe "release.rake helper methods" do
           "react_on_rails",
           otp: "123456",
           published_version: "17.0.0",
+          max_retries: 1
+        )
+      end.to raise_error(SystemExit, /already visible on RubyGems\.org/)
+    end
+
+    it "skips RubyGems publish when the exact gem version is visible during an idempotent retry" do
+      allow(self).to receive(:rubygem_version_published?)
+        .with("react_on_rails", "17.0.0")
+        .and_return(true)
+      expect(self).not_to receive(:sh_args_in_dir_for_release)
+
+      expect do
+        publish_gem_with_retry(
+          "/tmp/gem",
+          "react_on_rails",
+          otp: "123456",
+          published_version: "17.0.0",
+          idempotent_retry: true,
           max_retries: 1
         )
       end.to output(/already visible on RubyGems\.org/).to_stdout
@@ -749,7 +822,7 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
-    it "skips npm publish when the exact package version is already visible" do
+    it "aborts when the exact package version is already visible outside an idempotent retry" do
       allow(self).to receive(:npm_package_already_published?)
         .with("react-on-rails", "17.0.0")
         .and_return(true)
@@ -757,6 +830,17 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         publish_npm_with_retry("/tmp/npm", "react-on-rails@17.0.0", max_retries: 1)
+      end.to raise_error(SystemExit, /already visible on npm/)
+    end
+
+    it "skips npm publish when the exact package version is visible during an idempotent retry" do
+      allow(self).to receive(:npm_package_already_published?)
+        .with("react-on-rails", "17.0.0")
+        .and_return(true)
+      expect(self).not_to receive(:sh_args_in_dir_for_release)
+
+      expect do
+        publish_npm_with_retry("/tmp/npm", "react-on-rails@17.0.0", idempotent_retry: true, max_retries: 1)
       end.to output(/already visible on npm/).to_stdout
     end
   end
@@ -2961,6 +3045,149 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#stable_release_retry_for_current_head?" do
+    let(:monorepo_root) { "/tmp/repo" }
+
+    it "does not inspect tags before the checkout is already on the target version" do
+      expect(self).not_to receive(:current_git_sha!)
+
+      expect(
+        stable_release_retry_for_current_head?(
+          monorepo_root:,
+          current_branch: "main",
+          current_checkout_version: "16.9.0",
+          target_gem_version: "17.0.0"
+        )
+      ).to be(false)
+    end
+
+    it "allows a main release retry when the remote stable tag points at HEAD" do
+      allow(self).to receive(:current_git_sha!)
+        .with(monorepo_root, context: "stable release retry")
+        .and_return("headsha")
+      allow(self).to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(true)
+      allow(self).to receive(:peeled_git_tag_sha)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(nil, "headsha")
+      allow(self).to receive(:fetch_remote_release_tag!)
+        .with(monorepo_root:, tag: "v17.0.0", tag_type: "stable")
+
+      expect do
+        expect(
+          stable_release_retry_for_current_head?(
+            monorepo_root:,
+            current_branch: "main",
+            current_checkout_version: "17.0.0",
+            target_gem_version: "17.0.0"
+          )
+        ).to be(true)
+      end.to output(/Stable tag v17\.0\.0 already points at local HEAD/).to_stdout
+    end
+
+    it "does not trust a local-only stable tag at HEAD for idempotent retry" do
+      allow(self).to receive(:current_git_sha!)
+        .with(monorepo_root, context: "stable release retry")
+        .and_return("headsha")
+      allow(self).to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(false)
+      allow(self).to receive(:peeled_git_tag_sha)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return("headsha")
+      expect(self).not_to receive(:fetch_remote_release_tag!)
+
+      expect(
+        stable_release_retry_for_current_head?(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0",
+          target_gem_version: "17.0.0"
+        )
+      ).to be(false)
+    end
+
+    it "reports a local-only stable tag at HEAD for version-policy retry" do
+      allow(self).to receive(:current_git_sha!)
+        .with(monorepo_root, context: "stable release retry")
+        .and_return("headsha")
+      allow(self).to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(false)
+      allow(self).to receive(:peeled_git_tag_sha)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return("headsha")
+      expect(self).not_to receive(:fetch_remote_release_tag!)
+
+      retry_state = nil
+      expect do
+        retry_state = stable_release_retry_state_for_current_head(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0",
+          target_gem_version: "17.0.0"
+        )
+      end.to output(/continuing retry without registry publish skips/).to_stdout
+      expect(retry_state).to eq(:local)
+      expect(remote_release_tag_retry?(retry_state)).to be(false)
+      expect(release_tag_at_current_head?(retry_state)).to be(true)
+    end
+
+    it "allows a prerelease retry when the remote prerelease tag points at HEAD" do
+      allow(self).to receive(:current_git_sha!)
+        .with(monorepo_root, context: "prerelease release retry")
+        .and_return("headsha")
+      allow(self).to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0.rc.1")
+        .and_return(true)
+      allow(self).to receive(:peeled_git_tag_sha)
+        .with(monorepo_root:, tag: "v17.0.0.rc.1")
+        .and_return(nil, "headsha")
+      allow(self).to receive(:fetch_remote_release_tag!)
+        .with(monorepo_root:, tag: "v17.0.0.rc.1", tag_type: "prerelease")
+
+      expect do
+        expect(
+          release_tag_retry_state_for_current_head(
+            monorepo_root:,
+            current_branch: "release/17.0.0",
+            current_checkout_version: "17.0.0.rc.1",
+            target_gem_version: "17.0.0.rc.1",
+            tag_type: "prerelease"
+          )
+        ).to eq(:remote)
+      end.to output(/Prerelease tag v17\.0\.0\.rc\.1 already points at local HEAD/).to_stdout
+    end
+
+    it "reports a local-only prerelease tag at HEAD without idempotent publish retry" do
+      allow(self).to receive(:current_git_sha!)
+        .with(monorepo_root, context: "prerelease release retry")
+        .and_return("headsha")
+      allow(self).to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0.rc.1")
+        .and_return(false)
+      allow(self).to receive(:peeled_git_tag_sha)
+        .with(monorepo_root:, tag: "v17.0.0.rc.1")
+        .and_return("headsha")
+      expect(self).not_to receive(:fetch_remote_release_tag!)
+
+      retry_state = nil
+      expect do
+        retry_state = release_tag_retry_state_for_current_head(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.1",
+          target_gem_version: "17.0.0.rc.1",
+          tag_type: "prerelease"
+        )
+      end.to output(/continuing retry without registry publish skips/).to_stdout
+      expect(retry_state).to eq(:local)
+      expect(remote_release_tag_retry?(retry_state)).to be(false)
+      expect(release_tag_at_current_head?(retry_state)).to be(true)
+    end
+  end
+
   describe "#ensure_release_branch_matches_target_base!" do
     it "allows prerelease cuts from the matching release branch" do
       expect do
@@ -3032,12 +3259,14 @@ RSpec.describe "release.rake helper methods" do
     it "does not inspect tags for stable releases from main" do
       expect(Open3).not_to receive(:capture2e)
 
-      ensure_release_branch_promotes_tagged_rc!(
-        monorepo_root:,
-        current_branch: "main",
-        current_checkout_version: "17.0.0",
-        target_gem_version: "17.0.1"
-      )
+      expect(
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "main",
+          current_checkout_version: "17.0.0",
+          target_gem_version: "17.0.1"
+        )
+      ).to eq(stable_tag_retry: false, stable_tag_at_head: false)
     end
 
     it "allows a matching release branch when HEAD is the current RC tag" do

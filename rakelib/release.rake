@@ -30,6 +30,16 @@ RUBYGEMS_VERSIONS_READ_TIMEOUT_SECONDS = 15
 NPM_PUBLISH_VERIFY_ATTEMPTS = 6
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
 NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
+NPM_RELEASE_PACKAGE_NAMES = %w[
+  react-on-rails
+  react-on-rails-pro
+  react-on-rails-pro-node-renderer
+  create-react-on-rails-app
+].freeze
+RUBYGEMS_RELEASE_GEM_NAMES = %w[
+  react_on_rails
+  react_on_rails_pro
+].freeze
 SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE = "shakaperf-release-gates.yml"
 SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 600
 SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
@@ -638,47 +648,121 @@ def ensure_release_branch_current_version_is_rc!(current_branch:, current_checko
   ERROR
 end
 
-def stable_release_tag_retry?(monorepo_root:, stable_tag:, head_sha:, current_branch:, current_checkout_version:,
-                              target_gem_version:)
-  local_tag_sha = peeled_git_tag_sha(monorepo_root:, tag: stable_tag)
-  remote_tag_exists = remote_git_tag_exists?(monorepo_root:, tag: stable_tag)
+def release_tag_retry_state(monorepo_root:, release_tag:, head_sha:, current_branch:, current_checkout_version:,
+                            target_gem_version:, tag_type:)
+  remote_tag_exists = remote_git_tag_exists?(monorepo_root:, tag: release_tag)
+  local_tag_sha = peeled_git_tag_sha(monorepo_root:, tag: release_tag)
+  retry_label = "#{tag_type.capitalize} release retry"
 
-  if remote_tag_exists
-    fetch_remote_release_tag!(monorepo_root:, tag: stable_tag, tag_type: "stable")
-    local_tag_sha = peeled_git_tag_sha(monorepo_root:, tag: stable_tag)
-    unless local_tag_sha
-      abort <<~ERROR
-        ❌ Stable release branch promotion: stable tag was found on the remote but could not be resolved locally after fetching.
+  unless remote_tag_exists
+    return :none unless local_tag_sha
+    return :local if local_tag_sha == head_sha
 
-        Expected tag: #{stable_tag}
-        Current branch: #{current_branch}
-        Current version: #{current_checkout_version}
-        Target version: #{target_gem_version}
+    abort <<~ERROR
+      ❌ #{retry_label} is already tagged at a different commit locally.
 
-        Try running `git fetch --force origin refs/tags/#{stable_tag}:refs/tags/#{stable_tag}` and retrying.
-      ERROR
-    end
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      #{tag_type.capitalize} tag: #{release_tag} (#{local_tag_sha})
+      Local HEAD: #{head_sha}
+
+      Delete the local-only tag or move to the tagged commit before retrying.
+    ERROR
   end
 
-  return false unless local_tag_sha
-  return true if local_tag_sha == head_sha
+  fetch_remote_release_tag!(monorepo_root:, tag: release_tag, tag_type:)
+  local_tag_sha = peeled_git_tag_sha(monorepo_root:, tag: release_tag)
+  unless local_tag_sha
+    abort <<~ERROR
+      ❌ #{retry_label}: #{tag_type} tag was found on the remote but could not be resolved locally after fetching.
+
+      Expected tag: #{release_tag}
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Target version: #{target_gem_version}
+
+      Try running `git fetch --force origin refs/tags/#{release_tag}:refs/tags/#{release_tag}` and retrying.
+    ERROR
+  end
+
+  return :remote if local_tag_sha == head_sha
 
   abort <<~ERROR
-    ❌ Stable release branch promotion is already tagged at a different commit.
+    ❌ #{retry_label} is already tagged at a different commit.
 
     Current branch: #{current_branch}
     Current version: #{current_checkout_version}
-    Stable tag: #{stable_tag} (#{local_tag_sha})
+    #{tag_type.capitalize} tag: #{release_tag} (#{local_tag_sha})
     Local HEAD: #{head_sha}
 
-    Rerun only when the existing stable tag points at the current release branch HEAD.
+    Rerun only when the existing remote #{tag_type} tag points at the current release HEAD.
   ERROR
+end
+
+def release_tag_retry_state_for_current_head(monorepo_root:, current_branch:, current_checkout_version:,
+                                             target_gem_version:, tag_type:)
+  return :none unless current_checkout_version == target_gem_version
+
+  head_sha = current_git_sha!(monorepo_root, context: "#{tag_type} release retry")
+  release_tag = "v#{target_gem_version}"
+  tag_retry_state = release_tag_retry_state(
+    monorepo_root:,
+    release_tag:,
+    head_sha:,
+    current_branch:,
+    current_checkout_version:,
+    target_gem_version:,
+    tag_type:
+  )
+
+  case tag_retry_state
+  when :remote
+    puts "ℹ️ #{tag_type.capitalize} tag #{release_tag} already points at local HEAD; " \
+         "continuing idempotent release retry."
+  when :local
+    puts "ℹ️ Local #{tag_type} tag #{release_tag} already points at local HEAD; " \
+         "continuing retry without registry publish skips until the tag exists on origin."
+  end
+
+  tag_retry_state
+end
+
+def remote_release_tag_retry?(retry_state)
+  retry_state == :remote
+end
+
+def release_tag_at_current_head?(retry_state)
+  %i[local remote].include?(retry_state)
+end
+
+def stable_release_retry_for_current_head?(monorepo_root:, current_branch:, current_checkout_version:,
+                                           target_gem_version:)
+  remote_release_tag_retry?(
+    release_tag_retry_state_for_current_head(
+      monorepo_root:,
+      current_branch:,
+      current_checkout_version:,
+      target_gem_version:,
+      tag_type: "stable"
+    )
+  )
+end
+
+def stable_release_retry_state_for_current_head(monorepo_root:, current_branch:, current_checkout_version:,
+                                                target_gem_version:)
+  release_tag_retry_state_for_current_head(
+    monorepo_root:,
+    current_branch:,
+    current_checkout_version:,
+    target_gem_version:,
+    tag_type: "stable"
+  )
 end
 
 def release_branch_promotion_rc_tag!(monorepo_root:, current_branch:, current_checkout_version:, target_gem_version:)
   if release_prerelease_version?(current_checkout_version)
     ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
-    return { rc_tag: "v#{current_checkout_version}", stable_tag_retry: false }
+    return { rc_tag: "v#{current_checkout_version}", stable_tag_retry: false, stable_tag_at_head: false }
   end
 
   if current_checkout_version != target_gem_version
@@ -693,24 +777,23 @@ def release_branch_promotion_rc_tag!(monorepo_root:, current_branch:, current_ch
     ERROR
   end
 
-  head_sha = current_git_sha!(monorepo_root, context: "release branch promotion")
-  stable_tag = "v#{target_gem_version}"
   # A concurrent stable-tag push after this check is still caught by the later
   # `git push --tags`; this guard only decides whether a known tag is retry-safe.
-  stable_tag_retry = stable_release_tag_retry?(
+  stable_tag_retry_state = stable_release_retry_state_for_current_head(
     monorepo_root:,
-    stable_tag:,
-    head_sha:,
     current_branch:,
     current_checkout_version:,
     target_gem_version:
   )
-  if stable_tag_retry
-    puts "ℹ️ Stable tag #{stable_tag} already points at local HEAD; continuing idempotent release retry."
-  end
 
   rc_tag = latest_remote_rc_tag_for_version(monorepo_root:, target_gem_version:)
-  return { rc_tag:, stable_tag_retry: } if rc_tag
+  if rc_tag
+    return {
+      rc_tag:,
+      stable_tag_retry: remote_release_tag_retry?(stable_tag_retry_state),
+      stable_tag_at_head: release_tag_at_current_head?(stable_tag_retry_state)
+    }
+  end
 
   abort <<~ERROR
     ❌ Stable release branch promotion retry must descend from a remote RC tag.
@@ -801,7 +884,7 @@ end
 def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, current_checkout_version:,
                                               target_gem_version:)
   # RC cuts target prerelease versions, so only stable promotions match release/<final>.
-  return { stable_tag_retry: false } unless current_branch == "release/#{target_gem_version}"
+  return { stable_tag_retry: false, stable_tag_at_head: false } unless current_branch == "release/#{target_gem_version}"
 
   promotion = release_branch_promotion_rc_tag!(
     monorepo_root:,
@@ -1823,7 +1906,7 @@ def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_
 
   if latest_tagged_version && target_version <= Gem::Version.new(latest_tagged_version)
     if allow_existing_target_tag && target_version == Gem::Version.new(latest_tagged_version)
-      puts "ℹ️ VERSION POLICY: Existing target tag #{target_gem_version} points at this release branch HEAD; " \
+      puts "ℹ️ VERSION POLICY: Existing target tag #{target_gem_version} points at this release HEAD; " \
            "continuing idempotent release retry."
       return
     end
@@ -2116,20 +2199,64 @@ rescue StandardError => e
   false
 end
 
-def skip_existing_rubygem_publish?(gem_name:, published_version:)
+def abort_existing_registry_artifact_without_retry!(artifact_ref:, registry_name:)
+  abort <<~ERROR
+    ❌ #{artifact_ref} is already visible on #{registry_name}.
+
+    Refusing to treat the existing artifact as this release unless this run is a proven idempotent retry.
+    Verify the artifact source or remove the conflicting version before retrying.
+  ERROR
+end
+
+def release_registry_publish_conflicts(gem_version:, npm_version:)
+  npm_conflicts = NPM_RELEASE_PACKAGE_NAMES.select do |package_name|
+    npm_package_already_published?(package_name, npm_version)
+  end
+  rubygems_conflicts = RUBYGEMS_RELEASE_GEM_NAMES.select do |gem_name|
+    rubygem_version_published?(gem_name, gem_version)
+  end
+
+  npm_conflicts.map { |package_name| "npm package #{package_name}@#{npm_version}" } +
+    rubygems_conflicts.map { |gem_name| "RubyGem #{gem_name} #{gem_version}" }
+end
+
+def preflight_registry_publish_conflicts!(gem_version:, npm_version:, idempotent_retry:)
+  return if idempotent_retry
+
+  conflicts = release_registry_publish_conflicts(gem_version:, npm_version:)
+  return if conflicts.empty?
+
+  abort <<~ERROR
+    ❌ Target release artifacts already exist outside an idempotent retry.
+
+    Existing artifacts:
+    #{conflicts.map { |artifact| "  - #{artifact}" }.join("\n")}
+
+    Verify the artifact source or remove the conflicting version before tagging and publishing this release.
+  ERROR
+end
+
+def skip_existing_rubygem_publish?(gem_name:, published_version:, idempotent_retry:)
   return false unless published_version
   return false unless rubygem_version_published?(gem_name, published_version)
+
+  unless idempotent_retry
+    abort_existing_registry_artifact_without_retry!(
+      artifact_ref: "RubyGem #{gem_name} #{published_version}",
+      registry_name: "RubyGems.org"
+    )
+  end
 
   puts "ℹ️ RubyGem #{gem_name} #{published_version} is already visible on RubyGems.org; skipping publish."
   true
 end
 
-def publish_gem_with_retry(dir, gem_name, otp: nil, published_version: nil,
+def publish_gem_with_retry(dir, gem_name, otp: nil, published_version: nil, idempotent_retry: false,
                            max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
   puts "\nPublishing #{gem_name} gem to RubyGems.org..."
   current_otp = normalize_otp_code(otp, service_name: "RubyGems")
 
-  return current_otp if skip_existing_rubygem_publish?(gem_name:, published_version:)
+  return current_otp if skip_existing_rubygem_publish?(gem_name:, published_version:, idempotent_retry:)
 
   if current_otp
     puts "Using provided OTP code..."
@@ -2393,13 +2520,17 @@ rescue JSON::ParserError => e
   false
 end
 
-def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, max_retries: 3)
+def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempotent_retry: false, max_retries: 3)
   puts "\nPublishing #{package_name}..."
   current_otp = normalize_otp_code(otp, service_name: "NPM")
   publish_args = Array(base_args)
   npm_package_name, npm_package_version = parse_npm_package_ref(package_name)
 
   if npm_package_already_published?(npm_package_name, npm_package_version)
+    unless idempotent_retry
+      abort_existing_registry_artifact_without_retry!(artifact_ref: "npm package #{package_name}", registry_name: "npm")
+    end
+
     puts "ℹ️ npm package #{package_name} is already visible on npm; skipping publish."
     return current_otp
   end
@@ -2551,6 +2682,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       current_gem_version: current_checkout_version,
       version_input:
     )
+    version_converter = ReactOnRails::VersionSyntaxConverter.new
+    resolved_target_npm_version = version_converter.rubygem_to_npm(resolved_target_gem_version)
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
 
     ensure_release_branch_matches_target_base!(
@@ -2577,7 +2710,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       ERROR
     end
 
-    release_branch_promotion = { stable_tag_retry: false }
+    release_branch_promotion = { stable_tag_retry: false, stable_tag_at_head: false }
     unless is_prerelease
       release_branch_promotion = ensure_release_branch_promotes_tagged_rc!(
         monorepo_root: release_root,
@@ -2591,6 +2724,31 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     # release/X.Y.Z tip for an RC cut or final promotion, otherwise origin/main.
     ci_branch = release_ci_branch(current_branch)
     release_branch_tag_scope = current_branch == "release/#{release_base_version(resolved_target_gem_version)}"
+    main_stable_tag_retry_state = :none
+    if !is_prerelease && current_branch == "main"
+      main_stable_tag_retry_state = stable_release_retry_state_for_current_head(
+        monorepo_root: release_root,
+        current_branch:,
+        current_checkout_version:,
+        target_gem_version: resolved_target_gem_version
+      )
+    end
+    prerelease_tag_retry_state = :none
+    if is_prerelease
+      prerelease_tag_retry_state = release_tag_retry_state_for_current_head(
+        monorepo_root: release_root,
+        current_branch:,
+        current_checkout_version:,
+        target_gem_version: resolved_target_gem_version,
+        tag_type: "prerelease"
+      )
+    end
+    idempotent_publish_retry = release_branch_promotion.fetch(:stable_tag_retry) ||
+                               remote_release_tag_retry?(main_stable_tag_retry_state) ||
+                               remote_release_tag_retry?(prerelease_tag_retry_state)
+    target_tag_at_head = release_branch_promotion.fetch(:stable_tag_at_head) ||
+                         release_tag_at_current_head?(main_stable_tag_retry_state) ||
+                         release_tag_at_current_head?(prerelease_tag_retry_state)
 
     validate_main_ci_status!(
       monorepo_root: release_root,
@@ -2606,10 +2764,18 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       target_gem_version: resolved_target_gem_version,
       allow_override: allow_version_policy_override,
       fetch_tags: true,
-      allow_existing_target_tag: release_branch_promotion.fetch(:stable_tag_retry),
+      allow_existing_target_tag: target_tag_at_head,
       release_branch_final_promotion:,
       release_branch_tag_scope:
     )
+
+    unless is_dry_run
+      preflight_registry_publish_conflicts!(
+        gem_version: resolved_target_gem_version,
+        npm_version: resolved_target_npm_version,
+        idempotent_retry: idempotent_publish_retry
+      )
+    end
 
     confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root) unless is_dry_run
 
@@ -2629,7 +2795,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     sh_in_dir_for_release(release_paths_hash[:gem_root], "gem bump --no-commit --version #{version_input}")
 
     actual_gem_version = current_gem_version(release_root)
-    actual_npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(actual_gem_version)
+    actual_npm_version = version_converter.rubygem_to_npm(actual_gem_version)
 
     puts "\n#{'=' * 80}"
     puts "UNIFIED VERSION: #{actual_gem_version} (gem) / #{actual_npm_version} (npm)"
@@ -2745,14 +2911,16 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         File.join(release_root, "packages", "react-on-rails"),
         "react-on-rails@#{actual_npm_version}",
         base_args: npm_base_args,
-        otp: current_npm_otp
+        otp: current_npm_otp,
+        idempotent_retry: idempotent_publish_retry
       )
 
       current_npm_otp = publish_npm_with_retry(
         File.join(release_root, "packages", "react-on-rails-pro"),
         "react-on-rails-pro@#{actual_npm_version}",
         base_args: npm_base_args,
-        otp: current_npm_otp
+        otp: current_npm_otp,
+        idempotent_retry: idempotent_publish_retry
       )
 
       puts "\n#{'=' * 80}"
@@ -2763,14 +2931,16 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         File.join(release_root, "packages", "react-on-rails-pro-node-renderer"),
         "react-on-rails-pro-node-renderer@#{actual_npm_version}",
         base_args: npm_base_args,
-        otp: current_npm_otp
+        otp: current_npm_otp,
+        idempotent_retry: idempotent_publish_retry
       )
 
       publish_npm_with_retry(
         File.join(release_root, "packages", "create-react-on-rails-app"),
         "create-react-on-rails-app@#{actual_npm_version}",
         base_args: npm_base_args,
-        otp: current_npm_otp
+        otp: current_npm_otp,
+        idempotent_retry: idempotent_publish_retry
       )
 
       puts "\n#{'=' * 80}"
@@ -2783,14 +2953,16 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         release_paths_hash[:gem_root],
         "react_on_rails",
         otp: current_rubygems_otp,
-        published_version: actual_gem_version
+        published_version: actual_gem_version,
+        idempotent_retry: idempotent_publish_retry
       )
 
       publish_gem_with_retry(
         release_paths_hash[:pro_gem_root],
         "react_on_rails_pro",
         otp: current_rubygems_otp,
-        published_version: actual_gem_version
+        published_version: actual_gem_version,
+        idempotent_retry: idempotent_publish_retry
       )
     end
   end
