@@ -52,11 +52,11 @@ module TrackBenchmarks
     # display sidecar was missing/corrupt rendered_report returned "" — don't hand off an
     # empty-bodied regression issue. Substitute a run-URL pointer (and shout via ::error::)
     # so report-regressions still files something actionable.
-    def regression_handoff_summary(report_markdown)
+    def regression_handoff_summary(report_markdown, failure_context: "on main")
       return report_markdown unless report_markdown.empty?
 
       run_url = Github.run_url
-      warn "::error::Bencher flagged a regression on main but the summary table could not be " \
+      warn "::error::Bencher flagged a regression #{failure_context} but the summary table could not be " \
            "rendered (the display sidecar was missing or invalid); the auto-filed issue will link " \
            "the run instead of showing the table. Investigate: #{run_url}"
       "_Summary table unavailable (the benchmark display sidecar was missing or empty). " \

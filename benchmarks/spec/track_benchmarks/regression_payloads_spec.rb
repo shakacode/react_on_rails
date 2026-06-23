@@ -82,7 +82,36 @@ RSpec.describe TrackBenchmarks::RegressionPayloads do
       end
     end
 
-    it "preserves an empty confirmation summary instead of replacing it with a generic hand-off" do
+    it "uses a confirmation-specific fallback when the confirmation summary is empty" do
+      allow(Github).to receive(:run_url).and_return("https://github.test/run/2")
+
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "regression-confirmed.json")
+        alerts = [{ "benchmark" => "/posts: Pro", "measure" => "rps" }]
+
+        result = nil
+        expect do
+          result =
+            described_class.write_confirmed(
+              alerts,
+              "first run",
+              "",
+              "Core",
+              path:,
+              env: {}
+            )
+        end.to output(/Bencher flagged a regression during confirmation/).to_stderr
+
+        expect(result).to be(true)
+
+        payload = JSON.parse(File.read(path))
+        expect(payload.fetch(RegressionReport::CONFIRMATION_SUMMARY))
+          .to include("Summary table unavailable")
+        expect(payload.fetch(RegressionReport::CONFIRMATION_SUMMARY)).not_to eq("")
+      end
+    end
+
+    it "does not wrap a non-empty confirmation summary" do
       Dir.mktmpdir do |dir|
         path = File.join(dir, "regression-confirmed.json")
         alerts = [{ "benchmark" => "/posts: Pro", "measure" => "rps" }]
@@ -91,7 +120,7 @@ RSpec.describe TrackBenchmarks::RegressionPayloads do
           described_class.write_confirmed(
             alerts,
             "first run",
-            "",
+            "confirmation run",
             "Core",
             path:,
             env: {}
@@ -99,7 +128,7 @@ RSpec.describe TrackBenchmarks::RegressionPayloads do
         ).to be(true)
 
         payload = JSON.parse(File.read(path))
-        expect(payload.fetch(RegressionReport::CONFIRMATION_SUMMARY)).to eq("")
+        expect(payload.fetch(RegressionReport::CONFIRMATION_SUMMARY)).to eq("confirmation run")
       end
     end
   end
