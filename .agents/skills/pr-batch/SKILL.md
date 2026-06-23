@@ -96,6 +96,8 @@ Before implementation or worker launch, produce:
    canonical Batch QA Lane "allowed fallback evidence" definition in
    `.agents/workflows/pr-processing.md`); for low-risk omitted QA, record the
    final QA Evidence block with `not required` status and rationale.
+   Use the canonical capitalization convention: uppercase `UNKNOWN` means
+   coordination/backend state, and lowercase `unknown` is the QA lane status.
 8. A permission and trust preflight result.
 9. A conflict check for overlapping files or dependent PRs.
 10. A final `/goal` prompt when the user asked for Goal mode.
@@ -152,6 +154,9 @@ available. If private state is unavailable, record QA claim/heartbeat state as
 instead of downgrading required QA to `not required`. Require the final QA
 Evidence block in the handoff; if QA is not required, record the `not required`
 status and rationale in that block.
+Use the canonical capitalization convention from `.agents/workflows/pr-processing.md`:
+uppercase `UNKNOWN` means coordination/backend state, and lowercase `unknown`
+is the QA lane status.
 Attention contract: follow `AGENTS.md` under Maintainer Attention Contract and
 `.agents/workflows/pr-processing.md` under Maintainer Attention Contract. Do
 not escalate behavior-preserving optional nits, batch real questions into one

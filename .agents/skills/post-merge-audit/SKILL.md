@@ -99,6 +99,9 @@ After the scope algorithm identifies the batch or reports an `UNKNOWN` scope,
 collect any QA lane and QA Evidence block for that batch. Do not use missing QA
 state to shrink the worked-issue scope; report it as a QA coverage finding or
 `UNKNOWN` fact instead.
+Use the capitalization convention from `.agents/workflows/pr-processing.md`:
+uppercase `UNKNOWN` means coordination/backend state, and lowercase `unknown`
+is the QA lane status.
 
 Show included worked issues, included PRs, collected QA lanes and QA Evidence blocks, excluded near-matches, base/head SHAs, coordination status evidence, and assumptions. Ask for confirmation before deep audit unless the user explicitly asks to proceed without confirmation.
 

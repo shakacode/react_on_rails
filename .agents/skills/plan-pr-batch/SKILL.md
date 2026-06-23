@@ -75,6 +75,8 @@ Plan a PR batch
      `.agents/workflows/pr-processing.md`, the "Allowed fallback evidence:"
      label in the **Batch QA Lane** section) instead of downgrading QA to
      `not required`.
+     Use that section's capitalization convention: uppercase `UNKNOWN` means
+     coordination/backend state, and lowercase `unknown` is the QA lane status.
      When QA is omitted for low-risk work, record `not required` plus the
      rationale. Include the final QA Evidence expectations in the Batch Plan and
      generated goal prompt.

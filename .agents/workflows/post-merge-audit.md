@@ -86,6 +86,10 @@ List any QA lane or intentionally omitted QA lane, with:
 - `QA required`, QA required rationale, and QA lane status / coverage result
 - release-blocking status and any findings
 
+Use the capitalization convention from
+`.agents/workflows/pr-processing.md` -> **Batch QA Lane**: uppercase `UNKNOWN`
+means coordination/backend state, and lowercase `unknown` is the QA lane status.
+
 If you do not know or cannot verify an item from GitHub/local git, say UNKNOWN rather than guessing.
 ```
 
@@ -220,7 +224,7 @@ After confirmation, audit each known worked issue, QA lane, or advisory
   and a documented rationale; and `unknown` when evidence is missing, stale, or
   incomplete. Verify `Release-blocking status` is derived from QA lane status:
   `satisfied` -> `clear`, `blocked` -> `blocked`, `waived` -> `waived`,
-  `not_applicable` -> `not_applicable`, and `in_progress` / `unknown` -> `blocked`
+  `not_applicable` -> `not_applicable`, and `in_progress` / `unknown` -> `blocked`.
 - for healthy `in_progress` worked-issue lanes, evidenced `realized` outcomes,
   evidenced `satisfied` or `waived` QA lanes, and evidenced `not_applicable` QA
   omissions, record no action in the worked-issue/QA table; treat required QA

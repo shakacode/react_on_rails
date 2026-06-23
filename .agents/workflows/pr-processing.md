@@ -508,6 +508,10 @@ Each final batch handoff that has a QA lane, or intentionally omits one, include
 `Release-blocking status` is derived from `QA lane status`: `satisfied` -> `clear`,
 `blocked` -> `blocked`, `waived` -> `waived`, `not_applicable` -> `not_applicable`,
 and `in_progress` / `unknown` -> `blocked`.
+An unresponsive QA owner or incomplete QA evidence without a concrete
+release-blocking finding is `unknown`, not a separate QA `stalled` status; it
+still maps to release-blocking `blocked` and needs coordinator action to resume,
+reassign, drop, or recover evidence.
 
 Examples:
 
@@ -516,7 +520,7 @@ Examples:
 
 - QA lane: codex-qa, branch qa/batch-release, claim active, heartbeat done
 - Scope checked: release-affecting generator output and release runbook changes for PRs #1 and #2
-- Tested at: PR #1 abc1234 and PR #2 def5678
+- Tested at: PR #1 example-sha-1 and PR #2 example-sha-2
 - Automated checks: worker validation plus `pnpm start format.listDifferent`
 - Manual checks: generated-example smoke notes in PR #2
 - Findings: none
@@ -532,7 +536,7 @@ Examples:
 
 - QA lane: codex-qa, branch qa/batch-tooling, claim UNKNOWN (private backend unavailable), heartbeat UNKNOWN (private backend unavailable)
 - Scope checked: workflow/tooling changes for PRs #6 and #7; QA conducted independently of private coordination state
-- Tested at: PR #6 abc1111 and PR #7 def2222
+- Tested at: PR #6 example-sha-6 and PR #7 example-sha-7
 - Automated checks: worker validation plus `pnpm start format.listDifferent`
 - Manual checks: smoke test of generated example on Node 20
 - Findings: none
@@ -564,7 +568,7 @@ Examples:
 
 - QA lane: codex-qa, branch qa/batch-rc, claim active, heartbeat blocked
 - Scope checked: release-affecting CI config and generator changes for PRs #3 and #4
-- Tested at: PR #3 abc9876 and PR #4 fed4321
+- Tested at: PR #3 example-sha-3 and PR #4 example-sha-4
 - Automated checks: worker validation plus `pnpm start format.listDifferent`
 - Manual checks: CI smoke-test failure reproduced on generated example
 - Findings: generator output mismatch on Node 20: release-blocking, fix in progress in PR #5
@@ -580,7 +584,7 @@ Examples:
 
 - QA lane: codex-qa, branch qa/batch-release, claim active, heartbeat live
 - Scope checked: release-affecting generator output for PRs #9 and #10; testing in progress
-- Tested at: PR #9 abc1234 (manual smoke not yet run); PR #10 def5678 (pending)
+- Tested at: PR #9 example-sha-9 (manual smoke not yet run); PR #10 example-sha-10 (pending)
 - Automated checks: worker validation complete; hosted CI link pending
 - Manual checks: in progress: generated-example smoke on Node 20 not yet completed
 - Findings: none so far; final verdict pending manual checks
@@ -612,7 +616,7 @@ Examples:
 
 - QA lane: codex-qa, branch qa/batch-rc, claim active, heartbeat done
 - Scope checked: release-affecting CI config for PR #8
-- Tested at: PR #8 123abcd
+- Tested at: PR #8 example-sha-8
 - Automated checks: worker validation plus hosted CI run https://github.com/org/repo/actions/runs/123
 - Manual checks: not applicable: CI-only waiver
 - Findings: waiver accepted for non-blocking generated-example smoke gap, https://github.com/org/repo/pull/8#issuecomment-123
@@ -1638,8 +1642,10 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    `not_applicable`, or `unknown`. Use `satisfied` when the required QA evidence
    is current, adequately scoped, and has no untriaged release-blocking finding;
    `blocked` when a release-blocking QA finding still needs a fix or waiver;
-   `waived` when an explicit waiver exists; `in_progress` when required QA is
-   not complete; `not_applicable` when QA was correctly omitted with
+   `waived` when an explicit waiver exists and the auditor verifies a
+   maintainer comment URL, issue link, or PR body entry names the finding,
+   scope, and reason; `in_progress` when required QA is not complete;
+   `not_applicable` when QA was correctly omitted with
    `QA required: no` and a documented rationale; and `unknown` when evidence is
    missing, stale, or incomplete. Treat healthy active/live worked-issue lanes as
    `in_progress` no-action items unless they have a stalled, regressed, partial,
