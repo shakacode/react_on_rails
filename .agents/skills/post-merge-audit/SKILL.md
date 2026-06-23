@@ -44,7 +44,8 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
-   - run bounded `agent-coord doctor` then bounded `agent-coord status` to list
+   - run bounded `agent-coord doctor --json`, then broad `agent-coord status`
+     (via `agent-coord-bounded`) only as an audit/discovery read to list
      candidate batch/run ids and lanes
    - record `worked_issue_scope: UNKNOWN (needs batch confirmation)`
    - ask for confirmation before treating any candidate as the worked-issue
@@ -54,14 +55,15 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    `UNKNOWN (setup)` or `UNKNOWN (access)` takes precedence over
    `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
    is still needed after backend recovery. When a batch/run id is known, run
-   bounded `agent-coord doctor` then bounded `agent-coord status`, then inspect
-   the named batch entry; use claims, heartbeats, and batch metadata as the
-   primary worked-issue scope. If `agent-coord` is missing or bounded
-   `agent-coord doctor` fails/times out, record
+   bounded `agent-coord doctor --json` and bounded
+   `agent-coord status --batch-id <batch-id> --json`, then inspect the named
+   batch entry; use claims, heartbeats, and batch metadata as the primary
+   worked-issue scope. If `agent-coord` is missing or bounded
+   `agent-coord doctor --json` fails/times out, record
    `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
-   bounded `agent-coord doctor` passes but bounded `agent-coord status`
-   fails/times out, record `worked_issue_scope: UNKNOWN (access)` with the exact
-   command/error. In both UNKNOWN cases, use structured public `codex-claim`
+   bounded `agent-coord doctor --json` passes but targeted batch status fails,
+   exits 2, or times out, record `worked_issue_scope: UNKNOWN (access)` with the
+   exact command/error. In both UNKNOWN cases, use structured public `codex-claim`
    comments as an advisory fallback for possible no-PR, blocked, parked, or
    done-unmerged lanes before reducing scope to merged PRs. Keep advisory rows
    marked `UNKNOWN` as needed, and do not infer confirmed completeness from
@@ -71,7 +73,7 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    field to surface candidate batch ids, not to filter as confirmed scope until
    the user confirms the id.
 
-   If bounded `agent-coord doctor` and bounded `agent-coord status` both succeed
+   If bounded `agent-coord doctor --json` and targeted batch status both succeed
    but the named batch entry contains no worked issues or lanes, record
    `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
    scan structured public `codex-claim` comments as advisory recovery rows for

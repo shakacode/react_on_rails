@@ -92,6 +92,7 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Integrations',
           items: [
+            'building-features/accessibility',
             'building-features/forms',
             'building-features/react-and-redux',
             'building-features/styling-with-tailwind',
@@ -110,7 +111,6 @@ const sidebars: SidebarsConfig = {
           items: [
             'building-features/dev-server-and-testing',
             'building-features/testing-configuration',
-            'building-features/accessibility',
             'building-features/extensible-precompile-pattern',
             'building-features/process-managers',
             'building-features/debugging',

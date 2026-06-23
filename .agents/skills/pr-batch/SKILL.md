@@ -1,6 +1,6 @@
 ---
 name: pr-batch
-description: Plan and safely launch batches of issue or PR work, especially when using Codex subagents, multiple worktrees, or multiple machines. Use when the user asks to run a Codex batch, process several issues or PRs, split work across agents or machines, or turn filters into a PR-processing plan and /goal prompt.
+description: Plan and safely launch batches of issue or PR work, especially when using Codex or Claude subagents, multiple worktrees, or multiple machines. Use when the user asks to run an agent batch, Codex batch, Claude batch, process several issues or PRs, split work across agents or machines, or turn filters into a PR-processing plan and /goal prompt.
 argument-hint: '[exact issue/PR numbers or filters]'
 ---
 
@@ -16,7 +16,9 @@ Memorable invocation:
 
 ```text
 $pr-batch
+Run an agent batch
 Run a Codex batch
+Run a Claude batch
 ```
 
 Run `git fetch --prune origin main`, then use `.agents/workflows/pr-processing.md` as the deeper operating model for each issue, PR, review-fix pass, or merge-readiness item. If repo-local `.agents/skills/...` or `.agents/workflows/pr-processing.md` is missing in the checkout but present on `origin/main`, update the worktree before launching workers; if it remains missing, report repo workflow state as `UNKNOWN`.
@@ -348,18 +350,19 @@ canonical source for coordination state and worker rules. Keep this skill as a
 routing entry point; do not duplicate the full protocol here.
 
 In short: exact lane assignments beat labels; private `agent-coord` state is the
-source of truth when bounded `agent-coord doctor` and lane-scoped
-`agent-coord status` probes exit 0; agent-run preflights use
+source of truth when bounded `agent-coord doctor --json` and targeted
+lane-scoped status probes exit 0; agent-run preflights use
 `.agents/skills/pr-batch/bin/agent-coord-bounded` instead of unbounded
 full-backend reads; `CLAIM_REFUSED` / exit code 3 hard-stops machine agents;
 workers heartbeat at phase transitions; coordinators create private batch files
-before dependency lanes start; dependency-sensitive lanes run bounded
-`agent-coord status` before rebase, push, readiness, and closeout; exact
-independent lanes may proceed in `private_state: claim-only` after a successful
-direct bounded claim when status is degraded; and structured public claim
-comments are only advisory fallback state when a private claim cannot be started
-or definitively fails before mutation; timed-out claims stop as
-`UNKNOWN (claim outcome)` for backend reconciliation.
+before dependency lanes start; dependency-sensitive lanes run bounded targeted
+status before rebase, push, readiness, and closeout; broad `agent-coord status`
+is audit-only; exact independent lanes may proceed in
+`private_state: claim-only` after a successful direct bounded claim when status
+is degraded; and structured public claim comments are only advisory fallback
+state when a private claim cannot be started or definitively fails before
+mutation; timed-out claims stop as `UNKNOWN (claim outcome)` for backend
+reconciliation.
 
 ## Worker Rules
 
@@ -399,7 +402,16 @@ final batch handoff.
 
 When `merge_authority` is `auto_merge_when_gates_pass`, definition of done for a
 target is merged + closed out (or a true blocker / no-PR with evidence), not
-"stopped at a recommendation." When `merge_authority` is `ask`, surface exactly
+"stopped at a recommendation." This is the single most common way an authorized
+batch is left unfinished: the worktree did the work, satisfied the gate, wrote
+the confidence note, and then handed back a recommendation instead of merging.
+If the gate is met and the confidence note is complete (validated checks passed,
+evidence recorded, no unresolved MUST-FIX threads, and no open `UNKNOWN` facts
+that affect merge safety), **merge — do not re-ask for permission you were
+already given.** A blocker means a named, unmet gate (failed check, unresolved
+MUST-FIX thread, release-phase restriction), not residual caution.
+
+When `merge_authority` is `ask`, surface exactly
 one final merge decision if gates are clean and merge is allowed; if approval is
 declined or not granted by handoff, record `ready-no-merge-authority` and do not
 ask again. When `merge_authority` is `none`, done is a

@@ -11,6 +11,8 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   skill directory and reused across repos; they must resolve repo-specific
   values through this repo's `AGENTS.md` seam. The canonical shared source is
   [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows).
+  Use that repo's `agent-workflows-status` and `upgrade-agent-workflows`
+  helpers to keep installed Codex or Claude homes current.
 - `.agents/skills/`: repo-local skill copies/overrides plus repo-specific skills;
   `.claude/skills` is a symlink here so Claude Code exposes the same workflows as
   slash commands in this checkout.
@@ -35,8 +37,8 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - When deciding whether an issue or proposed fix is worth doing, use `.agents/skills/evaluate-issue/SKILL.md`; a short invocation is `$evaluate-issue` or "Is this issue worth fixing?"
 - When the user wants a ready prompt for review-only GitHub issue triage or an all-open-issues audit, use `.agents/skills/plan-issue-triage/SKILL.md`; a short invocation is `$plan-issue-triage` or "Plan an issue triage"
 - When the user wants a generated whole-surface issue/PR inventory, dependency graph, and capacity-aware batch split, use `.agents/skills/triage/SKILL.md`; a short invocation is `$triage` or "Run triage"
-- When the user wants to choose issues or PRs for a future Codex batch, use `.agents/skills/plan-pr-batch/SKILL.md` to produce a ready `$pr-batch` goal; a short invocation is `$plan-pr-batch` or "Plan a Codex batch"
-- When the user wants a multi-issue or multi-PR Codex batch, use `.agents/skills/pr-batch/SKILL.md`; a short invocation is `$pr-batch` or "Run a Codex batch"
+- When the user wants to choose issues or PRs for a future agent/Codex/Claude batch, use `.agents/skills/plan-pr-batch/SKILL.md` to produce a ready `$pr-batch` goal; a short invocation is `$plan-pr-batch` or "Plan a PR batch"
+- When the user wants a multi-issue or multi-PR agent/Codex/Claude batch, use `.agents/skills/pr-batch/SKILL.md`; a short invocation is `$pr-batch`, "Run an agent batch", "Run a Codex batch", or "Run a Claude batch"
 - When the user wants to stop or cancel an in-flight Codex/Claude batch (for example to relaunch it with updated skills), follow the **Cancelling Or Stopping A Batch** protocol in `.agents/workflows/pr-processing.md#cancelling-or-stopping-a-batch`; there is no short skill invocation for this coordinator action
 - When the user wants to audit merged batch work, missed reviews, release-candidate risk, or possible bad merges, use `.agents/skills/post-merge-audit/SKILL.md`; reusable prompts live in `.agents/workflows/post-merge-audit.md`
 - When the user wants an adversarial PR review, red-team review, Claude/Codex comparison review, or a stricter pre-merge gate, use `.agents/skills/adversarial-pr-review/SKILL.md`; reusable prompts live in `.agents/workflows/adversarial-pr-review.md`
@@ -123,6 +125,19 @@ on `origin/main`, update the worktree before continuing; if it is still missing,
 report the repo workflow state as `UNKNOWN` instead of silently using a global
 skill fallback.
 
+For user-installed shared skills, check the installed pack with:
+
+```bash
+agent-workflows-status --host codex
+```
+
+Use `--host claude` for Claude Code installs. To upgrade and validate this repo
+in one step, run:
+
+```bash
+upgrade-agent-workflows --host codex --consumer-root "$(pwd)"
+```
+
 ## Agent Workflow Configuration
 
 Shared workflow skills are repo-agnostic whether they are installed in the
@@ -176,6 +191,49 @@ see
   `shakacode/agent-coordination` backend (claims/heartbeats namespaced by full repo name).
   External adopters use the structured public claim-comment fallback in
   [`.agents/workflows/pr-processing.md`](.agents/workflows/pr-processing.md).
+
+## Agent Coordination Reads
+
+`agent-coord doctor --json` is the lightweight backend health check. Use
+`agent-coord doctor --deep --json` only for a full backend JSON audit: it parses
+every claim, heartbeat, and batch JSON state record, so it is slower and broader
+than the default health probe. Use `doctor --deep --json` only for full backend
+audit sweeps that intentionally parse all coordination records, not routine
+preflight checks. If the active shell may have cached an old install, run
+`hash -r 2>/dev/null || true` in a POSIX-style shell such as bash or zsh, or
+that shell's rehash equivalent, then confirm via
+`command -v agent-coord || which agent-coord`.
+
+Before dependency-sensitive actions, use targeted private coordination reads.
+The direct `agent-coord` subcommands are:
+
+```bash
+# Specific issue/PR lane
+agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json
+
+# Batch lane/dependency state
+agent-coord status --batch-id <batch-id> --json
+```
+
+When the repo workflow calls for bounded reads, pass the same targeted status
+subcommand through `.agents/skills/pr-batch/bin/agent-coord-bounded` so a slow
+private read becomes explicit degraded state instead of an indefinite wait:
+
+```bash
+# Specific issue/PR lane
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --repo shakacode/react_on_rails --target <issue-or-pr> --json
+
+# Batch lane/dependency state
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id <batch-id> --json
+```
+
+Do not use broad `agent-coord status` for routine lane checks. Broad private
+coordination reads are audit-only; if they time out, exit 1 (unexpected error),
+or exit 2, report private coordination as `UNKNOWN`/degraded and use structured
+public claim comments only as advisory evidence. Any non-zero exit other than
+`CLAIM_REFUSED` (exit 3) is treated as `UNKNOWN`/degraded. If targeted status
+exits 0, private coordination state is authoritative. Refused claims
+(`CLAIM_REFUSED` / exit 3) remain hard stops for machine agents.
 
 ## Commands
 
@@ -443,12 +501,31 @@ contract unless a maintainer explicitly narrows the run.
   the action, such as a required confirmation before a destructive force-push. A
   standalone "should I push this ordinary PR-iteration fix?" question counts.
   Report it as `Decision points: N` in the FYI section of the batch handoff.
-- **Confidence notes**: delegated merge authority exists only when the current
-  user or batch goal grants it and the release-mode rules permit it. Before a
-  delegated merge, the worker or coordinator writes a confidence note in the
-  issue, PR body, or batch handoff covering validated commands, evidence links,
-  remaining `UNKNOWN` facts, and residual risk. When merge authority is not
-  delegated, use the same format for merge-readiness evidence without merging:
+- **Confidence notes**: `merge_authority` has three states:
+  `auto_merge_when_gates_pass` is the only autonomous merge grant when the
+  current user or batch goal grants it and the release-mode rules permit it;
+  `ask` requires one confirmation before merging; and `none` grants no merge
+  authority. When `auto_merge_when_gates_pass` applies and the gate is met,
+  exercising it is the expected close-out — an authorized, gate-satisfied,
+  confident merge that is downgraded to a "ready to merge" recommendation is an
+  unfinished task, not a safe default. Before exercising merge authority,
+  complete the confidence note: validations and evidence are recorded, no
+  unresolved MUST-FIX threads remain, and any remaining `UNKNOWN` facts or
+  residual risk do not affect merge safety. Before a merge under
+  `auto_merge_when_gates_pass` or after an `ask` confirmation, the worker or
+  coordinator documents the merge qualifications in the PR description:
+  - which release-mode gate applied and that it was satisfied
+  - the confidence note: validated commands, evidence links, remaining
+    `UNKNOWN` facts, and residual risk
+  - the finalizer, when accelerated-RC requires one
+
+  This intentionally narrows merge-authority evidence to the PR description so
+  the merge decision is auditable from a single location. Use the issue or batch
+  handoff only for no-merge readiness evidence.
+
+  When merge authority is not granted, use the same confidence-note format for
+  merge-readiness evidence without merging:
+
   ```text
   Confidence note:
   - Validated: <commands or checks run and outcomes>
@@ -579,7 +656,7 @@ The **merge gate is a function of the target branch's release phase**. Resolve t
 | **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`.                                                                                                             |
 | **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial-pr-review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion**. No confidence-only auto-merge. |
 
-**Reading the phase.** The active phase per release line is published through the `shakacode/agent-coordination` backend so agents read the current gate without being told. Read it from the machine-readable `agent-coord` status output for the PR's target branch; treat it as available only when bounded `agent-coord doctor` and `agent-coord status` probes exit 0 (the private backend README and `agent-coord --help` are authoritative for the exact field). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is the tool that is unavailable here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
+**Reading the phase.** The active phase per release line is published through the `shakacode/agent-coordination` backend so agents read the current gate without being told. For a PR or issue lane, read it with targeted `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json` after `agent-coord doctor --json`; for batch dependency state, use `agent-coord status --batch-id <batch-id> --json`. Treat published phase as available only when the targeted status exits 0 (the private backend README and `agent-coord --help` are authoritative for the exact field). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is unavailable or degraded here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
 
 ## Review Workflow
 

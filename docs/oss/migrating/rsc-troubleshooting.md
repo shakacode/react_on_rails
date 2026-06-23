@@ -8,21 +8,22 @@ This guide covers the most common problems you'll encounter when migrating to Re
 
 When something goes wrong during RSC migration, start here. This table maps symptoms to the most likely cause and the relevant section in this guide:
 
-| Symptom                                                                                                        | Most Likely Cause                                                                            | Section                                                                           |
-| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Build error: _"cannot be passed directly to Client Components"_                                                | Passing functions or class instances across the server-client boundary                       | [Serialization Boundary Issues](#serialization-boundary-issues)                   |
-| Build error: _"needs useState/useEffect"_                                                                      | Using hooks in a Server Component file                                                       | [Error Message Catalog](#error-message-catalog)                                   |
-| RSC page downloads unexpectedly large JS chunks                                                                | Chunk contamination from shared `'use client'` modules                                       | [Chunk Contamination](#chunk-contamination)                                       |
-| Component stays a Client Component after removing `'use client'`                                               | Imported by another `'use client'` file, or RSC bundle not rebuilding                        | [Accidental Client Components](#accidental-client-components)                     |
-| Hydration mismatch warnings in console                                                                         | Server/client render output differs (timestamps, browser APIs, invalid HTML)                 | [Hydration Mismatches](#hydration-mismatches)                                     |
-| `ReferenceError: performance is not defined`                                                                   | Node renderer VM context missing globals                                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
-| `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                               | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
-| `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback) |
-| `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                 | [MessageChannel Not Defined](#messagechannel-not-defined)                         |
-| SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                     |
-| Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)     |
-| 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)  |
-| Page is blank until all data loads                                                                             | Missing `stream_react_component` or Suspense boundaries                                      | [Performance Pitfalls](#performance-pitfalls)                                     |
+| Symptom                                                                                                        | Most Likely Cause                                                                            | Section                                                                                       |
+| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Build error: _"cannot be passed directly to Client Components"_                                                | Passing functions or class instances across the server-client boundary                       | [Serialization Boundary Issues](#serialization-boundary-issues)                               |
+| Build error: _"needs useState/useEffect"_                                                                      | Using hooks in a Server Component file                                                       | [Error Message Catalog](#error-message-catalog)                                               |
+| RSC page downloads unexpectedly large JS chunks                                                                | Chunk contamination from shared `'use client'` modules                                       | [Chunk Contamination](#chunk-contamination)                                                   |
+| Global CSS resets change only on RSC pages                                                                     | Bare element selectors in an RSC CSS Module winning source-order ties                        | [RSC Stylesheet Injection](#rsc-stylesheet-injection-render-blocking-links-and-cascade-order) |
+| Component stays a Client Component after removing `'use client'`                                               | Imported by another `'use client'` file, or RSC bundle not rebuilding                        | [Accidental Client Components](#accidental-client-components)                                 |
+| Hydration mismatch warnings in console                                                                         | Server/client render output differs (timestamps, browser APIs, invalid HTML)                 | [Hydration Mismatches](#hydration-mismatches)                                                 |
+| `ReferenceError: performance is not defined`                                                                   | Node renderer VM context missing globals                                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                      |
+| `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                               | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                      |
+| `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)             |
+| `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                 | [MessageChannel Not Defined](#messagechannel-not-defined)                                     |
+| SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                 |
+| Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                 |
+| 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)              |
+| Page is blank until all data loads                                                                             | Missing `stream_react_component` or Suspense boundaries                                      | [Performance Pitfalls](#performance-pitfalls)                                                 |
 
 ## Serialization Boundary Issues
 
@@ -331,6 +332,57 @@ export default function SSRPage({ products }) {
 The RSC path uses `InteractiveWidgetsClient` (thin wrapper) to keep ProductCard's import edge clean, while the SSR path can import the full `InteractiveWidgets` module without affecting the RSC manifest for ProductCard.
 
 > **When to apply this:** Check the manifest or Network tab after building. If an RSC page downloads chunks larger than expected, start with a thin wrapper. If contamination persists because the component is shared across RSC and non-RSC entry points, use prop injection to remove the shared import edge.
+
+## RSC Stylesheet Injection: Render-Blocking Links and Cascade Order
+
+This section documents the current RSC stylesheet injection behavior so you know what to expect in
+the page source — it is not an open defect. It applies to React 19+ installations; earlier React
+versions do not support the `data-precedence` stylesheet groups used for this hoisting and
+render-blocking behavior.
+
+For RSC pages, React on Rails Pro injects
+`<link rel="stylesheet" data-precedence="rsc-css">` tags for CSS hrefs whose client chunk names appear
+in the current Flight payload. These links are **render-blocking** for the streamed RSC tree: React
+delays committing the streamed content until the referenced stylesheets are ready, which prevents a
+flash of unstyled content (FOUC) as the tree streams in.
+
+### Per-reference broadcast multiplication (fixed in the 19.2 line)
+
+Earlier versions re-broadcast shared vendor and common CSS _per client reference_, multiplying the same `<link>` tag across every reference that depended on it. This was fixed upstream in `react-on-rails-rsc` 19.2.0-rc.3 via:
+
+- [react_on_rails_rsc#108](https://github.com/shakacode/react_on_rails_rsc/pull/108)
+- [react_on_rails_rsc#110](https://github.com/shakacode/react_on_rails_rsc/pull/110)
+- [react_on_rails_rsc#113](https://github.com/shakacode/react_on_rails_rsc/pull/113)
+
+If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, use a coordinated
+React 19.2-compatible release set once stable Pro metadata is available. Key constraints:
+
+- The fix landed in `react-on-rails-rsc` 19.2.0-rc.3. Check the
+  [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases)
+  and the Pro release notes to determine whether a stable, coordinated release incorporating 19.2.x
+  is available and accepted by your Pro peer metadata. Do not install the rc prerelease in production
+  unless the Pro release notes name a matching package or peer range.
+- **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
+  React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
+  can fail at startup.
+- **Do not** use the default React 19.0.x generator pin from
+  [Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md)
+  for this duplicate-CSS fix; that guide remains the baseline 19.0.x RSC setup path.
+- Use maintainer-provided 19.2 compatibility guidance for the exact React, React DOM, React on Rails
+  Pro, and `react-on-rails-rsc` versions.
+
+On a supported, coordinated version set this is resolved — the shared CSS is emitted once.
+
+### Cascade order
+
+The `data-precedence="rsc-css"` group lands at the **end** of `<head>`, after precedence-less
+stylesheets such as the Rails-layout `stylesheet_pack_tag` links. This means rsc-css links win
+source-order ties when specificity is equal, and bare element selectors inside RSC CSS Modules can
+override globals once their stylesheet is delivered. See [CSS cascade guidance](../../pro/react-server-components/css-and-styling.md#rsc-stylesheet-cascade-order-end-of-head-precedence)
+for the full explanation and the cautionary `html { font-size }` example.
+
+See [React Performance Tracks and Profiling](../building-features/performance-tracks-and-profiling.md#measuring-an-rsc-conversion-with-a-paired-ab)
+to measure the end-to-end performance impact of RSC changes with a paired A/B comparison.
 
 ## Accidental Client Components
 

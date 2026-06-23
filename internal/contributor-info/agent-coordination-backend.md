@@ -33,7 +33,7 @@ agent-coord --help
 agent_coord --help
 agent-coord version --json
 agent-coord config show --json
-agent-coord doctor
+agent-coord doctor --json
 ```
 
 The workflow docs assume `agent-coord` is available on `PATH`.
@@ -41,18 +41,28 @@ The workflow docs assume `agent-coord` is available on `PATH`.
 alias `agent_coord` into `$HOME/.local/bin` by default. Add that directory to the
 active shell `PATH` if the shell has not reloaded its profile yet.
 
-Treat the backend as available when bounded `agent-coord doctor` and
-lane-scoped `agent-coord status` probes exit 0. In React on Rails batch
-workflows, run agent preflights through
-`.agents/skills/pr-batch/bin/agent-coord-bounded` so a slow full-backend read
-becomes explicit degraded state instead of an indefinite wait. If the command is
-missing, auth fails, the private repo cannot be read, a bounded probe times out,
-or either command exits non-zero, report private state as `UNKNOWN` / degraded.
-Use structured public claim comments as an advisory fallback only where
-dependency rules allow it. A successful status check followed by a refused
-`agent-coord claim` with exit code 3 / `CLAIM_REFUSED` is not unavailability; it
-is a hard stop. `agent-coord status` is a preflight view; `agent-coord claim` is
-the backend's compare-and-swap gate for concurrent claim races.
+Treat the backend as available when `agent-coord doctor --json` and targeted
+lane-scoped status probes exit 0. In React on Rails batch workflows, run agent
+preflights through `.agents/skills/pr-batch/bin/agent-coord-bounded` with the
+same targeted status subcommand so a slow private read becomes explicit degraded
+state instead of an indefinite wait:
+
+```bash
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 doctor --json
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --repo OWNER/REPO --target TARGET --json
+.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id BATCH_ID --json
+```
+
+Use broad `agent-coord status` only for audit-mode triage sweeps and post-merge
+batch discovery; treat those reads as advisory/discovery-only, not authoritative
+lane state. If the command is missing, auth fails, the private repo cannot be
+read, a bounded probe times out, or targeted status exits non-zero (exit 1/2
+means degraded/UNKNOWN; exit 3 is a hard stop, see below), report private state
+as `UNKNOWN` / degraded. Use structured public claim comments as an advisory
+fallback only where dependency rules allow it. A successful status check followed by a refused
+`agent-coord claim` with exit code 3 / `CLAIM_REFUSED` is not unavailability; it is a hard stop. Targeted
+`agent-coord status` is a preflight view; `agent-coord claim` is the backend's
+compare-and-swap gate for concurrent claim races.
 
 For exact independent lanes with no `depends_on` refs, a coordinator may attempt
 a bounded direct `agent-coord claim` when doctor/status is degraded. A successful
@@ -75,11 +85,11 @@ backend.
 
 Machine agents must not override a refused private claim on their own. A human
 coordinator may authorize a one-off manual override only after running
-`agent-coord status`, recording why the private state is wrong or degraded in
-the batch handoff as the authoritative incident note, and repairing the private
-state so later machine agents can observe the override through `agent-coord
-status`. Mirror the same note to the issue or PR when that is the active lane
-discussion, but do not use a public claim comment as the machine-readable
+targeted `agent-coord status`, recording why the private state is wrong or
+degraded in the batch handoff as the authoritative incident note, and repairing
+the private state so later machine agents can observe the override through
+targeted status. Mirror the same note to the issue or PR when that is the active
+lane discussion, but do not use a public claim comment as the machine-readable
 override channel or to bypass a live or stale holder that can be contacted.
 
 Use a temporary local state directory for smoke checks that should not write to
@@ -251,20 +261,21 @@ the private backend repo. This public pointer carries only the contract:
   not resume a lane while the other scope remains cancelled. To relaunch safely,
   clear every relevant batch- and lane-scope cancellation field, and cancel or
   reassign downstream lanes that still `depends_on` a cancelled lane. Workers
-  read cancellation through `agent-coord status` at every phase-transition
+  read cancellation through targeted
+  `agent-coord status --batch-id <batch-id> --json` at every phase-transition
   heartbeat, the same cadence they already use for `depends_on` / `blocked_on`.
   The private backend README and `agent-coord config show --json` are
   authoritative for the exact field name and cancel status values if they differ
   from this pointer.
-- Treat cancellation state as available only when bounded `agent-coord doctor`
-  and `agent-coord status` probes exit 0, exactly as for claim, heartbeat, and
-  phase state. Otherwise report it as `UNKNOWN`. If cancellation was already
-  recorded before the outage, a coordinator can continue the process-level
-  escape hatch; if not, stop worker processes and wait to reconcile claims and
-  cancellation state in the private backend before relaunch. A coordinator or
-  maintainer may post an advisory GitHub comment as a human-facing incident
-  note, but workers do not treat comments as a drain signal. Arbitrary public
-  comments cannot initiate this fallback.
+- Treat cancellation state as available only when `agent-coord doctor --json`
+  and targeted status exit 0, exactly as for claim, heartbeat, and phase state.
+  Otherwise report it as `UNKNOWN`. If cancellation was already recorded before
+  the outage, a coordinator can continue the process-level escape hatch; if not,
+  stop worker processes and wait to reconcile claims and cancellation state in
+  the private backend before relaunch. A coordinator or maintainer may post an
+  advisory GitHub comment as a human-facing incident note, but workers do not
+  treat comments as a drain signal. Arbitrary public comments cannot initiate
+  this fallback.
 - A cancelled worker drains at its next safe checkpoint and then runs
   `agent-coord release` for the lane. See
   [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md)
@@ -299,8 +310,9 @@ Keep the schema and exact subcommand surface in the private backend repo. This
 public pointer carries only the contract:
 
 - The backend exposes a phase value (`beta` | `rc` | `final`) keyed by release
-  line / target branch. Read it from the machine-readable `agent-coord` status
-  output for the PR's target branch. There is no separate `none` value; a missing
+  line / target branch. For PR/issue lanes, read it from targeted
+  `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json`.
+  There is no separate `none` value; a missing
   entry (no published phase for that line) means "no explicit override is
   published", so derive the phase from the target branch exactly as in the
   backend-UNKNOWN fallback below (`main` -> `beta`; `release/*` -> `rc`, or
@@ -308,12 +320,12 @@ public pointer carries only the contract:
   `release/*` target to `beta`. The private backend README, `agent-coord --help`,
   and `agent-coord config show --json` are authoritative for the exact field and
   subcommand if they differ from this pointer.
-- Treat the published phase as available only when bounded `agent-coord doctor`
-  and `agent-coord status` probes exit 0, exactly as for claim and heartbeat
-  state. Otherwise report the phase as `UNKNOWN` and use the `AGENTS.md`
-  fallback: derive it from the target branch (`main` -> `beta`; `release/*` ->
-  `rc`, or `final` when the applicable tracker is in `final-release` mode — the
-  only machine-readable signal in the fallback path).
+- Treat the published phase as available only when `agent-coord doctor --json`
+  and targeted status exit 0, exactly as for claim and heartbeat state.
+  Otherwise report the phase as `UNKNOWN` and use the `AGENTS.md` fallback:
+  derive it from the target branch (`main` -> `beta`; `release/*` -> `rc`, or
+  `final` when the applicable tracker is in `final-release` mode — the only
+  machine-readable signal in the fallback path).
 - The release tracker remains the human source of truth for mode and go/no-go.
   The published phase is the fast machine path. If the published phase and the
   tracker disagree, treat it as a `release-mode-conflict` per `AGENTS.md`, report
