@@ -434,7 +434,7 @@ def valid_enclosing_block_opener?(content, state_cache, lines, offsets, line_ind
   code = code_text_on_line(content, state_cache, lines, offsets, line_index).strip
   return false unless code.end_with?("{")
 
-  code.match?(/\A(?:if|for|while|switch|try\b|catch\b|finally\b|else\b|\}\s*(?:else|catch|finally)\b)/)
+  code.match?(/\A(?:if\b|for\b|while\b|switch\b|try\b|catch\b|finally\b|else\b|\}\s*(?:else|catch|finally)\b)/)
 end
 
 def immediate_enclosing_block_line(content, state_cache, lines, offsets, line_index)
@@ -470,13 +470,13 @@ end
 def find_code_brace_on_line(content, state_cache, lines, offsets, line_index)
   index = offsets.fetch(line_index)
   end_offset = index + lines.fetch(line_index).bytesize
-  state, quote = code_state_at_offset(state_cache, index)
+  state, context = code_state_at_offset(state_cache, index)
   brace_index = nil
 
   while index < end_offset
-    index, state, quote = next_code_state(content, index, state, quote, state_cache)
+    index, state, context = next_code_state(content, index, state, context, state_cache)
     # Use the last significant { on the line; in `if (fn({})) {`, the block opener is last.
-    brace_index = index if significant_code_byte?(state, quote, index) && content.getbyte(index) == "{".ord
+    brace_index = index if significant_code_byte?(state, context, index) && content.getbyte(index) == "{".ord
     index += 1
   end
 
@@ -485,17 +485,17 @@ end
 
 def find_matching_brace(content, state_cache, open_index)
   index = open_index
-  state, quote = code_state_at_offset(state_cache, open_index)
+  state, context = code_state_at_offset(state_cache, open_index)
   depth = 0
 
   while index < content.bytesize
-    next_index, state, quote = next_code_state(content, index, state, quote, state_cache)
+    next_index, state, context = next_code_state(content, index, state, context, state_cache)
     index = next_index
     byte = content.getbyte(index)
 
-    if significant_code_byte?(state, quote, index) && byte == "{".ord
+    if significant_code_byte?(state, context, index) && byte == "{".ord
       depth += 1
-    elsif significant_code_byte?(state, quote, index) && byte == "}".ord
+    elsif significant_code_byte?(state, context, index) && byte == "}".ord
       depth -= 1
       return index if depth.zero?
     end
