@@ -3,6 +3,7 @@
 require "bundler"
 require "English"
 require "json"
+require "net/http"
 require "open3"
 require "rubygems/version"
 require "shellwords"
@@ -23,6 +24,7 @@ end
 class UnhandledReleaseFinalizationMetadataPathError < StandardError; end
 
 NPM_REGISTRY_URL = "https://registry.npmjs.org/"
+RUBYGEMS_VERSIONS_API_URL = "https://rubygems.org/api/v1/versions"
 NPM_PUBLISH_VERIFY_ATTEMPTS = 6
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
 NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
@@ -1797,9 +1799,10 @@ end
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_override:, fetch_tags: true,
                                      allow_existing_target_tag: false,
-                                     release_branch_final_promotion: false)
+                                     release_branch_final_promotion: false,
+                                     release_branch_tag_scope: release_branch_final_promotion)
   tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags:)
-  tagged_version_order_candidates = if release_branch_final_promotion
+  tagged_version_order_candidates = if release_branch_tag_scope
                                       tagged_versions.select do |version|
                                         !release_prerelease_version?(version) ||
                                           same_release_base?(version, target_gem_version)
@@ -2074,9 +2077,42 @@ def resolve_version_input(version_input, monorepo_root)
   "patch"
 end
 
-def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
+def fetch_rubygems_versions(gem_name, api_url: RUBYGEMS_VERSIONS_API_URL)
+  uri = URI("#{api_url}/#{URI.encode_www_form_component(gem_name)}.json")
+  response = Net::HTTP.get_response(uri)
+  [response.body, response]
+end
+
+def rubygem_version_published?(gem_name, version, api_url: RUBYGEMS_VERSIONS_API_URL)
+  output, response = fetch_rubygems_versions(gem_name, api_url:)
+  return false unless response.is_a?(Net::HTTPSuccess)
+
+  versions = JSON.parse(output)
+  versions.any? do |metadata|
+    metadata.is_a?(Hash) && metadata["number"] == version
+  end
+rescue JSON::ParserError => e
+  warn "⚠️  Unable to parse RubyGems metadata for #{gem_name}: #{e.message}; attempting publish."
+  false
+rescue StandardError => e
+  warn "⚠️  Unable to check RubyGems metadata for #{gem_name}: #{e.class}: #{e.message}; attempting publish."
+  false
+end
+
+def skip_existing_rubygem_publish?(gem_name:, published_version:)
+  return false unless published_version
+  return false unless rubygem_version_published?(gem_name, published_version)
+
+  puts "ℹ️ RubyGem #{gem_name} #{published_version} is already visible on RubyGems.org; skipping publish."
+  true
+end
+
+def publish_gem_with_retry(dir, gem_name, otp: nil, published_version: nil,
+                           max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
   puts "\nPublishing #{gem_name} gem to RubyGems.org..."
   current_otp = normalize_otp_code(otp, service_name: "RubyGems")
+
+  return current_otp if skip_existing_rubygem_publish?(gem_name:, published_version:)
 
   if current_otp
     puts "Using provided OTP code..."
@@ -2312,11 +2348,44 @@ def verify_npm_package_published!(
   puts "✓ Verified npm package #{package_ref}"
 end
 
+def npm_package_already_published?(package_name, expected_version, registry_url: NPM_REGISTRY_URL)
+  package_ref = "#{package_name}@#{expected_version}"
+  output, status = fetch_npm_package_metadata(package_ref, registry_url:)
+  return false unless status.success?
+
+  metadata = JSON.parse(output)
+  actual_version = metadata.is_a?(Hash) ? metadata["version"] : metadata.to_s
+  return false unless actual_version == expected_version
+
+  workspace_dependencies = workspace_protocol_dependencies(metadata)
+  unless workspace_dependencies.empty?
+    abort <<~ERROR
+      ❌ #{package_ref} is already published with workspace protocol dependencies.
+
+      Published packages must not contain workspace:* install-time dependencies because external package managers
+      cannot resolve them from npm.
+
+      Offending dependencies:
+      #{workspace_dependencies.map { |dependency| "  - #{dependency}" }.join("\n")}
+    ERROR
+  end
+
+  true
+rescue JSON::ParserError => e
+  warn "⚠️  Unable to parse npm metadata for #{package_ref}: #{e.message}; attempting publish."
+  false
+end
+
 def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, max_retries: 3)
   puts "\nPublishing #{package_name}..."
   current_otp = normalize_otp_code(otp, service_name: "NPM")
   publish_args = Array(base_args)
   npm_package_name, npm_package_version = parse_npm_package_ref(package_name)
+
+  if npm_package_already_published?(npm_package_name, npm_package_version)
+    puts "ℹ️ npm package #{package_name} is already visible on npm; skipping publish."
+    return current_otp
+  end
 
   retry_count = 0
   success = false
@@ -2504,6 +2573,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     # Validate the tip of the branch we are actually releasing from: the
     # release/X.Y.Z tip for an RC cut or final promotion, otherwise origin/main.
     ci_branch = release_ci_branch(current_branch)
+    release_branch_tag_scope = current_branch == "release/#{release_base_version(resolved_target_gem_version)}"
 
     validate_main_ci_status!(
       monorepo_root: release_root,
@@ -2520,7 +2590,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       allow_override: allow_version_policy_override,
       fetch_tags: true,
       allow_existing_target_tag: release_branch_promotion.fetch(:stable_tag_retry),
-      release_branch_final_promotion:
+      release_branch_final_promotion:,
+      release_branch_tag_scope:
     )
 
     confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root) unless is_dry_run
@@ -2694,13 +2765,15 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       current_rubygems_otp = publish_gem_with_retry(
         release_paths_hash[:gem_root],
         "react_on_rails",
-        otp: current_rubygems_otp
+        otp: current_rubygems_otp,
+        published_version: actual_gem_version
       )
 
       publish_gem_with_retry(
         release_paths_hash[:pro_gem_root],
         "react_on_rails_pro",
-        otp: current_rubygems_otp
+        otp: current_rubygems_otp,
+        published_version: actual_gem_version
       )
     end
   end

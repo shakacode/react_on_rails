@@ -601,6 +601,23 @@ RSpec.describe "release.rake helper methods" do
 
       publish_gem_with_retry("/tmp/gem", "react_on_rails", otp: "123456", max_retries: 1)
     end
+
+    it "skips RubyGems publish when the exact gem version is already visible" do
+      allow(self).to receive(:rubygem_version_published?)
+        .with("react_on_rails", "17.0.0")
+        .and_return(true)
+      expect(self).not_to receive(:sh_args_in_dir_for_release)
+
+      expect do
+        publish_gem_with_retry(
+          "/tmp/gem",
+          "react_on_rails",
+          otp: "123456",
+          published_version: "17.0.0",
+          max_retries: 1
+        )
+      end.to output(/already visible on RubyGems\.org/).to_stdout
+    end
   end
 
   describe "#publish_npm_with_retry" do
@@ -608,6 +625,9 @@ RSpec.describe "release.rake helper methods" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "package.json"), JSON.pretty_generate({ "name" => "react-on-rails",
                                                                           "version" => "16.4.0-rc.1" }))
+        allow(self).to receive(:npm_package_already_published?)
+          .with("react-on-rails", "16.4.0-rc.1")
+          .and_return(false)
 
         expect(self).to receive(:sh_args_in_dir_for_release).with(
           dir,
@@ -637,6 +657,9 @@ RSpec.describe "release.rake helper methods" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "package.json"), JSON.pretty_generate({ "name" => "react-on-rails",
                                                                           "version" => "16.7.0-rc.1" }))
+        allow(self).to receive(:npm_package_already_published?)
+          .with("react-on-rails", "16.7.0-rc.1")
+          .and_return(false)
         expect(self).to receive(:sh_args_in_dir_for_release).with(dir, "pnpm", "publish")
         allow(Open3).to receive(:capture2e)
           .with(
@@ -683,6 +706,9 @@ RSpec.describe "release.rake helper methods" do
           }
         )
         File.write(package_json_path, "#{original_package_json}\n")
+        allow(self).to receive(:npm_package_already_published?)
+          .with("react-on-rails-pro", "16.7.0-rc.1")
+          .and_return(false)
 
         expect(self).to receive(:sh_args_in_dir_for_release).with(dir, "pnpm", "publish") do
           published_package_json = JSON.parse(File.read(package_json_path))
@@ -700,6 +726,17 @@ RSpec.describe "release.rake helper methods" do
 
         expect(File.read(package_json_path)).to eq("#{original_package_json}\n")
       end
+    end
+
+    it "skips npm publish when the exact package version is already visible" do
+      allow(self).to receive(:npm_package_already_published?)
+        .with("react-on-rails", "17.0.0")
+        .and_return(true)
+      expect(self).not_to receive(:sh_args_in_dir_for_release)
+
+      expect do
+        publish_npm_with_retry("/tmp/npm", "react-on-rails@17.0.0", max_retries: 1)
+      end.to output(/already visible on npm/).to_stdout
     end
   end
 
@@ -920,6 +957,22 @@ RSpec.describe "release.rake helper methods" do
           release_branch_final_promotion: true
         )
       end.not_to raise_error
+    end
+
+    it "allows release branch RC cuts when main already has a newer prerelease tag on another line" do
+      allow(self).to receive(:tagged_release_gem_versions)
+        .with("/tmp/repo", fetch_tags: false)
+        .and_return(["16.9.9", "17.0.0.rc.3", "17.1.0.beta.1"])
+
+      expect do
+        validate_release_version_policy!(
+          monorepo_root: "/tmp/repo",
+          target_gem_version: "17.0.0.rc.4",
+          allow_override: false,
+          fetch_tags: false,
+          release_branch_tag_scope: true
+        )
+      end.to output(/Skipping all downstream checks for same-base prerelease bump/).to_stdout
     end
 
     it "rejects release branch final promotion when a newer stable tag already exists" do
