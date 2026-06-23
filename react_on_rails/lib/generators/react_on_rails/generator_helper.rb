@@ -252,9 +252,10 @@ module GeneratorHelper
   end
 
   def tailwind_css_string(value)
-    escaped_value = value.to_s.gsub("\\", "\\\\\\\\").gsub('"', '\"')
+    css_string = value.to_s
+    raise ArgumentError, "Tailwind source paths cannot contain control characters" if css_string.match?(/[[:cntrl:]]/)
 
-    %("#{escaped_value}")
+    JSON.generate(css_string)
   end
 
   def unsafe_generator_destination_path?(path)

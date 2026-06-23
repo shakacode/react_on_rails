@@ -453,6 +453,16 @@ RSpec.describe GeneratorHelper, type: :generator do
         @source "../../../app";
       CSS
     end
+
+    it "escapes quoted Tailwind source paths with JSON string quoting" do
+      expect(tailwind_source_statement(%(../quoted"path\\dir)))
+        .to eq('@source "../quoted\\"path\\\\dir";')
+    end
+
+    it "rejects control characters in Tailwind source paths" do
+      expect { tailwind_source_statement("../bad\npath") }
+        .to raise_error(ArgumentError, "Tailwind source paths cannot contain control characters")
+    end
   end
 
   describe "#active_precompile_hook_configured?" do
