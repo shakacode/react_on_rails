@@ -1,0 +1,353 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "optparse"
+require "open3"
+
+# rubocop:disable Metrics/ClassLength
+class ReleaseForwardPort
+  VERSION_FILE = "react_on_rails/lib/react_on_rails/version.rb"
+  RC_VERSION_BUMP_SUBJECT = /
+    \Abump\s+version\s+to\s+v?\d+\.\d+\.\d+(?:[.-]rc[.-]?\d+|\.rc\.\d+)\b
+  /ix
+  VERSION_BUMP_SUBJECT = /
+    \Abump\s+version\s+to\s+v?
+    (?<version>\d+\.\d+\.\d+(?:(?:[.-])(?:alpha|beta|rc|pre|dev)(?:[.-]?\d+)?)?)\b
+  /ix
+  CHERRY_PICK_FOOTER_PREFIX = "(cherry picked from commit "
+
+  PlanEntry = Struct.new(:sha, :subject, :action, :reason, keyword_init: true) do
+    def short_sha
+      sha[0, 12]
+    end
+  end
+
+  class UsageError < StandardError; end
+  class GitError < StandardError; end
+
+  def initialize(argv)
+    @argv = argv.dup
+    @options = {
+      dry_run: false,
+      target: "main"
+    }
+    @parser = build_parser
+  end
+
+  def run
+    parse_options!
+
+    source = @options.fetch(:source)
+    target = @options.fetch(:target)
+
+    verify_ref!(source, label: "source")
+    verify_ref!(target, label: "target")
+    ensure_local_target_branch!(target) unless @options[:dry_run]
+
+    commits = source_only_commits(source, target)
+    patch_equivalent_commits = patch_equivalent_commits(source, target)
+    target_version = version_at(target)
+    plan = build_plan(commits, target, target_version, patch_equivalent_commits)
+
+    print_plan(source, target, target_version, plan)
+
+    if @options[:dry_run]
+      puts "\nDRY RUN: no branches were checked out and no commits were cherry-picked."
+      return 0
+    end
+
+    ensure_clean_worktree!
+    checkout_target!(target)
+    apply_plan(plan)
+  rescue OptionParser::ParseError, UsageError => e
+    warn "ERROR: #{e.message}"
+    warn @parser
+    2
+  rescue GitError => e
+    warn "ERROR: #{e.message}"
+    1
+  end
+
+  private
+
+  def parse_options!
+    argv = @argv.dup
+    @parser.parse!(argv)
+    @options[:source] ||= argv.shift
+    @options[:target] = argv.shift if argv.any?
+
+    raise UsageError, "source ref is required" if @options[:source].nil? || @options[:source].empty?
+    raise UsageError, "too many arguments: #{argv.join(' ')}" unless argv.empty?
+  end
+
+  def build_parser
+    OptionParser.new do |parser|
+      parser.banner = <<~BANNER
+        Usage: script/release-forward-port --source release/X.Y.Z [--target main] [--dry-run]
+               script/release-forward-port release/X.Y.Z [main] [--dry-run]
+
+        Forward-port commits that are on a release branch but not on the target branch.
+        The helper cherry-picks with -x, skips commits already forward-ported with -x
+        evidence or equivalent patches, and excludes RC version bump commits.
+      BANNER
+
+      parser.on("--source REF", "Release branch or ref to forward-port from") do |source|
+        @options[:source] = source
+      end
+      parser.on("--target REF", "Target local branch to forward-port onto (default: main)") do |target|
+        @options[:target] = target
+      end
+      parser.on("--dry-run", "Print the plan without checking out or cherry-picking") do
+        @options[:dry_run] = true
+      end
+      parser.on("-h", "--help", "Show this help") do
+        puts parser
+        exit 0
+      end
+    end
+  end
+
+  def source_only_commits(source, target)
+    git_lines("rev-list", "--reverse", "#{target}..#{source}")
+  end
+
+  def patch_equivalent_commits(source, target)
+    git_lines("cherry", target, source).each_with_object({}) do |line, commits|
+      marker, sha = line.split(/\s+/, 2)
+      commits[sha] = true if marker == "-"
+    end
+  end
+
+  def build_plan(commits, target, target_version, patch_equivalent_commits)
+    commits.map do |sha|
+      full_sha = git("rev-parse", "#{sha}^{commit}").strip
+      subject = git("log", "-1", "--format=%s", full_sha).strip
+      reason = skip_reason(full_sha, subject, target, target_version, patch_equivalent_commits)
+
+      PlanEntry.new(
+        sha: full_sha,
+        subject:,
+        action: reason ? :skip : :pick,
+        reason:
+      )
+    end
+  end
+
+  def skip_reason(sha, subject, target, target_version, patch_equivalent_commits)
+    if rc_version_bump?(subject)
+      return "rc version bump commit; release train forward-ports must keep prerelease bumps off #{target}"
+    end
+
+    if already_forward_ported_with_x?(sha, target)
+      return "already forward-ported to #{target} via cherry-pick -x evidence"
+    end
+
+    return "patch already exists on #{target} according to git cherry" if patch_equivalent_commits[sha]
+
+    version_bump_skip_reason(subject, target, target_version)
+  end
+
+  def rc_version_bump?(subject)
+    subject.match?(RC_VERSION_BUMP_SUBJECT)
+  end
+
+  def version_bump_skip_reason(subject, target, target_version)
+    version = version_from_bump_subject(subject)
+    return unless version && target_version
+
+    comparison = compare_versions(target_version, version)
+    return unless comparison && comparison >= 0
+
+    "target #{target} is already at #{target_version}; skipping version bump to #{version} to avoid " \
+      "regressing or duplicating the target version. If this commit also contains CHANGELOG changes, " \
+      "use the runbook's manual fallback to take only the CHANGELOG hunks."
+  end
+
+  def version_from_bump_subject(subject)
+    match = subject.match(VERSION_BUMP_SUBJECT)
+    match && match[:version].tr("-", ".")
+  end
+
+  def already_forward_ported_with_x?(sha, target)
+    footer = "#{CHERRY_PICK_FOOTER_PREFIX}#{sha})"
+    !git("log", target, "--fixed-strings", "--grep=#{footer}", "--format=%H", "--max-count=1").strip.empty?
+  end
+
+  def version_at(ref)
+    version_file = git("show", "#{ref}:#{VERSION_FILE}").strip
+    match = version_file.match(/VERSION\s*=\s*["'](?<version>[^"']+)["']/)
+    match && match[:version]
+  rescue GitError
+    nil
+  end
+
+  def compare_versions(left, right)
+    left_version = parse_version(left)
+    right_version = parse_version(right)
+    return unless left_version && right_version
+
+    base_comparison = left_version.fetch(:base) <=> right_version.fetch(:base)
+    return base_comparison unless base_comparison.zero?
+
+    compare_prerelease(left_version.fetch(:prerelease), right_version.fetch(:prerelease))
+  end
+
+  def parse_version(version)
+    normalized = version.to_s.delete_prefix("v").tr("-", ".")
+    match = normalized.match(
+      /\A(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:\.(?<label>[A-Za-z]+)(?:\.?(?<number>\d+))?)?\z/
+    )
+    return unless match
+
+    {
+      base: [match[:major].to_i, match[:minor].to_i, match[:patch].to_i],
+      prerelease: prerelease_from_match(match)
+    }
+  end
+
+  def prerelease_from_match(match)
+    return nil unless match[:label]
+
+    {
+      label: match[:label].downcase,
+      number: match[:number] ? match[:number].to_i : 0
+    }
+  end
+
+  def compare_prerelease(left, right)
+    return 0 if left.nil? && right.nil?
+    return 1 if left.nil?
+    return -1 if right.nil?
+
+    label_comparison = prerelease_rank(left.fetch(:label)) <=> prerelease_rank(right.fetch(:label))
+    return label_comparison unless label_comparison.zero?
+
+    left.fetch(:number) <=> right.fetch(:number)
+  end
+
+  def prerelease_rank(label)
+    {
+      "dev" => 0,
+      "test" => 1,
+      "alpha" => 2,
+      "beta" => 3,
+      "pre" => 4,
+      "rc" => 5
+    }.fetch(label, -1)
+  end
+
+  def print_plan(source, target, target_version, plan)
+    puts "Release forward-port plan"
+    puts "  source: #{source}"
+    puts "  target: #{target}"
+    puts "  target version: #{target_version || 'UNKNOWN'}"
+    puts
+
+    if plan.empty?
+      puts "No commits found in #{target}..#{source}."
+      return
+    end
+
+    plan.each { |entry| print_plan_entry(entry) }
+
+    picks = plan.count { |entry| entry.action == :pick }
+    skips = plan.length - picks
+    puts
+    puts "Summary: #{picks} commit#{'s' unless picks == 1} to cherry-pick, " \
+         "#{skips} commit#{'s' unless skips == 1} skipped."
+  end
+
+  def print_plan_entry(entry)
+    case entry.action
+    when :pick
+      puts "PICK #{entry.short_sha} #{entry.subject}"
+    when :skip
+      puts "SKIP #{entry.short_sha} #{entry.subject}"
+      puts "     #{entry.reason}"
+    end
+  end
+
+  def ensure_clean_worktree!
+    return if git("status", "--porcelain").strip.empty?
+
+    raise GitError, "working tree is not clean; commit, stash, or discard local changes before normal mode"
+  end
+
+  def ensure_local_target_branch!(target)
+    run_git("show-ref", "--verify", "--quiet", "refs/heads/#{target}") do |_stdout, stderr, status|
+      next if status.success?
+
+      raise GitError, "normal mode target must be a local branch (got #{target.inspect}): #{stderr.strip}"
+    end
+  end
+
+  def checkout_target!(target)
+    puts "\nChecking out #{target}..."
+    git!("checkout", target)
+  end
+
+  def apply_plan(plan)
+    picks = plan.select { |entry| entry.action == :pick }
+
+    if picks.empty?
+      puts "\nNothing to cherry-pick."
+      return 0
+    end
+
+    picks.each do |entry|
+      puts "\nCherry-picking #{entry.short_sha} #{entry.subject}"
+      stdout, stderr, status = capture_git("cherry-pick", "-x", entry.sha)
+      puts stdout unless stdout.empty?
+      warn stderr unless stderr.empty?
+      next if status.success?
+
+      warn "Cherry-pick failed for #{entry.sha}."
+      warn "Resolve the conflict and run git cherry-pick --continue, or run git cherry-pick --abort."
+      return status.exitstatus || 1
+    end
+
+    puts "\nForward-port complete."
+    0
+  end
+
+  def verify_ref!(ref, label:)
+    git("rev-parse", "--verify", "#{ref}^{commit}")
+  rescue GitError => e
+    raise GitError, "#{label} ref #{ref.inspect} is not a commit: #{e.message}"
+  end
+
+  def git_lines(*)
+    output = git(*)
+    output.lines.map(&:strip).reject(&:empty?)
+  end
+
+  def git!(*args)
+    stdout, stderr, status = capture_git(*args)
+    raise GitError, git_error(args, stdout, stderr, status) unless status.success?
+
+    stdout
+  end
+
+  def git(*)
+    git!(*)
+  end
+
+  def capture_git(*)
+    Open3.capture3("git", *)
+  end
+
+  def run_git(*)
+    stdout, stderr, status = capture_git(*)
+    yield(stdout, stderr, status)
+  end
+
+  def git_error(args, stdout, stderr, status)
+    message = ["git #{args.join(' ')} failed with status #{status.exitstatus}"]
+    message << stderr.strip unless stderr.strip.empty?
+    message << stdout.strip unless stdout.strip.empty?
+    message.join(": ")
+  end
+end
+# rubocop:enable Metrics/ClassLength
+
+exit ReleaseForwardPort.new(ARGV).run if $PROGRAM_NAME == __FILE__

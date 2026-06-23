@@ -184,22 +184,35 @@ branch tip when maintainers want a new candidate to validate. Re-run the hard-ga
 ### 3. Forward-port stabilizing fixes back to `main`
 
 Every fix that lands on `release/X.Y.Z` must also reach `main`, or `main` regresses the moment the
-release branch is deleted. Forward-port with **`git cherry-pick -x`**, not a branch merge:
+release branch is deleted. Use `script/release-forward-port` first so the operation is dry-run-able,
+idempotent, and skips RC version-bump commits. The helper uses **`git cherry-pick -x`** for commits it
+applies; do not use a branch merge:
 
 ```bash
 git fetch origin
 git checkout main
 git pull --rebase
-# Cherry-pick the fix commit(s) — NOT the rc version-bump commits.
-git cherry-pick -x <fix-sha>
+
+# Inspect the plan first. Expect fix/CHANGELOG commits to be PICK and
+# Bump version to ...rc.N commits to be SKIP.
+script/release-forward-port --source origin/release/17.0.0 --target main --dry-run
+
+# Apply the same plan. The helper checks out the local target branch and cherry-picks with -x.
+script/release-forward-port --source origin/release/17.0.0 --target main
 git push   # or open a PR if main is protected / the fix needs review on main
 ```
 
+- The helper skips commits already present on `main` using `(cherry picked from commit <sha>)`
+  evidence when available, and falls back to `git cherry` patch-equivalence for already-applied
+  patches without the footer.
 - `-x` appends `(cherry picked from commit <sha>)` so the forward-port is auditable and future
-  conflict resolution can see the relationship.
+  helper runs can see the relationship.
 - **Do not `git merge release/X.Y.Z` into `main`.** That drags the RC `Bump version to …rc.N` commits
   and the release-branch CHANGELOG layout onto `main`, which is exactly what we want to keep off `main`.
-  Cherry-pick only the fix commits.
+  Let the helper pick only eligible commits, or manually cherry-pick only the specific fix commit(s).
+- Manual fallback: if the helper reports a real conflict on an eligible fix, resolve that specific
+  cherry-pick with `git cherry-pick --continue` or abort and run `git cherry-pick -x <fix-sha>` for the
+  intended fix commit(s). Do not manually pick `Bump version to ...rc.N` commits.
 - If a fix is _also_ wanted for ongoing `main` development and is low-risk, it is acceptable to author
   it on `main` first and cherry-pick it onto `release/X.Y.Z` (step 2 in reverse). Pick one direction
   per fix and record which in the PR so the other branch is not missed.
@@ -255,22 +268,30 @@ and publish phase `final` for the release line during the promotion freeze.
 
 ```bash
 # After v17.0.0 is published and the GitHub release exists:
-# 1. Forward-port the final CHANGELOG collapse to main:
+# 1. Forward-port any remaining release-branch commits to main:
 git fetch origin
-git checkout main && git pull --rebase
-git cherry-pick -x <changelog-collapse-sha>  # the step-4 commit that collapsed the rc sections
-                                             # into ### [17.0.0]
+git checkout main
+git pull --rebase
+
+# The helper skips rc version bumps and already-forward-ported fixes.
+# It will also report and skip a version-bump commit when main has already
+# advanced past that version.
+script/release-forward-port --source origin/release/17.0.0 --target main --dry-run
+script/release-forward-port --source origin/release/17.0.0 --target main
 git push   # or open a PR if main is protected
 # 2. Delete the ephemeral branch — the tags are the durable record.
 git push origin --delete release/17.0.0
 ```
 
-> **Caveat — do not blindly cherry-pick the version-bump commit.** If `main` has already advanced past the
-> release version (e.g. to `17.1.0.dev`), cherry-picking the bump-to-`17.0.0` commit will conflict on the
-> version artifacts and would regress `main`'s version. Only forward-port the version bump if `main` has
-> **not** yet been bumped past `17.0.0`; otherwise resolve to keep `main`'s newer version and take only the
-> CHANGELOG changes. Then bump `main` to the next dev version per [`releasing.md`](releasing.md) if it is
-> not already.
+> **Caveat — do not blindly cherry-pick version-bump commits.** The helper always skips
+> `Bump version to ...rc.N` commits. For non-RC version bumps, it compares `main`'s current version to
+> the commit subject and skips with an explicit version-drift message when `main` has already advanced
+> past the release version (e.g. to `17.1.0.dev`) or already has that version. If the skipped final
+> version-bump commit also contains the only CHANGELOG collapse you need on `main`, use the manual
+> fallback: cherry-pick that one commit, resolve version artifacts to keep `main`'s newer version, keep
+> only the intended CHANGELOG changes, and preserve a `(cherry picked from commit <sha>)` footer in the
+> final commit message. Then bump `main` to the next dev version per [`releasing.md`](releasing.md) if it
+> is not already.
 
 See [`releasing.md`](releasing.md) for the next-dev version bump details.
 
