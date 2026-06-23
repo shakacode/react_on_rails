@@ -375,7 +375,16 @@ final batch handoff.
 
 When `merge_authority` is `auto_merge_when_gates_pass`, definition of done for a
 target is merged + closed out (or a true blocker / no-PR with evidence), not
-"stopped at a recommendation." When `merge_authority` is `ask`, surface exactly
+"stopped at a recommendation." This is the single most common way an authorized
+batch is left unfinished: the worktree did the work, satisfied the gate, wrote
+the confidence note, and then handed back a recommendation instead of merging.
+If the gate is met and the confidence note is complete (validated checks passed,
+evidence recorded, no unresolved MUST-FIX threads, and no open `UNKNOWN` facts
+that affect merge safety), **merge — do not re-ask for permission you were
+already given.** A blocker means a named, unmet gate (failed check, unresolved
+MUST-FIX thread, release-phase restriction), not residual caution.
+
+When `merge_authority` is `ask`, surface exactly
 one final merge decision if gates are clean and merge is allowed; if approval is
 declined or not granted by handoff, record `ready-no-merge-authority` and do not
 ask again. When `merge_authority` is `none`, done is a
