@@ -33,6 +33,9 @@ module TrackBenchmarks
     rescue JSON::ParserError => e
       Github.warning("Could not parse #{display_json} (#{e.message}); skipping the summary table")
       []
+    rescue SystemCallError => e
+      Github.warning("Could not read #{display_json} (#{e.class}: #{e.message}); skipping the summary table")
+      []
     end
 
     # The Markdown summary table: display rows joined with the Bencher report by

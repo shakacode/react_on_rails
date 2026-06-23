@@ -268,6 +268,49 @@ RSpec.describe "track_benchmarks" do
         end
       end
 
+      it "treats a missing candidate as inconclusive" do
+        Dir.mktmpdir do |dir|
+          result = nil
+          expect { result = load_candidate(dir) }
+            .to output(/::error::No confirmation candidate/).to_stderr
+
+          expect(result).to eq([nil, ""])
+        end
+      end
+
+      it "treats multiple candidates as inconclusive instead of choosing one arbitrarily" do
+        Dir.mktmpdir do |dir|
+          first = File.join(dir, "first")
+          second = File.join(dir, "second")
+          FileUtils.mkdir_p(first)
+          FileUtils.mkdir_p(second)
+          File.write(
+            File.join(first, RegressionReport::CANDIDATE_FILENAME),
+            JSON.generate(RegressionReport::ALERTS => [])
+          )
+          File.write(
+            File.join(second, RegressionReport::CANDIDATE_FILENAME),
+            JSON.generate(RegressionReport::ALERTS => [{ "benchmark" => "/x: Pro", "measure" => "rps" }])
+          )
+
+          result = nil
+          expect { result = load_candidate(dir) }
+            .to output(/::error::Multiple confirmation candidates/).to_stderr
+
+          expect(result).to eq([nil, ""])
+        end
+      end
+
+      it "keeps the rescue message safe when candidate discovery fails before a path is selected" do
+        allow(Dir).to receive(:glob).and_raise(Errno::EACCES)
+
+        result = nil
+        expect { result = load_candidate("candidate-dir") }
+          .to output(%r{::error::Could not read confirmation candidate candidate-dir/\*\*/}).to_stderr
+
+        expect(result).to eq([nil, ""])
+      end
+
       it "treats missing alerts as inconclusive" do
         Dir.mktmpdir do |dir|
           write_candidate(dir, RegressionReport::SUMMARY => "first run")

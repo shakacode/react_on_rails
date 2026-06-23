@@ -65,7 +65,7 @@ module TrackBenchmarks
     end
 
     def post_pull_request_report(report, report_markdown)
-      pr_event = ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
+      pr_event = ENV.fetch("GITHUB_EVENT_NAME", nil) == "pull_request"
       if report.nil? && pr_event
         # A nil report means Bencher produced no parseable output (operational failure). On
         # a PR, replacing the comment now would delete the previous run's real report and

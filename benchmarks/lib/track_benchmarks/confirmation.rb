@@ -10,10 +10,18 @@ module TrackBenchmarks
     # missing/corrupt so the caller can treat the confirmation as inconclusive (an
     # operational failure) rather than silently clearing it.
     def load_candidate(dir)
-      path = Dir.glob(File.join(dir, "**", RegressionReport::CANDIDATE_FILENAME)).first
-      unless path
+      path = nil
+      candidates = Dir.glob(File.join(dir, "**", RegressionReport::CANDIDATE_FILENAME))
+      case candidates.length
+      when 0
         warn "::error::No confirmation candidate (#{RegressionReport::CANDIDATE_FILENAME}) found under " \
              "#{dir}; treating the confirmation as inconclusive."
+        return [nil, ""]
+      when 1
+        path = candidates.first
+      else
+        warn "::error::Multiple confirmation candidates (#{RegressionReport::CANDIDATE_FILENAME}) found under " \
+             "#{dir}: #{candidates.sort.join(', ')}; treating the confirmation as inconclusive."
         return [nil, ""]
       end
 
@@ -33,7 +41,8 @@ module TrackBenchmarks
 
       [alerts, parsed[RegressionReport::SUMMARY].to_s]
     rescue StandardError => e
-      warn "::error::Could not read confirmation candidate #{path} (#{e.class}: #{e.message}); " \
+      candidate = path || File.join(dir, "**", RegressionReport::CANDIDATE_FILENAME)
+      warn "::error::Could not read confirmation candidate #{candidate} (#{e.class}: #{e.message}); " \
            "treating the confirmation as inconclusive."
       [nil, ""]
     end

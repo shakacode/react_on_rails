@@ -65,7 +65,7 @@ module TrackBenchmarks
           RegressionReport::SUITE_NAME => env.fetch("BENCHMARK_SUITE_GROUP", suite_name),
           RegressionReport::SHARD_LABEL => env.fetch("BENCHMARK_SHARD_LABEL", ""),
           RegressionReport::FIRST_RUN_SUMMARY => first_run_summary,
-          RegressionReport::CONFIRMATION_SUMMARY => Summary.regression_handoff_summary(confirmation_markdown),
+          RegressionReport::CONFIRMATION_SUMMARY => confirmation_markdown,
           RegressionReport::ALERTS => confirmed_alerts,
           RegressionReport::REGRESSED_BENCHMARKS =>
             confirmed_alerts.filter_map { |alert| alert[RegressionReport::ALERT_BENCHMARK] }.uniq

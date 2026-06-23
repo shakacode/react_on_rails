@@ -81,5 +81,26 @@ RSpec.describe TrackBenchmarks::RegressionPayloads do
         )
       end
     end
+
+    it "preserves an empty confirmation summary instead of replacing it with a generic hand-off" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "regression-confirmed.json")
+        alerts = [{ "benchmark" => "/posts: Pro", "measure" => "rps" }]
+
+        expect(
+          described_class.write_confirmed(
+            alerts,
+            "first run",
+            "",
+            "Core",
+            path:,
+            env: {}
+          )
+        ).to be(true)
+
+        payload = JSON.parse(File.read(path))
+        expect(payload.fetch(RegressionReport::CONFIRMATION_SUMMARY)).to eq("")
+      end
+    end
   end
 end

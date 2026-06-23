@@ -28,6 +28,53 @@ RSpec.describe TrackBenchmarks::Summary do
         expect(rows).to eq([])
       end
     end
+
+    it "preserves silent absent-file behavior" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "missing_display.json")
+
+        rows = nil
+        expect { rows = described_class.display_rows(path) }.not_to output.to_stdout
+
+        expect(rows).to eq([])
+      end
+    end
+
+    it "warns and returns no rows when the sidecar disappears after the existence check" do
+      path = "benchmark_display.json"
+      allow(File).to receive(:exist?).with(path).and_return(true)
+      allow(File).to receive(:read).with(path).and_raise(Errno::ENOENT)
+
+      rows = nil
+      expect { rows = described_class.display_rows(path) }
+        .to output(/::warning::Could not read #{Regexp.escape(path)} \(Errno::ENOENT:/).to_stdout
+
+      expect(rows).to eq([])
+    end
+
+    it "warns and returns no rows when the sidecar cannot be read because of permissions" do
+      path = "benchmark_display.json"
+      allow(File).to receive(:exist?).with(path).and_return(true)
+      allow(File).to receive(:read).with(path).and_raise(Errno::EACCES)
+
+      rows = nil
+      expect { rows = described_class.display_rows(path) }
+        .to output(/::warning::Could not read #{Regexp.escape(path)} \(Errno::EACCES:/).to_stdout
+
+      expect(rows).to eq([])
+    end
+
+    it "warns and returns no rows for other sidecar IO errors" do
+      path = "benchmark_display.json"
+      allow(File).to receive(:exist?).with(path).and_return(true)
+      allow(File).to receive(:read).with(path).and_raise(Errno::EIO)
+
+      rows = nil
+      expect { rows = described_class.display_rows(path) }
+        .to output(/::warning::Could not read #{Regexp.escape(path)} \(Errno::EIO:/).to_stdout
+
+      expect(rows).to eq([])
+    end
   end
 
   describe ".regressed_alert_pairs" do
