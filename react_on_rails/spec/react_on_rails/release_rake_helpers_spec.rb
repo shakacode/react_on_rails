@@ -590,6 +590,27 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#fetch_rubygems_versions" do
+    it "queries RubyGems with bounded timeouts" do
+      response = instance_double(Net::HTTPSuccess, body: '[{"number":"17.0.0"}]')
+      http = instance_double(Net::HTTP)
+
+      allow(Net::HTTP).to receive(:start).and_yield(http)
+      allow(http).to receive(:get).and_return(response)
+
+      expect(fetch_rubygems_versions("react_on_rails", api_url: "https://rubygems.example/versions"))
+        .to eq([response.body, response])
+      expect(Net::HTTP).to have_received(:start).with(
+        "rubygems.example",
+        443,
+        use_ssl: true,
+        open_timeout: RUBYGEMS_VERSIONS_OPEN_TIMEOUT_SECONDS,
+        read_timeout: RUBYGEMS_VERSIONS_READ_TIMEOUT_SECONDS
+      )
+      expect(http).to have_received(:get).with("/versions/react_on_rails.json")
+    end
+  end
+
   describe "#publish_gem_with_retry" do
     it "passes OTP via environment instead of shell interpolation" do
       expect(self).to receive(:sh_args_in_dir_for_release).with(

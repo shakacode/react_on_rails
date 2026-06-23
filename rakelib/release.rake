@@ -25,6 +25,8 @@ class UnhandledReleaseFinalizationMetadataPathError < StandardError; end
 
 NPM_REGISTRY_URL = "https://registry.npmjs.org/"
 RUBYGEMS_VERSIONS_API_URL = "https://rubygems.org/api/v1/versions"
+RUBYGEMS_VERSIONS_OPEN_TIMEOUT_SECONDS = 10
+RUBYGEMS_VERSIONS_READ_TIMEOUT_SECONDS = 15
 NPM_PUBLISH_VERIFY_ATTEMPTS = 6
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
 NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
@@ -35,6 +37,9 @@ SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
 SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 50 * 60
 # Keep in sync with every package.json, Gemfile.lock, and version file that the
 # release task rewrites while promoting an RC to a final release.
+# CHANGELOG.md is intentionally excluded. main_ci_walkback_commit? classifies
+# changelog-only release commits through commit_non_runtime_only?; adding
+# Markdown here would need a content handler.
 RELEASE_FINALIZATION_METADATA_PATHS = [
   "Gemfile.lock",
   "package.json",
@@ -859,6 +864,8 @@ def npm_publish_base_args(actual_gem_version:, actual_npm_version:, current_bran
 
   npm_base_args << "--no-git-checks" if is_prerelease || is_release_branch
   # `--publish-branch` is pnpm-specific; `publish_npm_with_retry` shells out to `pnpm publish`.
+  # --no-git-checks disables pnpm's branch guard today, but keep --publish-branch
+  # on final release-branch publishes so logs document the intended branch contract.
   npm_base_args += ["--publish-branch", current_branch] if !is_prerelease && is_release_branch
 
   npm_base_args
@@ -1800,6 +1807,7 @@ end
 def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_override:, fetch_tags: true,
                                      allow_existing_target_tag: false,
                                      release_branch_final_promotion: false,
+                                     # Final promotions need the same scoped tag-order check as RC cuts.
                                      release_branch_tag_scope: release_branch_final_promotion)
   tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags:)
   tagged_version_order_candidates = if release_branch_tag_scope
@@ -1842,9 +1850,10 @@ def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_
     end
   end
 
+  # Keep stable releases global even when prereleases are scoped by release base;
+  # a backport RC behind a newer stable line must use the explicit override path.
   stable_versions = tagged_versions.reject { |version| release_prerelease_version?(version) }
   if release_branch_final_promotion
-    target_version = Gem::Version.new(target_gem_version)
     stable_versions = stable_versions.select { |version| Gem::Version.new(version) < target_version }
   end
   latest_stable_version = stable_versions.max_by { |version| Gem::Version.new(version) }
@@ -2079,7 +2088,15 @@ end
 
 def fetch_rubygems_versions(gem_name, api_url: RUBYGEMS_VERSIONS_API_URL)
   uri = URI("#{api_url}/#{URI.encode_www_form_component(gem_name)}.json")
-  response = Net::HTTP.get_response(uri)
+  response = Net::HTTP.start(
+    uri.hostname,
+    uri.port,
+    use_ssl: uri.scheme == "https",
+    open_timeout: RUBYGEMS_VERSIONS_OPEN_TIMEOUT_SECONDS,
+    read_timeout: RUBYGEMS_VERSIONS_READ_TIMEOUT_SECONDS
+  ) do |http|
+    http.get(uri.request_uri)
+  end
   [response.body, response]
 end
 
