@@ -4891,7 +4891,7 @@ For a ~3 MB props payload on Ruby 3.3:
 | 2.7.2 (bundled)   | 21.5 ms            | Baseline        |
 | 2.19.8 (upgraded) | 10.2 ms            | **2.1x faster** |
 
-The improvement scales with payload size — approximately **5-8 ms saved per MB** of props data.
+The improvement scales with payload size — approximately **3-4 ms saved per MB** of props data.
 
 ### When This Matters
 
