@@ -300,10 +300,10 @@ gem 'json', '>= 2.8'
 
 For a ~3 MB props payload on Ruby 3.3:
 
-| JSON Gem Version | Serialization Time | Improvement |
-|------------------|-------------------|-------------|
-| 2.7.2 (bundled) | 21.5 ms | Baseline |
-| 2.19.8 (upgraded) | 10.2 ms | **2.1x faster** |
+| JSON Gem Version  | Serialization Time | Improvement     |
+| ----------------- | ------------------ | --------------- |
+| 2.7.2 (bundled)   | 21.5 ms            | Baseline        |
+| 2.19.8 (upgraded) | 10.2 ms            | **2.1x faster** |
 
 The improvement scales with payload size — approximately **5-8 ms saved per MB** of props data.
 
@@ -313,7 +313,7 @@ This optimization is most impactful for:
 
 - **Large component trees** with many props
 - **Data-heavy pages** (dashboards, tables, lists)
-- **React Server Components** with large server-rendered payloads
+- **Traditional SSR** where props are serialized before rendering
 
 For typical pages with small props (under 100 KB), the difference is negligible (< 1 ms).
 
