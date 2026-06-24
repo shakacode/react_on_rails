@@ -108,6 +108,51 @@ RSpec.describe "script/release-forward-port" do
     expect(stderr).not_to include("script/release-forward-port:")
   end
 
+  it "rejects an extra positional arg when --target is already set" do
+    with_release_repo do |repo|
+      add_rc_bump_and_fix(repo)
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "typo", "--dry-run")
+
+      expect(status.exitstatus).to eq(2)
+      expect(stderr).to include("ERROR: too many arguments: typo")
+      expect(stderr).to include("Usage: script/release-forward-port")
+    end
+  end
+
+  it "uses a leftover positional as the target when only --source is set" do
+    with_release_repo do |repo|
+      add_rc_bump_and_fix(repo)
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("target: main")
+      expect(stdout).to include("PICK")
+    end
+  end
+
+  it "skips commits already applied without an -x footer via git cherry patch-equivalence" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      # Apply the fix onto main WITHOUT -x so there is no
+      # "(cherry picked from commit ...)" footer; only git cherry can detect it.
+      git(repo, "cherry-pick", fix_sha)
+      latest_body = git(repo, "log", "-1", "--format=%B")
+      expect(latest_body).not_to include("cherry picked from commit")
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("patch already exists on main according to git cherry")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+    end
+  end
+
   it "cherry-picks fixes with -x while excluding rc version bump commits" do
     with_release_repo do |repo|
       _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)

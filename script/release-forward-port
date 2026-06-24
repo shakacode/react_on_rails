@@ -7,6 +7,9 @@ require "open3"
 # rubocop:disable Metrics/ClassLength
 class ReleaseForwardPort
   VERSION_FILE = "react_on_rails/lib/react_on_rails/version.rb"
+  # A trailing number after the `rc` marker is required (project convention is
+  # always `X.Y.Z.rc.N`). A versionless `1.0.0.rc` is intentionally NOT matched
+  # here; it falls through to the version-drift path in version_bump_skip_reason.
   RC_VERSION_BUMP_SUBJECT = /
     \Abump\s+version\s+to\s+v?\d+\.\d+\.\d+(?:[.-]rc[.-]?\d+|\.rc\.\d+)\b
   /ix
@@ -27,6 +30,7 @@ class ReleaseForwardPort
 
   def initialize(argv)
     @argv = argv.dup
+    @explicit_options = { source: false, target: false }
     @options = {
       dry_run: false,
       target: "main"
@@ -73,7 +77,13 @@ class ReleaseForwardPort
   def parse_options!
     argv = @argv.dup
     @parser.parse!(argv)
-    @options[:source] ||= argv.shift
+
+    # Only consume positional source/target when the corresponding flag was not
+    # supplied. A leftover positional after an explicit flag is an error, not a
+    # silent override of the flagged value.
+    @options[:source] = argv.shift unless @explicit_options[:source]
+    raise UsageError, "too many arguments: #{argv.join(' ')}" if @explicit_options[:target] && argv.any?
+
     @options[:target] = argv.shift if argv.any?
 
     raise UsageError, "source ref is required" if @options[:source].nil? || @options[:source].empty?
@@ -93,9 +103,11 @@ class ReleaseForwardPort
 
       parser.on("--source REF", "Release branch or ref to forward-port from") do |source|
         @options[:source] = source
+        @explicit_options[:source] = true
       end
       parser.on("--target REF", "Target local branch to forward-port onto (default: main)") do |target|
         @options[:target] = target
+        @explicit_options[:target] = true
       end
       parser.on("--dry-run", "Print the plan without checking out or cherry-picking") do
         @options[:dry_run] = true
@@ -233,7 +245,11 @@ class ReleaseForwardPort
       "beta" => 3,
       "pre" => 4,
       "rc" => 5
-    }.fetch(label, -1)
+      # Unknown labels rank as release-candidate (5) rather than below `dev`, so a
+      # novel marker like `1.0.0.snapshot` is treated as release-like instead of
+      # silently ranking below every known prerelease. Expand the table if the
+      # project adopts new prerelease markers.
+    }.fetch(label, 5)
   end
 
   def print_plan(source, target, target_version, plan)
@@ -294,20 +310,32 @@ class ReleaseForwardPort
       return 0
     end
 
-    picks.each do |entry|
+    picks.each_with_index do |entry, index|
       puts "\nCherry-picking #{entry.short_sha} #{entry.subject}"
       stdout, stderr, status = capture_git("cherry-pick", "-x", entry.sha)
       puts stdout unless stdout.empty?
       warn stderr unless stderr.empty?
       next if status.success?
 
-      warn "Cherry-pick failed for #{entry.sha}."
-      warn "Resolve the conflict and run git cherry-pick --continue, or run git cherry-pick --abort."
+      warn_cherry_pick_conflict(entry, remaining: picks.length - index - 1)
       return status.exitstatus || 1
     end
 
     puts "\nForward-port complete."
     0
+  end
+
+  def warn_cherry_pick_conflict(entry, remaining:)
+    warn "Cherry-pick failed for #{entry.sha}."
+    warn "Resolve the conflict and run git cherry-pick --continue to finish THIS commit."
+    if remaining.positive?
+      warn "Note: #{remaining} later eligible commit#{'s' unless remaining == 1} in this plan " \
+           "#{remaining == 1 ? 'is' : 'are'} not queued by --continue. Rerun " \
+           "script/release-forward-port after continuing to apply the rest " \
+           "(it is idempotent and skips commits already applied)."
+    end
+    warn "If you git cherry-pick --abort, earlier picks in this run are rolled back; " \
+         "rerun script/release-forward-port from the start after fixing the conflict."
   end
 
   def verify_ref!(ref, label:)

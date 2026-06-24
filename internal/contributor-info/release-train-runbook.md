@@ -207,12 +207,21 @@ git push   # or open a PR if main is protected / the fix needs review on main
   patches without the footer.
 - `-x` appends `(cherry picked from commit <sha>)` so the forward-port is auditable and future
   helper runs can see the relationship.
+- Known limitation: the "already forward-ported" skip is history-based. If a fix was previously
+  cherry-picked onto `main` (leaving a `-x` footer) and then **reverted**, the helper still treats it
+  as present and skips it. If you reverted an eligible fix on `main` on purpose, re-pick it manually
+  (`git cherry-pick -x <fix-sha>`); the patch-equivalence (`git cherry`) path already self-corrects
+  because a reverted change is no longer patch-equivalent.
 - **Do not `git merge release/X.Y.Z` into `main`.** That drags the RC `Bump version to …rc.N` commits
   and the release-branch CHANGELOG layout onto `main`, which is exactly what we want to keep off `main`.
   Let the helper pick only eligible commits, or manually cherry-pick only the specific fix commit(s).
-- Manual fallback: if the helper reports a real conflict on an eligible fix, resolve that specific
-  cherry-pick with `git cherry-pick --continue` or abort and run `git cherry-pick -x <fix-sha>` for the
-  intended fix commit(s). Do not manually pick `Bump version to ...rc.N` commits.
+- Manual fallback: if the helper reports a real conflict on an eligible fix, prefer resolving that
+  specific cherry-pick in place with `git cherry-pick --continue` so the earlier successful picks are
+  kept. If you instead run `git cherry-pick --abort`, that rolls back **all** of the helper's earlier
+  picks in this run, so rerunning only `git cherry-pick -x <fix-sha>` would leave the forward-port
+  incomplete — after fixing the conflict, rerun `script/release-forward-port` from the start to replay
+  the full plan (it is idempotent and skips commits already applied). Do not manually pick
+  `Bump version to ...rc.N` commits.
 - If a fix is _also_ wanted for ongoing `main` development and is low-risk, it is acceptable to author
   it on `main` first and cherry-pick it onto `release/X.Y.Z` (step 2 in reverse). Pick one direction
   per fix and record which in the PR so the other branch is not missed.
