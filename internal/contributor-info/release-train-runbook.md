@@ -217,11 +217,10 @@ git push   # or open a PR if main is protected / the fix needs review on main
   Let the helper pick only eligible commits, or manually cherry-pick only the specific fix commit(s).
 - Manual fallback: if the helper reports a real conflict on an eligible fix, prefer resolving that
   specific cherry-pick in place with `git cherry-pick --continue` so the earlier successful picks are
-  kept. If you instead run `git cherry-pick --abort`, that rolls back **all** of the helper's earlier
-  picks in this run, so rerunning only `git cherry-pick -x <fix-sha>` would leave the forward-port
-  incomplete — after fixing the conflict, rerun `script/release-forward-port` from the start to replay
-  the full plan (it is idempotent and skips commits already applied). Do not manually pick
-  `Bump version to ...rc.N` commits.
+  kept. If you instead run `git cherry-pick --abort`, only the current conflicting commit is abandoned;
+  earlier picks in this run are already committed and safe. After fixing the conflict, rerun
+  `script/release-forward-port` from the start: it is idempotent and skips commits already applied,
+  then continues from the still-missing fix. Do not manually pick `Bump version to ...rc.N` commits.
 - If a fix is _also_ wanted for ongoing `main` development and is low-risk, it is acceptable to author
   it on `main` first and cherry-pick it onto `release/X.Y.Z` (step 2 in reverse). Pick one direction
   per fix and record which in the PR so the other branch is not missed.

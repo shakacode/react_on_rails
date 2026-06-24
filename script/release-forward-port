@@ -49,9 +49,9 @@ class ReleaseForwardPort
     ensure_local_target_branch!(target) unless @options[:dry_run]
 
     commits = source_only_commits(source, target)
-    patch_equivalent_commits = patch_equivalent_commits(source, target)
+    equivalent_commits = patch_equivalent_commits(source, target)
     target_version = version_at(target)
-    plan = build_plan(commits, target, target_version, patch_equivalent_commits)
+    plan = build_plan(commits, target, target_version, equivalent_commits)
 
     print_plan(source, target, target_version, plan)
 
@@ -334,8 +334,10 @@ class ReleaseForwardPort
            "script/release-forward-port after continuing to apply the rest " \
            "(it is idempotent and skips commits already applied)."
     end
-    warn "If you git cherry-pick --abort, earlier picks in this run are rolled back; " \
-         "rerun script/release-forward-port from the start after fixing the conflict."
+    warn "If you run git cherry-pick --abort, only the current conflicting commit is abandoned; " \
+         "earlier picks from this run are already committed and safe. Rerun " \
+         "script/release-forward-port after fixing the conflict " \
+         "(it is idempotent and skips commits already applied)."
   end
 
   def verify_ref!(ref, label:)

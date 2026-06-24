@@ -171,6 +171,31 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "keeps earlier picks when a later cherry-pick is aborted" do
+    with_release_repo do |repo|
+      add_rc_bump_and_fix(repo)
+      git(repo, "checkout", "release/1.0.1")
+      write_file(repo, "conflict.txt", "release branch\n")
+      commit_all(repo, "Fix release conflict")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "conflict.txt", "main branch\n")
+      commit_all(repo, "Change conflict on main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).not_to be_success
+      expect(stdout).to include("Cherry-picking")
+      expect(stderr).to include("only the current conflicting commit is abandoned")
+      expect(git(repo, "log", "--format=%s", "main")).to include("Fix release regression")
+
+      git(repo, "cherry-pick", "--abort")
+
+      expect(git(repo, "log", "--format=%s", "main")).to include("Fix release regression")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+    end
+  end
+
   it "is idempotent when release commits were already forward-ported with -x" do
     with_release_repo do |repo|
       add_rc_bump_and_fix(repo)
