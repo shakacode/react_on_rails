@@ -211,7 +211,9 @@ git push   # or open a PR if main is protected / the fix needs review on main
   cherry-picked onto `main` (leaving a `-x` footer) and then **reverted**, the helper still treats it
   as present and skips it. If you reverted an eligible fix on `main` on purpose, re-pick it manually
   (`git cherry-pick -x <fix-sha>`); the patch-equivalence (`git cherry`) path already self-corrects
-  because a reverted change is no longer patch-equivalent.
+  because a reverted change is no longer patch-equivalent. The same history search can also
+  false-positive if a later target commit quotes the exact `(cherry picked from commit <sha>)` footer
+  in its message body.
 - **Do not `git merge release/X.Y.Z` into `main`.** That drags the RC `Bump version to …rc.N` commits
   and the release-branch CHANGELOG layout onto `main`, which is exactly what we want to keep off `main`.
   Let the helper pick only eligible commits, or manually cherry-pick only the specific fix commit(s).
@@ -302,16 +304,6 @@ git push origin --delete release/17.0.0
 > is not already.
 
 See [`releasing.md`](releasing.md) for the next-dev version bump details.
-
-> **Forward-port automation is a deliberate follow-up, not part of the promotion path.** The close-out
-> forward-port above (CHANGELOG collapse back to `main` + next-dev bump) is intentionally still manual
-> `git` because its safe shape is conditional — whether to take the version-bump commit at all depends on
-> how far `main` has drifted (see the caveat above), which is a judgment call a helper would have to
-> encode carefully. It is **not** a release blocker: unlike the stable-promotion guard (now resolved),
-> nothing aborts here. A `rake`/`script` helper that cherry-picks `-x` the fix/CHANGELOG commits while
-> skipping the rc version-bump commits can be added later without touching the promotion path; until then
-> follow the steps above. Track it as its own change rather than bundling speculative automation into the
-> release-critical `release.rake` promotion fix.
 
 Mark the release tracker released per [`rc-testing-plan.md`](rc-testing-plan.md), and clear the
 published phase for this line (the entry is removed when the branch is deleted) so agents stop applying

@@ -49,9 +49,9 @@ class ReleaseForwardPort
     ensure_local_target_branch!(target) unless @options[:dry_run]
 
     commits = source_only_commits(source, target)
-    equivalent_commits = patch_equivalent_commits(source, target)
+    equiv_commits = patch_equivalent_commits(source, target)
     target_version = version_at(target)
-    plan = build_plan(commits, target, target_version, equivalent_commits)
+    plan = build_plan(commits, target, target_version, equiv_commits)
 
     print_plan(source, target, target_version, plan)
 
@@ -182,6 +182,8 @@ class ReleaseForwardPort
 
   def already_forward_ported_with_x?(sha, target)
     footer = "#{CHERRY_PICK_FOOTER_PREFIX}#{sha})"
+    # This history search can false-positive if a later target commit quotes the
+    # footer verbatim. The runbook documents that boundary for release operators.
     !git("log", target, "--fixed-strings", "--grep=#{footer}", "--format=%H", "--max-count=1").strip.empty?
   end
 
@@ -245,10 +247,10 @@ class ReleaseForwardPort
       "beta" => 3,
       "pre" => 4,
       "rc" => 5
-      # Unknown labels rank as release-candidate (5) rather than below `dev`, so a
-      # novel marker like `1.0.0.snapshot` is treated as release-like instead of
-      # silently ranking below every known prerelease. Expand the table if the
-      # project adopts new prerelease markers.
+      # Unknown labels tie with `rc` instead of ranking below `dev`. That treats
+      # a novel marker like `1.0.0.snapshot` as a late-stage prerelease for
+      # version-drift detection. Expand the table if the project adopts new
+      # prerelease markers.
     }.fetch(label, 5)
   end
 
@@ -346,6 +348,8 @@ class ReleaseForwardPort
     raise GitError, "#{label} ref #{ref.inspect} is not a commit: #{e.message}"
   end
 
+  # The repo requires Ruby >= 3.3, so anonymous forwarding is valid and keeps
+  # these small git wrappers aligned with RuboCop's preferred style.
   def git_lines(*)
     output = git(*)
     output.lines.map(&:strip).reject(&:empty?)
