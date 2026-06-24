@@ -3,6 +3,7 @@
 
 require "optparse"
 require "open3"
+require "tempfile"
 
 # rubocop:disable Metrics/ClassLength
 class ReleaseForwardPort
@@ -98,7 +99,7 @@ class ReleaseForwardPort
 
         Forward-port commits that are on a release branch but not on the target branch.
         The helper cherry-picks with -x, skips commits already forward-ported with -x
-        evidence or equivalent patches, and excludes RC version bump commits.
+        evidence or patches present in the target tree, and excludes RC version bump commits.
       BANNER
 
       parser.on("--source REF", "Release branch or ref to forward-port from") do |source|
@@ -126,7 +127,7 @@ class ReleaseForwardPort
   def patch_equivalent_commits(source, target)
     git_lines("cherry", target, source).each_with_object({}) do |line, commits|
       marker, sha = line.split(/\s+/, 2)
-      commits[sha] = true if marker == "-"
+      commits[sha] = true if marker == "-" && patch_present_on_target_tree?(sha, target)
     end
   end
 
@@ -154,7 +155,7 @@ class ReleaseForwardPort
       return "already forward-ported to #{target} via cherry-pick -x evidence"
     end
 
-    return "patch already exists on #{target} according to git cherry" if patch_equivalent_commits[sha]
+    return "patch already exists on #{target} according to the current target tree" if patch_equivalent_commits[sha]
 
     version_bump_skip_reason(subject, target, target_version)
   end
@@ -184,7 +185,18 @@ class ReleaseForwardPort
     footer = "#{CHERRY_PICK_FOOTER_PREFIX}#{sha})"
     # This history search can false-positive if a later target commit quotes the
     # footer verbatim. The runbook documents that boundary for release operators.
-    !git("log", target, "--fixed-strings", "--grep=#{footer}", "--format=%H", "--max-count=1").strip.empty?
+    !git("log", target, "--fixed-strings", "--grep", footer, "--format=%H", "--max-count=1").strip.empty?
+  end
+
+  def patch_present_on_target_tree?(sha, target)
+    patch = git("show", "--format=", "--binary", "--full-index", "--find-renames", sha)
+    return false if patch.strip.empty?
+
+    with_temporary_index(target) do |env|
+      _stdout, _stderr, status =
+        capture_git(*%w[apply --cached --reverse --check], env:, stdin_data: patch)
+      status.success?
+    end
   end
 
   def version_at(ref)
@@ -293,9 +305,10 @@ class ReleaseForwardPort
 
   def ensure_local_target_branch!(target)
     run_git("show-ref", "--verify", "--quiet", "refs/heads/#{target}") do |_stdout, stderr, status|
-      next if status.success?
-
-      raise GitError, "normal mode target must be a local branch (got #{target.inspect}): #{stderr.strip}"
+      unless status.success?
+        raise GitError,
+              "normal mode target must be a local branch (got #{target.inspect}): #{stderr.strip}"
+      end
     end
   end
 
@@ -348,8 +361,25 @@ class ReleaseForwardPort
     raise GitError, "#{label} ref #{ref.inspect} is not a commit: #{e.message}"
   end
 
+  def with_temporary_index(target)
+    Tempfile.create("release-forward-port-index") do |file|
+      index_path = file.path
+      file.close
+      File.delete(index_path)
+      env = { "GIT_INDEX_FILE" => index_path }
+      stdout, stderr, status = capture_git("read-tree", target, env:)
+      raise GitError, git_error(["read-tree", target], stdout, stderr, status) unless status.success?
+
+      yield env
+    ensure
+      File.delete(index_path) if index_path && File.exist?(index_path)
+    end
+  end
+
   # The repo requires Ruby >= 3.3, so anonymous forwarding is valid and keeps
-  # these small git wrappers aligned with RuboCop's preferred style.
+  # these small git wrappers aligned with RuboCop's preferred style. Both git!
+  # and git raise on failure; capture_git/run_git are the non-raising escape
+  # hatches.
   def git_lines(*)
     output = git(*)
     output.lines.map(&:strip).reject(&:empty?)
@@ -366,8 +396,8 @@ class ReleaseForwardPort
     git!(*)
   end
 
-  def capture_git(*)
-    Open3.capture3("git", *)
+  def capture_git(*, env: {}, stdin_data: nil)
+    Open3.capture3(env, "git", *, stdin_data:)
   end
 
   def run_git(*)

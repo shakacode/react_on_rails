@@ -133,12 +133,13 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
-  it "skips commits already applied without an -x footer via git cherry patch-equivalence" do
+  it "skips commits already applied without an -x footer when the patch is still in the target tree" do
     with_release_repo do |repo|
       _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
 
       # Apply the fix onto main WITHOUT -x so there is no
-      # "(cherry picked from commit ...)" footer; only git cherry can detect it.
+      # "(cherry picked from commit ...)" footer; the helper must confirm the
+      # patch is still present in the current target tree before skipping it.
       git(repo, "cherry-pick", fix_sha)
       latest_body = git(repo, "log", "-1", "--format=%B")
       expect(latest_body).not_to include("cherry picked from commit")
@@ -147,9 +148,31 @@ RSpec.describe "script/release-forward-port" do
       stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
 
       expect(status).to be_success, stderr
-      expect(stdout).to include("patch already exists on main according to git cherry")
+      expect(stdout).to include("patch already exists on main according to the current target tree")
       expect(stdout).to include("Nothing to cherry-pick")
       expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+    end
+  end
+
+  it "does not skip a no-footer cherry-pick that was later reverted" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      git(repo, "cherry-pick", fix_sha)
+      git(repo, "revert", "--no-edit", "HEAD")
+      reverted_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\n")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(stdout).not_to include("patch already exists on main according to the current target tree")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+      expect(git(repo, "rev-list", "--count", "main").strip.to_i).to eq(reverted_count.to_i + 1)
+
+      latest_commit_body = git(repo, "log", "-1", "--format=%B")
+      expect(latest_commit_body).to include("(cherry picked from commit #{fix_sha})")
     end
   end
 
