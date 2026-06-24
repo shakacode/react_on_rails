@@ -123,6 +123,7 @@ minimum_pro_non_rsc_ignored_tests = %w[
   serverRenderReactComponent
   SuspenseHydration
   deferredRouteSsr
+  boundedCacheProvider[.]client[.]test
   imperativeRefetch[.]client[.]test
   inlineRefreshButton[.]client[.]test
   wrapServerComponentRenderer[.]client[.]test
