@@ -37,6 +37,24 @@ def find_rails_root
   nil
 end
 
+# Build a subprocess env that forces a UTF-8 locale.
+#
+# Under a C/POSIX locale (no LANG/LC_ALL) the parent's Encoding.default_external is US-ASCII, and a
+# spawned `bundle exec` / shakapacker child inherits it, then dies parsing any Gemfile that contains
+# non-ASCII bytes (e.g. react_on_rails_pro/Gemfile.loader) with "invalid byte sequence in US-ASCII".
+# `-EUTF-8` pins the child Ruby's external/internal encodings regardless of locale; LANG/LC_ALL are
+# set as a belt-and-suspenders for tools that read the locale directly. This is the subprocess-boundary
+# companion to the UTF-8-safe File.read calls in this script. `extra` keys override/extend the base env.
+def utf8_subprocess_env(extra = {})
+  rubyopt = ENV.fetch("RUBYOPT", "")
+  rubyopt = "#{rubyopt} -EUTF-8".strip unless rubyopt.include?("-EUTF-8")
+  {
+    "LANG" => ENV.fetch("LANG", "C.UTF-8"),
+    "LC_ALL" => ENV.fetch("LC_ALL", "C.UTF-8"),
+    "RUBYOPT" => rubyopt
+  }.merge(extra)
+end
+
 # Detect which package manager to use based on package.json's packageManager field,
 # falling back to checking system availability
 def detect_package_manager(package_json)
@@ -123,11 +141,11 @@ def generate_packs_if_needed
   puts "📦 Generating React on Rails packs..."
 
   Dir.chdir(rails_root) do
-    # Skip validation during precompile hook execution
-    ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
-
-    # Run pack generation
-    system("bundle", "exec", "rails", "react_on_rails:generate_packs", exception: true)
+    # Skip validation during precompile hook execution.
+    # Force a UTF-8 locale for the child so `bundle exec` can parse Gemfiles with non-ASCII bytes
+    # under a C/POSIX locale (see utf8_subprocess_env).
+    system(utf8_subprocess_env("REACT_ON_RAILS_SKIP_VALIDATION" => "true"),
+           "bundle", "exec", "rails", "react_on_rails:generate_packs", exception: true)
     puts "✅ Pack generation completed successfully"
   end
 rescue Errno::ENOENT => e
@@ -222,13 +240,18 @@ def generate_rsc_manifest_client_references_if_needed
 
   puts "🔎 Generating RSC manifest client references..."
 
-  env = {
+  # Force a UTF-8 locale so the shakapacker child (which loads the Gemfile via bundler/setup) does
+  # not crash under a C/POSIX locale on Gemfiles with non-ASCII bytes (see utf8_subprocess_env).
+  env = utf8_subprocess_env(
+    # Set explicitly (rather than relying on the parent ENV that generate_packs_if_needed used to
+    # mutate) so this discovery build still skips React on Rails config validation.
+    "REACT_ON_RAILS_SKIP_VALIDATION" => "true",
     "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => "true",
     "RSC_REFERENCE_DISCOVERY_BUILD" => "true",
     "RSC_BUNDLE_ONLY" => "true",
     "CLIENT_BUNDLE_ONLY" => nil,
     "SERVER_BUNDLE_ONLY" => nil
-  }
+  )
 
   Dir.chdir(rails_root) do
     system(env, shakapacker_bin, exception: true)
@@ -261,13 +284,11 @@ def generate_locales_if_needed
   puts "🌐 Generating i18n locale files..."
 
   Dir.chdir(rails_root) do
-    # Run locale generation (idempotent - skips if up-to-date)
-    # Pass env to subprocess only, not globally
-    system(
-      { "REACT_ON_RAILS_SKIP_VALIDATION" => "true" },
-      "bundle", "exec", "rake", "react_on_rails:locale",
-      exception: true
-    )
+    # Run locale generation (idempotent - skips if up-to-date). Pass env to subprocess only, not
+    # globally. Force a UTF-8 locale so `bundle exec` can parse Gemfiles with non-ASCII bytes under
+    # a C/POSIX locale (see utf8_subprocess_env).
+    system(utf8_subprocess_env("REACT_ON_RAILS_SKIP_VALIDATION" => "true"),
+           "bundle", "exec", "rake", "react_on_rails:locale", exception: true)
     puts "✅ Locale generation completed successfully"
   end
 rescue StandardError => e

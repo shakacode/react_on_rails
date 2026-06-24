@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** **Precompile hook no longer crashes under a non-UTF-8 (C/POSIX) locale**: The shared Shakapacker precompile hook now forces a UTF-8 locale on every `bundle exec` / shakapacker subprocess it spawns — pack generation, the i18n locale generation added in [PR 4128](https://github.com/shakacode/react_on_rails/pull/4128), and the RSC client-reference discovery build. Without `LANG`/`LC_ALL` set, those children inherited a US-ASCII default external encoding and died parsing Gemfiles containing non-ASCII bytes (e.g. `react_on_rails_pro/Gemfile.loader`: `invalid byte sequence in US-ASCII`), aborting the entire precompile. Extends the UTF-8 hardening from [PR 3949](https://github.com/shakacode/react_on_rails/pull/3949) from the hook's own file reads to the subprocess boundary. [PR 4169](https://github.com/shakacode/react_on_rails/pull/4169) by [justin808](https://github.com/justin808).
+
 ### [17.0.0.rc.6] - 2026-06-21
 
 #### Added
