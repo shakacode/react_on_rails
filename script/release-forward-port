@@ -3,7 +3,7 @@
 
 require "optparse"
 require "open3"
-require "tempfile"
+require "tmpdir"
 
 # rubocop:disable Metrics/ClassLength
 class ReleaseForwardPort
@@ -50,7 +50,7 @@ class ReleaseForwardPort
     ensure_local_target_branch!(target) unless @options[:dry_run]
 
     commits = source_only_commits(source, target)
-    equiv_commits = patch_equivalent_commits(source, target)
+    equiv_commits = patch_equivalent_candidates(source, target)
     target_version = version_at(target)
     plan = build_plan(commits, target, target_version, equiv_commits)
 
@@ -124,10 +124,10 @@ class ReleaseForwardPort
     git_lines("rev-list", "--reverse", "#{target}..#{source}")
   end
 
-  def patch_equivalent_commits(source, target)
+  def patch_equivalent_candidates(source, target)
     git_lines("cherry", target, source).each_with_object({}) do |line, commits|
       marker, sha = line.split(/\s+/, 2)
-      commits[sha] = true if marker == "-" && patch_present_on_target_tree?(sha, target)
+      commits[sha] = true if marker == "-"
     end
   end
 
@@ -155,7 +155,9 @@ class ReleaseForwardPort
       return "already forward-ported to #{target} via cherry-pick -x evidence"
     end
 
-    return "patch already exists on #{target} according to the current target tree" if patch_equivalent_commits[sha]
+    if patch_equivalent_commits[sha] && patch_present_on_target_tree?(sha, target)
+      return "patch already exists on #{target} according to the current target tree"
+    end
 
     version_bump_skip_reason(subject, target, target_version)
   end
@@ -362,17 +364,13 @@ class ReleaseForwardPort
   end
 
   def with_temporary_index(target)
-    Tempfile.create("release-forward-port-index") do |file|
-      index_path = file.path
-      file.close
-      File.delete(index_path)
+    Dir.mktmpdir("release-forward-port-index") do |dir|
+      index_path = File.join(dir, "index")
       env = { "GIT_INDEX_FILE" => index_path }
       stdout, stderr, status = capture_git("read-tree", target, env:)
       raise GitError, git_error(["read-tree", target], stdout, stderr, status) unless status.success?
 
       yield env
-    ensure
-      File.delete(index_path) if index_path && File.exist?(index_path)
     end
   end
 
