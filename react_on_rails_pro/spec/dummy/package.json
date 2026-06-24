@@ -56,7 +56,7 @@
     "react-intl": "^10",
     "react-on-rails-pro": "workspace:*",
     "react-on-rails-pro-node-renderer": "workspace:*",
-    "react-on-rails-rsc": "19.2.0-rc.3",
+    "react-on-rails-rsc": "19.2.0-rc.4",
     "react-proptypes": "^1.0.0",
     "react-redux": "^9.2.0",
     "react-refresh": "^0.11.0",

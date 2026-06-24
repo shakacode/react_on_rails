@@ -129,7 +129,7 @@
       "These force patched versions of transitive dev dependencies. Remove when upstream packages update.",
       "ajv overrides were intentionally excluded: ajv v8 breaks webpack's schema-utils/ajv-keywords.",
       "The 2 moderate ajv alerts (ReDoS in $data option) are tolerable — ajv only validates our own config files.",
-      "react_on_rails>react(-dom) scopes React 19.2 to the OSS dummy app (for the <Activity> demo, #3883). react_on_rails_pro_dummy>react(-dom)/react-on-rails-rsc scopes the Pro/RSC dummy to the coordinated React 19.2.7 + react-on-rails-rsc 19.2.0-rc.3 pair so CI soak-tests the RSC path on React 19.2 (#3865; gate landed in #4026). The workspace-wide pin stays at ~19.0.4 / react-on-rails-rsc 19.0.5 — the published/default pin for 17.0.0 — until #3865 promotes 19.2 to the default."
+      "react_on_rails>react(-dom) scopes React 19.2 to the OSS dummy app (for the <Activity> demo, #3883). react_on_rails_pro_dummy>react(-dom)/react-on-rails-rsc scopes the Pro/RSC dummy to the coordinated React 19.2.7 + react-on-rails-rsc 19.2.0-rc.4 pair so CI soak-tests the RSC path on React 19.2 (#3865; gate landed in #4026). The workspace-wide pin stays at ~19.0.4 / react-on-rails-rsc 19.0.5 — the published/default pin for 17.0.0 — until #3865 promotes 19.2 to the default."
     ],
     "overrides": {
       "react": "$react",
@@ -140,7 +140,7 @@
       "react_on_rails>react-dom": "^19.2.0",
       "react_on_rails_pro_dummy>react": "^19.2.7",
       "react_on_rails_pro_dummy>react-dom": "^19.2.7",
-      "react_on_rails_pro_dummy>react-on-rails-rsc": "19.2.0-rc.3",
+      "react_on_rails_pro_dummy>react-on-rails-rsc": "19.2.0-rc.4",
       "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",
       "sentry-testkit>express": "npm:empty-npm-package@1.0.0",
       "lodash@>=4.0.0 <=4.17.22": ">=4.17.23 <5",
