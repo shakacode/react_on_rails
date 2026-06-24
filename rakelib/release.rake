@@ -3,12 +3,14 @@
 require "bundler"
 require "English"
 require "json"
+require "net/http"
 require "open3"
 require "rubygems/version"
 require "shellwords"
 require "tempfile"
 require "time"
 require "tmpdir"
+require "uri"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
 require_relative "../react_on_rails/lib/react_on_rails/git_utils"
@@ -19,15 +21,50 @@ class RaisingMessageHandler
   end
 end
 
+class UnhandledReleaseFinalizationMetadataPathError < StandardError; end
+
 NPM_REGISTRY_URL = "https://registry.npmjs.org/"
+RUBYGEMS_VERSIONS_API_URL = "https://rubygems.org/api/v1/versions"
+RUBYGEMS_VERSIONS_OPEN_TIMEOUT_SECONDS = 10
+RUBYGEMS_VERSIONS_READ_TIMEOUT_SECONDS = 15
 NPM_PUBLISH_VERIFY_ATTEMPTS = 6
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
 NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
+NPM_RELEASE_PACKAGE_NAMES = %w[
+  react-on-rails
+  react-on-rails-pro
+  react-on-rails-pro-node-renderer
+  create-react-on-rails-app
+].freeze
+RUBYGEMS_RELEASE_GEM_NAMES = %w[
+  react_on_rails
+  react_on_rails_pro
+].freeze
 SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE = "shakaperf-release-gates.yml"
 SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 600
 SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
 SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
 SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 50 * 60
+# Keep in sync with every package.json, Gemfile.lock, and version file that the
+# release task rewrites while promoting an RC to a final release.
+# CHANGELOG.md is intentionally excluded. main_ci_walkback_commit? classifies
+# changelog-only release commits through commit_non_runtime_only?; adding
+# Markdown here would need a content handler.
+RELEASE_FINALIZATION_METADATA_PATHS = [
+  "Gemfile.lock",
+  "package.json",
+  "packages/create-react-on-rails-app/package.json",
+  "packages/react-on-rails/package.json",
+  "packages/react-on-rails-pro/package.json",
+  "packages/react-on-rails-pro-node-renderer/package.json",
+  "react_on_rails/Gemfile.lock",
+  "react_on_rails/lib/react_on_rails/version.rb",
+  "react_on_rails/spec/dummy/Gemfile.lock",
+  "react_on_rails_pro/Gemfile.lock",
+  "react_on_rails_pro/lib/react_on_rails_pro/version.rb",
+  "react_on_rails_pro/spec/dummy/Gemfile.lock",
+  "react_on_rails_pro/spec/execjs-compatible-dummy/Gemfile.lock"
+].freeze
 
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
@@ -253,8 +290,9 @@ def verify_gh_auth(monorepo_root:)
   puts "✓ GitHub CLI authenticated with write access to #{repo_slug}"
 end
 
-def current_git_sha!(monorepo_root)
+def current_git_sha!(monorepo_root, context: nil)
   output, status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
+  abort "❌ Unable to resolve local HEAD before #{context}.\n\n#{output.strip}" if !status.success? && context
   abort "❌ Unable to resolve current git SHA.\n\n#{output}" unless status.success?
 
   output.strip
@@ -429,6 +467,493 @@ def release_prerelease_version?(version)
   version.to_s.match?(/\.(test|beta|alpha|rc|pre)\./i)
 end
 
+# Whether a *stable* (non-prerelease) release may run from `current_branch`.
+# Stable releases are allowed from `main` (the standard path) or from the
+# ephemeral `release/X.Y.Z` promotion branch whose name matches the target
+# version exactly — that is how the release train promotes the last good RC to
+# its final tag in place, without re-cutting from `main` (see
+# internal/contributor-info/release-train-runbook.md). The exact-version match
+# prevents promoting, say, `17.0.0` from `release/16.7.1`. Prereleases use the
+# target-base release branch guard below so feature-branch prereleases remain
+# allowed, but `release/X.Y.Z` branches cannot cut another release line.
+def stable_release_branch_allowed?(current_branch:, target_gem_version:)
+  ["main", "release/#{target_gem_version}"].include?(current_branch)
+end
+
+def release_base_version(gem_version)
+  version = parse_gem_version_components(gem_version)
+
+  "#{version[:major]}.#{version[:minor]}.#{version[:patch]}"
+end
+
+def ensure_release_branch_matches_target_base!(current_branch:, target_gem_version:)
+  return unless current_branch.start_with?("release/")
+
+  expected_release_branch = "release/#{release_base_version(target_gem_version)}"
+  return if current_branch == expected_release_branch
+
+  abort <<~ERROR
+    ❌ Release branch must match the target release line.
+
+    Current branch: #{current_branch}
+    Target version: #{target_gem_version}
+    Expected branch: #{expected_release_branch}
+
+    Use the matching release branch for this target version, or run prereleases from a non-release branch.
+  ERROR
+end
+
+def same_release_base?(first_version, second_version)
+  first_components = parse_gem_version_components(first_version)
+  second_components = parse_gem_version_components(second_version)
+
+  %i[major minor patch].all? do |component|
+    first_components[component] == second_components[component]
+  end
+end
+
+def peeled_git_tag_sha(monorepo_root:, tag:)
+  tag_output, tag_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/#{tag}^{}"
+  )
+  return tag_output.strip if tag_status.success?
+
+  nil
+end
+
+def remote_git_tag_exists?(monorepo_root:, tag:)
+  _output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "ls-remote", "--exit-code", "--tags", "origin", "refs/tags/#{tag}"
+  )
+  return true if status.success?
+  return false if status.exitstatus == 2
+
+  abort "❌ Unable to verify remote git tag #{tag.inspect} before release branch promotion."
+end
+
+def fetch_remote_release_tag!(monorepo_root:, tag:, tag_type:)
+  tag_ref = "refs/tags/#{tag}"
+  fetch_output, fetch_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "fetch", "--force", "--no-tags", "--quiet", "origin", "#{tag_ref}:#{tag_ref}"
+  )
+  return if fetch_status.success?
+
+  abort "❌ Unable to fetch remote #{tag_type} tag before release branch promotion.\n\n#{fetch_output.strip}"
+end
+
+def remote_release_tags(monorepo_root:, pattern:)
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "ls-remote", "--tags", "--refs", "origin", "refs/tags/#{pattern}"
+  )
+  unless status.success?
+    abort "❌ Unable to list remote release tags before release branch promotion.\n\n#{output.strip}"
+  end
+
+  output.lines.filter_map do |line|
+    ref = line.split(/\s+/, 2).last.to_s.strip
+    ref.delete_prefix("refs/tags/") if ref.start_with?("refs/tags/")
+  end
+end
+
+def latest_remote_rc_tag_for_version(monorepo_root:, target_gem_version:)
+  candidates = remote_release_tags(monorepo_root:, pattern: "v#{target_gem_version}*").filter_map do |tag|
+    gem_version = parse_release_tag_to_gem_version(tag)
+    next unless gem_version
+
+    version = parse_gem_version_components(gem_version)
+    next unless release_base_version(gem_version) == target_gem_version && version[:prerelease_type] == "rc"
+
+    [tag, Gem::Version.new(gem_version)]
+  end
+
+  candidates.max_by { |_tag, version| version }&.first
+end
+
+def rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
+  ancestor_output, ancestor_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "merge-base", "--is-ancestor", tag_sha, head_sha
+  )
+  return true if ancestor_status.success?
+
+  if ancestor_status.exitstatus != 1
+    abort "❌ Unable to verify RC tag ancestry before release branch promotion.\n\n#{ancestor_output.strip}"
+  end
+
+  false
+end
+
+def commit_shas_after_rc_tag!(monorepo_root:, tag_sha:, head_sha:)
+  list_output, list_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "rev-list", "--reverse", "#{tag_sha}..#{head_sha}"
+  )
+  unless list_status.success?
+    abort "❌ Unable to list commits after RC tag before release branch promotion.\n\n#{list_output.strip}"
+  end
+
+  list_output.lines.map(&:strip).reject(&:empty?)
+end
+
+def release_branch_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
+  # Keep direct callers tolerant of equal SHAs; the primary promotion path returns before calling this helper.
+  return { status: :none, commits: [] } if tag_sha == head_sha
+  return { status: :not_ancestor, commits: [] } unless rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha:)
+
+  commits = commit_shas_after_rc_tag!(monorepo_root:, tag_sha:, head_sha:)
+  metadata_only = commits.all? do |sha|
+    commit_non_runtime_only?(monorepo_root:, sha:) ||
+      release_finalization_metadata_commit?(monorepo_root:, sha:)
+  end
+  return { status: :runtime_bearing, commits: } unless metadata_only
+
+  { status: :non_runtime_only, commits: }
+end
+
+def ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
+  version = parse_gem_version_components(current_checkout_version)
+  if version[:prerelease_type].nil?
+    abort <<~ERROR
+      ❌ Stable release branch promotion must start from a tagged RC.
+
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Target version: #{target_gem_version}
+
+      Cut and verify an RC on this release branch before promoting #{target_gem_version}.
+    ERROR
+  end
+
+  return if version[:prerelease_type] == "rc" && same_release_base?(current_checkout_version, target_gem_version)
+
+  if version[:prerelease_type] != "rc"
+    abort <<~ERROR
+      ❌ Stable release branch promotion must use an RC prerelease.
+
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Current prerelease type: #{version[:prerelease_type]}
+      Target version: #{target_gem_version}
+
+      Promote only from an accepted RC for #{target_gem_version}.
+    ERROR
+  end
+
+  abort <<~ERROR
+    ❌ Stable release branch promotion must use an RC for the target version.
+
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    Target version: #{target_gem_version}
+
+    Promote only from the accepted RC for #{target_gem_version}.
+  ERROR
+end
+
+def release_tag_retry_state(monorepo_root:, release_tag:, head_sha:, current_branch:, current_checkout_version:,
+                            target_gem_version:, tag_type:)
+  remote_tag_exists = remote_git_tag_exists?(monorepo_root:, tag: release_tag)
+  local_tag_sha = peeled_git_tag_sha(monorepo_root:, tag: release_tag)
+  retry_label = "#{tag_type.capitalize} release retry"
+
+  unless remote_tag_exists
+    return :none unless local_tag_sha
+    return :local if local_tag_sha == head_sha
+
+    abort <<~ERROR
+      ❌ #{retry_label} is already tagged at a different commit locally.
+
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      #{tag_type.capitalize} tag: #{release_tag} (#{local_tag_sha})
+      Local HEAD: #{head_sha}
+
+      Delete the local-only tag or move to the tagged commit before retrying.
+    ERROR
+  end
+
+  fetch_remote_release_tag!(monorepo_root:, tag: release_tag, tag_type:)
+  local_tag_sha = peeled_git_tag_sha(monorepo_root:, tag: release_tag)
+  unless local_tag_sha
+    abort <<~ERROR
+      ❌ #{retry_label}: #{tag_type} tag was found on the remote but could not be resolved locally after fetching.
+
+      Expected tag: #{release_tag}
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Target version: #{target_gem_version}
+
+      Try running `git fetch --force origin refs/tags/#{release_tag}:refs/tags/#{release_tag}` and retrying.
+    ERROR
+  end
+
+  return :remote if local_tag_sha == head_sha
+
+  abort <<~ERROR
+    ❌ #{retry_label} is already tagged at a different commit.
+
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    #{tag_type.capitalize} tag: #{release_tag} (#{local_tag_sha})
+    Local HEAD: #{head_sha}
+
+    Rerun only when the existing remote #{tag_type} tag points at the current release HEAD.
+  ERROR
+end
+
+def release_tag_retry_state_for_current_head(monorepo_root:, current_branch:, current_checkout_version:,
+                                             target_gem_version:, tag_type:)
+  return :none unless current_checkout_version == target_gem_version
+
+  head_sha = current_git_sha!(monorepo_root, context: "#{tag_type} release retry")
+  release_tag = "v#{target_gem_version}"
+  tag_retry_state = release_tag_retry_state(
+    monorepo_root:,
+    release_tag:,
+    head_sha:,
+    current_branch:,
+    current_checkout_version:,
+    target_gem_version:,
+    tag_type:
+  )
+
+  case tag_retry_state
+  when :remote
+    puts "ℹ️ #{tag_type.capitalize} tag #{release_tag} already points at local HEAD; " \
+         "continuing idempotent release retry."
+  when :local
+    puts "ℹ️ Local #{tag_type} tag #{release_tag} already points at local HEAD; " \
+         "continuing retry without registry publish skips until the tag exists on origin."
+  end
+
+  tag_retry_state
+end
+
+def remote_release_tag_retry?(retry_state)
+  retry_state == :remote
+end
+
+def release_tag_at_current_head?(retry_state)
+  %i[local remote].include?(retry_state)
+end
+
+def stable_release_retry_for_current_head?(monorepo_root:, current_branch:, current_checkout_version:,
+                                           target_gem_version:)
+  remote_release_tag_retry?(
+    release_tag_retry_state_for_current_head(
+      monorepo_root:,
+      current_branch:,
+      current_checkout_version:,
+      target_gem_version:,
+      tag_type: "stable"
+    )
+  )
+end
+
+def stable_release_retry_state_for_current_head(monorepo_root:, current_branch:, current_checkout_version:,
+                                                target_gem_version:)
+  release_tag_retry_state_for_current_head(
+    monorepo_root:,
+    current_branch:,
+    current_checkout_version:,
+    target_gem_version:,
+    tag_type: "stable"
+  )
+end
+
+def release_branch_promotion_rc_tag!(monorepo_root:, current_branch:, current_checkout_version:, target_gem_version:)
+  if release_prerelease_version?(current_checkout_version)
+    ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
+    return { rc_tag: "v#{current_checkout_version}", stable_tag_retry: false, stable_tag_at_head: false }
+  end
+
+  if current_checkout_version != target_gem_version
+    abort <<~ERROR
+      ❌ Unexpected stable checkout version before release branch promotion.
+
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Target version: #{target_gem_version}
+
+      Expected either an RC prerelease for #{target_gem_version} or the target stable version for an in-place retry.
+    ERROR
+  end
+
+  # A concurrent stable-tag push after this check is still caught by the later
+  # `git push --tags`; this guard only decides whether a known tag is retry-safe.
+  stable_tag_retry_state = stable_release_retry_state_for_current_head(
+    monorepo_root:,
+    current_branch:,
+    current_checkout_version:,
+    target_gem_version:
+  )
+
+  rc_tag = latest_remote_rc_tag_for_version(monorepo_root:, target_gem_version:)
+  if rc_tag
+    return {
+      rc_tag:,
+      stable_tag_retry: remote_release_tag_retry?(stable_tag_retry_state),
+      stable_tag_at_head: release_tag_at_current_head?(stable_tag_retry_state)
+    }
+  end
+
+  abort <<~ERROR
+    ❌ Stable release branch promotion retry must descend from a remote RC tag.
+
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    Target version: #{target_gem_version}
+
+    Push and verify an RC tag for #{target_gem_version} before retrying the already-bumped final promotion.
+  ERROR
+end
+
+def ensure_remote_rc_tag!(monorepo_root:, rc_tag:, current_branch:, current_checkout_version:, target_gem_version:)
+  return if remote_git_tag_exists?(monorepo_root:, tag: rc_tag)
+
+  abort <<~ERROR
+    ❌ Stable release branch promotion must start from a remote RC tag.
+
+    Expected remote tag: #{rc_tag}
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    Target version: #{target_gem_version}
+  ERROR
+end
+
+def fetch_remote_rc_tag!(monorepo_root:, rc_tag:)
+  fetch_remote_release_tag!(monorepo_root:, tag: rc_tag, tag_type: "RC")
+end
+
+def abort_not_ancestor_release_branch_promotion!(current_branch:, current_checkout_version:, target_gem_version:,
+                                                 rc_tag:, tag_sha:, head_sha:)
+  abort "❌ Stable release branch promotion must descend from the accepted RC tag.\n\n" \
+        "Current branch: #{current_branch}\n" \
+        "Current version: #{current_checkout_version}\n" \
+        "Expected tag: #{rc_tag} (#{tag_sha})\n" \
+        "Local HEAD: #{head_sha}\n\n" \
+        "The release branch tip is not reachable from #{rc_tag}. Reset this release branch to #{rc_tag}, " \
+        "or cut a new RC from this branch tip before promoting #{target_gem_version}."
+end
+
+def abort_runtime_bearing_release_branch_promotion!(current_branch:, current_checkout_version:, target_gem_version:,
+                                                    rc_tag:, tag_sha:, head_sha:)
+  abort <<~ERROR
+    ❌ Stable release branch promotion must run from the accepted RC tag or metadata-only finalization commits.
+
+    Current branch: #{current_branch}
+    Current version: #{current_checkout_version}
+    Expected tag: #{rc_tag} (#{tag_sha})
+    Local HEAD: #{head_sha}
+
+    Changelog/docs/comment-only and final release metadata-only commits after #{rc_tag} are allowed.
+    Runtime-bearing commits require a new RC.
+    Cut a new RC from this branch tip, or reset the branch to #{rc_tag} before promoting #{target_gem_version}.
+  ERROR
+end
+
+def handle_release_branch_commits_after_rc_tag!(commits_after_rc_tag:, current_branch:, current_checkout_version:,
+                                                target_gem_version:, rc_tag:, tag_sha:, head_sha:)
+  case commits_after_rc_tag[:status]
+  when :none
+    nil
+  when :non_runtime_only
+    puts "ℹ️ Stable release branch promotion includes #{commits_after_rc_tag[:commits].length} " \
+         "metadata-only commit(s) after #{rc_tag}; preserving accepted RC runtime content."
+  when :not_ancestor
+    abort_not_ancestor_release_branch_promotion!(
+      current_branch:,
+      current_checkout_version:,
+      target_gem_version:,
+      rc_tag:,
+      tag_sha:,
+      head_sha:
+    )
+  when :runtime_bearing
+    abort_runtime_bearing_release_branch_promotion!(
+      current_branch:,
+      current_checkout_version:,
+      target_gem_version:,
+      rc_tag:,
+      tag_sha:,
+      head_sha:
+    )
+  else
+    raise "Unexpected release branch RC status: #{commits_after_rc_tag[:status].inspect}"
+  end
+end
+
+def ensure_release_branch_promotes_tagged_rc!(monorepo_root:, current_branch:, current_checkout_version:,
+                                              target_gem_version:)
+  # RC cuts target prerelease versions, so only stable promotions match release/<final>.
+  return { stable_tag_retry: false, stable_tag_at_head: false } unless current_branch == "release/#{target_gem_version}"
+
+  promotion = release_branch_promotion_rc_tag!(
+    monorepo_root:,
+    current_branch:,
+    current_checkout_version:,
+    target_gem_version:
+  )
+  rc_tag = promotion.fetch(:rc_tag)
+
+  ensure_remote_rc_tag!(monorepo_root:, rc_tag:, current_branch:, current_checkout_version:, target_gem_version:)
+  fetch_remote_rc_tag!(monorepo_root:, rc_tag:)
+
+  tag_sha = peeled_git_tag_sha(monorepo_root:, tag: rc_tag)
+  unless tag_sha
+    abort <<~ERROR
+      ❌ Stable release branch promotion: RC tag was found on the remote but could not be resolved locally after fetching.
+
+      Expected tag: #{rc_tag}
+      Current branch: #{current_branch}
+      Current version: #{current_checkout_version}
+      Target version: #{target_gem_version}
+
+      Try running `git fetch --force origin refs/tags/#{rc_tag}:refs/tags/#{rc_tag}` and retrying.
+    ERROR
+  end
+
+  head_sha = current_git_sha!(monorepo_root, context: "release branch promotion")
+
+  return promotion if tag_sha == head_sha
+
+  commits_after_rc_tag = release_branch_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
+  handle_release_branch_commits_after_rc_tag!(
+    commits_after_rc_tag:,
+    current_branch:,
+    current_checkout_version:,
+    target_gem_version:,
+    rc_tag:,
+    tag_sha:,
+    head_sha:
+  )
+  promotion
+end
+
+# The branch whose tip CI the release gate should validate. For a release cut or
+# promoted from a `release/X.Y.Z` branch, validate that branch's tip (the frozen,
+# stabilized commit set the tag is being applied to); otherwise validate `main`.
+# This keeps the gate honest for both RC cuts and final promotions off a release
+# branch instead of always evaluating `origin/main`, which can have drifted.
+def release_ci_branch(current_branch)
+  current_branch.to_s.start_with?("release/") ? current_branch : "main"
+end
+
+def npm_publish_base_args(actual_gem_version:, actual_npm_version:, current_branch:)
+  npm_base_args = []
+  npm_dist_tag = npm_dist_tag_for_version(actual_npm_version)
+  npm_base_args += ["--tag", npm_dist_tag] unless npm_dist_tag == "latest"
+
+  is_prerelease = release_prerelease_version?(actual_gem_version)
+  is_release_branch = current_branch.to_s.start_with?("release/")
+
+  npm_base_args << "--no-git-checks" if is_prerelease || is_release_branch
+  # `--publish-branch` is pnpm-specific; `publish_npm_with_retry` shells out to `pnpm publish`.
+  # --no-git-checks disables pnpm's branch guard today, but keep --publish-branch
+  # on final release-branch publishes so logs document the intended branch contract.
+  npm_base_args += ["--publish-branch", current_branch] if !is_prerelease && is_release_branch
+
+  npm_base_args
+end
+
 def npm_dist_tag_for_version(npm_version)
   prerelease_part = npm_version.to_s.split("-", 2)[1]
   return "latest" if prerelease_part.nil? || prerelease_part.empty?
@@ -565,34 +1090,97 @@ CI_PASSING_CONCLUSIONS = %w[success skipped neutral].freeze
 # stopped. A real chain of docs/changelog commits is far shorter than this.
 MAIN_CI_NONRUNTIME_WALK_LIMIT = 25
 
+def ci_branch_fetch_refspec(ci_branch)
+  return ci_branch unless ci_branch.start_with?("release/")
+
+  "+refs/heads/#{ci_branch}:refs/remotes/origin/#{ci_branch}"
+end
+
+def handle_release_branch_identity_violation!(message:, dry_run:)
+  if dry_run
+    puts "⚠️ DRY RUN: #{message.sub(/\A❌\s*/, '')}"
+    return
+  end
+
+  abort message
+end
+
 # rubocop:disable Metrics/MethodLength
-def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
-  fetch_output, fetch_status = Open3.capture2e(
-    "git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet"
-  )
-  unless fetch_status.success?
-    handle_main_ci_status_violation!(
-      message: "❌ Unable to fetch origin/main for CI status check.\n\n#{fetch_output}",
-      allow_override:,
+# Abort in strict mode when a release branch local HEAD differs from the remote.
+# In dry-run mode, warn and continue so the releaser still sees remote CI state.
+# The normal CI override must not bypass this: otherwise the release could tag a
+# local commit whose remote release-branch CI belongs to a different SHA.
+def ensure_release_branch_head_matches_remote!(monorepo_root:, ci_branch:, remote_sha:, dry_run:)
+  return unless ci_branch.start_with?("release/")
+
+  head_output, head_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
+  unless head_status.success?
+    handle_release_branch_identity_violation!(
+      message: "❌ Unable to resolve local HEAD before release CI status check.\n\n#{head_output}",
       dry_run:
     )
+    # Strict mode aborts above; dry-run mode should still evaluate remote CI after warning.
+    return
+  end
+
+  local_sha = head_output.strip
+  return if local_sha == remote_sha
+
+  handle_release_branch_identity_violation!(
+    message: <<~MESSAGE,
+      ❌ Local HEAD does not match origin/#{ci_branch} before release CI status check.
+
+      Local HEAD: #{local_sha}
+      origin/#{ci_branch}: #{remote_sha}
+
+      Push, reset, or rebase the release branch so the commit being tagged is the same commit whose CI is being validated.
+    MESSAGE
+    dry_run:
+  )
+  # Strict mode aborts above; dry-run mode should still evaluate remote CI after warning.
+end
+
+def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
+  release_branch = ci_branch.start_with?("release/")
+  fetch_refspec = ci_branch_fetch_refspec(ci_branch)
+  fetch_output, fetch_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "fetch", "origin", fetch_refspec, "--quiet"
+  )
+  unless fetch_status.success?
+    message = "❌ Unable to fetch origin/#{ci_branch} for CI status check.\n\n#{fetch_output}"
+    if release_branch
+      handle_release_branch_identity_violation!(message:, dry_run:)
+    else
+      handle_main_ci_status_violation!(message:, allow_override:, dry_run:)
+    end
     return nil
   end
 
-  sha_output, sha_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "origin/main")
+  sha_output, sha_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "origin/#{ci_branch}")
   unless sha_status.success?
-    handle_main_ci_status_violation!(
-      message: "❌ Unable to resolve origin/main HEAD.\n\n#{sha_output}",
-      allow_override:,
-      dry_run:
-    )
+    message = "❌ Unable to resolve origin/#{ci_branch} HEAD.\n\n#{sha_output}"
+    if release_branch
+      handle_release_branch_identity_violation!(message:, dry_run:)
+    else
+      handle_main_ci_status_violation!(message:, allow_override:, dry_run:)
+    end
     return nil
   end
+  remote_sha = sha_output.strip
+  # Strict mode aborts on mismatch. Dry-run mode warns and continues so
+  # the releaser still sees the remote CI state instead of silently skipping it.
+  ensure_release_branch_head_matches_remote!(
+    monorepo_root:,
+    ci_branch:,
+    remote_sha:,
+    dry_run:
+  )
+
   # Evaluate the most recent commit that actually ran the full suite. When HEAD
   # is changelog/docs/comment-only (e.g. the pre-release `update-changelog`
   # commit), CI path-skips the runtime suite there, so its checks tell us
   # nothing about release health — walk back to the last runtime-bearing commit.
-  sha = main_ci_evaluation_sha(monorepo_root:, head_sha: sha_output.strip)
+  sha = main_ci_evaluation_sha(monorepo_root:, head_sha: remote_sha, ref: "origin/#{ci_branch}")
 
   repo_slug = github_repo_slug(monorepo_root)
   api_path = "repos/#{repo_slug}/commits/#{sha}/check-runs"
@@ -650,19 +1238,19 @@ def parse_gh_jsonl(output)
   end
 end
 
-# Choose which origin/main commit the CI gate should evaluate. Starting at
-# `head_sha`, walk back over commits that `script/ci-changes-detector` classifies
-# as non-runtime-only (changelog/docs/source-comment changes — exactly the
-# commits on which CI path-skips the runtime suite) and return the first commit
-# that ran the full suite. The walk stops at HEAD when a commit isn't provably
-# non-runtime-only, so the behavior degrades to the original "evaluate HEAD" gate.
-def main_ci_evaluation_sha(monorepo_root:, head_sha:)
+# Choose which remote ref commit the CI gate should evaluate. Starting at
+# `head_sha`, walk back over commits that do not prove release health: commits
+# that `script/ci-changes-detector` classifies as non-runtime-only, plus final
+# release metadata-only commits on `release/*` branches. The walk stops at HEAD
+# when a commit is not provably skippable, so the behavior degrades to the
+# original "evaluate HEAD" gate.
+def main_ci_evaluation_sha(monorepo_root:, head_sha:, ref: "origin/main")
   return head_sha if ci_evaluate_head_only?
 
   current = head_sha
   skipped = []
   MAIN_CI_NONRUNTIME_WALK_LIMIT.times do
-    break unless commit_non_runtime_only?(monorepo_root:, sha: current)
+    break unless main_ci_walkback_commit?(monorepo_root:, sha: current, ref:)
 
     parent = git_parent_sha(monorepo_root:, sha: current)
     break if parent.nil?
@@ -671,16 +1259,23 @@ def main_ci_evaluation_sha(monorepo_root:, head_sha:)
     current = parent
   end
 
-  log_main_ci_walkback(head_sha:, evaluated_sha: current, skipped:) unless skipped.empty?
+  log_main_ci_walkback(head_sha:, evaluated_sha: current, skipped:, ref:) unless skipped.empty?
   current
 end
 
-def log_main_ci_walkback(head_sha:, evaluated_sha:, skipped:)
-  puts "ℹ️ origin/main HEAD #{head_sha[0, 8]} is non-runtime-only " \
-       "(changelog/docs/comments); CI path-skips the full suite on such commits."
-  puts "   Skipped #{skipped.length} non-runtime commit(s): #{skipped.map { |s| s[0, 8] }.join(', ')}"
-  puts "   Evaluating main CI on #{evaluated_sha[0, 8]} — the most recent commit that ran the full suite."
+def log_main_ci_walkback(head_sha:, evaluated_sha:, skipped:, ref:)
+  puts "ℹ️ #{ref} HEAD #{head_sha[0, 8]} is release-gate metadata or non-runtime-only; " \
+       "CI can skip the full runtime suite on such commits."
+  puts "   Skipped #{skipped.length} release-gate commit(s): #{skipped.map { |s| s[0, 8] }.join(', ')}"
+  puts "   Evaluating CI on #{evaluated_sha[0, 8]} — the most recent commit that ran the full suite."
   puts "   (Set RELEASE_CI_EVALUATE_HEAD=true to force strict HEAD evaluation.)"
+end
+
+def main_ci_walkback_commit?(monorepo_root:, sha:, ref:)
+  return true if commit_non_runtime_only?(monorepo_root:, sha:)
+  return false unless ref.to_s.start_with?("origin/release/")
+
+  release_finalization_metadata_commit?(monorepo_root:, sha:)
 end
 
 # Whether `sha`'s changes are *provably* non-runtime-only per the canonical CI
@@ -712,6 +1307,81 @@ def commit_non_runtime_only?(monorepo_root:, sha:)
   end
 rescue StandardError
   false
+end
+
+def release_finalization_metadata_commit?(monorepo_root:, sha:)
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "diff-tree", "--no-commit-id", "--name-status", "-r", "#{sha}^", sha
+  )
+  return false unless status.success?
+
+  changes = output.lines.map { |line| release_finalization_metadata_path(line) }
+
+  # Empty diffs are not metadata commits. Non-modification entries map to nil
+  # via release_finalization_metadata_path and fail the all? block below.
+  changes.any? && changes.all? do |path|
+    path &&
+      RELEASE_FINALIZATION_METADATA_PATHS.include?(path) &&
+      release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
+  end
+rescue UnhandledReleaseFinalizationMetadataPathError
+  raise
+rescue StandardError => e
+  warn "⚠️ Unable to inspect release finalization metadata for #{sha}: #{e.class}: #{e.message}; " \
+       "treating commit as runtime-bearing."
+  false
+end
+
+def release_finalization_metadata_path(change_line)
+  status_code, path, extra = change_line.chomp.split("\t", 3)
+  return nil unless status_code == "M"
+  return nil if path.nil? || extra
+
+  path
+end
+
+def release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
+  before = git_file_at_commit(monorepo_root:, ref: "#{sha}^", path:)
+  after = git_file_at_commit(monorepo_root:, ref: sha, path:)
+  return false if before.nil? || after.nil?
+
+  if path.end_with?("package.json")
+    package_json_version_only_change?(before, after)
+  elsif path.end_with?("version.rb")
+    normalized_version_file(before) == normalized_version_file(after)
+  elsif path.end_with?("Gemfile.lock")
+    normalized_release_gemfile_lock(before) == normalized_release_gemfile_lock(after)
+  else
+    raise UnhandledReleaseFinalizationMetadataPathError,
+          "Unhandled release finalization metadata path type: #{path.inspect}"
+  end
+end
+
+def git_file_at_commit(monorepo_root:, ref:, path:)
+  output, status = Open3.capture2e("git", "-C", monorepo_root, "show", "#{ref}:#{path}")
+  return nil unless status.success?
+
+  output
+end
+
+def package_json_version_only_change?(before, after)
+  before_json = JSON.parse(before)
+  after_json = JSON.parse(after)
+  before_version = before_json["version"]
+  after_version = after_json["version"]
+
+  !!(before_version && after_version && before_version != after_version &&
+     before_json.except("version") == after_json.except("version"))
+rescue JSON::ParserError
+  false
+end
+
+def normalized_version_file(content)
+  content.gsub(/(\bVERSION = )"[^"]+"/, '\1"__RELEASE_VERSION__"')
+end
+
+def normalized_release_gemfile_lock(content)
+  content.gsub(/\b(react_on_rails(?:_pro)? \((?:= )?)[^)]+(\))/, '\1__RELEASE_VERSION__\2')
 end
 
 # First parent of `sha`, or nil at a root commit (or on any git failure) so the
@@ -824,9 +1494,10 @@ def normalize_required_checks_payload(parsed)
   contexts.empty? && checks.empty? ? nil : { contexts:, checks: }
 end
 
-def required_check_names_for_main(monorepo_root:, repo_slug: nil)
+def required_check_names_for_branch(monorepo_root:, repo_slug: nil, ci_branch: "main")
   repo_slug ||= github_repo_slug(monorepo_root)
-  api_path = "repos/#{repo_slug}/branches/main/protection/required_status_checks"
+  encoded_branch = URI.encode_www_form_component(ci_branch.to_s)
+  api_path = "repos/#{repo_slug}/branches/#{encoded_branch}/protection/required_status_checks"
   # Keep legacy `contexts` separate from modern `checks` entries. Modern
   # required checks can be pinned to a GitHub App via `app_id`; legacy contexts
   # may be satisfied by either a Checks API run or a commit-status context.
@@ -950,22 +1621,29 @@ def format_ci_status_run_line(run, kind:)
   url.strip.empty? ? "  #{icon} #{detail}: #{run['name']}" : "  #{icon} #{detail}: #{run['name']}\n      #{url}"
 end
 
-def format_main_ci_status_violation(kind:, short_sha:, runs:) # rubocop:disable Metrics/CyclomaticComplexity
+def format_main_ci_status_violation(kind:, short_sha:, runs:, ci_branch: "main") # rubocop:disable Metrics/CyclomaticComplexity
+  ref = "origin/#{ci_branch}"
   header = case kind
            when :in_progress
-             "⏳ CI is still in progress on origin/main (commit #{short_sha})."
+             "⏳ CI is still in progress on #{ref} (commit #{short_sha})."
            when :no_checks
-             "❌ No CI check runs visible on origin/main (commit #{short_sha}). " \
-             "CI may not have started yet, or the GitHub Checks API is unavailable."
+             message = "❌ No CI check runs visible on #{ref} (commit #{short_sha}). " \
+                       "CI may not have started yet, or the GitHub Checks API is unavailable."
+             if ci_branch.start_with?("release/")
+               "#{message} If this release branch was just pushed, wait for at least one CI run to complete " \
+                 "before retrying."
+             else
+               message
+             end
            when :no_required_checks
-             "❌ No required CI check runs found on origin/main (commit #{short_sha})."
+             "❌ No required CI check runs found on #{ref} (commit #{short_sha})."
            when :missing_required_checks
-             "❌ Some required CI checks are missing on origin/main (commit #{short_sha}). " \
+             "❌ Some required CI checks are missing on #{ref} (commit #{short_sha}). " \
              "Branch protection would refuse this merge."
            when :failed
-             "❌ CI on origin/main is not healthy (commit #{short_sha})."
+             "❌ CI on #{ref} is not healthy (commit #{short_sha})."
            when :unknown_status
-             "❌ Check run(s) with unrecognized status on origin/main (commit #{short_sha})."
+             "❌ Check run(s) with unrecognized status on #{ref} (commit #{short_sha})."
            else
              raise ArgumentError, "Unknown CI violation kind: #{kind.inspect}"
            end
@@ -999,10 +1677,10 @@ def handle_main_ci_status_violation!(message:, allow_override:, dry_run:)
 end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:)
-  puts "\nChecking CI status on origin/main..."
+def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:, ci_branch: "main")
+  puts "\nChecking CI status on origin/#{ci_branch}..."
 
-  data = fetch_main_ci_checks(monorepo_root:, allow_override:, dry_run:)
+  data = fetch_main_ci_checks(monorepo_root:, allow_override:, dry_run:, ci_branch:)
   # `fetch_main_ci_checks` returns nil when it surfaced a violation through
   # `handle_main_ci_status_violation!` (dry-run or override path). In that case
   # the warning has already been printed and we should not continue.
@@ -1038,7 +1716,8 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   #   - stable:     every check_run on the commit (broader filter; any failure blocks)
   required_args = { monorepo_root: }
   required_args[:repo_slug] = repo_slug if repo_slug
-  required_names = required_check_names_for_main(**required_args)
+  required_args[:ci_branch] = ci_branch
+  required_names = required_check_names_for_branch(**required_args)
   required_status_contexts = required_names ? legacy_status_contexts_for_required_checks(required_names) : []
   legacy_status_runs = []
   legacy_status_fetch_unknown = false
@@ -1073,7 +1752,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
 
   if check_runs.empty? && legacy_status_runs.empty?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :no_checks, short_sha:, runs: nil),
+      message: format_main_ci_status_violation(kind: :no_checks, short_sha:, runs: nil, ci_branch:),
       allow_override:,
       dry_run:
     )
@@ -1098,7 +1777,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   end
   if failed.any?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :failed, short_sha:, runs: failed),
+      message: format_main_ci_status_violation(kind: :failed, short_sha:, runs: failed, ci_branch:),
       allow_override:,
       dry_run:
     )
@@ -1123,7 +1802,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     missing_names = missing_required[:labels]
     if missing_required[:count] == required_check_count(required_names)
       handle_main_ci_status_violation!(
-        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha:, runs: nil) +
+        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha:, runs: nil, ci_branch:) +
                  "\nRequired: #{required_labels.join(', ')}",
         allow_override:,
         dry_run:
@@ -1131,7 +1810,8 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
       return
     elsif missing_names.any?
       handle_main_ci_status_violation!(
-        message: format_main_ci_status_violation(kind: :missing_required_checks, short_sha:, runs: nil) +
+        message: format_main_ci_status_violation(kind: :missing_required_checks, short_sha:, runs: nil,
+                                                 ci_branch:) +
                  "\nRequired: #{required_labels.join(', ')}\nMissing: #{missing_names.join(', ')}",
         allow_override:,
         dry_run:
@@ -1143,7 +1823,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   in_progress = evaluated.select { |run| CI_INCOMPLETE_STATUSES.include?(run["status"]) }
   if in_progress.any?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :in_progress, short_sha:, runs: in_progress),
+      message: format_main_ci_status_violation(kind: :in_progress, short_sha:, runs: in_progress, ci_branch:),
       allow_override:,
       dry_run:
     )
@@ -1160,7 +1840,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   end
   if unknown.any?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :unknown_status, short_sha:, runs: unknown),
+      message: format_main_ci_status_violation(kind: :unknown_status, short_sha:, runs: unknown, ci_branch:),
       allow_override:,
       dry_run:
     )
@@ -1177,7 +1857,8 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   qualifier = is_prerelease && required_names ? "required " : ""
   healthy_count = required_names ? required_check_count(required_names) : evaluated.length
   noun = healthy_count == 1 ? "check" : "checks"
-  puts "✓ Main CI is healthy on #{short_sha} (#{healthy_count} #{qualifier}#{noun})"
+  ci_label = ci_branch == "main" ? "Main CI" : "CI on origin/#{ci_branch}"
+  puts "✓ #{ci_label} is healthy on #{short_sha} (#{healthy_count} #{qualifier}#{noun})"
 end
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
@@ -1206,11 +1887,30 @@ def extract_changelog_section(changelog_path:, version:)
 end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_override:, fetch_tags: true)
+def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_override:, fetch_tags: true,
+                                     allow_existing_target_tag: false,
+                                     release_branch_final_promotion: false,
+                                     # Final promotions need the same scoped tag-order check as RC cuts.
+                                     release_branch_tag_scope: release_branch_final_promotion)
   tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags:)
-  latest_tagged_version = tagged_versions.max_by { |version| Gem::Version.new(version) }
+  tagged_version_order_candidates = if release_branch_tag_scope
+                                      tagged_versions.select do |version|
+                                        !release_prerelease_version?(version) ||
+                                          same_release_base?(version, target_gem_version)
+                                      end
+                                    else
+                                      tagged_versions
+                                    end
+  latest_tagged_version = tagged_version_order_candidates.max_by { |version| Gem::Version.new(version) }
+  target_version = Gem::Version.new(target_gem_version)
 
-  if latest_tagged_version && Gem::Version.new(target_gem_version) <= Gem::Version.new(latest_tagged_version)
+  if latest_tagged_version && target_version <= Gem::Version.new(latest_tagged_version)
+    if allow_existing_target_tag && target_version == Gem::Version.new(latest_tagged_version)
+      puts "ℹ️ VERSION POLICY: Existing target tag #{target_gem_version} points at this release HEAD; " \
+           "continuing idempotent release retry."
+      return
+    end
+
     handle_version_policy_violation!(
       message: "❌ Requested version #{target_gem_version} " \
                "must be greater than latest tagged version #{latest_tagged_version}.",
@@ -1233,8 +1933,13 @@ def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_
     end
   end
 
-  latest_stable_version = tagged_versions.reject { |version| release_prerelease_version?(version) }
-                                         .max_by { |version| Gem::Version.new(version) }
+  # Keep stable releases global even when prereleases are scoped by release base;
+  # a backport RC behind a newer stable line must use the explicit override path.
+  stable_versions = tagged_versions.reject { |version| release_prerelease_version?(version) }
+  if release_branch_final_promotion
+    stable_versions = stable_versions.select { |version| Gem::Version.new(version) < target_version }
+  end
+  latest_stable_version = stable_versions.max_by { |version| Gem::Version.new(version) }
   return unless latest_stable_version
 
   actual_bump_type = version_bump_type(previous_stable_gem_version: latest_stable_version,
@@ -1464,9 +2169,94 @@ def resolve_version_input(version_input, monorepo_root)
   "patch"
 end
 
-def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
+def fetch_rubygems_versions(gem_name, api_url: RUBYGEMS_VERSIONS_API_URL)
+  uri = URI("#{api_url}/#{URI.encode_www_form_component(gem_name)}.json")
+  response = Net::HTTP.start(
+    uri.hostname,
+    uri.port,
+    use_ssl: uri.scheme == "https",
+    open_timeout: RUBYGEMS_VERSIONS_OPEN_TIMEOUT_SECONDS,
+    read_timeout: RUBYGEMS_VERSIONS_READ_TIMEOUT_SECONDS
+  ) do |http|
+    http.get(uri.request_uri)
+  end
+  [response.body, response]
+end
+
+def rubygem_version_published?(gem_name, version, api_url: RUBYGEMS_VERSIONS_API_URL)
+  output, response = fetch_rubygems_versions(gem_name, api_url:)
+  return false unless response.is_a?(Net::HTTPSuccess)
+
+  versions = JSON.parse(output)
+  versions.any? do |metadata|
+    metadata.is_a?(Hash) && metadata["number"] == version
+  end
+rescue JSON::ParserError => e
+  warn "⚠️  Unable to parse RubyGems metadata for #{gem_name}: #{e.message}; attempting publish."
+  false
+rescue StandardError => e
+  warn "⚠️  Unable to check RubyGems metadata for #{gem_name}: #{e.class}: #{e.message}; attempting publish."
+  false
+end
+
+def abort_existing_registry_artifact_without_retry!(artifact_ref:, registry_name:)
+  abort <<~ERROR
+    ❌ #{artifact_ref} is already visible on #{registry_name}.
+
+    Refusing to treat the existing artifact as this release unless this run is a proven idempotent retry.
+    Verify the artifact source or remove the conflicting version before retrying.
+  ERROR
+end
+
+def release_registry_publish_conflicts(gem_version:, npm_version:)
+  npm_conflicts = NPM_RELEASE_PACKAGE_NAMES.select do |package_name|
+    npm_package_already_published?(package_name, npm_version)
+  end
+  rubygems_conflicts = RUBYGEMS_RELEASE_GEM_NAMES.select do |gem_name|
+    rubygem_version_published?(gem_name, gem_version)
+  end
+
+  npm_conflicts.map { |package_name| "npm package #{package_name}@#{npm_version}" } +
+    rubygems_conflicts.map { |gem_name| "RubyGem #{gem_name} #{gem_version}" }
+end
+
+def preflight_registry_publish_conflicts!(gem_version:, npm_version:, idempotent_retry:)
+  return if idempotent_retry
+
+  conflicts = release_registry_publish_conflicts(gem_version:, npm_version:)
+  return if conflicts.empty?
+
+  abort <<~ERROR
+    ❌ Target release artifacts already exist outside an idempotent retry.
+
+    Existing artifacts:
+    #{conflicts.map { |artifact| "  - #{artifact}" }.join("\n")}
+
+    Verify the artifact source or remove the conflicting version before tagging and publishing this release.
+  ERROR
+end
+
+def skip_existing_rubygem_publish?(gem_name:, published_version:, idempotent_retry:)
+  return false unless published_version
+  return false unless rubygem_version_published?(gem_name, published_version)
+
+  unless idempotent_retry
+    abort_existing_registry_artifact_without_retry!(
+      artifact_ref: "RubyGem #{gem_name} #{published_version}",
+      registry_name: "RubyGems.org"
+    )
+  end
+
+  puts "ℹ️ RubyGem #{gem_name} #{published_version} is already visible on RubyGems.org; skipping publish."
+  true
+end
+
+def publish_gem_with_retry(dir, gem_name, otp: nil, published_version: nil, idempotent_retry: false,
+                           max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
   puts "\nPublishing #{gem_name} gem to RubyGems.org..."
   current_otp = normalize_otp_code(otp, service_name: "RubyGems")
+
+  return current_otp if skip_existing_rubygem_publish?(gem_name:, published_version:, idempotent_retry:)
 
   if current_otp
     puts "Using provided OTP code..."
@@ -1702,11 +2492,48 @@ def verify_npm_package_published!(
   puts "✓ Verified npm package #{package_ref}"
 end
 
-def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, max_retries: 3)
+def npm_package_already_published?(package_name, expected_version, registry_url: NPM_REGISTRY_URL)
+  package_ref = "#{package_name}@#{expected_version}"
+  output, status = fetch_npm_package_metadata(package_ref, registry_url:)
+  return false unless status.success?
+
+  metadata = JSON.parse(output)
+  actual_version = metadata.is_a?(Hash) ? metadata["version"] : metadata.to_s
+  return false unless actual_version == expected_version
+
+  workspace_dependencies = workspace_protocol_dependencies(metadata)
+  unless workspace_dependencies.empty?
+    abort <<~ERROR
+      ❌ #{package_ref} is already published with workspace protocol dependencies.
+
+      Published packages must not contain workspace:* install-time dependencies because external package managers
+      cannot resolve them from npm.
+
+      Offending dependencies:
+      #{workspace_dependencies.map { |dependency| "  - #{dependency}" }.join("\n")}
+    ERROR
+  end
+
+  true
+rescue JSON::ParserError => e
+  warn "⚠️  Unable to parse npm metadata for #{package_ref}: #{e.message}; attempting publish."
+  false
+end
+
+def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempotent_retry: false, max_retries: 3)
   puts "\nPublishing #{package_name}..."
   current_otp = normalize_otp_code(otp, service_name: "NPM")
   publish_args = Array(base_args)
   npm_package_name, npm_package_version = parse_npm_package_ref(package_name)
+
+  if npm_package_already_published?(npm_package_name, npm_package_version)
+    unless idempotent_retry
+      abort_existing_registry_artifact_without_retry!(artifact_ref: "npm package #{package_name}", registry_name: "npm")
+    end
+
+    puts "ℹ️ npm package #{package_name} is already visible on npm; skipping publish."
+    return current_otp
+  end
 
   retry_count = 0
   success = false
@@ -1754,7 +2581,9 @@ Version argument can be:
   - Pre-release version: '16.2.0.beta.1' (rubygem format with dots, converted to 16.2.0-beta.1 for NPM)
 
 Note: Pre-release versions (containing .test., .beta., .alpha., .rc., or .pre.) automatically
-skip git branch checks, allowing releases from non-main branches.
+skip git branch checks, allowing releases from non-main branches. A stable release may run from
+`main` (standard) or from a matching `release/X.Y.Z` branch (release-train RC -> final promotion,
+see internal/contributor-info/release-train-runbook.md).
 
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
@@ -1775,7 +2604,8 @@ This will update and release:
 4th argument: Override release CI gates (true/false, default: false)
 
 Release CI policy:
-  Before releasing, the script checks CI status on origin/main.
+  Before releasing, the script checks CI status on the tip of the branch being released:
+  origin/main for a standard release, or origin/release/X.Y.Z when releasing from a release branch.
   - It evaluates the most recent commit that ran the full suite: if HEAD is
     changelog/docs/comment-only (e.g. the pre-release `update-changelog`
     commit), CI path-skips the runtime suite there, so the gate walks back to
@@ -1852,35 +2682,100 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       current_gem_version: current_checkout_version,
       version_input:
     )
+    version_converter = ReactOnRails::VersionSyntaxConverter.new
+    resolved_target_npm_version = version_converter.rubygem_to_npm(resolved_target_gem_version)
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
 
-    unless is_prerelease || current_branch == "main"
+    ensure_release_branch_matches_target_base!(
+      current_branch:,
+      target_gem_version: resolved_target_gem_version
+    )
+
+    unless is_prerelease || stable_release_branch_allowed?(current_branch:,
+                                                           target_gem_version: resolved_target_gem_version)
       abort <<~ERROR
-        ❌ Release must be run from the main branch!
+        ❌ Stable release must be run from `main` or the matching release branch!
 
         Current branch: #{current_branch}
+        Target version: #{resolved_target_gem_version}
 
-        To release a stable version, please switch to main:
-          git checkout main && git pull --rebase
+        To release a stable version, run from one of:
+          - main (standard release):
+              git checkout main && git pull --rebase
+          - release/#{resolved_target_gem_version} (RC → final promotion, per the release-train runbook):
+              promote the last good RC in place; do not re-cut from main
 
         For pre-release versions (beta, alpha, rc, etc.), you can release from any branch:
           rake release[#{resolved_target_gem_version.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]
       ERROR
     end
 
+    release_branch_promotion = { stable_tag_retry: false, stable_tag_at_head: false }
+    unless is_prerelease
+      release_branch_promotion = ensure_release_branch_promotes_tagged_rc!(
+        monorepo_root: release_root,
+        current_branch:,
+        current_checkout_version:,
+        target_gem_version: resolved_target_gem_version
+      )
+    end
+
+    # Validate the tip of the branch we are actually releasing from: the
+    # release/X.Y.Z tip for an RC cut or final promotion, otherwise origin/main.
+    ci_branch = release_ci_branch(current_branch)
+    release_branch_tag_scope = current_branch == "release/#{release_base_version(resolved_target_gem_version)}"
+    main_stable_tag_retry_state = :none
+    if !is_prerelease && current_branch == "main"
+      main_stable_tag_retry_state = stable_release_retry_state_for_current_head(
+        monorepo_root: release_root,
+        current_branch:,
+        current_checkout_version:,
+        target_gem_version: resolved_target_gem_version
+      )
+    end
+    prerelease_tag_retry_state = :none
+    if is_prerelease
+      prerelease_tag_retry_state = release_tag_retry_state_for_current_head(
+        monorepo_root: release_root,
+        current_branch:,
+        current_checkout_version:,
+        target_gem_version: resolved_target_gem_version,
+        tag_type: "prerelease"
+      )
+    end
+    idempotent_publish_retry = release_branch_promotion.fetch(:stable_tag_retry) ||
+                               remote_release_tag_retry?(main_stable_tag_retry_state) ||
+                               remote_release_tag_retry?(prerelease_tag_retry_state)
+    target_tag_at_head = release_branch_promotion.fetch(:stable_tag_at_head) ||
+                         release_tag_at_current_head?(main_stable_tag_retry_state) ||
+                         release_tag_at_current_head?(prerelease_tag_retry_state)
+
     validate_main_ci_status!(
       monorepo_root: release_root,
       is_prerelease:,
       allow_override: allow_ci_status_override,
-      dry_run: is_dry_run
+      dry_run: is_dry_run,
+      ci_branch:
     )
 
+    release_branch_final_promotion = !is_prerelease && current_branch == "release/#{resolved_target_gem_version}"
     validate_release_version_policy!(
       monorepo_root: release_root,
       target_gem_version: resolved_target_gem_version,
       allow_override: allow_version_policy_override,
-      fetch_tags: true
+      fetch_tags: true,
+      allow_existing_target_tag: target_tag_at_head,
+      release_branch_final_promotion:,
+      release_branch_tag_scope:
     )
+
+    unless is_dry_run
+      preflight_registry_publish_conflicts!(
+        gem_version: resolved_target_gem_version,
+        npm_version: resolved_target_npm_version,
+        idempotent_retry: idempotent_publish_retry
+      )
+    end
 
     confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root) unless is_dry_run
 
@@ -1900,7 +2795,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     sh_in_dir_for_release(release_paths_hash[:gem_root], "gem bump --no-commit --version #{version_input}")
 
     actual_gem_version = current_gem_version(release_root)
-    actual_npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(actual_gem_version)
+    actual_npm_version = version_converter.rubygem_to_npm(actual_gem_version)
 
     puts "\n#{'=' * 80}"
     puts "UNIFIED VERSION: #{actual_gem_version} (gem) / #{actual_npm_version} (npm)"
@@ -1989,7 +2884,6 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       puts "Publishing PUBLIC packages to npmjs.org..."
       puts "=" * 80
 
-      npm_base_args = []
       current_npm_otp = npm_otp
 
       if current_npm_otp
@@ -2001,25 +2895,32 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
 
       npm_dist_tag = npm_dist_tag_for_version(actual_npm_version)
       puts "NPM target: #{actual_npm_version} (dist-tag: #{npm_dist_tag})"
-      npm_base_args += ["--tag", npm_dist_tag] unless npm_dist_tag == "latest"
+      npm_base_args = npm_publish_base_args(
+        actual_gem_version:,
+        actual_npm_version:,
+        current_branch:
+      )
 
       if release_prerelease_version?(actual_gem_version)
-        npm_base_args << "--no-git-checks"
         puts "Pre-release version detected - skipping git branch checks for NPM publish"
+      elsif current_branch.start_with?("release/")
+        puts "Release branch detected - allowing NPM publish from #{current_branch}"
       end
 
       current_npm_otp = publish_npm_with_retry(
         File.join(release_root, "packages", "react-on-rails"),
         "react-on-rails@#{actual_npm_version}",
         base_args: npm_base_args,
-        otp: current_npm_otp
+        otp: current_npm_otp,
+        idempotent_retry: idempotent_publish_retry
       )
 
       current_npm_otp = publish_npm_with_retry(
         File.join(release_root, "packages", "react-on-rails-pro"),
         "react-on-rails-pro@#{actual_npm_version}",
         base_args: npm_base_args,
-        otp: current_npm_otp
+        otp: current_npm_otp,
+        idempotent_retry: idempotent_publish_retry
       )
 
       puts "\n#{'=' * 80}"
@@ -2030,14 +2931,16 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         File.join(release_root, "packages", "react-on-rails-pro-node-renderer"),
         "react-on-rails-pro-node-renderer@#{actual_npm_version}",
         base_args: npm_base_args,
-        otp: current_npm_otp
+        otp: current_npm_otp,
+        idempotent_retry: idempotent_publish_retry
       )
 
       publish_npm_with_retry(
         File.join(release_root, "packages", "create-react-on-rails-app"),
         "create-react-on-rails-app@#{actual_npm_version}",
         base_args: npm_base_args,
-        otp: current_npm_otp
+        otp: current_npm_otp,
+        idempotent_retry: idempotent_publish_retry
       )
 
       puts "\n#{'=' * 80}"
@@ -2049,13 +2952,17 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       current_rubygems_otp = publish_gem_with_retry(
         release_paths_hash[:gem_root],
         "react_on_rails",
-        otp: current_rubygems_otp
+        otp: current_rubygems_otp,
+        published_version: actual_gem_version,
+        idempotent_retry: idempotent_publish_retry
       )
 
       publish_gem_with_retry(
         release_paths_hash[:pro_gem_root],
         "react_on_rails_pro",
-        otp: current_rubygems_otp
+        otp: current_rubygems_otp,
+        published_version: actual_gem_version,
+        idempotent_retry: idempotent_publish_retry
       )
     end
   end

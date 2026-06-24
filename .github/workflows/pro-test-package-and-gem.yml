@@ -7,7 +7,8 @@ on:
   push:
     branches:
       - 'main'
-    # Always trigger on main; non-runtime detection handles skipping heavy jobs
+      - 'release/**'
+    # Always trigger on main/release branches; non-runtime detection handles skipping heavy jobs
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group:
@@ -27,7 +28,10 @@ jobs:
   detect-changes:
     # Skip Dependabot PRs — they can't access the Pro license secret.
     # Scoped to pull_request so push-to-main after merge still runs Pro CI.
-    if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
+    # Branch deletion push events have no checkoutable release ref.
+    if: |
+      (github.event_name != 'push' || github.event.deleted != true) &&
+      (github.event_name != 'pull_request' || github.actor != 'dependabot[bot]')
     permissions:
       contents: read
       actions: read

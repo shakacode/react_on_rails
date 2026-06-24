@@ -13,7 +13,7 @@ outputs:
     description: 'Whether the PR has the force-full-hosted-ci label.'
     value: ${{ steps.select.outputs.force_full_hosted_ci_requested }}
   is_release_target:
-    description: 'Whether the PR base branch is a release target.'
+    description: 'Whether the PR base branch or push ref is a release target.'
     value: ${{ steps.select.outputs.is_release_target }}
   should_run_hosted_ci:
     description: 'Whether hosted jobs are allowed to run for this event.'
@@ -48,14 +48,14 @@ runs:
           const hostedCiRequested = labels.includes('ready-for-hosted-ci');
           const forceFullHostedCiRequested = labels.includes('force-full-hosted-ci');
           const shouldForceFullHostedCi = forceFullInput || forceFullHostedCiRequested;
-          const baseRef = pullRequest?.base?.ref || '';
-          // Keep release-target naming in one place. These are base branches,
-          // not arbitrary source branches.
-          const isReleaseTarget = baseRef.startsWith('release/') ||
-            baseRef.startsWith('releases/') ||
-            baseRef.startsWith('release-');
-
           const eventName = context.eventName;
+          const baseRef = pullRequest?.base?.ref || '';
+          const releaseBranchPrefixes = ['release/', 'releases/', 'release-'];
+          const isReleasePullRequest = releaseBranchPrefixes.some((prefix) => baseRef.startsWith(prefix));
+          const isReleaseBranchPush = eventName === 'push' &&
+            context.ref.startsWith('refs/heads/release/');
+          const isReleaseTarget = isReleasePullRequest || isReleaseBranchPush;
+
           const isPushToMain = eventName === 'push' && context.ref === 'refs/heads/main';
           const isMergeGroup = eventName === 'merge_group';
           const shouldRunHostedCi = eventName !== 'pull_request' ||

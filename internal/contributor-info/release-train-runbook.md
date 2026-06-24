@@ -106,13 +106,14 @@ Then tag and publish the first RC from the release branch, following the mechani
 bundle exec rake "release[17.0.0.rc.0]"   # bumps version.rb, tags v17.0.0.rc.0, publishes
 ```
 
-> **Caveat — the release task's CI gate evaluates `origin/main`, not the release branch.**
-> `rakelib/release.rake` runs `validate_main_ci_status!`, which fetches and evaluates `origin/main`
-> HEAD's CI status, regardless of the branch you release from. Cutting an RC from `release/X.Y.Z`
-> therefore only proves `main` is green, not the release-branch tip. Until the release task gains an
-> explicit release-branch CI gate, manually confirm the `release/X.Y.Z` tip's CI is green (e.g. via
-> `gh pr checks` / `gh run list --branch release/X.Y.Z`) before publishing the RC. Track this as a
-> release-task follow-up alongside the stable-promotion `main`-only guard noted in step 4.
+> **The release task's CI gate evaluates the branch you release from.** `rakelib/release.rake` runs
+> `validate_main_ci_status!`, which now fetches and evaluates the tip of the branch the release is cut
+> from: `origin/release/X.Y.Z` when you run from a `release/*` branch (RC cut or final promotion), or
+> `origin/main` otherwise. Cutting an RC from `release/X.Y.Z` therefore validates the release-branch
+> tip, not `main`. (The non-runtime walk-back still applies, so a changelog/version-only tip is skipped
+> back to the last runtime-bearing commit on that branch.) The ShakaPerf release gate likewise runs on
+> the current branch ref. If the release branch was just pushed, wait for at least one CI run on that
+> branch before cutting the first RC; otherwise the branch-tip gate can stop with a `no_checks` result.
 
 A maintainer opens (or updates) the release tracker per [`rc-testing-plan.md`](rc-testing-plan.md) and
 sets the mode to `accelerated-rc` or `strict-rc`. Publish the phase as `rc` for this release line so
@@ -186,15 +187,15 @@ this is the only code change between the good RC and the final:
 bundle exec rake "release[17.0.0]"   # version.rb rc.3 -> 17.0.0, tags v17.0.0, publishes
 ```
 
-> **Blocker — release task is `main`-only for stable versions.** As of this writing
-> `rakelib/release.rake` aborts a stable (non-prerelease) `release[X.Y.Z]` unless the current branch is
-> `main` (the `is_prerelease || current_branch == "main"` guard), and it exposes no branch override.
-> Running the command above from `release/X.Y.Z` will therefore abort. Promoting an RC to its stable
-> tag from the ephemeral release branch requires a follow-up change to `release.rake` to allow stable
-> releases from `release/*` (or an equivalent supported final-promotion path). Until that lands, the
-> final stable `release[...]` must be cut from `main` at the promoted commit, which conflicts with the
-> "promote that RC, do not re-cut from `main`" invariant — treat this as a maintainer decision before
-> running a real final promotion.
+> **Run the stable promotion from `release/X.Y.Z` itself.** `rakelib/release.rake` allows a stable
+> (non-prerelease) `release[X.Y.Z]` from `main` **or** from the matching `release/X.Y.Z` branch (the
+> `stable_release_branch_allowed?` guard); the branch name must match the target version exactly, so you
+> cannot promote `17.0.0` from `release/16.7.1`. There is no re-cut from `main` and no manual tag dance —
+> promote the RC in place. The CI gate validates the `release/X.Y.Z` tip (see the step-1 note), and the
+> task still pushes the version-bump commit, runs the ShakaPerf release gate on the branch ref, tags
+> `vX.Y.Z`, and publishes, exactly as it does from `main`. Release-branch final promotion may ignore
+> newer prerelease tags from another line (for example `17.1.0.beta.1` while promoting `17.0.0`), but a
+> newer stable tag still blocks promotion so npm `latest` cannot move backward.
 
 The invariant that makes this safe (verified by the dry-run): the **final's runtime code tree equals
 the last good RC's** — only version/changelog **metadata** differs, never runtime source. Under unified
@@ -235,6 +236,16 @@ git push origin --delete release/17.0.0
 > not already.
 
 See [`releasing.md`](releasing.md) for the next-dev version bump details.
+
+> **Forward-port automation is a deliberate follow-up, not part of the promotion path.** The close-out
+> forward-port above (CHANGELOG collapse back to `main` + next-dev bump) is intentionally still manual
+> `git` because its safe shape is conditional — whether to take the version-bump commit at all depends on
+> how far `main` has drifted (see the caveat above), which is a judgment call a helper would have to
+> encode carefully. It is **not** a release blocker: unlike the stable-promotion guard (now resolved),
+> nothing aborts here. A `rake`/`script` helper that cherry-picks `-x` the fix/CHANGELOG commits while
+> skipping the rc version-bump commits can be added later without touching the promotion path; until then
+> follow the steps above. Track it as its own change rather than bundling speculative automation into the
+> release-critical `release.rake` promotion fix.
 
 Mark the release tracker released per [`rc-testing-plan.md`](rc-testing-plan.md), and clear the
 published phase for this line (the entry is removed when the branch is deleted) so agents stop applying
@@ -299,12 +310,12 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
    back to standard `AGENTS.md` merge qualification with a maintainer decision.
 
 Agents that act on the gate: `pr-batch`, `address-review` (nit-autonomy + MUST-FIX handling),
-`adversarial-pr-review` (required at `rc`/`final`), and `pr-processing` (the worker path). These skills
-inherit the gate indirectly from `AGENTS.md` and this runbook — none carries a skill-level phase table of
-its own. `pr-batch` and `adversarial-pr-review` add a one-line pointer back here and to `AGENTS.md`;
-`address-review` and `pr-processing` inherit the same gate through the `AGENTS.md` Maintainer Attention
-Contract they already follow, so they need no additional edit. If the gate tiers ever change, update
-`AGENTS.md` and this runbook (the canonical source) rather than adding per-skill phase tables.
+`adversarial-pr-review` (required at `rc`/`final`), and `pr-processing` (the worker path). None carries a
+skill-level phase **table** of its own — the table lives only in `AGENTS.md` and this runbook. `pr-batch`
+and `adversarial-pr-review` add a one-line pointer back here and to `AGENTS.md`; `address-review` and
+`pr-processing` inherit the same gate through the `AGENTS.md` Maintainer Attention Contract they already
+follow. If the gate tiers ever change, update `AGENTS.md` and this runbook (the canonical source) rather
+than adding per-skill phase tables.
 
 ### Phase vs. release mode
 
