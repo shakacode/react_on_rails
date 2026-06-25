@@ -31,6 +31,27 @@ The release train separates "keep merging" from "stabilize a release":
 - **Final = promote the last good RC**, not a re-cut from `main`. Extra `main` commits since the RC
   roll into the next version automatically.
 
+The whole train at a glance — `main` keeps moving while `release/17.0.0` stabilizes, every fix is
+cherry-picked back to `main`, and the final is the last good RC promoted in place (no re-cut):
+
+```mermaid
+gitGraph
+    commit id: "batch work"
+    commit id: "feature A"
+    branch release/17.0.0
+    commit id: "rc.0 bump" tag: "v17.0.0.rc.0"
+    checkout main
+    commit id: "feature B"
+    checkout release/17.0.0
+    commit id: "SSR fix"
+    commit id: "rc.1 bump" tag: "v17.0.0.rc.1"
+    checkout main
+    cherry-pick id: "SSR fix"
+    commit id: "feature C"
+    checkout release/17.0.0
+    commit id: "final bump" tag: "v17.0.0"
+```
+
 ## Decision: ephemeral `release/X.Y.Z`, not one long-lived `releases` branch
 
 We use an **ephemeral per-version `release/X.Y.Z` branch**, cut at RC time and deleted after the final
@@ -81,6 +102,20 @@ the auto-merge automation _within_ a phase. See
 
 The git mechanics below were validated end-to-end with a local dry-run (see
 [Dry-run](#dry-run-validate-the-mechanics)).
+
+The five steps and how they map onto the two branches — solid arrows are the release-branch
+progression; dotted arrows are what reaches `main` (which never freezes):
+
+```mermaid
+flowchart TD
+    A["1 · Cut RC<br/>branch release/X.Y.Z from origin/main<br/>tag vX.Y.Z.rc.0"] --> B["2 · Stabilize<br/>only fixes target release/X.Y.Z<br/>re-tag rc.1, rc.2 …"]
+    B --> C{"Hard gates pass?<br/>rc-testing-plan.md"}
+    C -->|"no"| B
+    C -->|"yes"| D["4 · Promote in place<br/>drop -rc at release tip<br/>tag vX.Y.Z — no re-cut"]
+    D --> E["5 · Close out<br/>forward-port CHANGELOG collapse<br/>delete release/X.Y.Z (tags persist)"]
+    B -.->|"3 · cherry-pick -x each fix"| M(["main — never freezes"])
+    E -.-> M
+```
 
 > **Note:** Worked examples use the concrete version `17.0.0` (and branch `release/17.0.0`, tags
 > `v17.0.0.rc.N` / `v17.0.0`) for clarity, because the repo is on `v17.0.0.rc.3` as this runbook lands.
@@ -266,6 +301,22 @@ judgment; everything machine-checkable is handled autonomously with evidence.
 | **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`; features still allowed on `main`.                                                                                  |
 | **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial-pr-review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion itself**. No confidence-only auto-merge. |
 
+The same selection as the decision an agent runs per PR — the table above is the canonical wording;
+this diagram mirrors it (`agent-coord` first, the deterministic branch-derived fallback when it is
+`UNKNOWN`):
+
+```mermaid
+flowchart TD
+    PR["Agent-merged PR"] --> T{"Target branch?"}
+    T -->|"main"| BETA["beta gate · lowest<br/>confidence note<br/>+ green required checks"]
+    T -->|"release/*"| AC{"agent-coord phase?<br/>doctor + status exit 0"}
+    AC -->|"rc"| RC
+    AC -->|"final"| FINAL
+    AC -->|"UNKNOWN / no entry"| FB{"tracker in<br/>final-release mode?"}
+    FB -->|"no"| RC["rc gate · higher<br/>confidence note<br/>+ adversarial-pr-review<br/>+ zero open MUST-FIX"]
+    FB -->|"yes"| FINAL["final gate · highest<br/>rc gate + cherry-picked<br/>verified fixes only<br/>+ no new features<br/>+ human sign-off"]
+```
+
 Reading the gate is mechanical:
 
 1. Determine the PR's **target branch**.
@@ -314,7 +365,8 @@ Agents that act on the gate: `pr-batch`, `address-review` (nit-autonomy + MUST-F
 skill-level phase **table** of its own — the table lives only in `AGENTS.md` and this runbook. `pr-batch`
 and `adversarial-pr-review` add a one-line pointer back here and to `AGENTS.md`; `address-review` and
 `pr-processing` inherit the same gate through the `AGENTS.md` Maintainer Attention Contract they already
-follow. If the gate tiers ever change, update `AGENTS.md` and this runbook (the canonical source) rather
+follow. If the gate tiers ever change, update `AGENTS.md` and this runbook (the canonical source) —
+including the gate-selection diagram above, which mirrors the table and is illustrative only — rather
 than adding per-skill phase tables.
 
 ### Phase vs. release mode
