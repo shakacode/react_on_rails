@@ -3970,7 +3970,7 @@ Use one of these patterns:
 
    The `refs` entries must match the compiled module paths that webpack/rspack resolve in the RSC build. Do not list the original `.res` source path unless that is the module actually imported by the RSC bundle through a loader.
 
-3. **Keep the discovery manifest fresh.** `bin/shakapacker-precompile-hook` runs the RSC client-reference discovery build and writes the default manifest. A long-running webpack/rspack watch process reads that manifest at startup, so restart the watch after adding a new compiled-language client boundary.
+3. **Keep the discovery manifest fresh.** `bin/shakapacker-precompile-hook` runs the RSC client-reference discovery build and writes the default manifest. A long-running webpack/rspack watch process reads that manifest at startup, so restart the watch after adding a new compiled-language client boundary. If the manifest is older than the server-component registration entry, webpack logs a `[react_on_rails] ... RSC client references may be stale` warning at startup; re-run the precompile hook and restart the watch when you see that warning.
 
 For direct compiled-output integration, the loader or build step for that language must preserve or inject the client boundary (the `'use client'` directive) before the RSC loader/plugin scans it. If that is not practical, use the wrapper-file pattern above; it is explicit and keeps the React on Rails generated files on the supported path.
 
