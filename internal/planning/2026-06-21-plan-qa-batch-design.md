@@ -111,15 +111,18 @@ repo="${QA_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}" || {
   echo "ERROR: could not determine repository name" >&2
   exit 1
 }
-target_base="${QA_TARGET_BASE:-main}" # e.g. main or the active release branch
+target_bases="${QA_TARGET_BASES:-main}" # e.g. "main release/v4.1"
 
-gh api --method GET --paginate \
-  -f state=closed -f base="$target_base" -f per_page=100 \
-  "/repos/$repo/pulls" |
+for target_base in $target_bases; do
+  gh api --method GET --paginate \
+    -f state=closed -f base="$target_base" -f per_page=100 \
+    "/repos/$repo/pulls"
+done |
   jq -s '
     [.[][] | select(.merged_at != null)
       | select(([.labels[].name] | index("qa-verified")) | not)
       | select(([.labels[].name] | index("qa-skipped")) | not)]
+    | unique_by(.number)
   '
 ```
 
@@ -128,17 +131,23 @@ caps around 1000 results. The planner therefore MUST NOT rely on a high
 `--limit` over search to prove "gap-free" coverage. It must page the pull-request
 API (or an equivalent non-search GraphQL connection) until `hasNextPage` /
 `Link: rel="next"` is exhausted, filter `merged_at != null`, and constrain the
-query to the active target base branch so a release sweep does not mix `main`
-and `release/*` PRs. The `repo` value is derived from the trusted local checkout
-or an explicit trusted override and reused anywhere this document shows
-`OWNER/REPO`-style placeholders. Repository derivation failure is also UNKNOWN:
-abort before making the backlog API call. The implementation MUST preserve
-`pipefail` (or capture the API exit code explicitly) and abort on
-API/auth/rate-limit/network errors before using the `jq` output; a failed page
-fetch is UNKNOWN, not an empty backlog. The `jq -s` example buffers all returned
-pages before filtering; that is acceptable for React on Rails' current PR volume,
-but the SKILL.md should switch to per-page/streaming processing if a target
-repo's merged PR count makes that memory trade-off unsafe.
+query to the trusted target-base set. That set is usually one branch (`main` or
+the active release branch), but a main sweep in a release-branch workflow must
+include release branches whose PRs can reach `HEAD` via release → main merges;
+otherwise PRs originally targeted at `release/*` are invisible to a
+`base=main`-only query. If the planner cannot enumerate the relevant base set, it
+stops with UNKNOWN instead of narrowing the "gap-free" guarantee.
+
+The `repo` value is derived from the trusted local checkout or an explicit
+trusted override and reused anywhere this document shows `OWNER/REPO`-style
+placeholders. Repository derivation failure is also UNKNOWN: abort before making
+the backlog API call. The implementation MUST preserve `pipefail` (or capture the
+API exit code explicitly) and abort on API/auth/rate-limit/network errors before
+using the `jq` output; a failed page fetch is UNKNOWN, not an empty backlog. The
+`jq -s` example buffers all returned pages before filtering; that is acceptable
+for React on Rails' current PR volume, but the SKILL.md should switch to
+per-page/streaming processing if a target repo's merged PR count makes that
+memory trade-off unsafe.
 
 The read-only resolver
 `.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json` is then used
