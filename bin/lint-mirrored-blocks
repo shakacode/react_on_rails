@@ -4,8 +4,8 @@
 require "open3"
 require "pathname"
 
-MARKER = "MUST SYNC:"
-SYNC_ROOTS = %w[
+MARKER = "MIRROR OF:"
+MIRROR_ROOTS = %w[
   packages/react-on-rails
   packages/react-on-rails-pro
 ].freeze
@@ -26,11 +26,9 @@ REGEX_LITERAL_PRECEDING_KEYWORDS = %w[
   void
   yield
 ].freeze
-COMMENT_MARKER_PATTERN = %r{\A\s*(?:(?://|\*)\s*|/\*+\s*)MUST\ SYNC:}
+COMMENT_MARKER_PATTERN = %r{\A\s*(?:(?://|\*)\s*|/\*+\s*)MIRROR\ OF:}
 TARGET_PATH_PATTERN = %r{
-  MUST\ SYNC:
-  .*?
-  (?:exists\ in|implementation\ exists\ in|with)
+  MIRROR\ OF:
   \s+
   `?
   ([A-Za-z0-9_@./+\-]+)
@@ -93,9 +91,9 @@ def line_offsets(lines)
   end
 end
 
-def sync_scope_path?(path)
+def mirror_scope_path?(path)
   clean_path = clean_repo_path(path)
-  clean_path && SYNC_ROOTS.any? { |root| clean_path == root || clean_path.start_with?("#{root}/") }
+  clean_path && MIRROR_ROOTS.any? { |root| clean_path == root || clean_path.start_with?("#{root}/") }
 end
 
 def initial_lexer_context
@@ -487,7 +485,7 @@ def immediate_enclosing_block_start(content, state_cache, lines, offsets, line_i
   BlockStart.new(line_index: header_start_line, open_index:)
 end
 
-def synchronized_block_start(marker_context, line, line_index)
+def mirrored_block_start(marker_context, line, line_index)
   content = marker_context.fetch(:content)
   state_cache = marker_context.fetch(:state_cache)
   lines = marker_context.fetch(:lines)
@@ -554,7 +552,7 @@ def line_index_for_offset(offsets, offset)
   insertion_index ? insertion_index - 1 : offsets.length - 1
 end
 
-def extract_sync_block(content, state_cache, lines, offsets, block_start)
+def extract_mirrored_block(content, state_cache, lines, offsets, block_start)
   start_line = block_start.line_index
   start_offset = offsets.fetch(start_line)
   open_index = block_start.open_index || find_code_brace_on_line(content, state_cache, lines, offsets, start_line)
@@ -596,18 +594,18 @@ def marker_record_from_line(marker_context, line, index)
 
   target_path = target_path_from(line)
   unless target_path
-    errors << "#{path}:#{index + 1}: unable to parse sync target path; expected linking phrase " \
-              "'exists in', 'implementation exists in', or 'with'"
+    errors << "#{path}:#{index + 1}: unable to parse mirror target path; " \
+              "expected '#{MARKER} <path>'"
     return nil
   end
 
-  block_start = synchronized_block_start(marker_context, line, index)
+  block_start = mirrored_block_start(marker_context, line, index)
   unless block_start
-    errors << "#{path}:#{index + 1}: no synchronized block found after marker"
+    errors << "#{path}:#{index + 1}: no mirrored block found after marker"
     return nil
   end
 
-  block, start_line, end_line = extract_sync_block(
+  block, start_line, end_line = extract_mirrored_block(
     content,
     state_cache,
     lines,
@@ -615,7 +613,7 @@ def marker_record_from_line(marker_context, line, index)
     block_start
   )
   unless block
-    errors << "#{path}:#{index + 1}: unable to extract synchronized block"
+    errors << "#{path}:#{index + 1}: unable to extract mirrored block"
     return nil
   end
 
@@ -691,7 +689,7 @@ errors = []
 
 git_files.sort.each do |path|
   next unless File.file?(path)
-  next unless sync_scope_path?(path)
+  next unless mirror_scope_path?(path)
 
   content = File.binread(path)
   next unless content.include?(MARKER)
@@ -714,8 +712,8 @@ end
 records_by_path = records.group_by(&:path)
 drift_pair_keys = {}
 records.each do |record|
-  unless sync_scope_path?(record.target_path)
-    errors << "#{record.path}:#{record.line_number}: target #{record.target_path} is outside sync marker scope"
+  unless mirror_scope_path?(record.target_path)
+    errors << "#{record.path}:#{record.line_number}: target #{record.target_path} is outside mirror marker scope"
     next
   end
 
@@ -746,10 +744,10 @@ records.each do |record|
 end
 
 if errors.any?
-  warn "Sync marker lint failed:"
+  warn "Mirror marker lint failed:"
   errors.uniq.each { |error| warn "  - #{error}" }
   exit 1
 end
 
 pair_count = records.map { |record| [record.path, record.target_path].sort }.uniq.length
-puts "Checked #{records.length} #{MARKER} markers across #{pair_count} synchronized pairs."
+puts "Checked #{records.length} #{MARKER} markers across #{pair_count} mirrored pairs."
