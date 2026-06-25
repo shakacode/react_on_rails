@@ -92,6 +92,13 @@ For detailed proof criteria and migration contribution guidance, see
 - Note: this is a ShakaCode-built demo modeled on a Gumroad-style UI, not an
   official Gumroad product or integration.
 
+### Octochangelog RSC Demo
+
+- Repo: [shakacode/react_on_rails-demo-octochangelog-on-rails-pro](https://github.com/shakacode/react_on_rails-demo-octochangelog-on-rails-pro)
+- Live demo: [changelog.reactonrails.com](https://changelog.reactonrails.com/)
+- Use it when you want a real-app migration to React on Rails Pro showing Rails
+  routing, React 19, and streamed React Server Components.
+
 ## Live Demos
 
 - [hn.reactonrails.com](https://hn.reactonrails.com/) — Hacker News reader
