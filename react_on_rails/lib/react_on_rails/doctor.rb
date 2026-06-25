@@ -3472,6 +3472,12 @@ module ReactOnRails
     ].freeze
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
+    PACKAGE_NAME_PATTERN = %r{
+      \A
+      (?:@[a-z0-9][a-z0-9._-]*/)?
+      [a-z0-9][a-z0-9._-]*
+      \z
+    }ix
     RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
 
     def check_rsc_setup
@@ -3699,14 +3705,32 @@ module ReactOnRails
     end
 
     def rsc_dist_tags(package_root)
+      @rsc_dist_tags_cache ||= {}
+      return @rsc_dist_tags_cache[package_root] if @rsc_dist_tags_cache.key?(package_root)
+
+      @rsc_dist_tags_cache[package_root] = fetch_rsc_dist_tags(package_root)
+    end
+
+    def fetch_rsc_dist_tags(package_root)
       stdout, _stderr, status = Timeout.timeout(5) do
         Open3.capture3("npm", "view", RSC_PACKAGE_NAME, "dist-tags", "--json", chdir: package_root)
       end
-      return {} unless status.success?
+      unless status.success?
+        report_rsc_dist_tag_lookup_skipped
+        return {}
+      end
 
       JSON.parse(stdout)
     rescue StandardError
+      report_rsc_dist_tag_lookup_skipped
       {}
+    end
+
+    def report_rsc_dist_tag_lookup_skipped
+      return if @rsc_dist_tag_lookup_skipped_reported
+
+      checker.add_info("  ℹ️  Could not fetch #{RSC_PACKAGE_NAME} dist-tags from npm; skipping stale-tag check")
+      @rsc_dist_tag_lookup_skipped_reported = true
     end
 
     def npm_range_satisfied?(version, range)
@@ -3719,10 +3743,38 @@ module ReactOnRails
       return false if range_clause.blank?
       return true if range_clause.match?(/\A[~^]?\s*[*xX](?:\.[*xX]){0,2}\z/)
 
+      hyphen_range_satisfied = npm_hyphen_range_result(version, range_clause)
+      return hyphen_range_satisfied unless hyphen_range_satisfied.nil?
+
       comparators = range_clause.scan(/(?:>=|<=|>|<|=|\^|~)?\s*v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?/)
       return false if comparators.empty?
 
       comparators.all? { |comparator| npm_comparator_satisfied?(version, comparator.strip) }
+    end
+
+    def npm_hyphen_range_result(version, range_clause)
+      match = range_clause.match(
+        /
+          \A\s*
+          (?<lower>v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?)
+          \s+-\s*
+          (?<upper>v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?)
+          \s*\z
+        /x
+      )
+      return nil unless match
+
+      npm_version_compare(version, npm_normalize_partial_version(match[:lower])) >= 0 &&
+        npm_hyphen_upper_bound_satisfied?(version, match[:upper])
+    end
+
+    def npm_hyphen_upper_bound_satisfied?(version, upper_bound)
+      normalized_upper_bound = npm_normalize_partial_version(upper_bound)
+      if npm_version_segment_count(upper_bound) >= 3 || npm_prerelease(upper_bound).present?
+        npm_version_compare(version, normalized_upper_bound) <= 0
+      else
+        npm_version_less_than?(version, npm_partial_upper_bound(upper_bound))
+      end
     end
 
     def npm_comparator_satisfied?(version, comparator)
@@ -3770,6 +3822,15 @@ module ReactOnRails
 
     def npm_tilde_upper_bound(version)
       major, minor, = npm_version_tuple(version)
+      return "#{major}.#{minor + 1}.0" if npm_version_segment_count(version) > 1
+
+      "#{major + 1}.0.0"
+    end
+
+    def npm_partial_upper_bound(version)
+      major, minor, = npm_version_tuple(version)
+      return "#{major + 1}.0.0" if npm_version_segment_count(version) <= 1
+
       "#{major}.#{minor + 1}.0"
     end
 
@@ -3794,9 +3855,30 @@ module ReactOnRails
     end
 
     def npm_version_tuple(version)
-      core = version.to_s.delete_prefix("v").split("+", 2).first.to_s.split("-", 2).first.to_s
+      core = npm_version_core(version)
       parts = core.split(".").map(&:to_i)
       [parts[0] || 0, parts[1] || 0, parts[2] || 0]
+    end
+
+    def npm_normalize_partial_version(version)
+      major, minor, patch = npm_version_tuple(version)
+      prerelease = npm_prerelease(version)
+      suffix = prerelease.present? ? "-#{prerelease}" : ""
+      "#{major}.#{minor}.#{patch}#{suffix}"
+    end
+
+    def npm_version_segment_count(version)
+      core = npm_version_core(version)
+      return 0 if core.blank?
+
+      core.split(".").length
+    end
+
+    def npm_version_core(version)
+      version.to_s
+             .delete_prefix("v")
+             .split("+", 2).first.to_s
+             .split("-", 2).first.to_s
     end
 
     def npm_prerelease(version)
@@ -3874,6 +3956,8 @@ module ReactOnRails
       # Use Node's own module resolution to find the actually installed package,
       # which handles hoisted dependencies in monorepos and pnpm workspaces.
       # Resolve from the configured package root so nested client/ layouts work.
+      return nil unless valid_package_name?(package_name)
+
       script = "console.log(require.resolve('#{package_name}/package.json'))"
       stdout, _stderr, status = Open3.capture3("node", "-e", script, chdir: package_root)
       resolved_path = status.success? ? stdout.strip : ""
@@ -3883,6 +3967,10 @@ module ReactOnRails
       JSON.parse(File.read(resolved_path))
     rescue StandardError
       nil
+    end
+
+    def valid_package_name?(package_name)
+      package_name.to_s.match?(PACKAGE_NAME_PATTERN)
     end
 
     def add_warning(message)

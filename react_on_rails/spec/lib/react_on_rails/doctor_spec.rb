@@ -5408,6 +5408,59 @@ RSpec.describe ReactOnRails::Doctor do
           )
         )
       end
+
+      it "reports an info message once when the dist-tag lookup is unavailable" do
+        allow(Open3).to receive(:capture3).and_call_original
+        allow(Open3).to receive(:capture3)
+          .with("npm", "view", "react-on-rails-rsc", "dist-tags", "--json", chdir: Dir.pwd)
+          .and_return(["", "network unavailable", instance_double(Process::Status, success?: false)])
+
+        doctor.send(:check_rsc_react_version)
+        doctor.send(:check_rsc_react_version)
+
+        info_msgs = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+        expect(
+          info_msgs.count { |msg| msg.include?("Could not fetch react-on-rails-rsc dist-tags") }
+        ).to eq(1)
+        expect(Open3).to have_received(:capture3)
+          .with("npm", "view", "react-on-rails-rsc", "dist-tags", "--json", chdir: Dir.pwd)
+          .once
+      end
+    end
+
+    describe "RSC npm range parsing" do
+      it "supports npm hyphen ranges" do
+        expect(doctor.send(:npm_range_satisfied?, "19.1.0", "19.0.0 - 19.2.0"))
+          .to be true
+        expect(doctor.send(:npm_range_satisfied?, "19.3.0", "19.0.0 - 19.2.0"))
+          .to be false
+      end
+
+      it "uses npm tilde upper bounds for single-component versions" do
+        expect(doctor.send(:npm_range_satisfied?, "1.9.0", "~1")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "2.0.0", "~1")).to be false
+      end
+    end
+
+    describe "installed package resolution" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "does not pass invalid package names to node resolution" do
+        allow(Open3).to receive(:capture3)
+
+        result = doctor.send(
+          :installed_package_json,
+          Dir.pwd,
+          "react'); require('child_process').execSync('echo unsafe'); require('react"
+        )
+
+        expect(result).to be_nil
+        expect(Open3).not_to have_received(:capture3)
+      end
     end
 
     context "when React is installed in a configured nested JS workspace" do
