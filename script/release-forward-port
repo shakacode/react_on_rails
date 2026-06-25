@@ -152,7 +152,7 @@ class ReleaseForwardPort
     end
 
     if already_forward_ported_with_x?(sha, target)
-      return "already forward-ported to #{target} via cherry-pick -x evidence"
+      return "already forward-ported to #{target} via cherry-pick -x evidence and current target tree"
     end
 
     if patch_equivalent_commits[sha] && patch_present_on_target_tree?(sha, target)
@@ -187,7 +187,9 @@ class ReleaseForwardPort
     footer = "#{CHERRY_PICK_FOOTER_PREFIX}#{sha})"
     # This history search can false-positive if a later target commit quotes the
     # footer verbatim. The runbook documents that boundary for release operators.
-    !git("log", target, "--fixed-strings", "--grep", footer, "--format=%H", "--max-count=1").strip.empty?
+    return false if git("log", target, "--fixed-strings", "--grep", footer, "--format=%H", "--max-count=1").strip.empty?
+
+    patch_present_on_target_tree?(sha, target)
   end
 
   def patch_present_on_target_tree?(sha, target)
@@ -206,6 +208,8 @@ class ReleaseForwardPort
     match = version_file.match(/VERSION\s*=\s*["'](?<version>[^"']+)["']/)
     match && match[:version]
   rescue GitError
+    warn "WARNING: unable to read #{VERSION_FILE} at #{ref}; " \
+         "version-drift guard is disabled for non-RC version bump commits."
     nil
   end
 
@@ -335,7 +339,7 @@ class ReleaseForwardPort
       next if status.success?
 
       warn_cherry_pick_conflict(entry, remaining: picks.length - index - 1)
-      return status.exitstatus || 1
+      return 1
     end
 
     puts "\nForward-port complete."

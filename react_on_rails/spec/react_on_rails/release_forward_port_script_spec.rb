@@ -11,7 +11,11 @@ RSpec.describe "script/release-forward-port" do
   let(:script_path) { File.join(repo_root, "script/release-forward-port") }
 
   def git_env
-    { "GIT_CONFIG_COUNT" => "0" }
+    {
+      "GIT_CONFIG_COUNT" => "0",
+      "GIT_CONFIG_GLOBAL" => File::NULL,
+      "GIT_CONFIG_NOSYSTEM" => "1"
+    }
   end
 
   def git(repo, *args)
@@ -259,6 +263,28 @@ RSpec.describe "script/release-forward-port" do
       expect(second_stdout).to include("already forward-ported to main via cherry-pick -x evidence")
       expect(second_stdout).to include("Nothing to cherry-pick")
       expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+    end
+  end
+
+  it "does not skip an -x cherry-pick that was later reverted" do
+    with_release_repo do |repo|
+      add_rc_bump_and_fix(repo)
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).to be_success, first_stderr
+      expect(first_stdout).to include("Forward-port complete")
+      git(repo, "revert", "--no-edit", "HEAD")
+      reverted_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\n")
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("PICK")
+      expect(second_stdout).not_to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+      expect(git(repo, "rev-list", "--count", "main").strip.to_i).to eq(reverted_count.to_i + 1)
     end
   end
 
