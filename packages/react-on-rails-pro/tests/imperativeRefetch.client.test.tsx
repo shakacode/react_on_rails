@@ -324,6 +324,12 @@ class CapturingErrorBoundary extends React.Component<
     await act(async () => {
       pending[0].reject(staleError);
       await expect(initialPromise).rejects.toThrow('stale initial RSC fetch failed');
+      // Let the stale rejection's deferred eviction actually run before we
+      // assert below: without this flush the cache check races ahead of
+      // evictPromiseIfRejected's setTimeout(0), so the test would still pass
+      // even if the identity guard were missing and the eviction deleted the
+      // newer refetch promise.
+      await waitForRejectedGetComponentEviction();
     });
 
     await act(async () => {
