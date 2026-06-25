@@ -19,7 +19,7 @@ import { Suspense } from 'react';
 import { render, screen, act, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-import { createRSCProvider } from '../src/RSCProvider.tsx';
+import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
 import RSCRoute, { type RSCRouteHandle, useCurrentRSCRoute } from '../src/RSCRoute.tsx';
 import { getNodeVersion } from './testUtils';
 
@@ -86,6 +86,28 @@ class CapturingErrorBoundary extends React.Component<
     </RSCProvider>
   );
 
+  type RSCProbeHandle = {
+    getComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
+    refetchComponent: (
+      componentName: string,
+      componentProps: unknown,
+      recoverOnError?: boolean,
+    ) => Promise<React.ReactNode>;
+  };
+
+  // Drives getComponent/refetchComponent imperatively (bypassing Suspense and
+  // error boundaries) so the provider's cache-layer eviction behavior can be
+  // asserted directly.
+  const RSCProbe = React.forwardRef<RSCProbeHandle>((_, ref) => {
+    const { getComponent, refetchComponent } = useRSC();
+    React.useImperativeHandle(ref, () => ({ getComponent, refetchComponent }), [
+      getComponent,
+      refetchComponent,
+    ]);
+    return null;
+  });
+  RSCProbe.displayName = 'RSCProbe';
+
   /**
    * Build a fetcher whose Nth call resolves with payloads[N]. Resolution is
    * deferred to a microtask so React's use() always sees a pending promise
@@ -144,6 +166,24 @@ class CapturingErrorBoundary extends React.Component<
     return pending;
   };
 
+  const usingJestFakeTimers = () => jest.isMockFunction(setTimeout);
+
+  // Waits for the deferred eviction scheduled by evictPromiseIfRejected to
+  // complete. The eviction uses setTimeout(0), so scheduling a second
+  // setTimeout(0) here guarantees via FIFO macrotask ordering that the eviction
+  // fires before this promise resolves.
+  const waitForRejectedGetComponentEviction = () => {
+    if (usingJestFakeTimers()) {
+      throw new Error(
+        'waitForRejectedGetComponentEviction requires real timers; advance fake timers explicitly',
+      );
+    }
+
+    return new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  };
+
   /**
    * Wrap the initial render in an act() so React drains microtasks queued by
    * `use(promise)` and we observe a settled tree on return. Without this,
@@ -156,6 +196,16 @@ class CapturingErrorBoundary extends React.Component<
       result = render(ui);
     });
     return result;
+  };
+
+  const renderRSCProbe = async () => {
+    const probeRef = React.createRef<RSCProbeHandle>();
+    await renderInAct(
+      <RSCProvider>
+        <RSCProbe ref={probeRef} />
+      </RSCProvider>,
+    );
+    return probeRef;
   };
 
   const rerenderInAct = async (result: ReturnType<typeof render>, ui: React.ReactElement) => {
@@ -201,6 +251,97 @@ class CapturingErrorBoundary extends React.Component<
 
   afterEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  it('0a. getComponent dedupes in-flight requests and keeps successful promises cached', async () => {
+    const pending = setupDeferredFetcher();
+    const payload = <div data-testid="cached-card">Cached card</div>;
+    const probeRef = await renderRSCProbe();
+
+    const firstPromise = probeRef.current!.getComponent('UserCard', { id: 1 });
+    const secondPromise = probeRef.current!.getComponent('UserCard', { id: 1 });
+
+    expect(secondPromise).toBe(firstPromise);
+    expect(getServerComponent).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      pending[0].resolve(payload);
+      await expect(firstPromise).resolves.toBe(payload);
+    });
+
+    const cachedPromise = probeRef.current!.getComponent('UserCard', { id: 1 });
+
+    expect(cachedPromise).toBe(firstPromise);
+    await expect(cachedPromise).resolves.toBe(payload);
+    expect(getServerComponent).toHaveBeenCalledTimes(1);
+  });
+
+  it('0b. getComponent evicts rejected promises so the same key can retry', async () => {
+    const transientError = new Error('transient RSC fetch failed');
+    const recoveredPayload = <div data-testid="recovered-card">Recovered card</div>;
+    setupSequencedFetcher([rejectWith(transientError), recoveredPayload]);
+    const probeRef = await renderRSCProbe();
+
+    await act(async () => {
+      await expect(probeRef.current!.getComponent('UserCard', { id: 1 })).rejects.toThrow(
+        'transient RSC fetch failed',
+      );
+      // FIFO timer ordering keeps this wait behind the deferred eviction timer,
+      // so the immediate retry below starts from an empty cache entry.
+      await waitForRejectedGetComponentEviction();
+    });
+
+    expect(getServerComponent).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await expect(probeRef.current!.getComponent('UserCard', { id: 1 })).resolves.toBe(recoveredPayload);
+    });
+
+    expect(getServerComponent).toHaveBeenCalledTimes(2);
+
+    const cachedPromise = probeRef.current!.getComponent('UserCard', { id: 1 });
+
+    await expect(cachedPromise).resolves.toBe(recoveredPayload);
+    expect(getServerComponent).toHaveBeenCalledTimes(2);
+  });
+
+  it('0c. getComponent rejection does not evict a newer same-key refetch promise', async () => {
+    const pending = setupDeferredFetcher();
+    const staleError = new Error('stale initial RSC fetch failed');
+    const recoveredPayload = <div data-testid="refetched-card">Refetched card</div>;
+    const probeRef = await renderRSCProbe();
+
+    const initialPromise = probeRef.current!.getComponent('UserCard', { id: 1 });
+    let refetchPromise!: Promise<React.ReactNode>;
+
+    await act(async () => {
+      refetchPromise = probeRef.current!.refetchComponent('UserCard', { id: 1 });
+      await Promise.resolve();
+    });
+
+    expect(getServerComponent).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      pending[0].reject(staleError);
+      await expect(initialPromise).rejects.toThrow('stale initial RSC fetch failed');
+      // Let the stale rejection's deferred eviction actually run before we
+      // assert below: without this flush the cache check races ahead of
+      // evictPromiseIfRejected's setTimeout(0), so the test would still pass
+      // even if the identity guard were missing and the eviction deleted the
+      // newer refetch promise.
+      await waitForRejectedGetComponentEviction();
+    });
+
+    await act(async () => {
+      pending[1].resolve(recoveredPayload);
+      await expect(refetchPromise).resolves.toBe(recoveredPayload);
+    });
+
+    const cachedPromise = probeRef.current!.getComponent('UserCard', { id: 1 });
+
+    expect(cachedPromise).toBe(refetchPromise);
+    await expect(cachedPromise).resolves.toBe(recoveredPayload);
+    expect(getServerComponent).toHaveBeenCalledTimes(2);
   });
 
   it('1. ref.current.refetch() triggers a fresh getServerComponent call with enforceRefetch=true', async () => {

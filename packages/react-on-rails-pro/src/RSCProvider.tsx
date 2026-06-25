@@ -344,6 +344,35 @@ export const createRSCProvider = ({
           }
           return payload;
         };
+        // When the underlying fetch REJECTS (as opposed to resolving with an
+        // `Error` value), the single-argument `.then` below would leave the
+        // rejected promise cached under `key`, so every later same-key
+        // `getComponent` returns that same rejection and a transient
+        // renderer/network/deploy failure stays wedged until an explicit
+        // refetch or reload (#3929). Evict the rejected entry so the next
+        // same-key `getComponent` starts a fresh fetch.
+        //
+        // Deferred one macrotask (`setTimeout(0)`, not `queueMicrotask`) so
+        // React's Suspense machinery observes the rejection on the cached
+        // promise before the entry is removed; a microtask could interleave
+        // with React's own queue and evict before Suspense reads it. Guarded on
+        // promise identity so a newer same-key promise (a fresh `getComponent`
+        // or a `refetchComponent`) installed during that window is not evicted
+        // by this stale failure. Pins are preserved because the `.finally`
+        // below still owns the matching `unpin` (mirrors the delete +
+        // deferred-unpin handoff in `restoreLastSuccessfulPromise`).
+        //
+        // NOTE: payloads that RESOLVE with an `Error` value are intentionally
+        // left cached here; whether those should also retry is a separate
+        // `getServerComponent` contract decision tracked apart from #3929.
+        const evictPromiseIfRejected = (error: unknown) => {
+          setTimeout(() => {
+            if (fetchRSCPromises.get(key, false) === promise) {
+              fetchRSCPromises.deletePreservingPins(key);
+            }
+          }, 0);
+          throw error;
+        };
         let serverComponentPromise: Promise<ReactNode>;
         try {
           serverComponentPromise = getServerComponent({ componentName, componentProps });
@@ -356,7 +385,7 @@ export const createRSCProvider = ({
           throw error;
         }
 
-        promise = serverComponentPromise.then(markPayloadIfSuccessful).finally(() => {
+        promise = serverComponentPromise.then(markPayloadIfSuccessful, evictPromiseIfRejected).finally(() => {
           if (notifyRoutesOnSuccess && !payloadSucceeded && releaseInFlightEvictedSuccessLatch()) {
             evictedSuccessfulPayloadKeys.set(key, true);
           }
