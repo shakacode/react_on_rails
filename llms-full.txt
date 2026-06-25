@@ -3934,6 +3934,49 @@ The `.client.jsx` / `.server.jsx` suffixes that auto-bundling supports for split
 
 3. **Use variants for the `wrapServerComponentRenderer` wrapper pattern.** When a client component contains `RSCRoute` and needs to be wrapped with `wrapServerComponentRenderer`, the wrappers are authored as `.client.tsx` and `.server.tsx` variants. See [Embedding Server Components in Client Components](../../pro/react-server-components/inside-client-components.md) for the full walkthrough.
 
+#### Compiled-to-JS languages and RSC client references
+
+For RSC builds, React on Rails only sees the JavaScript modules that webpack or rspack compile. If a component is authored in a language that emits JavaScript, such as ReScript, the RSC client-reference pipeline must discover the compiled JavaScript module that the RSC bundle will import, not the original source file.
+
+Use one of these patterns:
+
+1. **Prefer a thin JavaScript/TypeScript wrapper for each RSC boundary.** Put the wrapper in `components_subdirectory`, import the compiled output, and make the wrapper the module that server components import.
+
+   ```text
+   app/javascript/src/Comments/
+   ├── ReScriptLikeButton.bs.js
+   └── ror_components/
+       └── ReScriptLikeButton.jsx
+   ```
+
+   ```jsx
+   // app/javascript/src/Comments/ror_components/ReScriptLikeButton.jsx
+   'use client';
+
+   import ReScriptLikeButton from '../ReScriptLikeButton.bs.js';
+
+   export default ReScriptLikeButton;
+   ```
+
+   Server components should import the wrapper path, not the compiled `.bs.js` file directly. That keeps the `'use client'` directive, auto-bundled pack, RSC client-reference manifest key, and runtime module resolution aligned on the same JavaScript module. The same wrapper also satisfies the component-naming requirement covered in [Transpiled Languages (ReScript, Reason, etc.)](#transpiled-languages-rescript-reason-etc) below, so you do not need a second wrapper file.
+
+2. **If the compiled output is the boundary module, make the compiled JavaScript discoverable.** The generated RSC configs read client references from the file named by `RSC_MANIFEST_CLIENT_REFERENCES_JSON`, or from the default path `ssr-generated/rsc-client-references.json` when the env var is not set. That JSON must have this shape:
+
+   ```json
+   {
+     "refs": ["app/javascript/src/Comments/ReScriptLikeButton.bs.js"]
+   }
+   ```
+
+   The `refs` entries must match the compiled module paths that webpack/rspack resolve in the RSC build; use paths relative to the Rails root (webpack's cwd at build time), not absolute paths or module-specifier aliases. Do not list the original `.res` source path unless that is the module actually imported by the RSC bundle through a loader.
+
+   > [!IMPORTANT]
+   > The compiled JavaScript file must carry a `'use client'` directive at the top, either emitted by the compiler or injected by a loader, so the RSC plugin classifies it as a client boundary. If your toolchain cannot guarantee this, use the wrapper-file pattern above instead.
+
+3. **Keep the discovery manifest fresh.** `bin/shakapacker-precompile-hook` runs the RSC client-reference discovery build and writes the default manifest. A long-running webpack/rspack watch process reads that manifest at startup, so restart the watch after adding a new compiled-language client boundary. If the manifest is older than the server-component registration entry, webpack logs a `[react_on_rails] ... RSC client references may be stale` warning at startup; re-run the precompile hook and restart the watch when you see that warning.
+
+For direct compiled-output integration, the loader or build step for that language must preserve or inject the client boundary (the `'use client'` directive) before the RSC loader/plugin scans it. If that is not practical, use the wrapper-file pattern above; it is explicit and keeps the React on Rails generated files on the supported path.
+
 #### Related RSC documentation
 
 - [Create a React Server Component](../../pro/react-server-components/create-without-ssr.md) — step-by-step tutorial for setting up RSC and authoring your first server component.
@@ -3972,7 +4015,7 @@ import ReScriptShow from '../ReScriptShow.bs.js';
 export default ReScriptShow;
 ```
 
-This pattern works for any transpiled language and requires no gem configuration changes. The wrapper file can use `.js`, `.jsx`, `.ts`, or `.tsx` depending on your project setup.
+This pattern works for any transpiled language and requires no gem configuration changes. The wrapper file can use `.js`, `.jsx`, `.ts`, or `.tsx` depending on your project setup. If this wrapper is also an RSC client boundary, put the `'use client'` directive at the top as described in [Compiled-to-JS languages and RSC client references](#compiled-to-js-languages-and-rsc-client-references).
 
 > [!NOTE]
 > While it's possible to add gem-level configuration for additional extensions, the wrapper-file pattern is recommended because it:
