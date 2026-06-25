@@ -1,0 +1,50 @@
+name: Update llms-full.txt
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-llms-full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.tool-versions.outputs.node-version }}
+
+      - name: Test llms-full generator validation
+        run: bash script/generate-llms-full-test.bash
+
+      - name: Regenerate llms-full references
+        run: node script/generate-llms-full.mjs
+
+      - name: Create pull request for generated updates
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: docs/update-llms-full
+          delete-branch: true
+          title: Regenerate llms-full references
+          commit-message: Regenerate llms-full references
+          body: |
+            Regenerates the machine-readable docs reference files from the current docs source.
+
+            Validation:
+            - `bash script/generate-llms-full-test.bash`
+            - `node script/generate-llms-full.mjs`
+          add-paths: |
+            llms-full.txt
+            llms-full-pro.txt

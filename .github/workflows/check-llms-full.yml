@@ -1,4 +1,4 @@
-name: Check llms-full.txt
+name: Validate llms-full.txt
 
 permissions:
   contents: read
@@ -55,5 +55,5 @@ jobs:
       - name: Test llms-full generator validation
         run: bash script/generate-llms-full-test.bash
 
-      - name: Check llms-full.txt is current and docs URLs resolve
-        run: node script/generate-llms-full.mjs --check
+      - name: Validate llms-full generation inputs
+        run: node script/generate-llms-full.mjs --validate
