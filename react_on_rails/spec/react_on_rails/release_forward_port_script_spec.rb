@@ -362,6 +362,34 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "routes reverts of release-branch merge commits to manual handling" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      main_fix_sha = commit_all(repo, "Fix release regression")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      git(repo, "checkout", "-b", "release-fix", main_fix_sha)
+      git(repo, "checkout", "release/1.0.1")
+      git(repo, "merge", "--no-ff", "release-fix", "-m", "Merge release fix branch")
+      merge_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "revert", "-m", "1", "--no-edit", merge_sha)
+      merge_revert_sha = git(repo, "rev-parse", "HEAD").strip
+      merge_revert_body = git(repo, "log", "-1", "--format=%B")
+      expect(merge_revert_body).to include("This reverts commit #{merge_sha}, reversing")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--ack-manual", merge_sha)
+
+      expect(status).not_to be_success
+      expect(stdout).to include("ACK-MANUAL #{merge_sha[0, 12]} Merge release fix branch")
+      expect(stdout).to include("MANUAL #{merge_revert_sha[0, 12]} Revert \"Merge release fix branch\"")
+      expect(stdout).to include("reverts a release-branch merge commit")
+      expect(stderr).to include("Manual inspection required for #{merge_revert_sha}")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nmain fix\n")
+    end
+  end
+
   it "keeps earlier picks when a later cherry-pick is aborted" do
     with_release_repo do |repo|
       add_rc_bump_and_fix(repo)

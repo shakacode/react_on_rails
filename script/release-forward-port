@@ -162,6 +162,8 @@ class ReleaseForwardPort
   end
 
   def patch_equivalent_candidates(source, target)
+    # git cherry uses patch-id, which covers content hunks but not mode-only
+    # changes. Mode-only commit idempotency is covered by the -x footer path.
     git_lines("cherry", target, source).each_with_object({}) do |line, commits|
       marker, sha = line.split(/\s+/, 2)
       commits[sha] = true if marker == "-"
@@ -226,6 +228,7 @@ class ReleaseForwardPort
     reason.start_with?(
       "merge commit; inspect manually",
       "reverts a release-only application",
+      "reverts a release-branch merge commit",
       "stable release version bump commit"
     )
   end
@@ -296,15 +299,20 @@ class ReleaseForwardPort
   def reverse_pick_revert_skip_reason(sha, target)
     reverted_sha = standard_revert_target(sha)
     return unless reverted_sha && commit_exists?(reverted_sha)
+    return merge_revert_skip_reason(target) if merge_commit?(reverted_sha)
     return unless reverted_commit_live_on_target?(reverted_sha, target)
 
     "reverts a release-only application of a commit already live on #{target}; inspect manually " \
       "before applying this rollback to #{target}"
   end
 
+  def merge_revert_skip_reason(target)
+    "reverts a release-branch merge commit; inspect manually before applying this rollback to #{target}"
+  end
+
   def standard_revert_target(sha)
     body = git("log", "-1", "--format=%B", sha)
-    match = body.match(/This reverts commit (?<sha>[0-9a-f]{40})\./)
+    match = body.match(/This reverts commit (?<sha>[0-9a-f]{40})[.,]/)
     match && match[:sha]
   end
 
@@ -713,9 +721,9 @@ class ReleaseForwardPort
     stdout
   end
 
-  def capture_git(*, env: {}, stdin_data: nil)
-    merged_env = { "GIT_TERMINAL_PROMPT" => "0", "GIT_PAGER" => "cat" }.merge(env)
-    Open3.capture3(merged_env, "git", *, stdin_data:)
+  def capture_git(*, stdin_data: nil)
+    git_env = { "GIT_TERMINAL_PROMPT" => "0", "GIT_PAGER" => "cat" }
+    Open3.capture3(git_env, "git", *, stdin_data:)
   end
 
   def run_git(*)
