@@ -122,6 +122,30 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips reverts of skipped rc version bump commits" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc.1"))
+      write_file(repo, "CHANGELOG.md", "# Change Log\n\n### [1.0.1.rc.1]\n- RC notes\n")
+      rc_bump_sha = commit_all(repo, "Bump version to 1.0.1.rc.1")
+      git(repo, "revert", "--no-edit", "HEAD")
+      rc_revert_sha = git(repo, "rev-parse", "HEAD").strip
+
+      git(repo, "checkout", "main")
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{rc_bump_sha[0, 12]} Bump version to 1.0.1.rc.1")
+      expect(stdout).to include("SKIP #{rc_revert_sha[0, 12]} Revert \"Bump version to 1.0.1.rc.1\"")
+      expect(stdout).to include("reverts a release-only version bump that is skipped for main")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+      expect(File.read(File.join(repo, "react_on_rails/lib/react_on_rails/version.rb"))).to include("1.0.0")
+    end
+  end
+
   it "reports no commits when the source has nothing ahead of the target" do
     with_release_repo do |repo|
       stdout, stderr, status = run_script(repo, "--source", "main", "--target", "main", "--dry-run")
@@ -689,7 +713,9 @@ RSpec.describe "script/release-forward-port" do
     end
     allow(helper).to receive(:commit_descends_from?).and_return(true)
 
-    expect { helper.send(:standard_revert_on_target?, first_sha, "main") }.not_to raise_error
+    result = nil
+    expect { result = helper.send(:standard_revert_on_target?, first_sha, "main") }.not_to raise_error
+    expect(result).to be(false)
   end
 
   it "does not suggest cherry-pick --continue when Git did not start a cherry-pick" do

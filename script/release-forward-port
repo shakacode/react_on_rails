@@ -163,30 +163,32 @@ class ReleaseForwardPort
   end
 
   def skip_reason(sha, subject, target, target_version, patch_equivalent_commits)
-    if rc_version_bump?(subject)
-      return "rc version bump commit; release train forward-ports must keep prerelease bumps off #{target}"
-    end
+    special_reason = special_skip_reason(sha, subject, target, target_version)
+    return special_reason if special_reason
 
-    if merge_commit?(sha)
-      return "merge commit; inspect manually for conflict-resolution hunks before marking forward-port complete"
-    end
+    return "already forward-ported to #{target} via cherry-pick -x evidence with no later standard revert" if
+      already_forward_ported_with_x?(sha, target)
 
-    reverse_revert_reason = reverse_pick_revert_skip_reason(sha, target)
-    return reverse_revert_reason if reverse_revert_reason
+    return "empty commit; cherry-picking would only create a no-op commit on #{target}" if
+      patch_id_for_commit(sha) == EMPTY_PATCH_ID
 
-    if already_forward_ported_with_x?(sha, target)
-      return "already forward-ported to #{target} via cherry-pick -x evidence with no later standard revert"
-    end
-
-    if patch_id_for_commit(sha) == EMPTY_PATCH_ID
-      return "empty commit; cherry-picking would only create a no-op commit on #{target}"
-    end
-
-    if patch_equivalent_commits[sha] && patch_equivalent_commit_present_on_target?(sha, target)
+    if patch_equivalent_commits[sha] &&
+       patch_equivalent_commit_present_on_target?(sha, target)
       return "patch already exists on #{target} according to target history with no later standard revert"
     end
 
     version_bump_skip_reason(subject, target, target_version)
+  end
+
+  def special_skip_reason(sha, subject, target, target_version)
+    return "rc version bump commit; release train forward-ports must keep prerelease bumps off #{target}" if
+      rc_version_bump?(subject)
+
+    return "merge commit; inspect manually for conflict-resolution hunks before marking forward-port complete" if
+      merge_commit?(sha)
+
+    skipped_version_bump_revert_skip_reason(sha, subject, target, target_version) ||
+      reverse_pick_revert_skip_reason(sha, target)
   end
 
   def rc_version_bump?(subject)
@@ -200,7 +202,24 @@ class ReleaseForwardPort
   def manual_skip_reason?(reason)
     return false unless reason
 
-    reason.start_with?("merge commit; inspect manually", "reverts a release-only")
+    reason.start_with?("merge commit; inspect manually", "reverts a release-only application")
+  end
+
+  def skipped_version_bump_revert_skip_reason(sha, subject, target, target_version)
+    return unless standard_revert_subject?(subject)
+
+    reverted_sha = standard_revert_target(sha)
+    return unless reverted_sha
+
+    reverted_subject = git("log", "-1", "--format=%s", reverted_sha).strip
+    return unless skipped_version_bump_subject?(reverted_subject, target, target_version)
+
+    "reverts a release-only version bump that is skipped for #{target}; skipping this revert avoids " \
+      "an empty or target-regressing cherry-pick"
+  end
+
+  def skipped_version_bump_subject?(subject, target, target_version)
+    !!(rc_version_bump?(subject) || version_bump_skip_reason(subject, target, target_version))
   end
 
   def version_bump_skip_reason(subject, target, target_version)
@@ -261,6 +280,10 @@ class ReleaseForwardPort
     match && match[:sha]
   end
 
+  def standard_revert_subject?(subject)
+    subject.start_with?("Revert ")
+  end
+
   def already_forward_ported_with_x?(sha, target)
     return true if source_cherry_pick_origin_on_target?(sha, target)
 
@@ -308,6 +331,7 @@ class ReleaseForwardPort
 
     revert_message = "This reverts commit #{sha}."
     revert_shas = git_lines("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H")
+    # Seed the cache before recursive descent so mutual-revert cycles terminate.
     @standard_revert_cache[cache_key] = false
     @standard_revert_cache[cache_key] =
       revert_shas.any? do |revert_sha|
@@ -559,7 +583,7 @@ class ReleaseForwardPort
   end
 
   def cherry_pick_in_progress?
-    path = git("rev-parse", "--git-path", "CHERRY_PICK_HEAD").strip
+    path = git("rev-parse", "--path-format=absolute", "--git-path", "CHERRY_PICK_HEAD").strip
     File.exist?(path)
   rescue GitError
     false
