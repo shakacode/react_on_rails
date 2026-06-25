@@ -552,7 +552,9 @@ module ReactOnRailsPro
 
       runtime_envs = [ENV.fetch("RAILS_ENV", nil), ENV.fetch("NODE_ENV", nil)].compact_blank.map(&:downcase)
       allowed_envs = %w[development test].freeze
-      is_production_like = !(runtime_envs.any? && runtime_envs.all? { |e| allowed_envs.include?(e) })
+      # Fail closed when both envs are unset; the error below gives fresh dev shells
+      # the explicit development-env command.
+      is_production_like = !(runtime_envs.any? && runtime_envs.all? { |env| allowed_envs.include?(env) })
 
       if renderer_password.blank?
         return unless is_production_like
@@ -564,8 +566,8 @@ module ReactOnRailsPro
           In development and test environments, the renderer password is optional and no authentication
           is required. In all other environments, you must explicitly configure a password to secure
           communication between Rails and the Node Renderer.
-
-          To fix this, set the RENDERER_PASSWORD environment variable:
+          #{unset_renderer_env_guidance(runtime_envs)}
+          To secure the renderer, set the RENDERER_PASSWORD environment variable:
 
             export RENDERER_PASSWORD="your-secure-password"
 
@@ -594,6 +596,21 @@ module ReactOnRailsPro
       end
 
       warn_if_renderer_password_weak
+    end
+
+    def unset_renderer_env_guidance(runtime_envs)
+      return "" unless runtime_envs.empty?
+
+      <<~GUIDANCE
+
+        Both RAILS_ENV and NODE_ENV are unset. For a local Rails development shell,
+        either set them explicitly:
+
+          export RAILS_ENV=development NODE_ENV=development
+
+        or configure RENDERER_PASSWORD. Deployed/shared environments should set explicit
+        envs and RENDERER_PASSWORD.
+      GUIDANCE
     end
 
     def warn_if_renderer_password_weak
