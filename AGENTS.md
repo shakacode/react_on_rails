@@ -620,13 +620,13 @@ Current head SHA: <head SHA used for this block>
 Score: X/10
 Auto-merge recommendation: <yes if score is at least 8/10, else no>
 Affected areas: RSC, Pro/core boundary, CI
-CI detector: `script/ci-changes-detector origin/main` -> <summary>
+CI detector: `script/ci-changes-detector origin/main` → <summary>
 Validation run:
-- <command> -> <result>
+- <command> → <result>
 Review/check gate:
 - GitHub checks: complete for <head SHA>, failures/skips explained
 - Review threads: `gh`/GraphQL unresolved count is 0, or <N> unresolved threads each triaged with links
-- Review systems live this head: <N of M configured working; "none down" or each down system + reason; must be >= 2 working to merge>
+- Review systems live this head: <N of M configured working; "none down" or each down system + reason; must be ≥ 2 working to merge>
 - Current-head reviewer verdicts:
   - Claude review: complete for <head SHA>, no confirmed blocker
   - Fallback review, if Claude quota/capacity-limited: <Cursor or Codex result plus error evidence>
@@ -738,9 +738,11 @@ silently drop review coverage. Apply these rules to any PR merge, batch or not.
   pass, so total silence is treated as breakage, not approval. "Not working"
   also covers credit/quota exhaustion, hard usage-limit enforcement, HTTP 429
   that persists after one 60-second retry, HTTP 503 or other provider-capacity
-  errors, timeouts, and errored or not-installed checks. A system the repo/PR
-  does not configure is **not-configured**, which is distinct from not-working
-  and never counts against the floor below.
+  errors, timeouts, and errored or not-installed checks. Determine whether a
+  system is configured from repo-maintained automation, installed GitHub
+  app/check identities, PR check names, and recent PR review artifacts. A system
+  the repo/PR does not configure is **not-configured**, which is distinct from
+  not-working and never counts against the floor below.
 - **Keep iterating through a partial outage.** A not-working review system never
   blocks batch progress, review-fix iteration, or the readiness loop. As long as
   at least one configured system is working, continue; do not stall waiting on a

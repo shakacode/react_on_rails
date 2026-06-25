@@ -218,7 +218,7 @@ correctness regression, failing test, security issue, API contract break,
 data-loss risk, or missing required maintainer approval. Their approvals,
 positive issue comments, and "no actionable comments" summaries are useful
 evidence, but they do not count as required GitHub approval objects. Apply the
-review-system liveness rules in `AGENTS.md` -> **Review System Liveness And
+review-system liveness rules in `AGENTS.md` → **Review System Liveness And
 Coverage Floor**: classify each candidate system as working, not-working, or
 not-configured for the current head SHA. Only a configured system that produced
 no current-head artifact is not-working; a system the repo/PR does not configure
