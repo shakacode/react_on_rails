@@ -34,6 +34,12 @@ RSpec.describe "script/release-forward-port" do
     File.write(full_path, contents)
   end
 
+  def write_binary_file(repo, path, contents)
+    full_path = File.join(repo, path)
+    FileUtils.mkdir_p(File.dirname(full_path))
+    File.binwrite(full_path, contents)
+  end
+
   def commit_all(repo, message)
     git(repo, "add", ".")
     git(repo, "commit", "--no-gpg-sign", "-m", message)
@@ -533,6 +539,57 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "allows acknowledged manual items to be skipped so later eligible commits can continue" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      main_fix_sha = commit_all(repo, "Fix release regression")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      git(repo, "cherry-pick", "-x", main_fix_sha)
+      git(repo, "revert", "--no-edit", "HEAD")
+      release_revert_sha = git(repo, "rev-parse", "HEAD").strip
+      write_file(repo, "later.txt", "later release fix\n")
+      later_fix_sha = commit_all(repo, "Fix later release regression")
+      git(repo, "checkout", "main")
+
+      first_stdout, first_stderr, first_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(first_status).not_to be_success
+      expect(first_stdout).to include("MANUAL #{release_revert_sha[0, 12]} Revert \"Fix release regression\"")
+      expect(first_stdout).to include("PICK #{later_fix_sha[0, 12]} Fix later release regression")
+      expect(first_stderr).to include("Manual inspection required for #{release_revert_sha}")
+      expect(first_stderr).to include("--ack-manual #{release_revert_sha}")
+      expect(first_stderr).to include("Note: 1 later eligible commit in this plan is not attempted after this failure")
+      expect(File).not_to exist(File.join(repo, "later.txt"))
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--ack-manual", release_revert_sha)
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("ACK-MANUAL #{release_revert_sha[0, 12]} Revert \"Fix release regression\"")
+      expect(second_stdout).to include("PICK #{later_fix_sha[0, 12]} Fix later release regression")
+      expect(second_stdout).to include("Forward-port complete")
+      expect(File.read(File.join(repo, "later.txt"))).to eq("later release fix\n")
+
+      latest_commit_body = git(repo, "log", "-1", "--format=%B")
+      expect(latest_commit_body).to include("(cherry picked from commit #{later_fix_sha})")
+    end
+  end
+
+  it "rejects acknowledged commits that are not manual items in the current plan" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run", "--ack-manual", fix_sha)
+
+      expect(status.exitstatus).to eq(2)
+      expect(stderr).to include("--ack-manual only accepts commits currently marked MANUAL")
+      expect(stderr).to include(fix_sha)
+    end
+  end
+
   it "does not skip an -x cherry-pick that was later reverted" do
     with_release_repo do |repo|
       add_rc_bump_and_fix(repo)
@@ -716,6 +773,47 @@ RSpec.describe "script/release-forward-port" do
     result = nil
     expect { result = helper.send(:standard_revert_on_target?, first_sha, "main") }.not_to raise_error
     expect(result).to be(false)
+  end
+
+  it "does not crash when a standard revert footer references a missing commit" do
+    with_release_repo do |repo|
+      missing_sha = "a" * 40
+      git(repo, "checkout", "-b", "release/1.0.1")
+      git(
+        repo,
+        "commit",
+        "--allow-empty",
+        "--no-gpg-sign",
+        "-m",
+        "Revert \"Missing release commit\"",
+        "-m",
+        "This reverts commit #{missing_sha}."
+      )
+      revert_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stderr).not_to include("ERROR")
+      expect(stdout).to include("SKIP #{revert_sha[0, 12]} Revert \"Missing release commit\"")
+      expect(stdout).to include("empty commit; cherry-picking would only create a no-op commit on main")
+    end
+  end
+
+  it "handles invalid byte patches without encoding errors during patch-id checks" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_binary_file(repo, "invalid-bytes.txt", "\xffrelease bytes\n".b)
+      binary_fix_sha = commit_all(repo, "Fix release binary payload")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stderr).not_to include("ERROR")
+      expect(stdout).to include("PICK #{binary_fix_sha[0, 12]} Fix release binary payload")
+    end
   end
 
   it "does not suggest cherry-pick --continue when Git did not start a cherry-pick" do

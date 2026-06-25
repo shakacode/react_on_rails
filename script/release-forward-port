@@ -25,7 +25,9 @@ class ReleaseForwardPort
     "rc" => 5
   }.freeze
   EMPTY_PATCH_ID = "__empty_patch__"
-  CHERRY_PICK_FOOTER_PREFIX = "(cherry picked from commit "
+  CHERRY_PICK_FOOTER_FORMAT = "(cherry picked from commit %s)"
+  CHERRY_PICK_FOOTER_PATTERN = /\(cherry picked from commit (?<sha>[0-9a-f]{40})\)/
+  ASCII_WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
 
   PlanEntry = Struct.new(:sha, :subject, :action, :reason, :manual, keyword_init: true) do
     def short_sha
@@ -45,6 +47,7 @@ class ReleaseForwardPort
     @explicit_options = { source: false, target: false }
     @options = {
       dry_run: false,
+      ack_manual: [],
       target: "main"
     }
     @parser = build_parser
@@ -58,6 +61,7 @@ class ReleaseForwardPort
 
     verify_ref!(source, label: "source")
     verify_ref!(target, label: "target")
+    normalize_acknowledged_manual_shas!
     ensure_local_target_branch!(target) unless @options[:dry_run]
 
     commits = source_only_commits(source, target)
@@ -68,6 +72,7 @@ class ReleaseForwardPort
     # guard, so normal mode and dry-run report the same plan before refusing to
     # checkout or cherry-pick.
     plan = build_plan(commits, target, target_version, equiv_commits)
+    validate_acknowledged_manual_shas!(plan)
 
     print_plan(source, target, target_version, plan)
 
@@ -109,14 +114,7 @@ class ReleaseForwardPort
 
   def build_parser
     OptionParser.new do |parser|
-      parser.banner = <<~BANNER
-        Usage: script/release-forward-port --source release/X.Y.Z [--target main] [--dry-run]
-               script/release-forward-port release/X.Y.Z [main] [--dry-run]
-
-        Forward-port commits that are on a release branch but not on the target branch.
-        The helper cherry-picks with -x, skips commits already forward-ported with -x
-        evidence or patches present in the target tree, and excludes RC version bump commits.
-      BANNER
+      parser.banner = usage_banner
 
       parser.on("--source REF", "Release branch or ref to forward-port from") do |source|
         @options[:source] = source
@@ -129,10 +127,31 @@ class ReleaseForwardPort
       parser.on("--dry-run", "Print the plan without checking out or cherry-picking") do
         @options[:dry_run] = true
       end
+      add_ack_manual_option(parser)
       parser.on("-h", "--help", "Show this help") do
         puts parser
         exit 0
       end
+    end
+  end
+
+  def usage_banner
+    <<~BANNER
+      Usage: script/release-forward-port --source release/X.Y.Z [--target main] [--dry-run]
+             script/release-forward-port release/X.Y.Z [main] [--dry-run]
+
+      Forward-port commits that are on a release branch but not on the target branch.
+      The helper cherry-picks with -x, skips commits already forward-ported with -x
+      evidence or patches present in the target tree, and excludes RC version bump commits.
+    BANNER
+  end
+
+  def add_ack_manual_option(parser)
+    parser.on(
+      "--ack-manual SHA",
+      "Acknowledge an inspected MANUAL commit and skip it in normal mode (repeatable)"
+    ) do |sha|
+      @options[:ack_manual] << sha
     end
   end
 
@@ -211,7 +230,9 @@ class ReleaseForwardPort
     reverted_sha = standard_revert_target(sha)
     return unless reverted_sha
 
-    reverted_subject = git("log", "-1", "--format=%s", reverted_sha).strip
+    reverted_subject = subject_for_commit(reverted_sha)
+    return unless reverted_subject
+
     return unless skipped_version_bump_subject?(reverted_subject, target, target_version)
 
     "reverts a release-only version bump that is skipped for #{target}; skipping this revert avoids " \
@@ -268,7 +289,8 @@ class ReleaseForwardPort
 
   def reverse_pick_revert_skip_reason(sha, target)
     reverted_sha = standard_revert_target(sha)
-    return unless reverted_sha && reverted_commit_live_on_target?(reverted_sha, target)
+    return unless reverted_sha && commit_exists?(reverted_sha)
+    return unless reverted_commit_live_on_target?(reverted_sha, target)
 
     "reverts a release-only application of a commit already live on #{target}; inspect manually " \
       "before applying this rollback to #{target}"
@@ -287,7 +309,7 @@ class ReleaseForwardPort
   def already_forward_ported_with_x?(sha, target)
     return true if source_cherry_pick_origin_on_target?(sha, target)
 
-    footer = "#{CHERRY_PICK_FOOTER_PREFIX}#{sha})"
+    footer = format(CHERRY_PICK_FOOTER_FORMAT, sha)
     # This history search can false-positive if a later target commit quotes the
     # footer verbatim. The runbook documents that boundary for release operators.
     forwarded_shas = git_lines("log", target, "--fixed-strings", "--grep", footer, "--format=%H")
@@ -310,7 +332,7 @@ class ReleaseForwardPort
 
   def cherry_pick_origin(sha)
     body = git("log", "-1", "--format=%B", sha)
-    match = body.match(/\(cherry picked from commit (?<sha>[0-9a-f]{40})\)/)
+    match = body.match(CHERRY_PICK_FOOTER_PATTERN)
     match && match[:sha]
   end
 
@@ -355,10 +377,10 @@ class ReleaseForwardPort
   end
 
   def patch_id_for_commit(sha)
-    patch = git("show", "--format=", "--full-index", "--find-renames", sha)
+    patch = git("show", "--format=", "--full-index", "--find-renames", sha).b
     # Empty commits carry no file changes; cherry-picking them would only create
     # a no-op commit, so treat the patch as already present.
-    return EMPTY_PATCH_ID if patch.strip.empty?
+    return EMPTY_PATCH_ID if empty_patch?(patch)
 
     stdout, stderr, status = capture_git("patch-id", "--stable", stdin_data: patch)
     raise GitError, "#{git_error(['patch-id', '--stable'], stdout, stderr, status)} for #{sha}" unless status.success?
@@ -458,15 +480,36 @@ class ReleaseForwardPort
   end
 
   def plan_summary(plan)
+    counts = plan_counts(plan)
+    parts = [
+      "#{commit_count(counts.fetch(:picks))} to cherry-pick",
+      "#{commit_count(counts.fetch(:skips))} skipped"
+    ]
+    parts << "#{commit_count(counts.fetch(:acknowledged_manual))} acknowledged manual skipped" if
+      counts.fetch(:acknowledged_manual).positive?
+    parts << manual_inspection_summary(counts.fetch(:manual)) if counts.fetch(:manual).positive?
+    "Summary: #{parts.join(', ')}."
+  end
+
+  def plan_counts(plan)
     picks = plan.count { |entry| entry.action == :pick }
-    manual = plan.count(&:manual?)
-    skips = plan.length - picks - manual
-    summary = "Summary: #{picks} commit#{'s' unless picks == 1} to cherry-pick, " \
-              "#{skips} commit#{'s' unless skips == 1} skipped"
-    if manual.positive?
-      summary += ", #{manual} commit#{'s' unless manual == 1} need#{'s' if manual == 1} manual inspection"
-    end
-    "#{summary}."
+    acknowledged_manual = plan.count { |entry| acknowledged_manual_entry?(entry) }
+    manual = plan.count { |entry| entry.manual? && !acknowledged_manual_entry?(entry) }
+
+    {
+      picks:,
+      acknowledged_manual:,
+      manual:,
+      skips: plan.length - picks - manual - acknowledged_manual
+    }
+  end
+
+  def commit_count(count)
+    "#{count} commit#{'s' unless count == 1}"
+  end
+
+  def manual_inspection_summary(count)
+    "#{commit_count(count)} #{count == 1 ? 'needs' : 'need'} manual inspection"
   end
 
   def print_plan_entry(entry)
@@ -474,8 +517,10 @@ class ReleaseForwardPort
     when :pick
       puts "PICK #{entry.short_sha} #{entry.subject}"
     when :skip
-      puts "#{entry.manual? ? 'MANUAL' : 'SKIP'} #{entry.short_sha} #{entry.subject}"
+      puts "#{plan_entry_label(entry)} #{entry.short_sha} #{entry.subject}"
       puts "     #{entry.reason}"
+      puts "     acknowledged by --ack-manual; skipping after operator inspection" if
+        acknowledged_manual_entry?(entry)
     else
       raise GitError, "unexpected plan entry action: #{entry.action.inspect}"
     end
@@ -510,9 +555,10 @@ class ReleaseForwardPort
     completed_picks = 0
     plan.each_with_index do |entry, index|
       next if entry.action == :skip && !entry.manual?
+      next if acknowledged_manual_entry?(entry)
 
       if entry.manual?
-        warn_manual_entry(entry, completed: completed_picks, remaining: remaining_actionable_entries(plan, index))
+        warn_manual_entry(entry, completed: completed_picks, remaining: remaining_picks(plan, index))
         return 1
       end
 
@@ -530,11 +576,7 @@ class ReleaseForwardPort
   end
 
   def actionable_plan?(plan)
-    plan.any? { |entry| entry.action == :pick || entry.manual? }
-  end
-
-  def remaining_actionable_entries(plan, index)
-    plan[index + 1..].count { |entry| entry.action == :pick || entry.manual? }
+    plan.any? { |entry| entry.action == :pick || (entry.manual? && !acknowledged_manual_entry?(entry)) }
   end
 
   def remaining_picks(plan, index)
@@ -568,7 +610,9 @@ class ReleaseForwardPort
   def warn_manual_entry(entry, completed:, remaining:)
     warn "Manual inspection required for #{entry.sha}."
     warn entry.reason
-    warn_later_commits(remaining, "after resolving the manual item", continue_context: false)
+    warn "After inspection, apply any needed manual hunks so a rerun can skip this commit, or rerun with " \
+         "--ack-manual #{entry.sha} to record a no-hunks-needed decision and continue."
+    warn_later_commits(remaining, "after acknowledging the manual item", continue_context: false)
     warn "Earlier successful picks from this run are already committed and safe." if completed.positive?
   end
 
@@ -583,10 +627,55 @@ class ReleaseForwardPort
   end
 
   def cherry_pick_in_progress?
-    path = git("rev-parse", "--path-format=absolute", "--git-path", "CHERRY_PICK_HEAD").strip
+    git_dir = git("rev-parse", "--git-dir").strip
+    path = File.expand_path("CHERRY_PICK_HEAD", git_dir)
     File.exist?(path)
   rescue GitError
     false
+  end
+
+  def normalize_acknowledged_manual_shas!
+    @acknowledged_manual_shas = @options.fetch(:ack_manual).map do |sha|
+      git("rev-parse", "--verify", "#{sha}^{commit}").strip
+    rescue GitError => e
+      raise GitError, "--ack-manual #{sha.inspect} is not a commit: #{e.message}"
+    end.uniq
+  end
+
+  def validate_acknowledged_manual_shas!(plan)
+    return if @acknowledged_manual_shas.empty?
+
+    manual_shas = plan.select(&:manual?).map(&:sha)
+    unmatched = @acknowledged_manual_shas - manual_shas
+    return if unmatched.empty?
+
+    raise UsageError, "--ack-manual only accepts commits currently marked MANUAL in the plan; " \
+                      "unmatched: #{unmatched.join(', ')}"
+  end
+
+  def acknowledged_manual_entry?(entry)
+    entry.manual? && @acknowledged_manual_shas&.include?(entry.sha)
+  end
+
+  def plan_entry_label(entry)
+    return "ACK-MANUAL" if acknowledged_manual_entry?(entry)
+
+    entry.manual? ? "MANUAL" : "SKIP"
+  end
+
+  def subject_for_commit(sha)
+    git("log", "-1", "--format=%s", sha).strip
+  rescue GitError
+    nil
+  end
+
+  def commit_exists?(sha)
+    _stdout, _stderr, status = capture_git("cat-file", "-e", "#{sha}^{commit}")
+    status.success?
+  end
+
+  def empty_patch?(patch)
+    patch.each_byte.all? { |byte| ASCII_WHITESPACE_BYTES.include?(byte) }
   end
 
   def verify_ref!(ref, label:)

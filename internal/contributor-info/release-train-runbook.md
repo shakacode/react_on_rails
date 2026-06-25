@@ -227,6 +227,12 @@ git push   # or open a PR if main is protected / the fix needs review on main
   earlier picks in this run are already committed and safe. After fixing the conflict, rerun
   `script/release-forward-port` from the start: it is idempotent and skips commits already applied,
   then continues from the still-missing fix. Do not manually pick `Bump version to ...rc.N` commits.
+- Manual inspection fallback: if the helper reports `MANUAL` for a merge commit or a release-only
+  rollback, inspect whether any target hunks are needed. Apply those hunks manually if needed, then
+  rerun the helper. If the inspected commit still appears as `MANUAL` and no target hunks are needed,
+  rerun with `--ack-manual <sha>` for that commit so the helper can continue to later eligible picks.
+  `--ack-manual` only accepts commits that the current plan marks `MANUAL`; it is an acknowledgement,
+  not a blanket skip for normal `PICK` commits.
 - If a fix is _also_ wanted for ongoing `main` development and is low-risk, it is acceptable to author
   it on `main` first and cherry-pick it onto `release/X.Y.Z` (step 2 in reverse). Pick one direction
   per fix and record which in the PR so the other branch is not missed.
