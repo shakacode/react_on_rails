@@ -198,10 +198,9 @@ function normalizedRuntimeEnvs() {
 
 function runtimeEnvsAllowDevelopmentDefaults() {
   const runtimeEnvs = normalizedRuntimeEnvs();
-  // Fail closed: every present runtime env must be development/test before we allow
-  // missing-password defaults. Any production-like value, or no env at all, still
-  // requires an explicit password.
-  return runtimeEnvs.length > 0 && runtimeEnvs.every((value) => value === 'development' || value === 'test');
+  // Rails defaults an unset environment to development, so the fully unset case
+  // should not make fresh development shells fail closed.
+  return runtimeEnvs.every((value) => value === 'development' || value === 'test');
 }
 
 // Intentionally checks only NODE_ENV, not both NODE_ENV and RAILS_ENV like
@@ -369,7 +368,7 @@ function validatePasswordForProduction(aConfig: Config): string | null {
         'Environment matrix:\n' +
         '  development — password optional (no authentication)\n' +
         '  test        — password optional (no authentication)\n' +
-        '  (neither set) — treated as production-like; RENDERER_PASSWORD required\n' +
+        '  (neither set) — password optional; Rails defaults unset env to development\n' +
         '  all other environments (staging, production, qa, preview, etc.) — RENDERER_PASSWORD required'
       );
     }

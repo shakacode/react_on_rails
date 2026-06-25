@@ -552,7 +552,9 @@ module ReactOnRailsPro
 
       runtime_envs = [ENV.fetch("RAILS_ENV", nil), ENV.fetch("NODE_ENV", nil)].compact_blank.map(&:downcase)
       allowed_envs = %w[development test].freeze
-      is_production_like = !(runtime_envs.any? && runtime_envs.all? { |e| allowed_envs.include?(e) })
+      # Rails defaults an unset environment to development, so the fully unset
+      # case should not make fresh development shells fail closed.
+      is_production_like = !runtime_envs.all? { |env| allowed_envs.include?(env) }
 
       if renderer_password.blank?
         return unless is_production_like
@@ -586,7 +588,7 @@ module ReactOnRailsPro
 
           Environment matrix (both RAILS_ENV and NODE_ENV are checked):
             development/test — password optional when every set env is development or test
-            (both unset)     — treated as production-like; RENDERER_PASSWORD required
+            (both unset)     — password optional; Rails defaults unset env to development
             staging          — RENDERER_PASSWORD required
             production       — RENDERER_PASSWORD required
             (mixed envs)     — RENDERER_PASSWORD required (e.g. NODE_ENV=production + RAILS_ENV=development)
