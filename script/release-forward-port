@@ -192,12 +192,14 @@ class ReleaseForwardPort
     special_reason = special_skip_reason(sha, subject, target, target_version)
     return special_reason if special_reason
 
-    return "already forward-ported to #{target} via cherry-pick -x evidence with no later standard revert" if
+    return "already forward-ported to #{target} via cherry-pick -x evidence with no later target revert" if
       already_forward_ported_with_x?(sha, target)
 
     return "empty commit; cherry-picking would only create a no-op commit on #{target}" if
       patch_id_for_commit(sha) == EMPTY_PATCH_ID
 
+    # Origin was reverted on target: the fix was applied and then undone, so
+    # re-apply it even if git cherry reports a patch match.
     return if source_cherry_pick_origin_reverted_on_target?(sha, target)
 
     if patch_equivalent_commits[sha] &&
@@ -344,20 +346,20 @@ class ReleaseForwardPort
     forwarded_shas = git_lines("log", target, "--fixed-strings", "--grep", footer, "--format=%H")
     return false if forwarded_shas.empty?
 
-    # True if at least one copy of the cherry-pick is still live on the target
-    # (that is, not followed by a live standard git revert). Multiple copies are
-    # fine: pick -> revert -> re-pick is handled because the re-pick copy passes.
-    forwarded_shas.any? { |forwarded_sha| !standard_revert_on_target?(forwarded_sha, target) }
+    # True if at least one copy of the cherry-pick is still live on the target.
+    # Multiple copies are fine: pick -> revert -> re-pick is handled because the
+    # re-pick copy passes.
+    forwarded_shas.any? { |forwarded_sha| target_commit_live_on_target?(forwarded_sha, target) }
   end
 
   def source_cherry_pick_origin_on_target?(sha, target)
     origin_sha = cherry_pick_origin(sha)
-    origin_sha && commit_on_target?(origin_sha, target) && !standard_revert_on_target?(origin_sha, target)
+    origin_sha && commit_on_target?(origin_sha, target) && target_commit_live_on_target?(origin_sha, target)
   end
 
   def source_cherry_pick_origin_reverted_on_target?(sha, target)
     origin_sha = cherry_pick_origin(sha)
-    origin_sha && commit_on_target?(origin_sha, target) && standard_revert_on_target?(origin_sha, target)
+    origin_sha && commit_on_target?(origin_sha, target) && !target_commit_live_on_target?(origin_sha, target)
   end
 
   def reverted_commit_live_on_target?(sha, target)
@@ -395,6 +397,7 @@ class ReleaseForwardPort
   end
 
   def standard_revert_shas_on_target(sha, target)
+    # Git writes simple reverts as "sha." and merge reverts as "sha, reversing...".
     [".", ","].flat_map do |suffix|
       revert_message = "This reverts commit #{sha}#{suffix}"
       git_lines("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H")
@@ -405,8 +408,25 @@ class ReleaseForwardPort
     source_patch_id = patch_id_for_commit(sha)
 
     patch_equivalent_target_candidates(sha, target).any? do |target_sha|
-      patch_id_for_commit(target_sha) == source_patch_id && !standard_revert_on_target?(target_sha, target)
+      patch_id_for_commit(target_sha) == source_patch_id && target_commit_live_on_target?(target_sha, target)
     end
+  end
+
+  def target_commit_live_on_target?(sha, target)
+    !standard_revert_on_target?(sha, target) && !target_commit_reverted_through_merge?(sha, target)
+  end
+
+  def target_commit_reverted_through_merge?(sha, target)
+    @target_merge_revert_cache ||= {}
+    cache_key = [sha, target]
+    return @target_merge_revert_cache.fetch(cache_key) if @target_merge_revert_cache.key?(cache_key)
+
+    @target_merge_revert_cache[cache_key] =
+      target_merge_descendants(sha, target).any? { |merge_sha| standard_revert_on_target?(merge_sha, target) }
+  end
+
+  def target_merge_descendants(sha, target)
+    git_lines("log", target, "--merges", "--ancestry-path", "#{sha}..#{target}", "--format=%H")
   end
 
   def patch_equivalent_target_candidates(sha, target)
@@ -750,7 +770,7 @@ class ReleaseForwardPort
     stdout
   end
 
-  def capture_git(*, stdin_data: nil)
+  def capture_git(*, stdin_data: "")
     git_env = { "GIT_TERMINAL_PROMPT" => "0", "GIT_PAGER" => "cat" }
     Open3.capture3(git_env, "git", *, stdin_data:)
   end

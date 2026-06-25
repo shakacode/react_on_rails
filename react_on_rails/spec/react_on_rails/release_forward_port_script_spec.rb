@@ -98,6 +98,22 @@ RSpec.describe "script/release-forward-port" do
     [rc_bump_sha, fix_sha]
   end
 
+  def add_reverted_feature_merge(repo)
+    base_sha = git(repo, "rev-parse", "HEAD").strip
+    git(repo, "checkout", "-b", "feature")
+    write_file(repo, "app.txt", "base\nmain merge fix\n")
+    feature_sha = commit_all(repo, "Fix regression through feature branch")
+
+    git(repo, "checkout", "main")
+    git(repo, "merge", "--no-ff", "feature", "-m", "Merge feature fix")
+    merge_sha = git(repo, "rev-parse", "HEAD").strip
+    git(repo, "revert", "-m", "1", "--no-edit", merge_sha)
+    merge_revert_body = git(repo, "log", "-1", "--format=%B")
+    expect(merge_revert_body).to include("This reverts commit #{merge_sha}, reversing")
+
+    [base_sha, feature_sha, merge_sha]
+  end
+
   it "dry-runs the forward-port plan without changing the target branch" do
     with_release_repo do |repo|
       rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
@@ -543,6 +559,44 @@ RSpec.describe "script/release-forward-port" do
 
       expect(status).to be_success, stderr
       expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Merge feature fix")
+      expect(stdout).to include("Forward-port complete")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nmain merge fix\n")
+    end
+  end
+
+  it "picks release commits cherry-picked from target feature commits whose merge was later reverted" do
+    with_release_repo do |repo|
+      base_sha, feature_sha = add_reverted_feature_merge(repo)
+
+      git(repo, "checkout", "-b", "release/1.0.1", base_sha)
+      git(repo, "cherry-pick", "-x", feature_sha)
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Fix regression through feature branch")
+      expect(stdout).to include("Forward-port complete")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nmain merge fix\n")
+    end
+  end
+
+  it "picks no-footer release commits when the matching target merge was later reverted" do
+    with_release_repo do |repo|
+      base_sha, = add_reverted_feature_merge(repo)
+
+      git(repo, "checkout", "-b", "release/1.0.1", base_sha)
+      write_file(repo, "app.txt", "base\nmain merge fix\n")
+      release_fix_sha = commit_all(repo, "Fix release regression")
+      release_fix_body = git(repo, "log", "-1", "--format=%B")
+      expect(release_fix_body).not_to include("cherry picked from commit")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Fix release regression")
       expect(stdout).to include("Forward-port complete")
       expect(File.read(File.join(repo, "app.txt"))).to eq("base\nmain merge fix\n")
     end
