@@ -740,9 +740,9 @@ silently drop review coverage. Apply these rules to any PR merge, batch or not.
   that persists after one 60-second retry, HTTP 503 or other provider-capacity
   errors, timeouts, and errored or not-installed checks. Determine whether a
   system is configured from repo-maintained automation, installed GitHub
-  app/check identities, PR check names, and recent PR review artifacts. A system
-  the repo/PR does not configure is **not-configured**, which is distinct from
-  not-working and never counts against the floor below.
+  app/check identities, and check or review identities visible on the current PR.
+  A system the repo/PR does not configure is **not-configured**, which is
+  distinct from not-working and never counts against the floor below.
 - **Keep iterating through a partial outage.** A not-working review system never
   blocks batch progress, review-fix iteration, or the readiness loop. As long as
   at least one configured system is working, continue; do not stall waiting on a
