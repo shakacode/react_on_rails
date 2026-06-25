@@ -3472,6 +3472,7 @@ module ReactOnRails
     ].freeze
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
+    RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
 
     def check_rsc_setup
       return unless ReactOnRails::Utils.react_on_rails_pro?
@@ -3489,6 +3490,7 @@ module ReactOnRails
       check_rsc_bundler_config
       check_rsc_react_version
       check_rsc_procfile_watcher
+      check_rsc_client_manifest
     rescue StandardError => e
       checker.add_warning("⚠️  RSC setup check encountered an error: #{e.message}")
     end
@@ -3920,6 +3922,86 @@ module ReactOnRails
       all_deps[package_name]
     rescue StandardError
       nil
+    end
+
+    def check_rsc_client_manifest
+      manifest_path = rsc_client_manifest_file_path
+      unless manifest_path
+        checker.add_warning("⚠️  RSC client manifest path could not be resolved — cannot verify client references")
+        return
+      end
+
+      if manifest_url?(manifest_path)
+        report_rsc_client_manifest_dev_server_url(manifest_path)
+        return
+      end
+
+      unless File.exist?(manifest_path)
+        report_missing_rsc_client_manifest(manifest_path)
+        return
+      end
+
+      report_rsc_client_manifest_metadata(manifest_path)
+    rescue JSON::ParserError => e
+      checker.add_warning("⚠️  RSC client manifest is not valid JSON: #{e.message}")
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not inspect RSC client manifest: #{e.message}")
+    end
+
+    def rsc_client_manifest_file_path
+      return nil unless defined?(ReactOnRailsPro::Utils)
+      return nil unless ReactOnRailsPro::Utils.respond_to?(:react_client_manifest_file_path)
+
+      ReactOnRailsPro::Utils.react_client_manifest_file_path
+    end
+
+    def manifest_url?(manifest_path)
+      manifest_path.to_s.match?(%r{\Ahttps?://})
+    end
+
+    def report_rsc_client_manifest_dev_server_url(manifest_path)
+      checker.add_warning("⚠️  RSC client manifest resolves to a dev-server URL: #{manifest_path}")
+      add_rsc_client_manifest_static_mode_guidance
+    end
+
+    def report_missing_rsc_client_manifest(manifest_path)
+      checker.add_warning("⚠️  RSC client manifest not found at #{manifest_path}")
+      add_rsc_client_manifest_static_mode_guidance
+    end
+
+    def report_rsc_client_manifest_metadata(manifest_path)
+      manifest_metadata = rsc_client_manifest_metadata(manifest_path)
+      if manifest_metadata.nil?
+        checker.add_warning("⚠️  RSC client manifest is missing filePathToModuleMetadata: #{manifest_path}")
+      elsif manifest_metadata.empty?
+        report_empty_rsc_client_manifest(manifest_path)
+      else
+        checker.add_success(
+          "✅ RSC client manifest includes #{manifest_metadata.size} client reference metadata entries"
+        )
+      end
+    end
+
+    def report_empty_rsc_client_manifest(manifest_path)
+      checker.add_warning(
+        "⚠️  RSC client manifest has no client reference metadata: #{manifest_path}"
+      )
+      add_rsc_client_manifest_static_mode_guidance
+    end
+
+    def rsc_client_manifest_metadata(manifest_path)
+      manifest = JSON.parse(File.read(manifest_path))
+      metadata = manifest["filePathToModuleMetadata"]
+      metadata if metadata.is_a?(Hash)
+    end
+
+    def add_rsc_client_manifest_static_mode_guidance
+      checker.add_info("  💡 For RSC development, run: ./bin/dev static")
+      checker.add_info(
+        "  💡 If this followed an in-place package or React upgrade, stop the dev server and remove: " \
+        "#{RSC_CLIENT_MANIFEST_CLEANUP_PATHS.join(', ')}"
+      )
+      checker.add_info("  💡 Then rebuild so the Node renderer reads a fresh on-disk React Client Manifest")
     end
 
     def check_rsc_procfile_watcher

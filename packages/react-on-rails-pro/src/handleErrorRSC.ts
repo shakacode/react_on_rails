@@ -17,8 +17,22 @@ import { ErrorOptions } from 'react-on-rails/types';
 import { renderToPipeableStream } from 'react-on-rails-rsc/server.node';
 import generateRenderingErrorMessage from 'react-on-rails/generateRenderingErrorMessage';
 
+const RSC_CLIENT_MANIFEST_LOOKUP_FAILURE = /Could not find the module [\s\S]+ in the React Client Manifest/;
+const RSC_CLIENT_MANIFEST_GUIDANCE =
+  '\n\n[React on Rails Pro RSC diagnostic]\n' +
+  'The React Client Manifest may be stale, empty, or built for a different React/package version.\n' +
+  'Try a clean static-assets rebuild: stop the dev server, remove public/packs*, ssr-generated/, ' +
+  '.node-renderer-bundles/, then run bin/dev static so the Node renderer reads a fresh on-disk manifest.';
+
+const addRSCClientManifestGuidance = (msg: string) => {
+  if (!RSC_CLIENT_MANIFEST_LOOKUP_FAILURE.test(msg)) return msg;
+  if (msg.includes('[React on Rails Pro RSC diagnostic]')) return msg;
+
+  return `${msg}${RSC_CLIENT_MANIFEST_GUIDANCE}`;
+};
+
 const handleError = (options: ErrorOptions) => {
-  const msg = generateRenderingErrorMessage(options);
+  const msg = addRSCClientManifestGuidance(generateRenderingErrorMessage(options));
   return renderToPipeableStream(new Error(msg), {
     filePathToModuleMetadata: {},
     moduleLoading: { prefix: '', crossOrigin: null },

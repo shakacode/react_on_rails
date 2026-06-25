@@ -5650,5 +5650,44 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
   end
+
+  describe "check_rsc_client_manifest" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    before do
+      stub_const("ReactOnRailsPro", Module.new)
+      ReactOnRailsPro.const_set(:Utils, Module.new)
+      ReactOnRailsPro::Utils.define_singleton_method(:react_client_manifest_file_path) { nil }
+      allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
+        .and_return(File.expand_path("public/packs/react-client-manifest.json"))
+    end
+
+    it "warns when the RSC client manifest has no client reference metadata" do
+      FileUtils.mkdir_p("public/packs")
+      File.write(
+        "public/packs/react-client-manifest.json",
+        JSON.generate("moduleLoading" => { "prefix" => "", "crossOrigin" => nil }, "filePathToModuleMetadata" => {})
+      )
+
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("RSC client manifest has no client reference metadata")
+      )
+      expect(info_messages).to include(a_string_including("bin/dev static"))
+      expect(info_messages).to include(a_string_including("public/packs"))
+      expect(info_messages).to include(a_string_including("ssr-generated"))
+      expect(info_messages).to include(a_string_including(".node-renderer-bundles"))
+    end
+  end
   # rubocop:enable RSpec/VerifiedDoubles
 end
