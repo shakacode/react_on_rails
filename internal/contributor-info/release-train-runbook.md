@@ -114,7 +114,7 @@ flowchart TD
     C -->|"yes"| D["4 · Promote in place<br/>drop -rc at release tip<br/>tag vX.Y.Z — no re-cut"]
     D --> E["5 · Close out<br/>forward-port CHANGELOG collapse<br/>delete release/X.Y.Z (tags persist)"]
     B -.->|"3 · cherry-pick -x each fix"| M(["main — never freezes"])
-    E -.-> M
+    E -.->|"5 · forward-port CHANGELOG"| M
 ```
 
 > **Note:** Worked examples use the concrete version `17.0.0` (and branch `release/17.0.0`, tags
@@ -310,11 +310,11 @@ flowchart TD
     PR["Agent-merged PR"] --> T{"Target branch?"}
     T -->|"main"| BETA["beta gate · lowest<br/>confidence note<br/>+ green required checks"]
     T -->|"release/*"| AC{"agent-coord phase?<br/>doctor + status exit 0"}
-    AC -->|"rc"| RC
-    AC -->|"final"| FINAL
+    AC -->|"rc"| RC["rc gate · higher<br/>confidence note<br/>+ adversarial-pr-review<br/>+ zero open MUST-FIX"]
+    AC -->|"final"| FINAL["final gate · highest<br/>rc gate + cherry-picked<br/>verified fixes only<br/>+ no new features<br/>+ human sign-off"]
     AC -->|"UNKNOWN / no entry"| FB{"tracker in<br/>final-release mode?"}
-    FB -->|"no"| RC["rc gate · higher<br/>confidence note<br/>+ adversarial-pr-review<br/>+ zero open MUST-FIX"]
-    FB -->|"yes"| FINAL["final gate · highest<br/>rc gate + cherry-picked<br/>verified fixes only<br/>+ no new features<br/>+ human sign-off"]
+    FB -->|"no"| RC
+    FB -->|"yes"| FINAL
 ```
 
 Reading the gate is mechanical:
