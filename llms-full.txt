@@ -3958,7 +3958,7 @@ Use one of these patterns:
    export default ReScriptLikeButton;
    ```
 
-   Server components should import the wrapper path, not the compiled `.bs.js` file directly. That keeps the `'use client'` directive, auto-bundled pack, RSC client-reference manifest key, and runtime module resolution aligned on the same JavaScript module.
+   Server components should import the wrapper path, not the compiled `.bs.js` file directly. That keeps the `'use client'` directive, auto-bundled pack, RSC client-reference manifest key, and runtime module resolution aligned on the same JavaScript module. The same wrapper also satisfies the component-naming requirement covered in [Transpiled Languages (ReScript, Reason, etc.)](#transpiled-languages-rescript-reason-etc) below, so you do not need a second wrapper file.
 
 2. **If the compiled output is the boundary module, make the compiled JavaScript discoverable.** The generated RSC configs read client references from the file named by `RSC_MANIFEST_CLIENT_REFERENCES_JSON`, or from the default path `ssr-generated/rsc-client-references.json` when the env var is not set. That JSON must have this shape:
 
@@ -4012,7 +4012,7 @@ import ReScriptShow from '../ReScriptShow.bs.js';
 export default ReScriptShow;
 ```
 
-This pattern works for any transpiled language and requires no gem configuration changes. The wrapper file can use `.js`, `.jsx`, `.ts`, or `.tsx` depending on your project setup.
+This pattern works for any transpiled language and requires no gem configuration changes. The wrapper file can use `.js`, `.jsx`, `.ts`, or `.tsx` depending on your project setup. If this wrapper is also an RSC client boundary, put the `'use client'` directive at the top as described in [Compiled-to-JS languages and RSC client references](#compiled-to-js-languages-and-rsc-client-references).
 
 > [!NOTE]
 > While it's possible to add gem-level configuration for additional extensions, the wrapper-file pattern is recommended because it:
