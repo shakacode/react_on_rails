@@ -3478,6 +3478,8 @@ module ReactOnRails
       [a-z0-9][a-z0-9._-]*
       \z
     }ix
+    # Keep in sync with RSC_CLIENT_MANIFEST_GUIDANCE in
+    # packages/react-on-rails-pro/src/handleErrorRSC.ts.
     RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
 
     def check_rsc_setup
@@ -3609,12 +3611,17 @@ module ReactOnRails
 
       rsc_package = installed_package_json(package_root, RSC_PACKAGE_NAME)
       return false unless rsc_package
+      return false unless rsc_package_declares_react_peer_dependencies?(rsc_package)
 
       peer_compatible = check_rsc_package_peer_compatibility(rsc_package, react_version)
-      return false if peer_compatible.nil?
 
       check_rsc_package_dist_tags(rsc_package, package_root) if peer_compatible
       true
+    end
+
+    def rsc_package_declares_react_peer_dependencies?(rsc_package)
+      peer_dependencies = rsc_package["peerDependencies"] || {}
+      peer_dependencies["react"].present? || peer_dependencies["react-dom"].present?
     end
 
     def check_rsc_package_peer_compatibility(rsc_package, react_version)
@@ -3622,7 +3629,6 @@ module ReactOnRails
       peer_dependencies = rsc_package["peerDependencies"] || {}
       react_peer_range = peer_dependencies["react"]
       react_dom_peer_range = peer_dependencies["react-dom"]
-      return nil if react_peer_range.blank? && react_dom_peer_range.blank?
 
       peer_checks = rsc_peer_check_results(
         react_version:,
@@ -3958,8 +3964,8 @@ module ReactOnRails
       # Resolve from the configured package root so nested client/ layouts work.
       return nil unless valid_package_name?(package_name)
 
-      script = "console.log(require.resolve('#{package_name}/package.json'))"
-      stdout, _stderr, status = Open3.capture3("node", "-e", script, chdir: package_root)
+      script = "console.log(require.resolve(process.argv[1] + '/package.json'))"
+      stdout, _stderr, status = Open3.capture3("node", "-e", script, package_name, chdir: package_root)
       resolved_path = status.success? ? stdout.strip : ""
       resolved_path = File.join(package_root, "node_modules", package_name, "package.json") if resolved_path.empty?
       return nil if resolved_path.empty? || !File.exist?(resolved_path)

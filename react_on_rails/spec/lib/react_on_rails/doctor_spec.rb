@@ -5481,7 +5481,8 @@ RSpec.describe ReactOnRails::Doctor do
           .with(
             "node",
             "-e",
-            "console.log(require.resolve('react/package.json'))",
+            "console.log(require.resolve(process.argv[1] + '/package.json'))",
+            "react",
             chdir: package_root
           )
           .and_return(
@@ -5720,6 +5721,42 @@ RSpec.describe ReactOnRails::Doctor do
       ReactOnRailsPro::Utils.define_singleton_method(:react_client_manifest_file_path) { nil }
       allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
         .and_return(File.expand_path("public/packs/react-client-manifest.json"))
+    end
+
+    it "warns when the RSC client manifest resolves to a dev-server URL" do
+      allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
+        .and_return("http://localhost:3035/packs/react-client-manifest.json")
+
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("dev-server URL"))
+      expect(info_messages).to include(a_string_including("bin/dev static"))
+    end
+
+    it "warns when the RSC client manifest file is missing" do
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client manifest not found"))
+      expect(info_messages).to include(a_string_including("bin/dev static"))
+    end
+
+    it "warns when the RSC client manifest is missing client reference metadata" do
+      FileUtils.mkdir_p("public/packs")
+      File.write(
+        "public/packs/react-client-manifest.json",
+        JSON.generate("moduleLoading" => { "prefix" => "", "crossOrigin" => nil })
+      )
+
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("RSC client manifest is missing filePathToModuleMetadata")
+      )
     end
 
     it "warns when the RSC client manifest has no client reference metadata" do
