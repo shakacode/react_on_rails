@@ -131,7 +131,10 @@ or an explicit trusted override and reused anywhere this document shows
 `OWNER/REPO`-style placeholders. The implementation MUST preserve `pipefail` (or
 capture the API exit code explicitly) and abort on API/auth/rate-limit/network
 errors before using the `jq` output; a failed page fetch is UNKNOWN, not an empty
-backlog.
+backlog. The `jq -s` example buffers all returned pages before filtering; that is
+acceptable for React on Rails' current PR volume, but the SKILL.md should switch
+to per-page/streaming processing if a target repo's merged PR count makes that
+memory trade-off unsafe.
 
 The read-only resolver
 `.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json` is then used
@@ -221,15 +224,14 @@ Properties:
   create a missing label (it errors / no-ops), which would silently break dedup.
   So the writer first ensures the label exists, then adds it — no manual one-time
   setup to forget. Because `qa-batch` lanes run concurrently, the ensure step is
-  **idempotent**: read the full label set first (for example,
-  `gh label list --limit 1000 --json name`, or `gh api --paginate` over
-  `/repos/$repo/labels` if the repo can exceed that), create the missing label if
-  absent, and if a concurrent `gh label create` returns the GitHub 422 validation
-  error, re-read the full label set and treat it as success only when the
-  expected label is now present. A failed re-read after a 422 is also a loud
-  failure: abort the label step and surface the error rather than proceeding
-  silently. Any other create failure stays loud (equivalently, a single
-  serialized bootstrap before fan-out).
+  **idempotent**: read the full label set first via the paginated labels API
+  (for example, `gh api --method GET --paginate "/repos/$repo/labels"` with
+  `--jq '.[].name'`), create the missing label if absent, and if a concurrent
+  `gh label create` returns the GitHub 422 validation error, re-read the full
+  label set and treat it as success only when the expected label is now present.
+  A failed re-read after a 422 is also a loud failure: abort the label step and
+  surface the error rather than proceeding silently. Any other create failure
+  stays loud (equivalently, a single serialized bootstrap before fan-out).
 - **Write-ordering is an invariant, not a description.** `qa-verified` MUST be the
   **final** write: apply it only after `gh pr comment` returns success for the
   evidence comment. If the evidence post fails, the label step is aborted — so a
@@ -382,9 +384,10 @@ documented as a future enhancement, not built.
   `post-merge-audit`'s "Needs follow-up issue / Needs fix PR" classification), and
   post the failing evidence on the PR. **Neither** label is applied.
 - **Infra/tooling stall:** do not create a duplicate product bug issue. Post or
-  record the blocker evidence, leave the PR unlabeled, and create at most one
-  maintainer-approved tooling follow-up if the failure is durable and not already
-  tracked.
+  record the blocker evidence, leave the PR unlabeled (so it re-enters the
+  backlog on the next run, matching the §5 failure posture), and create at most
+  one maintainer-approved tooling follow-up if the failure is durable and not
+  already tracked.
 - **No standing umbrella tracker issue** for the QA effort itself — that is the
   only thing #3952 ruled out. Per-bug issues are expected and encouraged.
 
@@ -435,7 +438,8 @@ readiness) differ enough that overloading `pr-batch` would muddy both.
 
 ## Boundaries (what it does NOT do)
 
-- Does not run `verify-pr-fix` itself (Phase A is plan-only).
+- `plan-qa-batch` is plan-only: it produces the plan and goal prompt and does
+  not directly invoke `verify-pr-fix`; that is `qa-batch`'s job.
 - Does not create branches or PRs, and does not merge. (It does use ephemeral
   git worktrees to isolate spec-only "before" repros — §9c — which are discarded
   after the lane.)
@@ -475,6 +479,13 @@ readiness) differ enough that overloading `pr-batch` would muddy both.
 - **Resolver coupling.** Reusing `post-merge-audit-scope` ties `plan-qa-batch` to
   that script's contract (its `--json` shape, and the last-RC default base that
   §3 deliberately overrides with the label query as the authoritative backlog).
+- **Durable skip-counter requires an `agent-coord` schema extension.** The
+  repeated-contention escalation (§6) needs a first-class, compare-and-swap-safe
+  counter field on coordination records. If that field does not exist at Phase A
+  implementation time, escalation runs in degraded mode (current-batch report
+  only, no automated gate). Decide before implementation: add the field to
+  `agent-coord`, use a surrogate such as a dedicated GitHub status/check, or
+  explicitly accept degraded mode for v1.
 - **Mislocated existing specs (separate task).** Three design docs sit under
   public `docs/superpowers/specs/`; by the "`docs/` is public, internal design
   goes to `internal/planning/`" rule they should move. Out of scope for this
