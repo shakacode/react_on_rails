@@ -7,11 +7,10 @@ require "open3"
 # rubocop:disable Metrics/ClassLength
 class ReleaseForwardPort
   VERSION_FILE = "react_on_rails/lib/react_on_rails/version.rb"
-  # A trailing number after the `rc` marker is required (project convention is
-  # always `X.Y.Z.rc.N`). A versionless `1.0.0.rc` is intentionally NOT matched
-  # here; it falls through to the version-drift path in version_bump_skip_reason.
+  # Project convention is `X.Y.Z.rc.N`, but a release branch can still contain a
+  # bare `X.Y.Z.rc` bump. Treat both as release-only version bumps.
   RC_VERSION_BUMP_SUBJECT = /
-    \Abump\s+version\s+to\s+v?\d+\.\d+\.\d+[.-]rc[.-]?\d+\b
+    \Abump\s+version\s+to\s+v?\d+\.\d+\.\d+[.-]rc(?:[.-]?\d+)?\b
   /ix
   VERSION_BUMP_SUBJECT = /
     \Abump\s+version\s+to\s+v?
@@ -198,9 +197,10 @@ class ReleaseForwardPort
     return unless version
 
     parsed_version = parse_version(version)
-    if parsed_version && parsed_version.fetch(:prerelease).nil?
-      return "stable release version bump commit; use the runbook's manual fallback to take only " \
-             "the CHANGELOG hunks and keep release branch version changes off #{target}"
+    return stable_version_bump_skip_reason(target) if stable_version_bump?(parsed_version)
+
+    if prerelease_version_bump?(parsed_version) && target_version.nil?
+      return unknown_target_prerelease_skip_reason(target)
     end
 
     return unless target_version
@@ -211,6 +211,24 @@ class ReleaseForwardPort
     "target #{target} is already at #{target_version}; skipping version bump to #{version} to avoid " \
       "regressing or duplicating the target version. If this commit also contains CHANGELOG changes, " \
       "use the runbook's manual fallback to take only the CHANGELOG hunks."
+  end
+
+  def stable_version_bump?(parsed_version)
+    parsed_version && parsed_version.fetch(:prerelease).nil?
+  end
+
+  def prerelease_version_bump?(parsed_version)
+    parsed_version&.fetch(:prerelease)
+  end
+
+  def stable_version_bump_skip_reason(target)
+    "stable release version bump commit; use the runbook's manual fallback to take only " \
+      "the CHANGELOG hunks and keep release branch version changes off #{target}"
+  end
+
+  def unknown_target_prerelease_skip_reason(target)
+    "prerelease version bump commit with target version UNKNOWN; use the runbook's manual fallback " \
+      "to take only the CHANGELOG hunks and keep release branch version changes off #{target}"
   end
 
   def version_from_bump_subject(subject)
@@ -263,6 +281,11 @@ class ReleaseForwardPort
     status.success?
   end
 
+  def commit_descends_from?(descendant_sha, ancestor_sha)
+    _stdout, _stderr, status = capture_git("merge-base", "--is-ancestor", ancestor_sha, descendant_sha)
+    status.success?
+  end
+
   def standard_revert_on_target?(sha, target)
     @standard_revert_cache ||= {}
     cache_key = [sha, target]
@@ -270,13 +293,15 @@ class ReleaseForwardPort
 
     revert_message = "This reverts commit #{sha}."
     revert_shas = git_lines("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H")
+    @standard_revert_cache[cache_key] = false
     @standard_revert_cache[cache_key] =
-      revert_shas.any? { |revert_sha| !standard_revert_on_target?(revert_sha, target) }
+      revert_shas.any? do |revert_sha|
+        commit_descends_from?(revert_sha, sha) && !standard_revert_on_target?(revert_sha, target)
+      end
   end
 
   def patch_equivalent_commit_present_on_target?(sha, target)
     source_patch_id = patch_id_for_commit(sha)
-    return true if source_patch_id == EMPTY_PATCH_ID
 
     patch_equivalent_target_candidates(sha, target).any? do |target_sha|
       patch_id_for_commit(target_sha) == source_patch_id && !standard_revert_on_target?(target_sha, target)
@@ -443,7 +468,7 @@ class ReleaseForwardPort
       warn stderr unless stderr.empty?
       next if status.success?
 
-      warn_cherry_pick_conflict(entry, completed: index, remaining: picks.length - index - 1)
+      warn_cherry_pick_failure(entry, completed: index, remaining: picks.length - index - 1)
       return 1
     end
 
@@ -451,19 +476,37 @@ class ReleaseForwardPort
     0
   end
 
-  def warn_cherry_pick_conflict(entry, completed:, remaining:)
+  def warn_cherry_pick_failure(entry, completed:, remaining:)
     warn "Cherry-pick failed for #{entry.sha}."
-    warn "Resolve the conflict and run git cherry-pick --continue to finish THIS commit."
-    if remaining.positive?
-      warn "Note: #{remaining} later eligible commit#{'s' unless remaining == 1} in this plan " \
-           "#{remaining == 1 ? 'is' : 'are'} not queued by --continue. Rerun " \
-           "script/release-forward-port after continuing to apply the rest " \
-           "(it is idempotent and skips commits already applied)."
+
+    if cherry_pick_in_progress?
+      warn "Resolve the conflict and run git cherry-pick --continue to finish THIS commit."
+      warn_later_commits(remaining, "after continuing to apply the rest", continue_context: true)
+      warn "If you run git cherry-pick --abort, only the current conflicting commit is abandoned."
+    else
+      warn "Git did not leave a cherry-pick in progress; fix the git error above and rerun " \
+           "script/release-forward-port."
+      warn_later_commits(remaining, "after fixing the failed pick", continue_context: false)
     end
-    warn "If you run git cherry-pick --abort, only the current conflicting commit is abandoned."
+
     warn "Earlier successful picks from this run are already committed and safe." if completed.positive?
-    warn "Rerun script/release-forward-port after fixing the conflict " \
+  end
+
+  def warn_later_commits(remaining, rerun_after, continue_context:)
+    return unless remaining.positive?
+
+    queue_note = continue_context ? "not queued by --continue" : "not attempted after this failure"
+    warn "Note: #{remaining} later eligible commit#{'s' unless remaining == 1} in this plan " \
+         "#{remaining == 1 ? 'is' : 'are'} #{queue_note}. Rerun " \
+         "script/release-forward-port #{rerun_after} " \
          "(it is idempotent and skips commits already applied)."
+  end
+
+  def cherry_pick_in_progress?
+    path = git("rev-parse", "--git-path", "CHERRY_PICK_HEAD").strip
+    File.exist?(path)
+  rescue GitError
+    false
   end
 
   def verify_ref!(ref, label:)
@@ -493,6 +536,8 @@ class ReleaseForwardPort
   end
 
   def run_git(*)
+    raise ArgumentError, "run_git requires a block" unless block_given?
+
     stdout, stderr, status = capture_git(*)
     yield(stdout, stderr, status)
   end

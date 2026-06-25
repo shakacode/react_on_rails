@@ -6,6 +6,9 @@ require "rbconfig"
 require "tmpdir"
 require_relative "spec_helper"
 
+release_forward_port_script = File.expand_path("../../../script/release-forward-port", __dir__)
+load release_forward_port_script unless defined?(ReleaseForwardPort)
+
 RSpec.describe "script/release-forward-port" do
   let(:repo_root) { File.expand_path("../../..", __dir__) }
   let(:script_path) { File.join(repo_root, "script/release-forward-port") }
@@ -100,6 +103,22 @@ RSpec.describe "script/release-forward-port" do
       expect(git(repo, "rev-parse", "--abbrev-ref", "HEAD").strip).to eq("main")
       expect(File.read(File.join(repo, "app.txt"))).to eq("base\n")
       expect(File.read(File.join(repo, "react_on_rails/lib/react_on_rails/version.rb"))).to include("1.0.0")
+    end
+  end
+
+  it "skips bare rc version bump subjects before version-drift checks" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc"))
+      bare_rc_bump_sha = commit_all(repo, "Bump version to 1.0.1.rc")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{bare_rc_bump_sha[0, 12]} Bump version to 1.0.1.rc")
+      expect(stdout).to include("rc version bump commit")
+      expect(stdout).to include("Summary: 0 commits to cherry-pick, 1 commit skipped.")
     end
   end
 
@@ -564,6 +583,26 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips prerelease version bumps when the target version file cannot be parsed" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.beta.1"))
+      beta_bump_sha = commit_all(repo, "Bump version to 1.0.1.beta.1")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", "# version constant intentionally missing\n")
+      commit_all(repo, "Break target version file")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stderr).to include("WARNING: VERSION constant not found")
+      expect(stdout).to include("target version: UNKNOWN")
+      expect(stdout).to include("SKIP #{beta_bump_sha[0, 12]} Bump version to 1.0.1.beta.1")
+      expect(stdout).to include("prerelease version bump commit with target version UNKNOWN")
+    end
+  end
+
   it "skips test prerelease version bumps when the target has advanced to a later prerelease" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
@@ -580,5 +619,36 @@ RSpec.describe "script/release-forward-port" do
       expect(stdout).to include("SKIP #{test_bump_sha[0, 12]} Bump version to 1.0.1.test.1")
       expect(stdout).to include("target main is already at 1.0.1.beta.1")
     end
+  end
+
+  it "does not recurse forever when target revert messages reference each other" do
+    helper = ReleaseForwardPort.new([])
+    first_sha = "a" * 40
+    second_sha = "b" * 40
+
+    allow(helper).to receive(:git_lines) do |*args|
+      case args
+      when ["log", "main", "--fixed-strings", "--grep", "This reverts commit #{first_sha}.", "--format=%H"]
+        [second_sha]
+      when ["log", "main", "--fixed-strings", "--grep", "This reverts commit #{second_sha}.", "--format=%H"]
+        [first_sha]
+      else
+        raise "unexpected git_lines call: #{args.inspect}"
+      end
+    end
+    allow(helper).to receive(:commit_descends_from?).and_return(true)
+
+    expect { helper.send(:standard_revert_on_target?, first_sha, "main") }.not_to raise_error
+  end
+
+  it "does not suggest cherry-pick --continue when Git did not start a cherry-pick" do
+    helper = ReleaseForwardPort.new([])
+    entry = ReleaseForwardPort::PlanEntry.new(sha: "a" * 40, subject: "Fix release regression", action: :pick)
+
+    allow(helper).to receive(:cherry_pick_in_progress?).and_return(false)
+
+    expect do
+      helper.send(:warn_cherry_pick_failure, entry, completed: 0, remaining: 1)
+    end.to output(/\A(?=.*Git did not leave a cherry-pick in progress)(?!.*--continue).*\z/m).to_stderr
   end
 end
