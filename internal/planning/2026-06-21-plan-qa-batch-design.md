@@ -213,9 +213,11 @@ Properties:
   create a missing label (it errors / no-ops), which would silently break dedup.
   So the writer first ensures the label exists, then adds it — no manual one-time
   setup to forget. Because `qa-batch` lanes run concurrently, the ensure step is
-  **idempotent**: read labels first (`gh label list --json name`), create the
-  missing label if absent, and if a concurrent `gh label create` returns the
-  GitHub 422 validation error, re-read labels and treat it as success only when
+  **idempotent**: read the full label set first (for example,
+  `gh label list --limit 1000 --json name`, or `gh api --paginate` over
+  `/repos/OWNER/REPO/labels` if the repo can exceed that), create the missing
+  label if absent, and if a concurrent `gh label create` returns the GitHub 422
+  validation error, re-read the full label set and treat it as success only when
   the expected label is now present. Any other create failure stays loud
   (equivalently, a single serialized bootstrap before fan-out).
 - **Write-ordering is an invariant, not a description.** `qa-verified` MUST be the
