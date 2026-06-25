@@ -61,6 +61,22 @@ module ReactOnRailsPro
       end
     end
 
+    # Install ScoutApm instrumentation after ScoutApm is configured via "scout_apm.start" initializer.
+    # https://github.com/scoutapp/scout_apm_ruby/blob/v6.1.0/lib/scout_apm.rb#L221
+    # If scout_apm is not in the Gemfile, Rails ignores the unknown `after:` target and still
+    # runs this block; the `next unless defined?(ScoutApm)` guard makes that safe.
+    initializer "react_on_rails_pro.scout_apm_instrumentation", after: "scout_apm.start" do
+      next unless defined?(ScoutApm)
+
+      node_rendering_pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      next if node_rendering_pool.singleton_class < ScoutApm::Tracer
+
+      node_rendering_pool.singleton_class.class_eval do
+        include ScoutApm::Tracer
+        instrument_method :exec_server_render_js, type: "ReactOnRails", name: "Node React Server Rendering"
+      end
+    end
+
     class << self
       def log_license_status
         status = ReactOnRailsPro::LicenseValidator.license_status

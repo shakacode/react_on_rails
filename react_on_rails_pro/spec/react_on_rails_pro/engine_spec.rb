@@ -286,4 +286,93 @@ RSpec.describe ReactOnRailsPro::Engine do
       expect(mock_logger).not_to have_received(:warn)
     end
   end
+
+  describe "ScoutApm instrumentation initializer" do
+    subject(:initializer) { described_class.initializers.find { |i| i.name.include?("scout_apm") } }
+
+    it "defines a named Rails initializer to run after scout_apm.start" do
+      expect(initializer.name).to eq "react_on_rails_pro.scout_apm_instrumentation"
+      expect(initializer.after).to eq "scout_apm.start"
+    end
+
+    describe "react_on_rails_pro.scout_apm_instrumentation" do
+      let(:instrumentation_calls) { [] }
+
+      let(:mock_scout_tracer) do
+        calls = instrumentation_calls
+
+        # Simplified mock of ScoutApm::Tracer that mirrors its real implementation.
+        # https://github.com/scoutapp/scout_apm_ruby/blob/v6.1.0/lib/scout_apm/tracer.rb#L47-L70
+        Module.new do
+          def self.included(base)
+            calls = const_get(:INSTRUMENTATION_CALLS)
+
+            base.define_singleton_method(:instrument_method) do |method_name, **|
+              raise "method does not exist: #{method_name}" unless method_defined?(method_name)
+
+              calls << method_name
+
+              instrumented_name = :"#{method_name}_with_test_instrument"
+              uninstrumented_name = :"#{method_name}_without_test_instrument"
+
+              define_method(instrumented_name) do |*args, **kwargs, &block|
+                send(uninstrumented_name, *args, **kwargs, &block)
+              end
+
+              alias_method uninstrumented_name, method_name
+              alias_method method_name, instrumented_name
+            end
+          end
+
+          const_set(:INSTRUMENTATION_CALLS, calls)
+        end
+      end
+
+      let(:mock_node_rendering_pool) do
+        Class.new(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+      end
+
+      before do
+        stub_const("ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool", mock_node_rendering_pool)
+      end
+
+      context "when ScoutApm is not defined" do
+        before { hide_const("ScoutApm") }
+
+        it "does not instrument NodeRenderingPool.exec_server_render_js" do
+          initializer.run
+
+          # `false` restricts this check to methods defined on the stubbed singleton class.
+          direct_methods = mock_node_rendering_pool.methods(false)
+
+          expect(direct_methods).not_to include(:exec_server_render_js_with_test_instrument)
+          expect(direct_methods).not_to include(:exec_server_render_js_without_test_instrument)
+        end
+      end
+
+      context "when ScoutApm is defined" do
+        before do
+          # stub_const on a nested constant implicitly creates the parent namespace,
+          # making `defined?(ScoutApm)` truthy in the initializer block.
+          stub_const("ScoutApm::Tracer", mock_scout_tracer)
+        end
+
+        it "instruments NodeRenderingPool.exec_server_render_js" do
+          initializer.run
+
+          direct_methods = mock_node_rendering_pool.methods(false)
+
+          expect(direct_methods).to include(:exec_server_render_js_with_test_instrument)
+          expect(direct_methods).to include(:exec_server_render_js_without_test_instrument)
+        end
+
+        it "does not instrument NodeRenderingPool.exec_server_render_js more than once" do
+          initializer.run
+          initializer.run
+
+          expect(instrumentation_calls).to eq([:exec_server_render_js])
+        end
+      end
+    end
+  end
 end
