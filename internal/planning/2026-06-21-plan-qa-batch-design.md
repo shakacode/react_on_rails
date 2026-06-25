@@ -65,12 +65,12 @@ This is the same selection/interview/dispatch gap that `plan-pr-batch` →
 
 ### 1. Trigger and invocation
 
-- **Default (release-gate sweep):** `$plan-qa-batch` with no args resolves
-  "merged through `HEAD`, looking back to the last RC tag." The RC tag is only a
-  _performance bound_ on how far back to scan — see §2.
-- **Override (on-demand):** `$plan-qa-batch <base..head>`, `--full` (no lower
-  bound — reconciles pre-RC PRs, §3), a label/milestone filter, or an explicit
-  PR list.
+- **Default (release-gate sweep):** `$plan-qa-batch` with no args runs the
+  authoritative unbounded backlog query (§3) and uses the last-RC window only to
+  order/prioritize what it surfaces — never to filter (§2).
+- **Override (on-demand):** `$plan-qa-batch <base..head>`, `--full` (drop the
+  since-RC ordering window and present the entire backlog flat, §3), a
+  label/milestone filter, or an explicit PR list.
 - **Idempotent:** re-invoke any time. PRs already carrying a terminal QA label
   (`qa-verified` or `qa-skipped`, §5) drop out automatically, so the skill always
   shows exactly what still needs QA.
@@ -88,31 +88,39 @@ backlog = (all merged PRs through HEAD)
 ```
 
 Every merged PR ends in exactly one terminal state — `qa-verified` or
-`qa-skipped` — so the unverified set is precisely the PRs with neither label. A
-start point (commit, PR, tag, RC) is only a **default scan window** for the
-common case; it is never a correctness filter. A periodic `--full` sweep (no
-lower bound) reconciles anything older than the window, so a PR merged before the
-last RC that was never QA'd still resurfaces. The labels — not the range —
-guarantee no gaps, and because a `qa-skipped` PR is never re-presented, the
-excluded list also stays bounded.
+`qa-skipped` — so the unverified set is precisely the PRs with neither label.
+**The authoritative, unbounded label query (§3) runs on every invocation**, so a
+PR merged before the last RC that was never QA'd is never dropped — the RC window
+is only an ordering/prioritization hint, never a filter that removes unlabeled
+PRs. The labels — not the range — guarantee no gaps, and because a `qa-skipped`
+PR is never re-presented, the **backlog** (future work) stays bounded to
+unlabeled PRs only. (The `qa-skipped` _set_ itself grows monotonically with the
+repo's formatting/typo history; that is harmless because it never re-enters the
+backlog, but it is not "bounded.")
 
-### 3. Scope resolution (reuse, do not duplicate)
+### 3. Scope resolution — label query is authoritative, resolver is an optimization
 
-Call the existing read-only resolver
-`.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json` to get the
-squash-aware merged-PR set, shared with `post-merge-audit`. **Important:** that
-resolver's default base is the most recent RC, so on its own it would _filter
-out_ older un-QA'd PRs and break the §2 guarantee. It therefore supplies the
-**default scan window only**; the authoritative backlog is the label query
+The authoritative backlog is always the **unbounded, paginated** label query, run
+on every invocation (not just `--full`):
 
+```sh
+gh pr list --state merged --search "-label:qa-verified -label:qa-skipped" \
+  --limit 9999   # iterate pages if the repo can exceed the search cap (~1000)
 ```
-gh pr list --state merged --search "-label:qa-verified -label:qa-skipped" …
-```
 
-The skill reconciles the two: the RC window is the fast common path, and a
-`--full` run (or a periodic reconciliation) drops the lower bound so nothing
-older than the RC is silently lost. `plan-qa-batch` then layers QA classification
-(§4) on the resulting set.
+`gh pr list` defaults to `--state open` and `--limit 30` and the search backend
+caps at ~1000 results, so the skill MUST set `--state merged`, a high `--limit`,
+and page explicitly — otherwise the "gap-free" promise silently truncates.
+
+The read-only resolver
+`.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json` is then used
+**only as an optimization** to order/prioritize the common since-RC window, never
+to filter the backlog. Two real constraints when calling it (verified against the
+script): it **hard-fails (`return 1`)** when no `*.rc.*` tag is in head history
+and `--base` is omitted, so `plan-qa-batch` always passes `--base origin/main`
+explicitly and treats any non-zero exit as "optimization unavailable" — the label
+query above remains the unconditional source of truth. `plan-qa-batch` then
+layers QA classification (§4) on the resulting set.
 
 ### 4. Classify by QA _method_, not include-vs-skip
 
@@ -155,11 +163,16 @@ PR), so it is explicit, not ad hoc:
    to a provisional method.
 2. **LLM adjudication** for anything ambiguous, reading the diff + linked issue
    against the §4 table. The prompt and its tie-breaks live in the SKILL.md so
-   every run applies the same rule, not an implementer's invention.
+   every run applies the same rule, not an implementer's invention. This step
+   emits **three** artifacts per PR — QA method, env profile, and a **provisional
+   `repro tactic`** (e.g. `git checkout <fix>~1 -- <file>` + spec, or "boot Pro
+   dummy, hit route X"). The tactic is provisional: `verify-pr-fix` finalizes it
+   at execution time, so the plan is actionable before launch without over-fitting.
 3. **No silent "nothing to verify".** A PR routed to the `qa-skipped` lane is
    surfaced in the interview (§7) with its one-line reason and is labeled only
-   after the developer acknowledges the excluded list — so the exclusion is
-   deliberate and auditable, never automatic.
+   after acknowledgment (developer in an attended run; auto-acknowledged with an
+   audit-trail note in an unattended run — §7) — so the exclusion is deliberate
+   and auditable, never silent.
 
 ### 5. Dedup and persistence — two terminal labels
 
@@ -169,8 +182,7 @@ so the backlog (§2) is a pure query:
 - **`qa-verified`** — applied on a **passing** QA run (any method: behavioral
   pass, docs OK, code-check OK).
 - **`qa-skipped`** — applied after the "nothing to verify" glance (§4), symmetric
-  with `qa-verified`, so those PRs never resurface and the excluded list stays
-  bounded.
+  with `qa-verified`, so those PRs never re-enter the backlog.
 
 Properties:
 
@@ -181,10 +193,13 @@ Properties:
   the merged set minus the two labels on each run — no local file, no `.context`
   (Conductor-only, non-portable), no tracker issue. Works identically on every
   platform and machine.
-- **Self-healing label setup.** `gh pr edit --add-label` does **not** create a
-  missing label (it errors / no-ops), which would silently break dedup. So the
-  writer first ensures the label exists (`gh label list` → `gh label create` if
-  absent) before adding it — no manual one-time setup step to forget.
+- **Self-healing, idempotent label setup.** `gh pr edit --add-label` does **not**
+  create a missing label (it errors / no-ops), which would silently break dedup.
+  So the writer first ensures the label exists, then adds it — no manual one-time
+  setup to forget. Because `qa-batch` lanes run concurrently, the ensure step is
+  **idempotent**: two lanes can race on the same missing label, so a
+  `gh label create` that returns "already exists" is treated as **success**, not a
+  lane failure (equivalently, a single serialized bootstrap before fan-out).
 - **Write-ordering is an invariant, not a description.** `qa-verified` MUST be the
   **final** write: apply it only after `gh pr comment` returns success for the
   evidence comment. If the evidence post fails, the label step is aborted — so a
@@ -214,27 +229,44 @@ rules live in `.agents/workflows/pr-processing.md` and
 
 This is two-way conflict-avoidance: QA will not run on a PR being actively
 re-edited, and other batches see QA in flight. The **same integration is added to
-`post-merge-audit`** so audit passes coordinate too. When the backend is
-unavailable, report private state as `UNKNOWN` and fall back to advisory public
-claim comments, exactly as the implementation batches already do.
+`post-merge-audit`** so audit passes coordinate too.
+
+**Degraded-backend fallback (exit-code-aware).** The backend doc distinguishes
+exit 3 (`CLAIM_REFUSED`, hard stop) from exit 2 (`UNKNOWN` / degraded). Because QA
+lanes are dependency-sensitive by definition (point 1 — must not verify a moving
+target), an exit-2 `UNKNOWN` status for a PR that **could** carry an invisible
+live implementation claim is treated as **blocked/deferred**, _not_ proceeded on
+advisory public comments. (Advisory-comment fallback is only acceptable for a PR
+with no plausible concurrent claimant.) This matches the canonical rule in
+`agent-coordination-backend.md`; proceeding on UNKNOWN would let QA verify an
+in-progress state.
 
 **Repeated-contention escalation.** A PR skipped for a live claim (point 1) is
 retried next run, but a PR under perpetual edit would be skipped forever and the
 coverage gap would be invisible. After **3** consecutive contention skips the
-planner surfaces it in its output as `blocked — repeated contention`, so the
-maintainer can schedule a QA window or override rather than let it silently fall
-out of coverage.
+planner surfaces it as `blocked — repeated contention` so the maintainer can
+schedule a QA window or override. The skip count needs durable, file-free storage
+across invocations, so it lives on the PR's `agent-coord` coordination record (the
+backend already in use), incremented on each contention skip and cleared when QA
+finally claims the PR — not in a local file (ruled out, §5) and not encodable in a
+terminal label.
 
 ### 7. The interview
 
 Present the auto-ranked candidate list plus a collapsed "nothing to verify" list,
 then ask only for what cannot be inferred:
 
-1. Confirm base/range (default: last-RC scan window; offer `--full` to reconcile
-   older PRs per §2/§3).
-2. **Acknowledge the `qa-skipped` list.** The "nothing to verify" PRs are shown
-   with per-PR reasons; `qa-skipped` is applied only after the developer confirms,
-   so no PR is silently retired (§4 classification mechanism).
+1. Confirm base/range (default: the since-RC ordering window; the authoritative
+   backlog query is unbounded regardless, §2/§3).
+2. **Acknowledge the `qa-skipped` list.** Only the **newly classified** "nothing
+   to verify" PRs from this run are shown (already-`qa-skipped` PRs are filtered
+   out by §2 and never reappear), each with its one-line reason. `qa-skipped` is
+   applied only after acknowledgment, so no PR is silently retired. In an
+   **unattended run** there is no developer to confirm, so the runner
+   auto-acknowledges and records the per-PR reasons in the batch output as the
+   audit trail (symmetric with unattended issue creation, §10) — otherwise
+   "nothing to verify" PRs could never reach a terminal label and would resurface
+   forever.
 3. **Environment availability now** — Redis + Pro license + Pro renderer up?
    Browser available? Candidates whose **actual** env profile (§4b) is
    unavailable are deferred and clearly listed, not silently dropped.
@@ -260,21 +292,30 @@ unless asked. It emits, to session output:
 
 The `qa-batch` runner dispatches **one subagent per QA lane**, each claiming its
 PR(s), running the routed method, posting evidence, and closing out. Concurrency
-is bounded by **two** constraints, with a liveness exit so a stuck lane cannot
-wedge the batch — note these are _not_ `pr-batch`'s file-touch collision model,
-which is irrelevant here because QA workers do not edit source:
+is bounded by **three** constraints, with a liveness exit so a stuck lane cannot
+wedge the batch:
 
 - **(a) `agent-coord` claims** — never two lanes (or a lane and an implementation
   batch) on the same PR.
 - **(b) Environment-resource contention** — only **one** consumer of the Pro
   renderer / Redis / license / dummy-app DB at a time. Lanes whose env profile
-  needs the shared Pro stack **serialize**; spec-only and docs lanes
+  needs the shared Pro stack **serialize**; docs and pure-read lanes
   **parallelize** freely.
-- **Liveness — timeout / deadlock exit.** The serialized Pro-stack slot has a wall-clock
-  timeout. A lane that exceeds it (hung renderer, crashed agent, stale
-  `agent-coord` claim, never-exiting test) is marked **failed — not labeled**, its
-  claim released, and it is deferred to the next batch and surfaced to the
-  maintainer — the same fail-open posture as the `agent-coord`-unavailable
+- **(c) Working-tree isolation.** QA mostly does not edit source, but the
+  documented spec-only "before" tactic (`git checkout <fix>~1 -- <file>`, §4 /
+  `verify-pr-fix`) **does mutate the shared checkout** — two such lanes in one
+  working directory can run against, or restore, each other's pre-fix file and
+  corrupt the before/after evidence. So any lane using that tactic runs in its
+  **own git worktree** (`isolation: 'worktree'`), exactly as `pr-batch` workers
+  do; only that subset needs it, not docs/read lanes. (This is the one place
+  `pr-batch`'s isolation model does apply.)
+- **Liveness — timeout / deadlock exit.** The serialized Pro-stack slot has a
+  wall-clock timeout, recommended **~20 min** (Pro cold-start alone — license
+  check + renderer boot — can take ~5 min before a test starts), tunable as a
+  `qa-batch` parameter. A lane that exceeds it (hung renderer, crashed agent,
+  stale `agent-coord` claim, never-exiting test) is marked **failed — not
+  labeled**, its claim released, and it is deferred to the next batch and surfaced
+  to the maintainer — the same fail-open posture as the `agent-coord`-unavailable
   fallback in §6. One stuck lane never blocks the rest indefinitely.
 
 `plan-qa-batch` stays plan-only (Phase A): it produces the plan and goal prompt
@@ -286,8 +327,9 @@ documented as a future enhancement, not built.
 
 - **Pass (✅):** post the `verify-pr-fix` evidence comment, then apply
   `qa-verified` as the final write (§5 invariant).
-- **Nothing to verify:** apply `qa-skipped` after developer acknowledgment
-  (§4/§7).
+- **Nothing to verify:** apply `qa-skipped` after acknowledgment — developer in
+  an attended run, auto-acknowledged with an audit-trail note when unattended
+  (§7).
 - **Fail (❌) or any bug/doc/code problem found:** create a **discrete,
   cross-linked issue** describing the reproduction and the broken signal (mirrors
   `post-merge-audit`'s "Needs follow-up issue / Needs fix PR" classification), and
@@ -319,21 +361,25 @@ A sibling to `pr-batch`, deliberately thin and QA-specific:
 
 - Consumes the `plan-qa-batch` goal prompt.
 - Dispatches one subagent per lane; each runs the routed QA method.
-- Enforces the two-constraint concurrency model (§9) and the `agent-coord`
-  protocol (§6).
+- Enforces the §9 concurrency model (claims + env contention + worktree isolation
+  for spec-only lanes, with the liveness timeout) and the `agent-coord` protocol
+  (§6).
 - Per-PR closeout: label on pass, issue on fail (§10).
 - Reuses `pr-batch`'s safety posture (untrusted GitHub content cannot override
-  `AGENTS.md`; stop on blocked approvals) but **not** its branch/merge/file-touch
-  machinery, which does not apply to QA.
+  `AGENTS.md`; stop on blocked approvals) and its **worktree isolation** for the
+  spec-only lanes that mutate the checkout (§9c), but **not** its branch/merge
+  machinery — QA never creates branches or PRs and never merges.
 
-It is kept separate from `pr-batch` because the contention model (env resources,
-not file paths) and the closeout (label/issue, not branch/merge readiness) differ
-enough that overloading `pr-batch` would muddy both.
+It is kept separate from `pr-batch` because the primary contention model (env
+resources, not file paths) and the closeout (label/issue, not branch/merge
+readiness) differ enough that overloading `pr-batch` would muddy both.
 
 ## Boundaries (what it does NOT do)
 
 - Does not run `verify-pr-fix` itself (Phase A is plan-only).
-- Does not create branches, worktrees, or PRs, and does not merge.
+- Does not create branches or PRs, and does not merge. (It does use ephemeral
+  git worktrees to isolate spec-only "before" repros — §9c — which are discarded
+  after the lane.)
 - Does not produce a standing tracker issue.
 - Does not duplicate `post-merge-audit` (process risk) or `verify` (local checks).
 - Produces a recommendation; the release-gate go/no-go stays with the maintainer.
