@@ -18,6 +18,14 @@ class ReleaseForwardPort
     \Abump\s+version\s+to\s+v?
     (?<version>\d+\.\d+\.\d+(?:(?:[.-])(?:alpha|beta|rc|pre|dev|test)(?:[.-]?\d+)?)?)\b
   /ix
+  PRERELEASE_RANKS = {
+    "dev" => 0,
+    "test" => 1,
+    "alpha" => 2,
+    "beta" => 3,
+    "pre" => 4,
+    "rc" => 5
+  }.freeze
   CHERRY_PICK_FOOTER_PREFIX = "(cherry picked from commit "
 
   PlanEntry = Struct.new(:sha, :subject, :action, :reason, keyword_init: true) do
@@ -210,7 +218,13 @@ class ReleaseForwardPort
   def version_at(ref)
     version_file = git("show", "#{ref}:#{VERSION_FILE}").strip
     match = version_file.match(/VERSION\s*=\s*["'](?<version>[^"']+)["']/)
-    match && match[:version]
+    unless match
+      warn "WARNING: VERSION constant not found in #{VERSION_FILE} at #{ref}; " \
+           "version-drift guard is disabled for non-RC version bump commits."
+      return nil
+    end
+
+    match[:version]
   rescue GitError
     warn "WARNING: unable to read #{VERSION_FILE} at #{ref}; " \
          "version-drift guard is disabled for non-RC version bump commits."
@@ -255,25 +269,20 @@ class ReleaseForwardPort
     return 1 if left.nil?
     return -1 if right.nil?
 
-    label_comparison = prerelease_rank(left.fetch(:label)) <=> prerelease_rank(right.fetch(:label))
+    left_rank = prerelease_rank(left.fetch(:label))
+    right_rank = prerelease_rank(right.fetch(:label))
+    return unless left_rank && right_rank
+
+    label_comparison = left_rank <=> right_rank
     return label_comparison unless label_comparison.zero?
 
     left.fetch(:number) <=> right.fetch(:number)
   end
 
   def prerelease_rank(label)
-    {
-      "dev" => 0,
-      "test" => 1,
-      "alpha" => 2,
-      "beta" => 3,
-      "pre" => 4,
-      "rc" => 5
-      # Unknown labels tie with `rc` instead of ranking below `dev`. That treats
-      # a novel marker like `1.0.0.snapshot` as a late-stage prerelease for
-      # version-drift detection. Expand the table if the project adopts new
-      # prerelease markers.
-    }.fetch(label, 5)
+    # Unknown labels disable version-bump skipping. Picking an uncertain bump is
+    # safer than silently dropping a version commit that may still be needed.
+    PRERELEASE_RANKS[label]
   end
 
   def print_plan(source, target, target_version, plan)

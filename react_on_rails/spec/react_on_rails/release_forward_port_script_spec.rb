@@ -355,6 +355,44 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "picks version bumps when the target prerelease label is unknown" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.beta.1"))
+      beta_bump_sha = commit_all(repo, "Bump version to 1.0.1.beta.1")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.canary.1"))
+      commit_all(repo, "Start canary prerelease")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("target version: 1.0.1.canary.1")
+      expect(stdout).to include("PICK #{beta_bump_sha[0, 12]} Bump version to 1.0.1.beta.1")
+      expect(stdout).not_to include("target main is already at 1.0.1.canary.1")
+    end
+  end
+
+  it "warns when the target version file cannot be parsed" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
+      stable_bump_sha = commit_all(repo, "Bump version to 1.0.1")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", "# version constant intentionally missing\n")
+      commit_all(repo, "Break target version file")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stderr).to include("WARNING: VERSION constant not found")
+      expect(stdout).to include("target version: UNKNOWN")
+      expect(stdout).to include("PICK #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+    end
+  end
+
   it "skips test prerelease version bumps when the target has advanced to a later prerelease" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
