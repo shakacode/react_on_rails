@@ -69,7 +69,9 @@ module AgentWorkflowSeamDoctor
 
     return ["missing AGENTS.md"] unless File.file?(agents_path)
 
-    config = parse_config(File.read(agents_path))
+    # Read as UTF-8 regardless of locale; a non-UTF-8 default external encoding
+    # (e.g. LANG=C) otherwise crashes the parser on non-ASCII bytes in AGENTS.md.
+    config = parse_config(File.binread(agents_path).force_encoding("UTF-8").scrub)
     if config.nil?
       issues << "missing AGENTS.md section: #{SECTION}"
     else
