@@ -41,6 +41,8 @@ class ReleaseForwardPort
     end
   end
 
+  ManualSkipReason = Struct.new(:message, keyword_init: true)
+
   class UsageError < StandardError; end
   class GitError < StandardError; end
 
@@ -173,14 +175,15 @@ class ReleaseForwardPort
   def build_plan(commits, target, target_version, patch_equivalent_commits)
     commits.map do |sha|
       subject = git("log", "-1", "--format=%s", sha).strip
-      reason = skip_reason(sha, subject, target, target_version, patch_equivalent_commits)
+      skip_decision = skip_reason(sha, subject, target, target_version, patch_equivalent_commits)
+      reason = skip_reason_message(skip_decision)
 
       PlanEntry.new(
         sha:,
         subject:,
         action: reason ? :skip : :pick,
         reason:,
-        manual: manual_skip_reason?(reason)
+        manual: manual_skip_reason?(skip_decision)
       )
     end
   end
@@ -195,6 +198,8 @@ class ReleaseForwardPort
     return "empty commit; cherry-picking would only create a no-op commit on #{target}" if
       patch_id_for_commit(sha) == EMPTY_PATCH_ID
 
+    return if source_cherry_pick_origin_reverted_on_target?(sha, target)
+
     if patch_equivalent_commits[sha] &&
        patch_equivalent_commit_present_on_target?(sha, target)
       return "patch already exists on #{target} according to target history with no later standard revert"
@@ -207,8 +212,11 @@ class ReleaseForwardPort
     return "rc version bump commit; release train forward-ports must keep prerelease bumps off #{target}" if
       rc_version_bump?(subject)
 
-    return "merge commit; inspect manually for conflict-resolution hunks before marking forward-port complete" if
-      merge_commit?(sha)
+    if merge_commit?(sha)
+      return manual_skip_reason(
+        "merge commit; inspect manually for conflict-resolution hunks before marking forward-port complete"
+      )
+    end
 
     skipped_version_bump_revert_skip_reason(sha, subject, target, target_version) ||
       reverse_pick_revert_skip_reason(sha, target)
@@ -223,14 +231,15 @@ class ReleaseForwardPort
   end
 
   def manual_skip_reason?(reason)
-    return false unless reason
+    reason.is_a?(ManualSkipReason)
+  end
 
-    reason.start_with?(
-      "merge commit; inspect manually",
-      "reverts a release-only application",
-      "reverts a release-branch merge commit",
-      "stable release version bump commit"
-    )
+  def skip_reason_message(reason)
+    reason.is_a?(ManualSkipReason) ? reason.message : reason
+  end
+
+  def manual_skip_reason(message)
+    ManualSkipReason.new(message:)
   end
 
   def skipped_version_bump_revert_skip_reason(sha, subject, target, target_version)
@@ -282,8 +291,10 @@ class ReleaseForwardPort
   end
 
   def stable_version_bump_skip_reason(target)
-    "stable release version bump commit; use the runbook's manual fallback to take only " \
+    manual_skip_reason(
+      "stable release version bump commit; use the runbook's manual fallback to take only " \
       "the CHANGELOG hunks and keep release branch version changes off #{target}"
+    )
   end
 
   def unknown_target_prerelease_skip_reason(target)
@@ -302,12 +313,16 @@ class ReleaseForwardPort
     return merge_revert_skip_reason(target) if merge_commit?(reverted_sha)
     return unless reverted_commit_live_on_target?(reverted_sha, target)
 
-    "reverts a release-only application of a commit already live on #{target}; inspect manually " \
+    manual_skip_reason(
+      "reverts a release-only application of a commit already live on #{target}; inspect manually " \
       "before applying this rollback to #{target}"
+    )
   end
 
   def merge_revert_skip_reason(target)
-    "reverts a release-branch merge commit; inspect manually before applying this rollback to #{target}"
+    manual_skip_reason(
+      "reverts a release-branch merge commit; inspect manually before applying this rollback to #{target}"
+    )
   end
 
   def standard_revert_target(sha)
@@ -340,6 +355,11 @@ class ReleaseForwardPort
     origin_sha && commit_on_target?(origin_sha, target) && !standard_revert_on_target?(origin_sha, target)
   end
 
+  def source_cherry_pick_origin_reverted_on_target?(sha, target)
+    origin_sha = cherry_pick_origin(sha)
+    origin_sha && commit_on_target?(origin_sha, target) && standard_revert_on_target?(origin_sha, target)
+  end
+
   def reverted_commit_live_on_target?(sha, target)
     source_cherry_pick_origin_on_target?(sha, target) || patch_equivalent_commit_present_on_target?(sha, target)
   end
@@ -365,14 +385,20 @@ class ReleaseForwardPort
     cache_key = [sha, target]
     return @standard_revert_cache.fetch(cache_key) if @standard_revert_cache.key?(cache_key)
 
-    revert_message = "This reverts commit #{sha}."
-    revert_shas = git_lines("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H")
+    revert_shas = standard_revert_shas_on_target(sha, target)
     # Seed the cache before recursive descent so mutual-revert cycles terminate.
     @standard_revert_cache[cache_key] = false
     @standard_revert_cache[cache_key] =
       revert_shas.any? do |revert_sha|
         commit_descends_from?(revert_sha, sha) && !standard_revert_on_target?(revert_sha, target)
       end
+  end
+
+  def standard_revert_shas_on_target(sha, target)
+    [".", ","].flat_map do |suffix|
+      revert_message = "This reverts commit #{sha}#{suffix}"
+      git_lines("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H")
+    end.uniq
   end
 
   def patch_equivalent_commit_present_on_target?(sha, target)
@@ -387,6 +413,9 @@ class ReleaseForwardPort
     paths = git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
     return [] if paths.empty?
 
+    # This path-history walk can be broad for high-churn files, but it only runs
+    # for no-footer patch-equivalent candidates after git cherry marks a commit
+    # equivalent. Normal helper reruns use the faster -x footer path.
     git_lines("log", target, "--format=%H", "--no-merges", "--", *paths)
   end
 

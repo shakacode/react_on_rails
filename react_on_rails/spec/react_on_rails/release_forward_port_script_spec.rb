@@ -520,6 +520,34 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "picks release commits cherry-picked from target merge commits that were later reverted" do
+    with_release_repo do |repo|
+      base_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "-b", "feature")
+      write_file(repo, "app.txt", "base\nmain merge fix\n")
+      commit_all(repo, "Fix regression through feature branch")
+
+      git(repo, "checkout", "main")
+      git(repo, "merge", "--no-ff", "feature", "-m", "Merge feature fix")
+      merge_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "revert", "-m", "1", "--no-edit", merge_sha)
+      merge_revert_body = git(repo, "log", "-1", "--format=%B")
+      expect(merge_revert_body).to include("This reverts commit #{merge_sha}, reversing")
+
+      git(repo, "checkout", "-b", "release/1.0.1", base_sha)
+      git(repo, "cherry-pick", "-x", "-m", "1", merge_sha)
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Merge feature fix")
+      expect(stdout).to include("Forward-port complete")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nmain merge fix\n")
+    end
+  end
+
   it "routes release-only reverts of reverse cherry-picks to manual handling" do
     with_release_repo do |repo|
       write_file(repo, "app.txt", "base\nmain fix\n")
@@ -810,14 +838,14 @@ RSpec.describe "script/release-forward-port" do
     first_sha = "a" * 40
     second_sha = "b" * 40
 
-    allow(helper).to receive(:git_lines) do |*args|
-      case args
-      when ["log", "main", "--fixed-strings", "--grep", "This reverts commit #{first_sha}.", "--format=%H"]
+    allow(helper).to receive(:standard_revert_shas_on_target) do |sha, target|
+      case [sha, target]
+      when [first_sha, "main"]
         [second_sha]
-      when ["log", "main", "--fixed-strings", "--grep", "This reverts commit #{second_sha}.", "--format=%H"]
+      when [second_sha, "main"]
         [first_sha]
       else
-        raise "unexpected git_lines call: #{args.inspect}"
+        raise "unexpected standard_revert_shas_on_target call: #{[sha, target].inspect}"
       end
     end
     allow(helper).to receive(:commit_descends_from?).and_return(true)
