@@ -28,6 +28,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **`bin/dev clean` clears generated bundles and caches**: The command stops development processes, reads `config/shakapacker.yml` or `SHAKAPACKER_CONFIG`, removes configured Shakapacker public/private output and cache paths plus common Rails, JavaScript, and renderer bundle caches, and skips unsafe paths outside the app root. [PR 4218](https://github.com/shakacode/react_on_rails/pull/4218) by [justin808](https://github.com/justin808).
 
+#### Changed
+
+- **`create-react-on-rails-app` now defaults to Pro for React 19.2 support**: Running
+  `npx create-react-on-rails-app my-app` no longer asks setup questions and generates the recommended
+  React on Rails Pro scaffold by default. Use `--standard` only for an open-source-only setup or
+  `--pro` only when you want Pro without the generated React Server Components example.
+
 #### Fixed
 
 - **[Pro]** **RSC doctor now catches stale install and client-manifest setup failures**:

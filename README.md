@@ -67,6 +67,9 @@ bin/rails db:prepare
 bin/dev
 ```
 
+New apps default to React on Rails Pro for React 19.2 support. Use `--standard`
+only when you intentionally want an open-source-only setup.
+
 Add React on Rails to an existing Rails app:
 
 ```bash

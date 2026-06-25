@@ -1,9 +1,7 @@
-import { promptForMode, promptForTailwind } from '../src/prompt';
 import { validateAll } from '../src/validators';
 import { createApp, validateAppName } from '../src/create-app';
 import { detectPackageManager, logError, logInfo } from '../src/utils';
 
-jest.mock('../src/prompt');
 jest.mock('../src/validators');
 jest.mock('../src/create-app');
 jest.mock('../src/utils', () => ({
@@ -16,8 +14,6 @@ jest.mock('../src/utils', () => ({
   logSuccess: jest.fn(),
 }));
 
-const mockedPromptForMode = jest.mocked(promptForMode);
-const mockedPromptForTailwind = jest.mocked(promptForTailwind);
 const mockedValidateAll = jest.mocked(validateAll);
 const mockedValidateAppName = jest.mocked(validateAppName);
 const mockedCreateApp = jest.mocked(createApp);
@@ -30,7 +26,6 @@ function setupMocks() {
   mockedValidateAll.mockReturnValue({ allValid: true, results: [] });
   mockedCreateApp.mockImplementation(() => {});
   mockedDetectPackageManager.mockReturnValue('npm');
-  mockedPromptForTailwind.mockResolvedValue(false);
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 }
@@ -38,7 +33,6 @@ function setupMocks() {
 /**
  * Imports index.ts in an isolated module scope so that each test gets a fresh
  * Commander program. process.argv must be set before calling this.
- * Awaits the exported `ready` promise so the async action fully completes.
  */
 function loadIndex(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -53,7 +47,7 @@ function loadIndex(): Promise<void> {
   });
 }
 
-describe('TTY detection branching in run()', () => {
+describe('setup mode resolution in run()', () => {
   const originalArgv = process.argv;
   const originalStdinIsTTY = process.stdin.isTTY;
   const originalStdoutIsTTY = process.stdout.isTTY;
@@ -70,92 +64,79 @@ describe('TTY detection branching in run()', () => {
     jest.restoreAllMocks();
   });
 
-  it('calls promptForMode when stdin and stdout are TTY and no mode flag is passed', async () => {
+  it('defaults to the Pro RSC setup when no mode flag is passed in a TTY', async () => {
     Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true });
     Object.defineProperty(process.stdout, 'isTTY', { value: true, writable: true });
-    mockedPromptForMode.mockResolvedValue({ pro: false, rsc: true });
     process.argv = ['node', 'create-react-on-rails-app', 'my-app'];
 
     await loadIndex();
 
-    expect(mockedPromptForMode).toHaveBeenCalled();
-    expect(mockedPromptForTailwind).toHaveBeenCalled();
+    expect(mockedCreateApp).toHaveBeenCalledWith(
+      'my-app',
+      expect.objectContaining({ pro: false, rsc: true, tailwind: false }),
+    );
+    expect(mockedLogInfo).toHaveBeenCalledWith(expect.stringContaining('Default setup: React on Rails Pro'));
   });
 
-  it('passes the prompted Tailwind choice when no mode flag is passed', async () => {
-    Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, writable: true });
-    mockedPromptForMode.mockResolvedValue({ pro: false, rsc: false });
-    mockedPromptForTailwind.mockResolvedValue(true);
-    process.argv = ['node', 'create-react-on-rails-app', 'my-app'];
-
-    await loadIndex();
-
-    expect(mockedCreateApp).toHaveBeenCalledWith('my-app', expect.objectContaining({ tailwind: true }));
-  });
-
-  it('does not call promptForMode when stdin is not a TTY', async () => {
+  it('defaults to the Pro RSC setup when stdin/stdout are not TTYs', async () => {
     Object.defineProperty(process.stdin, 'isTTY', { value: undefined, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, writable: true });
-    process.argv = ['node', 'create-react-on-rails-app', 'my-app'];
-
-    await loadIndex();
-
-    expect(mockedPromptForMode).not.toHaveBeenCalled();
-    expect(mockedPromptForTailwind).not.toHaveBeenCalled();
-    expect(mockedLogInfo).toHaveBeenCalledWith(expect.stringContaining('not running interactively'));
-  });
-
-  it('does not call promptForMode when stdout is not a TTY', async () => {
-    Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true });
     Object.defineProperty(process.stdout, 'isTTY', { value: undefined, writable: true });
     process.argv = ['node', 'create-react-on-rails-app', 'my-app'];
 
     await loadIndex();
 
-    expect(mockedPromptForMode).not.toHaveBeenCalled();
-    expect(mockedPromptForTailwind).not.toHaveBeenCalled();
-    expect(mockedLogInfo).toHaveBeenCalledWith(expect.stringContaining('not running interactively'));
+    expect(mockedCreateApp).toHaveBeenCalledWith(
+      'my-app',
+      expect.objectContaining({ pro: false, rsc: true }),
+    );
+    expect(mockedLogInfo).not.toHaveBeenCalledWith(expect.stringContaining('not running interactively'));
   });
 
-  it('does not call promptForMode when --rsc is explicitly passed', async () => {
-    Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, writable: true });
-    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--rsc'];
-
-    await loadIndex();
-
-    expect(mockedPromptForMode).not.toHaveBeenCalled();
-    expect(mockedPromptForTailwind).not.toHaveBeenCalled();
-  });
-
-  it('does not call promptForMode when --standard is explicitly passed', async () => {
-    Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, writable: true });
+  it('keeps --standard as the explicit OSS-only setup', async () => {
     process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--standard'];
 
     await loadIndex();
 
-    expect(mockedPromptForMode).not.toHaveBeenCalled();
-    expect(mockedPromptForTailwind).not.toHaveBeenCalled();
+    expect(mockedCreateApp).toHaveBeenCalledWith(
+      'my-app',
+      expect.objectContaining({ pro: false, rsc: false }),
+    );
   });
 
-  it('exits with error when --standard is combined with --pro', async () => {
-    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--standard', '--pro'];
+  it('keeps --pro as the explicit Pro setup without the RSC example', async () => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--pro'];
 
     await loadIndex();
 
-    expect(mockedLogError).toHaveBeenCalledWith('--standard cannot be combined with --pro or --rsc.');
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockedCreateApp).toHaveBeenCalledWith(
+      'my-app',
+      expect.objectContaining({ pro: true, rsc: false }),
+    );
   });
 
-  it('exits with error when --standard is combined with --rsc', async () => {
-    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--standard', '--rsc'];
+  it('keeps --rsc as the explicit recommended Pro setup', async () => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--rsc'];
 
     await loadIndex();
 
-    expect(mockedLogError).toHaveBeenCalledWith('--standard cannot be combined with --pro or --rsc.');
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockedCreateApp).toHaveBeenCalledWith(
+      'my-app',
+      expect.objectContaining({ pro: false, rsc: true }),
+    );
+  });
+
+  it('keeps --rsc precedence over --pro for compatibility', async () => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--pro', '--rsc'];
+
+    await loadIndex();
+
+    expect(mockedCreateApp).toHaveBeenCalledWith(
+      'my-app',
+      expect.objectContaining({ pro: false, rsc: true }),
+    );
+    expect(mockedLogInfo).toHaveBeenCalledWith(
+      'Note: --rsc takes precedence over --pro; --pro will be ignored.',
+    );
   });
 });
 
@@ -167,7 +148,6 @@ describe('bundler flag resolution in run()', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setupMocks();
-    // Non-interactive so no mode prompt fires; standard mode is used automatically.
     Object.defineProperty(process.stdin, 'isTTY', { value: undefined, writable: true });
     Object.defineProperty(process.stdout, 'isTTY', { value: undefined, writable: true });
   });
