@@ -105,7 +105,7 @@ export function createCoreCapability(registries: Registries) {
       }
 
       if (Object.prototype.hasOwnProperty.call(newOptions, 'rootErrorHandlers')) {
-        // MUST SYNC: sibling implementation exists in packages/react-on-rails/src/base/client.ts.
+        // MIRROR OF: packages/react-on-rails/src/base/client.ts
         // Validates and merges the handlers per key (partial updates keep previously registered
         // callbacks); warns when the React runtime cannot support them. Store the merged result so
         // `option('rootErrorHandlers')` reflects the effective registration.

@@ -149,8 +149,8 @@ function waitForGeneratedComponentStylesheets(componentName: string, componentSp
  * OSS internals (no reliance on a non-public export) instead of widening the OSS public API just to
  * share it. The thenable guard (`isThenable`) and the shared `RendererFunction`/`RendererTeardown`/
  * `RendererTeardownResult` *types* are imported, so only this small runtime helper is duplicated.
- * MUST SYNC: A sibling helper exists in packages/react-on-rails/src/ClientRenderer.ts. If you
- * change the error-handling logic or log format here, update that copy too.
+ * MIRROR OF: packages/react-on-rails/src/ClientRenderer.ts (sibling helper). If you change
+ * the error-handling logic or log format here, update that copy too.
  */
 function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
   if (!teardown) return;

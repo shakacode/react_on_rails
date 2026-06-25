@@ -60,8 +60,8 @@ const renderedRoots = new Map<string, RenderedEntry>();
  * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
  * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch. `domNodeId`
  * is included in the log so a failure can be traced to its mount.
- * MUST SYNC: A sibling helper exists in packages/react-on-rails-pro/src/ClientSideRenderer.ts. If you
- * change the error-handling logic or log format here, update that copy too.
+ * MIRROR OF: packages/react-on-rails-pro/src/ClientSideRenderer.ts (sibling helper). If you change
+ * the error-handling logic or log format here, update that copy too.
  */
 function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
   if (!teardown) return;
