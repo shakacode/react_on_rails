@@ -69,8 +69,8 @@ This is the same selection/interview/dispatch gap that `plan-pr-batch` →
   authoritative unbounded backlog query (§3) and uses the last-RC window only to
   order/prioritize what it surfaces — never to filter (§2).
 - **Override (on-demand):** `$plan-qa-batch <base..head>`, `--full` (drop the
-  since-RC ordering window and present the entire backlog flat, §3), a
-  label/milestone filter, or an explicit PR list.
+  since-RC ordering window; backlog coverage is always unbounded regardless —
+  §2), a label/milestone filter, or an explicit PR list.
 - **Idempotent:** re-invoke any time. PRs already carrying a terminal QA label
   (`qa-verified` or `qa-skipped`, §5) drop out automatically, so the skill always
   shows exactly what still needs QA.
@@ -107,7 +107,10 @@ the active target base branch, run on every invocation (not just `--full`):
 ```sh
 set -o pipefail
 
-repo="${QA_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
+repo="${QA_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}" || {
+  echo "ERROR: could not determine repository name" >&2
+  exit 1
+}
 target_base="${QA_TARGET_BASE:-main}" # e.g. main or the active release branch
 
 gh api --method GET --paginate \
@@ -128,13 +131,14 @@ API (or an equivalent non-search GraphQL connection) until `hasNextPage` /
 query to the active target base branch so a release sweep does not mix `main`
 and `release/*` PRs. The `repo` value is derived from the trusted local checkout
 or an explicit trusted override and reused anywhere this document shows
-`OWNER/REPO`-style placeholders. The implementation MUST preserve `pipefail` (or
-capture the API exit code explicitly) and abort on API/auth/rate-limit/network
-errors before using the `jq` output; a failed page fetch is UNKNOWN, not an empty
-backlog. The `jq -s` example buffers all returned pages before filtering; that is
-acceptable for React on Rails' current PR volume, but the SKILL.md should switch
-to per-page/streaming processing if a target repo's merged PR count makes that
-memory trade-off unsafe.
+`OWNER/REPO`-style placeholders. Repository derivation failure is also UNKNOWN:
+abort before making the backlog API call. The implementation MUST preserve
+`pipefail` (or capture the API exit code explicitly) and abort on
+API/auth/rate-limit/network errors before using the `jq` output; a failed page
+fetch is UNKNOWN, not an empty backlog. The `jq -s` example buffers all returned
+pages before filtering; that is acceptable for React on Rails' current PR volume,
+but the SKILL.md should switch to per-page/streaming processing if a target
+repo's merged PR count makes that memory trade-off unsafe.
 
 The read-only resolver
 `.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json` is then used
