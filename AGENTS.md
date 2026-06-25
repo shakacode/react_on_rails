@@ -620,13 +620,13 @@ Current head SHA: <head SHA used for this block>
 Score: X/10
 Auto-merge recommendation: <yes if score is at least 8/10, else no>
 Affected areas: RSC, Pro/core boundary, CI
-CI detector: `script/ci-changes-detector origin/main` → <summary>
+CI detector: `script/ci-changes-detector origin/main` -> <summary>
 Validation run:
-- <command> → <result>
+- <command> -> <result>
 Review/check gate:
 - GitHub checks: complete for <head SHA>, failures/skips explained
 - Review threads: `gh`/GraphQL unresolved count is 0, or <N> unresolved threads each triaged with links
-- Review systems live this head: <N of M configured working; "none down" or each down system + reason; must be ≥ 2 working to merge>
+- Review systems live this head: <N of M configured working; "none down" or each down system + reason; must be >= 2 working to merge>
 - Current-head reviewer verdicts:
   - Claude review: complete for <head SHA>, no confirmed blocker
   - Fallback review, if Claude quota/capacity-limited: <Cursor or Codex result plus error evidence>
@@ -754,7 +754,11 @@ silently drop review coverage. Apply these rules to any PR merge, batch or not.
   — blocks merge until coverage is restored or a maintainer explicitly waives
   the floor with evidence. This floor is about live, independent coverage; the
   Claude→Cursor/Codex fallback above describes _which_ systems may cover, but two
-  must actually be live for the current head.
+  must actually be live for the current head. If fewer than two systems are
+  configured for the repo/PR at all, treat that as a structural coverage
+  shortfall instead of waiting on nonexistent reviewers; merge only after a
+  maintainer configures another system or explicitly waives the floor with
+  evidence and records the structural exception.
 - **Acknowledge degraded coverage before merging.** When a PR is merged with any
   configured review system not working for the last round of changes (the current
   head SHA), record the degraded coverage in the **PR description before
