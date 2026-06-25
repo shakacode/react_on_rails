@@ -120,8 +120,8 @@ for target_base in $target_bases; do
 done |
   jq -s '
     [.[][] | select(.merged_at != null)
-      | select(([.labels[].name] | index("qa-verified")) | not)
-      | select(([.labels[].name] | index("qa-skipped")) | not)]
+      | select(any(.labels[]; .name == "qa-verified") | not)
+      | select(any(.labels[]; .name == "qa-skipped") | not)]
     | unique_by(.number)
   '
 ```
@@ -157,9 +157,12 @@ script): it **hard-fails (`return 1`)** when no `*.rc.*` tag is in head history
 and `--base` is omitted, so `plan-qa-batch` always passes an explicit
 release-aware `--base` matching the sweep target (`origin/main` for a main sweep,
 or the active release branch for an RC/release sweep). If the resolver returns an
-empty or non-zero optimization for that base, the planner treats the optimization
-as unavailable — the label query above remains the unconditional source of truth.
-`plan-qa-batch` then layers QA classification (§4) on the resulting set.
+empty optimization or a known "no RC tag" result for that base, the planner
+treats the optimization as unavailable — the label query above remains the
+unconditional source of truth. Unexpected resolver failures (auth, missing tools,
+network, malformed JSON, or an unrecognized non-zero exit) are infrastructure
+UNKNOWN and abort before planning. `plan-qa-batch` then layers QA classification
+(§4) on the resulting set.
 
 ### 4. Classify by QA _method_, not include-vs-skip
 
@@ -250,7 +253,9 @@ Properties:
   evidence comment. If the evidence post fails, the label step is aborted — so a
   PR can never carry `qa-verified` without its supporting evidence (no silent
   false positive). A crash between a successful evidence post and the label is
-  survivable: the next run simply re-verifies.
+  survivable: the next run simply re-verifies. `qa-skipped` has no evidence
+  comment; its prerequisite write is the developer acknowledgment, or the
+  unattended auto-acknowledgment audit-trail note (§7).
 - **Failures stay loud.** A failing verification (❌) gets **neither** label and a
   discrete issue (§10); it deliberately remains in the backlog so re-runs keep
   re-verifying until the fix lands, with the open issue as the human signal. (A
@@ -280,12 +285,10 @@ re-edited, and other batches see QA in flight. The **same integration is added t
 **Degraded-backend fallback (exit-code-aware).** The backend doc distinguishes
 exit 3 (`CLAIM_REFUSED`, hard stop) from exit 2 (`UNKNOWN` / degraded). Because QA
 lanes are dependency-sensitive by definition (point 1 — must not verify a moving
-target), an exit-2 `UNKNOWN` status for a PR that **could** carry an invisible
-live implementation claim is treated as **blocked/deferred**, _not_ proceeded on
-advisory public comments. (Advisory-comment fallback is only acceptable for a PR
-with no plausible concurrent claimant.) This matches the canonical rule in
-`agent-coordination-backend.md`; proceeding on UNKNOWN would let QA verify an
-in-progress state.
+target), any exit-2 `UNKNOWN` status for a candidate PR is treated as
+**blocked/deferred**, _not_ proceeded on advisory public comments. This matches
+the canonical rule in `agent-coordination-backend.md`; proceeding on UNKNOWN
+would let QA verify an in-progress state.
 
 **Repeated-contention escalation.** A PR skipped for a live claim (point 1) is
 retried next run, but a PR under perpetual edit would be skipped forever and the
@@ -325,9 +328,12 @@ then ask only for what cannot be inferred:
 3. **Environment availability now** — Redis + Pro license + Pro renderer up?
    Browser available? Candidates whose **actual** env profile (§4b) is
    unavailable are deferred and clearly listed, not silently dropped.
-4. Cap — max items this batch.
-5. Methods/areas to include or exclude.
-6. Concurrency — how many lanes / subagents to plan for.
+4. Cap — max items this batch. Unattended default: the `--cap` invocation value,
+   or unlimited if unset.
+5. Methods/areas to include or exclude. Unattended default: include all methods
+   and areas that have available environments.
+6. Concurrency — how many lanes / subagents to plan for. Unattended default: the
+   configured `qa-batch` concurrency, capped by resource serialization (§9).
 
 ### 8. Output — the QA Batch Plan + goal prompt
 
@@ -360,11 +366,11 @@ wedge the batch:
   semaphore for the current batch and, before cross-batch Pro concurrency is
   enabled, must either acquire an explicit backend resource claim such as
   `resource:pro-stack` (if the coordination backend supports non-PR targets) or
-  stop with UNKNOWN when another live QA batch could already be using the shared
-  stack. Per-PR claims alone are insufficient to protect the Pro resources. The
-  **v1 default** is to stop with UNKNOWN unless the backend resource claim is
-  implemented and verified; proceeding without cross-batch Pro serialization is
-  not allowed.
+  stop with UNKNOWN because another live QA batch could already be using the
+  shared stack and there is no safe cross-machine detection primitive. Per-PR
+  claims alone are insufficient to protect the Pro resources. The **v1 default**
+  is to stop with UNKNOWN unless the backend resource claim is implemented and
+  verified; proceeding without cross-batch Pro serialization is not allowed.
 - **(c) Working-tree isolation.** QA mostly does not edit source, but the
   documented spec-only "before" tactic (`git checkout <fix>~1 -- <file>`, §4 /
   `verify-pr-fix`) **does mutate the shared checkout** — two such lanes in one
@@ -430,9 +436,9 @@ output into it.
 ## Coordinated edits to existing skills
 
 1. **`verify-pr-fix`** — after a passing verification, ensure the label exists
-   (`gh label list` → `gh label create qa-verified` if absent) and add it as the
-   **final** write, only after the evidence comment posts successfully (§5
-   invariant). No other change to its flow.
+   using the paginated label lookup and idempotent create flow from §5, then add
+   it as the **final** write, only after the evidence comment posts successfully
+   (§5 invariant). No other change to its flow.
 2. **`post-merge-audit`** — register `agent-coord` claims/heartbeats for audit
    passes so audits coordinate with implementation and QA batches (§6).
 
