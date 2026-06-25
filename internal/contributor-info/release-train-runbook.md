@@ -194,7 +194,7 @@ git checkout main
 git pull --rebase
 
 # Inspect the plan first. Expect fix/CHANGELOG commits to be PICK and
-# Bump version to ...rc.N commits to be SKIP.
+# Bump version commits to be SKIP.
 script/release-forward-port --source origin/release/17.0.0 --target main --dry-run
 
 # Apply the same plan. The helper checks out the local target branch and cherry-picks with -x.
@@ -217,6 +217,9 @@ git push   # or open a PR if main is protected / the fix needs review on main
 - **Do not `git merge release/X.Y.Z` into `main`.** That drags the RC `Bump version to …rc.N` commits
   and the release-branch CHANGELOG layout onto `main`, which is exactly what we want to keep off `main`.
   Let the helper pick only eligible commits, or manually cherry-pick only the specific fix commit(s).
+- Stable final `Bump version to X.Y.Z` commits are also skipped. If the release closeout needs their
+  CHANGELOG content on `main`, use the manual fallback to take only those hunks and leave release-branch
+  version-file changes behind.
 - Manual fallback: if the helper reports a real conflict on an eligible fix, prefer resolving that
   specific cherry-pick in place with `git cherry-pick --continue` so the earlier successful picks are
   kept. If you instead run `git cherry-pick --abort`, only the current conflicting commit is abandoned;

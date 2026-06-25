@@ -383,7 +383,28 @@ RSpec.describe "script/release-forward-port" do
 
       expect(status).to be_success, stderr
       expect(stdout).to include("SKIP #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
-      expect(stdout).to include("target main is already at 1.1.0.dev")
+      expect(stdout).to include("stable release version bump commit")
+      expect(stdout).to include("manual fallback to take only the CHANGELOG hunks")
+    end
+  end
+
+  it "skips stable final version bumps when the target is still pre-release-cut" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc.1"))
+      rc_bump_sha = commit_all(repo, "Bump version to 1.0.1.rc.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
+      write_file(repo, "CHANGELOG.md", "# Change Log\n\n### [1.0.1]\n- Final notes\n")
+      stable_bump_sha = commit_all(repo, "Bump version to 1.0.1")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("target version: 1.0.0")
+      expect(stdout).to include("SKIP #{rc_bump_sha[0, 12]} Bump version to 1.0.1.rc.1")
+      expect(stdout).to include("SKIP #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).to include("stable release version bump commit")
       expect(stdout).to include("manual fallback to take only the CHANGELOG hunks")
     end
   end
@@ -422,7 +443,8 @@ RSpec.describe "script/release-forward-port" do
       expect(status).to be_success, stderr
       expect(stderr).to include("WARNING: VERSION constant not found")
       expect(stdout).to include("target version: UNKNOWN")
-      expect(stdout).to include("PICK #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).to include("SKIP #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).to include("stable release version bump commit")
     end
   end
 

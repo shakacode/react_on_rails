@@ -180,7 +180,15 @@ class ReleaseForwardPort
 
   def version_bump_skip_reason(subject, target, target_version)
     version = version_from_bump_subject(subject)
-    return unless version && target_version
+    return unless version
+
+    parsed_version = parse_version(version)
+    if parsed_version && parsed_version.fetch(:prerelease).nil?
+      return "stable release version bump commit; use the runbook's manual fallback to take only " \
+             "the CHANGELOG hunks and keep release branch version changes off #{target}"
+    end
+
+    return unless target_version
 
     comparison = compare_versions(target_version, version)
     return unless comparison && comparison >= 0
@@ -212,6 +220,8 @@ class ReleaseForwardPort
 
   def patch_present_on_target_tree?(sha, target)
     patch = git("show", "--format=", "--binary", "--full-index", "--find-renames", sha)
+    # Empty commits carry no file changes; cherry-picking them would only create
+    # a no-op commit, so treat the patch as already present.
     return true if patch.strip.empty?
 
     with_temporary_index(target) do |env|
@@ -359,7 +369,7 @@ class ReleaseForwardPort
       warn stderr unless stderr.empty?
       next if status.success?
 
-      warn_cherry_pick_conflict(entry, remaining: picks.length - index - 1)
+      warn_cherry_pick_conflict(entry, completed: index, remaining: picks.length - index - 1)
       return 1
     end
 
@@ -367,7 +377,7 @@ class ReleaseForwardPort
     0
   end
 
-  def warn_cherry_pick_conflict(entry, remaining:)
+  def warn_cherry_pick_conflict(entry, completed:, remaining:)
     warn "Cherry-pick failed for #{entry.sha}."
     warn "Resolve the conflict and run git cherry-pick --continue to finish THIS commit."
     if remaining.positive?
@@ -376,9 +386,9 @@ class ReleaseForwardPort
            "script/release-forward-port after continuing to apply the rest " \
            "(it is idempotent and skips commits already applied)."
     end
-    warn "If you run git cherry-pick --abort, only the current conflicting commit is abandoned; " \
-         "earlier picks from this run are already committed and safe. Rerun " \
-         "script/release-forward-port after fixing the conflict " \
+    warn "If you run git cherry-pick --abort, only the current conflicting commit is abandoned."
+    warn "Earlier successful picks from this run are already committed and safe." if completed.positive?
+    warn "Rerun script/release-forward-port after fixing the conflict " \
          "(it is idempotent and skips commits already applied)."
   end
 
@@ -415,7 +425,7 @@ class ReleaseForwardPort
   end
 
   def capture_git(*, env: {}, stdin_data: nil)
-    merged_env = { "GIT_TERMINAL_PROMPT" => "0" }.merge(env)
+    merged_env = { "GIT_TERMINAL_PROMPT" => "0", "GIT_PAGER" => "cat" }.merge(env)
     Open3.capture3(merged_env, "git", *, stdin_data:)
   end
 
