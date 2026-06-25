@@ -567,7 +567,6 @@ module ReactOnRailsPro
           is required. In all other environments, you must explicitly configure a password to secure
           communication between Rails and the Node Renderer.
           #{unset_renderer_env_guidance(runtime_envs)}
-
           To secure the renderer, set the RENDERER_PASSWORD environment variable:
 
             export RENDERER_PASSWORD="your-secure-password"
@@ -600,7 +599,7 @@ module ReactOnRailsPro
     end
 
     def unset_renderer_env_guidance(runtime_envs)
-      return unless runtime_envs.empty?
+      return "" unless runtime_envs.empty?
 
       <<~GUIDANCE
 
@@ -611,6 +610,7 @@ module ReactOnRailsPro
 
         or configure RENDERER_PASSWORD. Deployed/shared environments should set explicit
         envs and RENDERER_PASSWORD.
+
       GUIDANCE
     end
 

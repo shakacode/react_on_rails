@@ -469,7 +469,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             end
           end.to raise_error(ReactOnRailsPro::Error) { |error|
             expect(error.message).to include("export RAILS_ENV=development NODE_ENV=development")
-            expect(error.message).to include("(both unset)     — treated as production-like")
+            expect(error.message).to include("(both unset)").and include("treated as production-like")
           }
         end
 

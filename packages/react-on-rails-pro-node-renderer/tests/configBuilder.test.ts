@@ -357,7 +357,7 @@ describe('configBuilder', () => {
         expect.stringContaining('export RAILS_ENV=development NODE_ENV=development'),
       );
       expect(error).toHaveBeenCalledWith(
-        expect.stringContaining('(neither set) — treated as production-like; RENDERER_PASSWORD required'),
+        expect.stringContaining('(both unset) — treated as production-like; RENDERER_PASSWORD required'),
       );
     });
 
