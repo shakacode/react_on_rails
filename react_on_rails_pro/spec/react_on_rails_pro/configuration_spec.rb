@@ -461,6 +461,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
         it "raises with local dev guidance when RAILS_ENV and NODE_ENV are unset" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return(nil)
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return(nil)
 
           expect do
             ReactOnRailsPro.configure do |config|

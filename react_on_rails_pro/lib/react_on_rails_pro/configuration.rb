@@ -610,7 +610,6 @@ module ReactOnRailsPro
 
         or configure RENDERER_PASSWORD. Deployed/shared environments should set explicit
         envs and RENDERER_PASSWORD.
-
       GUIDANCE
     end
 
