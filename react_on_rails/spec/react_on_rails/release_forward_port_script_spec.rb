@@ -365,6 +365,36 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips release commits cherry-picked from a live target commit" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      main_fix_sha = commit_all(repo, "Fix release regression")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      write_file(repo, "app.txt", "base\nrelease-specific fix\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Fix release regression",
+        "-m",
+        "(cherry picked from commit #{main_fix_sha})"
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{release_fix_sha[0, 12]} Fix release regression")
+      expect(stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nmain fix\n")
+    end
+  end
+
   it "does not skip an -x cherry-pick that was later reverted" do
     with_release_repo do |repo|
       add_rc_bump_and_fix(repo)

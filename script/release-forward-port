@@ -204,6 +204,8 @@ class ReleaseForwardPort
   end
 
   def already_forward_ported_with_x?(sha, target)
+    return true if source_cherry_pick_origin_on_target?(sha, target)
+
     footer = "#{CHERRY_PICK_FOOTER_PREFIX}#{sha})"
     # This history search can false-positive if a later target commit quotes the
     # footer verbatim. The runbook documents that boundary for release operators.
@@ -216,10 +218,31 @@ class ReleaseForwardPort
     forwarded_shas.any? { |forwarded_sha| !standard_revert_on_target?(forwarded_sha, target) }
   end
 
+  def source_cherry_pick_origin_on_target?(sha, target)
+    origin_sha = cherry_pick_origin(sha)
+    origin_sha && commit_on_target?(origin_sha, target) && !standard_revert_on_target?(origin_sha, target)
+  end
+
+  def cherry_pick_origin(sha)
+    body = git("log", "-1", "--format=%B", sha)
+    match = body.match(/\(cherry picked from commit (?<sha>[0-9a-f]{40})\)/)
+    match && match[:sha]
+  end
+
+  def commit_on_target?(sha, target)
+    _stdout, _stderr, status = capture_git("merge-base", "--is-ancestor", sha, target)
+    status.success?
+  end
+
   def standard_revert_on_target?(sha, target)
+    @standard_revert_cache ||= {}
+    cache_key = [sha, target]
+    return @standard_revert_cache.fetch(cache_key) if @standard_revert_cache.key?(cache_key)
+
     revert_message = "This reverts commit #{sha}."
     revert_shas = git_lines("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H")
-    revert_shas.any? { |revert_sha| !standard_revert_on_target?(revert_sha, target) }
+    @standard_revert_cache[cache_key] =
+      revert_shas.any? { |revert_sha| !standard_revert_on_target?(revert_sha, target) }
   end
 
   def patch_equivalent_commit_present_on_target?(sha, target)
@@ -245,7 +268,7 @@ class ReleaseForwardPort
     return EMPTY_PATCH_ID if patch.strip.empty?
 
     stdout, stderr, status = capture_git("patch-id", "--stable", stdin_data: patch)
-    raise GitError, git_error(["patch-id", "--stable", sha], stdout, stderr, status) unless status.success?
+    raise GitError, "#{git_error(['patch-id', '--stable'], stdout, stderr, status)} for #{sha}" unless status.success?
 
     patch_id = stdout.split.first
     raise GitError, "git patch-id produced no output for #{sha}" if patch_id.nil?
