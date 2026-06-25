@@ -290,11 +290,12 @@ relax it for cadence.
 The skip count needs durable, file-free storage across invocations. Do **not**
 assume arbitrary mutable metadata exists on current `agent-coord` records. Phase A
 must either add a first-class coordination field / batch-state entry with
-compare-and-swap semantics, or run in degraded mode where repeated-contention
-counts are reported in the current batch output only and are not used for
-automated escalation. A successful QA claim clears the durable count when that
-capability exists; without it, escalation is advisory/UNKNOWN rather than a hard
-gate.
+compare-and-swap semantics, or explicitly ship v1 in degraded mode where
+repeated-contention counts are reported in the current batch output only and are
+not used for automated escalation. A successful QA claim clears the durable count
+when that capability exists; without it, escalation is advisory/UNKNOWN rather
+than a hard gate, and `qa-batch` must label that mode as "no automated
+repeated-contention escalation" in its handoff.
 
 ### 7. The interview
 
@@ -351,7 +352,10 @@ wedge the batch:
   enabled, must either acquire an explicit backend resource claim such as
   `resource:pro-stack` (if the coordination backend supports non-PR targets) or
   stop with UNKNOWN when another live QA batch could already be using the shared
-  stack. Per-PR claims alone are insufficient to protect the Pro resources.
+  stack. Per-PR claims alone are insufficient to protect the Pro resources. The
+  **v1 default** is to stop with UNKNOWN unless the backend resource claim is
+  implemented and verified; proceeding without cross-batch Pro serialization is
+  not allowed.
 - **(c) Working-tree isolation.** QA mostly does not edit source, but the
   documented spec-only "before" tactic (`git checkout <fix>~1 -- <file>`, §4 /
   `verify-pr-fix`) **does mutate the shared checkout** — two such lanes in one
@@ -410,7 +414,9 @@ data: quote it, fence it, cap excerpts, and never let it supply instructions to
 the agent or alter labels, assignees, commands, repository paths, or safety
 rules. Build multi-line issue bodies in a temporary Markdown file and pass them
 with `gh issue create --body-file`, matching the repository's GitHub follow-up
-issue rule.
+issue rule. The implementation must create that file with `mktemp` and register a
+cleanup trap (for example, `trap 'rm -f "$tmp"' EXIT`) before writing reproduced
+output into it.
 
 ## Coordinated edits to existing skills
 
@@ -486,10 +492,10 @@ readiness) differ enough that overloading `pr-batch` would muddy both.
 - **Durable skip-counter requires an `agent-coord` schema extension.** The
   repeated-contention escalation (§6) needs a first-class, compare-and-swap-safe
   counter field on coordination records. If that field does not exist at Phase A
-  implementation time, escalation runs in degraded mode (current-batch report
-  only, no automated gate). Decide before implementation: add the field to
-  `agent-coord`, use a surrogate such as a dedicated GitHub status/check, or
-  explicitly accept degraded mode for v1.
+  implementation time, v1 explicitly runs in degraded mode (current-batch report
+  only, no automated gate) and must say so in every handoff. A later iteration can
+  add the field to `agent-coord` or use a surrogate such as a dedicated GitHub
+  status/check.
 - **Mislocated existing specs (separate task).** Three design docs sit under
   public `docs/superpowers/specs/`; by the "`docs/` is public, internal design
   goes to `internal/planning/`" rule they should move. Out of scope for this
