@@ -137,6 +137,19 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "accepts positional source and target refs" do
+    with_release_repo do |repo|
+      add_rc_bump_and_fix(repo)
+
+      stdout, stderr, status = run_script(repo, "release/1.0.1", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("source: release/1.0.1")
+      expect(stdout).to include("target: main")
+      expect(stdout).to include("PICK")
+    end
+  end
+
   it "skips commits already applied without an -x footer when the patch is still in the target tree" do
     with_release_repo do |repo|
       _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)

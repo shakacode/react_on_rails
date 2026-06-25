@@ -52,6 +52,10 @@ class ReleaseForwardPort
     commits = source_only_commits(source, target)
     equiv_commits = patch_equivalent_candidates(source, target)
     target_version = version_at(target)
+
+    # Build the operator-facing plan before the normal-mode dirty-worktree
+    # guard, so normal mode and dry-run report the same plan before refusing to
+    # checkout or cherry-pick.
     plan = build_plan(commits, target, target_version, equiv_commits)
 
     print_plan(source, target, target_version, plan)
@@ -133,12 +137,11 @@ class ReleaseForwardPort
 
   def build_plan(commits, target, target_version, patch_equivalent_commits)
     commits.map do |sha|
-      full_sha = git("rev-parse", "#{sha}^{commit}").strip
-      subject = git("log", "-1", "--format=%s", full_sha).strip
-      reason = skip_reason(full_sha, subject, target, target_version, patch_equivalent_commits)
+      subject = git("log", "-1", "--format=%s", sha).strip
+      reason = skip_reason(sha, subject, target, target_version, patch_equivalent_commits)
 
       PlanEntry.new(
-        sha: full_sha,
+        sha:,
         subject:,
         action: reason ? :skip : :pick,
         reason:
@@ -321,7 +324,7 @@ class ReleaseForwardPort
 
   def checkout_target!(target)
     puts "\nChecking out #{target}..."
-    git!("checkout", target)
+    git("checkout", target)
   end
 
   def apply_plan(plan)
@@ -380,27 +383,23 @@ class ReleaseForwardPort
   end
 
   # The repo requires Ruby >= 3.3, so anonymous forwarding is valid and keeps
-  # these small git wrappers aligned with RuboCop's preferred style. Both git!
-  # and git raise on failure; capture_git/run_git are the non-raising escape
-  # hatches.
+  # these small git wrappers aligned with RuboCop's preferred style. git raises
+  # on failure; capture_git/run_git are the non-raising escape hatches.
   def git_lines(*)
     output = git(*)
     output.lines.map(&:strip).reject(&:empty?)
   end
 
-  def git!(*args)
+  def git(*args)
     stdout, stderr, status = capture_git(*args)
     raise GitError, git_error(args, stdout, stderr, status) unless status.success?
 
     stdout
   end
 
-  def git(*)
-    git!(*)
-  end
-
   def capture_git(*, env: {}, stdin_data: nil)
-    Open3.capture3(env, "git", *, stdin_data:)
+    merged_env = { "GIT_TERMINAL_PROMPT" => "0" }.merge(env)
+    Open3.capture3(merged_env, "git", *, stdin_data:)
   end
 
   def run_git(*)
