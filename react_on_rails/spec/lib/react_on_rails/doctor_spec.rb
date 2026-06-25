@@ -5389,7 +5389,15 @@ RSpec.describe ReactOnRails::Doctor do
       it "warns that the installed package is behind the next dist-tag" do
         allow(Open3).to receive(:capture3).and_call_original
         allow(Open3).to receive(:capture3)
-          .with("npm", "view", "react-on-rails-rsc", "dist-tags", "--json", chdir: Dir.pwd)
+          .with(
+            "npm",
+            "view",
+            "react-on-rails-rsc",
+            "dist-tags",
+            "--json",
+            "--fetch-timeout=5000",
+            chdir: Dir.pwd
+          )
           .and_return(
             [
               JSON.generate("latest" => "19.0.5", "next" => "19.2.0-rc.4"),
@@ -5412,7 +5420,15 @@ RSpec.describe ReactOnRails::Doctor do
       it "reports an info message once when the dist-tag lookup is unavailable" do
         allow(Open3).to receive(:capture3).and_call_original
         allow(Open3).to receive(:capture3)
-          .with("npm", "view", "react-on-rails-rsc", "dist-tags", "--json", chdir: Dir.pwd)
+          .with(
+            "npm",
+            "view",
+            "react-on-rails-rsc",
+            "dist-tags",
+            "--json",
+            "--fetch-timeout=5000",
+            chdir: Dir.pwd
+          )
           .and_return(["", "network unavailable", instance_double(Process::Status, success?: false)])
 
         doctor.send(:check_rsc_react_version)
@@ -5423,7 +5439,15 @@ RSpec.describe ReactOnRails::Doctor do
           info_msgs.count { |msg| msg.include?("Could not fetch react-on-rails-rsc dist-tags") }
         ).to eq(1)
         expect(Open3).to have_received(:capture3)
-          .with("npm", "view", "react-on-rails-rsc", "dist-tags", "--json", chdir: Dir.pwd)
+          .with(
+            "npm",
+            "view",
+            "react-on-rails-rsc",
+            "dist-tags",
+            "--json",
+            "--fetch-timeout=5000",
+            chdir: Dir.pwd
+          )
           .once
       end
     end

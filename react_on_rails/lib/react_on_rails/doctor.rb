@@ -3472,6 +3472,7 @@ module ReactOnRails
     ].freeze
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
+    NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
     PACKAGE_NAME_PATTERN = %r{
       \A
       (?:@[a-z0-9][a-z0-9._-]*/)?
@@ -3718,9 +3719,16 @@ module ReactOnRails
     end
 
     def fetch_rsc_dist_tags(package_root)
-      stdout, _stderr, status = Timeout.timeout(5) do
-        Open3.capture3("npm", "view", RSC_PACKAGE_NAME, "dist-tags", "--json", chdir: package_root)
-      end
+      checker.add_info("  ℹ️  Checking #{RSC_PACKAGE_NAME} npm dist-tags to flag stale RSC pins")
+      stdout, _stderr, status = Open3.capture3(
+        "npm",
+        "view",
+        RSC_PACKAGE_NAME,
+        "dist-tags",
+        "--json",
+        "--fetch-timeout=#{NPM_VIEW_FETCH_TIMEOUT_MS}",
+        chdir: package_root
+      )
       unless status.success?
         report_rsc_dist_tag_lookup_skipped
         return {}
