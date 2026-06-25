@@ -29912,3 +29912,4 @@ This is a large release with significant improvements to the install generator, 
 ### Bug Fixes
 
 Numerous bug fixes for CSS module SSR with rspack, `bin/dev` hook resolution, generator test defaults, precompile hook coordination, and more. See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details.
+
