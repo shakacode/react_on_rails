@@ -103,8 +103,10 @@ the auto-merge automation _within_ a phase. See
 The git mechanics below were validated end-to-end with a local dry-run (see
 [Dry-run](#dry-run-validate-the-mechanics)).
 
-The five steps and how they map onto the two branches — solid arrows are the release-branch
-progression; dotted arrows are what reaches `main` (which never freezes):
+The five steps mapped onto the two branches. The solid path is the release branch (1 → 2 → 4 → 5);
+step 3 is not a separate stage — it runs _during_ stabilization, so it appears as a dotted
+forward-port arrow to `main` rather than a node in the main flow. The step-5 close-out likewise
+forward-ports the CHANGELOG. `main` never freezes:
 
 ```mermaid
 flowchart TD
@@ -114,7 +116,7 @@ flowchart TD
     C -->|"yes"| D["4 · Promote in place<br/>drop -rc at release tip<br/>tag vX.Y.Z — no re-cut"]
     D --> E["5 · Close out<br/>forward-port CHANGELOG collapse<br/>delete release/X.Y.Z (tags persist)"]
     B -.->|"3 · cherry-pick -x each fix"| M(["main — never freezes"])
-    E -.->|"5 · forward-port CHANGELOG"| M
+    E -.->|"forward-port CHANGELOG"| M
 ```
 
 > **Note:** Worked examples use the concrete version `17.0.0` (and branch `release/17.0.0`, tags
