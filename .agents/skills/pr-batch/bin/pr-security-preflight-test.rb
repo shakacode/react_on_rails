@@ -298,6 +298,23 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
     end
   end
 
+  def test_non_ascii_gh_output_does_not_crash_under_ascii_locale
+    with_fake_gh("non-ascii-issue") do |env, trust_config_path, _log_path|
+      out, status = run_script(
+        env.merge("LANG" => "C", "LC_ALL" => "C"),
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "123"
+      )
+
+      refute_includes out, "invalid byte sequence"
+      assert status.success?, out
+      assert_includes out, "SECURITY_PREFLIGHT_OK"
+    end
+  end
+
   private
 
   def trust_coderabbit(trust_config_path)
@@ -374,6 +391,10 @@ class PrSecurityPreflightTest < Minitest::Test # rubocop:disable Metrics/ClassLe
         elif [ "$mode" = "reaction-only-participant" ] || [ "$mode" = "trusted-hidden-participant" ] || [ "$mode" = "trusted-bot-participant" ] || [ "$mode" = "human-bot-basename-participant" ]; then
           cat <<'JSON'
       {"number":123,"title":"Test issue","html_url":"https://github.com/owner/repo/issues/123","body":"Document GITHUB_TOKEN use.","user":{"login":"issue-author"}}
+      JSON
+        elif [ "$mode" = "non-ascii-issue" ]; then
+          cat <<'JSON'
+      {"number":123,"title":"Tëst issué — café","html_url":"https://github.com/owner/repo/issues/123","body":"Café au lait notes — déjà vu 🚀 friendly documentation update","user":{"login":"justin808"}}
       JSON
         else
           cat <<'JSON'

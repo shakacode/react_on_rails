@@ -82,6 +82,10 @@ def run_gh(*args)
     stdout, stderr, status = Open3.capture3("gh", *args)
   end
 
+  # Force UTF-8 so non-ASCII gh output (issue bodies, author names) survives LANG=C.
+  stdout = stdout.force_encoding("UTF-8").scrub
+  stderr = stderr.force_encoding("UTF-8").scrub
+
   return stdout if status.success?
 
   output = [stderr, stdout].reject { |text| text.to_s.empty? }.join("\n")
