@@ -134,7 +134,7 @@ class ReleaseForwardPort
   end
 
   def source_only_commits(source, target)
-    git_lines("rev-list", "--reverse", "--no-merges", "#{target}..#{source}")
+    git_lines("rev-list", "--reverse", "#{target}..#{source}")
   end
 
   def patch_equivalent_candidates(source, target)
@@ -163,6 +163,10 @@ class ReleaseForwardPort
       return "rc version bump commit; release train forward-ports must keep prerelease bumps off #{target}"
     end
 
+    if merge_commit?(sha)
+      return "merge commit; inspect manually for conflict-resolution hunks before marking forward-port complete"
+    end
+
     if already_forward_ported_with_x?(sha, target)
       return "already forward-ported to #{target} via cherry-pick -x evidence with no later standard revert"
     end
@@ -180,6 +184,10 @@ class ReleaseForwardPort
 
   def rc_version_bump?(subject)
     subject.match?(RC_VERSION_BUMP_SUBJECT)
+  end
+
+  def merge_commit?(sha)
+    git("rev-list", "--parents", "-n", "1", sha).split.length > 2
   end
 
   def version_bump_skip_reason(subject, target, target_version)

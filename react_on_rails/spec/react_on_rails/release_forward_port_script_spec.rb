@@ -258,7 +258,7 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
-  it "omits release branch merge commits from the forward-port plan" do
+  it "reports release branch merge commits for manual handling" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
       write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc.1"))
@@ -278,8 +278,8 @@ RSpec.describe "script/release-forward-port" do
       expect(status).to be_success, stderr
       expect(stdout).to include("SKIP #{rc_bump_sha[0, 12]} Bump version to 1.0.1.rc.1")
       expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
-      expect(stdout).not_to include(merge_sha[0, 12])
-      expect(stdout).not_to include("Merge release fix branch")
+      expect(stdout).to include("SKIP #{merge_sha[0, 12]} Merge release fix branch")
+      expect(stdout).to include("merge commit; inspect manually for conflict-resolution hunks")
     end
   end
 
