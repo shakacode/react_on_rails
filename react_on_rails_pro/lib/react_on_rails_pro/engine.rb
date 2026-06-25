@@ -68,7 +68,10 @@ module ReactOnRailsPro
     initializer "react_on_rails_pro.scout_apm_instrumentation", after: "scout_apm.start" do
       next unless defined?(ScoutApm)
 
-      ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.singleton_class.class_eval do
+      node_rendering_pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      next if node_rendering_pool.singleton_class < ScoutApm::Tracer
+
+      node_rendering_pool.singleton_class.class_eval do
         include ScoutApm::Tracer
         instrument_method :exec_server_render_js, type: "ReactOnRails", name: "Node React Server Rendering"
       end

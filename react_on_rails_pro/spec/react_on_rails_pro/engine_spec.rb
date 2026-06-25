@@ -296,13 +296,21 @@ RSpec.describe ReactOnRailsPro::Engine do
     end
 
     describe "react_on_rails_pro.scout_apm_instrumentation" do
+      let(:instrumentation_calls) { [] }
+
       let(:mock_scout_tracer) do
+        calls = instrumentation_calls
+
         # Simplified mock of ScoutApm::Tracer that mirrors its real implementation.
         # https://github.com/scoutapp/scout_apm_ruby/blob/v6.1.0/lib/scout_apm/tracer.rb#L47-L70
         Module.new do
           def self.included(base)
+            calls = const_get(:INSTRUMENTATION_CALLS)
+
             base.define_singleton_method(:instrument_method) do |method_name, **|
               raise "method does not exist: #{method_name}" unless method_defined?(method_name)
+
+              calls << method_name
 
               instrumented_name = :"#{method_name}_with_test_instrument"
               uninstrumented_name = :"#{method_name}_without_test_instrument"
@@ -315,6 +323,8 @@ RSpec.describe ReactOnRailsPro::Engine do
               alias_method method_name, instrumented_name
             end
           end
+
+          const_set(:INSTRUMENTATION_CALLS, calls)
         end
       end
 
@@ -332,8 +342,11 @@ RSpec.describe ReactOnRailsPro::Engine do
         it "does not instrument NodeRenderingPool.exec_server_render_js" do
           initializer.run
 
-          expect(mock_node_rendering_pool.methods(false)).not_to include(:exec_server_render_js_with_test_instrument)
-          expect(mock_node_rendering_pool.methods(false)).not_to include(:exec_server_render_js_without_test_instrument)
+          # `false` restricts this check to methods defined on the stubbed singleton class.
+          direct_methods = mock_node_rendering_pool.methods(false)
+
+          expect(direct_methods).not_to include(:exec_server_render_js_with_test_instrument)
+          expect(direct_methods).not_to include(:exec_server_render_js_without_test_instrument)
         end
       end
 
@@ -347,8 +360,17 @@ RSpec.describe ReactOnRailsPro::Engine do
         it "instruments NodeRenderingPool.exec_server_render_js" do
           initializer.run
 
-          expect(mock_node_rendering_pool.methods(false)).to include(:exec_server_render_js_with_test_instrument)
-          expect(mock_node_rendering_pool.methods(false)).to include(:exec_server_render_js_without_test_instrument)
+          direct_methods = mock_node_rendering_pool.methods(false)
+
+          expect(direct_methods).to include(:exec_server_render_js_with_test_instrument)
+          expect(direct_methods).to include(:exec_server_render_js_without_test_instrument)
+        end
+
+        it "does not instrument NodeRenderingPool.exec_server_render_js more than once" do
+          initializer.run
+          initializer.run
+
+          expect(instrumentation_calls).to eq([:exec_server_render_js])
         end
       end
     end
