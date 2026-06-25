@@ -68,45 +68,63 @@ This is the same selection/interview/dispatch gap that `plan-pr-batch` →
 - **Default (release-gate sweep):** `$plan-qa-batch` with no args resolves
   "merged through `HEAD`, looking back to the last RC tag." The RC tag is only a
   _performance bound_ on how far back to scan — see §2.
-- **Override (on-demand):** `$plan-qa-batch <base..head>`, a label/milestone
-  filter, or an explicit PR list.
-- **Idempotent:** re-invoke any time. PRs already carrying `qa-verified` drop
-  out automatically, so the skill always shows exactly what still needs QA.
+- **Override (on-demand):** `$plan-qa-batch <base..head>`, `--full` (no lower
+  bound — reconciles pre-RC PRs, §3), a label/milestone filter, or an explicit
+  PR list.
+- **Idempotent:** re-invoke any time. PRs already carrying a terminal QA label
+  (`qa-verified` or `qa-skipped`, §5) drop out automatically, so the skill always
+  shows exactly what still needs QA.
 
-### 2. Range is always through HEAD — gap-free by construction
+### 2. Backlog is defined by labels, not the range — gap-free by construction
 
-`HEAD` (`origin/main` / the release branch) is always the upper bound. A
-start point (commit, PR, tag, RC) is an **optional performance bound**, never the
-correctness boundary, because selection is **per-PR**:
+`HEAD` (`origin/main` / the release branch) is always the upper bound. The QA
+backlog is defined **only** by terminal labels, so the range can never silently
+drop a PR:
 
 ```
-candidates = (all merged PRs through HEAD)
-             − (PRs carrying the `qa-verified` label)
-             − (PRs with genuinely nothing to verify)
+backlog = (all merged PRs through HEAD)
+          − (PRs labeled `qa-verified`)   ← passed QA (§5)
+          − (PRs labeled `qa-skipped`)    ← reviewed, nothing to verify (§5)
 ```
 
-Anything left unverified before an arbitrary start point resurfaces on the next
-full sweep. The `qa-verified` label — not the range — guarantees no gaps.
+Every merged PR ends in exactly one terminal state — `qa-verified` or
+`qa-skipped` — so the unverified set is precisely the PRs with neither label. A
+start point (commit, PR, tag, RC) is only a **default scan window** for the
+common case; it is never a correctness filter. A periodic `--full` sweep (no
+lower bound) reconciles anything older than the window, so a PR merged before the
+last RC that was never QA'd still resurfaces. The labels — not the range —
+guarantee no gaps, and because a `qa-skipped` PR is never re-presented, the
+excluded list also stays bounded.
 
 ### 3. Scope resolution (reuse, do not duplicate)
 
 Call the existing read-only resolver
 `.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json` to get the
-squash-aware merged-PR set and the last-RC base. One source of truth for "what
-merged since the RC," shared with `post-merge-audit`. `plan-qa-batch` layers QA
-classification (§4) and label dedup (§5) on top of that list.
+squash-aware merged-PR set, shared with `post-merge-audit`. **Important:** that
+resolver's default base is the most recent RC, so on its own it would _filter
+out_ older un-QA'd PRs and break the §2 guarantee. It therefore supplies the
+**default scan window only**; the authoritative backlog is the label query
+
+```
+gh pr list --state merged --search "-label:qa-verified -label:qa-skipped" …
+```
+
+The skill reconciles the two: the RC window is the fast common path, and a
+`--full` run (or a periodic reconciliation) drops the lower bound so nothing
+older than the RC is silently lost. `plan-qa-batch` then layers QA classification
+(§4) on the resulting set.
 
 ### 4. Classify by QA _method_, not include-vs-skip
 
 Nothing merged is dropped silently — every PR is routed to the right verification
 method. Each candidate is classified by reading its diff and linked issue:
 
-| Merged change                                      | QA method                                                                                             |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Behavioral fix / feature                           | `verify-pr-fix` — reproduce before/after, post evidence                                               |
-| **Docs**                                           | Read it: does it make sense, are commands/links/examples correct, does it match the code it describes |
-| Refactor / types / config / other code             | "Does it do what it claims, nothing broke" — confirm behavior unchanged + coverage                    |
-| Truly nothing to verify (formatting, comment typo) | Glance + note — the only "excluded" lane, near-empty                                                  |
+| Merged change                                      | QA method                                                                                                 |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Behavioral fix / feature                           | `verify-pr-fix` — reproduce before/after, post evidence                                                   |
+| **Docs**                                           | Read it: does it make sense, are commands/links/examples correct, does it match the code it describes     |
+| Refactor / types / config / other code             | "Does it do what it claims, nothing broke" — confirm behavior unchanged + coverage                        |
+| Truly nothing to verify (formatting, comment typo) | Glance + note, then apply `qa-skipped` (§5) so it never resurfaces — the only "excluded" lane, near-empty |
 
 Each candidate carries **three independent attributes** (deliberately _not_
 collapsed into a single "tier"):
@@ -127,21 +145,57 @@ The skip filter from `verify-pr-fix`'s "When NOT to use" still applies to the
 repro), but it no longer removes the PR from QA — the PR is routed to the docs or
 code-check method instead.
 
-### 5. Dedup and persistence — one signal
+#### Classification mechanism
 
-- **`qa-verified` label** on the PR, applied by `verify-pr-fix` on a **passing**
-  run (`gh pr edit <n> --add-label qa-verified`, which works on already-merged
-  PRs). Created once in the repo.
-- **Dedup** is a single `gh pr list --search "… label:qa-verified"` query rather
-  than scanning every candidate's comment body.
+Classification is the correctness boundary (a wrong "nothing to verify" silences a
+PR), so it is explicit, not ad hoc:
+
+1. **Heuristic first pass** on the file-touch set (reuse `plan-pr-batch`'s
+   `pr-file-touch-map`): docs-only, comment/format-only, and code path sets route
+   to a provisional method.
+2. **LLM adjudication** for anything ambiguous, reading the diff + linked issue
+   against the §4 table. The prompt and its tie-breaks live in the SKILL.md so
+   every run applies the same rule, not an implementer's invention.
+3. **No silent "nothing to verify".** A PR routed to the `qa-skipped` lane is
+   surfaced in the interview (§7) with its one-line reason and is labeled only
+   after the developer acknowledges the excluded list — so the exclusion is
+   deliberate and auditable, never automatic.
+
+### 5. Dedup and persistence — two terminal labels
+
+Every merged PR reaches exactly one terminal QA state, recorded as a GitHub label
+so the backlog (§2) is a pure query:
+
+- **`qa-verified`** — applied on a **passing** QA run (any method: behavioral
+  pass, docs OK, code-check OK).
+- **`qa-skipped`** — applied after the "nothing to verify" glance (§4), symmetric
+  with `qa-verified`, so those PRs never resurface and the excluded list stays
+  bounded.
+
+Properties:
+
+- **Dedup** is a single
+  `gh pr list --state merged --search "-label:qa-verified -label:qa-skipped"`
+  query rather than scanning every candidate's comment body.
 - **GitHub is the persistence.** The plan is a _derived view_ reconstructed from
-  the merged set minus the label on each run — no local file, no `.context`
+  the merged set minus the two labels on each run — no local file, no `.context`
   (Conductor-only, non-portable), no tracker issue. Works identically on every
   platform and machine.
-- **Failures stay loud.** A failing verification gets **no** label — it routes to
-  a discrete issue (§10), never a quiet success marker. (A hidden marker comment
-  to machine-locate the exact evidence comment is intentionally deferred; the
-  label plus the human-readable `verify-pr-fix` comment is enough for v1.)
+- **Self-healing label setup.** `gh pr edit --add-label` does **not** create a
+  missing label (it errors / no-ops), which would silently break dedup. So the
+  writer first ensures the label exists (`gh label list` → `gh label create` if
+  absent) before adding it — no manual one-time setup step to forget.
+- **Write-ordering is an invariant, not a description.** `qa-verified` MUST be the
+  **final** write: apply it only after `gh pr comment` returns success for the
+  evidence comment. If the evidence post fails, the label step is aborted — so a
+  PR can never carry `qa-verified` without its supporting evidence (no silent
+  false positive). A crash between a successful evidence post and the label is
+  survivable: the next run simply re-verifies.
+- **Failures stay loud.** A failing verification (❌) gets **neither** label and a
+  discrete issue (§10); it deliberately remains in the backlog so re-runs keep
+  re-verifying until the fix lands, with the open issue as the human signal. (A
+  hidden marker comment to machine-locate the exact evidence is deferred; the
+  labels plus the human-readable `verify-pr-fix` comment are enough for v1.)
 
 ### 6. Coordination — same heartbeat as the implementation batches
 
@@ -164,18 +218,29 @@ re-edited, and other batches see QA in flight. The **same integration is added t
 unavailable, report private state as `UNKNOWN` and fall back to advisory public
 claim comments, exactly as the implementation batches already do.
 
+**Repeated-contention escalation.** A PR skipped for a live claim (point 1) is
+retried next run, but a PR under perpetual edit would be skipped forever and the
+coverage gap would be invisible. After **3** consecutive contention skips the
+planner surfaces it in its output as `blocked — repeated contention`, so the
+maintainer can schedule a QA window or override rather than let it silently fall
+out of coverage.
+
 ### 7. The interview
 
 Present the auto-ranked candidate list plus a collapsed "nothing to verify" list,
 then ask only for what cannot be inferred:
 
-1. Confirm base/range (default: look back to last RC, through `HEAD`).
-2. **Environment availability now** — Redis + Pro license + Pro renderer up?
+1. Confirm base/range (default: last-RC scan window; offer `--full` to reconcile
+   older PRs per §2/§3).
+2. **Acknowledge the `qa-skipped` list.** The "nothing to verify" PRs are shown
+   with per-PR reasons; `qa-skipped` is applied only after the developer confirms,
+   so no PR is silently retired (§4 classification mechanism).
+3. **Environment availability now** — Redis + Pro license + Pro renderer up?
    Browser available? Candidates whose **actual** env profile (§4b) is
    unavailable are deferred and clearly listed, not silently dropped.
-3. Cap — max items this batch.
-4. Methods/areas to include or exclude.
-5. Concurrency — how many lanes / subagents to plan for.
+4. Cap — max items this batch.
+5. Methods/areas to include or exclude.
+6. Concurrency — how many lanes / subagents to plan for.
 
 ### 8. Output — the QA Batch Plan + goal prompt
 
@@ -195,8 +260,9 @@ unless asked. It emits, to session output:
 
 The `qa-batch` runner dispatches **one subagent per QA lane**, each claiming its
 PR(s), running the routed method, posting evidence, and closing out. Concurrency
-is bounded by **two** constraints — note these are _not_ `pr-batch`'s file-touch
-collision model, which is irrelevant here because QA workers do not edit source:
+is bounded by **two** constraints, with a liveness exit so a stuck lane cannot
+wedge the batch — note these are _not_ `pr-batch`'s file-touch collision model,
+which is irrelevant here because QA workers do not edit source:
 
 - **(a) `agent-coord` claims** — never two lanes (or a lane and an implementation
   batch) on the same PR.
@@ -204,6 +270,12 @@ collision model, which is irrelevant here because QA workers do not edit source:
   renderer / Redis / license / dummy-app DB at a time. Lanes whose env profile
   needs the shared Pro stack **serialize**; spec-only and docs lanes
   **parallelize** freely.
+- **Liveness — timeout / deadlock exit.** The serialized Pro-stack slot has a wall-clock
+  timeout. A lane that exceeds it (hung renderer, crashed agent, stale
+  `agent-coord` claim, never-exiting test) is marked **failed — not labeled**, its
+  claim released, and it is deferred to the next batch and surfaced to the
+  maintainer — the same fail-open posture as the `agent-coord`-unavailable
+  fallback in §6. One stuck lane never blocks the rest indefinitely.
 
 `plan-qa-batch` stays plan-only (Phase A): it produces the plan and goal prompt
 and launches `qa-batch` only when the user asks. **Phase B** (the planner
@@ -212,20 +284,32 @@ documented as a future enhancement, not built.
 
 ### 10. Findings → issues
 
-- **Pass (✅):** apply `qa-verified`; post the `verify-pr-fix` evidence comment.
+- **Pass (✅):** post the `verify-pr-fix` evidence comment, then apply
+  `qa-verified` as the final write (§5 invariant).
+- **Nothing to verify:** apply `qa-skipped` after developer acknowledgment
+  (§4/§7).
 - **Fail (❌) or any bug/doc/code problem found:** create a **discrete,
-  cross-linked issue** describing the reproduction and the broken signal
-  (mirrors `post-merge-audit`'s "Needs follow-up issue / Needs fix PR"
-  classification, approval-gated before creation), and post the failing evidence
-  on the PR. **No** `qa-verified` label.
+  cross-linked issue** describing the reproduction and the broken signal (mirrors
+  `post-merge-audit`'s "Needs follow-up issue / Needs fix PR" classification), and
+  post the failing evidence on the PR. **Neither** label is applied.
 - **No standing umbrella tracker issue** for the QA effort itself — that is the
   only thing #3952 ruled out. Per-bug issues are expected and encouraged.
 
+**Issue-creation approval.** Creating an issue is outward-facing, so it is gated:
+
+- **Attended run:** synchronous confirm in-session before creation (the default).
+- **Unattended run** (e.g. scheduled `qa-batch` with no operator): do **not**
+  block. Create the issue with a `needs-human-review` label, or — if issue
+  auto-creation is disabled for the run — record the finding in the batch output
+  for later filing. The mode is a `qa-batch` invocation flag, recorded in the
+  handoff.
+
 ## Coordinated edits to existing skills
 
-1. **`verify-pr-fix`** — on a passing verification, add `qa-verified`
-   (`gh pr edit <n> --add-label qa-verified`) after posting evidence. One-time:
-   create the label in the repo. No other change to its flow.
+1. **`verify-pr-fix`** — after a passing verification, ensure the label exists
+   (`gh label list` → `gh label create qa-verified` if absent) and add it as the
+   **final** write, only after the evidence comment posts successfully (§5
+   invariant). No other change to its flow.
 2. **`post-merge-audit`** — register `agent-coord` claims/heartbeats for audit
    passes so audits coordinate with implementation and QA batches (§6).
 
@@ -269,20 +353,23 @@ enough that overloading `pr-batch` would muddy both.
 - `.agents/skills/verify-pr-fix/SKILL.md` — add the `qa-verified` label step.
 - `.agents/skills/post-merge-audit/SKILL.md` — add `agent-coord` coordination.
 
-**One-time repo setup:**
+**Labels** (created on demand by the writers — no manual pre-step, see §5):
 
-- Create the `qa-verified` GitHub label.
+- `qa-verified`, `qa-skipped`, and `needs-human-review` (the last for unattended
+  issue creation, §10).
 
 ## Open questions / risks
 
-- **`qa-verified` label semantics over time.** A PR superseded by a later change
-  could carry a stale `qa-verified`. Acceptable for v1 (the label means "the fix
-  as merged was proven once"); revisit if churn makes it misleading.
+- **Terminal-label semantics over time.** A PR superseded by a later change could
+  carry a stale `qa-verified`/`qa-skipped`. Acceptable for v1 (a label means "the
+  change as merged reached this state once"); revisit if churn makes it
+  misleading.
 - **Docs/other-code QA depth.** The non-behavioral methods (§4) are lighter and
   more subjective than `verify-pr-fix`. v1 keeps them as a structured read +
   note; they may warrant their own mini-rubric later.
 - **Resolver coupling.** Reusing `post-merge-audit-scope` ties `plan-qa-batch` to
-  that script's contract; a change there must keep the `--json` shape stable.
+  that script's contract (its `--json` shape, and the last-RC default base that
+  §3 deliberately overrides with the label query as the authoritative backlog).
 - **Mislocated existing specs (separate task).** Three design docs sit under
   public `docs/superpowers/specs/`; by the "`docs/` is public, internal design
   goes to `internal/planning/`" rule they should move. Out of scope for this
