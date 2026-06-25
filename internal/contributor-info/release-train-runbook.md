@@ -312,6 +312,7 @@ flowchart TD
     PR["Agent-merged PR"] --> T{"Target branch?"}
     T -->|"main"| BETA["beta gate · lowest<br/>confidence note<br/>+ green required checks"]
     T -->|"release/*"| AC{"agent-coord phase?<br/>doctor + status exit 0"}
+    T -->|"cannot determine"| NOAM["report UNKNOWN<br/>do not auto-merge<br/>maintainer decision"]
     AC -->|"rc"| RC["rc gate · higher<br/>confidence note<br/>+ adversarial-pr-review<br/>+ zero open MUST-FIX"]
     AC -->|"final"| FINAL["final gate · highest<br/>rc gate + cherry-picked<br/>verified fixes only<br/>+ no new features<br/>+ human sign-off"]
     AC -->|"UNKNOWN / no entry"| FB{"tracker in<br/>final-release mode?"}
