@@ -3934,6 +3934,46 @@ The `.client.jsx` / `.server.jsx` suffixes that auto-bundling supports for split
 
 3. **Use variants for the `wrapServerComponentRenderer` wrapper pattern.** When a client component contains `RSCRoute` and needs to be wrapped with `wrapServerComponentRenderer`, the wrappers are authored as `.client.tsx` and `.server.tsx` variants. See [Embedding Server Components in Client Components](../../pro/react-server-components/inside-client-components.md) for the full walkthrough.
 
+#### Compiled-to-JS languages and RSC client references
+
+For RSC builds, React on Rails only sees the JavaScript modules that webpack or rspack compile. If a component is authored in a language that emits JavaScript, such as ReScript, the RSC client-reference pipeline must discover the compiled JavaScript module that the RSC bundle will import, not the original source file.
+
+Use one of these patterns:
+
+1. **Prefer a thin JavaScript/TypeScript wrapper for each RSC boundary.** Put the wrapper in `components_subdirectory`, import the compiled output, and make the wrapper the module that server components import.
+
+   ```text
+   app/javascript/src/Comments/
+   ├── ReScriptLikeButton.bs.js
+   └── ror_components/
+       └── ReScriptLikeButton.jsx
+   ```
+
+   ```jsx
+   // app/javascript/src/Comments/ror_components/ReScriptLikeButton.jsx
+   'use client';
+
+   import ReScriptLikeButton from '../ReScriptLikeButton.bs.js';
+
+   export default ReScriptLikeButton;
+   ```
+
+   Server components should import the wrapper path, not the compiled `.bs.js` file directly. That keeps the `'use client'` directive, auto-bundled pack, RSC client-reference manifest key, and runtime module resolution aligned on the same JavaScript module.
+
+2. **If the compiled output is the boundary module, make the compiled JavaScript discoverable.** The generated RSC configs read client references from the file named by `RSC_MANIFEST_CLIENT_REFERENCES_JSON`, or from the default path `ssr-generated/rsc-client-references.json` when the env var is not set. That JSON must have this shape:
+
+   ```json
+   {
+     "refs": ["app/javascript/src/Comments/ReScriptLikeButton.bs.js"]
+   }
+   ```
+
+   The `refs` entries must match the compiled module paths that webpack/rspack resolve in the RSC build. Do not list the original `.res` source path unless that is the module actually imported by the RSC bundle through a loader.
+
+3. **Keep the discovery manifest fresh.** `bin/shakapacker-precompile-hook` runs the RSC client-reference discovery build and writes the default manifest. A long-running webpack/rspack watch process reads that manifest at startup, so restart the watch after adding a new compiled-language client boundary.
+
+For direct compiled-output integration, the loader or build step for that language must preserve or inject the client boundary (the `'use client'` directive) before the RSC loader/plugin scans it. If that is not practical, use the wrapper-file pattern above; it is explicit and keeps the React on Rails generated files on the supported path.
+
 #### Related RSC documentation
 
 - [Create a React Server Component](../../pro/react-server-components/create-without-ssr.md) — step-by-step tutorial for setting up RSC and authoring your first server component.
