@@ -24,11 +24,12 @@ import {
   mergeRSCStreamDiagnosticError,
   RSC_STREAM_DIAGNOSTIC_ERROR_NAME,
 } from './rscDiagnostics.ts';
+import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
 
 declare global {
   interface Window {
-    REACT_ON_RAILS_RSC_PAYLOADS?: Record<string, string[]>;
-    REACT_ON_RAILS_RSC_ERRORS?: Record<string, Record<string, unknown>>;
+    REACT_ON_RAILS_RSC_PAYLOADS?: RSCPreloadedPayloadGlobals['REACT_ON_RAILS_RSC_PAYLOADS'];
+    REACT_ON_RAILS_RSC_ERRORS?: RSCPreloadedPayloadGlobals['REACT_ON_RAILS_RSC_ERRORS'];
   }
 }
 

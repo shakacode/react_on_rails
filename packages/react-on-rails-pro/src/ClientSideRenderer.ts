@@ -39,6 +39,7 @@ import {
 import { isThenable } from 'react-on-rails/@internal/isThenable';
 import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderRegistry.ts';
 import { chainRecoverableErrorHandlers } from './handleRecoverableError.client.ts';
+import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
 
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -615,13 +616,10 @@ function unmountAllStores(): void {
   storeRenderers.clear();
 }
 
-type RSCPreloadedPayloadGlobal = {
-  REACT_ON_RAILS_RSC_PAYLOADS?: Record<string, string[]>;
-  REACT_ON_RAILS_RSC_ERRORS?: Record<string, Record<string, unknown>>;
-};
-
 function clearRSCPreloadedPayloadGlobals(): void {
-  const rscGlobal = globalThis as typeof globalThis & RSCPreloadedPayloadGlobal;
+  // `Partial<>` keeps the two globals optional here (matching the `Window` augmentation
+  // in getReactServerComponent.client.ts) so the `delete`s below type-check.
+  const rscGlobal = globalThis as typeof globalThis & Partial<RSCPreloadedPayloadGlobals>;
   delete rscGlobal.REACT_ON_RAILS_RSC_PAYLOADS;
   delete rscGlobal.REACT_ON_RAILS_RSC_ERRORS;
 }
