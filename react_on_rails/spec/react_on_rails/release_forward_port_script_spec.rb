@@ -704,6 +704,17 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "reports invalid acknowledged commits as usage errors" do
+    with_release_repo do |repo|
+      _stdout, stderr, status =
+        run_script(repo, "--source", "main", "--target", "main", "--dry-run", "--ack-manual", "not-a-sha")
+
+      expect(status.exitstatus).to eq(2)
+      expect(stderr).to include("Usage: script/release-forward-port")
+      expect(stderr).to include("--ack-manual \"not-a-sha\" is not a commit")
+    end
+  end
+
   it "does not skip an -x cherry-pick that was later reverted" do
     with_release_repo do |repo|
       add_rc_bump_and_fix(repo)

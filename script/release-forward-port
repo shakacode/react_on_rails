@@ -417,6 +417,9 @@ class ReleaseForwardPort
   end
 
   def target_commit_reverted_through_merge?(sha, target)
+    # Intentionally conservative: if any merge that included this commit was
+    # reverted, treat the commit as not live. Re-picking a present change is
+    # safer than skipping a release fix that the target tree no longer has.
     @target_merge_revert_cache ||= {}
     cache_key = [sha, target]
     return @target_merge_revert_cache.fetch(cache_key) if @target_merge_revert_cache.key?(cache_key)
@@ -440,6 +443,9 @@ class ReleaseForwardPort
   end
 
   def patch_id_for_commit(sha)
+    # git show --format= emits diff-only output. git patch-id still hashes the
+    # hunk content and emits a commit field we discard; the first token is the
+    # content hash used for comparisons.
     patch = git("show", "--format=", "--full-index", "--find-renames", sha).b
     # Empty commits carry no file changes; cherry-picking them would only create
     # a no-op commit, so treat the patch as already present.
@@ -705,7 +711,7 @@ class ReleaseForwardPort
     @acknowledged_manual_shas = @options.fetch(:ack_manual).map do |sha|
       git("rev-parse", "--verify", "#{sha}^{commit}").strip
     rescue GitError => e
-      raise GitError, "--ack-manual #{sha.inspect} is not a commit: #{e.message}"
+      raise UsageError, "--ack-manual #{sha.inspect} is not a commit: #{e.message}"
     end.uniq
   end
 
