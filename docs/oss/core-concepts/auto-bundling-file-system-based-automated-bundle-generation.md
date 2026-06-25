@@ -661,7 +661,7 @@ Use one of these patterns:
 
    ```json
    {
-     "refs": ["client/app/src/Comments/ReScriptLikeButton.bs.js"]
+     "refs": ["app/javascript/src/Comments/ReScriptLikeButton.bs.js"]
    }
    ```
 
