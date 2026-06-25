@@ -677,3 +677,27 @@ class AgentWorkflowSeamDoctorSharedRootTest < Minitest::Test
     end
   end
 end
+
+class AgentWorkflowSeamDoctorEncodingTest < Minitest::Test
+  include AgentWorkflowSeamDoctorTestHelpers
+
+  def test_non_ascii_agents_md_parses_under_ascii_locale
+    with_repo do |root|
+      write_agents(root)
+      agents_path = File.join(root, "AGENTS.md")
+      body = File.read(agents_path)
+      # A real AGENTS.md carries non-ASCII bytes (em dashes, arrows). Reading it
+      # under a non-UTF-8 locale must not crash the config parser.
+      body.sub!("# AGENTS.md\n", "# AGENTS.md\n\nReact on Rails → SSR overview.\n")
+      File.write(agents_path, body)
+      write_skill(root, "No commands here.\n")
+
+      out, status = Open3.capture2e(
+        { "LC_ALL" => "C", "LANG" => "C" }, "ruby", SCRIPT, "--root", root
+      )
+
+      assert status.success?, out
+      assert_includes out, "PASS"
+    end
+  end
+end
