@@ -205,7 +205,8 @@ git push   # or open a PR if main is protected / the fix needs review on main
 - The helper skips commits already present on `main` using `(cherry picked from commit <sha>)`
   evidence when available, unless the footer-bearing target commit has a later standard `git revert` commit
   on the target branch. For already-applied patches without the footer, it uses `git cherry` as the
-  candidate signal before verifying the source patch against the current target tree.
+  candidate signal before matching the source patch-id to target history and checking for a later standard
+  `git revert` of the matching target commit.
 - `-x` appends `(cherry picked from commit <sha>)` so the forward-port is auditable and future
   helper runs can see the relationship.
 - Known limitation: the "already forward-ported" skip still starts from history evidence. If a later

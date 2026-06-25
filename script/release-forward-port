@@ -3,7 +3,6 @@
 
 require "optparse"
 require "open3"
-require "tmpdir"
 
 # rubocop:disable Metrics/ClassLength
 class ReleaseForwardPort
@@ -26,6 +25,7 @@ class ReleaseForwardPort
     "pre" => 4,
     "rc" => 5
   }.freeze
+  EMPTY_PATCH_ID = "__empty_patch__"
   CHERRY_PICK_FOOTER_PREFIX = "(cherry picked from commit "
 
   PlanEntry = Struct.new(:sha, :subject, :action, :reason, keyword_init: true) do
@@ -167,8 +167,8 @@ class ReleaseForwardPort
       return "already forward-ported to #{target} via cherry-pick -x evidence with no later standard revert"
     end
 
-    if patch_equivalent_commits[sha] && patch_present_on_target_tree?(sha, target)
-      return "patch already exists on #{target} according to the current target tree"
+    if patch_equivalent_commits[sha] && patch_equivalent_commit_present_on_target?(sha, target)
+      return "patch already exists on #{target} according to target history with no later standard revert"
     end
 
     version_bump_skip_reason(subject, target, target_version)
@@ -218,17 +218,32 @@ class ReleaseForwardPort
     !git("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H", "--max-count=1").strip.empty?
   end
 
-  def patch_present_on_target_tree?(sha, target)
-    patch = git("show", "--format=", "--binary", "--full-index", "--find-renames", sha)
+  def patch_equivalent_commit_present_on_target?(sha, target)
+    source_patch_id = patch_id_for_commit(sha)
+    return true if source_patch_id == EMPTY_PATCH_ID
+
+    patch_equivalent_target_candidates(sha, target).any? do |target_sha|
+      patch_id_for_commit(target_sha) == source_patch_id && !standard_revert_on_target?(target_sha, target)
+    end
+  end
+
+  def patch_equivalent_target_candidates(sha, target)
+    paths = git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
+    return [] if paths.empty?
+
+    git_lines("log", target, "--format=%H", "--no-merges", "--", *paths)
+  end
+
+  def patch_id_for_commit(sha)
+    patch = git("show", "--format=", "--full-index", "--find-renames", sha)
     # Empty commits carry no file changes; cherry-picking them would only create
     # a no-op commit, so treat the patch as already present.
-    return true if patch.strip.empty?
+    return EMPTY_PATCH_ID if patch.strip.empty?
 
-    with_temporary_index(target) do |env|
-      _stdout, _stderr, status =
-        capture_git(*%w[apply --cached --reverse --check], env:, stdin_data: patch)
-      status.success?
-    end
+    stdout, stderr, status = capture_git("patch-id", "--stable", stdin_data: patch)
+    raise GitError, git_error(["patch-id", "--stable", sha], stdout, stderr, status) unless status.success?
+
+    stdout.split.first
   end
 
   def version_at(ref)
@@ -396,17 +411,6 @@ class ReleaseForwardPort
     git("rev-parse", "--verify", "#{ref}^{commit}")
   rescue GitError => e
     raise GitError, "#{label} ref #{ref.inspect} is not a commit: #{e.message}"
-  end
-
-  def with_temporary_index(target)
-    Dir.mktmpdir("release-forward-port-index") do |dir|
-      index_path = File.join(dir, "index")
-      env = { "GIT_INDEX_FILE" => index_path }
-      stdout, stderr, status = capture_git("read-tree", target, env:)
-      raise GitError, git_error(["read-tree", target], stdout, stderr, status) unless status.success?
-
-      yield env
-    end
   end
 
   # The repo requires Ruby >= 3.3, so anonymous forwarding is valid and keeps

@@ -166,7 +166,7 @@ RSpec.describe "script/release-forward-port" do
 
       # Apply the fix onto main WITHOUT -x so there is no
       # "(cherry picked from commit ...)" footer; the helper must confirm the
-      # patch is still present in the current target tree before skipping it.
+      # equivalent target patch is still present in history before skipping it.
       git(repo, "cherry-pick", fix_sha)
       latest_body = git(repo, "log", "-1", "--format=%B")
       expect(latest_body).not_to include("cherry picked from commit")
@@ -175,9 +175,28 @@ RSpec.describe "script/release-forward-port" do
       stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
 
       expect(status).to be_success, stderr
-      expect(stdout).to include("patch already exists on main according to the current target tree")
+      expect(stdout).to include("patch already exists on main according to target history")
       expect(stdout).to include("Nothing to cherry-pick")
       expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+    end
+  end
+
+  it "skips no-footer cherry-picks after later target context changes" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      git(repo, "cherry-pick", fix_sha)
+      write_file(repo, "app.txt", "base updated on main\nrelease fix\n")
+      commit_all(repo, "Adjust target context around release fix")
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("patch already exists on main according to target history")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base updated on main\nrelease fix\n")
     end
   end
 
@@ -194,7 +213,7 @@ RSpec.describe "script/release-forward-port" do
 
       expect(status).to be_success, stderr
       expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
-      expect(stdout).not_to include("patch already exists on main according to the current target tree")
+      expect(stdout).not_to include("patch already exists on main according to target history")
       expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
       expect(git(repo, "rev-list", "--count", "main").strip.to_i).to eq(reverted_count.to_i + 1)
 
