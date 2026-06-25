@@ -297,8 +297,34 @@ RSpec.describe "script/release-forward-port" do
       expect(status).to be_success, stderr
       expect(stdout).to include("SKIP #{rc_bump_sha[0, 12]} Bump version to 1.0.1.rc.1")
       expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
-      expect(stdout).to include("SKIP #{merge_sha[0, 12]} Merge release fix branch")
+      expect(stdout).to include("MANUAL #{merge_sha[0, 12]} Merge release fix branch")
       expect(stdout).to include("merge commit; inspect manually for conflict-resolution hunks")
+    end
+  end
+
+  it "blocks normal mode when release branch merge commits need manual inspection" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "app.txt", "base\nrelease base\n")
+      base_fix_sha = commit_all(repo, "Fix release regression")
+
+      git(repo, "checkout", "-b", "release-fix")
+      write_file(repo, "merge-only.txt", "merge-only fix\n")
+      commit_all(repo, "Fix merge-only regression")
+
+      git(repo, "checkout", "release/1.0.1")
+      git(repo, "merge", "--no-ff", "release-fix", "-m", "Merge release fix branch")
+      merge_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).not_to be_success
+      expect(stdout).to include("PICK #{base_fix_sha[0, 12]} Fix release regression")
+      expect(stdout).to include("MANUAL #{merge_sha[0, 12]} Merge release fix branch")
+      expect(stdout).not_to include("Forward-port complete")
+      expect(stderr).to include("Manual inspection required for #{merge_sha}")
+      expect(stderr).to include("Earlier successful picks from this run are already committed and safe")
     end
   end
 
@@ -447,12 +473,37 @@ RSpec.describe "script/release-forward-port" do
 
       stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
 
-      expect(status).to be_success, stderr
+      expect(status).not_to be_success
       expect(stdout).to include("SKIP #{release_pick_sha[0, 12]} Fix release regression")
       expect(stdout).to include("already forward-ported to main via cherry-pick -x evidence")
-      expect(stdout).to include("SKIP #{release_revert_sha[0, 12]} Revert \"Fix release regression\"")
-      expect(stdout).to include("reverts a release-only cherry-pick of a commit already live on main")
-      expect(stdout).to include("Nothing to cherry-pick")
+      expect(stdout).to include("MANUAL #{release_revert_sha[0, 12]} Revert \"Fix release regression\"")
+      expect(stdout).to include("reverts a release-only application of a commit already live on main")
+      expect(stderr).to include("Manual inspection required for #{release_revert_sha}")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nmain fix\n")
+    end
+  end
+
+  it "routes release-only reverts of no-footer reverse picks to manual handling" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      main_fix_sha = commit_all(repo, "Fix release regression")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      git(repo, "cherry-pick", main_fix_sha)
+      release_pick_body = git(repo, "log", "-1", "--format=%B")
+      expect(release_pick_body).not_to include("cherry picked from commit")
+      git(repo, "revert", "--no-edit", "HEAD")
+      release_revert_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).not_to be_success
+      expect(stdout).to include("MANUAL #{release_revert_sha[0, 12]} Revert \"Fix release regression\"")
+      expect(stdout).to include("reverts a release-only application of a commit already live on main")
+      expect(stderr).to include("Manual inspection required for #{release_revert_sha}")
       expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
       expect(File.read(File.join(repo, "app.txt"))).to eq("base\nmain fix\n")
     end

@@ -27,9 +27,13 @@ class ReleaseForwardPort
   EMPTY_PATCH_ID = "__empty_patch__"
   CHERRY_PICK_FOOTER_PREFIX = "(cherry picked from commit "
 
-  PlanEntry = Struct.new(:sha, :subject, :action, :reason, keyword_init: true) do
+  PlanEntry = Struct.new(:sha, :subject, :action, :reason, :manual, keyword_init: true) do
     def short_sha
       sha[0, 12]
+    end
+
+    def manual?
+      !!manual
     end
   end
 
@@ -152,7 +156,8 @@ class ReleaseForwardPort
         sha:,
         subject:,
         action: reason ? :skip : :pick,
-        reason:
+        reason:,
+        manual: manual_skip_reason?(reason)
       )
     end
   end
@@ -190,6 +195,12 @@ class ReleaseForwardPort
 
   def merge_commit?(sha)
     git("rev-list", "--parents", "-n", "1", sha).split.length > 2
+  end
+
+  def manual_skip_reason?(reason)
+    return false unless reason
+
+    reason.start_with?("merge commit; inspect manually", "reverts a release-only")
   end
 
   def version_bump_skip_reason(subject, target, target_version)
@@ -238,9 +249,9 @@ class ReleaseForwardPort
 
   def reverse_pick_revert_skip_reason(sha, target)
     reverted_sha = standard_revert_target(sha)
-    return unless reverted_sha && source_cherry_pick_origin_on_target?(reverted_sha, target)
+    return unless reverted_sha && reverted_commit_live_on_target?(reverted_sha, target)
 
-    "reverts a release-only cherry-pick of a commit already live on #{target}; inspect manually " \
+    "reverts a release-only application of a commit already live on #{target}; inspect manually " \
       "before applying this rollback to #{target}"
   end
 
@@ -268,6 +279,10 @@ class ReleaseForwardPort
   def source_cherry_pick_origin_on_target?(sha, target)
     origin_sha = cherry_pick_origin(sha)
     origin_sha && commit_on_target?(origin_sha, target) && !standard_revert_on_target?(origin_sha, target)
+  end
+
+  def reverted_commit_live_on_target?(sha, target)
+    source_cherry_pick_origin_on_target?(sha, target) || patch_equivalent_commit_present_on_target?(sha, target)
   end
 
   def cherry_pick_origin(sha)
@@ -414,11 +429,20 @@ class ReleaseForwardPort
 
     plan.each { |entry| print_plan_entry(entry) }
 
-    picks = plan.count { |entry| entry.action == :pick }
-    skips = plan.length - picks
     puts
-    puts "Summary: #{picks} commit#{'s' unless picks == 1} to cherry-pick, " \
-         "#{skips} commit#{'s' unless skips == 1} skipped."
+    puts plan_summary(plan)
+  end
+
+  def plan_summary(plan)
+    picks = plan.count { |entry| entry.action == :pick }
+    manual = plan.count(&:manual?)
+    skips = plan.length - picks - manual
+    summary = "Summary: #{picks} commit#{'s' unless picks == 1} to cherry-pick, " \
+              "#{skips} commit#{'s' unless skips == 1} skipped"
+    if manual.positive?
+      summary += ", #{manual} commit#{'s' unless manual == 1} need#{'s' if manual == 1} manual inspection"
+    end
+    "#{summary}."
   end
 
   def print_plan_entry(entry)
@@ -426,7 +450,7 @@ class ReleaseForwardPort
     when :pick
       puts "PICK #{entry.short_sha} #{entry.subject}"
     when :skip
-      puts "SKIP #{entry.short_sha} #{entry.subject}"
+      puts "#{entry.manual? ? 'MANUAL' : 'SKIP'} #{entry.short_sha} #{entry.subject}"
       puts "     #{entry.reason}"
     else
       raise GitError, "unexpected plan entry action: #{entry.action.inspect}"
@@ -454,26 +478,51 @@ class ReleaseForwardPort
   end
 
   def apply_plan(plan)
-    picks = plan.select { |entry| entry.action == :pick }
-
-    if picks.empty?
+    unless actionable_plan?(plan)
       puts "\nNothing to cherry-pick."
       return 0
     end
 
-    picks.each_with_index do |entry, index|
-      puts "\nCherry-picking #{entry.short_sha} #{entry.subject}"
-      stdout, stderr, status = capture_git("cherry-pick", "-x", entry.sha)
-      puts stdout unless stdout.empty?
-      warn stderr unless stderr.empty?
-      next if status.success?
+    completed_picks = 0
+    plan.each_with_index do |entry, index|
+      next if entry.action == :skip && !entry.manual?
 
-      warn_cherry_pick_failure(entry, completed: index, remaining: picks.length - index - 1)
+      if entry.manual?
+        warn_manual_entry(entry, completed: completed_picks, remaining: remaining_actionable_entries(plan, index))
+        return 1
+      end
+
+      if cherry_pick_entry(entry)
+        completed_picks += 1
+        next
+      end
+
+      warn_cherry_pick_failure(entry, completed: completed_picks, remaining: remaining_picks(plan, index))
       return 1
     end
 
     puts "\nForward-port complete."
     0
+  end
+
+  def actionable_plan?(plan)
+    plan.any? { |entry| entry.action == :pick || entry.manual? }
+  end
+
+  def remaining_actionable_entries(plan, index)
+    plan[index + 1..].count { |entry| entry.action == :pick || entry.manual? }
+  end
+
+  def remaining_picks(plan, index)
+    plan[index + 1..].count { |entry| entry.action == :pick }
+  end
+
+  def cherry_pick_entry(entry)
+    puts "\nCherry-picking #{entry.short_sha} #{entry.subject}"
+    stdout, stderr, status = capture_git("cherry-pick", "-x", entry.sha)
+    puts stdout unless stdout.empty?
+    warn stderr unless stderr.empty?
+    status.success?
   end
 
   def warn_cherry_pick_failure(entry, completed:, remaining:)
@@ -489,6 +538,13 @@ class ReleaseForwardPort
       warn_later_commits(remaining, "after fixing the failed pick", continue_context: false)
     end
 
+    warn "Earlier successful picks from this run are already committed and safe." if completed.positive?
+  end
+
+  def warn_manual_entry(entry, completed:, remaining:)
+    warn "Manual inspection required for #{entry.sha}."
+    warn entry.reason
+    warn_later_commits(remaining, "after resolving the manual item", continue_context: false)
     warn "Earlier successful picks from this run are already committed and safe." if completed.positive?
   end
 
