@@ -294,8 +294,7 @@ git checkout main
 git pull --rebase
 
 # The helper skips rc version bumps and already-forward-ported fixes.
-# It will also report and skip a version-bump commit when main has already
-# advanced past that version.
+# It reports stable final version bumps as MANUAL so CHANGELOG extraction is explicit.
 script/release-forward-port --source origin/release/17.0.0 --target main --dry-run
 script/release-forward-port --source origin/release/17.0.0 --target main
 git push   # or open a PR if main is protected
@@ -304,14 +303,16 @@ git push origin --delete release/17.0.0
 ```
 
 > **Caveat — do not blindly cherry-pick version-bump commits.** The helper always skips
-> `Bump version to ...rc.N` commits. For non-RC version bumps, it compares `main`'s current version to
-> the commit subject and skips with an explicit version-drift message when `main` has already advanced
-> past the release version (e.g. to `17.1.0.dev`) or already has that version. If the skipped final
-> version-bump commit also contains the only CHANGELOG collapse you need on `main`, use the manual
-> fallback: cherry-pick that one commit, resolve version artifacts to keep `main`'s newer version, keep
-> only the intended CHANGELOG changes, and preserve a `(cherry picked from commit <sha>)` footer in the
-> final commit message. Then bump `main` to the next dev version per [`releasing.md`](releasing.md) if it
-> is not already.
+> `Bump version to ...rc.N` commits. For stable non-RC version bumps, the helper always marks the commit
+> `MANUAL`, regardless of `main`'s current version, so the operator explicitly decides whether to extract
+> only the CHANGELOG hunks. For prerelease non-RC bumps (for example `beta` or `dev`), it compares
+> `main`'s current version to the commit subject and skips with an explicit version-drift message when
+> `main` has already advanced past the release version (e.g. to `17.1.0.dev`) or already has that version.
+> If the skipped final version-bump commit also contains the only CHANGELOG collapse you need on `main`,
+> use the manual fallback: cherry-pick that one commit, resolve version artifacts to keep `main`'s newer
+> version, keep only the intended CHANGELOG changes, and preserve a `(cherry picked from commit <sha>)`
+> footer in the final commit message. Then bump `main` to the next dev version per
+> [`releasing.md`](releasing.md) if it is not already.
 
 See [`releasing.md`](releasing.md) for the next-dev version bump details.
 

@@ -3,6 +3,7 @@
 
 require "optparse"
 require "open3"
+require "digest"
 
 # rubocop:disable Metrics/ClassLength
 class ReleaseForwardPort
@@ -25,6 +26,7 @@ class ReleaseForwardPort
     "rc" => 5
   }.freeze
   EMPTY_PATCH_ID = "__empty_patch__"
+  HUNKLESS_PATCH_ID_PREFIX = "__hunkless_patch__:"
   CHERRY_PICK_FOOTER_FORMAT = "(cherry picked from commit %s)"
   CHERRY_PICK_FOOTER_PATTERN = /\(cherry picked from commit (?<sha>[0-9a-f]{40})\)/
   ASCII_WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
@@ -221,7 +223,11 @@ class ReleaseForwardPort
   def manual_skip_reason?(reason)
     return false unless reason
 
-    reason.start_with?("merge commit; inspect manually", "reverts a release-only application")
+    reason.start_with?(
+      "merge commit; inspect manually",
+      "reverts a release-only application",
+      "stable release version bump commit"
+    )
   end
 
   def skipped_version_bump_revert_skip_reason(sha, subject, target, target_version)
@@ -386,7 +392,7 @@ class ReleaseForwardPort
     raise GitError, "#{git_error(['patch-id', '--stable'], stdout, stderr, status)} for #{sha}" unless status.success?
 
     patch_id = stdout.split.first
-    raise GitError, "git patch-id produced no output for #{sha}" if patch_id.nil?
+    return hunkless_patch_id(patch) if patch_id.nil?
 
     patch_id
   end
@@ -527,6 +533,10 @@ class ReleaseForwardPort
   end
 
   def ensure_clean_worktree!
+    if cherry_pick_in_progress?
+      raise GitError, "a cherry-pick is already in progress; run git cherry-pick --continue or --abort first"
+    end
+
     return if git("status", "--porcelain").strip.empty?
 
     raise GitError, "working tree is not clean; commit, stash, or discard local changes before normal mode"
@@ -676,6 +686,10 @@ class ReleaseForwardPort
 
   def empty_patch?(patch)
     patch.each_byte.all? { |byte| ASCII_WHITESPACE_BYTES.include?(byte) }
+  end
+
+  def hunkless_patch_id(patch)
+    "#{HUNKLESS_PATCH_ID_PREFIX}#{Digest::SHA256.hexdigest(patch)}"
   end
 
   def verify_ref!(ref, label:)

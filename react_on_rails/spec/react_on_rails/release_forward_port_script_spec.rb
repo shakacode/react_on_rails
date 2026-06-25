@@ -40,6 +40,10 @@ RSpec.describe "script/release-forward-port" do
     File.binwrite(full_path, contents)
   end
 
+  def executable_file?(repo, path)
+    (File.stat(File.join(repo, path)).mode & 0o111).positive?
+  end
+
   def commit_all(repo, message)
     git(repo, "add", ".")
     git(repo, "commit", "--no-gpg-sign", "-m", message)
@@ -635,7 +639,7 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
-  it "skips stable version bump commits when the target branch has already advanced" do
+  it "marks stable version bump commits as manual when the target branch has already advanced" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
       write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
@@ -649,13 +653,13 @@ RSpec.describe "script/release-forward-port" do
       stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
 
       expect(status).to be_success, stderr
-      expect(stdout).to include("SKIP #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).to include("MANUAL #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
       expect(stdout).to include("stable release version bump commit")
       expect(stdout).to include("manual fallback to take only the CHANGELOG hunks")
     end
   end
 
-  it "skips stable final version bumps when the target is still pre-release-cut" do
+  it "marks stable final version bumps as manual when the target is still pre-release-cut" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
       write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc.1"))
@@ -670,9 +674,29 @@ RSpec.describe "script/release-forward-port" do
       expect(status).to be_success, stderr
       expect(stdout).to include("target version: 1.0.0")
       expect(stdout).to include("SKIP #{rc_bump_sha[0, 12]} Bump version to 1.0.1.rc.1")
-      expect(stdout).to include("SKIP #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).to include("MANUAL #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
       expect(stdout).to include("stable release version bump commit")
       expect(stdout).to include("manual fallback to take only the CHANGELOG hunks")
+    end
+  end
+
+  it "blocks normal mode on stable final version bumps so changelog extraction is explicit" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
+      write_file(repo, "CHANGELOG.md", "# Change Log\n\n### [1.0.1]\n- Final notes\n")
+      stable_bump_sha = commit_all(repo, "Bump version to 1.0.1")
+      git(repo, "checkout", "main")
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).not_to be_success
+      expect(stdout).to include("MANUAL #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stderr).to include("Manual inspection required for #{stable_bump_sha}")
+      expect(stderr).to include("--ack-manual #{stable_bump_sha}")
+      expect(stdout).not_to include("Forward-port complete")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
     end
   end
 
@@ -710,7 +734,7 @@ RSpec.describe "script/release-forward-port" do
       expect(status).to be_success, stderr
       expect(stderr).to include("WARNING: VERSION constant not found")
       expect(stdout).to include("target version: UNKNOWN")
-      expect(stdout).to include("SKIP #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).to include("MANUAL #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
       expect(stdout).to include("stable release version bump commit")
     end
   end
@@ -816,6 +840,29 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "picks mode-only commits instead of treating hunkless patch-id output as empty" do
+    with_release_repo do |repo|
+      write_file(repo, "script.sh", "#!/bin/sh\necho base\n")
+      commit_all(repo, "Add script")
+      expect(executable_file?(repo, "script.sh")).to be(false)
+
+      git(repo, "checkout", "-b", "release/1.0.1")
+      git(repo, "update-index", "--chmod=+x", "script.sh")
+      FileUtils.chmod(0o755, File.join(repo, "script.sh"))
+      git(repo, "commit", "--no-gpg-sign", "-m", "Make script executable")
+      mode_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+      expect(executable_file?(repo, "script.sh")).to be(false)
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{mode_fix_sha[0, 12]} Make script executable")
+      expect(stdout).to include("Forward-port complete")
+      expect(executable_file?(repo, "script.sh")).to be(true)
+    end
+  end
+
   it "does not suggest cherry-pick --continue when Git did not start a cherry-pick" do
     helper = ReleaseForwardPort.new([])
     entry = ReleaseForwardPort::PlanEntry.new(sha: "a" * 40, subject: "Fix release regression", action: :pick)
@@ -825,5 +872,19 @@ RSpec.describe "script/release-forward-port" do
     expect do
       helper.send(:warn_cherry_pick_failure, entry, completed: 0, remaining: 1)
     end.to output(/\A(?=.*Git did not leave a cherry-pick in progress)(?!.*--continue).*\z/m).to_stderr
+  end
+
+  it "rejects a pre-existing cherry-pick before checking worktree cleanliness" do
+    helper = ReleaseForwardPort.new([])
+
+    allow(helper).to receive(:cherry_pick_in_progress?).and_return(true)
+    expect(helper).not_to receive(:git).with("status", "--porcelain")
+
+    expect do
+      helper.send(:ensure_clean_worktree!)
+    end.to raise_error(
+      ReleaseForwardPort::GitError,
+      "a cherry-pick is already in progress; run git cherry-pick --continue or --abort first"
+    )
   end
 end
