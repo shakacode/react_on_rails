@@ -167,6 +167,9 @@ class ReleaseForwardPort
       return "merge commit; inspect manually for conflict-resolution hunks before marking forward-port complete"
     end
 
+    reverse_revert_reason = reverse_pick_revert_skip_reason(sha, target)
+    return reverse_revert_reason if reverse_revert_reason
+
     if already_forward_ported_with_x?(sha, target)
       return "already forward-ported to #{target} via cherry-pick -x evidence with no later standard revert"
     end
@@ -213,6 +216,20 @@ class ReleaseForwardPort
   def version_from_bump_subject(subject)
     match = subject.match(VERSION_BUMP_SUBJECT)
     match && match[:version].tr("-", ".")
+  end
+
+  def reverse_pick_revert_skip_reason(sha, target)
+    reverted_sha = standard_revert_target(sha)
+    return unless reverted_sha && source_cherry_pick_origin_on_target?(reverted_sha, target)
+
+    "reverts a release-only cherry-pick of a commit already live on #{target}; inspect manually " \
+      "before applying this rollback to #{target}"
+  end
+
+  def standard_revert_target(sha)
+    body = git("log", "-1", "--format=%B", sha)
+    match = body.match(/This reverts commit (?<sha>[0-9a-f]{40})\./)
+    match && match[:sha]
   end
 
   def already_forward_ported_with_x?(sha, target)
