@@ -813,14 +813,14 @@ npx create-react-on-rails-app my-app --template javascript
 # Add Tailwind CSS v4 to the generated SSR example
 npx create-react-on-rails-app my-app --tailwind
 
-# Use Rspack for ~20x faster builds
-npx create-react-on-rails-app my-app --rspack
+# Use Webpack instead of the default Rspack bundler
+npx create-react-on-rails-app my-app --webpack
 
 # Specify package manager
 npx create-react-on-rails-app my-app --package-manager pnpm
 
-# Combine RSC with Rspack
-npx create-react-on-rails-app my-app --rspack --rsc
+# RSC uses Rspack by default; no bundler flag needed
+npx create-react-on-rails-app my-app --rsc
 ```
 
 ### All Options
@@ -828,7 +828,8 @@ npx create-react-on-rails-app my-app --rspack --rsc
 | Option                       | Description                                                    | Default                  |
 | ---------------------------- | -------------------------------------------------------------- | ------------------------ |
 | `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`             |
-| `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`                  |
+| `--rspack`                   | Use Rspack as the bundler (~20x faster; Rspack is the default) | `true`                   |
+| `--webpack`, `--no-rspack`   | Use Webpack instead of Rspack                                  | `false`                  |
 | `--standard`                 | Use open-source React on Rails (skip prompt)                   | `false`                  |
 | `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)      | `false`                  |
 | `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`                  |
@@ -850,7 +851,7 @@ The CLI runs these steps automatically:
 After completion, you get:
 
 - A Rails 7+ app with PostgreSQL
-- Shakapacker configured with Webpack (or Rspack) and HMR
+- Shakapacker configured with Rspack by default (or Webpack when requested) and HMR
 - A working HelloWorld React component (TypeScript by default)
 - A generated home page at `/` with links to the example pages, important project files, and Pro/RSC learning resources
 - A teaching-friendly git history that separates Rails creation, gem installation, generator output, and pnpm normalization
