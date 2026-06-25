@@ -203,15 +203,16 @@ git push   # or open a PR if main is protected / the fix needs review on main
 ```
 
 - The helper skips commits already present on `main` using `(cherry picked from commit <sha>)`
-  evidence when available, then verifies the source patch against the current target tree before skipping.
-  For already-applied patches without the footer, it uses `git cherry` as the candidate signal before the
-  same current-tree verification.
+  evidence when available, then verifies that the footer-bearing target commit's patch is still present in
+  the current target tree before skipping. For already-applied patches without the footer, it uses
+  `git cherry` as the candidate signal before verifying the source patch against the current target tree.
 - `-x` appends `(cherry picked from commit <sha>)` so the forward-port is auditable and future
   helper runs can see the relationship.
 - Known limitation: the "already forward-ported" skip still starts from history evidence. If a later
   target commit quotes the exact `(cherry picked from commit <sha>)` footer in its message body, that can
-  look like `-x` evidence. The helper still requires the source patch to be present in the current target
-  tree before skipping, so reverted picks are eligible to be picked again.
+  look like `-x` evidence. The helper still requires that footer-bearing target commit's patch to be
+  present in the current target tree before skipping, so reverted picks are eligible to be picked again;
+  inspect the dry-run plan before applying if a commit message intentionally quotes cherry-pick footers.
 - **Do not `git merge release/X.Y.Z` into `main`.** That drags the RC `Bump version to …rc.N` commits
   and the release-branch CHANGELOG layout onto `main`, which is exactly what we want to keep off `main`.
   Let the helper pick only eligible commits, or manually cherry-pick only the specific fix commit(s).

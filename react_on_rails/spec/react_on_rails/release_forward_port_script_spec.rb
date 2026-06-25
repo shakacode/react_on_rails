@@ -266,6 +266,40 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips conflict-resolved -x cherry-picks on rerun" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "app.txt", "release branch\n")
+      fix_sha = commit_all(repo, "Fix release regression")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "app.txt", "main branch\n")
+      commit_all(repo, "Change same line on main")
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(first_status).not_to be_success
+      expect(first_stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(first_stderr).to include("Cherry-pick failed for #{fix_sha}")
+
+      write_file(repo, "app.txt", "main branch\nrelease branch\n")
+      git(repo, "add", "app.txt")
+      git(repo, "-c", "core.editor=true", "cherry-pick", "--continue")
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+      latest_commit_body = git(repo, "log", "-1", "--format=%B")
+      expect(latest_commit_body).to include("(cherry picked from commit #{fix_sha})")
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(second_stdout).to include("Nothing to cherry-pick")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+      expect(File.read(File.join(repo, "app.txt"))).to eq("main branch\nrelease branch\n")
+    end
+  end
+
   it "does not skip an -x cherry-pick that was later reverted" do
     with_release_repo do |repo|
       add_rc_bump_and_fix(repo)
