@@ -81,46 +81,61 @@ This is the same selection/interview/dispatch gap that `plan-pr-batch` →
 backlog is defined **only** by terminal labels, so the range can never silently
 drop a PR:
 
-```
+```text
 backlog = (all merged PRs through HEAD)
           − (PRs labeled `qa-verified`)   ← passed QA (§5)
           − (PRs labeled `qa-skipped`)    ← reviewed, nothing to verify (§5)
 ```
 
-Every merged PR ends in exactly one terminal state — `qa-verified` or
-`qa-skipped` — so the unverified set is precisely the PRs with neither label.
-**The authoritative, unbounded label query (§3) runs on every invocation**, so a
-PR merged before the last RC that was never QA'd is never dropped — the RC window
-is only an ordering/prioritization hint, never a filter that removes unlabeled
-PRs. The labels — not the range — guarantee no gaps, and because a `qa-skipped`
-PR is never re-presented, the **backlog** (future work) stays bounded to
-unlabeled PRs only. (The `qa-skipped` _set_ itself grows monotonically with the
-repo's formatting/typo history; that is harmless because it never re-enters the
-backlog, but it is not "bounded.")
+Every merged PR that passes QA or is deliberately skipped ends in exactly one
+terminal state — `qa-verified` or `qa-skipped`. A failing, blocked, or
+tool-stalled PR intentionally carries neither label, so it remains visible for a
+later run. **The authoritative, unbounded label query (§3) runs on every
+invocation**, so a PR merged before the last RC that was never QA'd is never
+dropped — the RC window is only an ordering/prioritization hint, never a filter
+that removes unlabeled PRs. The labels — not the range — guarantee no gaps, and
+because a `qa-skipped` PR is never re-presented, the **backlog** (future work)
+stays bounded to unlabeled PRs only. (The `qa-skipped` _set_ itself grows
+monotonically with the repo's formatting/typo history; that is harmless because
+it never re-enters the backlog, but it is not "bounded.")
 
 ### 3. Scope resolution — label query is authoritative, resolver is an optimization
 
-The authoritative backlog is always the **unbounded, paginated** label query, run
-on every invocation (not just `--full`):
+The authoritative backlog is always the **unbounded, paginated** label query for
+the active target base branch, run on every invocation (not just `--full`):
 
 ```sh
-gh pr list --state merged --search "-label:qa-verified -label:qa-skipped" \
-  --limit 9999   # iterate pages if the repo can exceed the search cap (~1000)
+target_base="${QA_TARGET_BASE:-main}" # e.g. main or the active release branch
+
+gh api --method GET --paginate \
+  -f state=closed -f base="$target_base" -f per_page=100 \
+  /repos/OWNER/REPO/pulls |
+  jq -s '
+    [.[][] | select(.merged_at != null)
+      | select(([.labels[].name] | index("qa-verified")) | not)
+      | select(([.labels[].name] | index("qa-skipped")) | not)]
+  '
 ```
 
-`gh pr list` defaults to `--state open` and `--limit 30` and the search backend
-caps at ~1000 results, so the skill MUST set `--state merged`, a high `--limit`,
-and page explicitly — otherwise the "gap-free" promise silently truncates.
+`gh pr list` defaults to `--state open` and `--limit 30`, and its search backend
+caps around 1000 results. The planner therefore MUST NOT rely on a high
+`--limit` over search to prove "gap-free" coverage. It must page the pull-request
+API (or an equivalent non-search GraphQL connection) until `hasNextPage` /
+`Link: rel="next"` is exhausted, filter `merged_at != null`, and constrain the
+query to the active target base branch so a release sweep does not mix `main`
+and `release/*` PRs.
 
 The read-only resolver
 `.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json` is then used
 **only as an optimization** to order/prioritize the common since-RC window, never
 to filter the backlog. Two real constraints when calling it (verified against the
 script): it **hard-fails (`return 1`)** when no `*.rc.*` tag is in head history
-and `--base` is omitted, so `plan-qa-batch` always passes `--base origin/main`
-explicitly and treats any non-zero exit as "optimization unavailable" — the label
-query above remains the unconditional source of truth. `plan-qa-batch` then
-layers QA classification (§4) on the resulting set.
+and `--base` is omitted, so `plan-qa-batch` always passes an explicit
+release-aware `--base` matching the sweep target (`origin/main` for a main sweep,
+or the active release branch for an RC/release sweep). If the resolver returns an
+empty or non-zero optimization for that base, the planner treats the optimization
+as unavailable — the label query above remains the unconditional source of truth.
+`plan-qa-batch` then layers QA classification (§4) on the resulting set.
 
 ### 4. Classify by QA _method_, not include-vs-skip
 
@@ -170,14 +185,15 @@ PR), so it is explicit, not ad hoc:
    at execution time, so the plan is actionable before launch without over-fitting.
 3. **No silent "nothing to verify".** A PR routed to the `qa-skipped` lane is
    surfaced in the interview (§7) with its one-line reason and is labeled only
-   after acknowledgment (developer in an attended run; auto-acknowledged with an
-   audit-trail note in an unattended run — §7) — so the exclusion is deliberate
-   and auditable, never silent.
+   after acknowledgment (an **attended run** has a developer present to confirm;
+   an **unattended run** has no operator and records an auto-acknowledgment audit
+   trail — §7) — so the exclusion is deliberate and auditable, never silent.
 
 ### 5. Dedup and persistence — two terminal labels
 
-Every merged PR reaches exactly one terminal QA state, recorded as a GitHub label
-so the backlog (§2) is a pure query:
+Every merged PR that passes QA or is deliberately skipped reaches exactly one
+terminal QA state, recorded as a GitHub label. Unlabeled PRs are still pending,
+failed, blocked, or tool-stalled, so the backlog (§2) remains a pure query:
 
 - **`qa-verified`** — applied on a **passing** QA run (any method: behavioral
   pass, docs OK, code-check OK).
@@ -186,9 +202,9 @@ so the backlog (§2) is a pure query:
 
 Properties:
 
-- **Dedup** is a single
-  `gh pr list --state merged --search "-label:qa-verified -label:qa-skipped"`
-  query rather than scanning every candidate's comment body.
+- **Dedup** is the paginated pull-request API query from §3 plus client-side
+  label filtering, rather than search-index caps or scanning every candidate's
+  comment body.
 - **GitHub is the persistence.** The plan is a _derived view_ reconstructed from
   the merged set minus the two labels on each run — no local file, no `.context`
   (Conductor-only, non-portable), no tracker issue. Works identically on every
@@ -197,9 +213,11 @@ Properties:
   create a missing label (it errors / no-ops), which would silently break dedup.
   So the writer first ensures the label exists, then adds it — no manual one-time
   setup to forget. Because `qa-batch` lanes run concurrently, the ensure step is
-  **idempotent**: two lanes can race on the same missing label, so a
-  `gh label create` that returns "already exists" is treated as **success**, not a
-  lane failure (equivalently, a single serialized bootstrap before fan-out).
+  **idempotent**: read labels first (`gh label list --json name`), create the
+  missing label if absent, and if a concurrent `gh label create` returns the
+  GitHub 422 validation error, re-read labels and treat it as success only when
+  the expected label is now present. Any other create failure stays loud
+  (equivalently, a single serialized bootstrap before fan-out).
 - **Write-ordering is an invariant, not a description.** `qa-verified` MUST be the
   **final** write: apply it only after `gh pr comment` returns success for the
   evidence comment. If the evidence post fails, the label step is aborted — so a
@@ -219,9 +237,10 @@ QA batches register in the **same `agent-coord` backend**
 rules live in `.agents/workflows/pr-processing.md` and
 `internal/contributor-info/agent-coordination-backend.md`. Per QA lane:
 
-1. `agent-coord doctor` + `agent-coord status` — if a candidate PR has a **live
-   claim** from another (implementation/review) batch, **skip it this round** and
-   report why; QA must not verify a moving target.
+1. `agent-coord doctor` + targeted
+   `agent-coord status --repo OWNER/REPO --target <pr>` per candidate — if a
+   candidate PR has a **live claim** from another (implementation/review) batch,
+   **skip it this round** and report why; QA must not verify a moving target.
 2. `agent-coord claim` the PR's QA lane before starting (compare-and-swap gate;
    `CLAIM_REFUSED` / exit 3 is a hard stop — report holder + heartbeat liveness).
 3. `agent-coord heartbeat` at phase transitions (claimed → reproducing →
@@ -243,13 +262,21 @@ in-progress state.
 
 **Repeated-contention escalation.** A PR skipped for a live claim (point 1) is
 retried next run, but a PR under perpetual edit would be skipped forever and the
-coverage gap would be invisible. After **3** consecutive contention skips the
-planner surfaces it as `blocked — repeated contention` so the maintainer can
-schedule a QA window or override. The skip count needs durable, file-free storage
-across invocations, so it lives on the PR's `agent-coord` coordination record (the
-backend already in use), incremented on each contention skip and cleared when QA
-finally claims the PR — not in a local file (ruled out, §5) and not encodable in a
-terminal label.
+coverage gap would be invisible. The default policy is **3** consecutive
+contention skips before surfacing `blocked — repeated contention`: one skip is
+common during active review, two may be normal during a release day, and three
+means the PR has now missed multiple QA opportunities. The threshold is a
+`qa-batch` parameter, recorded in the handoff, so release managers can tighten or
+relax it for cadence.
+
+The skip count needs durable, file-free storage across invocations. Do **not**
+assume arbitrary mutable metadata exists on current `agent-coord` records. Phase A
+must either add a first-class coordination field / batch-state entry with
+compare-and-swap semantics, or run in degraded mode where repeated-contention
+counts are reported in the current batch output only and are not used for
+automated escalation. A successful QA claim clears the durable count when that
+capability exists; without it, escalation is advisory/UNKNOWN rather than a hard
+gate.
 
 ### 7. The interview
 
@@ -300,7 +327,13 @@ wedge the batch:
 - **(b) Environment-resource contention** — only **one** consumer of the Pro
   renderer / Redis / license / dummy-app DB at a time. Lanes whose env profile
   needs the shared Pro stack **serialize**; docs and pure-read lanes
-  **parallelize** freely.
+  **parallelize** freely. This serialization is separate from per-PR
+  `agent-coord` claims: the `qa-batch` scheduler keeps an in-process resource
+  semaphore for the current batch and, before cross-batch Pro concurrency is
+  enabled, must either acquire an explicit backend resource claim such as
+  `resource:pro-stack` (if the coordination backend supports non-PR targets) or
+  stop with UNKNOWN when another live QA batch could already be using the shared
+  stack. Per-PR claims alone are insufficient to protect the Pro resources.
 - **(c) Working-tree isolation.** QA mostly does not edit source, but the
   documented spec-only "before" tactic (`git checkout <fix>~1 -- <file>`, §4 /
   `verify-pr-fix`) **does mutate the shared checkout** — two such lanes in one
@@ -315,8 +348,9 @@ wedge the batch:
   `qa-batch` parameter. A lane that exceeds it (hung renderer, crashed agent,
   stale `agent-coord` claim, never-exiting test) is marked **failed — not
   labeled**, its claim released, and it is deferred to the next batch and surfaced
-  to the maintainer — the same fail-open posture as the `agent-coord`-unavailable
-  fallback in §6. One stuck lane never blocks the rest indefinitely.
+  to the maintainer — the same blocked/deferred posture as the
+  `agent-coord`-unavailable fallback in §6. One stuck lane never blocks the rest
+  indefinitely.
 
 `plan-qa-batch` stays plan-only (Phase A): it produces the plan and goal prompt
 and launches `qa-batch` only when the user asks. **Phase B** (the planner
@@ -334,6 +368,10 @@ documented as a future enhancement, not built.
   cross-linked issue** describing the reproduction and the broken signal (mirrors
   `post-merge-audit`'s "Needs follow-up issue / Needs fix PR" classification), and
   post the failing evidence on the PR. **Neither** label is applied.
+- **Infra/tooling stall:** do not create a duplicate product bug issue. Post or
+  record the blocker evidence, leave the PR unlabeled, and create at most one
+  maintainer-approved tooling follow-up if the failure is durable and not already
+  tracked.
 - **No standing umbrella tracker issue** for the QA effort itself — that is the
   only thing #3952 ruled out. Per-bug issues are expected and encouraged.
 
@@ -345,6 +383,14 @@ documented as a future enhancement, not built.
   auto-creation is disabled for the run — record the finding in the batch output
   for later filing. The mode is a `qa-batch` invocation flag, recorded in the
   handoff.
+
+Issue bodies are generated from a trusted template. PR-sourced content (titles,
+bodies, comments, diffs, logs, and reproduced output) is treated as untrusted
+data: quote it, fence it, cap excerpts, and never let it supply instructions to
+the agent or alter labels, assignees, commands, repository paths, or safety
+rules. Build multi-line issue bodies in a temporary Markdown file and pass them
+with `gh issue create --body-file`, matching the repository's GitHub follow-up
+issue rule.
 
 ## Coordinated edits to existing skills
 
@@ -420,6 +466,12 @@ readiness) differ enough that overloading `pr-batch` would muddy both.
   public `docs/superpowers/specs/`; by the "`docs/` is public, internal design
   goes to `internal/planning/`" rule they should move. Out of scope for this
   work — handle in a separate PR.
+- **Canonical home.** This planning artifact is useful in this repository because
+  it ties QA labels to React on Rails release readiness, but the reusable
+  `plan-qa-batch` / `qa-batch` skill implementation may belong in
+  `shakacode/agent-workflows`. Decide before Phase A implementation whether to
+  keep only the React on Rails release policy here and move the generic workflow
+  mechanics there.
 
 ## Phasing
 
