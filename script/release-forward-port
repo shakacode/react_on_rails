@@ -12,11 +12,11 @@ class ReleaseForwardPort
   # always `X.Y.Z.rc.N`). A versionless `1.0.0.rc` is intentionally NOT matched
   # here; it falls through to the version-drift path in version_bump_skip_reason.
   RC_VERSION_BUMP_SUBJECT = /
-    \Abump\s+version\s+to\s+v?\d+\.\d+\.\d+(?:[.-]rc[.-]?\d+|\.rc\.\d+)\b
+    \Abump\s+version\s+to\s+v?\d+\.\d+\.\d+[.-]rc[.-]?\d+\b
   /ix
   VERSION_BUMP_SUBJECT = /
     \Abump\s+version\s+to\s+v?
-    (?<version>\d+\.\d+\.\d+(?:(?:[.-])(?:alpha|beta|rc|pre|dev)(?:[.-]?\d+)?)?)\b
+    (?<version>\d+\.\d+\.\d+(?:(?:[.-])(?:alpha|beta|rc|pre|dev|test)(?:[.-]?\d+)?)?)\b
   /ix
   CHERRY_PICK_FOOTER_PREFIX = "(cherry picked from commit "
 
@@ -121,7 +121,7 @@ class ReleaseForwardPort
   end
 
   def source_only_commits(source, target)
-    git_lines("rev-list", "--reverse", "#{target}..#{source}")
+    git_lines("rev-list", "--reverse", "--no-merges", "#{target}..#{source}")
   end
 
   def patch_equivalent_candidates(source, target)
