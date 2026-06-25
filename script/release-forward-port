@@ -210,12 +210,16 @@ class ReleaseForwardPort
     forwarded_shas = git_lines("log", target, "--fixed-strings", "--grep", footer, "--format=%H")
     return false if forwarded_shas.empty?
 
+    # True if at least one copy of the cherry-pick is still live on the target
+    # (that is, not followed by a live standard git revert). Multiple copies are
+    # fine: pick -> revert -> re-pick is handled because the re-pick copy passes.
     forwarded_shas.any? { |forwarded_sha| !standard_revert_on_target?(forwarded_sha, target) }
   end
 
   def standard_revert_on_target?(sha, target)
     revert_message = "This reverts commit #{sha}."
-    !git("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H", "--max-count=1").strip.empty?
+    revert_shas = git_lines("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H")
+    revert_shas.any? { |revert_sha| !standard_revert_on_target?(revert_sha, target) }
   end
 
   def patch_equivalent_commit_present_on_target?(sha, target)
@@ -243,7 +247,10 @@ class ReleaseForwardPort
     stdout, stderr, status = capture_git("patch-id", "--stable", stdin_data: patch)
     raise GitError, git_error(["patch-id", "--stable", sha], stdout, stderr, status) unless status.success?
 
-    stdout.split.first
+    patch_id = stdout.split.first
+    raise GitError, "git patch-id produced no output for #{sha}" if patch_id.nil?
+
+    patch_id
   end
 
   def version_at(ref)

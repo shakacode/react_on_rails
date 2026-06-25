@@ -387,6 +387,29 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips an -x cherry-pick restored by reverting its revert" do
+    with_release_repo do |repo|
+      add_rc_bump_and_fix(repo)
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).to be_success, first_stderr
+      expect(first_stdout).to include("Forward-port complete")
+
+      git(repo, "revert", "--no-edit", "HEAD")
+      git(repo, "revert", "--no-edit", "HEAD")
+      restored_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(second_stdout).to include("Nothing to cherry-pick")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(restored_count)
+    end
+  end
+
   it "skips stable version bump commits when the target branch has already advanced" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
