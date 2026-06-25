@@ -105,11 +105,14 @@ The authoritative backlog is always the **unbounded, paginated** label query for
 the active target base branch, run on every invocation (not just `--full`):
 
 ```sh
+set -o pipefail
+
+repo="${QA_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 target_base="${QA_TARGET_BASE:-main}" # e.g. main or the active release branch
 
 gh api --method GET --paginate \
   -f state=closed -f base="$target_base" -f per_page=100 \
-  /repos/OWNER/REPO/pulls |
+  "/repos/$repo/pulls" |
   jq -s '
     [.[][] | select(.merged_at != null)
       | select(([.labels[].name] | index("qa-verified")) | not)
@@ -123,7 +126,12 @@ caps around 1000 results. The planner therefore MUST NOT rely on a high
 API (or an equivalent non-search GraphQL connection) until `hasNextPage` /
 `Link: rel="next"` is exhausted, filter `merged_at != null`, and constrain the
 query to the active target base branch so a release sweep does not mix `main`
-and `release/*` PRs.
+and `release/*` PRs. The `repo` value is derived from the trusted local checkout
+or an explicit trusted override and reused anywhere this document shows
+`OWNER/REPO`-style placeholders. The implementation MUST preserve `pipefail` (or
+capture the API exit code explicitly) and abort on API/auth/rate-limit/network
+errors before using the `jq` output; a failed page fetch is UNKNOWN, not an empty
+backlog.
 
 The read-only resolver
 `.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json` is then used
@@ -215,11 +223,13 @@ Properties:
   setup to forget. Because `qa-batch` lanes run concurrently, the ensure step is
   **idempotent**: read the full label set first (for example,
   `gh label list --limit 1000 --json name`, or `gh api --paginate` over
-  `/repos/OWNER/REPO/labels` if the repo can exceed that), create the missing
-  label if absent, and if a concurrent `gh label create` returns the GitHub 422
-  validation error, re-read the full label set and treat it as success only when
-  the expected label is now present. Any other create failure stays loud
-  (equivalently, a single serialized bootstrap before fan-out).
+  `/repos/$repo/labels` if the repo can exceed that), create the missing label if
+  absent, and if a concurrent `gh label create` returns the GitHub 422 validation
+  error, re-read the full label set and treat it as success only when the
+  expected label is now present. A failed re-read after a 422 is also a loud
+  failure: abort the label step and surface the error rather than proceeding
+  silently. Any other create failure stays loud (equivalently, a single
+  serialized bootstrap before fan-out).
 - **Write-ordering is an invariant, not a description.** `qa-verified` MUST be the
   **final** write: apply it only after `gh pr comment` returns success for the
   evidence comment. If the evidence post fails, the label step is aborted — so a
@@ -240,7 +250,7 @@ rules live in `.agents/workflows/pr-processing.md` and
 `internal/contributor-info/agent-coordination-backend.md`. Per QA lane:
 
 1. `agent-coord doctor` + targeted
-   `agent-coord status --repo OWNER/REPO --target <pr>` per candidate — if a
+   `agent-coord status --repo "$repo" --target <pr>` per candidate — if a
    candidate PR has a **live claim** from another (implementation/review) batch,
    **skip it this round** and report why; QA must not verify a moving target.
 2. `agent-coord claim` the PR's QA lane before starting (compare-and-swap gate;
@@ -344,15 +354,16 @@ wedge the batch:
   **own git worktree** (`isolation: 'worktree'`), exactly as `pr-batch` workers
   do; only that subset needs it, not docs/read lanes. (This is the one place
   `pr-batch`'s isolation model does apply.)
-- **Liveness — timeout / deadlock exit.** The serialized Pro-stack slot has a
-  wall-clock timeout, recommended **~20 min** (Pro cold-start alone — license
-  check + renderer boot — can take ~5 min before a test starts), tunable as a
-  `qa-batch` parameter. A lane that exceeds it (hung renderer, crashed agent,
-  stale `agent-coord` claim, never-exiting test) is marked **failed — not
-  labeled**, its claim released, and it is deferred to the next batch and surfaced
-  to the maintainer — the same blocked/deferred posture as the
-  `agent-coord`-unavailable fallback in §6. One stuck lane never blocks the rest
-  indefinitely.
+- **Liveness — timeout / deadlock exit.** Every lane, regardless of method, has a
+  wall-clock timeout. Pro-stack lanes use a recommended floor of **~20 min** (Pro
+  cold-start alone — license check + renderer boot — can take ~5 min before a
+  test starts); docs/read lanes can use a shorter value, but they still need a
+  hard cap. The timeout is tunable as a `qa-batch` parameter. A lane that exceeds
+  it (hung renderer, crashed agent, stale `agent-coord` claim, never-exiting
+  test) is marked **failed — not labeled**, its claim released, and it is deferred
+  to the next batch and surfaced to the maintainer — the same blocked/deferred
+  posture as the `agent-coord`-unavailable fallback in §6. One stuck lane never
+  blocks the rest indefinitely.
 
 `plan-qa-batch` stays plan-only (Phase A): it produces the plan and goal prompt
 and launches `qa-batch` only when the user asks. **Phase B** (the planner
