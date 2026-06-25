@@ -3470,6 +3470,8 @@ module ReactOnRails
       config/webpack/rscWebpackConfig.js
       config/rspack/rscWebpackConfig.js
     ].freeze
+    RSC_PACKAGE_NAME = "react-on-rails-rsc"
+    RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
 
     def check_rsc_setup
       return unless ReactOnRails::Utils.react_on_rails_pro?
@@ -3551,7 +3553,6 @@ module ReactOnRails
       end
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity
     def check_rsc_react_version
       react_version = detect_react_version_from_deps
       unless react_version
@@ -3559,6 +3560,13 @@ module ReactOnRails
         return
       end
 
+      package_root = resolved_package_root
+      return if check_rsc_package_compatibility_if_present(package_root, react_version)
+
+      check_legacy_rsc_react_version(react_version)
+    end
+
+    def check_legacy_rsc_react_version(react_version)
       major, minor, patch = react_version.split(".").map(&:to_i)
 
       if major == 19 && minor.zero? && patch >= 4
@@ -3587,7 +3595,241 @@ module ReactOnRails
         MSG
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
+
+    def check_rsc_package_compatibility_if_present(package_root, react_version)
+      return false unless declared_package_spec(RSC_PACKAGE_NAME)
+
+      rsc_package = installed_package_json(package_root, RSC_PACKAGE_NAME)
+      return false unless rsc_package
+
+      peer_compatible = check_rsc_package_peer_compatibility(rsc_package, react_version)
+      return false if peer_compatible.nil?
+
+      check_rsc_package_dist_tags(rsc_package, package_root) if peer_compatible
+      true
+    end
+
+    def check_rsc_package_peer_compatibility(rsc_package, react_version)
+      rsc_version = rsc_package["version"].to_s
+      peer_dependencies = rsc_package["peerDependencies"] || {}
+      react_peer_range = peer_dependencies["react"]
+      react_dom_peer_range = peer_dependencies["react-dom"]
+      return nil if react_peer_range.blank? && react_dom_peer_range.blank?
+
+      peer_checks = rsc_peer_check_results(
+        react_version:,
+        react_peer_range:,
+        react_dom_peer_range:,
+        rsc_version:
+      )
+
+      if peer_checks.all?
+        checker.add_success(
+          "✅ #{RSC_PACKAGE_NAME} #{rsc_version} peer dependencies are compatible with React #{react_version}"
+        )
+        true
+      else
+        false
+      end
+    end
+
+    def rsc_peer_check_results(react_version:, react_peer_range:, react_dom_peer_range:, rsc_version:)
+      results = []
+      if react_peer_range.present?
+        results << check_rsc_peer_package(
+          package_name: "react",
+          installed_version: react_version,
+          peer_range: react_peer_range,
+          rsc_version:
+        )
+      end
+      if react_dom_peer_range.present?
+        results << check_rsc_peer_package(
+          package_name: "react-dom",
+          installed_version: detect_package_version_from_deps("react-dom"),
+          peer_range: react_dom_peer_range,
+          rsc_version:
+        )
+      end
+      results
+    end
+
+    def check_rsc_peer_package(package_name:, installed_version:, peer_range:, rsc_version:)
+      unless installed_version
+        checker.add_error(<<~MSG.strip)
+          🚫 #{RSC_PACKAGE_NAME} #{rsc_version} requires #{package_name} #{peer_range}, but #{package_name} is not installed or could not be detected.
+
+          Fix: install #{package_name} in the JavaScript package root configured by ReactOnRails.configuration.node_modules_location.
+        MSG
+        return false
+      end
+
+      return true if npm_range_satisfied?(installed_version, peer_range)
+
+      checker.add_error(<<~MSG.strip)
+        🚫 #{RSC_PACKAGE_NAME} #{rsc_version} requires #{package_name} #{peer_range}, but installed #{package_name} is #{installed_version}.
+
+        React Server Components depend on React internal server APIs that can change between React minors.
+
+        Fix: install matching versions, for example:
+          npm install #{package_name}@#{peer_range} #{RSC_PACKAGE_NAME}@#{rsc_version} --save-exact
+      MSG
+      false
+    end
+
+    def check_rsc_package_dist_tags(rsc_package, package_root)
+      installed_version = rsc_package["version"].to_s
+      return if installed_version.blank?
+
+      rsc_dist_tags(package_root).each do |tag, tag_version|
+        next unless RSC_DIST_TAGS_TO_CHECK.include?(tag)
+        next unless npm_version_greater?(tag_version, installed_version)
+
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  #{RSC_PACKAGE_NAME} #{installed_version} is behind the npm #{tag} dist-tag #{tag_version}.
+
+          React Server Components track React minor versions. If your React version is on the #{tag_version.split('.')[0, 2].join('.')} line, install the matching RSC package instead of relying on a stale latest tag.
+
+          Check peer requirements with:
+            npm view #{RSC_PACKAGE_NAME}@#{tag_version} peerDependencies
+        MSG
+      end
+    end
+
+    def rsc_dist_tags(package_root)
+      stdout, _stderr, status = Timeout.timeout(5) do
+        Open3.capture3("npm", "view", RSC_PACKAGE_NAME, "dist-tags", "--json", chdir: package_root)
+      end
+      return {} unless status.success?
+
+      JSON.parse(stdout)
+    rescue StandardError
+      {}
+    end
+
+    def npm_range_satisfied?(version, range)
+      range.to_s.split("||").any? do |range_clause|
+        npm_range_clause_satisfied?(version, range_clause.strip)
+      end
+    end
+
+    def npm_range_clause_satisfied?(version, range_clause)
+      return false if range_clause.blank?
+      return true if range_clause.match?(/\A[~^]?\s*[*xX](?:\.[*xX]){0,2}\z/)
+
+      comparators = range_clause.scan(/(?:>=|<=|>|<|=|\^|~)?\s*v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?/)
+      return false if comparators.empty?
+
+      comparators.all? { |comparator| npm_comparator_satisfied?(version, comparator.strip) }
+    end
+
+    def npm_comparator_satisfied?(version, comparator)
+      operator = comparator[/\A(?:>=|<=|>|<|=|\^|~)/] || "="
+      target_version = comparator.sub(/\A(?:>=|<=|>|<|=|\^|~)\s*/, "")
+      comparison = npm_version_compare(version, target_version)
+
+      case operator
+      when "^"
+        comparison >= 0 &&
+          npm_version_less_than?(version, npm_caret_upper_bound(target_version))
+      when "~"
+        comparison >= 0 &&
+          npm_version_less_than?(version, npm_tilde_upper_bound(target_version))
+      else
+        npm_plain_comparator_satisfied?(comparison, operator)
+      end
+    end
+
+    def npm_plain_comparator_satisfied?(comparison, operator)
+      case operator
+      when ">="
+        comparison >= 0
+      when ">"
+        comparison.positive?
+      when "<="
+        comparison <= 0
+      when "<"
+        comparison.negative?
+      else
+        comparison.zero?
+      end
+    end
+
+    def npm_caret_upper_bound(version)
+      major, minor, patch = npm_version_tuple(version)
+      if major.positive?
+        "#{major + 1}.0.0"
+      elsif minor.positive?
+        "0.#{minor + 1}.0"
+      else
+        "0.0.#{patch + 1}"
+      end
+    end
+
+    def npm_tilde_upper_bound(version)
+      major, minor, = npm_version_tuple(version)
+      "#{major}.#{minor + 1}.0"
+    end
+
+    def npm_version_greater?(left, right)
+      npm_version_compare(left, right).positive?
+    end
+
+    def npm_version_less_than?(left, right)
+      npm_version_compare(left, right).negative?
+    end
+
+    def npm_version_compare(left, right)
+      left_tuple = npm_version_tuple(left)
+      right_tuple = npm_version_tuple(right)
+
+      left_tuple.zip(right_tuple).each do |left_part, right_part|
+        comparison = left_part <=> right_part
+        return comparison unless comparison.zero?
+      end
+
+      npm_prerelease_compare(npm_prerelease(left), npm_prerelease(right))
+    end
+
+    def npm_version_tuple(version)
+      core = version.to_s.delete_prefix("v").split("+", 2).first.to_s.split("-", 2).first.to_s
+      parts = core.split(".").map(&:to_i)
+      [parts[0] || 0, parts[1] || 0, parts[2] || 0]
+    end
+
+    def npm_prerelease(version)
+      version.to_s.split("+", 2).first.to_s.split("-", 2)[1].to_s
+    end
+
+    def npm_prerelease_compare(left, right)
+      return 0 if left == right
+      return 1 if left.blank?
+      return -1 if right.blank?
+
+      npm_prerelease_segments_compare(left.split("."), right.split("."))
+    end
+
+    def npm_prerelease_segments_compare(left_parts, right_parts)
+      [left_parts.length, right_parts.length].max.times do |index|
+        left_part = left_parts[index]
+        right_part = right_parts[index]
+        return -1 if left_part.nil?
+        return 1 if right_part.nil?
+
+        comparison = npm_prerelease_part_compare(left_part, right_part)
+        return comparison unless comparison.zero?
+      end
+
+      0
+    end
+
+    def npm_prerelease_part_compare(left_part, right_part)
+      if left_part.match?(/\A\d+\z/) && right_part.match?(/\A\d+\z/)
+        left_part.to_i <=> right_part.to_i
+      else
+        left_part <=> right_part
+      end
+    end
 
     def detect_react_version_from_deps
       # Prefer the actually installed version from node_modules over the declared
@@ -3610,18 +3852,33 @@ module ReactOnRails
     end
 
     def installed_react_version(package_root)
-      # Use Node's own module resolution to find the actually installed React,
+      installed_package_version(package_root, "react")
+    end
+
+    def detect_package_version_from_deps(package_name)
+      package_root = resolved_package_root
+      return nil if package_root_missing?(package_root)
+
+      installed_package_version(package_root, package_name) || declared_package_version(package_name)
+    rescue StandardError
+      nil
+    end
+
+    def installed_package_version(package_root, package_name)
+      installed_package_json(package_root, package_name)&.fetch("version", nil)
+    end
+
+    def installed_package_json(package_root, package_name)
+      # Use Node's own module resolution to find the actually installed package,
       # which handles hoisted dependencies in monorepos and pnpm workspaces.
       # Resolve from the configured package root so nested client/ layouts work.
-      script = "console.log(require.resolve('react/package.json'))"
+      script = "console.log(require.resolve('#{package_name}/package.json'))"
       stdout, _stderr, status = Open3.capture3("node", "-e", script, chdir: package_root)
-      return nil unless status.success?
-
-      resolved_path = stdout.strip
+      resolved_path = status.success? ? stdout.strip : ""
+      resolved_path = File.join(package_root, "node_modules", package_name, "package.json") if resolved_path.empty?
       return nil if resolved_path.empty? || !File.exist?(resolved_path)
 
-      version = JSON.parse(File.read(resolved_path))["version"]
-      version if version&.match?(/\A\d+\.\d+\.\d+/)
+      JSON.parse(File.read(resolved_path))
     rescue StandardError
       nil
     end
@@ -3640,16 +3897,27 @@ module ReactOnRails
     end
 
     def declared_react_version
-      package_json_path = package_json_path_for("declared React version")
-      return nil unless package_json_path
+      declared_package_version("react")
+    end
 
-      package_json = JSON.parse(File.read(package_json_path))
-      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
-      version_str = all_deps["react"]
+    def declared_package_version(package_name)
+      version_str = declared_package_spec(package_name)
       return nil unless version_str
 
       clean_version = version_str.gsub(/\A[^0-9]*/, "")
       clean_version if clean_version.match?(/\A\d+\.\d+\.\d+\z/)
+    rescue StandardError
+      nil
+    end
+
+    def declared_package_spec(package_name)
+      package_label = package_name == "react" ? "React" : package_name
+      package_json_path = package_json_path_for("declared #{package_label} version")
+      return nil unless package_json_path
+
+      package_json = JSON.parse(File.read(package_json_path))
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
+      all_deps[package_name]
     rescue StandardError
       nil
     end

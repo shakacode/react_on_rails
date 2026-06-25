@@ -5202,6 +5202,11 @@ RSpec.describe ReactOnRails::Doctor do
       File.write("node_modules/react/package.json", "{\"version\":\"#{version}\"}")
     end
 
+    def install_package(name, package_json)
+      FileUtils.mkdir_p("node_modules/#{name}")
+      File.write("node_modules/#{name}/package.json", JSON.generate(package_json))
+    end
+
     def stub_package_root(path)
       allow(doctor).to receive(:resolved_package_root).and_return(path)
     end
@@ -5316,6 +5321,95 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when react-on-rails-rsc declares a React peer range" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.0.7",
+                  "react-dom" => "19.0.7",
+                  "react-on-rails-rsc" => "19.2.0-rc.4"
+                }
+              )
+            )
+            install_react("19.0.7")
+            install_package("react-dom", "version" => "19.0.7")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.2.0-rc.4",
+              "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
+            )
+            example.run
+          end
+        end
+      end
+
+      it "errors when installed React does not satisfy the RSC peer range" do
+        doctor.send(:check_rsc_react_version)
+
+        error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+        expect(error_msgs).to include(
+          a_string_including(
+            "react-on-rails-rsc 19.2.0-rc.4 requires react ^19.2.7",
+            "installed react is 19.0.7"
+          )
+        )
+      end
+    end
+
+    context "when react-on-rails-rsc is behind the prerelease dist-tag" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.0.7",
+                  "react-dom" => "19.0.7",
+                  "react-on-rails-rsc" => "19.0.5"
+                }
+              )
+            )
+            install_react("19.0.7")
+            install_package("react-dom", "version" => "19.0.7")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.0.5",
+              "peerDependencies" => { "react" => "^19.0.4", "react-dom" => "^19.0.4" }
+            )
+            example.run
+          end
+        end
+      end
+
+      it "warns that the installed package is behind the next dist-tag" do
+        allow(Open3).to receive(:capture3).and_call_original
+        allow(Open3).to receive(:capture3)
+          .with("npm", "view", "react-on-rails-rsc", "dist-tags", "--json", chdir: Dir.pwd)
+          .and_return(
+            [
+              JSON.generate("latest" => "19.0.5", "next" => "19.2.0-rc.4"),
+              "",
+              instance_double(Process::Status, success?: true)
+            ]
+          )
+
+        doctor.send(:check_rsc_react_version)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+        expect(warning_msgs).to include(
+          a_string_including(
+            "react-on-rails-rsc 19.0.5 is behind the npm next dist-tag 19.2.0-rc.4",
+            "React Server Components track React minor versions"
+          )
+        )
+      end
+    end
+
     context "when React is installed in a configured nested JS workspace" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -5410,6 +5504,79 @@ RSpec.describe ReactOnRails::Doctor do
         info_msgs = checker.messages.select { |m| m[:type] == :info }
         expect(info_msgs.any? { |m| m[:content].include?("Could not detect React version") }).to be true
       end
+    end
+  end
+
+  describe "JSON output for RSC compatibility" do
+    let(:json_doctor) { described_class.new(format: :json) }
+    let(:checker) { json_doctor.instance_variable_get(:@checker) }
+    let(:pro_config) do
+      double(
+        "ProConfig",
+        enable_rsc_support: true,
+        server_renderer: "NodeRenderer",
+        rsc_bundle_js_file: "rsc-bundle.js",
+        rsc_payload_generation_url_path: "rsc_payload/"
+      )
+    end
+
+    def install_package(name, package_json)
+      FileUtils.mkdir_p("node_modules/#{name}")
+      File.write("node_modules/#{name}/package.json", JSON.generate(package_json))
+    end
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) do
+          FileUtils.mkdir_p("config/webpack")
+          File.write("config/routes.rb", "Rails.application.routes.draw do\n  rsc_payload_route\nend")
+          File.write("config/webpack/rscWebpackConfig.js", "{}")
+          File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
+          File.write(
+            "package.json",
+            JSON.generate(
+              "dependencies" => {
+                "react" => "19.0.7",
+                "react-dom" => "19.0.7",
+                "react-on-rails-rsc" => "19.2.0-rc.4"
+              }
+            )
+          )
+          install_package("react", "version" => "19.0.7")
+          install_package("react-dom", "version" => "19.0.7")
+          install_package(
+            "react-on-rails-rsc",
+            "version" => "19.2.0-rc.4",
+            "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
+          )
+          example.run
+        end
+      end
+    end
+
+    before do
+      described_class::CHECK_SECTIONS.each do |section|
+        allow(json_doctor).to receive(section[:method])
+      end
+      allow(json_doctor).to receive(:check_rsc_setup).and_call_original
+      allow(json_doctor).to receive(:ensure_rails_environment_loaded)
+      allow(json_doctor).to receive(:resolved_package_root).and_return(Dir.pwd)
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
+    end
+
+    it "includes RSC peer compatibility failures in the react_server_components check" do
+      output = []
+      allow(json_doctor).to receive(:exit)
+      allow(json_doctor).to receive(:puts) { |arg| output << arg.to_s }
+
+      json_doctor.run_diagnosis
+
+      report = JSON.parse(output.join("\n"))
+      rsc_check = report["checks"].find { |check| check["id"] == "react_server_components" }
+      expect(rsc_check["status"]).to eq("fail")
+      expect(rsc_check["message"]).to include("react-on-rails-rsc 19.2.0-rc.4 requires react ^19.2.7")
+      expect(report["status"]).to eq("fail")
     end
   end
 
