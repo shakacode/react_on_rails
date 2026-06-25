@@ -113,6 +113,24 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips initially empty release commits before cherry-picking" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      git(repo, "commit", "--allow-empty", "--no-gpg-sign", "-m", "Record release-only marker")
+      empty_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{empty_sha[0, 12]} Record release-only marker")
+      expect(stdout).to include("empty commit; cherry-picking would only create a no-op commit on main")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+    end
+  end
+
   it "prints usage without a stack trace for argument errors" do
     _stdout, stderr, status = run_script_from_repo_root("--bogus")
 

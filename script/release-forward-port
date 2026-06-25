@@ -167,6 +167,10 @@ class ReleaseForwardPort
       return "already forward-ported to #{target} via cherry-pick -x evidence with no later standard revert"
     end
 
+    if patch_id_for_commit(sha) == EMPTY_PATCH_ID
+      return "empty commit; cherry-picking would only create a no-op commit on #{target}"
+    end
+
     if patch_equivalent_commits[sha] && patch_equivalent_commit_present_on_target?(sha, target)
       return "patch already exists on #{target} according to target history with no later standard revert"
     end
