@@ -338,7 +338,11 @@ RSpec.describe ReactOnRailsPro::Engine do
       end
 
       context "when ScoutApm is defined" do
-        before { stub_const("ScoutApm::Tracer", mock_scout_tracer) }
+        before do
+          # stub_const on a nested constant implicitly creates the parent namespace,
+          # making `defined?(ScoutApm)` truthy in the initializer block.
+          stub_const("ScoutApm::Tracer", mock_scout_tracer)
+        end
 
         it "instruments NodeRenderingPool.exec_server_render_js" do
           initializer.run
