@@ -75,6 +75,7 @@ class ReleaseForwardPort
 
     ensure_clean_worktree!
     checkout_target!(target)
+    # This final expression is the process exit status.
     apply_plan(plan)
   rescue OptionParser::ParseError, UsageError => e
     warn "ERROR: #{e.message}"
@@ -163,7 +164,7 @@ class ReleaseForwardPort
     end
 
     if already_forward_ported_with_x?(sha, target)
-      return "already forward-ported to #{target} via cherry-pick -x evidence and current target tree"
+      return "already forward-ported to #{target} via cherry-pick -x evidence with no later standard revert"
     end
 
     if patch_equivalent_commits[sha] && patch_present_on_target_tree?(sha, target)
@@ -198,15 +199,20 @@ class ReleaseForwardPort
     footer = "#{CHERRY_PICK_FOOTER_PREFIX}#{sha})"
     # This history search can false-positive if a later target commit quotes the
     # footer verbatim. The runbook documents that boundary for release operators.
-    forwarded_sha = git("log", target, "--fixed-strings", "--grep", footer, "--format=%H", "--max-count=1").strip
-    return false if forwarded_sha.empty?
+    forwarded_shas = git_lines("log", target, "--fixed-strings", "--grep", footer, "--format=%H")
+    return false if forwarded_shas.empty?
 
-    patch_present_on_target_tree?(forwarded_sha, target)
+    forwarded_shas.any? { |forwarded_sha| !standard_revert_on_target?(forwarded_sha, target) }
+  end
+
+  def standard_revert_on_target?(sha, target)
+    revert_message = "This reverts commit #{sha}."
+    !git("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H", "--max-count=1").strip.empty?
   end
 
   def patch_present_on_target_tree?(sha, target)
     patch = git("show", "--format=", "--binary", "--full-index", "--find-renames", sha)
-    return false if patch.strip.empty?
+    return true if patch.strip.empty?
 
     with_temporary_index(target) do |env|
       _stdout, _stderr, status =
@@ -313,6 +319,8 @@ class ReleaseForwardPort
     when :skip
       puts "SKIP #{entry.short_sha} #{entry.subject}"
       puts "     #{entry.reason}"
+    else
+      raise GitError, "unexpected plan entry action: #{entry.action.inspect}"
     end
   end
 

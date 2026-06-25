@@ -103,6 +103,16 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "reports no commits when the source has nothing ahead of the target" do
+    with_release_repo do |repo|
+      stdout, stderr, status = run_script(repo, "--source", "main", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("No commits found in main..main.")
+      expect(stdout).to include("DRY RUN")
+    end
+  end
+
   it "prints usage without a stack trace for argument errors" do
     _stdout, stderr, status = run_script_from_repo_root("--bogus")
 
@@ -276,6 +286,29 @@ RSpec.describe "script/release-forward-port" do
       expect(second_stdout).to include("already forward-ported to main via cherry-pick -x evidence")
       expect(second_stdout).to include("Nothing to cherry-pick")
       expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+    end
+  end
+
+  it "skips -x cherry-picks after later target context changes" do
+    with_release_repo do |repo|
+      add_rc_bump_and_fix(repo)
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).to be_success, first_stderr
+      expect(first_stdout).to include("Forward-port complete")
+
+      write_file(repo, "app.txt", "base updated on main\nrelease fix\n")
+      commit_all(repo, "Adjust target context around release fix")
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(second_stdout).to include("Nothing to cherry-pick")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base updated on main\nrelease fix\n")
     end
   end
 
