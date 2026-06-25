@@ -716,16 +716,6 @@ For detailed proof criteria and migration contribution guidance, see
 - Use it when you want a real-app migration to React on Rails Pro showing Rails
   routing, React 19, and streamed React Server Components.
 
-## Live Demos
-
-- [hn.reactonrails.com](https://hn.reactonrails.com/) — Hacker News reader
-  showing React on Rails Pro with React 19 and React Server Components on a
-  familiar read-heavy UI.
-- [www.reactrails.com](https://www.reactrails.com) — production-style React on Rails app
-  you can click through in your browser without any local setup. Backed by the
-  legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
-  source.
-
 ## Control Plane Cost Posture
 
 For public demo and starter staging deployments on Control Plane, keep the app
@@ -755,7 +745,7 @@ repos are useful historical references, but they are not the primary starting
 point for new evaluations.
 
 - Legacy full app: [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) —
-  older production-style app (see Live Demos above for the running site at www.reactrails.com).
+  older production-style app with a running site at [www.reactrails.com](https://www.reactrails.com).
   Still useful as a historical reference, but not the recommended starting point for new projects.
 - Minimal RSC sample: [shakacode/react-on-rails-rsc-demo](https://github.com/shakacode/react-on-rails-rsc-demo) —
   older minimal React Server Components sample. Use the TanStack Starter above
@@ -29922,4 +29912,3 @@ This is a large release with significant improvements to the install generator, 
 ### Bug Fixes
 
 Numerous bug fixes for CSS module SSR with rspack, `bin/dev` hook resolution, generator test defaults, precompile hook coordination, and more. See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details.
-
