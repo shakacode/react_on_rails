@@ -822,22 +822,22 @@ npx create-react-on-rails-app my-app --webpack
 # Specify package manager
 npx create-react-on-rails-app my-app --package-manager pnpm
 
-# Combine RSC with Webpack
+# RSC already uses Rspack by default; opt into Webpack if needed
 npx create-react-on-rails-app my-app --rsc --webpack
 ```
 
 ### All Options
 
-| Option                       | Description                                                    | Default                  |
-| ---------------------------- | -------------------------------------------------------------- | ------------------------ |
-| `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`             |
-| `--rspack`                   | Use Rspack as the bundler (~20x faster)                        | `true`                   |
-| `--webpack`, `--no-rspack`   | Use Webpack instead of Rspack                                  | `false`                  |
-| `--standard`                 | Use open-source React on Rails (skip prompt)                   | `false`                  |
-| `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)      | `false`                  |
-| `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`                  |
-| `--tailwind`                 | Add Tailwind CSS v4 to the generated SSR example               | prompt with mode/`false` |
-| `-p, --package-manager <pm>` | `npm` or `pnpm`                                                | auto-detected            |
+| Option                       | Description                                                           | Default                  |
+| ---------------------------- | --------------------------------------------------------------------- | ------------------------ |
+| `-t, --template <type>`      | `javascript` or `typescript`                                          | `typescript`             |
+| `--rspack`                   | Use Rspack as the bundler (~20x faster, default; pass to be explicit) | `true`                   |
+| `--webpack`, `--no-rspack`   | Use Webpack instead of Rspack                                         | `false`                  |
+| `--standard`                 | Use open-source React on Rails (skip prompt)                          | `false`                  |
+| `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)             | `false`                  |
+| `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`)        | `false`                  |
+| `--tailwind`                 | Add Tailwind CSS v4 to the generated SSR example                      | prompt with mode/`false` |
+| `-p, --package-manager <pm>` | `npm` or `pnpm`                                                       | auto-detected            |
 
 When none of `--standard`, `--pro`, or `--rsc` is given, the CLI prompts interactively in TTY environments (default: RSC). In non-TTY environments (CI, pipes, redirected output), standard mode is used automatically.
 When `--tailwind` is omitted, Tailwind is prompted only alongside the mode prompt and disabled otherwise.
