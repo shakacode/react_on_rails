@@ -46,7 +46,7 @@ bin/dev clean
 pnpm install
 ```
 
-`bin/dev clean` derives Shakapacker public and private output paths from the `default`, `development`, `test`, and `production` sections of `shakapacker.yml`, then clears those directories plus configured `cache_path` directories, `public/assets`, `tmp/cache`, `node_modules/.cache`, `.node-renderer-bundles`, and `tmp/node-renderer-bundles-test-*`.
+`bin/dev clean` derives Shakapacker public and private output paths from every top-level section in `shakapacker.yml` (including custom sections such as `staging`, plus the standard `default`, `development`, `test`, and `production` sections), then clears those directories plus configured `cache_path` directories, `public/assets`, `tmp/cache`, `node_modules/.cache`, `.node-renderer-bundles`, and `tmp/node-renderer-bundles-test-*`.
 
 For React Server Components or the React on Rails Pro node renderer, `bin/dev clean` handles the default generated renderer cache paths above and app-local paths configured with `RENDERER_SERVER_BUNDLE_CACHE_PATH`. If that environment variable points outside the app root, the safety guard skips it; clear that external path manually. The [RSC testing setup](./testing-configuration.md#rsc-and-node-renderer-system-tests) explains why each parallel test worker should use its own renderer bundle cache.
 

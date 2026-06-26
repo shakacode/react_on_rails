@@ -1592,6 +1592,23 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    it "removes broken symlink cleanup targets when the link target stays inside the app root" do
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: broken-packs
+      YAML
+      FileUtils.mkdir_p("public")
+      File.symlink(File.expand_path("tmp/deleted-packs", Dir.pwd), "public/broken-packs")
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Removed public/broken-packs")
+        expect(File).not_to be_symlink("public/broken-packs")
+      end
+    end
+
     it "skips shakapacker.yml paths that resolve outside the app root or to broad root directories" do
       outside_packs = clean_test_outside_path("outside-packs")
       outside_cache = clean_test_outside_path("outside-cache")

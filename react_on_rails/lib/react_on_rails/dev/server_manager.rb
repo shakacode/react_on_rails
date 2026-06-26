@@ -483,11 +483,24 @@ module ReactOnRails
 
         def real_clean_path_inside_app_root?(path)
           return true unless File.exist?(path) || File.symlink?(path)
+          return broken_symlink_target_inside_app_root?(path) if File.symlink?(path) && !File.exist?(path)
 
           real_path = File.realpath(path)
-          real_path.start_with?("#{real_app_root_path}/")
-        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR
+          path_inside_real_app_root?(real_path)
+        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL
           false
+        end
+
+        def broken_symlink_target_inside_app_root?(path)
+          link_target = File.readlink(path)
+          resolved_path = File.expand_path(link_target, File.dirname(path))
+          path_inside_real_app_root?(resolved_path)
+        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL
+          false
+        end
+
+        def path_inside_real_app_root?(path)
+          path.start_with?("#{real_app_root_path}/")
         end
 
         def real_app_root_path
@@ -517,7 +530,11 @@ module ReactOnRails
         end
 
         def app_root_path
-          File.expand_path(shakapacker_config_base_dir)
+          base_dir = shakapacker_config_base_dir
+          return @app_root_path if @app_root_path_base_dir == base_dir
+
+          @app_root_path_base_dir = base_dir
+          @app_root_path = File.expand_path(base_dir)
         end
 
         def stringify_config_keys(hash)
