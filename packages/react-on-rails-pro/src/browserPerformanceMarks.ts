@@ -30,6 +30,7 @@ type BrowserPerformanceMarkGlobal = typeof globalThis & {
 };
 
 const JSON_ESCAPE_FOR_HTML_REPLACEMENTS: Record<string, string> = {
+  // JavaScript treats lowercase hex escapes the same as Ruby json_escape's output.
   '&': '\\u0026',
   '<': '\\u003c',
   '>': '\\u003e',
@@ -42,7 +43,13 @@ function browserPerformanceMarkGlobal(): BrowserPerformanceMarkGlobal {
 }
 
 function jsonEscapeForHtml(value: unknown): string {
-  const json = JSON.stringify(value);
+  let json: string | undefined;
+
+  try {
+    json = JSON.stringify(value);
+  } catch {
+    json = undefined;
+  }
 
   return (json ?? 'null').replace(
     /[<>&\u2028\u2029]/g,

@@ -215,6 +215,16 @@ describe('browserPerformanceMarks runtime helper', () => {
     );
   });
 
+  it('falls back to null detail when generated inline mark details cannot be JSON-stringified', () => {
+    const cyclicDetail: Record<string, unknown> = { source: 'react-on-rails-pro' };
+    cyclicDetail.self = cyclicDetail;
+
+    const markScript = createBrowserPerformanceMarkScript('react-on-rails:rsc:payload', cyclicDetail);
+
+    expect(markScript).toContain('var detail=null;');
+    expect(() => new Function(markScript)).not.toThrow();
+  });
+
   it('escapes generated inline mark scripts for HTML script context', () => {
     const mark = jest.fn();
     setPerformanceMark(mark as Performance['mark']);

@@ -40,7 +40,7 @@ export type RailsContext = {
   httpAcceptLanguage: string;
   rscPayloadGenerationUrlPath?: string;
   cspNonce?: string;
-  rscStreamObservability?: boolean;
+  rscStreamObservability?: true;
 } & (
   | {
       serverSide: false;

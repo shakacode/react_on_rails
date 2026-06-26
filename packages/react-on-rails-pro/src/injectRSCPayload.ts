@@ -270,6 +270,8 @@ function splitIncompleteHtmlTagTail(htmlString: string) {
   // characters are tag starts, and React reveal scripts are deferred separately.
   // This same guard feeds stylesheet-preload gating and observability flush marks,
   // so hold any trailing incomplete tag rather than only partial <link> tokens.
+  // If hand-authored HTML contains a raw "<" in text, this treats it as an
+  // incomplete tag; React SSR encodes text "<" as "&lt;", so renderer output is safe.
   const lastCompleteTagEnd = htmlString.lastIndexOf('>');
   const lastTagStart = htmlString.lastIndexOf('<');
 
@@ -441,7 +443,7 @@ export default function injectRSCPayload(
    * Can be sent after the component HTML since the arrays already exist.
    */
   const rscPayloadBuffers: Buffer[] = [];
-  const rscObservabilityBuffers: Buffer[] = [];
+  const rscPayloadMarkBuffers: Buffer[] = [];
 
   // ========================================
   // FLUSH SCHEDULING SYSTEM
@@ -495,13 +497,13 @@ export default function injectRSCPayload(
       : { flushableHtmlBuffer: gatedHtmlBuffer, deferredRevealHtmlBuffer: undefined };
     const rscClientStylesheetSize = rscClientStylesheetBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const rscPayloadSize = rscPayloadBuffers.reduce((sum, buf) => sum + buf.length, 0);
-    const rscObservabilitySize = rscObservabilityBuffers.reduce((sum, buf) => sum + buf.length, 0);
+    const payloadMarkScriptBytes = rscPayloadMarkBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const totalSizeWithoutFlushMark =
       rscInitializationSize +
       rscClientStylesheetSize +
       flushableHtmlBuffer.length +
       rscPayloadSize +
-      rscObservabilitySize;
+      payloadMarkScriptBytes;
 
     if (hasIncompleteHtmlTail && holdIncompleteHtmlTail) {
       return;
@@ -523,7 +525,7 @@ export default function injectRSCPayload(
       rscClientStylesheetBytes: rscClientStylesheetSize,
       htmlBytes: flushableHtmlBuffer.length,
       rscPayloadScriptBytes: rscPayloadSize,
-      observabilityBytes: rscObservabilitySize,
+      payloadMarkScriptBytes,
       // Excludes this flush mark's own script bytes, which are unknown until this detail object is serialized.
       streamChunkBytes: totalSizeWithoutFlushMark,
       containsHtml: flushableHtmlBuffer.length > 0,
@@ -576,7 +578,7 @@ export default function injectRSCPayload(
       offset += buffer.length;
     }
 
-    for (const buffer of rscObservabilityBuffers) {
+    for (const buffer of rscPayloadMarkBuffers) {
       buffer.copy(combinedBuffer, offset);
       offset += buffer.length;
     }
@@ -589,6 +591,8 @@ export default function injectRSCPayload(
     // Send combined chunk to output stream
     resultStream.push(combinedBuffer);
     hasFlushedOutputChunk = true;
+    // Payload marks queued during this flush and the flush mark itself share the
+    // pre-increment value, enabling exact correlation by flushIndex.
     flushIndex += 1;
 
     // Clear all buffers to free memory and prepare for next flush cycle
@@ -599,7 +603,7 @@ export default function injectRSCPayload(
       htmlBuffers.push(deferredRevealHtmlBuffer);
     }
     rscPayloadBuffers.length = 0;
-    rscObservabilityBuffers.length = 0;
+    rscPayloadMarkBuffers.length = 0;
   };
 
   const endResultStream = () => {
@@ -772,13 +776,14 @@ export default function injectRSCPayload(
                   domNodeId,
                   payloadKey: rscPayloadKey,
                   chunkIndex: rscPayloadChunkIndex,
+                  // The flush mark assembled in this cycle uses the same pre-increment flushIndex.
                   flushIndex,
                   flightPayloadBytes: content.byteLength,
                   rscPayloadScriptBytes: Buffer.byteLength(payloadScript, 'utf8'),
                 },
               );
               if (payloadMarkBuffer) {
-                rscObservabilityBuffers.push(payloadMarkBuffer);
+                rscPayloadMarkBuffers.push(payloadMarkBuffer);
               }
               rscPayloadChunkIndex += 1;
 
