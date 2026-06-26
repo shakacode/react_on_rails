@@ -91,7 +91,8 @@ export function markBrowserPerformance(markName: string, detail: BrowserPerforma
     entry.fallback = 'performance-mark-unavailable';
   }
 
-  (markGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE] ||= []).push(entry);
+  (markGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE] =
+    markGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE] || []).push(entry);
 }
 
 // Keep this inline script in sync with
