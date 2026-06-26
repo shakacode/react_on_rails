@@ -267,9 +267,8 @@ function stylesheetTagsForRSCClientChunks(
 
 function splitIncompleteHtmlTagTail(htmlString: string) {
   // Streaming renderer output is expected to be well-formed HTML where bare "<"
-  // characters are tag starts, and React reveal scripts are deferred separately.
-  // This same guard feeds stylesheet-preload gating and observability flush marks,
-  // so hold any trailing incomplete tag rather than only partial <link> tokens.
+  // characters are tag starts. Observability mode holds any trailing incomplete
+  // tag so flush marks never split a tag boundary.
   // If hand-authored HTML contains a raw "<" in text, this treats it as an
   // incomplete tag; React SSR encodes text "<" as "&lt;", so renderer output is safe.
   // Application inline scripts that stream a bare "<" operator across chunks are
@@ -287,6 +286,29 @@ function splitIncompleteHtmlTagTail(htmlString: string) {
     incompleteHtmlTagTail: htmlString.slice(lastTagStart),
   };
 }
+
+function splitIncompleteLinkTagTail(htmlString: string) {
+  const lastCompleteTagEnd = htmlString.lastIndexOf('>');
+  const lastTagStart = htmlString.lastIndexOf('<');
+
+  if (lastTagStart === -1 || lastTagStart < lastCompleteTagEnd) {
+    return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
+  }
+
+  const incompleteHtmlTagTail = htmlString.slice(lastTagStart);
+  const normalizedTail = incompleteHtmlTagTail.toLowerCase();
+
+  if (!'<link'.startsWith(normalizedTail) && !normalizedTail.startsWith('<link')) {
+    return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
+  }
+
+  return {
+    completeHtml: htmlString.slice(0, lastTagStart),
+    incompleteHtmlTagTail,
+  };
+}
+
+type IncompleteHtmlTailMode = 'none' | 'link' | 'tag';
 
 function promoteStylesheetPreloadTag(linkTag: string) {
   const promotedTag = linkTag
@@ -341,15 +363,21 @@ function hasIncompleteUTF8Tail(buffer: Buffer) {
   return continuationBytes < expectedContinuationBytes;
 }
 
-function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteHtmlTail: boolean) {
-  if (holdIncompleteHtmlTail && hasIncompleteUTF8Tail(html)) {
+function applyStreamedStylesheetPreloadGating(html: Buffer, incompleteHtmlTailMode: IncompleteHtmlTailMode) {
+  if (incompleteHtmlTailMode !== 'none' && hasIncompleteUTF8Tail(html)) {
     return { gatedHtmlBuffer: html, hasIncompleteHtmlTail: true };
   }
 
   const htmlString = html.toString();
-  const { completeHtml, incompleteHtmlTagTail: nextIncompleteHtmlTagTail } = holdIncompleteHtmlTail
-    ? splitIncompleteHtmlTagTail(htmlString)
-    : { completeHtml: htmlString, incompleteHtmlTagTail: '' };
+  let completeHtml = htmlString;
+  let nextIncompleteHtmlTagTail = '';
+  if (incompleteHtmlTailMode === 'tag') {
+    ({ completeHtml, incompleteHtmlTagTail: nextIncompleteHtmlTagTail } =
+      splitIncompleteHtmlTagTail(htmlString));
+  } else if (incompleteHtmlTailMode === 'link') {
+    ({ completeHtml, incompleteHtmlTagTail: nextIncompleteHtmlTagTail } =
+      splitIncompleteLinkTagTail(htmlString));
+  }
   const gatedHtml = completeHtml.replace(
     /<link\b(?=[^>]*\brel=(["'])(?:(?!\1).)*\bpreload\b(?:(?!\1).)*\1)(?=[^>]*\bas=(["'])style\2)(?=[^>]*\bhref=(["'])(?:(?!\3).)+\3)[^>]*\/?>/gi,
     (linkTag) =>
@@ -430,7 +458,7 @@ export default function injectRSCPayload(
    * CONSTRAINT: The first output chunk must contain HTML data to begin streaming.
    */
   const htmlBuffers: Buffer[] = [];
-  let holdIncompleteHtmlTail = true;
+  let incompleteHtmlTailMode: IncompleteHtmlTailMode = rscStreamObservability ? 'tag' : 'link';
 
   /**
    * Buffer for stylesheet links inferred from RSC client chunk references.
@@ -487,7 +515,7 @@ export default function injectRSCPayload(
     const htmlBuffer = Buffer.concat(htmlBuffers);
     const { gatedHtmlBuffer, hasIncompleteHtmlTail } = applyStreamedStylesheetPreloadGating(
       htmlBuffer,
-      holdIncompleteHtmlTail,
+      incompleteHtmlTailMode,
     );
     const shouldDeferRevealHtml =
       rscPromise &&
@@ -507,7 +535,7 @@ export default function injectRSCPayload(
       rscPayloadSize +
       payloadMarkScriptBytes;
 
-    if (hasIncompleteHtmlTail && holdIncompleteHtmlTail) {
+    if (hasIncompleteHtmlTail) {
       return;
     }
 
@@ -609,7 +637,7 @@ export default function injectRSCPayload(
   };
 
   const endResultStream = () => {
-    holdIncompleteHtmlTail = false;
+    incompleteHtmlTailMode = 'none';
     // Cancel any pending fallback timer unconditionally.
     // flush() only clears the timer when it actually flushes data (past the
     // early-return guards). If we're closing with empty buffers, the timer

@@ -235,6 +235,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain('"flushIndex":0');
     expect(resultStr).toContain('"payloadMarkScriptBytes":');
     expect(resultStr).toContain('"streamChunkBytesBeforeFlushMark":');
+    expect(resultStr).not.toContain('"observabilityBytes":');
     expect(resultStr).toContain('"containsRscPayload":true');
   });
 
@@ -623,6 +624,27 @@ describe('injectRSCPayload', () => {
       'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
     );
     expect(resultStr).not.toContain('rel="preload" as="style"');
+  });
+
+  it('does not hold non-link partial tags for stylesheet gating when observability is disabled', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream({
+      0: 'before<spa',
+      10: 'n>after',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([
+        ['client1', ['/webpack/test/css/client1-46072b81.css']],
+      ]),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain('before<spa');
+    await expect(firstChunk).resolves.not.toContain('n>after');
+    await expect(allData).resolves.toContain('before<spa');
+    await expect(allData).resolves.toContain('n>after');
   });
 
   it('preserves split UTF-8 bytes when promoting streamed RSC stylesheet preloads', async () => {
