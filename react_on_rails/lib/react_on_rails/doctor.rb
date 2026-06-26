@@ -3815,7 +3815,7 @@ module ReactOnRails
     def read_pipe_async(pipe)
       thread = Thread.new do
         pipe.read
-      rescue IOError
+      rescue IOError, SystemCallError
         ""
       end
       thread.report_on_exception = false if thread.respond_to?(:report_on_exception=)
@@ -3925,13 +3925,19 @@ module ReactOnRails
     end
 
     def npm_x_range_upper_bound(operator, wildcard_index, major, minor, lower_bound)
-      if operator == "^" && wildcard_index == 1
-        return major.positive? ? "#{major + 1}.0.0" : "1.0.0"
-      end
-      return npm_caret_upper_bound(lower_bound) if operator == "^"
+      return npm_caret_x_range_upper_bound(wildcard_index, major, minor, lower_bound) if operator == "^"
       return "#{major + 1}.0.0" if wildcard_index == 1
 
       "#{major}.#{minor + 1}.0"
+    end
+
+    def npm_caret_x_range_upper_bound(wildcard_index, major, minor, lower_bound)
+      if wildcard_index == 1
+        return major.positive? ? "#{major + 1}.0.0" : "1.0.0"
+      end
+      return "#{major}.#{minor + 1}.0" if wildcard_index == 2 && major.zero? && minor.zero?
+
+      npm_caret_upper_bound(lower_bound)
     end
 
     def npm_hyphen_range_result(version, range_clause)
@@ -4187,11 +4193,16 @@ module ReactOnRails
       package_json_path = package_json_path_for("declared #{package_label} version")
       return nil unless package_json_path
 
-      package_json = JSON.parse(File.read(package_json_path))
+      package_json = parsed_package_json(package_json_path)
       all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
       all_deps[package_name]
     rescue StandardError
       nil
+    end
+
+    def parsed_package_json(package_json_path)
+      @parsed_package_json_cache ||= {}
+      @parsed_package_json_cache[package_json_path] ||= JSON.parse(File.read(package_json_path))
     end
 
     def check_rsc_client_manifest

@@ -5530,6 +5530,8 @@ RSpec.describe ReactOnRails::Doctor do
         expect(doctor.send(:npm_range_satisfied?, "19.3.0", "19.2.x")).to be false
         expect(doctor.send(:npm_range_satisfied?, "19.3.0", "^19.2")).to be true
         expect(doctor.send(:npm_range_satisfied?, "20.0.0", "^19.2")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "0.0.5", "^0.0.x")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "0.1.0", "^0.0.x")).to be false
       end
     end
 
