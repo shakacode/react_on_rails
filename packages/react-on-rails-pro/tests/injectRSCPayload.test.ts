@@ -647,6 +647,27 @@ describe('injectRSCPayload', () => {
     await expect(allData).resolves.toContain('n>after');
   });
 
+  it('does not hold non-link tag names that start with link during stylesheet gating', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream({
+      0: 'before<linked',
+      10: '>after',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([
+        ['client1', ['/webpack/test/css/client1-46072b81.css']],
+      ]),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain('before<linked');
+    await expect(firstChunk).resolves.not.toContain('>after');
+    await expect(allData).resolves.toContain('before<linked');
+    await expect(allData).resolves.toContain('>after');
+  });
+
   it('keeps opt-in observability flush marks out of non-link split tags during stylesheet gating', async () => {
     const mockRSC = createMockRSCStream(['{"test": "data"}']);
     const mockHTML = createMockHTMLStream({

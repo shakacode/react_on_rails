@@ -287,6 +287,16 @@ function splitIncompleteHtmlTagTail(htmlString: string) {
   };
 }
 
+const LINK_TAG_PREFIX = '<link';
+const LINK_TAG_BOUNDARIES = new Set(['', ' ', '\t', '\n', '\f', '\r', '>', '/']);
+
+function isLinkTagTail(normalizedTail: string) {
+  if (LINK_TAG_PREFIX.startsWith(normalizedTail)) return true;
+  if (!normalizedTail.startsWith(LINK_TAG_PREFIX)) return false;
+
+  return LINK_TAG_BOUNDARIES.has(normalizedTail.charAt(LINK_TAG_PREFIX.length));
+}
+
 function splitIncompleteLinkTagTail(htmlString: string) {
   const lastCompleteTagEnd = htmlString.lastIndexOf('>');
   const lastTagStart = htmlString.lastIndexOf('<');
@@ -298,9 +308,7 @@ function splitIncompleteLinkTagTail(htmlString: string) {
   const incompleteHtmlTagTail = htmlString.slice(lastTagStart);
   const normalizedTail = incompleteHtmlTagTail.toLowerCase();
 
-  // Intentionally over-match tags beginning with "<link" so split `<link rel=preload>`
-  // tokens are not missed while preserving the legacy link-only gating path.
-  if (!'<link'.startsWith(normalizedTail) && !normalizedTail.startsWith('<link')) {
+  if (!isLinkTagTail(normalizedTail)) {
     return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
   }
 
