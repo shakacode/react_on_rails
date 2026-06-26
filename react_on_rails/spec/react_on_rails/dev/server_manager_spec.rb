@@ -1535,12 +1535,16 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
         production:
           public_output_path: webpack/production
+
+        staging:
+          public_output_path: webpack/staging
       YAML
       create_clean_test_dirs(
         "public/packs",
         "public/webpack/development",
         "public/webpack/test",
         "public/webpack/production",
+        "public/webpack/staging",
         "ssr-generated",
         "tmp/shakapacker",
         "tmp/shakapacker-test",
@@ -1557,11 +1561,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(described_class).to have_received(:kill_processes)
         expect(output).to include("config/shakapacker.yml")
         expect(output).to include("public/webpack/development")
+        expect(output).to include("public/webpack/staging")
         expect(output).to include("tmp/shakapacker-test")
         expect(File).not_to exist("public/packs")
         expect(File).not_to exist("public/webpack/development")
         expect(File).not_to exist("public/webpack/test")
         expect(File).not_to exist("public/webpack/production")
+        expect(File).not_to exist("public/webpack/staging")
         expect(File).not_to exist("ssr-generated")
         expect(File).not_to exist("tmp/shakapacker")
         expect(File).not_to exist("tmp/shakapacker-test")
@@ -1606,6 +1612,25 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       aggregate_failures do
         expect(output).to include("Removed public/broken-packs")
         expect(File).not_to be_symlink("public/broken-packs")
+      end
+    end
+
+    it "skips cleanup targets when realpath is blocked by permissions" do
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: restricted-packs
+      YAML
+      create_clean_test_dirs("public/restricted-packs")
+      restricted_path = File.expand_path("public/restricted-packs", Dir.pwd)
+      allow(File).to receive(:realpath).and_call_original
+      allow(File).to receive(:realpath).with(restricted_path).and_raise(Errno::EACCES)
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Skipping unsafe cleanup path: public/restricted-packs")
+        expect(File).to exist("public/restricted-packs")
       end
     end
 
