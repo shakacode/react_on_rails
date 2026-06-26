@@ -149,6 +149,8 @@ module ReactOnRailsPro
         sinceStreamStartMs: elapsed_ms(@react_on_rails_rsc_stream_started_at)
       }
       response.stream.write(rsc_stream_observability_script("react-on-rails:rsc:stream", detail))
+    rescue IOError, Errno::EPIPE => e
+      log_client_disconnect("observability", e)
     end
 
     def rsc_stream_observability_enabled?

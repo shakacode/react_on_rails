@@ -192,6 +192,26 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(written_chunks.join).not_to include("<di<script")
     end
 
+    it "handles client disconnects while writing the final observability mark" do
+      queues, controller, stream = setup_stream_test(component_count: 1)
+      written_chunks = []
+      allow(stream).to receive(:write) do |chunk|
+        raise IOError, "client disconnected" if chunk.include?("react-on-rails:rsc:stream")
+
+        written_chunks << chunk
+      end
+
+      expect do
+        run_stream(controller, rsc_stream_observability: true) do |_parent|
+          queues[0].enqueue("Chunk1")
+          queues[0].close
+          sleep 0.1
+        end
+      end.not_to raise_error
+
+      expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+    end
+
     it "applies backpressure with slow writer" do
       queues, controller, stream = setup_stream_test(component_count: 1)
 
