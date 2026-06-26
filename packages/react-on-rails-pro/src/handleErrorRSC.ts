@@ -19,7 +19,7 @@ import generateRenderingErrorMessage from 'react-on-rails/generateRenderingError
 
 // Must match the missing client-reference error from react-server-dom-webpack.
 // Update this when upstream React changes the Client Manifest wording.
-const RSC_CLIENT_MANIFEST_LOOKUP_FAILURE = /Could not find the module [\s\S]+ in the React Client Manifest/;
+const RSC_CLIENT_MANIFEST_LOOKUP_FAILURE = /Could not find the module [\s\S]+? in the React Client Manifest/;
 const RSC_DIAGNOSTIC_SENTINEL = '[React on Rails Pro RSC diagnostic]';
 // Keep cleanup guidance in sync with RSC_CLIENT_MANIFEST_CLEANUP_PATHS in
 // react_on_rails/lib/react_on_rails/doctor.rb.

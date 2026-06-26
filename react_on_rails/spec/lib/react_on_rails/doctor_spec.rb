@@ -5366,15 +5366,20 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "errors when installed React does not satisfy the RSC peer range" do
+        allow(doctor).to receive(:capture_rsc_dist_tags)
+
         doctor.send(:check_rsc_react_version)
 
         error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(error_msgs).to include(
           a_string_including(
             "react-on-rails-rsc 19.2.0-rc.4 requires react ^19.2.7",
             "installed react is 19.0.7"
           )
         )
+        expect(warning_msgs).not_to include(a_string_including("behind the npm"))
+        expect(doctor).not_to have_received(:capture_rsc_dist_tags)
       end
 
       it "does not report peer compatibility success when peer checks are unexpectedly empty" do

@@ -3642,7 +3642,7 @@ module ReactOnRails
       if peer_compatible && vulnerable_legacy_rsc_react_version?(react_version)
         check_legacy_rsc_react_version(react_version)
       end
-      check_rsc_package_dist_tags(rsc_package, package_root)
+      check_rsc_package_dist_tags(rsc_package, package_root) if peer_compatible
       true
     end
 
@@ -3801,6 +3801,7 @@ module ReactOnRails
         stdout_thread = read_pipe_async(stdout_r)
         stderr_thread = read_pipe_async(stderr_r)
         status = wait_for_rsc_dist_tag_process(pid)
+        # wait_for_rsc_dist_tag_process reaps the process or confirms it is gone.
         process_reaped = true
         if status
           stdout = stdout_thread.value
