@@ -28,6 +28,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **`bin/dev clean` clears generated bundles and caches**: The command stops development processes, reads `config/shakapacker.yml` or `SHAKAPACKER_CONFIG`, removes configured Shakapacker public/private output and cache paths plus common Rails, JavaScript, and renderer bundle caches, and skips unsafe paths outside the app root. [PR 4218](https://github.com/shakacode/react_on_rails/pull/4218) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **Focused RSC doctor artifact diagnostics**: `rake react_on_rails:doctor:rsc` and
+  `Doctor.new(only: ...)` now run the RSC artifact checks directly, reporting missing,
+  stale, invalid, or dev-server-backed RSC bundle and manifest files with rebuild guidance
+  while explaining when Pro path resolution is unavailable. Closes
+  [Issue 4204](https://github.com/shakacode/react_on_rails/issues/4204).
+  [PR 4223](https://github.com/shakacode/react_on_rails/pull/4223) by
+  [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **[Pro]** **RSC doctor now catches stale install and client-manifest setup failures**:
