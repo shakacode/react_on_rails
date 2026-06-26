@@ -965,7 +965,7 @@ The doctor will check:
 rm -rf public/webpack/test
 ```
 
-If this started after switching branches or changing package versions, also stop any `bin/dev` watchers and clear the relevant build caches. See [Generated Bundle Files and Cache Cleanup](./dev-server-and-testing.md#generated-bundle-files-and-cache-cleanup) for the command-by-command cleanup behavior.
+If this started after switching branches or changing package versions, run `bin/dev clean` to stop any `bin/dev` watchers and clear the relevant generated bundles and build caches. See [Generated Bundle Files and Cache Cleanup](./dev-server-and-testing.md#generated-bundle-files-and-cache-cleanup) for the command-by-command cleanup behavior.
 
 ### Build command fails
 

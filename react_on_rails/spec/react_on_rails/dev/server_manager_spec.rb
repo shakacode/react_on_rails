@@ -1479,6 +1479,130 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
   end
 
+  describe ".clean_generated_assets_and_caches" do
+    around do |example|
+      original_renderer_cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", nil)
+      Dir.mktmpdir("react-on-rails-clean") do |tmpdir|
+        Dir.chdir(tmpdir) do
+          example.run
+        end
+      end
+    ensure
+      if original_renderer_cache_path.nil?
+        ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
+      else
+        ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = original_renderer_cache_path
+      end
+    end
+
+    before do
+      allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
+      allow(described_class).to receive(:kill_processes)
+    end
+
+    def write_clean_test_shakapacker_config(content)
+      FileUtils.mkdir_p("config")
+      File.write("config/shakapacker.yml", content)
+    end
+
+    def create_clean_test_dirs(*paths)
+      paths.each { |path| FileUtils.mkdir_p(path) }
+    end
+
+    it "removes bundle outputs and cache paths derived from shakapacker.yml" do
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "tmp/custom-renderer-cache"
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: packs
+          private_output_path: ssr-generated
+          cache_path: tmp/shakapacker
+
+        development:
+          public_output_path: webpack/development
+
+        test:
+          public_output_path: webpack/test
+          cache_path: tmp/shakapacker-test
+
+        production:
+          public_output_path: webpack/production
+      YAML
+      create_clean_test_dirs(
+        "public/packs",
+        "public/webpack/development",
+        "public/webpack/test",
+        "public/webpack/production",
+        "ssr-generated",
+        "tmp/shakapacker",
+        "tmp/shakapacker-test",
+        "tmp/cache",
+        "node_modules/.cache",
+        ".node-renderer-bundles",
+        "tmp/custom-renderer-cache",
+        "tmp/node-renderer-bundles-test-0"
+      )
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(described_class).to have_received(:kill_processes)
+        expect(output).to include("config/shakapacker.yml")
+        expect(output).to include("public/webpack/development")
+        expect(output).to include("tmp/shakapacker-test")
+        expect(File).not_to exist("public/packs")
+        expect(File).not_to exist("public/webpack/development")
+        expect(File).not_to exist("public/webpack/test")
+        expect(File).not_to exist("public/webpack/production")
+        expect(File).not_to exist("ssr-generated")
+        expect(File).not_to exist("tmp/shakapacker")
+        expect(File).not_to exist("tmp/shakapacker-test")
+        expect(File).not_to exist("tmp/cache")
+        expect(File).not_to exist("node_modules/.cache")
+        expect(File).not_to exist(".node-renderer-bundles")
+        expect(File).not_to exist("tmp/custom-renderer-cache")
+        expect(File).not_to exist("tmp/node-renderer-bundles-test-0")
+      end
+    end
+
+    it "skips shakapacker.yml paths that resolve outside the app root or to broad root directories" do
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "../outside-renderer-cache"
+      FileUtils.mkdir_p("../outside-packs")
+      FileUtils.mkdir_p("../outside-webpack/development")
+      FileUtils.mkdir_p("../outside-renderer-cache")
+      FileUtils.mkdir_p("public")
+      File.write("../outside-packs/keep.txt", "keep")
+      File.write("../outside-webpack/development/keep.txt", "keep")
+      File.write("../outside-renderer-cache/keep.txt", "keep")
+      File.symlink(File.expand_path("../outside-webpack", Dir.pwd), "public/webpack")
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: ..
+          public_output_path: outside-packs
+          cache_path: ../outside-cache
+
+        test:
+          public_root_path: public
+          public_output_path: .
+          cache_path: tmp
+
+        development:
+          public_root_path: public
+          public_output_path: webpack/development
+      YAML
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(File).to exist("../outside-packs/keep.txt")
+        expect(File).to exist("../outside-webpack/development/keep.txt")
+        expect(File).to exist("../outside-renderer-cache/keep.txt")
+        expect(File).to exist("public")
+        expect(output).to include("Skipping unsafe cleanup path")
+      end
+    end
+  end
+
   describe ".kill_port_processes" do
     it "kills processes on specified ports" do
       allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["1234", nil])
@@ -1687,6 +1811,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(output).to match(%r{bin/dev test-watch})
         expect(output).to match(%r{bin/dev static})
       end
+    end
+
+    it "documents the clean command" do
+      output = capture_stdout { described_class.show_help }
+
+      expect(output).to match(%r{clean\s+Kill dev processes and remove generated bundles/caches})
     end
 
     it "links to the published documentation for dev server and testing guidance" do
@@ -2189,6 +2319,15 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(Open3).not_to receive(:capture3)
 
         described_class.run_from_command_line(["kill"])
+
+        expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to be_nil
+      end
+
+      it "does not run hook or set environment variable for clean command" do
+        expect(Open3).not_to receive(:capture3)
+        expect(described_class).to receive(:clean_generated_assets_and_caches)
+
+        described_class.run_from_command_line(["clean"])
 
         expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to be_nil
       end

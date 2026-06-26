@@ -28,6 +28,7 @@ module ReactOnRails
 
       HELP_FLAGS = ["-h", "--help"].freeze
       TEST_WATCH_MODES = %w[auto full client-only].freeze
+      CLEAN_SHAKAPACKER_ENVIRONMENTS = %w[development test production].freeze
       OPEN_BROWSER_WAIT_TIMEOUT = 60
       OPEN_BROWSER_POLL_INTERVAL = 0.5
       DOCS_BASE_URL = "https://reactonrails.com/docs"
@@ -75,6 +76,20 @@ module ReactOnRails
           ].any?
 
           print_kill_summary(killed_any)
+        end
+
+        def clean_generated_assets_and_caches
+          puts "🧹 Cleaning generated bundles and caches..."
+          puts ""
+          kill_processes
+          puts ""
+          puts "📖 Reading Shakapacker config: #{display_clean_path(shakapacker_config_path)}"
+          puts ""
+
+          remove_clean_targets(clean_targets)
+
+          puts ""
+          puts "✅ Generated bundles and caches cleaned"
         end
 
         # Fallback port list for the port-scan kill path. Uses the base-port
@@ -296,12 +311,12 @@ module ReactOnRails
 
           options = parse_cli_options(args)
 
-          # Run precompile hook once before starting any mode (except kill/help)
+          # Run precompile hook once before starting any mode (except kill/clean/help)
           # Then set environment variable to prevent duplicate execution in spawned processes.
           # Note: We always set SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true (even when no hook is configured)
           # to provide a consistent signal that bin/dev is managing the precompile lifecycle.
           # This allows custom scripts to detect bin/dev's presence and adjust behavior accordingly.
-          unless %w[kill help].include?(command) || help_requested
+          unless %w[kill clean help].include?(command) || help_requested
             run_precompile_hook_if_present
             ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] = "true"
           end
@@ -321,6 +336,8 @@ module ReactOnRails
                                                          open_browser_once: options[:open_browser_once])
           when "kill"
             kill_processes
+          when "clean"
+            clean_generated_assets_and_caches
           when "help"
             show_help
           when "test-watch"
@@ -339,6 +356,161 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
         private
+
+        def clean_targets
+          deduplicate_clean_targets(
+            shakapacker_clean_targets +
+              common_clean_targets +
+              renderer_bundle_cache_targets
+          )
+        end
+
+        def shakapacker_clean_targets
+          shakapacker_sections_for_cleanup.flat_map do |environment, section|
+            public_output_path = shakapacker_public_output_path(section)
+            private_output_path = section["private_output_path"].to_s.strip
+            cache_path = section["cache_path"].to_s.strip
+            targets = [
+              clean_target(public_output_path, "Shakapacker #{environment} public output")
+            ]
+            unless private_output_path.empty?
+              targets << clean_target(private_output_path, "Shakapacker #{environment} private output")
+            end
+            targets << clean_target(cache_path, "Shakapacker #{environment} cache") unless cache_path.empty?
+            targets
+          end
+        end
+
+        def shakapacker_sections_for_cleanup
+          config = parsed_shakapacker_config
+          return [] unless config
+
+          default_section = stringify_config_keys(shakapacker_section(config, "default"))
+          environment_names = ["default"] | (config.keys.map(&:to_s) - ["default"]) | CLEAN_SHAKAPACKER_ENVIRONMENTS
+          environment_names.map do |environment|
+            section = default_section.merge(stringify_config_keys(shakapacker_section(config, environment)))
+            [environment, section]
+          end
+        end
+
+        def shakapacker_public_output_path(section)
+          public_root_path = section["public_root_path"].to_s.strip
+          public_root_path = "public" if public_root_path.empty?
+
+          public_output_path = section["public_output_path"].to_s.strip
+          public_output_path = "packs" if public_output_path.empty?
+
+          return public_output_path if File.absolute_path?(public_output_path)
+
+          File.join(public_root_path, public_output_path)
+        end
+
+        def common_clean_targets
+          [
+            clean_target("public/assets", "Rails compiled assets"),
+            clean_target("tmp/cache", "Rails/Shakapacker cache"),
+            clean_target("node_modules/.cache", "JavaScript bundler cache"),
+            clean_target(".node-renderer-bundles", "node renderer bundle cache")
+          ]
+        end
+
+        def renderer_bundle_cache_targets
+          targets = []
+          renderer_cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").to_s.strip
+          unless renderer_cache_path.empty?
+            targets << clean_target(renderer_cache_path, "configured node renderer bundle cache")
+          end
+
+          Dir.glob(File.join(app_root_path, "tmp/node-renderer-bundles-test-*")).each do |path|
+            targets << clean_target(path, "test node renderer bundle cache")
+          end
+
+          targets
+        end
+
+        def clean_target(path, label)
+          { path: File.expand_path(path, app_root_path), label: }
+        end
+
+        def deduplicate_clean_targets(targets)
+          targets.each_with_object({}) do |target, deduplicated|
+            deduplicated[target[:path]] ||= target
+          end.values
+        end
+
+        def remove_clean_targets(targets)
+          targets.each do |target|
+            path = target.fetch(:path)
+            label = target.fetch(:label)
+            display_path = display_clean_path(path)
+
+            unless safe_clean_path?(path)
+              puts "⚠️  Skipping unsafe cleanup path: #{display_path} (#{label})"
+              next
+            end
+
+            unless File.exist?(path) || File.symlink?(path)
+              puts "   • #{display_path} (not present)"
+              next
+            end
+
+            FileUtils.rm_rf(path)
+            puts "   ✓ Removed #{display_path} (#{label})"
+          end
+        end
+
+        def safe_clean_path?(path)
+          expanded_path = File.expand_path(path, app_root_path)
+          return false unless path_inside_app_root?(expanded_path)
+          return false if broad_clean_path?(expanded_path)
+          return false unless real_clean_path_inside_app_root?(expanded_path)
+
+          true
+        end
+
+        def path_inside_app_root?(path)
+          path.start_with?("#{app_root_path}/")
+        end
+
+        def real_clean_path_inside_app_root?(path)
+          return true unless File.exist?(path) || File.symlink?(path)
+
+          real_path = File.realpath(path)
+          real_path.start_with?("#{real_app_root_path}/")
+        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR
+          false
+        end
+
+        def real_app_root_path
+          File.realpath(app_root_path)
+        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR
+          app_root_path
+        end
+
+        def broad_clean_path?(path)
+          [
+            app_root_path,
+            File.join(app_root_path, "public"),
+            File.join(app_root_path, "tmp"),
+            File.join(app_root_path, "node_modules")
+          ].include?(path)
+        end
+
+        def display_clean_path(path)
+          expanded_path = File.expand_path(path, app_root_path)
+          root_prefix = "#{app_root_path}/"
+          return expanded_path.delete_prefix(root_prefix) if expanded_path.start_with?(root_prefix)
+
+          expanded_path
+        end
+
+        def app_root_path
+          File.expand_path(shakapacker_config_base_dir)
+        end
+
+        def stringify_config_keys(hash)
+          hash.transform_keys(&:to_s)
+        end
 
         # Extract the command from args, skipping flag values
         # For example, in ["--route", "hello_world"], "hello_world" is a flag value, not a command
@@ -634,6 +806,7 @@ module ReactOnRails
                                   #{Rainbow('→ Uses:').yellow} bin/shakapacker --watch (RAILS_ENV=test)
 
               #{Rainbow('kill').red.bold}                #{Rainbow('Kill all development processes for a clean start').white}
+              #{Rainbow('clean').red.bold}               #{Rainbow('Kill dev processes and remove generated bundles/caches').white}
               #{Rainbow('help').blue.bold}                #{Rainbow('Show this help message').white}
           COMMANDS
         end

@@ -83,8 +83,9 @@ if AUTO_OPEN_BROWSER_ONCE && browser_flags.none? { |flag| argv_with_defaults.inc
 end
 
 # Uncomment to run custom precompile tasks before starting the server
-# Only run for server start commands (not kill/help)
-# unless ARGV.include?("kill") || ARGV.include?("-h") || ARGV.include?("--help") || ARGV.include?("help")
+# Only run for server start commands (not kill/clean/help)
+# skip_commands = %w[kill clean help -h --help]
+# unless (ARGV & skip_commands).any?
 #   run_precompile_tasks
 # end
 
