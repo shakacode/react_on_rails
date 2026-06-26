@@ -58,3 +58,20 @@ test('RSC manifest lookup failures include stale manifest and static-assets guid
   expect((decodedObject as Error).message).toContain('ssr-generated');
   expect((decodedObject as Error).message).toContain('.node-renderer-bundles');
 });
+
+test('non-matching errors do not include RSC manifest diagnostics', async () => {
+  const originalError = new Error('Some unrelated render failure');
+
+  const decodedObject = await decodeErrorStream(
+    handleError({
+      e: originalError,
+      name: 'HelloServer',
+      serverSide: true,
+    }),
+  );
+
+  expect(decodedObject).toBeInstanceOf(Error);
+  expect((decodedObject as Error).message).toContain('Some unrelated render failure');
+  expect((decodedObject as Error).message).not.toContain('React on Rails Pro RSC diagnostic');
+  expect((decodedObject as Error).message).not.toContain('The React Client Manifest may be stale');
+});

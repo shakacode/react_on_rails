@@ -4199,8 +4199,7 @@ module ReactOnRails
       return nil unless valid_package_name?(package_name)
 
       script = "console.log(require.resolve(process.argv[1] + '/package.json'))"
-      stdout, _stderr, status = Open3.capture3("node", "-e", script, package_name, chdir: package_root)
-      resolved_path = status.success? ? stdout.strip : ""
+      resolved_path = resolved_node_package_json_path(package_root, package_name, script)
       # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
       # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.
       # Limitation: a stale orphaned directory can still be read if Node resolution fails.
@@ -4214,6 +4213,30 @@ module ReactOnRails
 
     def valid_package_name?(package_name)
       package_name.to_s.match?(PACKAGE_NAME_PATTERN)
+    end
+
+    def resolved_node_package_json_path(package_root, package_name, script)
+      stdout, _stderr, status = Open3.capture3("node", "-e", script, package_name, chdir: package_root)
+      unless status.success?
+        report_node_package_resolution_failed(package_name)
+        return ""
+      end
+
+      stdout.strip
+    rescue StandardError
+      report_node_package_resolution_failed(package_name)
+      ""
+    end
+
+    def report_node_package_resolution_failed(package_name)
+      @node_package_resolution_failed_reported ||= {}
+      return if @node_package_resolution_failed_reported[package_name]
+
+      checker.add_info(
+        "  ℹ️  Node module resolution failed for #{package_name}; " \
+        "falling back to classic flat node_modules lookup"
+      )
+      @node_package_resolution_failed_reported[package_name] = true
     end
 
     def add_warning(message)
@@ -4263,7 +4286,7 @@ module ReactOnRails
     def check_rsc_client_manifest
       manifest_path = rsc_client_manifest_file_path
       unless manifest_path
-        checker.add_warning("⚠️  RSC client manifest path could not be resolved — cannot verify client references")
+        report_unresolved_rsc_client_manifest_path
         return
       end
 
@@ -4290,6 +4313,14 @@ module ReactOnRails
       return nil unless ReactOnRailsPro::Utils.respond_to?(:react_client_manifest_file_path)
 
       ReactOnRailsPro::Utils.react_client_manifest_file_path
+    end
+
+    def report_unresolved_rsc_client_manifest_path
+      if defined?(ReactOnRailsPro::Utils) && !ReactOnRailsPro::Utils.respond_to?(:react_client_manifest_file_path)
+        checker.add_info("  ℹ️  RSC client manifest check skipped — upgrade react-on-rails-pro to enable it")
+      else
+        checker.add_warning("⚠️  RSC client manifest path could not be resolved — cannot verify client references")
+      end
     end
 
     def manifest_url?(manifest_path)

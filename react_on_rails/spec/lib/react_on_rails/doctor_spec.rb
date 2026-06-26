@@ -5637,6 +5637,21 @@ RSpec.describe ReactOnRails::Doctor do
         expect(result).to be_nil
         expect(Open3).not_to have_received(:capture3)
       end
+
+      it "reports when node resolution fails before using the flat node_modules fallback" do
+        FileUtils.mkdir_p("node_modules/react")
+        File.write("node_modules/react/package.json", '{"version":"19.0.4"}')
+        allow(Open3).to receive(:capture3)
+          .and_return(
+            ["", "Cannot find module 'react/package.json'", instance_double(Process::Status, success?: false)]
+          )
+
+        result = doctor.send(:installed_package_json, Dir.pwd, "react")
+
+        expect(result.fetch("version")).to eq("19.0.4")
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("Node module resolution failed for react"))
+      end
     end
 
     context "when React is installed in a configured nested JS workspace" do
@@ -5892,6 +5907,26 @@ RSpec.describe ReactOnRails::Doctor do
       ReactOnRailsPro::Utils.define_singleton_method(:react_client_manifest_file_path) { nil }
       allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
         .and_return(File.expand_path("public/packs/react-client-manifest.json"))
+    end
+
+    it "reports an info message when the installed Pro API is too old for manifest path resolution" do
+      stub_const("ReactOnRailsPro::Utils", Module.new)
+
+      doctor.send(:check_rsc_client_manifest)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(info_messages).to include(a_string_including("upgrade react-on-rails-pro to enable it"))
+      expect(warning_messages).not_to include(a_string_including("RSC client manifest path could not be resolved"))
+    end
+
+    it "warns when the installed Pro API resolves a nil manifest path" do
+      allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path).and_return(nil)
+
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client manifest path could not be resolved"))
     end
 
     it "warns when the RSC client manifest resolves to a dev-server URL" do
