@@ -107,6 +107,6 @@ export function createBrowserPerformanceMarkScript(
     `try{performance.mark(${markNameJson});entry.fallback="mark-detail-unavailable";}` +
     'catch(fallbackError){entry.fallback="performance-mark-unavailable";}' +
     '}else{entry.fallback="performance-mark-unavailable";}' +
-    `(self.${REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE}||=[]).push(entry);})()`
+    `(self.${REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE}=self.${REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE}||[]).push(entry);})()`
   );
 }

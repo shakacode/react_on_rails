@@ -173,6 +173,10 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(written_chunks.second).to include("var supportsDetail=typeof PerformanceMark")
       expect(written_chunks.second).to include('"detail" in PerformanceMark.prototype')
       expect(written_chunks.second).to include("entry.fallback=\"mark-detail-unavailable\"")
+      expect(written_chunks.second).to include(
+        "self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]"
+      )
+      expect(written_chunks.second).not_to include("||=")
       expect(written_chunks.second).to include('performance.mark("react-on-rails:rsc:stream"')
       expect(written_chunks.second).to include('"phase":"stream-complete"')
       expect(written_chunks.second).to include('"initialChunkBytes":8')
@@ -209,7 +213,8 @@ RSpec.describe ReactOnRailsPro::Stream do
         try{performance.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}
         catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
         else{entry.fallback="performance-mark-unavailable";}
-        (self.REACT_ON_RAILS_PERFORMANCE_MARKS||=[]).push(entry);})()
+        (self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]).push(entry);
+        })()
       JAVASCRIPT
 
       expect(script).to eq("<script>#{expected_script_body}</script>")

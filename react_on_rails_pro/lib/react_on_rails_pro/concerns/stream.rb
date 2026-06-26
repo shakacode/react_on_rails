@@ -176,7 +176,8 @@ module ReactOnRailsPro
         try{performance.mark(#{mark_name_json});entry.fallback="mark-detail-unavailable";}
         catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
         else{entry.fallback="performance-mark-unavailable";}
-        (self.REACT_ON_RAILS_PERFORMANCE_MARKS||=[]).push(entry);})()</script>
+        (self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]).push(entry);
+        })()</script>
       HTML
     end
 

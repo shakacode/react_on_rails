@@ -233,7 +233,7 @@ performance.mark('react-on-rails:rsc:payload', { detail });
 If the browser does not support mark details, or if `performance.mark` is unavailable, the same entry is appended to:
 
 ```js
-window.REACT_ON_RAILS_PERFORMANCE_MARKS;
+self.REACT_ON_RAILS_PERFORMANCE_MARKS;
 ```
 
 Use a `PerformanceObserver` for the normal path and read the queue as a fallback:
@@ -249,7 +249,7 @@ const observer = new PerformanceObserver((list) => {
 
 observer.observe({ type: 'mark', buffered: true });
 
-for (const entry of window.REACT_ON_RAILS_PERFORMANCE_MARKS || []) {
+for (const entry of self.REACT_ON_RAILS_PERFORMANCE_MARKS || []) {
   console.log(entry.name, entry.detail, entry.fallback);
 }
 ```

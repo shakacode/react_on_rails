@@ -175,6 +175,7 @@ describe('browserPerformanceMarks runtime helper', () => {
       source: 'react-on-rails-pro',
       bytes: 2048,
     });
+    expect(markScript).not.toContain('||=');
     new Function(markScript)();
 
     expect(mark).toHaveBeenCalledTimes(1);
@@ -210,7 +211,7 @@ describe('browserPerformanceMarks runtime helper', () => {
         'try{performance.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}' +
         'catch(fallbackError){entry.fallback="performance-mark-unavailable";}' +
         '}else{entry.fallback="performance-mark-unavailable";}' +
-        '(self.REACT_ON_RAILS_PERFORMANCE_MARKS||=[]).push(entry);})()',
+        '(self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]).push(entry);})()',
     );
   });
 
@@ -235,6 +236,7 @@ describe('browserPerformanceMarks runtime helper', () => {
     expect(markScript).toContain('\\u003c/script\\u003e\\u003cscript\\u003ealert(2)');
     expect(markScript).toContain('products\\u0026featured\\u003ecard');
     expect(markScript).not.toContain('</script><script>');
+    expect(markScript).not.toContain('||=');
 
     new Function(markScript)();
 
