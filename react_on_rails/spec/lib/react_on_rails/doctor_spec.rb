@@ -6092,6 +6092,16 @@ RSpec.describe ReactOnRails::Doctor do
       allow(ReactOnRails::PackerUtils).to receive(:packer_source_entry_path).and_return("app/javascript/packs")
     end
 
+    def write_rsc_discovery_support_files
+      FileUtils.mkdir_p("config/webpack")
+      FileUtils.mkdir_p("bin")
+      File.write("config/webpack/rscWebpackConfig.js", "RSC_REFERENCE_DISCOVERY_BUILD RSCReferenceDiscoveryPlugin")
+      File.write(
+        "bin/shakapacker-precompile-hook",
+        "generate_rsc_manifest_client_references_if_needed RSC_REFERENCE_DISCOVERY_BUILD"
+      )
+    end
+
     it "uses the client-reference discovery fallback when the registration entry is absent" do
       doctor.send(:check_rsc_artifacts)
 
@@ -6103,14 +6113,28 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages).to include(a_string_including("broad client-reference discovery fallback"))
     end
 
-    it "warns when the RSC client references manifest is missing but the registration entry exists" do
+    it "warns when the RSC client references manifest is missing and generated configs support discovery" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+      write_rsc_discovery_support_files
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+    end
+
+    it "warns with generator guidance when missing manifest discovery support requires broad fallback" do
       FileUtils.mkdir_p("app/javascript/generated")
       File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
 
       doctor.send(:check_rsc_artifacts)
 
       warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
-      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("does not support manifest discovery yet"))
+      expect(warning_messages).to include(a_string_including("broad client-reference discovery fallback"))
+      expect(info_messages).to include(a_string_including("rails g react_on_rails:rsc"))
     end
 
     it "warns when a configured RSC client references manifest is missing" do
@@ -6144,6 +6168,22 @@ RSpec.describe ReactOnRails::Doctor do
       expect(success_messages).to include(a_string_including("RSC server client manifest exists"))
       expect(success_messages).to include(a_string_including("RSC client references manifest includes 0 refs"))
       expect(checker.messages.none? { |msg| msg[:type] == :warning }).to be true
+    end
+
+    it "warns when the RSC client references manifest is older than the registration entry" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+      File.write("ssr-generated/rsc-client-references.json", JSON.generate("refs" => []))
+      File.utime(Time.now - 120, Time.now - 120, "ssr-generated/rsc-client-references.json")
+      File.utime(Time.now, Time.now, "app/javascript/generated/server-component-registration-entry.js")
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("older than the server component registration entry"))
+      expect(info_messages).to include(a_string_including("bin/shakapacker-precompile-hook"))
     end
 
     it "warns when JSON RSC artifacts cannot be parsed or have the wrong shape" do

@@ -3497,6 +3497,13 @@ module ReactOnRails
     EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules public spec test tmp vendor].freeze
     RSC_CLIENT_REFERENCES_MANIFEST_ENV = "RSC_MANIFEST_CLIENT_REFERENCES_JSON"
     DEFAULT_RSC_CLIENT_REFERENCES_MANIFEST_PATH = "ssr-generated/rsc-client-references.json"
+    RSC_DISCOVERY_WEBPACK_CONFIG_PATH = "config/webpack/rscWebpackConfig.js"
+    RSC_DISCOVERY_PRECOMPILE_HOOK_PATH = "bin/shakapacker-precompile-hook"
+    RSC_DISCOVERY_WEBPACK_CONFIG_TOKENS = %w[RSC_REFERENCE_DISCOVERY_BUILD RSCReferenceDiscoveryPlugin].freeze
+    RSC_DISCOVERY_PRECOMPILE_HOOK_TOKENS = %w[
+      generate_rsc_manifest_client_references_if_needed
+      RSC_REFERENCE_DISCOVERY_BUILD
+    ].freeze
     # npm registry package names used here must be lowercase; keep this allowlist
     # narrow so names remain safe when reused as Node resolver args and paths.
     PACKAGE_NAME_PATTERN = %r{
@@ -4440,6 +4447,9 @@ module ReactOnRails
 
       refs = rsc_client_references_manifest_refs(artifact_path)
       if refs.is_a?(Array)
+        if rsc_client_references_manifest_stale?(artifact_path)
+          report_stale_rsc_client_references_manifest(artifact_path)
+        end
         checker.add_success("✅ RSC client references manifest includes #{refs.size} refs at #{artifact_path}")
       else
         checker.add_warning("⚠️  RSC client references manifest must contain a refs array: #{artifact_path}")
@@ -4455,6 +4465,13 @@ module ReactOnRails
     def report_missing_rsc_client_references_manifest(artifact_path)
       if rsc_client_references_manifest_required?
         report_missing_rsc_artifact("RSC client references manifest", artifact_path)
+      elsif rsc_manifest_registration_entry_exists? && !rsc_manifest_discovery_supported?
+        checker.add_warning(
+          "⚠️  RSC client references manifest not found at #{artifact_path}, but this app's RSC webpack " \
+          "config or precompile hook does not support manifest discovery yet; resolver will use broad " \
+          "client-reference discovery fallback"
+        )
+        checker.add_info("  💡 Re-run rails g react_on_rails:rsc to update generated configs")
       else
         checker.add_info(
           "  ℹ️  RSC client references manifest not found at #{artifact_path} — " \
@@ -4466,8 +4483,44 @@ module ReactOnRails
     def rsc_client_references_manifest_required?
       return true unless ENV[RSC_CLIENT_REFERENCES_MANIFEST_ENV].to_s.strip.empty?
 
+      rsc_manifest_registration_entry_exists? && rsc_manifest_discovery_supported?
+    end
+
+    def rsc_manifest_registration_entry_exists?
       registration_entry = rsc_manifest_registration_entry
       registration_entry && File.exist?(registration_entry)
+    end
+
+    def rsc_client_references_manifest_stale?(artifact_path)
+      registration_entry = rsc_manifest_registration_entry
+      return false unless registration_entry && File.exist?(registration_entry)
+
+      File.mtime(registration_entry) > File.mtime(artifact_path)
+    rescue StandardError
+      false
+    end
+
+    def report_stale_rsc_client_references_manifest(artifact_path)
+      checker.add_warning(
+        "⚠️  RSC client references manifest is older than the server component registration entry: " \
+        "#{artifact_path}"
+      )
+      checker.add_info("  💡 Re-run bin/shakapacker-precompile-hook before bin/shakapacker")
+    end
+
+    def rsc_manifest_discovery_supported?
+      file_contains_all?(RSC_DISCOVERY_WEBPACK_CONFIG_PATH, RSC_DISCOVERY_WEBPACK_CONFIG_TOKENS) &&
+        file_contains_all?(RSC_DISCOVERY_PRECOMPILE_HOOK_PATH, RSC_DISCOVERY_PRECOMPILE_HOOK_TOKENS)
+    end
+
+    def file_contains_all?(file_path, tokens)
+      resolved_path = File.expand_path(file_path, Dir.pwd)
+      return false unless File.exist?(resolved_path)
+
+      content = File.read(resolved_path)
+      tokens.all? { |token| content.include?(token) }
+    rescue StandardError
+      false
     end
 
     def rsc_manifest_registration_entry
