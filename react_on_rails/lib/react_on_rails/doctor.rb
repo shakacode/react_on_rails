@@ -3492,6 +3492,9 @@ module ReactOnRails
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
     NPM_VIEW_TERMINATION_GRACE_SECONDS = 0.5
     SKIP_NPM_DIST_TAG_CHECK_ENV = "REACT_ON_RAILS_SKIP_NPM_DIST_TAG_CHECK"
+    RSC_REGISTRATION_ENTRY_PATH_ENV = "REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH"
+    EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME = "server-component-registration-entry.js"
+    EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules public spec test tmp vendor].freeze
     RSC_CLIENT_REFERENCES_MANIFEST_ENV = "RSC_MANIFEST_CLIENT_REFERENCES_JSON"
     DEFAULT_RSC_CLIENT_REFERENCES_MANIFEST_PATH = "ssr-generated/rsc-client-references.json"
     # npm registry package names used here must be lowercase; keep this allowlist
@@ -4431,7 +4434,7 @@ module ReactOnRails
     def check_rsc_client_references_manifest
       artifact_path = rsc_client_references_manifest_path
       unless File.exist?(artifact_path)
-        report_missing_rsc_artifact("RSC client references manifest", artifact_path)
+        report_missing_rsc_client_references_manifest(artifact_path)
         return
       end
 
@@ -4447,6 +4450,67 @@ module ReactOnRails
       add_rsc_artifacts_rebuild_guidance
     rescue StandardError => e
       checker.add_warning("⚠️  Could not inspect RSC client references manifest: #{e.message}")
+    end
+
+    def report_missing_rsc_client_references_manifest(artifact_path)
+      if rsc_client_references_manifest_required?
+        report_missing_rsc_artifact("RSC client references manifest", artifact_path)
+      else
+        checker.add_info(
+          "  ℹ️  RSC client references manifest not found at #{artifact_path} — " \
+          "resolver will use broad client-reference discovery fallback"
+        )
+      end
+    end
+
+    def rsc_client_references_manifest_required?
+      registration_entry = rsc_manifest_registration_entry
+      registration_entry && File.exist?(registration_entry)
+    end
+
+    def rsc_manifest_registration_entry
+      configured_entry = configured_rsc_manifest_registration_entry
+      return configured_entry if configured_entry
+
+      default_rsc_manifest_registration_entry
+    end
+
+    def configured_rsc_manifest_registration_entry
+      configured_path = ENV[RSC_REGISTRATION_ENTRY_PATH_ENV].to_s.strip
+      return nil if configured_path.empty?
+
+      resolved_path = File.absolute_path(configured_path, Dir.pwd)
+      return nil unless valid_rsc_manifest_registration_entry?(resolved_path)
+
+      resolved_path
+    end
+
+    def default_rsc_manifest_registration_entry
+      source_entry_path = ReactOnRails::PackerUtils.packer_source_entry_path.to_s
+      source_entry_path = "" if source_entry_path == "/"
+
+      File.expand_path(
+        File.join(File.dirname(source_entry_path), "generated", EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME),
+        Dir.pwd
+      )
+    rescue StandardError
+      nil
+    end
+
+    def valid_rsc_manifest_registration_entry?(path)
+      return false unless File.file?(path)
+      return false unless File.basename(path.to_s) == EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME
+
+      path_components = rsc_registration_entry_path_components(path)
+      EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS.none? { |component| path_components.include?(component) }
+    end
+
+    def rsc_registration_entry_path_components(path)
+      expanded_path = File.expand_path(path.to_s)
+      expanded_root = "#{File.expand_path(Dir.pwd)}#{File::SEPARATOR}"
+      expanded_path = expanded_path.delete_prefix(expanded_root) if expanded_path.start_with?(expanded_root)
+
+      expanded_path.split(File::SEPARATOR).reject(&:empty?)
     end
 
     def rsc_pro_utils_artifact_path(method_name, label)

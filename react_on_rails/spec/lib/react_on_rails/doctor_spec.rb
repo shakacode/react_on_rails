@@ -6089,14 +6089,27 @@ RSpec.describe ReactOnRails::Doctor do
         rsc_bundle_js_file_path: File.expand_path("ssr-generated/rsc-bundle.js"),
         react_server_client_manifest_file_path: File.expand_path("ssr-generated/react-server-client-manifest.json")
       )
+      allow(ReactOnRails::PackerUtils).to receive(:packer_source_entry_path).and_return("app/javascript/packs")
     end
 
-    it "warns when required RSC build artifacts are missing" do
+    it "uses the client-reference discovery fallback when the registration entry is absent" do
       doctor.send(:check_rsc_artifacts)
 
       warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
       expect(warning_messages).to include(a_string_including("RSC bundle not found"))
       expect(warning_messages).to include(a_string_including("RSC server client manifest not found"))
+      expect(warning_messages).not_to include(a_string_including("RSC client references manifest not found"))
+      expect(info_messages).to include(a_string_including("broad client-reference discovery fallback"))
+    end
+
+    it "warns when the RSC client references manifest is missing but the registration entry exists" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
       expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
     end
 
