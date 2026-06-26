@@ -164,6 +164,7 @@ module ReactOnRailsPro
     # Keep this inline script in sync with createBrowserPerformanceMarkScript in
     # packages/react-on-rails-pro/src/browserPerformanceMarks.ts.
     def rsc_stream_observability_script(mark_name, detail)
+      # Mirrors createBrowserPerformanceMarkScript in browserPerformanceMarks.ts.
       mark_name_json = ERB::Util.json_escape(mark_name.to_json)
       detail_json = ERB::Util.json_escape(detail.to_json)
       <<~HTML.delete("\n")

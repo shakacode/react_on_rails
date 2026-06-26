@@ -172,14 +172,12 @@ const collectStreamDataByChunk = (stream: Readable) => {
   return { allData, chunks, firstChunk };
 };
 
-const injectWithStylesheetMap = injectRSCPayload as unknown as (
+const injectWithOptions = (
   html: Readable,
   tracker: RSCRequestTracker,
   nodeId: string,
-  nonce: string | undefined,
-  stylesheetHrefsByChunkName: Map<string, string[]>,
-  rscStreamObservability?: boolean,
-) => Readable;
+  options: Parameters<typeof injectRSCPayload>[4],
+) => injectRSCPayload(html, tracker, nodeId, undefined, options);
 
 // Test setup helper
 const setupTestWithStreams = (
@@ -219,14 +217,10 @@ describe('injectRSCPayload', () => {
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectWithStylesheetMap(
-      mockHTML,
-      rscRequestTracker,
-      domNodeId,
-      undefined,
-      new Map(),
-      true,
-    );
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('self.REACT_ON_RAILS_PERFORMANCE_MARKS');
@@ -252,14 +246,10 @@ describe('injectRSCPayload', () => {
     });
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectWithStylesheetMap(
-      mockHTML,
-      rscRequestTracker,
-      domNodeId,
-      undefined,
-      new Map(),
-      true,
-    );
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('<div>observed split tag</div>');
@@ -388,13 +378,11 @@ describe('injectRSCPayload', () => {
     ]);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectWithStylesheetMap(
-      mockHTML,
-      rscRequestTracker,
-      domNodeId,
-      undefined,
-      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
-    );
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([
+        ['client1', ['/webpack/test/css/client1-46072b81.css']],
+      ]),
+    });
     const resultStr = await collectStreamData(result);
 
     const stylesheetIndex = resultStr.indexOf(
@@ -421,13 +409,11 @@ describe('injectRSCPayload', () => {
     );
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectWithStylesheetMap(
-      mockHTML,
-      rscRequestTracker,
-      domNodeId,
-      undefined,
-      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
-    );
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([
+        ['client1', ['/webpack/test/css/client1-46072b81.css']],
+      ]),
+    });
     const resultStr = await collectStreamData(result);
 
     const stylesheetIndex = resultStr.indexOf(
@@ -454,13 +440,11 @@ describe('injectRSCPayload', () => {
     );
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectWithStylesheetMap(
-      mockHTML,
-      rscRequestTracker,
-      domNodeId,
-      undefined,
-      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
-    );
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([
+        ['client1', ['/webpack/test/css/client1-46072b81.css']],
+      ]),
+    });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
     await expect(firstChunk).resolves.toContain('Loading ToggleContainer');
@@ -495,13 +479,11 @@ describe('injectRSCPayload', () => {
       { stream: slowRSCWithClientStylesheet, componentName: 'styled' },
     ]);
 
-    const result = injectWithStylesheetMap(
-      mockHTML,
-      rscRequestTracker,
-      domNodeId,
-      undefined,
-      new Map([['client2', ['/webpack/test/css/client2-46072b81.css']]]),
-    );
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([
+        ['client2', ['/webpack/test/css/client2-46072b81.css']],
+      ]),
+    });
     const resultStr = await collectStreamData(result);
 
     const stylesheetIndex = resultStr.indexOf(
@@ -533,13 +515,11 @@ describe('injectRSCPayload', () => {
     });
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectWithStylesheetMap(
-      mockHTML,
-      rscRequestTracker,
-      domNodeId,
-      undefined,
-      new Map([['client3', ['/webpack/test/css/client3-46072b81.css']]]),
-    );
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([
+        ['client3', ['/webpack/test/css/client3-46072b81.css']],
+      ]),
+    });
     const resultStr = await collectStreamData(result);
 
     const stylesheetIndex = resultStr.indexOf(
@@ -576,13 +556,11 @@ describe('injectRSCPayload', () => {
     });
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectWithStylesheetMap(
-      mockHTML,
-      rscRequestTracker,
-      domNodeId,
-      undefined,
-      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
-    );
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([
+        ['client1', ['/webpack/test/css/client1-46072b81.css']],
+      ]),
+    });
     const resultStr = (await collectStreamBuffer(result)).toString('utf8');
 
     expect(resultStr).toContain('<p>café</p>');
@@ -600,13 +578,11 @@ describe('injectRSCPayload', () => {
     );
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectWithStylesheetMap(
-      mockHTML,
-      rscRequestTracker,
-      domNodeId,
-      undefined,
-      new Map([['client1', ['/webpack/test/css/client1-46072b81.css']]]),
-    );
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([
+        ['client1', ['/webpack/test/css/client1-46072b81.css']],
+      ]),
+    });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
     await expect(firstChunk).resolves.toContain('Async shell can stream before Redis resolves');

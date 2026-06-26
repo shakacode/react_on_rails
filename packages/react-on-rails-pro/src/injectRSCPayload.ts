@@ -356,6 +356,11 @@ function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteHtmlTa
   };
 }
 
+type InjectRSCPayloadOptions = {
+  rscClientChunkStylesheetHrefsByChunkName?: RSCClientChunkStylesheetHrefsByChunkName;
+  rscStreamObservability?: boolean;
+};
+
 /**
  * Embeds RSC payloads into the HTML stream for optimal hydration.
  *
@@ -387,9 +392,12 @@ export default function injectRSCPayload(
   rscRequestTracker: RSCRequestTracker,
   domNodeId: string | undefined,
   cspNonce?: string,
-  rscClientChunkStylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
-  rscStreamObservability = false,
+  options: InjectRSCPayloadOptions = {},
 ) {
+  const {
+    rscClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
+    rscStreamObservability = false,
+  } = options;
   const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
   const resultStream = new PassThrough();
