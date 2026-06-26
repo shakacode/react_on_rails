@@ -15,21 +15,26 @@
 
 const domNodeId = 'rsc-performance-root';
 
-const loadWrappedRenderer = () => {
+const loadWrappedRenderer = ({ strictModeProvider = false } = {}) => {
   jest.resetModules();
   jest.doMock('react-on-rails-rsc/client.browser', () => ({}));
   jest.doMock('../src/getReactServerComponent.client.ts', () => ({
     __esModule: true,
     default: jest.fn(() => jest.fn()),
   }));
-  jest.doMock('../src/RSCProvider.tsx', () => ({
-    __esModule: true,
-    createRSCProvider: jest.fn(
-      () =>
-        ({ children }) =>
-          children,
-    ),
-  }));
+  jest.doMock('../src/RSCProvider.tsx', () => {
+    // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
+    const React = require('react');
+
+    return {
+      __esModule: true,
+      createRSCProvider: jest.fn(
+        () =>
+          ({ children }) =>
+            strictModeProvider ? React.createElement(React.StrictMode, null, children) : children,
+      ),
+    };
+  });
 
   // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
   const React = require('react');
@@ -94,10 +99,10 @@ describe('wrapServerComponentRenderer/client performance marks', () => {
     });
   };
 
-  const renderWrappedComponent = async ({ rscStreamObservability }) => {
+  const renderWrappedComponent = async ({ rscStreamObservability, strictModeProvider = false }) => {
     const mark = jest.fn();
     setPerformanceMark(mark);
-    const { React, wrapServerComponentRenderer } = loadWrappedRenderer();
+    const { React, wrapServerComponentRenderer } = loadWrappedRenderer({ strictModeProvider });
 
     const domNode = document.createElement('div');
     domNode.id = domNodeId;
@@ -143,6 +148,20 @@ describe('wrapServerComponentRenderer/client performance marks', () => {
         mode: 'hydrate',
       }),
     });
+
+    await React.act(async () => teardownResult.teardown());
+  });
+
+  it('emits the interactive mark once when StrictMode replays passive effects', async () => {
+    const { mark, React, teardownResult } = await renderWrappedComponent({
+      rscStreamObservability: true,
+      strictModeProvider: true,
+    });
+    const interactiveMarkCalls = mark.mock.calls.filter(
+      ([name]) => name === 'react-on-rails:rsc:hydration:interactive',
+    );
+
+    expect(interactiveMarkCalls).toHaveLength(1);
 
     await React.act(async () => teardownResult.teardown());
   });

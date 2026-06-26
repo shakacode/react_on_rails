@@ -269,6 +269,7 @@ function splitIncompleteHtmlTagTail(htmlString: string) {
   const lastCompleteTagEnd = htmlString.lastIndexOf('>');
   const lastTagStart = htmlString.lastIndexOf('<');
 
+  // The streamed payload is well-formed HTML, so a trailing "<" means a split tag rather than text content.
   if (lastTagStart === -1 || lastTagStart < lastCompleteTagEnd) {
     return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
   }
