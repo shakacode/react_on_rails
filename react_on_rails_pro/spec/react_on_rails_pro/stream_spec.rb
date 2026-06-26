@@ -57,9 +57,9 @@ RSpec.describe ReactOnRailsPro::Stream do
       end
     end
 
-    def setup_stream_test(component_count: 2)
+    def setup_stream_test(component_count: 2, initial_response: "TEMPLATE")
       component_queues = Array.new(component_count) { Async::Queue.new }
-      controller = StreamController.new(component_queues:)
+      controller = StreamController.new(component_queues:, initial_response:)
 
       mocked_response = instance_double(ActionController::Live::Response)
       mocked_stream = instance_double(ActionController::Live::Buffer)
@@ -155,11 +155,11 @@ RSpec.describe ReactOnRailsPro::Stream do
       end
 
       expect(written_chunks.first).to eq("TEMPLATE")
-      expect(written_chunks.first).not_to include("REACT_ON_RAILS_PERFORMANCE_MARKS")
-      expect(written_chunks.first).not_to include("react-on-rails:rsc:stream")
+      expect(written_chunks.join).not_to include("REACT_ON_RAILS_PERFORMANCE_MARKS")
+      expect(written_chunks.join).not_to include("react-on-rails:rsc:stream")
     end
 
-    it "emits opt-in browser performance marks for the initial streamed response" do
+    it "emits opt-in browser performance marks after component chunks drain" do
       _queues, controller, stream = setup_stream_test(component_count: 0)
       written_chunks = []
       allow(stream).to receive(:write) { |chunk| written_chunks << chunk }
@@ -168,11 +168,28 @@ RSpec.describe ReactOnRailsPro::Stream do
         sleep 0.1
       end
 
-      expect(written_chunks.first).to start_with("TEMPLATE")
-      expect(written_chunks.first).to include("self.REACT_ON_RAILS_PERFORMANCE_MARKS")
-      expect(written_chunks.first).to include('performance.mark("react-on-rails:rsc:stream"')
-      expect(written_chunks.first).to include('"phase":"initial-write"')
-      expect(written_chunks.first).to include('"chunkBytes":8')
+      expect(written_chunks.first).to eq("TEMPLATE")
+      expect(written_chunks.second).to include("self.REACT_ON_RAILS_PERFORMANCE_MARKS")
+      expect(written_chunks.second).to include('performance.mark("react-on-rails:rsc:stream"')
+      expect(written_chunks.second).to include('"phase":"stream-complete"')
+      expect(written_chunks.second).to include('"initialChunkBytes":8')
+    end
+
+    it "does not insert opt-in browser performance marks inside split component markup" do
+      queues, controller, stream = setup_stream_test(component_count: 1, initial_response: "<di")
+      written_chunks = []
+      allow(stream).to receive(:write) { |chunk| written_chunks << chunk }
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        queues[0].enqueue("v>observed split tag</div>")
+        queues[0].close
+        sleep 0.1
+      end
+
+      expect(written_chunks[0]).to eq("<di")
+      expect(written_chunks[1]).to eq("v>observed split tag</div>")
+      expect(written_chunks[2]).to include("react-on-rails:rsc:stream")
+      expect(written_chunks.join).not_to include("<di<script")
     end
 
     it "applies backpressure with slow writer" do

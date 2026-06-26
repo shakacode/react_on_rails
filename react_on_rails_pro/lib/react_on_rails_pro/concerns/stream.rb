@@ -57,11 +57,9 @@ module ReactOnRailsPro
       require "async"
       require "async/barrier"
       require "async/limited_queue"
+      previous_rsc_stream_observability_state = current_rsc_stream_observability_state
       warn_on_non_html_formats_without_content_type(render_options[:formats], content_type)
-      previous_rsc_stream_observability = @react_on_rails_rsc_stream_observability
-      previous_rsc_stream_started_at = @react_on_rails_rsc_stream_started_at
-      @react_on_rails_rsc_stream_observability = rsc_stream_observability == true
-      @react_on_rails_rsc_stream_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      initialize_rsc_stream_observability_state(rsc_stream_observability)
 
       Sync do |parent_task|
         # Initialize async primitives for concurrent component streaming
@@ -83,6 +81,7 @@ module ReactOnRailsPro
         response.stream.write(render_stream_template_chunk(template:, render_options:))
 
         drain_streams_concurrently(parent_task)
+        write_rsc_stream_observability_mark
         # Do not close the response stream in an ensure block.
         # If an error occurs we may need the stream open to send diagnostic/error details
         # (for example, ApplicationController#rescue_from in the dummy app).
@@ -97,11 +96,33 @@ module ReactOnRailsPro
         raise
       end
     ensure
-      @react_on_rails_rsc_stream_observability = previous_rsc_stream_observability
-      @react_on_rails_rsc_stream_started_at = previous_rsc_stream_started_at
+      restore_rsc_stream_observability_state(previous_rsc_stream_observability_state)
     end
 
     private
+
+    def current_rsc_stream_observability_state
+      {
+        enabled: @react_on_rails_rsc_stream_observability,
+        started_at: @react_on_rails_rsc_stream_started_at,
+        initial_chunk_bytes: @react_on_rails_rsc_stream_initial_chunk_bytes,
+        initial_render_duration_ms: @react_on_rails_rsc_stream_initial_render_duration_ms
+      }
+    end
+
+    def initialize_rsc_stream_observability_state(rsc_stream_observability)
+      @react_on_rails_rsc_stream_observability = rsc_stream_observability == true
+      @react_on_rails_rsc_stream_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      @react_on_rails_rsc_stream_initial_chunk_bytes = nil
+      @react_on_rails_rsc_stream_initial_render_duration_ms = nil
+    end
+
+    def restore_rsc_stream_observability_state(state)
+      @react_on_rails_rsc_stream_observability = state[:enabled]
+      @react_on_rails_rsc_stream_started_at = state[:started_at]
+      @react_on_rails_rsc_stream_initial_chunk_bytes = state[:initial_chunk_bytes]
+      @react_on_rails_rsc_stream_initial_render_duration_ms = state[:initial_render_duration_ms]
+    end
 
     def render_stream_template_chunk(template:, render_options:)
       return render_to_string(template:, **render_options).lstrip unless rsc_stream_observability_enabled?
@@ -109,25 +130,25 @@ module ReactOnRailsPro
       render_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       template_string = render_to_string(template:, **render_options)
       render_finished_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      template_chunk = template_string.lstrip
 
-      append_rsc_stream_observability_mark(
-        template_string.lstrip,
-        phase: "initial-write",
-        render_duration_ms: elapsed_ms(render_started_at, render_finished_at)
-      )
+      @react_on_rails_rsc_stream_initial_chunk_bytes = template_chunk.bytesize
+      @react_on_rails_rsc_stream_initial_render_duration_ms = elapsed_ms(render_started_at, render_finished_at)
+      template_chunk
     end
 
-    def append_rsc_stream_observability_mark(chunk, phase:, render_duration_ms:)
-      return chunk unless rsc_stream_observability_enabled?
+    def write_rsc_stream_observability_mark
+      return unless rsc_stream_observability_enabled?
+      return if response.stream.closed?
 
       detail = {
         source: "react-on-rails-pro",
-        phase:,
-        chunkBytes: chunk.bytesize,
-        renderDurationMs: render_duration_ms,
+        phase: "stream-complete",
+        initialChunkBytes: @react_on_rails_rsc_stream_initial_chunk_bytes,
+        renderDurationMs: @react_on_rails_rsc_stream_initial_render_duration_ms,
         sinceStreamStartMs: elapsed_ms(@react_on_rails_rsc_stream_started_at)
       }
-      "#{chunk}#{rsc_stream_observability_script('react-on-rails:rsc:stream', detail)}"
+      response.stream.write(rsc_stream_observability_script("react-on-rails:rsc:stream", detail))
     end
 
     def rsc_stream_observability_enabled?
