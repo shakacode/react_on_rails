@@ -30,6 +30,9 @@ module ReactOnRails
       TEST_WATCH_MODES = %w[auto full client-only].freeze
       OPEN_BROWSER_WAIT_TIMEOUT = 60
       OPEN_BROWSER_POLL_INTERVAL = 0.5
+      DOCS_BASE_URL = "https://reactonrails.com/docs"
+      DEV_SERVER_AND_TESTING_DOCS_URL = "#{DOCS_BASE_URL}/building-features/dev-server-and-testing/".freeze
+      TESTING_CONFIGURATION_DOCS_URL = "#{DOCS_BASE_URL}/building-features/testing-configuration/".freeze
 
       class << self
         def start(mode = :development, procfile = nil, verbose: false, route: nil, rails_env: nil,
@@ -1819,12 +1822,16 @@ module ReactOnRails
             #{Rainbow('•').red} #{Rainbow('"Assets not loading"').white} #{Rainbow('→ Verify Procfile.dev is present and check server logs').white}
 
             #{Rainbow('📖 DOCUMENTATION:').cyan.bold}
-            #{Rainbow('•').yellow} #{Rainbow('Testing & dev server guide:').white} #{Rainbow('docs/oss/building-features/dev-server-and-testing.md').green}
-            #{Rainbow('•').yellow} #{Rainbow('Testing configuration:').white} #{Rainbow('docs/oss/building-features/testing-configuration.md').green}
-            #{Rainbow('•').yellow} #{Rainbow('Full docs:').white} #{Rainbow('https://reactonrails.com/docs/').cyan.underline}
+            #{documentation_link('Dev server modes & testing:', DEV_SERVER_AND_TESTING_DOCS_URL)}
+            #{documentation_link('Test asset configuration:', TESTING_CONFIGURATION_DOCS_URL)}
+            #{documentation_link('Full documentation:', "#{DOCS_BASE_URL}/")}
           TROUBLESHOOTING
         end
         # rubocop:enable Metrics/AbcSize
+
+        def documentation_link(label, url)
+          "#{Rainbow('•').yellow} #{Rainbow(label).white} #{Rainbow(url).cyan.underline}"
+        end
       end
     end
   end

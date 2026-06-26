@@ -1689,6 +1689,16 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    it "links to the published documentation for dev server and testing guidance" do
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(%r{https://reactonrails.com/docs/building-features/dev-server-and-testing/})
+        expect(output).to match(%r{https://reactonrails.com/docs/building-features/testing-configuration/})
+        expect(output).to match(%r{https://reactonrails.com/docs/})
+      end
+    end
+
     context "when Shakapacker config uses live reload instead of HMR" do
       include_context "with clean port env"
 
