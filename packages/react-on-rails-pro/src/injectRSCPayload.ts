@@ -773,7 +773,7 @@ export default function injectRSCPayload(
                   chunkIndex: rscPayloadChunkIndex,
                   flushIndex,
                   flightPayloadBytes: content.byteLength,
-                  inlineScriptBytes: Buffer.byteLength(payloadScript, 'utf8'),
+                  rscPayloadScriptBytes: Buffer.byteLength(payloadScript, 'utf8'),
                 },
               );
               if (payloadMarkBuffer) {

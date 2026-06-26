@@ -25,7 +25,7 @@ export const RSC_HYDRATION_START_MARK = `${RSC_STREAM_PERFORMANCE_MARK_PREFIX}:h
 export const RSC_HYDRATION_INTERACTIVE_MARK = `${RSC_STREAM_PERFORMANCE_MARK_PREFIX}:hydration:interactive`;
 
 type RSCClientHydrationMode = 'hydrate' | 'render';
-type RSCClientHydrationBoundary = 'server-component-root' | 'default-rsc-provider-root';
+type RSCClientHydrationBoundary = 'server-component-root';
 
 export type RSCClientHydrationMarkDetail = BrowserPerformanceMarkDetail & {
   source: 'react-on-rails-pro';
