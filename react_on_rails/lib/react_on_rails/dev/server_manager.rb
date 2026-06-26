@@ -455,7 +455,11 @@ module ReactOnRails
             end
 
             FileUtils.rm_rf(path)
-            puts "   ✓ Removed #{display_path} (#{label})"
+            if File.exist?(path) || File.symlink?(path)
+              puts "⚠️  Partially removed #{display_path} - some files could not be deleted (#{label})"
+            else
+              puts "   ✓ Removed #{display_path} (#{label})"
+            end
           end
         end
 
@@ -509,7 +513,7 @@ module ReactOnRails
 
           @real_app_root_path_for = root_path
           @real_app_root_path = File.realpath(root_path)
-        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EACCES
+        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES
           @real_app_root_path = root_path
         end
 

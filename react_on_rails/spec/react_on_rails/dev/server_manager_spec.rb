@@ -1634,6 +1634,25 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    it "warns when a cleanup target remains after removal" do
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: partial-packs
+      YAML
+      create_clean_test_dirs("public/partial-packs")
+      partial_path = File.expand_path("public/partial-packs", Dir.pwd)
+      allow(FileUtils).to receive(:rm_rf).and_call_original
+      allow(FileUtils).to receive(:rm_rf).with(partial_path)
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Partially removed public/partial-packs")
+        expect(File).to exist("public/partial-packs")
+      end
+    end
+
     it "skips shakapacker.yml paths that resolve outside the app root or to broad root directories" do
       outside_packs = clean_test_outside_path("outside-packs")
       outside_cache = clean_test_outside_path("outside-cache")
