@@ -3883,8 +3883,15 @@ module ReactOnRails
       x_range_satisfied = npm_x_range_result(version, range_clause)
       return x_range_satisfied unless x_range_satisfied.nil?
 
+      npm_comparators_range_result(version, range_clause)
+    end
+
+    def npm_comparators_range_result(version, range_clause)
       comparators = range_clause.scan(/(?:>=|<=|>|<|=|\^|~)?\s*v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?/)
       return false if comparators.empty?
+
+      target_versions = comparators.map { |comparator| npm_comparator_target_version(comparator.strip) }
+      return false unless npm_prerelease_allowed_by_versions?(version, target_versions)
 
       comparators.all? { |comparator| npm_comparator_satisfied?(version, comparator.strip) }
     end
@@ -3892,6 +3899,7 @@ module ReactOnRails
     def npm_x_range_result(version, range_clause)
       match = npm_x_range_match(range_clause)
       return nil unless match
+      return false if npm_prerelease(version).present?
 
       segments = [match[:major], match[:minor], match[:patch]]
       wildcard_index = segments.index { |segment| npm_wildcard_version_segment?(segment) }
@@ -3951,6 +3959,7 @@ module ReactOnRails
         /x
       )
       return nil unless match
+      return false unless npm_prerelease_allowed_by_versions?(version, [match[:lower], match[:upper]])
 
       npm_version_compare(version, npm_normalize_partial_version(match[:lower])) >= 0 &&
         npm_hyphen_upper_bound_satisfied?(version, match[:upper])
@@ -3967,7 +3976,7 @@ module ReactOnRails
 
     def npm_comparator_satisfied?(version, comparator)
       operator = comparator[/\A(?:>=|<=|>|<|=|\^|~)/] || "="
-      target_version = comparator.sub(/\A(?:>=|<=|>|<|=|\^|~)\s*/, "")
+      target_version = npm_comparator_target_version(comparator)
       comparison = npm_version_compare(version, target_version)
 
       case operator
@@ -3979,6 +3988,19 @@ module ReactOnRails
           npm_version_less_than?(version, npm_tilde_upper_bound(target_version))
       else
         npm_plain_comparator_satisfied?(comparison, operator)
+      end
+    end
+
+    def npm_comparator_target_version(comparator)
+      comparator.sub(/\A(?:>=|<=|>|<|=|\^|~)\s*/, "")
+    end
+
+    def npm_prerelease_allowed_by_versions?(version, target_versions)
+      return true if npm_prerelease(version).blank?
+
+      version_tuple = npm_version_tuple(version)
+      target_versions.any? do |target_version|
+        npm_prerelease(target_version).present? && npm_version_tuple(target_version) == version_tuple
       end
     end
 
@@ -4137,7 +4159,8 @@ module ReactOnRails
     end
 
     def installed_package_version(package_root, package_name)
-      installed_package_json(package_root, package_name)&.fetch("version", nil)
+      version = installed_package_json(package_root, package_name)&.fetch("version", nil)
+      version if version&.match?(/\A\d+\.\d+\.\d+/)
     end
 
     def installed_package_json(package_root, package_name)

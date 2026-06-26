@@ -5321,6 +5321,24 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when installed package version is not semver-like" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write("package.json", '{"dependencies":{"react":"19.0.4"}}')
+            install_react("canary")
+            example.run
+          end
+        end
+      end
+
+      it "falls back to the declared package version" do
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+    end
+
     context "when react-on-rails-rsc declares a React peer range" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -5532,6 +5550,15 @@ RSpec.describe ReactOnRails::Doctor do
         expect(doctor.send(:npm_range_satisfied?, "20.0.0", "^19.2")).to be false
         expect(doctor.send(:npm_range_satisfied?, "0.0.5", "^0.0.x")).to be true
         expect(doctor.send(:npm_range_satisfied?, "0.1.0", "^0.0.x")).to be false
+      end
+
+      it "excludes prereleases unless the range names the same prerelease tuple" do
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "^19.0.4")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", ">=19.0.4")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "19.x")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "19.0.4 - 20.0.0")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", ">=19.2.0-rc.0 <20.0.0")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "19.2.0-rc.0 - 20.0.0")).to be true
       end
     end
 
