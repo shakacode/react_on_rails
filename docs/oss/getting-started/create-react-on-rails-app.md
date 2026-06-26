@@ -34,7 +34,7 @@ All mode flags support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 To try the latest release candidate instead of the latest stable release, use the npm `rc` tag:
 
 ```bash
-npx create-react-on-rails-app@rc my-app --rsc
+npx create-react-on-rails-app@rc my-app
 ```
 
 When the CLI itself is a prerelease, it pins `react_on_rails` and, for `--pro` or `--rsc`,
