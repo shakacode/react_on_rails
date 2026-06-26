@@ -64,7 +64,7 @@ describe('setup mode resolution in run()', () => {
     jest.restoreAllMocks();
   });
 
-  it('defaults to the Pro RSC setup when no mode flag is passed in a TTY', async () => {
+  it('defaults to the Pro setup without RSC when no mode flag is passed in a TTY', async () => {
     Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true });
     Object.defineProperty(process.stdout, 'isTTY', { value: true, writable: true });
     process.argv = ['node', 'create-react-on-rails-app', 'my-app'];
@@ -73,12 +73,12 @@ describe('setup mode resolution in run()', () => {
 
     expect(mockedCreateApp).toHaveBeenCalledWith(
       'my-app',
-      expect.objectContaining({ pro: false, rsc: true, tailwind: false }),
+      expect.objectContaining({ pro: true, rsc: false, tailwind: false }),
     );
     expect(mockedLogInfo).toHaveBeenCalledWith(expect.stringContaining('Default setup: React on Rails Pro'));
   });
 
-  it('defaults to the Pro RSC setup when stdin/stdout are not TTYs', async () => {
+  it('defaults to the Pro setup without RSC when stdin/stdout are not TTYs', async () => {
     Object.defineProperty(process.stdin, 'isTTY', { value: undefined, writable: true });
     Object.defineProperty(process.stdout, 'isTTY', { value: undefined, writable: true });
     process.argv = ['node', 'create-react-on-rails-app', 'my-app'];
@@ -87,7 +87,7 @@ describe('setup mode resolution in run()', () => {
 
     expect(mockedCreateApp).toHaveBeenCalledWith(
       'my-app',
-      expect.objectContaining({ pro: false, rsc: true }),
+      expect.objectContaining({ pro: true, rsc: false }),
     );
     expect(mockedLogInfo).not.toHaveBeenCalledWith(expect.stringContaining('not running interactively'));
   });
@@ -114,7 +114,7 @@ describe('setup mode resolution in run()', () => {
     );
   });
 
-  it('keeps --rsc as the explicit recommended Pro setup', async () => {
+  it('keeps --rsc as the explicit Pro setup with the RSC example', async () => {
     process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--rsc'];
 
     await loadIndex();
@@ -142,20 +142,14 @@ describe('setup mode resolution in run()', () => {
 
 describe('bundler flag resolution in run()', () => {
   const originalArgv = process.argv;
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
 
   beforeEach(() => {
     jest.clearAllMocks();
     setupMocks();
-    Object.defineProperty(process.stdin, 'isTTY', { value: undefined, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: undefined, writable: true });
   });
 
   afterEach(() => {
     process.argv = originalArgv;
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
     jest.restoreAllMocks();
   });
 

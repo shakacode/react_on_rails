@@ -99,6 +99,9 @@ function run(appName: string, rawOpts: Record<string, unknown>, command?: Comman
     logInfo(`Note: ${setupLabel} adds react_on_rails_pro and uses the Pro generator path.`);
     logInfo('If installation fails, verify your Bundler/RubyGems setup, then rerun the command.');
     logInfo('Pro setup docs: https://reactonrails.com/docs/pro/installation/');
+    logInfo(
+      'License: no token is required for development, test, CI/CD, or staging; production Pro deployments require a paid license.',
+    );
     console.log('');
   }
 
@@ -126,7 +129,7 @@ function run(appName: string, rawOpts: Record<string, unknown>, command?: Comman
   console.log('');
   let modeLabel = '';
   if (options.rsc) {
-    modeLabel = ', setup: pro (React 19.2)';
+    modeLabel = ', setup: pro with RSC example';
   } else if (options.pro) {
     modeLabel = ', setup: pro without RSC example';
   } else if (setupMode.mode === 'standard') {
@@ -158,8 +161,8 @@ program
   .option('--webpack', 'Use Webpack as the bundler (alias for --no-rspack)')
   .option('--tailwind', 'Install Tailwind CSS v4 and style the generated SSR example')
   .option('--standard', 'Advanced: generate open-source React on Rails without Pro React 19.2 features')
-  .option('--pro', 'Advanced: generate React on Rails Pro without the RSC example')
-  .option('--rsc', 'Generate the recommended React on Rails Pro setup (default)')
+  .option('--pro', 'Generate the default React on Rails Pro setup explicitly')
+  .option('--rsc', 'Advanced: generate React on Rails Pro with the RSC example')
   .option('--no-agent-files', 'Skip AI-agent guidance files (AGENTS.md + editor pointers)')
   .addHelpText(
     'after',
@@ -170,17 +173,20 @@ Examples:
   $ npx create-react-on-rails-app my-app --no-rspack             # use Webpack instead of Rspack
   $ npx create-react-on-rails-app my-app --webpack               # same as --no-rspack
   $ npx create-react-on-rails-app my-app --tailwind
+  $ npx create-react-on-rails-app my-app --pro                   # explicit default Pro setup
+  $ npx create-react-on-rails-app my-app --rsc                   # advanced: Pro with RSC example
   $ npx create-react-on-rails-app my-app --standard              # advanced: OSS-only setup
-  $ npx create-react-on-rails-app my-app --pro                   # advanced: Pro without RSC example
-  $ npx create-react-on-rails-app my-app --rsc                   # explicit default Pro setup
   $ npx create-react-on-rails-app my-app --no-rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
   $ npx create-react-on-rails-app my-app --no-agent-files            # skip AGENTS.md + editor pointers
 
 No setup questions are asked. New apps use React on Rails Pro by default because
 that is where React 19.2 feature support lives. Use --standard only when you
-intentionally want an open-source-only scaffold. Use --pro only when you want Pro
-without the generated React Server Components example.
+intentionally want an open-source-only scaffold. Use --rsc when you want the
+generated React Server Components example.
+
+Pro license note: no token is required for development, test, CI/CD, or
+staging. Production Pro deployments require a paid license.
 
 What it does:
   1. Creates a new Rails app with PostgreSQL
@@ -190,8 +196,8 @@ What it does:
 
 After setup, run bin/dev and visit:
   - http://localhost:3000 (generated home page)
-  - /hello_server (default Pro example page)
-  - /hello_world (--standard and --pro example page)
+  - /hello_world (default, --standard, and --pro example page)
+  - /hello_server (--rsc example page)
 
 Inspect the generated setup history with:
   - git log --oneline --reverse

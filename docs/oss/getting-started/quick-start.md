@@ -33,8 +33,9 @@ bin/rails db:prepare
 ```
 
 New apps use React on Rails Pro by default because Pro is where React 19.2 feature support lives. Use
-`--template javascript` for JavaScript, `--tailwind` to style the generated example, or `--standard`
-only when you intentionally want an open-source-only scaffold.
+`--template javascript` for JavaScript, `--tailwind` to style the generated example, `--rsc` for the
+React Server Components example, or `--standard` only when you intentionally want an
+open-source-only scaffold.
 
 To try the latest release candidate, use:
 
@@ -82,8 +83,8 @@ The generated home page links to the example pages and the files React on Rails 
 
 Let's make a quick change to see hot reloading in action:
 
-1. Open the generated HelloServer component (`app/javascript/src/HelloServer/components/HelloServer.tsx`)
-2. Change the returned `message` string from `Hello, ${name}!` to `Hello from React on Rails Pro, ${name}!`
+1. Open the generated HelloWorld component (`app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx`)
+2. Change `<h3>Hello, {name}!</h3>` to `<h3>Hello from React on Rails Pro, {name}!</h3>`
 3. Save the file
 4. Watch your browser automatically refresh
 
@@ -194,14 +195,14 @@ Now that you have React on Rails working, here's what to explore next:
 1. **[Redux Integration](../building-features/react-and-redux.md)** - Manage application state
 2. **[React Router](../building-features/react-router.md)** - Client-side routing
 
-### Go Pro
+### Pro Features
 
-:::tip Pro Upgrade
-Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to the [upgrade guide](../../pro/upgrading-to-pro.md), [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Friendly license model: no token is required for development, test, CI/CD, or staging.
+:::tip Pro Features
+Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Friendly license model: no token is required for development, test, CI/CD, or staging.
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
-- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - Three-step migration from OSS
+- **[React Server Components](../../pro/react-server-components/tutorial.md)** - Add the RSC path when you need it
 - **[Pro pricing and sign up](https://pro.reactonrails.com/)** - Current plans and production licenses
 
 ## 🆘 Need Help?

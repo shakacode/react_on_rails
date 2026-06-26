@@ -13,17 +13,20 @@ bin/dev
 
 On fresh apps, `bin/dev` will try to open [http://localhost:3000](http://localhost:3000) the first time the app boots successfully.
 The generated home page links to the example pages, the key files React on Rails created for you,
-and follow-on docs for React 19.2 features, React Server Components, and the marketplace demo.
+and follow-on docs for React 19.2 features, Pro, optional React Server Components, and the marketplace demo.
 The generated app also includes a step-by-step git history so you can inspect each major scaffold phase with `git log --oneline --reverse`.
 
 This creates a TypeScript React on Rails Pro app by default because Pro is where React 19.2 feature
 support lives. New users do not need to choose a setup mode. The default adds `react_on_rails_pro`
-automatically and the generated home page links to `/hello_server`.
+automatically and the generated home page links to `/hello_world`.
 
-Use `--standard` only when you intentionally want an open-source-only scaffold. Use `--pro` only when
-you want Pro without the generated React Server Components example. `--pro` and `--rsc` require
-`react_on_rails_pro` to be installable in your environment ([Pro setup docs](../../pro/installation.md)).
-All mode flags support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
+Use `--standard` only when you intentionally want an open-source-only scaffold. Use `--rsc` when you
+want Pro with the generated React Server Components example. Pro modes require `react_on_rails_pro`
+to be installable in your environment ([Pro setup docs](../../pro/installation.md)). All mode flags
+support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
+
+Pro license note: no token is required for development, test, CI/CD, or staging. Production Pro
+deployments require a paid license.
 
 To try the latest release candidate instead of the latest stable release, use the npm `rc` tag:
 
@@ -64,31 +67,32 @@ npx create-react-on-rails-app my-app --webpack
 # Specify package manager
 npx create-react-on-rails-app my-app --package-manager pnpm
 
-# Advanced: generate the open-source-only setup
-npx create-react-on-rails-app my-app --standard
-
-# Advanced: generate Pro without the React Server Components example
+# Make the default Pro setup explicit
 npx create-react-on-rails-app my-app --pro
 
-# Make the default Pro setup explicit
+# Advanced: generate Pro with the React Server Components example
 npx create-react-on-rails-app my-app --rsc
+
+# Advanced: generate the open-source-only setup
+npx create-react-on-rails-app my-app --standard
 ```
 
 ### All Options
 
-| Option                       | Description                                                                   | Default       |
-| ---------------------------- | ----------------------------------------------------------------------------- | ------------- |
-| `-t, --template <type>`      | `javascript` or `typescript`                                                  | `typescript`  |
-| `--rspack`                   | Use Rspack as the bundler (~20x faster; Rspack is the default)                | `true`        |
-| `--webpack`, `--no-rspack`   | Use Webpack instead of Rspack                                                 | `false`       |
-| `--standard`                 | Advanced: generate open-source React on Rails without Pro React 19.2 features | `false`       |
-| `--pro`                      | Advanced: generate React on Rails Pro without the RSC example                 | `false`       |
-| `--rsc`                      | Generate the recommended React on Rails Pro setup                             | `true`        |
-| `--tailwind`                 | Add Tailwind CSS v4 to the generated SSR example                              | `false`       |
-| `-p, --package-manager <pm>` | `npm` or `pnpm`                                                               | auto-detected |
+| Option                       | Description                                                                    | Default          |
+| ---------------------------- | ------------------------------------------------------------------------------ | ---------------- |
+| `-t, --template <type>`      | `javascript` or `typescript`                                                   | `typescript`     |
+| `--rspack`                   | Use Rspack as the bundler (~20x faster; Rspack is the default)                 | `true`           |
+| `--webpack`, `--no-rspack`   | Use Webpack instead of Rspack                                                  | `false`          |
+| `--pro`                      | Generate the default React on Rails Pro setup explicitly                       | default behavior |
+| `--rsc`                      | Advanced: generate React on Rails Pro with the React Server Components example | `false`          |
+| `--standard`                 | Advanced: generate open-source React on Rails without Pro React 19.2 features  | `false`          |
+| `--tailwind`                 | Add Tailwind CSS v4 to the generated SSR example                               | `false`          |
+| `-p, --package-manager <pm>` | `npm` or `pnpm`                                                                | auto-detected    |
 
-When none of `--standard`, `--pro`, or `--rsc` is given, the CLI uses the recommended Pro setup. No
-setup questions are asked.
+When none of `--standard`, `--pro`, or `--rsc` is given, the CLI uses the Pro setup. No
+setup questions are asked, including in non-TTY environments such as CI, piped input, or redirected
+output. Add `--standard` to any CI command that intentionally needs the open-source-only scaffold.
 
 ## What It Does
 
@@ -103,12 +107,12 @@ After completion, you get:
 
 - A Rails 7+ app with PostgreSQL
 - Shakapacker configured with Rspack by default (or Webpack when requested) and HMR
-- A generated React example: HelloServer by default, or HelloWorld when using `--standard` or `--pro`
+- A generated React example: HelloWorld by default, or HelloServer when using `--rsc`
 - A generated home page at `/` with links to the example pages, important project files, and Pro/RSC learning resources
 - A teaching-friendly git history that separates Rails creation, gem installation, generator output, and pnpm normalization
 - Standard Rails git scaffold files (`.gitignore` and `.gitattributes`) preserved in the generated app
-- Default Pro RSC setup with HelloServer route and Pro Node renderer wiring
-- Optional Pro setup without the RSC example (`--pro`) with Pro Node renderer wiring and the generated `/hello_world` example
+- Default Pro setup with Pro Node renderer wiring and the generated `/hello_world` example
+- Optional Pro RSC setup (`--rsc`) with the HelloServer route, RSC package, and Pro Node renderer wiring
 - Optional Tailwind CSS v4 setup (`--tailwind`) for the generated SSR example
 - Server-side rendering ready
 - Development scripts (`bin/dev` with hot reloading and first-run browser open)
@@ -144,5 +148,5 @@ Now that you have React on Rails running, here are ways to level up:
 
 - **Add server-side rendering** — [SSR guide](../core-concepts/react-server-rendering.md)
 - **See the feature comparison** — [OSS vs Pro](./oss-vs-pro.md)
-- **Upgrade to Pro** for React Server Components, streaming SSR, and 3-10x faster SSR — [3-step upgrade guide](../../pro/upgrading-to-pro.md)
+- **Add React Server Components** when you want the RSC example and streaming path — [RSC guide](../../pro/react-server-components/tutorial.md)
 - **Explore the full docs** — [Documentation index](../../README.md)

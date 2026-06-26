@@ -45,8 +45,8 @@ export function resolveSetupMode(rawOpts: Record<string, unknown>): ResolvedSetu
 
   return {
     defaulted: true,
-    mode: 'rsc',
-    pro: false,
-    rsc: true,
+    mode: 'pro',
+    pro: true,
+    rsc: false,
   };
 }

@@ -4,9 +4,9 @@ describe('resolveSetupMode', () => {
   it('defaults to the recommended Pro setup when no setup mode is given', () => {
     expect(resolveSetupMode({})).toEqual({
       defaulted: true,
-      mode: 'rsc',
-      pro: false,
-      rsc: true,
+      mode: 'pro',
+      pro: true,
+      rsc: false,
     });
   });
 
@@ -28,7 +28,7 @@ describe('resolveSetupMode', () => {
     });
   });
 
-  it('keeps explicit RSC mode on the recommended Pro setup', () => {
+  it('keeps explicit RSC mode as a Pro setup option', () => {
     expect(resolveSetupMode({ rsc: true })).toEqual({
       defaulted: false,
       mode: 'rsc',
