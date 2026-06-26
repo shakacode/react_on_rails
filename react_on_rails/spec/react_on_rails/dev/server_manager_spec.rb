@@ -1479,6 +1479,313 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
   end
 
+  describe ".clean_generated_assets_and_caches" do
+    around do |example|
+      original_renderer_cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", nil)
+      Dir.mktmpdir("react-on-rails-clean") do |tmpdir|
+        Dir.mktmpdir("react-on-rails-clean-outside") do |outside_tmpdir|
+          @clean_test_outside_root = outside_tmpdir
+          Dir.chdir(tmpdir) do
+            example.run
+          end
+        end
+      end
+    ensure
+      @clean_test_outside_root = nil
+      if original_renderer_cache_path.nil?
+        ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
+      else
+        ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = original_renderer_cache_path
+      end
+    end
+
+    before do
+      allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
+      allow(described_class).to receive(:kill_processes)
+    end
+
+    def write_clean_test_shakapacker_config(content)
+      FileUtils.mkdir_p("config")
+      File.write("config/shakapacker.yml", content)
+    end
+
+    def create_clean_test_dirs(*paths)
+      paths.each { |path| FileUtils.mkdir_p(path) }
+    end
+
+    def clean_test_outside_path(*parts)
+      File.join(@clean_test_outside_root, *parts)
+    end
+
+    it "removes bundle outputs and cache paths derived from shakapacker.yml" do
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "tmp/custom-renderer-cache"
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: packs
+          private_output_path: ssr-generated
+          cache_path: tmp/shakapacker
+
+        development:
+          public_output_path: webpack/development
+
+        test:
+          public_output_path: webpack/test
+          cache_path: tmp/shakapacker-test
+
+        production:
+          public_output_path: webpack/production
+
+        staging:
+          public_output_path: webpack/staging
+      YAML
+      create_clean_test_dirs(
+        "public/packs",
+        "public/webpack/development",
+        "public/webpack/test",
+        "public/webpack/production",
+        "public/webpack/staging",
+        "ssr-generated",
+        "tmp/shakapacker",
+        "tmp/shakapacker-test",
+        "tmp/cache",
+        "node_modules/.cache",
+        ".node-renderer-bundles",
+        "tmp/custom-renderer-cache",
+        "tmp/node-renderer-bundles-test-0"
+      )
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(described_class).to have_received(:kill_processes)
+        expect(output).to include("config/shakapacker.yml")
+        expect(output).to include("public/webpack/development")
+        expect(output).to include("public/webpack/staging")
+        expect(output).to include("tmp/shakapacker-test")
+        expect(output).to include("Generated bundles and caches cleaned")
+        expect(File).not_to exist("public/packs")
+        expect(File).not_to exist("public/webpack/development")
+        expect(File).not_to exist("public/webpack/test")
+        expect(File).not_to exist("public/webpack/production")
+        expect(File).not_to exist("public/webpack/staging")
+        expect(File).not_to exist("ssr-generated")
+        expect(File).not_to exist("tmp/shakapacker")
+        expect(File).not_to exist("tmp/shakapacker-test")
+        expect(File).not_to exist("tmp/cache")
+        expect(File).not_to exist("node_modules/.cache")
+        expect(File).not_to exist(".node-renderer-bundles")
+        expect(File).not_to exist("tmp/custom-renderer-cache")
+        expect(File).not_to exist("tmp/node-renderer-bundles-test-0")
+      end
+    end
+
+    it "reports missing shakapacker.yml and still removes common caches" do
+      create_clean_test_dirs(
+        "tmp/cache",
+        "node_modules/.cache",
+        ".node-renderer-bundles"
+      )
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Shakapacker config not found: config/shakapacker.yml")
+        expect(output).to include("Skipping configured Shakapacker output/cache paths")
+        expect(output).not_to include("Reading Shakapacker config")
+        expect(File).not_to exist("tmp/cache")
+        expect(File).not_to exist("node_modules/.cache")
+        expect(File).not_to exist(".node-renderer-bundles")
+      end
+    end
+
+    it "reports invalid shakapacker.yml and still removes common caches" do
+      write_clean_test_shakapacker_config("<% if %>")
+      create_clean_test_dirs(
+        "tmp/cache",
+        "node_modules/.cache",
+        ".node-renderer-bundles"
+      )
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Could not parse Shakapacker config: config/shakapacker.yml")
+        expect(output).to include("Skipping configured Shakapacker output/cache paths")
+        expect(output).not_to include("Reading Shakapacker config")
+        expect(File).not_to exist("tmp/cache")
+        expect(File).not_to exist("node_modules/.cache")
+        expect(File).not_to exist(".node-renderer-bundles")
+      end
+    end
+
+    it "removes broken symlink cleanup targets when the link target stays inside the app root" do
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: broken-packs
+      YAML
+      FileUtils.mkdir_p("public")
+      File.symlink(File.expand_path("tmp/deleted-packs", Dir.pwd), "public/broken-packs")
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Removed public/broken-packs")
+        expect(File).not_to be_symlink("public/broken-packs")
+      end
+    end
+
+    it "removes broken symlink cleanup targets when the app root path is a symlink" do
+      Dir.mktmpdir("react-on-rails-real-root") do |real_root|
+        symlink_root = clean_test_outside_path("symlink-root")
+        File.symlink(real_root, symlink_root)
+
+        Dir.chdir(symlink_root) do
+          allow(Rails).to receive(:root).and_return(Pathname.new(symlink_root))
+          write_clean_test_shakapacker_config(<<~YAML)
+            default:
+              public_root_path: public
+              public_output_path: broken-packs
+          YAML
+          FileUtils.mkdir_p("public")
+          File.symlink("../tmp/deleted-packs", "public/broken-packs")
+
+          output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+          aggregate_failures do
+            expect(output).to include("Removed public/broken-packs")
+            expect(File).not_to be_symlink("public/broken-packs")
+          end
+        end
+      end
+    end
+
+    it "skips cleanup targets when realpath is blocked by permissions" do
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: restricted-packs
+      YAML
+      create_clean_test_dirs("public/restricted-packs")
+      restricted_path = File.expand_path("public/restricted-packs", Dir.pwd)
+      allow(File).to receive(:realpath).and_call_original
+      allow(File).to receive(:realpath).with(restricted_path).and_raise(Errno::EACCES)
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Skipping unsafe cleanup path: public/restricted-packs")
+        expect(output).to include("Cleanup completed with warnings")
+        expect(File).to exist("public/restricted-packs")
+      end
+    end
+
+    it "skips cleanup targets when realpath is blocked by operation permissions" do
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: restricted-packs
+      YAML
+      create_clean_test_dirs("public/restricted-packs")
+      restricted_path = File.expand_path("public/restricted-packs", Dir.pwd)
+      allow(File).to receive(:realpath).and_call_original
+      allow(File).to receive(:realpath).with(restricted_path).and_raise(Errno::EPERM)
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Skipping unsafe cleanup path: public/restricted-packs")
+        expect(output).to include("Cleanup completed with warnings")
+        expect(File).to exist("public/restricted-packs")
+      end
+    end
+
+    it "skips broken symlink cleanup targets when readlink is blocked by operation permissions" do
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: blocked-link
+      YAML
+      FileUtils.mkdir_p("public")
+      File.symlink("../tmp/deleted-packs", "public/blocked-link")
+      blocked_path = File.expand_path("public/blocked-link", Dir.pwd)
+      allow(File).to receive(:readlink).and_call_original
+      allow(File).to receive(:readlink).with(blocked_path).and_raise(Errno::EPERM)
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Skipping unsafe cleanup path: public/blocked-link")
+        expect(output).to include("Cleanup completed with warnings")
+        expect(File).to be_symlink("public/blocked-link")
+      end
+    end
+
+    it "warns when a cleanup target remains after removal" do
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: partial-packs
+      YAML
+      create_clean_test_dirs("public/partial-packs")
+      partial_path = File.expand_path("public/partial-packs", Dir.pwd)
+      allow(FileUtils).to receive(:rm_rf).and_call_original
+      allow(FileUtils).to receive(:rm_rf).with(partial_path)
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Partially removed public/partial-packs")
+        expect(output).to include("Cleanup completed with warnings")
+        expect(output).not_to include("Generated bundles and caches cleaned")
+        expect(File).to exist("public/partial-packs")
+      end
+    end
+
+    it "skips shakapacker.yml paths that resolve outside the app root or to broad root directories" do
+      outside_packs = clean_test_outside_path("outside-packs")
+      outside_cache = clean_test_outside_path("outside-cache")
+      outside_webpack = clean_test_outside_path("outside-webpack")
+      outside_renderer_cache = clean_test_outside_path("outside-renderer-cache")
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = outside_renderer_cache
+      FileUtils.mkdir_p(outside_packs)
+      FileUtils.mkdir_p(File.join(outside_webpack, "development"))
+      FileUtils.mkdir_p(outside_renderer_cache)
+      FileUtils.mkdir_p("public")
+      File.write(File.join(outside_packs, "keep.txt"), "keep")
+      File.write(File.join(outside_webpack, "development", "keep.txt"), "keep")
+      File.write(File.join(outside_renderer_cache, "keep.txt"), "keep")
+      File.symlink(outside_webpack, "public/webpack")
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: #{@clean_test_outside_root}
+          public_output_path: outside-packs
+          cache_path: #{outside_cache}
+
+        test:
+          public_root_path: public
+          public_output_path: .
+          cache_path: tmp
+
+        development:
+          public_root_path: public
+          public_output_path: webpack/development
+      YAML
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(File).to exist(File.join(outside_packs, "keep.txt"))
+        expect(File).to exist(File.join(outside_webpack, "development", "keep.txt"))
+        expect(File).to exist(File.join(outside_renderer_cache, "keep.txt"))
+        expect(File).to exist("public")
+        expect(output).to include("Skipping unsafe cleanup path")
+        expect(output).to include("Cleanup completed with warnings")
+      end
+    end
+  end
+
   describe ".kill_port_processes" do
     it "kills processes on specified ports" do
       allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["1234", nil])
@@ -1686,6 +1993,22 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(output).to match(/TEST ASSET WORKFLOWS/)
         expect(output).to match(%r{bin/dev test-watch})
         expect(output).to match(%r{bin/dev static})
+      end
+    end
+
+    it "documents the clean command" do
+      output = capture_stdout { described_class.show_help }
+
+      expect(output).to match(%r{clean\s+Kill dev processes and remove generated bundles/caches})
+    end
+
+    it "links to the published documentation for dev server and testing guidance" do
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(%r{https://reactonrails.com/docs/building-features/dev-server-and-testing/})
+        expect(output).to match(%r{https://reactonrails.com/docs/building-features/testing-configuration/})
+        expect(output).to match(%r{https://reactonrails.com/docs/})
       end
     end
 
@@ -2179,6 +2502,15 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(Open3).not_to receive(:capture3)
 
         described_class.run_from_command_line(["kill"])
+
+        expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to be_nil
+      end
+
+      it "does not run hook or set environment variable for clean command" do
+        expect(Open3).not_to receive(:capture3)
+        expect(described_class).to receive(:clean_generated_assets_and_caches)
+
+        described_class.run_from_command_line(["clean"])
 
         expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to be_nil
       end

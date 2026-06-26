@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **`bin/dev clean` clears generated bundles and caches**: The command stops development processes, reads `config/shakapacker.yml` or `SHAKAPACKER_CONFIG`, removes configured Shakapacker public/private output and cache paths plus common Rails, JavaScript, and renderer bundle caches, and skips unsafe paths outside the app root. [PR 4218](https://github.com/shakacode/react_on_rails/pull/4218) by [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **[Pro]** **RSC doctor now catches stale install and client-manifest setup failures**:
@@ -40,6 +44,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   and scopes [Issue 4204](https://github.com/shakacode/react_on_rails/issues/4204).
   [PR 4213](https://github.com/shakacode/react_on_rails/pull/4213) by
   [justin808](https://github.com/justin808).
+
+- **Dummy app setup uses native Nokogiri gems on macOS**: The dummy app lockfile now includes Darwin platforms so `bin/setup` installs native Nokogiri gems on Apple Silicon and Intel macOS instead of attempting a source build that can fail with a missing `nokogiri_gumbo.h` header. [PR 4218](https://github.com/shakacode/react_on_rails/pull/4218) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **ScoutApm Node renderer instrumentation no longer depends on Gemfile load order**: Pro now installs `NodeRenderingPool.exec_server_render_js` instrumentation from a Rails engine initializer that runs after `scout_apm.start`, instead of checking `defined?(ScoutApm)` at class load time. Apps without ScoutApm still boot normally, and apps that load `scout_apm` after `react_on_rails_pro` no longer silently skip the Pro Node renderer span. Fixes [Issue 4208](https://github.com/shakacode/react_on_rails/issues/4208). [PR 4210](https://github.com/shakacode/react_on_rails/pull/4210) by [justin808](https://github.com/justin808).
 

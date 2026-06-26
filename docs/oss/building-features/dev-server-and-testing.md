@@ -21,6 +21,37 @@ Your test setup depends on which testing framework you use. Pick your path:
 
 **The key takeaway:** With [TestHelper properly configured](#test-helper-configuration), all `bin/dev` modes work with all test types. TestHelper auto-compiles test assets when needed, regardless of whether HMR or static mode is running.
 
+## Generated Bundle Files and Cache Cleanup
+
+Most `bin/dev` commands are intentionally conservative: they start, watch, rebuild, or stop the processes for the selected mode, but they do not wipe every generated bundle directory or bundler cache first. That keeps normal restarts fast, but stale files can survive branch switches, package-version changes, and Shakapacker configuration changes. Use `bin/dev clean` when you want the cleanup step too.
+
+The exact output directories come from `config/shakapacker.yml`. The paths below use the defaults shown in this guide.
+
+| Command                              | Generated bundles it uses or writes                                                                        | What it clears automatically                                                                                                                                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bin/dev` (HMR, default)             | Browser bundles are served from webpack-dev-server memory, not from `public/webpack/development/`.         | No generated bundle directories or build caches. Existing disk outputs are left alone.                                                                                                                             |
+| `bin/dev static`                     | Writes development bundles to the development `public_output_path`, usually `public/webpack/development/`. | No output directories or build caches. Watch rebuilds update known outputs but do not remove stale files from old branches.                                                                                        |
+| `bin/dev test-watch`                 | Writes test bundles to the test `public_output_path`, usually `public/webpack/test/`.                      | No output directories or build caches. Watch rebuilds update known outputs but do not remove stale files from old branches.                                                                                        |
+| TestHelper / `build_test_command`    | Writes test bundles when assets are stale.                                                                 | No output directories or build caches unless your custom `build_test_command` deletes them.                                                                                                                        |
+| `bin/dev prod` / `production-assets` | Runs `rails assets:precompile` with production bundler optimizations.                                      | No `public/assets`, `public/webpack/*`, or build-cache cleanup unless your Rails tasks do it.                                                                                                                      |
+| `bin/dev kill`                       | Does not build bundles.                                                                                    | Stops known dev processes and removes process/socket files such as Overmind sockets and `tmp/pids/server.pid`; it does not delete bundles, `tmp/cache`, `node_modules/.cache`, or renderer bundle caches.          |
+| `bin/dev clean`                      | Does not build bundles.                                                                                    | Runs the `kill` cleanup, reads `config/shakapacker.yml` or `SHAKAPACKER_CONFIG`, removes configured Shakapacker output/cache paths, and clears common build caches. Unsafe paths outside the app root are skipped. |
+
+If a branch switch or package update leaves confusing asset errors, stop watchers and clear generated outputs first, then reinstall packages if the lockfile changed before rebuilding:
+
+```bash
+bin/dev clean
+
+# If package versions changed, reinstall with your package manager.
+pnpm install
+# or: yarn install
+# or: npm install
+```
+
+`bin/dev clean` derives Shakapacker public and private output paths from every top-level section in `shakapacker.yml` (including custom sections such as `staging`, plus the standard `default`, `development`, `test`, and `production` sections), then clears those directories plus configured `cache_path` directories, `public/assets`, `tmp/cache`, `node_modules/.cache`, `.node-renderer-bundles`, and `tmp/node-renderer-bundles-test-*`.
+
+For React Server Components or the React on Rails Pro node renderer, `bin/dev clean` handles the default generated renderer cache paths above and app-local paths configured with `RENDERER_SERVER_BUNDLE_CACHE_PATH`. If that environment variable points outside the app root, the safety guard skips it; clear that external path manually. The [RSC testing setup](./testing-configuration.md#rsc-and-node-renderer-system-tests) explains why each parallel test worker should use its own renderer bundle cache.
+
 ## Capybara / Rails System Tests (RSpec and Minitest)
 
 Capybara boots its **own** Puma server for each test run. That server reads `manifest.json` to find asset paths, so assets must exist as files on disk. HMR manifests contain `http://localhost:3035/...` URLs that Capybara's Puma can't serve — but this doesn't matter if TestHelper is configured, because it compiles separate test assets.
