@@ -33,22 +33,34 @@ function browserPerformanceMarkGlobal(): BrowserPerformanceMarkGlobal {
   return globalThis as BrowserPerformanceMarkGlobal;
 }
 
+function browserPerformanceMarkDetailSupported(): boolean {
+  return (
+    typeof PerformanceMark !== 'undefined' &&
+    Boolean(PerformanceMark.prototype) &&
+    'detail' in PerformanceMark.prototype
+  );
+}
+
 export function markBrowserPerformance(markName: string, detail: BrowserPerformanceMarkDetail): void {
   const markGlobal = browserPerformanceMarkGlobal();
   const entry: BrowserPerformanceMarkEntry = { name: markName, detail };
   const perf = markGlobal.performance;
 
   if (perf && typeof perf.mark === 'function') {
-    try {
-      perf.mark(markName, { detail });
-      return;
-    } catch {
+    if (browserPerformanceMarkDetailSupported()) {
       try {
-        perf.mark(markName);
-        entry.fallback = 'mark-detail-unavailable';
+        perf.mark(markName, { detail });
+        return;
       } catch {
-        entry.fallback = 'performance-mark-unavailable';
+        // Fall back to a plain mark below so older User Timing implementations still get timing data.
       }
+    }
+
+    try {
+      perf.mark(markName);
+      entry.fallback = 'mark-detail-unavailable';
+    } catch {
+      entry.fallback = 'performance-mark-unavailable';
     }
   } else {
     entry.fallback = 'performance-mark-unavailable';
@@ -65,12 +77,14 @@ export function createBrowserPerformanceMarkScript(markName: string, detail: Bro
     `(function(){var detail=${detailJson};` +
     `var entry={name:${markNameJson},detail:detail};` +
     'var perf=self.performance;' +
+    'var supportsDetail=typeof PerformanceMark!=="undefined"&&PerformanceMark.prototype&&' +
+    '"detail" in PerformanceMark.prototype;' +
     'if(perf&&typeof perf.mark==="function"){' +
-    `try{performance.mark(${markNameJson},{detail:detail});return;}` +
-    'catch(error){' +
+    `if(supportsDetail){try{performance.mark(${markNameJson},{detail:detail});return;}` +
+    'catch(error){}}' +
     `try{performance.mark(${markNameJson});entry.fallback="mark-detail-unavailable";}` +
     'catch(fallbackError){entry.fallback="performance-mark-unavailable";}' +
-    '}}else{entry.fallback="performance-mark-unavailable";}' +
+    '}else{entry.fallback="performance-mark-unavailable";}' +
     `(self.${REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE}||=[]).push(entry);})()`
   );
 }

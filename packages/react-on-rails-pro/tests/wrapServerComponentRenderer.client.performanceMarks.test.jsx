@@ -40,14 +40,23 @@ const loadWrappedRenderer = () => {
 };
 
 describe('wrapServerComponentRenderer/client performance marks', () => {
+  let originalPerformanceMarkDescriptor;
   let originalPerformanceMark;
 
   beforeEach(() => {
     document.body.innerHTML = '';
+    originalPerformanceMarkDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'PerformanceMark');
     originalPerformanceMark = globalThis.performance.mark;
+    setPerformanceMarkDetailSupport(true);
   });
 
   afterEach(() => {
+    if (originalPerformanceMarkDescriptor) {
+      Object.defineProperty(globalThis, 'PerformanceMark', originalPerformanceMarkDescriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, 'PerformanceMark');
+    }
+
     Object.defineProperty(globalThis.performance, 'mark', {
       configurable: true,
       value: originalPerformanceMark,
@@ -59,6 +68,23 @@ describe('wrapServerComponentRenderer/client performance marks', () => {
     jest.resetModules();
     document.body.innerHTML = '';
   });
+
+  const setPerformanceMarkDetailSupport = (supported) => {
+    function PerformanceMarkShim() {}
+
+    if (supported) {
+      Object.defineProperty(PerformanceMarkShim.prototype, 'detail', {
+        configurable: true,
+        value: null,
+      });
+    }
+
+    Object.defineProperty(globalThis, 'PerformanceMark', {
+      configurable: true,
+      value: PerformanceMarkShim,
+      writable: true,
+    });
+  };
 
   const setPerformanceMark = (mark) => {
     Object.defineProperty(globalThis.performance, 'mark', {

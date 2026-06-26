@@ -14,32 +14,69 @@
  */
 
 import {
+  createBrowserPerformanceMarkScript,
   markBrowserPerformance,
   REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE,
 } from '../src/browserPerformanceMarks.ts';
 
 type PerformanceWithWritableMark = Performance & { mark?: Performance['mark'] };
 type GlobalWithPerformanceQueue = typeof globalThis & {
+  PerformanceMark?: typeof PerformanceMark;
   [REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE]?: unknown[];
 };
 
 describe('browserPerformanceMarks runtime helper', () => {
   const globalWithQueue = globalThis as GlobalWithPerformanceQueue;
+  let originalPerformanceMarkDescriptor: PropertyDescriptor | undefined;
   let originalPerformanceMark: PerformanceWithWritableMark['mark'];
+  let originalSelfDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(() => {
+    originalPerformanceMarkDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'PerformanceMark');
     originalPerformanceMark = (globalThis.performance as PerformanceWithWritableMark).mark;
+    originalSelfDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'self');
     delete globalWithQueue[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE];
+    setPerformanceMarkDetailSupport(true);
   });
 
   afterEach(() => {
+    if (originalPerformanceMarkDescriptor) {
+      Object.defineProperty(globalThis, 'PerformanceMark', originalPerformanceMarkDescriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, 'PerformanceMark');
+    }
+
     Object.defineProperty(globalThis.performance, 'mark', {
       configurable: true,
       value: originalPerformanceMark,
       writable: true,
     });
+
+    if (originalSelfDescriptor) {
+      Object.defineProperty(globalThis, 'self', originalSelfDescriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, 'self');
+    }
+
     delete globalWithQueue[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE];
   });
+
+  const setPerformanceMarkDetailSupport = (supported: boolean) => {
+    function PerformanceMarkShim() {}
+
+    if (supported) {
+      Object.defineProperty(PerformanceMarkShim.prototype, 'detail', {
+        configurable: true,
+        value: null,
+      });
+    }
+
+    Object.defineProperty(globalThis, 'PerformanceMark', {
+      configurable: true,
+      value: PerformanceMarkShim,
+      writable: true,
+    });
+  };
 
   const setPerformanceMark = (mark: PerformanceWithWritableMark['mark']) => {
     Object.defineProperty(globalThis.performance, 'mark', {
@@ -94,6 +131,60 @@ describe('browserPerformanceMarks runtime helper', () => {
         detail: {
           source: 'react-on-rails-pro',
           componentName: 'ProductPage',
+        },
+        fallback: 'mark-detail-unavailable',
+      },
+    ]);
+  });
+
+  it('queues fallback details when mark options are ignored instead of rejected', () => {
+    setPerformanceMarkDetailSupport(false);
+    const mark = jest.fn();
+    setPerformanceMark(mark as Performance['mark']);
+
+    markBrowserPerformance('react-on-rails:rsc:hydration:interactive', {
+      source: 'react-on-rails-pro',
+      componentName: 'ProductPage',
+    });
+
+    expect(mark).toHaveBeenCalledTimes(1);
+    expect(mark).toHaveBeenCalledWith('react-on-rails:rsc:hydration:interactive');
+    expect(globalWithQueue[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE]).toEqual([
+      {
+        name: 'react-on-rails:rsc:hydration:interactive',
+        detail: {
+          source: 'react-on-rails-pro',
+          componentName: 'ProductPage',
+        },
+        fallback: 'mark-detail-unavailable',
+      },
+    ]);
+  });
+
+  it('uses the same fallback contract from generated inline mark scripts', () => {
+    setPerformanceMarkDetailSupport(false);
+    Object.defineProperty(globalThis, 'self', {
+      configurable: true,
+      value: globalThis,
+      writable: true,
+    });
+    const mark = jest.fn();
+    setPerformanceMark(mark as Performance['mark']);
+
+    const markScript = createBrowserPerformanceMarkScript('react-on-rails:rsc:payload', {
+      source: 'react-on-rails-pro',
+      bytes: 2048,
+    });
+    new Function(markScript)();
+
+    expect(mark).toHaveBeenCalledTimes(1);
+    expect(mark).toHaveBeenCalledWith('react-on-rails:rsc:payload');
+    expect(globalWithQueue[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE]).toEqual([
+      {
+        name: 'react-on-rails:rsc:payload',
+        detail: {
+          source: 'react-on-rails-pro',
+          bytes: 2048,
         },
         fallback: 'mark-detail-unavailable',
       },
