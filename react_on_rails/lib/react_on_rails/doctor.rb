@@ -3497,7 +3497,6 @@ module ReactOnRails
     EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules public spec test tmp vendor].freeze
     RSC_CLIENT_REFERENCES_MANIFEST_ENV = "RSC_MANIFEST_CLIENT_REFERENCES_JSON"
     DEFAULT_RSC_CLIENT_REFERENCES_MANIFEST_PATH = "ssr-generated/rsc-client-references.json"
-    RSC_DISCOVERY_WEBPACK_CONFIG_PATH = "config/webpack/rscWebpackConfig.js"
     RSC_DISCOVERY_PRECOMPILE_HOOK_PATH = "bin/shakapacker-precompile-hook"
     RSC_DISCOVERY_WEBPACK_CONFIG_TOKENS = %w[RSC_REFERENCE_DISCOVERY_BUILD RSCReferenceDiscoveryPlugin].freeze
     RSC_DISCOVERY_PRECOMPILE_HOOK_TOKENS = %w[
@@ -4509,7 +4508,9 @@ module ReactOnRails
     end
 
     def rsc_manifest_discovery_supported?
-      file_contains_all?(RSC_DISCOVERY_WEBPACK_CONFIG_PATH, RSC_DISCOVERY_WEBPACK_CONFIG_TOKENS) &&
+      RSC_BUNDLER_CONFIG_PATHS.any? do |config_path|
+        file_contains_all?(config_path, RSC_DISCOVERY_WEBPACK_CONFIG_TOKENS)
+      end &&
         file_contains_all?(RSC_DISCOVERY_PRECOMPILE_HOOK_PATH, RSC_DISCOVERY_PRECOMPILE_HOOK_TOKENS)
     end
 

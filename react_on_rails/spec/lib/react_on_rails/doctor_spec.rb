@@ -6092,10 +6092,11 @@ RSpec.describe ReactOnRails::Doctor do
       allow(ReactOnRails::PackerUtils).to receive(:packer_source_entry_path).and_return("app/javascript/packs")
     end
 
-    def write_rsc_discovery_support_files
-      FileUtils.mkdir_p("config/webpack")
+    def write_rsc_discovery_support_files(bundler: "webpack")
+      config_dir = "config/#{bundler}"
+      FileUtils.mkdir_p(config_dir)
       FileUtils.mkdir_p("bin")
-      File.write("config/webpack/rscWebpackConfig.js", "RSC_REFERENCE_DISCOVERY_BUILD RSCReferenceDiscoveryPlugin")
+      File.write("#{config_dir}/rscWebpackConfig.js", "RSC_REFERENCE_DISCOVERY_BUILD RSCReferenceDiscoveryPlugin")
       File.write(
         "bin/shakapacker-precompile-hook",
         "generate_rsc_manifest_client_references_if_needed RSC_REFERENCE_DISCOVERY_BUILD"
@@ -6117,6 +6118,17 @@ RSpec.describe ReactOnRails::Doctor do
       FileUtils.mkdir_p("app/javascript/generated")
       File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
       write_rsc_discovery_support_files
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+    end
+
+    it "warns when the Rspack RSC config supports manifest discovery and the manifest is missing" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+      write_rsc_discovery_support_files(bundler: "rspack")
 
       doctor.send(:check_rsc_artifacts)
 
