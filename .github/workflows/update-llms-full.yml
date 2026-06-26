@@ -1,7 +1,9 @@
 name: Update llms-full.txt
 
 permissions:
-  contents: read
+  actions: write # needed for `gh workflow run` in "Dispatch generated PR checks"
+  contents: write
+  pull-requests: write
 
 on:
   schedule:
@@ -35,21 +37,27 @@ jobs:
       - name: Regenerate llms-full references
         run: node script/generate-llms-full.mjs
 
-      - name: Create docs bot token
-        id: docs-bot-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
-        with:
-          app-id: ${{ secrets.DOCS_DISPATCH_APP_ID }}
-          private-key: ${{ secrets.DOCS_DISPATCH_APP_KEY }}
-          owner: shakacode
-          repositories: react_on_rails
-          permission-contents: write
-          permission-pull-requests: write
+      - name: Detect generated changes
+        id: generated-changes
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- llms-full.txt llms-full-pro.txt &&
+            [ -z "$(git status --porcelain -- llms-full.txt llms-full-pro.txt)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No llms-full reference changes detected."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Generated llms-full reference changes detected:"
+            git status --short -- llms-full.txt llms-full-pro.txt
+          fi
 
       - name: Create pull request for generated updates
+        if: steps.generated-changes.outputs.changed == 'true'
+        id: create-pull-request
         uses: peter-evans/create-pull-request@67ccf781d68cd99b580ae25a5c18a1cc84ffff1f # v7.0.6
         with:
-          token: ${{ steps.docs-bot-token.outputs.token }}
+          token: ${{ github.token }}
           branch: docs/update-llms-full
           delete-branch: true
           title: Regenerate llms-full references
@@ -62,8 +70,27 @@ jobs:
             - `bash script/generate-llms-full-test.bash`
             - `node script/generate-llms-full.mjs`
 
-            Expected generated PR check:
-            - `node script/generate-llms-full.mjs --check`
+            Expected generated PR checks:
+            - `ci-required / required-pr-gate`
+            - `Validate llms-full.txt / check-llms-full`
           add-paths: |
             llms-full.txt
             llms-full-pro.txt
+
+      - name: Dispatch generated PR checks
+        if: steps.create-pull-request.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          dispatch_failed=false
+          for workflow in ci-required.yml check-llms-full.yml; do
+            if ! gh workflow run "$workflow" --ref docs/update-llms-full; then
+              dispatch_failed=true
+            fi
+          done
+
+          if [ "$dispatch_failed" = "true" ]; then
+            exit 1
+          fi

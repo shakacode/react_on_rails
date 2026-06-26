@@ -45,6 +45,11 @@ jobs:
         run: |
           bash script/ci-required-hosted-gate-test.bash
 
+      - name: Fetch workflow dispatch base
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git fetch --no-tags --depth=50 origin main:refs/remotes/origin/main
+
       - name: Select hosted CI mode
         id: hosted-ci
         uses: ./.github/actions/hosted-ci-selectors
