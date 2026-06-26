@@ -161,6 +161,8 @@ module ReactOnRailsPro
       ((end_time - start_time) * 1000).round(3)
     end
 
+    # Keep this inline script in sync with createBrowserPerformanceMarkScript in
+    # packages/react-on-rails-pro/src/browserPerformanceMarks.ts.
     def rsc_stream_observability_script(mark_name, detail)
       mark_name_json = ERB::Util.json_escape(mark_name.to_json)
       detail_json = ERB::Util.json_escape(detail.to_json)
