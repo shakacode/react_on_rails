@@ -5022,6 +5022,20 @@ RSpec.describe ReactOnRails::Doctor do
         expect(info_messages).to include(a_string_including("React Server Components checks skipped"))
         expect(info_messages).to include(a_string_including("react_on_rails_pro is not installed"))
       end
+
+      it "reports a skip reason when RSC is part of an explicit mixed selection" do
+        mixed_doctor = described_class.new(verbose: false, fix: false,
+                                           only: %w[environment_prerequisites react_server_components])
+        mixed_checker = mixed_doctor.instance_variable_get(:@checker)
+        allow(mixed_doctor).to receive(:puts)
+        allow(mixed_doctor).to receive(:exit)
+
+        mixed_doctor.send(:check_rsc_setup)
+
+        info_messages = mixed_checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("React Server Components checks skipped"))
+        expect(info_messages).to include(a_string_including("react_on_rails_pro is not installed"))
+      end
     end
 
     context "when Pro is installed but RSC is disabled" do
@@ -6303,6 +6317,29 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages).to include(
         a_string_including("RSC client references manifest must contain a refs array")
       )
+    end
+
+    it "continues client-reference diagnostics when the server manifest cannot be read" do
+      previous_manifest_path = ENV.fetch(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil)
+      ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = "missing-rsc-client-references.json"
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("ssr-generated/rsc-bundle.js", "// RSC bundle")
+      File.write("ssr-generated/react-server-client-manifest.json", JSON.generate("module" => {}))
+      server_manifest_path = File.expand_path("ssr-generated/react-server-client-manifest.json")
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(server_manifest_path).and_raise(Errno::EACCES, "Permission denied")
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("Could not inspect RSC server client manifest"))
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+    ensure
+      if previous_manifest_path.nil?
+        ENV.delete(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV)
+      else
+        ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = previous_manifest_path
+      end
     end
 
     it "warns clearly when the RSC client references manifest is a JSON array" do

@@ -3518,7 +3518,7 @@ module ReactOnRails
 
     def check_rsc_setup
       unless ReactOnRails::Utils.react_on_rails_pro?
-        if rsc_only_check?
+        if rsc_check_explicitly_selected?
           checker.add_info(
             "ℹ️  React Server Components checks skipped — react_on_rails_pro is not installed"
           )
@@ -3545,8 +3545,9 @@ module ReactOnRails
       checker.add_warning("⚠️  RSC setup check encountered an error: #{e.message}")
     end
 
-    def rsc_only_check?
-      check_sections.one? && check_sections.first[:id] == "react_server_components"
+    def rsc_check_explicitly_selected?
+      check_sections.any? { |section| section[:id] == "react_server_components" } &&
+        check_sections != CHECK_SECTIONS
     end
 
     def check_rsc_renderer_mode(pro_config)
@@ -4504,14 +4505,8 @@ module ReactOnRails
       end
     end
 
-    def rsc_client_references_manifest_required?(
-      registration_entry_exists: nil,
-      discovery_supported: nil
-    )
+    def rsc_client_references_manifest_required?(registration_entry_exists:, discovery_supported:)
       return true unless ENV[RSC_CLIENT_REFERENCES_MANIFEST_ENV].to_s.strip.empty?
-
-      registration_entry_exists = rsc_manifest_registration_entry_exists? if registration_entry_exists.nil?
-      discovery_supported = rsc_manifest_discovery_supported? if discovery_supported.nil?
 
       registration_entry_exists && discovery_supported
     end
@@ -4647,6 +4642,9 @@ module ReactOnRails
       end
     rescue JSON::ParserError => e
       checker.add_warning("⚠️  #{label} is not valid JSON: #{e.message}")
+      add_rsc_artifacts_rebuild_guidance
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not inspect #{label}: #{e.message}")
       add_rsc_artifacts_rebuild_guidance
     end
 
