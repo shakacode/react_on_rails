@@ -155,6 +155,7 @@ const wrapServerComponentRenderer = (
     );
     const { onRecoverableError: userOnRecoverableError, ...rootErrorCallbackOptions } =
       userErrorCallbackOptions;
+    // Keep the start mark adjacent to root creation so it always brackets the same mount attempt.
     if (hydrationMarkDetail) {
       markRSCClientHydrationStart(hydrationMarkDetail);
     }

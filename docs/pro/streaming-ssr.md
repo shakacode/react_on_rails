@@ -266,6 +266,8 @@ The emitted mark names are:
 
 The details intentionally include byte counts, phase names, component names, DOM ids, hydrate/render mode, chunk indexes, and timing offsets. They do not include serialized props or Flight payload contents.
 
+For flush marks, `streamChunkBytes` is the sum of the flush detail subfields and excludes the flush mark's own inline script bytes.
+
 The initial RSC payload remains inline in the navigation response by design. A separate `/rsc_payload/*` request exists for client-side RSC payload generation, but the streamed initial page does not switch to that fetch path unless your application deliberately renders that route separately.
 
 #### CDN And Trailer Caveats
