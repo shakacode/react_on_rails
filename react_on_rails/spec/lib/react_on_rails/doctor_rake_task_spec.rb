@@ -53,11 +53,53 @@ RSpec.describe "doctor rake task" do
       ENV.delete("FORMAT")
     end
 
+    it "passes selected checks from ONLY" do
+      doctor_instance = instance_double(ReactOnRails::Doctor, run_diagnosis: nil)
+      allow(ReactOnRails::Doctor).to receive(:new).and_return(doctor_instance)
+
+      ENV["ONLY"] = "react_server_components"
+      Rake::Task["react_on_rails:doctor"].invoke
+
+      expect(ReactOnRails::Doctor).to have_received(:new)
+        .with(verbose: false, fix: false, format: :text, only: ["react_server_components"])
+    ensure
+      ENV.delete("ONLY")
+    end
+
     it "fails fast with ArgumentError when FORMAT is an unrecognized value" do
       ENV["FORMAT"] = "jsno"
 
       expect { Rake::Task["react_on_rails:doctor"].invoke }
         .to raise_error(ArgumentError, /Invalid doctor format/)
+    ensure
+      ENV.delete("FORMAT")
+    end
+  end
+
+  describe "rake react_on_rails:doctor:rsc task" do
+    it "exists" do
+      expect(Rake::Task.task_defined?("react_on_rails:doctor:rsc")).to be true
+    end
+
+    it "invokes doctor with only the React Server Components section" do
+      doctor_instance = instance_double(ReactOnRails::Doctor, run_diagnosis: nil)
+      allow(ReactOnRails::Doctor).to receive(:new).and_return(doctor_instance)
+
+      Rake::Task["react_on_rails:doctor:rsc"].invoke
+
+      expect(ReactOnRails::Doctor).to have_received(:new)
+        .with(verbose: false, fix: false, format: :text, only: ["react_server_components"])
+    end
+
+    it "passes FORMAT=json through the RSC-only task" do
+      doctor_instance = instance_double(ReactOnRails::Doctor, run_diagnosis: nil)
+      allow(ReactOnRails::Doctor).to receive(:new).and_return(doctor_instance)
+
+      ENV["FORMAT"] = "json"
+      Rake::Task["react_on_rails:doctor:rsc"].invoke
+
+      expect(ReactOnRails::Doctor).to have_received(:new)
+        .with(verbose: false, fix: false, format: :json, only: ["react_server_components"])
     ensure
       ENV.delete("FORMAT")
     end

@@ -164,8 +164,9 @@ module ReactOnRails
       { id: "react_on_rails_pro_setup", title: "React on Rails Pro Setup", method: :check_pro_setup },
       { id: "react_server_components", title: "React Server Components", method: :check_rsc_setup }
     ].freeze
+    CHECK_SECTIONS_BY_ID = CHECK_SECTIONS.to_h { |section| [section[:id], section] }.freeze
 
-    def initialize(verbose: false, fix: false, format: :text)
+    def initialize(verbose: false, fix: false, format: :text, only: nil)
       @verbose = verbose
       @fix = fix
       @format = format.respond_to?(:to_sym) ? format.to_sym : format
@@ -173,6 +174,7 @@ module ReactOnRails
         raise ArgumentError, "Invalid doctor format #{format.inspect}; expected one of #{OUTPUT_FORMATS.join(', ')}"
       end
 
+      @check_sections = normalize_check_sections(only)
       @checker = SystemChecker.new
       @test_output_path_strategy = :unknown
       @rails_environment_loaded = false
@@ -191,7 +193,21 @@ module ReactOnRails
 
     private
 
-    attr_reader :verbose, :fix, :format, :checker
+    attr_reader :verbose, :fix, :format, :checker, :check_sections
+
+    def normalize_check_sections(only)
+      check_ids = Array(only).flat_map { |value| value.to_s.split(/[,\s]+/) }.reject(&:empty?)
+      return CHECK_SECTIONS if check_ids.empty?
+
+      invalid_check_ids = check_ids - CHECK_SECTIONS_BY_ID.keys
+      if invalid_check_ids.any?
+        raise ArgumentError,
+              "Invalid doctor check selector #{invalid_check_ids.join(', ')}; expected one of " \
+              "#{CHECK_SECTIONS_BY_ID.keys.join(', ')}"
+      end
+
+      check_ids.uniq.map { |check_id| CHECK_SECTIONS_BY_ID.fetch(check_id) }
+    end
 
     def print_header
       puts Rainbow("\n#{'=' * 80}").cyan
@@ -212,7 +228,7 @@ module ReactOnRails
     end
 
     def run_all_checks
-      CHECK_SECTIONS.each do |section|
+      check_sections.each do |section|
         initial_message_count = checker.messages.length
         send(section[:method])
 
@@ -238,7 +254,7 @@ module ReactOnRails
     end
 
     def collect_check_results
-      CHECK_SECTIONS.map do |section|
+      check_sections.map do |section|
         initial_message_count = checker.messages.length
         send(section[:method])
 
@@ -3476,6 +3492,8 @@ module ReactOnRails
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
     NPM_VIEW_TERMINATION_GRACE_SECONDS = 0.5
     SKIP_NPM_DIST_TAG_CHECK_ENV = "REACT_ON_RAILS_SKIP_NPM_DIST_TAG_CHECK"
+    RSC_CLIENT_REFERENCES_MANIFEST_ENV = "RSC_MANIFEST_CLIENT_REFERENCES_JSON"
+    DEFAULT_RSC_CLIENT_REFERENCES_MANIFEST_PATH = "ssr-generated/rsc-client-references.json"
     # npm registry package names used here must be lowercase; keep this allowlist
     # narrow so names remain safe when reused as Node resolver args and paths.
     PACKAGE_NAME_PATTERN = %r{
@@ -3505,6 +3523,7 @@ module ReactOnRails
       check_rsc_react_version
       check_rsc_procfile_watcher
       check_rsc_client_manifest
+      check_rsc_artifacts
     rescue StandardError => e
       checker.add_warning("⚠️  RSC setup check encountered an error: #{e.message}")
     end
@@ -4370,6 +4389,121 @@ module ReactOnRails
         "#{RSC_CLIENT_MANIFEST_CLEANUP_PATHS.join(', ')}"
       )
       checker.add_info("  💡 Then rebuild so the Node renderer reads a fresh on-disk React Client Manifest")
+    end
+
+    def check_rsc_artifacts
+      check_rsc_bundle_artifact
+      check_rsc_server_client_manifest_artifact
+      check_rsc_client_references_manifest
+    end
+
+    def check_rsc_bundle_artifact
+      artifact_path = rsc_pro_utils_artifact_path(:rsc_bundle_js_file_path, "RSC bundle")
+      return unless artifact_path
+
+      if manifest_url?(artifact_path)
+        checker.add_warning("⚠️  RSC bundle resolves to a dev-server URL: #{artifact_path}")
+        add_rsc_artifacts_rebuild_guidance
+      elsif File.exist?(artifact_path)
+        checker.add_success("✅ RSC bundle exists at #{artifact_path}")
+      else
+        report_missing_rsc_artifact("RSC bundle", artifact_path)
+      end
+    end
+
+    def check_rsc_server_client_manifest_artifact
+      artifact_path = rsc_pro_utils_artifact_path(
+        :react_server_client_manifest_file_path,
+        "RSC server client manifest"
+      )
+      return unless artifact_path
+
+      if manifest_url?(artifact_path)
+        checker.add_warning("⚠️  RSC server client manifest resolves to a dev-server URL: #{artifact_path}")
+        add_rsc_artifacts_rebuild_guidance
+      elsif File.exist?(artifact_path)
+        report_rsc_json_artifact("RSC server client manifest", artifact_path)
+      else
+        report_missing_rsc_artifact("RSC server client manifest", artifact_path)
+      end
+    end
+
+    def check_rsc_client_references_manifest
+      artifact_path = rsc_client_references_manifest_path
+      unless File.exist?(artifact_path)
+        report_missing_rsc_artifact("RSC client references manifest", artifact_path)
+        return
+      end
+
+      refs = rsc_client_references_manifest_refs(artifact_path)
+      if refs.is_a?(Array)
+        checker.add_success("✅ RSC client references manifest includes #{refs.size} refs at #{artifact_path}")
+      else
+        checker.add_warning("⚠️  RSC client references manifest must contain a refs array: #{artifact_path}")
+        add_rsc_artifacts_rebuild_guidance
+      end
+    rescue JSON::ParserError => e
+      checker.add_warning("⚠️  RSC client references manifest is not valid JSON: #{e.message}")
+      add_rsc_artifacts_rebuild_guidance
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not inspect RSC client references manifest: #{e.message}")
+    end
+
+    def rsc_pro_utils_artifact_path(method_name, label)
+      unless defined?(ReactOnRailsPro::Utils) && ReactOnRailsPro::Utils.respond_to?(method_name)
+        checker.add_info("  ℹ️  #{label} check skipped — upgrade react-on-rails-pro to enable path resolution")
+        return nil
+      end
+
+      artifact_path = ReactOnRailsPro::Utils.public_send(method_name)
+      if artifact_path.blank?
+        checker.add_warning("⚠️  #{label} path could not be resolved")
+        return nil
+      end
+
+      artifact_path
+    rescue StandardError => e
+      checker.add_warning("⚠️  #{label} path could not be resolved: #{e.message}")
+      nil
+    end
+
+    def report_rsc_json_artifact(label, artifact_path)
+      payload = JSON.parse(File.read(artifact_path))
+      if payload.is_a?(Hash)
+        checker.add_success("✅ #{label} exists at #{artifact_path}")
+      else
+        checker.add_warning("⚠️  #{label} must contain a JSON object: #{artifact_path}")
+        add_rsc_artifacts_rebuild_guidance
+      end
+    rescue JSON::ParserError => e
+      checker.add_warning("⚠️  #{label} is not valid JSON: #{e.message}")
+      add_rsc_artifacts_rebuild_guidance
+    end
+
+    def rsc_client_references_manifest_refs(artifact_path)
+      JSON.parse(File.read(artifact_path))["refs"]
+    end
+
+    def rsc_client_references_manifest_path
+      configured_path = ENV.fetch(RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil)
+      File.expand_path(configured_path.presence || DEFAULT_RSC_CLIENT_REFERENCES_MANIFEST_PATH)
+    end
+
+    def report_missing_rsc_artifact(label, artifact_path)
+      checker.add_warning("⚠️  #{label} not found at #{artifact_path}")
+      add_rsc_artifacts_rebuild_guidance
+    end
+
+    def add_rsc_artifacts_rebuild_guidance
+      return if @rsc_artifacts_rebuild_guidance_added
+
+      checker.add_info("  💡 For RSC development, run: ./bin/dev static")
+      checker.add_info("  💡 Re-run bin/shakapacker-precompile-hook before rebuilding RSC assets")
+      checker.add_info(
+        "  💡 If artifacts look stale after a package or React upgrade, stop the dev server and remove: " \
+        "#{RSC_CLIENT_MANIFEST_CLEANUP_PATHS.join(', ')}"
+      )
+      @rsc_artifacts_rebuild_guidance_added = true
     end
 
     def check_rsc_procfile_watcher

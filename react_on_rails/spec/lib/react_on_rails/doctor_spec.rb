@@ -284,6 +284,55 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "selected check sections" do
+    def stub_all_check_sections(doctor)
+      described_class::CHECK_SECTIONS.each do |section|
+        allow(doctor).to receive(section[:method])
+      end
+    end
+
+    it "runs only the selected check in human-readable output" do
+      rsc_doctor = described_class.new(only: "react_server_components")
+      checker = rsc_doctor.instance_variable_get(:@checker)
+      stub_all_check_sections(rsc_doctor)
+      allow(rsc_doctor).to receive(:check_rsc_setup) do
+        checker.messages << { type: :success, content: "RSC-only doctor check ran" }
+      end
+      allow(rsc_doctor).to receive(:exit)
+
+      expect { rsc_doctor.run_diagnosis }
+        .to output(/React Server Components:.*RSC-only doctor check ran/m).to_stdout
+
+      expect(rsc_doctor).to have_received(:check_rsc_setup)
+      expect(rsc_doctor).not_to have_received(:check_environment)
+    end
+
+    it "emits only the selected check in JSON output" do
+      rsc_doctor = described_class.new(format: :json, only: [:react_server_components])
+      checker = rsc_doctor.instance_variable_get(:@checker)
+      stub_all_check_sections(rsc_doctor)
+      allow(rsc_doctor).to receive(:check_rsc_setup) do
+        checker.messages << { type: :warning, content: "RSC artifact missing" }
+      end
+      allow(rsc_doctor).to receive(:exit)
+
+      output = []
+      allow(rsc_doctor).to receive(:puts) { |arg| output << arg.to_s }
+
+      rsc_doctor.run_diagnosis
+
+      report = JSON.parse(output.join("\n"))
+      expect(report["checks"].map { |check| check["id"] }).to eq(["react_server_components"])
+      expect(report["summary"]).to eq("pass" => 0, "warn" => 1, "fail" => 0)
+      expect(report["status"]).to eq("warn")
+    end
+
+    it "rejects unknown check selectors" do
+      expect { described_class.new(only: "missing_section") }
+        .to raise_error(ArgumentError, /Invalid doctor check selector/)
+    end
+  end
+
   describe "#dev_server_label" do
     it "uses the canonical webpack-dev-server spelling for webpack apps" do
       allow(doctor).to receive(:configured_assets_bundler).and_return("webpack")
@@ -6018,6 +6067,67 @@ RSpec.describe ReactOnRails::Doctor do
       success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
       expect(success_messages).to include(a_string_including("RSC client manifest includes 1 client reference"))
       expect(checker.messages.none? { |msg| msg[:type] == :warning }).to be true
+    end
+  end
+
+  describe "check_rsc_artifacts" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    before do
+      stub_const("ReactOnRailsPro", Module.new)
+      ReactOnRailsPro.const_set(:Utils, Module.new)
+      ReactOnRailsPro::Utils.define_singleton_method(:rsc_bundle_js_file_path) { nil }
+      ReactOnRailsPro::Utils.define_singleton_method(:react_server_client_manifest_file_path) { nil }
+      allow(ReactOnRailsPro::Utils).to receive_messages(
+        rsc_bundle_js_file_path: File.expand_path("ssr-generated/rsc-bundle.js"),
+        react_server_client_manifest_file_path: File.expand_path("ssr-generated/react-server-client-manifest.json")
+      )
+    end
+
+    it "warns when required RSC build artifacts are missing" do
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC bundle not found"))
+      expect(warning_messages).to include(a_string_including("RSC server client manifest not found"))
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+    end
+
+    it "reports success when the RSC bundle, server manifest, and client references manifest exist" do
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("ssr-generated/rsc-bundle.js", "// RSC bundle")
+      File.write("ssr-generated/react-server-client-manifest.json", JSON.generate("module" => {}))
+      File.write("ssr-generated/rsc-client-references.json", JSON.generate("refs" => []))
+
+      doctor.send(:check_rsc_artifacts)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("RSC bundle exists"))
+      expect(success_messages).to include(a_string_including("RSC server client manifest exists"))
+      expect(success_messages).to include(a_string_including("RSC client references manifest includes 0 refs"))
+      expect(checker.messages.none? { |msg| msg[:type] == :warning }).to be true
+    end
+
+    it "warns when JSON RSC artifacts cannot be parsed or have the wrong shape" do
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("ssr-generated/rsc-bundle.js", "// RSC bundle")
+      File.write("ssr-generated/react-server-client-manifest.json", "{not-json")
+      File.write("ssr-generated/rsc-client-references.json", JSON.generate("refs" => {}))
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC server client manifest is not valid JSON"))
+      expect(warning_messages).to include(
+        a_string_including("RSC client references manifest must contain a refs array")
+      )
     end
   end
   # rubocop:enable RSpec/VerifiedDoubles
