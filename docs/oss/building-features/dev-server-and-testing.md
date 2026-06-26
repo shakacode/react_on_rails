@@ -42,8 +42,10 @@ If a branch switch or package update leaves confusing asset errors, stop watcher
 ```bash
 bin/dev clean
 
-# If package versions changed, run your package-manager install command first.
+# If package versions changed, reinstall with your package manager.
 pnpm install
+# or: yarn install
+# or: npm install
 ```
 
 `bin/dev clean` derives Shakapacker public and private output paths from every top-level section in `shakapacker.yml` (including custom sections such as `staging`, plus the standard `default`, `development`, `test`, and `production` sections), then clears those directories plus configured `cache_path` directories, `public/assets`, `tmp/cache`, `node_modules/.cache`, `.node-renderer-bundles`, and `tmp/node-renderer-bundles-test-*`.

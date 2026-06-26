@@ -465,8 +465,11 @@ module ReactOnRails
 
         def print_shakapacker_config_status
           config_path = shakapacker_config_path
-          if File.exist?(config_path)
+          if parsed_shakapacker_config
             puts "📖 Reading Shakapacker config: #{display_clean_path(config_path)}"
+          elsif File.exist?(config_path)
+            puts "📖 Could not parse Shakapacker config: #{display_clean_path(config_path)}"
+            puts "   • Skipping configured Shakapacker output/cache paths"
           else
             puts "📖 Shakapacker config not found: #{display_clean_path(config_path)}"
             puts "   • Skipping configured Shakapacker output/cache paths"

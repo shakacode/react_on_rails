@@ -1598,6 +1598,26 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    it "reports invalid shakapacker.yml and still removes common caches" do
+      write_clean_test_shakapacker_config("<% if %>")
+      create_clean_test_dirs(
+        "tmp/cache",
+        "node_modules/.cache",
+        ".node-renderer-bundles"
+      )
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Could not parse Shakapacker config: config/shakapacker.yml")
+        expect(output).to include("Skipping configured Shakapacker output/cache paths")
+        expect(output).not_to include("Reading Shakapacker config")
+        expect(File).not_to exist("tmp/cache")
+        expect(File).not_to exist("node_modules/.cache")
+        expect(File).not_to exist(".node-renderer-bundles")
+      end
+    end
+
     it "removes broken symlink cleanup targets when the link target stays inside the app root" do
       write_clean_test_shakapacker_config(<<~YAML)
         default:
