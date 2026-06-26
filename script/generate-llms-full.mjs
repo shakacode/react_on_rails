@@ -14,6 +14,7 @@
  * Usage:
  *   node script/generate-llms-full.mjs           # regenerate both llms-full files
  *   node script/generate-llms-full.mjs --check   # CI mode: fail on drift
+ *   node script/generate-llms-full.mjs --validate # CI mode: validate without drift check or writes
  *
  * Doc ID rules mirror script/check-docs-sidebar:
  *   docs/oss/getting-started/quick-start.md → getting-started/quick-start
@@ -42,6 +43,12 @@ const SITE_DOCS_URL = 'https://reactonrails.com/docs';
 const SPLIT_THRESHOLD_KIB = 2048;
 
 const checkMode = process.argv.includes('--check');
+const validateMode = process.argv.includes('--validate');
+
+if (checkMode && validateMode) {
+  console.error('✗ Use either --check or --validate, not both.');
+  process.exit(1);
+}
 
 function fail(message) {
   console.error(`✗ ${message}`);
@@ -487,6 +494,11 @@ if (checkMode) {
       fail(`${label} is stale. Run \`node script/generate-llms-full.mjs\` and commit the result.`);
     }
   }
+} else if (validateMode) {
+  // Validation-only mode intentionally does not compare or write the generated
+  // aggregate files. Docs PRs should prove the generator still works and the
+  // URLs/sidebar map are valid without forcing large generated diffs into every
+  // source-doc change. Scheduled automation keeps the committed references fresh.
 } else if (process.exitCode === 1) {
   console.error('✗ Not writing llms-full files while URL validation is failing; fix the URLs above first.');
 } else {
@@ -499,8 +511,14 @@ if (process.exitCode !== 1) {
   const summary = outputs
     .map(({ label, ids, sizeKib }) => `${label} ${sizeKib.toFixed(0)} KiB (${ids.length} pages)`)
     .join(', ');
+  let action = 'generated';
+  if (checkMode) {
+    action = 'are current';
+  } else if (validateMode) {
+    action = 'validated';
+  }
   console.log(
-    `✓ llms-full files ${checkMode ? 'are current' : 'generated'}: ${summary} ` +
+    `✓ llms-full files ${action}: ${summary} ` +
       `(split threshold ${SPLIT_THRESHOLD_KIB} KiB); ${validatedUrlCount} docs URLs and ` +
       `${validatedSidebarSectionCount} sidebar top-level sections validated.`,
   );

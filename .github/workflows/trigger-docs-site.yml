@@ -6,7 +6,11 @@ permissions:
 on:
   push:
     branches: [main]
-    paths: ['docs/**']
+    paths:
+      - 'docs/**'
+      - 'llms.txt'
+      - 'llms-full.txt'
+      - 'llms-full-pro.txt'
 
 jobs:
   notify-docs-site:
@@ -20,7 +24,7 @@ jobs:
           owner: shakacode
           repositories: reactonrails.com
 
-      - uses: peter-evans/repository-dispatch@v3
+      - uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: shakacode/reactonrails.com

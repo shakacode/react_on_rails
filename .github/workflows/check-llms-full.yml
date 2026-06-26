@@ -1,4 +1,4 @@
-name: Check llms-full.txt
+name: Validate llms-full.txt
 
 permissions:
   contents: read
@@ -55,5 +55,61 @@ jobs:
       - name: Test llms-full generator validation
         run: bash script/generate-llms-full-test.bash
 
-      - name: Check llms-full.txt is current and docs URLs resolve
-        run: node script/generate-llms-full.mjs --check
+      - name: Determine llms-full validation mode
+        id: llms-full-mode
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          mode=validate
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            mode=check
+          elif [ -z "$BASE_SHA" ] || [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            mode=check
+          else
+            if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$BASE_SHA" || {
+                echo "::error::Could not fetch base SHA $BASE_SHA; unable to determine llms-full mode" >&2
+                exit 1
+              }
+            fi
+
+            if git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- \
+              llms-full.txt \
+              llms-full-pro.txt \
+              llms.txt \
+              docs/sidebars.ts \
+              docs/llms-full-preamble.md \
+              docs/.llms-exclusions \
+              docs/.llms-known-redirects \
+              script/generate-llms-full.mjs \
+              script/generate-llms-full-test.bash \
+              .github/workflows/check-llms-full.yml | grep -q .; then
+              mode=check
+            fi
+          fi
+
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "llms-full validation mode: --$mode"
+
+      - name: Validate llms-full references
+        env:
+          LLMS_FULL_MODE: ${{ steps.llms-full-mode.outputs.mode }}
+        run: |
+          set -euo pipefail
+
+          case "$LLMS_FULL_MODE" in
+            check)
+              node script/generate-llms-full.mjs --check
+              ;;
+            validate)
+              node script/generate-llms-full.mjs --validate
+              ;;
+            *)
+              echo "Unexpected llms-full validation mode: $LLMS_FULL_MODE" >&2
+              exit 1
+              ;;
+          esac

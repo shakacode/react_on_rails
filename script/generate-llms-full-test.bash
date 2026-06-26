@@ -193,6 +193,28 @@ test_complete_sidebar_top_level_sections_pass_check() {
   node script/generate-llms-full.mjs --check >/dev/null
 }
 
+test_validate_mode_allows_stale_generated_outputs() {
+  write_fixture
+  cat >> docs/oss/getting-started/quick-start.md <<'MD'
+
+New source-only docs content.
+MD
+
+  node script/generate-llms-full.mjs --validate >/dev/null
+
+  local out rc
+  set +e
+  out="$(node script/generate-llms-full.mjs --check 2>&1)"
+  rc=$?
+  set -e
+
+  if [ "$rc" -eq 0 ]; then
+    fail "expected --check to fail after source docs changed without regenerating llms-full.txt"
+    return 1
+  fi
+  assert_contains "$out" "llms-full.txt is stale"
+}
+
 test_missing_sidebar_top_level_section_fails_check() {
   write_fixture
   awk '!/^- Core Concepts: /' llms.txt > llms.txt.next
@@ -327,6 +349,7 @@ test_svg_diagram_embeds_become_text_descriptions() {
 }
 
 run_test test_complete_sidebar_top_level_sections_pass_check
+run_test test_validate_mode_allows_stale_generated_outputs
 run_test test_svg_diagram_embeds_become_text_descriptions
 run_test test_split_produces_oss_and_pro_files
 run_test test_missing_sidebar_top_level_section_fails_check
