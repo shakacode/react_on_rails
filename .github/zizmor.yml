@@ -127,4 +127,3 @@ rules:
       - pro-test-package-and-gem.yml:225
       - pro-test-package-and-gem.yml:324
       - shakaperf-release-gates.yml:56
-      - trigger-docs-site.yml:23
