@@ -3886,7 +3886,7 @@ module ReactOnRails
 
     def signal_rsc_dist_tag_process(signal, pid)
       Process.kill(signal, -pid)
-    rescue Errno::ESRCH, Errno::EINVAL
+    rescue Errno::ESRCH
       Process.kill(signal, pid)
     end
 
@@ -3904,7 +3904,7 @@ module ReactOnRails
 
     def npm_range_clause_satisfied?(version, range_clause)
       return false if range_clause.blank?
-      return true if range_clause.match?(/\A[~^]?\s*[*xX](?:\.[*xX]){0,2}\z/)
+      return npm_prerelease(version).blank? if range_clause.match?(/\A[~^]?\s*[*xX](?:\.[*xX]){0,2}\z/)
 
       hyphen_range_satisfied = npm_hyphen_range_result(version, range_clause)
       return hyphen_range_satisfied unless hyphen_range_satisfied.nil?

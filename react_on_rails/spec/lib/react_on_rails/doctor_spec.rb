@@ -5600,6 +5600,10 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "excludes prereleases unless the range names the same prerelease tuple" do
+        expect(doctor.send(:npm_range_satisfied?, "1.0.0", "*")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "1.0.0-rc.1", "*")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "1.0.0-rc.1", "x")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "1.0.0-rc.1", "~*")).to be false
         expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "^19.0.4")).to be false
         expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", ">=19.0.4")).to be false
         expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "19.x")).to be false
