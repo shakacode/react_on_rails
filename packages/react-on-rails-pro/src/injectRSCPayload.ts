@@ -298,6 +298,8 @@ function splitIncompleteLinkTagTail(htmlString: string) {
   const incompleteHtmlTagTail = htmlString.slice(lastTagStart);
   const normalizedTail = incompleteHtmlTagTail.toLowerCase();
 
+  // Intentionally over-match tags beginning with "<link" so split `<link rel=preload>`
+  // tokens are not missed while preserving the legacy link-only gating path.
   if (!'<link'.startsWith(normalizedTail) && !normalizedTail.startsWith('<link')) {
     return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
   }
@@ -458,6 +460,9 @@ export default function injectRSCPayload(
    * CONSTRAINT: The first output chunk must contain HTML data to begin streaming.
    */
   const htmlBuffers: Buffer[] = [];
+  // Observability mode holds any split tag so inline mark scripts never land in
+  // the middle of markup. Without observability, preserve the older link-only
+  // hold used by stylesheet preload promotion.
   let incompleteHtmlTailMode: IncompleteHtmlTailMode = rscStreamObservability ? 'tag' : 'link';
 
   /**

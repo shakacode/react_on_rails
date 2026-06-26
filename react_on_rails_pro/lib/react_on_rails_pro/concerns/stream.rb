@@ -139,7 +139,7 @@ module ReactOnRailsPro
 
     def write_rsc_stream_observability_mark
       return unless rsc_stream_observability_enabled?
-      return if response.stream.closed?
+      return if response.stream.closed? # Best-effort preflight; the rescue below covers the close/write race.
 
       detail = {
         source: "react-on-rails-pro",
@@ -148,6 +148,7 @@ module ReactOnRailsPro
         renderDurationMs: @react_on_rails_rsc_stream_initial_render_duration_ms,
         sinceStreamStartMs: elapsed_ms(@react_on_rails_rsc_stream_started_at)
       }
+      # Direct write: the component queue is already drained, so this mark must trail all component content.
       response.stream.write(rsc_stream_observability_script("react-on-rails:rsc:stream", detail))
     rescue IOError, Errno::EPIPE, Errno::ECONNRESET, Errno::ECONNABORTED => e
       log_client_disconnect("observability", e)
@@ -167,6 +168,7 @@ module ReactOnRailsPro
       mark_name_json = ERB::Util.json_escape(mark_name.to_json)
       detail_json = ERB::Util.json_escape(detail.to_json)
       # The heredoc is newline-stripped, so keep generated JavaScript tokens complete on each line.
+      # Verified by the stream spec that keeps this body aligned with the TypeScript helper.
       <<~HTML.delete("\n")
         <script#{rsc_stream_observability_nonce_attribute}>(function(){var detail=#{detail_json};
         var entry={name:#{mark_name_json},detail:detail};var perf=self.performance;

@@ -68,6 +68,7 @@ describe('wrapServerComponentRenderer/client performance marks', () => {
       writable: true,
     });
     jest.dontMock('react-on-rails-rsc/client.browser');
+    jest.dontMock('react-dom/client');
     jest.dontMock('../src/getReactServerComponent.client.ts');
     jest.dontMock('../src/RSCProvider.tsx');
     jest.resetModules();

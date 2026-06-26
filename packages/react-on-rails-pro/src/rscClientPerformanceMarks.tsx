@@ -58,15 +58,11 @@ export function markRSCClientHydrationStart(detail: RSCClientHydrationMarkDetail
 }
 
 export function scheduleRSCClientHydrationInteractiveMark(detail: RSCClientHydrationMarkDetail): () => void {
-  let canceled = false;
   const timeoutId = setTimeout(() => {
-    if (canceled) return;
-
     markBrowserPerformance(RSC_HYDRATION_INTERACTIVE_MARK, detail);
   }, 0);
 
   return () => {
-    canceled = true;
     clearTimeout(timeoutId);
   };
 }
