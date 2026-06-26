@@ -405,6 +405,8 @@ module ReactOnRails
       context
     end
 
+    # Set by ReactOnRailsPro::Stream#initialize_rsc_stream_observability_state.
+    # Keep this ivar name in sync with the Pro stream concern.
     def add_rsc_stream_observability_to_context(context)
       return unless defined?(@react_on_rails_rsc_stream_observability) &&
                     @react_on_rails_rsc_stream_observability

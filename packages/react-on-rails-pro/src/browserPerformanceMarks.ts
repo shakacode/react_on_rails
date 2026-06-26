@@ -88,7 +88,10 @@ export function markBrowserPerformance(markName: string, detail: BrowserPerforma
 
 // Keep this inline script in sync with
 // ReactOnRailsPro::Stream#rsc_stream_observability_script.
-export function createBrowserPerformanceMarkScript(markName: string, detail: BrowserPerformanceMarkDetail) {
+export function createBrowserPerformanceMarkScript(
+  markName: string,
+  detail: BrowserPerformanceMarkDetail,
+): string {
   const markNameJson = jsonEscapeForHtml(markName);
   const detailJson = jsonEscapeForHtml(detail);
 
