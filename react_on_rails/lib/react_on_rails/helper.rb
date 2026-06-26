@@ -400,7 +400,16 @@ module ReactOnRails
         result
       end
 
-      @rails_context.merge(serverSide: server_side)
+      context = @rails_context.merge(serverSide: server_side)
+      add_rsc_stream_observability_to_context(context)
+      context
+    end
+
+    def add_rsc_stream_observability_to_context(context)
+      return unless defined?(@react_on_rails_rsc_stream_observability) &&
+                    @react_on_rails_rsc_stream_observability
+
+      context[:rscStreamObservability] = true
     end
 
     def add_csp_nonce_to_context(result)

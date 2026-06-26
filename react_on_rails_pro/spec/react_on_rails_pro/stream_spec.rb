@@ -145,6 +145,36 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(stream).to have_received(:write).with("Single2")
     end
 
+    it "does not emit browser performance marks by default" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      written_chunks = []
+      allow(stream).to receive(:write) { |chunk| written_chunks << chunk }
+
+      run_stream(controller) do |_parent|
+        sleep 0.1
+      end
+
+      expect(written_chunks.first).to eq("TEMPLATE")
+      expect(written_chunks.first).not_to include("REACT_ON_RAILS_PERFORMANCE_MARKS")
+      expect(written_chunks.first).not_to include("react-on-rails:rsc:stream")
+    end
+
+    it "emits opt-in browser performance marks for the initial streamed response" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      written_chunks = []
+      allow(stream).to receive(:write) { |chunk| written_chunks << chunk }
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        sleep 0.1
+      end
+
+      expect(written_chunks.first).to start_with("TEMPLATE")
+      expect(written_chunks.first).to include("self.REACT_ON_RAILS_PERFORMANCE_MARKS")
+      expect(written_chunks.first).to include('performance.mark("react-on-rails:rsc:stream"')
+      expect(written_chunks.first).to include('"phase":"initial-write"')
+      expect(written_chunks.first).to include('"chunkBytes":8')
+    end
+
     it "applies backpressure with slow writer" do
       queues, controller, stream = setup_stream_test(component_count: 1)
 

@@ -208,6 +208,8 @@ const streamRenderReactComponent = (
               streamingTrackers.rscRequestTracker,
               domNodeId,
               railsContext.cspNonce,
+              undefined,
+              railsContext.rscStreamObservability,
             ),
           );
         },

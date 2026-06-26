@@ -178,6 +178,7 @@ const injectWithStylesheetMap = injectRSCPayload as unknown as (
   nodeId: string,
   nonce: string | undefined,
   stylesheetHrefsByChunkName: Map<string, string[]>,
+  rscStreamObservability?: boolean,
 ) => Readable;
 
 // Test setup helper
@@ -208,6 +209,39 @@ describe('injectRSCPayload', () => {
 
     expect(resultStr).toContain(expectedInitializationScript);
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
+    expect(resultStr).not.toContain('REACT_ON_RAILS_PERFORMANCE_MARKS');
+    expect(resultStr).not.toContain('react-on-rails:rsc:payload');
+  });
+
+  it('emits opt-in browser performance marks for RSC payload bytes and flush timing', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream([flightData]);
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map(),
+      true,
+    );
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('self.REACT_ON_RAILS_PERFORMANCE_MARKS');
+    expect(resultStr).toContain('performance.mark("react-on-rails:rsc:payload"');
+    expect(resultStr).toContain('performance.mark("react-on-rails:rsc:flush"');
+    expect(resultStr).toContain('"componentName":"test"');
+    expect(resultStr).toContain(`"flightPayloadBytes":${Buffer.byteLength(flightData, 'utf8')}`);
+    expect(resultStr).toContain(
+      `"inlineScriptBytes":${Buffer.byteLength(expectedPayloadPushScript(flightData), 'utf8')}`,
+    );
+    expect(resultStr).toContain(
+      `"rscPayloadScriptBytes":${Buffer.byteLength(expectedPayloadPushScript(flightData), 'utf8')}`,
+    );
+    expect(resultStr).toContain('"flushIndex":0');
+    expect(resultStr).toContain('"containsRscPayload":true');
   });
 
   it('should handle multiple RSC payloads', async () => {

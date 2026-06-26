@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "English"
+require "erb"
 
 module ReactOnRailsPro
   module Stream
@@ -31,6 +32,7 @@ module ReactOnRailsPro
     #   stream write, overriding any content type inferred from the template format. When using
     #   a non-HTML `formats:` value (for example `[:text]`), pass `content_type` too unless
     #   committing the format-derived MIME type is intentional.
+    # @param rsc_stream_observability [Boolean] Whether to emit browser-observable streamed RSC timing marks.
     # @param render_options [Hash] Additional options to pass to `render_to_string`.
     #
     # components must be added to the view using the `stream_react_component` helper.
@@ -50,12 +52,16 @@ module ReactOnRailsPro
     #
     # @see ReactOnRails::Helper#stream_react_component
     def stream_view_containing_react_components(
-      template:, close_stream_at_end: true, content_type: nil, **render_options
+      template:, close_stream_at_end: true, content_type: nil, rsc_stream_observability: false, **render_options
     )
       require "async"
       require "async/barrier"
       require "async/limited_queue"
       warn_on_non_html_formats_without_content_type(render_options[:formats], content_type)
+      previous_rsc_stream_observability = @react_on_rails_rsc_stream_observability
+      previous_rsc_stream_started_at = @react_on_rails_rsc_stream_started_at
+      @react_on_rails_rsc_stream_observability = rsc_stream_observability == true
+      @react_on_rails_rsc_stream_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
       Sync do |parent_task|
         # Initialize async primitives for concurrent component streaming
@@ -66,7 +72,6 @@ module ReactOnRailsPro
         # Render template - components will start streaming immediately.
         # If a shell error occurs, consumer_stream_async raises PrerenderError here
         # (BEFORE the response is committed), enabling a proper HTTP redirect.
-        template_string = render_to_string(template:, **render_options)
         # View may contain extra newlines, chunk already contains a newline
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline
@@ -75,7 +80,7 @@ module ReactOnRailsPro
         # is when ActionController::Live commits headers. render_to_string itself
         # never writes to response.stream, so this assignment is always safe.
         response.content_type = content_type if content_type
-        response.stream.write(template_string.lstrip)
+        response.stream.write(render_stream_template_chunk(template:, render_options:))
 
         drain_streams_concurrently(parent_task)
         # Do not close the response stream in an ensure block.
@@ -91,9 +96,68 @@ module ReactOnRailsPro
         @async_barrier&.stop
         raise
       end
+    ensure
+      @react_on_rails_rsc_stream_observability = previous_rsc_stream_observability
+      @react_on_rails_rsc_stream_started_at = previous_rsc_stream_started_at
     end
 
     private
+
+    def render_stream_template_chunk(template:, render_options:)
+      return render_to_string(template:, **render_options).lstrip unless rsc_stream_observability_enabled?
+
+      render_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      template_string = render_to_string(template:, **render_options)
+      render_finished_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      append_rsc_stream_observability_mark(
+        template_string.lstrip,
+        phase: "initial-write",
+        render_duration_ms: elapsed_ms(render_started_at, render_finished_at)
+      )
+    end
+
+    def append_rsc_stream_observability_mark(chunk, phase:, render_duration_ms:)
+      return chunk unless rsc_stream_observability_enabled?
+
+      detail = {
+        source: "react-on-rails-pro",
+        phase:,
+        chunkBytes: chunk.bytesize,
+        renderDurationMs: render_duration_ms,
+        sinceStreamStartMs: elapsed_ms(@react_on_rails_rsc_stream_started_at)
+      }
+      "#{chunk}#{rsc_stream_observability_script('react-on-rails:rsc:stream', detail)}"
+    end
+
+    def rsc_stream_observability_enabled?
+      defined?(@react_on_rails_rsc_stream_observability) && @react_on_rails_rsc_stream_observability
+    end
+
+    def elapsed_ms(start_time, end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC))
+      ((end_time - start_time) * 1000).round(3)
+    end
+
+    def rsc_stream_observability_script(mark_name, detail)
+      mark_name_json = mark_name.to_json
+      detail_json = ERB::Util.json_escape(detail.to_json)
+      <<~HTML.delete("\n")
+        <script#{rsc_stream_observability_nonce_attribute}>(function(){var detail=#{detail_json};
+        var entry={name:#{mark_name_json},detail:detail};var perf=self.performance;
+        if(perf&&typeof perf.mark==="function"){try{performance.mark(#{mark_name_json},{detail:detail});return;}
+        catch(error){try{performance.mark(#{mark_name_json});entry.fallback="mark-detail-unavailable";}
+        catch(fallbackError){entry.fallback="performance-mark-unavailable";}}}
+        else{entry.fallback="performance-mark-unavailable";}
+        (self.REACT_ON_RAILS_PERFORMANCE_MARKS||=[]).push(entry);})()</script>
+      HTML
+    end
+
+    def rsc_stream_observability_nonce_attribute
+      return "" unless respond_to?(:content_security_policy_nonce, true)
+
+      nonce = content_security_policy_nonce
+      nonce.present? ? %( nonce="#{ERB::Util.html_escape(nonce)}") : ""
+    end
 
     # Drains all streaming tasks concurrently using a producer-consumer pattern.
     #

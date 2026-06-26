@@ -213,6 +213,63 @@ end
 
 The controller just renders — the async prop's query runs in the view's `emit` block (Step 3) so the shell can stream before the query finishes. The controller still owns request-level concerns: authentication, authorization, and any fast props you pass synchronously.
 
+### Browser-Observable RSC Stream Marks
+
+For streamed React Server Component pages, the initial Flight payload is embedded in the HTML stream. It is not a separate browser resource, so `PerformanceResourceTiming` will not show a named RSC payload request for the initial page load. To inspect streamed payload bytes and flush timing from browser tooling without changing that transport, opt in to inline performance marks:
+
+```ruby
+stream_view_containing_react_components(
+  template: "example/show",
+  rsc_stream_observability: true
+)
+```
+
+When enabled, React on Rails Pro appends small inline scripts to the streamed response. Each script first tries:
+
+```js
+performance.mark('react-on-rails:rsc:payload', { detail });
+```
+
+If the browser does not support mark details, or if `performance.mark` is unavailable, the same entry is appended to:
+
+```js
+window.REACT_ON_RAILS_PERFORMANCE_MARKS;
+```
+
+Use a `PerformanceObserver` for the normal path and read the queue as a fallback:
+
+```js
+const observer = new PerformanceObserver((list) => {
+  for (const entry of list.getEntries()) {
+    if (entry.name.startsWith('react-on-rails:rsc:')) {
+      console.log(entry.name, entry.detail);
+    }
+  }
+});
+
+observer.observe({ type: 'mark', buffered: true });
+
+for (const entry of window.REACT_ON_RAILS_PERFORMANCE_MARKS || []) {
+  console.log(entry.name, entry.detail, entry.fallback);
+}
+```
+
+The emitted mark names are:
+
+| Mark name                    | What it records                                                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `react-on-rails:rsc:stream`  | Rails-side streaming phases, including the initial template write and later component chunks.                       |
+| `react-on-rails:rsc:payload` | Each inline Flight payload chunk, including component name, chunk index, raw Flight bytes, and inline script bytes. |
+| `react-on-rails:rsc:flush`   | Each Node-side HTML/RSC combined flush, including HTML bytes, payload script bytes, stylesheet bytes, and index.    |
+
+The details intentionally include byte counts, phase names, component names, chunk indexes, and timing offsets. They do not include serialized props or Flight payload contents.
+
+The initial RSC payload remains inline in the navigation response by design. A separate `/rsc_payload/*` request exists for client-side RSC payload generation, but the streamed initial page does not switch to that fetch path unless your application deliberately renders that route separately.
+
+#### CDN And Trailer Caveats
+
+`Server-Timing` headers are useful for non-streamed responses, but `ActionController::Live` commits headers on the first stream write. HTTP trailers can theoretically carry late timing data, but browser, proxy, and CDN support varies, and intermediaries may buffer, strip, rewrite, or hide trailer/header timing values. React on Rails Pro therefore does not make HTTP trailers the default streamed observability path. Inline marks travel in the response body, so they survive the same CDN path as the streamed HTML and are visible to `PerformanceObserver` or the fallback queue after the browser parses them.
+
 #### Loading Multiple Slow Sources in Parallel
 
 When several sources are slow and independent, run them concurrently with the [`async` gem](https://github.com/socketry/async) (already a dependency of React on Rails Pro and loaded by the streaming helper). Pro's streaming stack is fiber-based, so fan out with fibers from the running reactor rather than introducing a separate Ruby-thread concurrency model. The emit block runs inside an `Async` task — capture it with `Async::Task.current` and spawn one child task per source with `parent.async`, so each prop is emitted the moment its own query resolves:

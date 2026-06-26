@@ -22,6 +22,10 @@ import { createEmbeddedPayloadKey } from './utils.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
 import safePipe from './safePipe.ts';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
+import {
+  createBrowserPerformanceMarkScript,
+  RSC_STREAM_PERFORMANCE_MARK_PREFIX,
+} from './browserPerformanceMarks.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
 // that isn't a recognized escape character, the backslash is ignored, and the character
@@ -401,6 +405,7 @@ export default function injectRSCPayload(
   domNodeId: string | undefined,
   cspNonce?: string,
   rscClientChunkStylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
+  rscStreamObservability = false,
 ) {
   const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
@@ -443,6 +448,7 @@ export default function injectRSCPayload(
    * Can be sent after the component HTML since the arrays already exist.
    */
   const rscPayloadBuffers: Buffer[] = [];
+  const rscObservabilityBuffers: Buffer[] = [];
 
   // ========================================
   // FLUSH SCHEDULING SYSTEM
@@ -451,6 +457,13 @@ export default function injectRSCPayload(
   let flushFallbackTimeout: NodeJS.Timeout | null = null;
   let hasReceivedFirstHtmlChunk = false;
   let hasFlushedOutputChunk = false;
+  let flushIndex = 0;
+
+  const createPerformanceMarkBuffer = (markName: string, detail: Record<string, unknown>) => {
+    if (!rscStreamObservability) return undefined;
+
+    return Buffer.from(createScriptTag(createBrowserPerformanceMarkScript(markName, detail), sanitizedNonce));
+  };
 
   /**
    * Combines all buffered data into a single chunk and sends it to the result stream.
@@ -489,8 +502,13 @@ export default function injectRSCPayload(
       : { flushableHtmlBuffer: gatedHtmlBuffer, deferredRevealHtmlBuffer: undefined };
     const rscClientStylesheetSize = rscClientStylesheetBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const rscPayloadSize = rscPayloadBuffers.reduce((sum, buf) => sum + buf.length, 0);
-    const totalSize =
-      rscInitializationSize + rscClientStylesheetSize + flushableHtmlBuffer.length + rscPayloadSize;
+    const rscObservabilitySize = rscObservabilityBuffers.reduce((sum, buf) => sum + buf.length, 0);
+    const totalSizeWithoutFlushMark =
+      rscInitializationSize +
+      rscClientStylesheetSize +
+      flushableHtmlBuffer.length +
+      rscPayloadSize +
+      rscObservabilitySize;
 
     if (hasIncompleteHtmlTail && holdIncompleteHtmlTail) {
       return;
@@ -501,9 +519,24 @@ export default function injectRSCPayload(
     }
 
     // Skip flush if no data is buffered
-    if (totalSize === 0) {
+    if (totalSizeWithoutFlushMark === 0) {
       return;
     }
+
+    const flushMarkBuffer = createPerformanceMarkBuffer(`${RSC_STREAM_PERFORMANCE_MARK_PREFIX}:flush`, {
+      source: 'react-on-rails-pro',
+      flushIndex,
+      rscInitializationBytes: rscInitializationSize,
+      rscClientStylesheetBytes: rscClientStylesheetSize,
+      htmlBytes: flushableHtmlBuffer.length,
+      rscPayloadScriptBytes: rscPayloadSize,
+      observabilityBytes: rscObservabilitySize,
+      streamChunkBytes: totalSizeWithoutFlushMark,
+      containsHtml: flushableHtmlBuffer.length > 0,
+      containsRscPayload: rscPayloadSize > 0,
+      firstFlush: !hasFlushedOutputChunk,
+    });
+    const totalSize = totalSizeWithoutFlushMark + (flushMarkBuffer?.length ?? 0);
 
     // Cancel the fallback timer only when we're actually flushing data.
     // If we cancelled before the early-return guards above, a flush() call
@@ -549,9 +582,20 @@ export default function injectRSCPayload(
       offset += buffer.length;
     }
 
+    for (const buffer of rscObservabilityBuffers) {
+      buffer.copy(combinedBuffer, offset);
+      offset += buffer.length;
+    }
+
+    if (flushMarkBuffer) {
+      flushMarkBuffer.copy(combinedBuffer, offset);
+      offset += flushMarkBuffer.length;
+    }
+
     // Send combined chunk to output stream
     resultStream.push(combinedBuffer);
     hasFlushedOutputChunk = true;
+    flushIndex += 1;
 
     // Clear all buffers to free memory and prepare for next flush cycle
     rscInitializationBuffers.length = 0;
@@ -561,6 +605,7 @@ export default function injectRSCPayload(
       htmlBuffers.push(deferredRevealHtmlBuffer);
     }
     rscPayloadBuffers.length = 0;
+    rscObservabilityBuffers.length = 0;
   };
 
   const endResultStream = () => {
@@ -702,6 +747,7 @@ export default function injectRSCPayload(
             const parser = new LengthPrefixedStreamParser();
             const textDecoder = new TextDecoder();
             let hasEmittedDiagnosticScript = false;
+            let rscPayloadChunkIndex = 0;
             const handleParsedChunk = (content: Uint8Array, metadata: Record<string, unknown>) => {
               const flightData = textDecoder.decode(content);
               if (!hasEmittedDiagnosticScript) {
@@ -724,6 +770,22 @@ export default function injectRSCPayload(
               }
               const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
+              const payloadMarkBuffer = createPerformanceMarkBuffer(
+                `${RSC_STREAM_PERFORMANCE_MARK_PREFIX}:payload`,
+                {
+                  source: 'react-on-rails-pro',
+                  componentName,
+                  domNodeId,
+                  payloadKey: rscPayloadKey,
+                  chunkIndex: rscPayloadChunkIndex,
+                  flightPayloadBytes: content.byteLength,
+                  inlineScriptBytes: Buffer.byteLength(payloadScript, 'utf8'),
+                },
+              );
+              if (payloadMarkBuffer) {
+                rscObservabilityBuffers.push(payloadMarkBuffer);
+              }
+              rscPayloadChunkIndex += 1;
 
               // Emit console replay as a separate <script> tag (not inside the payload)
               const consoleScript = metadata.consoleReplayScript as string;
