@@ -504,7 +504,7 @@ module ReactOnRails
 
           real_path = File.realpath(path)
           path_inside_real_app_root?(real_path)
-        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES
+        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES, Errno::EPERM
           false
         end
 
@@ -515,7 +515,7 @@ module ReactOnRails
           link_target = File.readlink(path)
           resolved_path = File.expand_path(link_target, File.dirname(path))
           path_inside_app_root?(resolved_path) || path_inside_real_app_root?(resolved_path)
-        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES
+        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES, Errno::EPERM
           false
         end
 
@@ -529,7 +529,7 @@ module ReactOnRails
 
           @real_app_root_path_for = root_path
           @real_app_root_path = File.realpath(root_path)
-        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES
+        rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES, Errno::EPERM
           @real_app_root_path = root_path
         end
 

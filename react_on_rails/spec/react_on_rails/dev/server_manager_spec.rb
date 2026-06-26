@@ -1681,6 +1681,47 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    it "skips cleanup targets when realpath is blocked by operation permissions" do
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: restricted-packs
+      YAML
+      create_clean_test_dirs("public/restricted-packs")
+      restricted_path = File.expand_path("public/restricted-packs", Dir.pwd)
+      allow(File).to receive(:realpath).and_call_original
+      allow(File).to receive(:realpath).with(restricted_path).and_raise(Errno::EPERM)
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Skipping unsafe cleanup path: public/restricted-packs")
+        expect(output).to include("Cleanup completed with warnings")
+        expect(File).to exist("public/restricted-packs")
+      end
+    end
+
+    it "skips broken symlink cleanup targets when readlink is blocked by operation permissions" do
+      write_clean_test_shakapacker_config(<<~YAML)
+        default:
+          public_root_path: public
+          public_output_path: blocked-link
+      YAML
+      FileUtils.mkdir_p("public")
+      File.symlink("../tmp/deleted-packs", "public/blocked-link")
+      blocked_path = File.expand_path("public/blocked-link", Dir.pwd)
+      allow(File).to receive(:readlink).and_call_original
+      allow(File).to receive(:readlink).with(blocked_path).and_raise(Errno::EPERM)
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Skipping unsafe cleanup path: public/blocked-link")
+        expect(output).to include("Cleanup completed with warnings")
+        expect(File).to be_symlink("public/blocked-link")
+      end
+    end
+
     it "warns when a cleanup target remains after removal" do
       write_clean_test_shakapacker_config(<<~YAML)
         default:
