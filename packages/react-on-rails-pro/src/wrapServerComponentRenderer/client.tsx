@@ -26,7 +26,6 @@ import 'react-on-rails-rsc/client.browser';
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
 import type { ReactComponent, ReactComponentRenderFunction, RendererFunction } from 'react-on-rails/types';
-import type { ReactElement } from 'react';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { isRendererTeardownResult } from 'react-on-rails/@internal/rendererTeardown';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
@@ -37,8 +36,8 @@ import { chainRecoverableErrorHandlers } from '../handleRecoverableError.client.
 import {
   createRSCClientHydrationMarkDetail,
   markRSCClientHydrationStart,
+  scheduleRSCClientHydrationInteractiveMark,
   type RSCClientHydrationMarkDetail,
-  wrapWithRSCClientInteractivePerformanceMark,
 } from '../rscClientPerformanceMarks.tsx';
 
 ensureReactUseAvailable();
@@ -123,7 +122,6 @@ const wrapServerComponentRenderer = (
 
     const shouldHydrate = !!domNode.innerHTML;
     const componentElement = <Component {...props} />;
-    let observableComponentElement: ReactElement = componentElement;
     let hydrationMarkDetail: RSCClientHydrationMarkDetail | undefined;
 
     if (railsContext.rscStreamObservability === true) {
@@ -133,14 +131,10 @@ const wrapServerComponentRenderer = (
         mode: shouldHydrate ? 'hydrate' : 'render',
         boundary: 'server-component-root',
       });
-      observableComponentElement = wrapWithRSCClientInteractivePerformanceMark(
-        componentElement,
-        hydrationMarkDetail,
-      );
     }
     const rootElement = (
       <RSCProvider>
-        <React.Suspense fallback={null}>{observableComponentElement}</React.Suspense>
+        <React.Suspense fallback={null}>{componentElement}</React.Suspense>
       </RSCProvider>
     );
 
@@ -176,11 +170,19 @@ const wrapServerComponentRenderer = (
           root.render(rootElement);
           return root;
         })();
+    const cancelHydrationInteractiveMark = hydrationMarkDetail
+      ? scheduleRSCClientHydrationInteractiveMark(hydrationMarkDetail)
+      : undefined;
 
     // Return an explicit teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks
     // navigation (the soft-navigation page swap) instead of leaking it. This closes the leak for every
     // registerServerComponent user without confusing legacy bare function returns for cleanup.
-    return { teardown: () => reactRoot.unmount() };
+    return {
+      teardown: () => {
+        cancelHydrationInteractiveMark?.();
+        reactRoot.unmount();
+      },
+    };
   };
 
   return wrapper;

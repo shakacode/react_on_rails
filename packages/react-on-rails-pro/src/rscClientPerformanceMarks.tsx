@@ -13,8 +13,6 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import * as React from 'react';
-import type { ReactElement } from 'react';
 import {
   markBrowserPerformance,
   type BrowserPerformanceMarkDetail,
@@ -59,31 +57,16 @@ export function markRSCClientHydrationStart(detail: RSCClientHydrationMarkDetail
   markBrowserPerformance(RSC_HYDRATION_START_MARK, detail);
 }
 
-function RSCClientInteractivePerformanceMark({
-  children,
-  detail,
-}: {
-  children: ReactElement;
-  detail: RSCClientHydrationMarkDetail;
-}) {
-  const initialDetail = React.useRef(detail);
-  const hasMarkedInteractive = React.useRef(false);
+export function scheduleRSCClientHydrationInteractiveMark(detail: RSCClientHydrationMarkDetail): () => void {
+  let canceled = false;
+  const timeoutId = setTimeout(() => {
+    if (canceled) return;
 
-  React.useEffect(() => {
-    if (hasMarkedInteractive.current) return;
+    markBrowserPerformance(RSC_HYDRATION_INTERACTIVE_MARK, detail);
+  }, 0);
 
-    hasMarkedInteractive.current = true;
-    markBrowserPerformance(RSC_HYDRATION_INTERACTIVE_MARK, initialDetail.current);
-  }, []);
-
-  return children;
-}
-
-export function wrapWithRSCClientInteractivePerformanceMark(
-  reactElement: ReactElement,
-  detail: RSCClientHydrationMarkDetail,
-): ReactElement {
-  return (
-    <RSCClientInteractivePerformanceMark detail={detail}>{reactElement}</RSCClientInteractivePerformanceMark>
-  );
+  return () => {
+    canceled = true;
+    clearTimeout(timeoutId);
+  };
 }

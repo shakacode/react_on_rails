@@ -268,7 +268,8 @@ function stylesheetTagsForRSCClientChunks(
 function splitIncompleteHtmlTagTail(htmlString: string) {
   // Streaming renderer output is expected to be well-formed HTML where bare "<"
   // characters are tag starts, and React reveal scripts are deferred separately.
-  // Hold trailing incomplete tags so flush marks never split a tag boundary.
+  // This same guard feeds stylesheet-preload gating and observability flush marks,
+  // so hold any trailing incomplete tag rather than only partial <link> tokens.
   const lastCompleteTagEnd = htmlString.lastIndexOf('>');
   const lastTagStart = htmlString.lastIndexOf('<');
 

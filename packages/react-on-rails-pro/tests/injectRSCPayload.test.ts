@@ -224,8 +224,8 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('self.REACT_ON_RAILS_PERFORMANCE_MARKS');
-    expect(resultStr).toContain('performance.mark("react-on-rails:rsc:payload"');
-    expect(resultStr).toContain('performance.mark("react-on-rails:rsc:flush"');
+    expect(resultStr).toContain('perf.mark("react-on-rails:rsc:payload"');
+    expect(resultStr).toContain('perf.mark("react-on-rails:rsc:flush"');
     expect(resultStr).toContain('"componentName":"test"');
     expect(resultStr).toContain(`"flightPayloadBytes":${Buffer.byteLength(flightData, 'utf8')}`);
     expect(resultStr).toContain(
@@ -251,7 +251,7 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('<div>observed split tag</div>');
-    expect(resultStr).toContain('performance.mark("react-on-rails:rsc:flush"');
+    expect(resultStr).toContain('perf.mark("react-on-rails:rsc:flush"');
     expect(resultStr).not.toContain('<di<script');
   });
 

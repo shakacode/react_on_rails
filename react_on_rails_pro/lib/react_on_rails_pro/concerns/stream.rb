@@ -166,6 +166,7 @@ module ReactOnRailsPro
     def rsc_stream_observability_script(mark_name, detail)
       mark_name_json = ERB::Util.json_escape(mark_name.to_json)
       detail_json = ERB::Util.json_escape(detail.to_json)
+      # The heredoc is newline-stripped, so keep generated JavaScript tokens complete on each line.
       <<~HTML.delete("\n")
         <script#{rsc_stream_observability_nonce_attribute}>(function(){var detail=#{detail_json};
         var entry={name:#{mark_name_json},detail:detail};var perf=self.performance;

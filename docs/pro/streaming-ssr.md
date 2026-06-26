@@ -262,13 +262,13 @@ The emitted mark names are:
 | `react-on-rails:rsc:payload`               | Each inline Flight payload chunk, including component name, chunk index, matching flush index, raw Flight bytes, and RSC payload script bytes.                                  |
 | `react-on-rails:rsc:flush`                 | Each Node-side HTML/RSC combined flush, including HTML bytes, payload script bytes, stylesheet bytes, and index. `streamChunkBytes` excludes the flush mark script's own bytes. |
 | `react-on-rails:rsc:hydration:start`       | Client-side start of an RSC island root hydration or client render, including component name, DOM id, and mode.                                                                 |
-| `react-on-rails:rsc:hydration:interactive` | First committed client effect for that RSC island root, a practical interactivity boundary for browser benchmarks.                                                              |
+| `react-on-rails:rsc:hydration:interactive` | Browser task scheduled after root creation for that RSC island root, a practical interactivity boundary for browser benchmarks without changing the React tree shape.           |
 
 The details intentionally include byte counts, phase names, component names, DOM ids, hydrate/render mode, chunk indexes, and timing offsets. They do not include serialized props or Flight payload contents.
 
 For flush marks, `streamChunkBytes` is the sum of the flush detail subfields and excludes the flush mark's own inline script bytes.
 
-Hydration start marks are emitted immediately before root creation. If root creation or hydration throws before mounting, the paired `react-on-rails:rsc:hydration:interactive` mark will be absent.
+Hydration start marks are emitted immediately before root creation. Interactive marks are scheduled outside the React element tree after root creation so observability does not add client-only wrapper components that could affect `useId()` hydration parity. If root creation or hydration throws before mounting, or if the root is torn down before the scheduled mark runs, the paired `react-on-rails:rsc:hydration:interactive` mark will be absent.
 
 The initial RSC payload remains inline in the navigation response by design. A separate `/rsc_payload/*` request exists for client-side RSC payload generation, but the streamed initial page does not switch to that fetch path unless your application deliberately renders that route separately.
 

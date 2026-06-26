@@ -556,6 +556,14 @@ describe ReactOnRailsProHelper do
         @react_on_rails_rsc_stream_started_at = nil
       end
 
+      it "adds stream observability to the Rails context when the Pro stream state enables it" do
+        @react_on_rails_rsc_stream_observability = true
+
+        expect(send(:rails_context, server_side: false)).to include(rscStreamObservability: true)
+      ensure
+        @react_on_rails_rsc_stream_observability = false
+      end
+
       it "does not trim whitespaces from html" do
         first_chunk_string = +"  <div>Chunk 1: with whitespaces</div>  "
         chunks_with_whitespaces = [
