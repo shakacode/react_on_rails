@@ -177,7 +177,7 @@ RSpec.describe ReactOnRailsPro::Stream do
         "self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]"
       )
       expect(written_chunks.second).not_to include("||=")
-      expect(written_chunks.second).to include('performance.mark("react-on-rails:rsc:stream"')
+      expect(written_chunks.second).to include('perf.mark("react-on-rails:rsc:stream"')
       expect(written_chunks.second).to include('"phase":"stream-complete"')
       expect(written_chunks.second).to include('"initialChunkBytes":8')
     end
@@ -208,9 +208,9 @@ RSpec.describe ReactOnRailsPro::Stream do
         var entry={name:"react-on-rails:rsc:contract",detail:detail};var perf=self.performance;
         var supportsDetail=typeof PerformanceMark!=="undefined"&&PerformanceMark.prototype&&
         "detail" in PerformanceMark.prototype;
-        if(perf&&typeof perf.mark==="function"){if(supportsDetail){try{performance.mark("react-on-rails:rsc:contract",
+        if(perf&&typeof perf.mark==="function"){if(supportsDetail){try{perf.mark("react-on-rails:rsc:contract",
         {detail:detail});return;}catch(error){}}
-        try{performance.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}
+        try{perf.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}
         catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
         else{entry.fallback="performance-mark-unavailable";}
         (self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]).push(entry);

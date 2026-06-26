@@ -206,9 +206,9 @@ describe('browserPerformanceMarks runtime helper', () => {
         'var supportsDetail=typeof PerformanceMark!=="undefined"&&PerformanceMark.prototype&&' +
         '"detail" in PerformanceMark.prototype;' +
         'if(perf&&typeof perf.mark==="function"){' +
-        'if(supportsDetail){try{performance.mark("react-on-rails:rsc:contract",{detail:detail});return;}' +
+        'if(supportsDetail){try{perf.mark("react-on-rails:rsc:contract",{detail:detail});return;}' +
         'catch(error){}}' +
-        'try{performance.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}' +
+        'try{perf.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}' +
         'catch(fallbackError){entry.fallback="performance-mark-unavailable";}' +
         '}else{entry.fallback="performance-mark-unavailable";}' +
         '(self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]).push(entry);})()',
