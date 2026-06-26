@@ -99,8 +99,9 @@ function run(appName: string, rawOpts: Record<string, unknown>, command?: Comman
     logInfo(`Note: ${setupLabel} adds react_on_rails_pro and uses the Pro generator path.`);
     logInfo('If installation fails, verify your Bundler/RubyGems setup, then rerun the command.');
     logInfo('Pro setup docs: https://reactonrails.com/docs/pro/installation/');
+    logInfo('Pro pricing and sign up: https://pro.reactonrails.com/');
     logInfo(
-      'License: no token is required for development, test, CI/CD, or staging; production Pro deployments require a paid license.',
+      'License: no token is required for development, test, CI/CD, or staging. Production Pro deployments need a paid license, with free or low-cost options for startups and small projects.',
     );
     console.log('');
   }
@@ -186,7 +187,9 @@ intentionally want an open-source-only scaffold. Use --rsc when you want the
 generated React Server Components example.
 
 Pro license note: no token is required for development, test, CI/CD, or
-staging. Production Pro deployments require a paid license.
+staging. Production Pro deployments need a paid license, with free or low-cost
+options for startups and small projects. See pricing and sign up:
+https://pro.reactonrails.com/
 
 What it does:
   1. Creates a new Rails app with PostgreSQL

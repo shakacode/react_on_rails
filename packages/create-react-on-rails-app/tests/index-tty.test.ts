@@ -76,6 +76,8 @@ describe('setup mode resolution in run()', () => {
       expect.objectContaining({ pro: true, rsc: false, tailwind: false }),
     );
     expect(mockedLogInfo).toHaveBeenCalledWith(expect.stringContaining('Default setup: React on Rails Pro'));
+    expect(mockedLogInfo).toHaveBeenCalledWith('Pro pricing and sign up: https://pro.reactonrails.com/');
+    expect(mockedLogInfo).toHaveBeenCalledWith(expect.stringContaining('free or low-cost options'));
   });
 
   it('defaults to the Pro setup without RSC when stdin/stdout are not TTYs', async () => {

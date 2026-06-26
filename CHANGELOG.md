@@ -30,12 +30,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
-- **Breaking (CI): `create-react-on-rails-app` now defaults to Pro for React 19.2 support**: Running
+- **`create-react-on-rails-app` now defaults to Pro for React 19.2 support**: Running
   `npx create-react-on-rails-app my-app` no longer asks setup questions and generates the recommended
-  React on Rails Pro scaffold by default. Non-TTY environments, including CI and piped commands,
-  previously auto-selected Standard mode; they now select Pro. Add `--standard` to any CI command
-  that expected an open-source-only scaffold. Use `--standard` only for an open-source-only setup or
-  `--rsc` when you want Pro with the generated React Server Components example.
+  React on Rails Pro scaffold by default. Automation note: non-TTY environments, including CI and piped
+  commands, previously auto-selected Standard mode; they now select Pro. Add `--standard` to any command
+  that intentionally checks or creates an open-source-only scaffold. Use `--rsc` when you want Pro with the
+  generated React Server Components example.
 
 #### Fixed
 
