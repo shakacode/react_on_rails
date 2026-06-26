@@ -71,7 +71,10 @@ jobs:
             mode=check
           else
             if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
-              git fetch --no-tags --depth=1 origin "$BASE_SHA"
+              git fetch --no-tags --depth=1 origin "$BASE_SHA" || {
+                echo "::error::Could not fetch base SHA $BASE_SHA; unable to determine llms-full mode" >&2
+                exit 1
+              }
             fi
 
             if git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- \
