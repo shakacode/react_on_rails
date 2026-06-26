@@ -647,6 +647,27 @@ describe('injectRSCPayload', () => {
     await expect(allData).resolves.toContain('n>after');
   });
 
+  it('keeps opt-in observability flush marks out of non-link split tags during stylesheet gating', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream({
+      0: 'before<scr',
+      10: 'ipt>after</script>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([
+        ['client1', ['/webpack/test/css/client1-46072b81.css']],
+      ]),
+      rscStreamObservability: true,
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('before<script>after</script>');
+    expect(resultStr).toContain('perf.mark("react-on-rails:rsc:flush"');
+    expect(resultStr).not.toContain('before<scr<script');
+  });
+
   it('preserves split UTF-8 bytes when promoting streamed RSC stylesheet preloads', async () => {
     const mockRSC = createMockRSCStream(['{"test": "data"}']);
     const eAcuteBytes = Buffer.from('é');
