@@ -13,6 +13,10 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows).
   Use that repo's `agent-workflows-status` and `upgrade-agent-workflows`
   helpers to keep installed Codex or Claude homes current.
+- When updating reusable agent workflows, skills, commands, or prompt
+  templates, first consider whether the change belongs in
+  `shakacode/agent-workflows` rather than this repo; keep local edits focused on
+  React on Rails-specific policy, seams, or overrides.
 - `.agents/skills/`: repo-local skill copies/overrides plus repo-specific skills;
   `.claude/skills` is a symlink here so Claude Code exposes the same workflows as
   slash commands in this checkout.
