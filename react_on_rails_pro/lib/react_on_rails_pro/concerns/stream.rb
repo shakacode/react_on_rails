@@ -149,7 +149,7 @@ module ReactOnRailsPro
         sinceStreamStartMs: elapsed_ms(@react_on_rails_rsc_stream_started_at)
       }
       response.stream.write(rsc_stream_observability_script("react-on-rails:rsc:stream", detail))
-    rescue IOError, Errno::EPIPE, Errno::ECONNRESET => e
+    rescue IOError, Errno::EPIPE, Errno::ECONNRESET, Errno::ECONNABORTED => e
       log_client_disconnect("observability", e)
     end
 
@@ -206,7 +206,7 @@ module ReactOnRailsPro
         while (chunk = @main_output_queue.dequeue)
           response.stream.write(chunk)
         end
-      rescue IOError, Errno::EPIPE, Errno::ECONNRESET => e
+      rescue IOError, Errno::EPIPE, Errno::ECONNRESET, Errno::ECONNABORTED => e
         # Client disconnected - stop writing gracefully
         log_client_disconnect("writer", e)
       ensure

@@ -272,6 +272,8 @@ function splitIncompleteHtmlTagTail(htmlString: string) {
   // so hold any trailing incomplete tag rather than only partial <link> tokens.
   // If hand-authored HTML contains a raw "<" in text, this treats it as an
   // incomplete tag; React SSR encodes text "<" as "&lt;", so renderer output is safe.
+  // Application inline scripts that stream a bare "<" operator across chunks are
+  // outside this guard's assumptions.
   const lastCompleteTagEnd = htmlString.lastIndexOf('>');
   const lastTagStart = htmlString.lastIndexOf('<');
 
@@ -527,7 +529,7 @@ export default function injectRSCPayload(
       rscPayloadScriptBytes: rscPayloadSize,
       payloadMarkScriptBytes,
       // Excludes this flush mark's own script bytes, which are unknown until this detail object is serialized.
-      streamChunkBytes: totalSizeWithoutFlushMark,
+      streamChunkBytesBeforeFlushMark: totalSizeWithoutFlushMark,
       containsHtml: flushableHtmlBuffer.length > 0,
       containsRscPayload: rscPayloadSize > 0,
       firstFlush: !hasFlushedOutputChunk,
@@ -591,7 +593,7 @@ export default function injectRSCPayload(
     // Send combined chunk to output stream
     resultStream.push(combinedBuffer);
     hasFlushedOutputChunk = true;
-    // Payload marks queued during this flush and the flush mark itself share the
+    // Payload marks parsed since the previous flush and this flush mark share the
     // pre-increment value, enabling exact correlation by flushIndex.
     flushIndex += 1;
 
@@ -776,7 +778,7 @@ export default function injectRSCPayload(
                   domNodeId,
                   payloadKey: rscPayloadKey,
                   chunkIndex: rscPayloadChunkIndex,
-                  // The flush mark assembled in this cycle uses the same pre-increment flushIndex.
+                  // This is the next flush index; flush() uses the same value before incrementing after write.
                   flushIndex,
                   flightPayloadBytes: content.byteLength,
                   rscPayloadScriptBytes: Buffer.byteLength(payloadScript, 'utf8'),

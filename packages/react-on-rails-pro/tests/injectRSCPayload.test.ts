@@ -234,6 +234,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain('"chunkIndex":0,"flushIndex":0,"flightPayloadBytes"');
     expect(resultStr).toContain('"flushIndex":0');
     expect(resultStr).toContain('"payloadMarkScriptBytes":');
+    expect(resultStr).toContain('"streamChunkBytesBeforeFlushMark":');
     expect(resultStr).toContain('"containsRscPayload":true');
   });
 
@@ -780,5 +781,21 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('nonce="abc123"');
+  });
+
+  it('adds valid nonce attribute to opt-in observability mark script tags', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, 'abc123', {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<script nonce="abc123">(function(){var detail=');
+    expect(resultStr).toContain('perf.mark("react-on-rails:rsc:payload"');
+    expect(resultStr).toContain('perf.mark("react-on-rails:rsc:flush"');
   });
 });

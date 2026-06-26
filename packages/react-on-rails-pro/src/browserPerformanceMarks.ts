@@ -43,6 +43,7 @@ function browserPerformanceMarkGlobal(): BrowserPerformanceMarkGlobal {
 }
 
 function jsonEscapeForHtml(value: unknown): string {
+  // JSON.stringify returns undefined for undefined input and throws on cyclic values.
   let json: string | undefined;
 
   try {
