@@ -5009,6 +5009,19 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_rsc_setup)
         expect(checker.messages.length).to eq(initial_count)
       end
+
+      it "reports a skip reason for the RSC-only doctor" do
+        rsc_only_doctor = described_class.new(verbose: false, fix: false, only: ["react_server_components"])
+        rsc_only_checker = rsc_only_doctor.instance_variable_get(:@checker)
+        allow(rsc_only_doctor).to receive(:puts)
+        allow(rsc_only_doctor).to receive(:exit)
+
+        rsc_only_doctor.send(:check_rsc_setup)
+
+        info_messages = rsc_only_checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("React Server Components checks skipped"))
+        expect(info_messages).to include(a_string_including("react_on_rails_pro is not installed"))
+      end
     end
 
     context "when Pro is installed but RSC is disabled" do
@@ -6153,6 +6166,20 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
     end
 
+    it "does not treat a blank Shakapacker source entry path as ./generated" do
+      allow(ReactOnRails::PackerUtils).to receive(:packer_source_entry_path).and_return("")
+      FileUtils.mkdir_p("generated")
+      File.write("generated/server-component-registration-entry.js", "// wrong default when source_entry_path is blank")
+      write_rsc_discovery_support_files
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).not_to include(a_string_including("RSC client references manifest not found"))
+      expect(info_messages).to include(a_string_including("broad client-reference discovery fallback"))
+    end
+
     it "warns when the Rspack RSC config supports manifest discovery and the manifest is missing" do
       FileUtils.mkdir_p("app/javascript/generated")
       File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
@@ -6187,6 +6214,25 @@ RSpec.describe ReactOnRails::Doctor do
       info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
       expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
       expect(info_messages).not_to include(a_string_including("broad client-reference discovery fallback"))
+    ensure
+      if previous_manifest_path.nil?
+        ENV.delete(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV)
+      else
+        ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = previous_manifest_path
+      end
+    end
+
+    it "names the configured RSC client references manifest env var when the path is missing" do
+      previous_manifest_path = ENV.fetch(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil)
+      ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = "true"
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("#{described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV}=\"true\"")
+      )
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
     ensure
       if previous_manifest_path.nil?
         ENV.delete(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV)

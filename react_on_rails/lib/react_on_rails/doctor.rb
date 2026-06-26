@@ -3517,7 +3517,14 @@ module ReactOnRails
     RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
 
     def check_rsc_setup
-      return unless ReactOnRails::Utils.react_on_rails_pro?
+      unless ReactOnRails::Utils.react_on_rails_pro?
+        if rsc_only_check?
+          checker.add_info(
+            "ℹ️  React Server Components checks skipped — react_on_rails_pro is not installed"
+          )
+        end
+        return
+      end
 
       ensure_rails_environment_loaded
       pro_config = ReactOnRailsPro.configuration
@@ -3536,6 +3543,10 @@ module ReactOnRails
       check_rsc_artifacts
     rescue StandardError => e
       checker.add_warning("⚠️  RSC setup check encountered an error: #{e.message}")
+    end
+
+    def rsc_only_check?
+      @check_sections.one? && @check_sections.first[:id] == "react_server_components"
     end
 
     def check_rsc_renderer_mode(pro_config)
@@ -4476,6 +4487,7 @@ module ReactOnRails
         registration_entry_exists:,
         discovery_supported:
       )
+        report_configured_rsc_client_references_manifest(artifact_path)
         report_missing_rsc_artifact("RSC client references manifest", artifact_path)
       elsif registration_entry_exists && !discovery_supported
         checker.add_warning(
@@ -4502,6 +4514,16 @@ module ReactOnRails
       discovery_supported = rsc_manifest_discovery_supported? if discovery_supported.nil?
 
       registration_entry_exists && discovery_supported
+    end
+
+    def report_configured_rsc_client_references_manifest(artifact_path)
+      configured_path = ENV[RSC_CLIENT_REFERENCES_MANIFEST_ENV].to_s.strip
+      return if configured_path.empty?
+
+      checker.add_warning(
+        "⚠️  #{RSC_CLIENT_REFERENCES_MANIFEST_ENV}=#{configured_path.inspect} requires an existing " \
+        "RSC client references manifest at #{artifact_path}"
+      )
     end
 
     def rsc_manifest_registration_entry_exists?
@@ -4568,7 +4590,7 @@ module ReactOnRails
 
     def default_rsc_manifest_registration_entry
       source_entry_path = ReactOnRails::PackerUtils.packer_source_entry_path.to_s
-      source_entry_path = "" if source_entry_path == "/"
+      return nil if source_entry_path.strip.empty? || source_entry_path == "/"
 
       File.expand_path(
         File.join(File.dirname(source_entry_path), "generated", EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME),
