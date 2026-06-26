@@ -23,8 +23,8 @@ const RSC_CLIENT_MANIFEST_LOOKUP_FAILURE = /Could not find the module [\s\S]+ in
 const RSC_CLIENT_MANIFEST_GUIDANCE =
   '\n\n[React on Rails Pro RSC diagnostic]\n' +
   'The React Client Manifest may be stale, empty, or built for a different React/package version.\n' +
-  'Try a clean static-assets rebuild: stop the dev server, remove public/packs*, ssr-generated/, ' +
-  '.node-renderer-bundles/, then run bin/dev static so the Node renderer reads a fresh on-disk manifest.';
+  'Try a clean static-assets rebuild: stop the dev server, remove public/packs, public/packs-test, ' +
+  'ssr-generated, .node-renderer-bundles, then run bin/dev static so the Node renderer reads a fresh on-disk manifest.';
 
 const addRSCClientManifestGuidance = (msg: string) => {
   if (!RSC_CLIENT_MANIFEST_LOOKUP_FAILURE.test(msg)) return msg;

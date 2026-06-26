@@ -8,6 +8,11 @@ require "tmpdir"
 RSpec.describe ReactOnRails::Doctor do
   let(:doctor) { described_class.new(verbose: false, fix: false) }
 
+  def install_package(name, package_json)
+    FileUtils.mkdir_p("node_modules/#{name}")
+    File.write("node_modules/#{name}/package.json", JSON.generate(package_json))
+  end
+
   describe "#initialize" do
     it "initializes with default options" do
       expect(doctor).to be_instance_of(described_class)
@@ -5202,11 +5207,6 @@ RSpec.describe ReactOnRails::Doctor do
       File.write("node_modules/react/package.json", "{\"version\":\"#{version}\"}")
     end
 
-    def install_package(name, package_json)
-      FileUtils.mkdir_p("node_modules/#{name}")
-      File.write("node_modules/#{name}/package.json", JSON.generate(package_json))
-    end
-
     def stub_package_root(path)
       allow(doctor).to receive(:resolved_package_root).and_return(path)
     end
@@ -5674,11 +5674,6 @@ RSpec.describe ReactOnRails::Doctor do
         rsc_bundle_js_file: "rsc-bundle.js",
         rsc_payload_generation_url_path: "rsc_payload/"
       )
-    end
-
-    def install_package(name, package_json)
-      FileUtils.mkdir_p("node_modules/#{name}")
-      File.write("node_modules/#{name}/package.json", JSON.generate(package_json))
     end
 
     around do |example|
