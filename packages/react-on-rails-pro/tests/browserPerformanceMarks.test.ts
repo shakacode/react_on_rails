@@ -191,6 +191,29 @@ describe('browserPerformanceMarks runtime helper', () => {
     ]);
   });
 
+  it('keeps the generated inline mark script body aligned with the Ruby stream script', () => {
+    const markScript = createBrowserPerformanceMarkScript('react-on-rails:rsc:contract', {
+      source: 'react-on-rails-pro',
+      phase: 'stream-complete',
+      bytes: 2048,
+    });
+
+    expect(markScript).toBe(
+      '(function(){var detail={"source":"react-on-rails-pro","phase":"stream-complete","bytes":2048};' +
+        'var entry={name:"react-on-rails:rsc:contract",detail:detail};' +
+        'var perf=self.performance;' +
+        'var supportsDetail=typeof PerformanceMark!=="undefined"&&PerformanceMark.prototype&&' +
+        '"detail" in PerformanceMark.prototype;' +
+        'if(perf&&typeof perf.mark==="function"){' +
+        'if(supportsDetail){try{performance.mark("react-on-rails:rsc:contract",{detail:detail});return;}' +
+        'catch(error){}}' +
+        'try{performance.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}' +
+        'catch(fallbackError){entry.fallback="performance-mark-unavailable";}' +
+        '}else{entry.fallback="performance-mark-unavailable";}' +
+        '(self.REACT_ON_RAILS_PERFORMANCE_MARKS||=[]).push(entry);})()',
+    );
+  });
+
   it('escapes generated inline mark scripts for HTML script context', () => {
     const mark = jest.fn();
     setPerformanceMark(mark as Performance['mark']);

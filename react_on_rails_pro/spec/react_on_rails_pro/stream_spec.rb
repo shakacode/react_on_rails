@@ -191,6 +191,30 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(script).not_to include("react</script><script>")
     end
 
+    it "keeps the generated inline mark script body aligned with the TypeScript helper" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+
+      script = controller.send(
+        :rsc_stream_observability_script,
+        "react-on-rails:rsc:contract",
+        { source: "react-on-rails-pro", phase: "stream-complete", bytes: 2048 }
+      )
+      expected_script_body = <<~JAVASCRIPT.delete("\n")
+        (function(){var detail={"source":"react-on-rails-pro","phase":"stream-complete","bytes":2048};
+        var entry={name:"react-on-rails:rsc:contract",detail:detail};var perf=self.performance;
+        var supportsDetail=typeof PerformanceMark!=="undefined"&&PerformanceMark.prototype&&
+        "detail" in PerformanceMark.prototype;
+        if(perf&&typeof perf.mark==="function"){if(supportsDetail){try{performance.mark("react-on-rails:rsc:contract",
+        {detail:detail});return;}catch(error){}}
+        try{performance.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}
+        catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
+        else{entry.fallback="performance-mark-unavailable";}
+        (self.REACT_ON_RAILS_PERFORMANCE_MARKS||=[]).push(entry);})()
+      JAVASCRIPT
+
+      expect(script).to eq("<script>#{expected_script_body}</script>")
+    end
+
     it "does not insert opt-in browser performance marks inside split component markup" do
       queues, controller, stream = setup_stream_test(component_count: 1, initial_response: "<di")
       written_chunks = []
