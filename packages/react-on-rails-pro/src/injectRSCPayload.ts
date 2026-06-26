@@ -266,6 +266,8 @@ function stylesheetTagsForRSCClientChunks(
 }
 
 function splitIncompleteHtmlTagTail(htmlString: string) {
+  // Streaming renderer output is expected to be well-formed HTML; a bare trailing "<"
+  // is held as an incomplete tag so flush marks never split a tag boundary.
   const lastCompleteTagEnd = htmlString.lastIndexOf('>');
   const lastTagStart = htmlString.lastIndexOf('<');
 
@@ -512,6 +514,7 @@ export default function injectRSCPayload(
       htmlBytes: flushableHtmlBuffer.length,
       rscPayloadScriptBytes: rscPayloadSize,
       observabilityBytes: rscObservabilitySize,
+      // Excludes this flush mark's own script bytes, which are unknown until this detail object is serialized.
       streamChunkBytes: totalSizeWithoutFlushMark,
       containsHtml: flushableHtmlBuffer.length > 0,
       containsRscPayload: rscPayloadSize > 0,

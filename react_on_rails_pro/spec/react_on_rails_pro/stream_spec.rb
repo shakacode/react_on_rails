@@ -178,6 +178,19 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(written_chunks.second).to include('"initialChunkBytes":8')
     end
 
+    it "escapes the final observability mark name inside the generated script" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+
+      script = controller.send(
+        :rsc_stream_observability_script,
+        "react</script><script>alert(1)</script>",
+        { source: "react-on-rails-pro" }
+      )
+
+      expect(script).to include("react\\u003c/script\\u003e\\u003cscript\\u003ealert(1)\\u003c/script\\u003e")
+      expect(script).not_to include("react</script><script>")
+    end
+
     it "does not insert opt-in browser performance marks inside split component markup" do
       queues, controller, stream = setup_stream_test(component_count: 1, initial_response: "<di")
       written_chunks = []

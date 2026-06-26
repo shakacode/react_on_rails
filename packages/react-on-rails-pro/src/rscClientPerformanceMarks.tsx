@@ -66,13 +66,14 @@ function RSCClientInteractivePerformanceMark({
   children: ReactElement;
   detail: RSCClientHydrationMarkDetail;
 }) {
-  const interactiveMarkState = React.useRef({ detail, marked: false });
+  const initialDetail = React.useRef(detail);
+  const hasMarkedInteractive = React.useRef(false);
 
   React.useEffect(() => {
-    if (interactiveMarkState.current.marked) return;
+    if (hasMarkedInteractive.current) return;
 
-    interactiveMarkState.current.marked = true;
-    markBrowserPerformance(RSC_HYDRATION_INTERACTIVE_MARK, interactiveMarkState.current.detail);
+    hasMarkedInteractive.current = true;
+    markBrowserPerformance(RSC_HYDRATION_INTERACTIVE_MARK, initialDetail.current);
   }, []);
 
   return children;
