@@ -4493,11 +4493,12 @@ module ReactOnRails
     end
 
     def rsc_client_references_manifest_required?(
-      registration_entry_exists: rsc_manifest_registration_entry_exists?,
+      registration_entry_exists: nil,
       discovery_supported: nil
     )
       return true unless ENV[RSC_CLIENT_REFERENCES_MANIFEST_ENV].to_s.strip.empty?
 
+      registration_entry_exists = rsc_manifest_registration_entry_exists? if registration_entry_exists.nil?
       discovery_supported = rsc_manifest_discovery_supported? if discovery_supported.nil?
 
       registration_entry_exists && discovery_supported
@@ -4600,7 +4601,7 @@ module ReactOnRails
       end
 
       artifact_path = ReactOnRailsPro::Utils.public_send(method_name)
-      if artifact_path.blank?
+      if artifact_path.to_s.strip.empty?
         checker.add_warning("⚠️  #{label} path could not be resolved")
         return nil
       end
