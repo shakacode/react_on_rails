@@ -167,9 +167,12 @@ module ReactOnRailsPro
       <<~HTML.delete("\n")
         <script#{rsc_stream_observability_nonce_attribute}>(function(){var detail=#{detail_json};
         var entry={name:#{mark_name_json},detail:detail};var perf=self.performance;
-        if(perf&&typeof perf.mark==="function"){try{performance.mark(#{mark_name_json},{detail:detail});return;}
-        catch(error){try{performance.mark(#{mark_name_json});entry.fallback="mark-detail-unavailable";}
-        catch(fallbackError){entry.fallback="performance-mark-unavailable";}}}
+        var supportsDetail=typeof PerformanceMark!=="undefined"&&PerformanceMark.prototype&&
+        "detail" in PerformanceMark.prototype;
+        if(perf&&typeof perf.mark==="function"){if(supportsDetail){try{performance.mark(#{mark_name_json},
+        {detail:detail});return;}catch(error){}}
+        try{performance.mark(#{mark_name_json});entry.fallback="mark-detail-unavailable";}
+        catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
         else{entry.fallback="performance-mark-unavailable";}
         (self.REACT_ON_RAILS_PERFORMANCE_MARKS||=[]).push(entry);})()</script>
       HTML

@@ -170,6 +170,9 @@ RSpec.describe ReactOnRailsPro::Stream do
 
       expect(written_chunks.first).to eq("TEMPLATE")
       expect(written_chunks.second).to include("self.REACT_ON_RAILS_PERFORMANCE_MARKS")
+      expect(written_chunks.second).to include("var supportsDetail=typeof PerformanceMark")
+      expect(written_chunks.second).to include('"detail" in PerformanceMark.prototype')
+      expect(written_chunks.second).to include("entry.fallback=\"mark-detail-unavailable\"")
       expect(written_chunks.second).to include('performance.mark("react-on-rails:rsc:stream"')
       expect(written_chunks.second).to include('"phase":"stream-complete"')
       expect(written_chunks.second).to include('"initialChunkBytes":8')
