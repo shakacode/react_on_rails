@@ -224,7 +224,7 @@ stream_view_containing_react_components(
 )
 ```
 
-When enabled, React on Rails Pro appends small inline scripts to the streamed response. Each script first tries:
+When enabled, React on Rails Pro appends small inline scripts to the streamed response and enables matching client-side hydration marks for RSC island roots. Each mark first tries:
 
 ```js
 performance.mark('react-on-rails:rsc:payload', { detail });
@@ -256,13 +256,15 @@ for (const entry of window.REACT_ON_RAILS_PERFORMANCE_MARKS || []) {
 
 The emitted mark names are:
 
-| Mark name                    | What it records                                                                                                     |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `react-on-rails:rsc:stream`  | Rails-side streaming phases, including the initial template write and later component chunks.                       |
-| `react-on-rails:rsc:payload` | Each inline Flight payload chunk, including component name, chunk index, raw Flight bytes, and inline script bytes. |
-| `react-on-rails:rsc:flush`   | Each Node-side HTML/RSC combined flush, including HTML bytes, payload script bytes, stylesheet bytes, and index.    |
+| Mark name                                  | What it records                                                                                                     |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `react-on-rails:rsc:stream`                | Rails-side streaming phases, including the initial template write and later component chunks.                       |
+| `react-on-rails:rsc:payload`               | Each inline Flight payload chunk, including component name, chunk index, raw Flight bytes, and inline script bytes. |
+| `react-on-rails:rsc:flush`                 | Each Node-side HTML/RSC combined flush, including HTML bytes, payload script bytes, stylesheet bytes, and index.    |
+| `react-on-rails:rsc:hydration:start`       | Client-side start of an RSC island root hydration or client render, including component name, DOM id, and mode.     |
+| `react-on-rails:rsc:hydration:interactive` | First committed client effect for that RSC island root, a practical interactivity boundary for browser benchmarks.  |
 
-The details intentionally include byte counts, phase names, component names, chunk indexes, and timing offsets. They do not include serialized props or Flight payload contents.
+The details intentionally include byte counts, phase names, component names, DOM ids, hydrate/render mode, chunk indexes, and timing offsets. They do not include serialized props or Flight payload contents.
 
 The initial RSC payload remains inline in the navigation response by design. A separate `/rsc_payload/*` request exists for client-side RSC payload generation, but the streamed initial page does not switch to that fetch path unless your application deliberately renders that route separately.
 

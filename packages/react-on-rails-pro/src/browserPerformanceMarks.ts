@@ -17,6 +17,45 @@ export const REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE = 'REACT_ON_RAILS_PERFORMANC
 export const RSC_STREAM_PERFORMANCE_MARK_PREFIX = 'react-on-rails:rsc';
 
 export type BrowserPerformanceMarkDetail = Record<string, unknown>;
+export type BrowserPerformanceMarkFallback = 'mark-detail-unavailable' | 'performance-mark-unavailable';
+
+export type BrowserPerformanceMarkEntry = {
+  name: string;
+  detail: BrowserPerformanceMarkDetail;
+  fallback?: BrowserPerformanceMarkFallback;
+};
+
+type BrowserPerformanceMarkGlobal = typeof globalThis & {
+  [REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE]?: BrowserPerformanceMarkEntry[];
+};
+
+function browserPerformanceMarkGlobal(): BrowserPerformanceMarkGlobal {
+  return globalThis as BrowserPerformanceMarkGlobal;
+}
+
+export function markBrowserPerformance(markName: string, detail: BrowserPerformanceMarkDetail): void {
+  const markGlobal = browserPerformanceMarkGlobal();
+  const entry: BrowserPerformanceMarkEntry = { name: markName, detail };
+  const perf = markGlobal.performance;
+
+  if (perf && typeof perf.mark === 'function') {
+    try {
+      perf.mark(markName, { detail });
+      return;
+    } catch {
+      try {
+        perf.mark(markName);
+        entry.fallback = 'mark-detail-unavailable';
+      } catch {
+        entry.fallback = 'performance-mark-unavailable';
+      }
+    }
+  } else {
+    entry.fallback = 'performance-mark-unavailable';
+  }
+
+  (markGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE] ||= []).push(entry);
+}
 
 export function createBrowserPerformanceMarkScript(markName: string, detail: BrowserPerformanceMarkDetail) {
   const markNameJson = JSON.stringify(markName);

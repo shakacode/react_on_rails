@@ -26,6 +26,7 @@ import 'react-on-rails-rsc/client.browser';
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
 import type { ReactComponent, ReactComponentRenderFunction, RendererFunction } from 'react-on-rails/types';
+import type { ReactElement } from 'react';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { isRendererTeardownResult } from 'react-on-rails/@internal/rendererTeardown';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
@@ -33,6 +34,12 @@ import { buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting } fr
 import { createRSCProvider } from '../RSCProvider.tsx';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
 import { chainRecoverableErrorHandlers } from '../handleRecoverableError.client.ts';
+import {
+  createRSCClientHydrationMarkDetail,
+  markRSCClientHydrationStart,
+  type RSCClientHydrationMarkDetail,
+  wrapWithRSCClientInteractivePerformanceMark,
+} from '../rscClientPerformanceMarks.tsx';
 
 ensureReactUseAvailable();
 
@@ -114,11 +121,26 @@ const wrapServerComponentRenderer = (
       getServerComponent: getReactServerComponent(domNodeId, railsContext),
     });
 
+    const shouldHydrate = !!domNode.innerHTML;
+    const componentElement = <Component {...props} />;
+    let observableComponentElement: ReactElement = componentElement;
+    let hydrationMarkDetail: RSCClientHydrationMarkDetail | undefined;
+
+    if (railsContext.rscStreamObservability === true) {
+      hydrationMarkDetail = createRSCClientHydrationMarkDetail({
+        componentName,
+        domNodeId,
+        mode: shouldHydrate ? 'hydrate' : 'render',
+        boundary: 'server-component-root',
+      });
+      observableComponentElement = wrapWithRSCClientInteractivePerformanceMark(
+        componentElement,
+        hydrationMarkDetail,
+      );
+    }
     const rootElement = (
       <RSCProvider>
-        <React.Suspense fallback={null}>
-          <Component {...props} />
-        </React.Suspense>
+        <React.Suspense fallback={null}>{observableComponentElement}</React.Suspense>
       </RSCProvider>
     );
 
@@ -127,13 +149,15 @@ const wrapServerComponentRenderer = (
     // Pro's internal recoverable-error handler so both run. This file is always RSC-wrapped; the
     // helper records that the internal handler already default-reports on hydrate, so the dev-mode
     // logger emits only its supplemental branded line.
-    const shouldHydrate = !!domNode.innerHTML;
     const userErrorCallbackOptions = buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting(
       { componentName, domNodeId },
       shouldHydrate,
     );
     const { onRecoverableError: userOnRecoverableError, ...rootErrorCallbackOptions } =
       userErrorCallbackOptions;
+    if (hydrationMarkDetail) {
+      markRSCClientHydrationStart(hydrationMarkDetail);
+    }
     const reactRoot = shouldHydrate
       ? ReactDOMClient.hydrateRoot(domNode, rootElement, {
           ...rootErrorCallbackOptions,
