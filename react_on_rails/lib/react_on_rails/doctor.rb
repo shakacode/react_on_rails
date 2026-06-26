@@ -174,11 +174,13 @@ module ReactOnRails
         raise ArgumentError, "Invalid doctor format #{format.inspect}; expected one of #{OUTPUT_FORMATS.join(', ')}"
       end
 
+      @only_explicitly_set = explicit_check_selection?(only)
       @check_sections = normalize_check_sections(only)
       @checker = SystemChecker.new
       @test_output_path_strategy = :unknown
       @rails_environment_loaded = false
       @rsc_artifacts_rebuild_guidance_added = false
+      @rsc_registration_entry_warning_added = false
     end
 
     def run_diagnosis
@@ -208,6 +210,10 @@ module ReactOnRails
       end
 
       check_ids.uniq.map { |check_id| CHECK_SECTIONS_BY_ID.fetch(check_id) }
+    end
+
+    def explicit_check_selection?(only)
+      Array(only).flat_map { |value| value.to_s.split(/[,\s]+/) }.reject(&:empty?).any?
     end
 
     def print_header
@@ -3546,8 +3552,7 @@ module ReactOnRails
     end
 
     def rsc_check_explicitly_selected?
-      check_sections.any? { |section| section[:id] == "react_server_components" } &&
-        check_sections != CHECK_SECTIONS
+      @only_explicitly_set && check_sections.any? { |section| section[:id] == "react_server_components" }
     end
 
     def check_rsc_renderer_mode(pro_config)
@@ -4551,13 +4556,11 @@ module ReactOnRails
     end
 
     def file_contains_all?(file_path, tokens)
-      resolved_path = File.expand_path(file_path, Dir.pwd)
+      resolved_path = File.expand_path(file_path, doctor_app_root)
       return false unless File.exist?(resolved_path)
 
       content = File.read(resolved_path)
       tokens.all? { |token| content.include?(token) }
-    rescue Errno::ENOENT
-      false
     rescue StandardError => e
       checker.add_warning("⚠️  Could not read #{file_path} during RSC discovery check: #{e.message}")
       false
@@ -4574,16 +4577,23 @@ module ReactOnRails
       configured_path = ENV[RSC_REGISTRATION_ENTRY_PATH_ENV].to_s.strip
       return nil if configured_path.empty?
 
-      resolved_path = File.absolute_path(configured_path, Dir.pwd)
+      resolved_path = File.absolute_path(configured_path, doctor_app_root)
       unless valid_rsc_manifest_registration_entry?(resolved_path)
-        checker.add_warning(
-          "⚠️  #{RSC_REGISTRATION_ENTRY_PATH_ENV}=#{configured_path.inspect} was set but did not pass " \
-          "validation; falling back to default discovery"
-        )
+        warn_invalid_rsc_registration_entry(configured_path)
         return nil
       end
 
       resolved_path
+    end
+
+    def warn_invalid_rsc_registration_entry(configured_path)
+      return if @rsc_registration_entry_warning_added
+
+      checker.add_warning(
+        "⚠️  #{RSC_REGISTRATION_ENTRY_PATH_ENV}=#{configured_path.inspect} was set but did not pass " \
+        "validation; falling back to default discovery"
+      )
+      @rsc_registration_entry_warning_added = true
     end
 
     def default_rsc_manifest_registration_entry
@@ -4592,7 +4602,7 @@ module ReactOnRails
 
       File.expand_path(
         File.join(File.dirname(source_entry_path), "generated", EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME),
-        Dir.pwd
+        doctor_app_root
       )
     rescue StandardError
       nil
@@ -4608,7 +4618,7 @@ module ReactOnRails
 
     def rsc_registration_entry_path_components(path)
       expanded_path = File.expand_path(path.to_s)
-      expanded_root = "#{File.expand_path(Dir.pwd)}#{File::SEPARATOR}"
+      expanded_root = "#{File.expand_path(doctor_app_root)}#{File::SEPARATOR}"
       expanded_path = expanded_path.delete_prefix(expanded_root) if expanded_path.start_with?(expanded_root)
 
       expanded_path.split(File::SEPARATOR).reject(&:empty?)
@@ -4643,6 +4653,8 @@ module ReactOnRails
     rescue JSON::ParserError => e
       checker.add_warning("⚠️  #{label} is not valid JSON: #{e.message}")
       add_rsc_artifacts_rebuild_guidance
+    rescue Errno::EACCES => e
+      checker.add_warning("⚠️  Could not read #{label} (permission denied): #{e.message}")
     rescue StandardError => e
       checker.add_warning("⚠️  Could not inspect #{label}: #{e.message}")
       add_rsc_artifacts_rebuild_guidance
@@ -4659,8 +4671,16 @@ module ReactOnRails
       configured_path = ENV.fetch(RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil).to_s.strip
       File.expand_path(
         configured_path.empty? ? DEFAULT_RSC_CLIENT_REFERENCES_MANIFEST_PATH : configured_path,
-        Dir.pwd
+        doctor_app_root
       )
+    end
+
+    def doctor_app_root
+      rails_root = Rails.root if defined?(Rails) && Rails.respond_to?(:root)
+      rails_root = rails_root.to_s
+      rails_root.empty? ? Dir.pwd : rails_root
+    rescue StandardError
+      Dir.pwd
     end
 
     def report_missing_rsc_artifact(label, artifact_path)

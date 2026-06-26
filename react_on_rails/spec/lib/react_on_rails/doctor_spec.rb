@@ -6108,6 +6108,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     before do
+      allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
       stub_const("ReactOnRailsPro", Module.new)
       ReactOnRailsPro.const_set(:Utils, Module.new)
       ReactOnRailsPro::Utils.define_singleton_method(:rsc_bundle_js_file_path) { nil }
@@ -6175,6 +6176,18 @@ RSpec.describe ReactOnRails::Doctor do
       write_rsc_discovery_support_files
 
       doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+    end
+
+    it "resolves relative RSC discovery paths from Rails.root when invoked from a subdirectory" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+      write_rsc_discovery_support_files
+      FileUtils.mkdir_p("tmp/subdir")
+
+      Dir.chdir("tmp/subdir") { doctor.send(:check_rsc_artifacts) }
 
       warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
       expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
@@ -6332,7 +6345,7 @@ RSpec.describe ReactOnRails::Doctor do
       doctor.send(:check_rsc_artifacts)
 
       warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
-      expect(warning_messages).to include(a_string_including("Could not inspect RSC server client manifest"))
+      expect(warning_messages).to include(a_string_including("Could not read RSC server client manifest"))
       expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
     ensure
       if previous_manifest_path.nil?
@@ -6340,6 +6353,21 @@ RSpec.describe ReactOnRails::Doctor do
       else
         ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = previous_manifest_path
       end
+    end
+
+    it "does not add rebuild guidance when a JSON artifact exists but cannot be read" do
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("ssr-generated/react-server-client-manifest.json", JSON.generate("module" => {}))
+      server_manifest_path = File.expand_path("ssr-generated/react-server-client-manifest.json")
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(server_manifest_path).and_raise(Errno::EACCES, "Permission denied")
+
+      doctor.send(:report_rsc_json_artifact, "RSC server client manifest", server_manifest_path)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("Could not read RSC server client manifest"))
+      expect(info_messages).not_to include(a_string_including("Re-run bin/shakapacker-precompile-hook"))
     end
 
     it "warns clearly when the RSC client references manifest is a JSON array" do
