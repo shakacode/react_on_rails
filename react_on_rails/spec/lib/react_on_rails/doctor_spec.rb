@@ -6113,6 +6113,24 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
     end
 
+    it "warns when a configured RSC client references manifest is missing" do
+      previous_manifest_path = ENV.fetch(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil)
+      ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = "missing-rsc-client-references.json"
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+      expect(info_messages).not_to include(a_string_including("broad client-reference discovery fallback"))
+    ensure
+      if previous_manifest_path.nil?
+        ENV.delete(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV)
+      else
+        ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = previous_manifest_path
+      end
+    end
+
     it "reports success when the RSC bundle, server manifest, and client references manifest exist" do
       FileUtils.mkdir_p("ssr-generated")
       File.write("ssr-generated/rsc-bundle.js", "// RSC bundle")

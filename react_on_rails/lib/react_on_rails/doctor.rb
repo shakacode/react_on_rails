@@ -4464,6 +4464,8 @@ module ReactOnRails
     end
 
     def rsc_client_references_manifest_required?
+      return true unless ENV[RSC_CLIENT_REFERENCES_MANIFEST_ENV].to_s.strip.empty?
+
       registration_entry = rsc_manifest_registration_entry
       registration_entry && File.exist?(registration_entry)
     end
