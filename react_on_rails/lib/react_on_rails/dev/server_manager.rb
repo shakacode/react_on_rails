@@ -83,7 +83,7 @@ module ReactOnRails
           puts ""
           kill_processes
           puts ""
-          puts "📖 Reading Shakapacker config: #{display_clean_path(shakapacker_config_path)}"
+          print_shakapacker_config_status
           puts ""
 
           remove_clean_targets(clean_targets)
@@ -459,11 +459,20 @@ module ReactOnRails
           end
         end
 
+        def print_shakapacker_config_status
+          config_path = shakapacker_config_path
+          if File.exist?(config_path)
+            puts "📖 Reading Shakapacker config: #{display_clean_path(config_path)}"
+          else
+            puts "📖 Shakapacker config not found: #{display_clean_path(config_path)}"
+            puts "   • Skipping configured Shakapacker output/cache paths"
+          end
+        end
+
         def safe_clean_path?(path)
-          expanded_path = File.expand_path(path, app_root_path)
-          return false unless path_inside_app_root?(expanded_path)
-          return false if broad_clean_path?(expanded_path)
-          return false unless real_clean_path_inside_app_root?(expanded_path)
+          return false unless path_inside_app_root?(path)
+          return false if broad_clean_path?(path)
+          return false unless real_clean_path_inside_app_root?(path)
 
           true
         end
@@ -482,9 +491,13 @@ module ReactOnRails
         end
 
         def real_app_root_path
-          File.realpath(app_root_path)
+          root_path = app_root_path
+          return @real_app_root_path if @real_app_root_path_for == root_path
+
+          @real_app_root_path_for = root_path
+          @real_app_root_path = File.realpath(root_path)
         rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR
-          app_root_path
+          @real_app_root_path = root_path
         end
 
         def broad_clean_path?(path)
@@ -497,11 +510,10 @@ module ReactOnRails
         end
 
         def display_clean_path(path)
-          expanded_path = File.expand_path(path, app_root_path)
           root_prefix = "#{app_root_path}/"
-          return expanded_path.delete_prefix(root_prefix) if expanded_path.start_with?(root_prefix)
+          return path.delete_prefix(root_prefix) if path.start_with?(root_prefix)
 
-          expanded_path
+          path
         end
 
         def app_root_path

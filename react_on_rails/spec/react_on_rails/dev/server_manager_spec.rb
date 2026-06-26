@@ -1483,11 +1483,15 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     around do |example|
       original_renderer_cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", nil)
       Dir.mktmpdir("react-on-rails-clean") do |tmpdir|
-        Dir.chdir(tmpdir) do
-          example.run
+        Dir.mktmpdir("react-on-rails-clean-outside") do |outside_tmpdir|
+          @clean_test_outside_root = outside_tmpdir
+          Dir.chdir(tmpdir) do
+            example.run
+          end
         end
       end
     ensure
+      @clean_test_outside_root = nil
       if original_renderer_cache_path.nil?
         ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
       else
@@ -1507,6 +1511,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     def create_clean_test_dirs(*paths)
       paths.each { |path| FileUtils.mkdir_p(path) }
+    end
+
+    def clean_test_outside_path(*parts)
+      File.join(@clean_test_outside_root, *parts)
     end
 
     it "removes bundle outputs and cache paths derived from shakapacker.yml" do
@@ -1565,21 +1573,44 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    it "reports missing shakapacker.yml and still removes common caches" do
+      create_clean_test_dirs(
+        "tmp/cache",
+        "node_modules/.cache",
+        ".node-renderer-bundles"
+      )
+
+      output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+      aggregate_failures do
+        expect(output).to include("Shakapacker config not found: config/shakapacker.yml")
+        expect(output).to include("Skipping configured Shakapacker output/cache paths")
+        expect(output).not_to include("Reading Shakapacker config")
+        expect(File).not_to exist("tmp/cache")
+        expect(File).not_to exist("node_modules/.cache")
+        expect(File).not_to exist(".node-renderer-bundles")
+      end
+    end
+
     it "skips shakapacker.yml paths that resolve outside the app root or to broad root directories" do
-      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "../outside-renderer-cache"
-      FileUtils.mkdir_p("../outside-packs")
-      FileUtils.mkdir_p("../outside-webpack/development")
-      FileUtils.mkdir_p("../outside-renderer-cache")
+      outside_packs = clean_test_outside_path("outside-packs")
+      outside_cache = clean_test_outside_path("outside-cache")
+      outside_webpack = clean_test_outside_path("outside-webpack")
+      outside_renderer_cache = clean_test_outside_path("outside-renderer-cache")
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = outside_renderer_cache
+      FileUtils.mkdir_p(outside_packs)
+      FileUtils.mkdir_p(File.join(outside_webpack, "development"))
+      FileUtils.mkdir_p(outside_renderer_cache)
       FileUtils.mkdir_p("public")
-      File.write("../outside-packs/keep.txt", "keep")
-      File.write("../outside-webpack/development/keep.txt", "keep")
-      File.write("../outside-renderer-cache/keep.txt", "keep")
-      File.symlink(File.expand_path("../outside-webpack", Dir.pwd), "public/webpack")
+      File.write(File.join(outside_packs, "keep.txt"), "keep")
+      File.write(File.join(outside_webpack, "development", "keep.txt"), "keep")
+      File.write(File.join(outside_renderer_cache, "keep.txt"), "keep")
+      File.symlink(outside_webpack, "public/webpack")
       write_clean_test_shakapacker_config(<<~YAML)
         default:
-          public_root_path: ..
+          public_root_path: #{@clean_test_outside_root}
           public_output_path: outside-packs
-          cache_path: ../outside-cache
+          cache_path: #{outside_cache}
 
         test:
           public_root_path: public
@@ -1594,9 +1625,9 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       output = capture_stdout { described_class.clean_generated_assets_and_caches }
 
       aggregate_failures do
-        expect(File).to exist("../outside-packs/keep.txt")
-        expect(File).to exist("../outside-webpack/development/keep.txt")
-        expect(File).to exist("../outside-renderer-cache/keep.txt")
+        expect(File).to exist(File.join(outside_packs, "keep.txt"))
+        expect(File).to exist(File.join(outside_webpack, "development", "keep.txt"))
+        expect(File).to exist(File.join(outside_renderer_cache, "keep.txt"))
         expect(File).to exist("public")
         expect(output).to include("Skipping unsafe cleanup path")
       end
