@@ -81,6 +81,10 @@ RSpec.describe "doctor rake task" do
       expect(Rake::Task.task_defined?("react_on_rails:doctor:rsc")).to be true
     end
 
+    it "documents that ONLY is ignored for the RSC-only task" do
+      expect(File.read(rake_file)).to include("ONLY is ignored")
+    end
+
     it "invokes doctor with only the React Server Components section" do
       doctor_instance = instance_double(ReactOnRails::Doctor, run_diagnosis: nil)
       allow(ReactOnRails::Doctor).to receive(:new).and_return(doctor_instance)
@@ -102,6 +106,19 @@ RSpec.describe "doctor rake task" do
         .with(verbose: false, fix: false, format: :json, only: ["react_server_components"])
     ensure
       ENV.delete("FORMAT")
+    end
+
+    it "ignores ONLY because the task is already scoped to the RSC section" do
+      doctor_instance = instance_double(ReactOnRails::Doctor, run_diagnosis: nil)
+      allow(ReactOnRails::Doctor).to receive(:new).and_return(doctor_instance)
+
+      ENV["ONLY"] = "environment"
+      Rake::Task["react_on_rails:doctor:rsc"].invoke
+
+      expect(ReactOnRails::Doctor).to have_received(:new)
+        .with(verbose: false, fix: false, format: :text, only: ["react_server_components"])
+    ensure
+      ENV.delete("ONLY")
     end
   end
 end

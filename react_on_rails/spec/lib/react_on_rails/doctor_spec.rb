@@ -6191,6 +6191,22 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
     end
 
+    it "warns when RSC discovery support files exist but cannot be read" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+      write_rsc_discovery_support_files
+      config_path = File.expand_path("config/webpack/rscWebpackConfig.js", Dir.pwd)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(config_path).and_raise(Errno::EACCES, "Permission denied")
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("Could not read config/webpack/rscWebpackConfig.js during RSC discovery check")
+      )
+    end
+
     it "warns with generator guidance when missing manifest discovery support requires broad fallback" do
       FileUtils.mkdir_p("app/javascript/generated")
       File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")

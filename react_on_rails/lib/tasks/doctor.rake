@@ -58,7 +58,7 @@ namespace :react_on_rails do
   end
 
   namespace :doctor do
-    desc "Diagnose only React Server Components setup (FORMAT=json for machine-readable output)"
+    desc "Diagnose only React Server Components setup (ONLY is ignored; FORMAT=json for machine-readable output)"
     task :rsc do
       doctor = ReactOnRails::Doctor.new(**doctor_options.call(only: rsc_doctor_checks))
       doctor.run_diagnosis

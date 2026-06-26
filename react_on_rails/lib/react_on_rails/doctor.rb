@@ -3546,7 +3546,7 @@ module ReactOnRails
     end
 
     def rsc_only_check?
-      @check_sections.one? && @check_sections.first[:id] == "react_server_components"
+      check_sections.one? && check_sections.first[:id] == "react_server_components"
     end
 
     def check_rsc_renderer_mode(pro_config)
@@ -4561,7 +4561,10 @@ module ReactOnRails
 
       content = File.read(resolved_path)
       tokens.all? { |token| content.include?(token) }
-    rescue StandardError
+    rescue Errno::ENOENT
+      false
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not read #{file_path} during RSC discovery check: #{e.message}")
       false
     end
 
