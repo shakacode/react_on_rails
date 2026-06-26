@@ -222,7 +222,7 @@ describe('browserPerformanceMarks runtime helper', () => {
     const markScript = createBrowserPerformanceMarkScript('react-on-rails:rsc:payload', cyclicDetail);
 
     expect(markScript).toContain('var detail=null;');
-    expect(() => new Function(markScript)).not.toThrow();
+    expect(() => new Function(markScript)()).not.toThrow();
   });
 
   it('escapes generated inline mark scripts for HTML script context', () => {
