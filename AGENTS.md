@@ -167,6 +167,19 @@ see
   `+ci-force-full`, `+ci-stop-hosted`, `+ci-stop-full`, `+ci-skip-hosted [reason]`, `+ci-help`);
   labels `ready-for-hosted-ci` and `force-full-hosted-ci`; human helper `bin/request-hosted-ci`.
   Decision rules are in the **Review Workflow → PR CI Labels** section.
+- **CI parity environment**: no dedicated `act`/local runner image is currently documented.
+  Use `bin/ci-local` and `script/ci-changes-detector origin/main` for local routing, then reproduce
+  CI-only failures from the exact GitHub Actions workflow/job, `runs-on` image, matrix, services,
+  and commands in `.github/workflows/**`; record any runner, service, or secret gap as `UNKNOWN`.
+- **Secret redaction patterns**: redact values for environment variables or log fields whose names
+  contain `SECRET`, `TOKEN`, `KEY`, `PASSWORD`, `CREDENTIAL`, `CERT`, `PASSPHRASE`, `PEM`,
+  `PRIVATE`, `DSN`, or `LICENSE`, plus repo-specific names including `REACT_ON_RAILS_PRO_LICENSE`,
+  `REACT_ON_RAILS_PRO_LICENSE_V2`, `BENCHER_API_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN`,
+  `GH_TOKEN`, `NPM_OTP`, `RUBYGEMS_OTP`, `DOCS_DISPATCH_APP_KEY`, `RENDERER_PASSWORD`, and
+  `SECRET_KEY_BASE`. These patterns intentionally favor conservative over-redaction of logs, prompts,
+  and issue comments over preserving non-secret diagnostic text. Repo-specific entries are public
+  identifier names, not values; list them here so agents redact exact aliases even when generic patterns
+  would also match.
 - **Benchmark labels**: `benchmark`, `benchmark-core`, `benchmark-pro`,
   `benchmark-pro-node-renderer`, and `hosted-ci-no-benchmarks` (suppress). Opt-in on PRs.
 - **Follow-up issue prefix**: `Follow-up:`. Default to no new issue; see the **Maintainer
