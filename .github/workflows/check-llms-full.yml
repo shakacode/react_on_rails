@@ -41,7 +41,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Read runtime versions
@@ -96,4 +95,18 @@ jobs:
       - name: Validate llms-full references
         env:
           LLMS_FULL_MODE: ${{ steps.llms-full-mode.outputs.mode }}
-        run: node script/generate-llms-full.mjs "--${LLMS_FULL_MODE}"
+        run: |
+          set -euo pipefail
+
+          case "$LLMS_FULL_MODE" in
+            check)
+              node script/generate-llms-full.mjs --check
+              ;;
+            validate)
+              node script/generate-llms-full.mjs --validate
+              ;;
+            *)
+              echo "Unexpected llms-full validation mode: $LLMS_FULL_MODE" >&2
+              exit 1
+              ;;
+          esac
