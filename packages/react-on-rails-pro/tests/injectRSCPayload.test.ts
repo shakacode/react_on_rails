@@ -234,6 +234,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain(
       `"rscPayloadScriptBytes":${Buffer.byteLength(expectedPayloadPushScript(flightData), 'utf8')}`,
     );
+    expect(resultStr).toContain('"chunkIndex":0,"flushIndex":0,"flightPayloadBytes"');
     expect(resultStr).toContain('"flushIndex":0');
     expect(resultStr).toContain('"containsRscPayload":true');
   });

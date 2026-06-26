@@ -190,4 +190,31 @@ describe('browserPerformanceMarks runtime helper', () => {
       },
     ]);
   });
+
+  it('escapes generated inline mark scripts for HTML script context', () => {
+    const mark = jest.fn();
+    setPerformanceMark(mark as Performance['mark']);
+    Object.defineProperty(globalThis, 'self', {
+      configurable: true,
+      value: globalThis,
+      writable: true,
+    });
+
+    const markName = 'react-on-rails:rsc:payload</script><script>alert(1)</script>';
+    const detail = {
+      source: 'react-on-rails-pro',
+      componentName: '</script><script>alert(2)</script>',
+      domNodeId: 'products&featured>card',
+    };
+    const markScript = createBrowserPerformanceMarkScript(markName, detail);
+
+    expect(markScript).toContain('payload\\u003c/script\\u003e\\u003cscript\\u003ealert(1)');
+    expect(markScript).toContain('\\u003c/script\\u003e\\u003cscript\\u003ealert(2)');
+    expect(markScript).toContain('products\\u0026featured\\u003ecard');
+    expect(markScript).not.toContain('</script><script>');
+
+    new Function(markScript)();
+
+    expect(mark).toHaveBeenCalledWith(markName, { detail });
+  });
 });

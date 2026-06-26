@@ -266,8 +266,9 @@ function stylesheetTagsForRSCClientChunks(
 }
 
 function splitIncompleteHtmlTagTail(htmlString: string) {
-  // Streaming renderer output is expected to be well-formed HTML; a bare trailing "<"
-  // is held as an incomplete tag so flush marks never split a tag boundary.
+  // Streaming renderer output is expected to be well-formed HTML where bare "<"
+  // characters are tag starts, and React reveal scripts are deferred separately.
+  // Hold trailing incomplete tags so flush marks never split a tag boundary.
   const lastCompleteTagEnd = htmlString.lastIndexOf('>');
   const lastTagStart = htmlString.lastIndexOf('<');
 
@@ -770,6 +771,7 @@ export default function injectRSCPayload(
                   domNodeId,
                   payloadKey: rscPayloadKey,
                   chunkIndex: rscPayloadChunkIndex,
+                  flushIndex,
                   flightPayloadBytes: content.byteLength,
                   inlineScriptBytes: Buffer.byteLength(payloadScript, 'utf8'),
                 },

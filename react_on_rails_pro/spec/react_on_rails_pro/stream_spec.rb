@@ -228,6 +228,26 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
     end
 
+    it "handles connection resets while writing the final observability mark" do
+      queues, controller, stream = setup_stream_test(component_count: 1)
+      written_chunks = []
+      allow(stream).to receive(:write) do |chunk|
+        raise Errno::ECONNRESET, "connection reset" if chunk.include?("react-on-rails:rsc:stream")
+
+        written_chunks << chunk
+      end
+
+      expect do
+        run_stream(controller, rsc_stream_observability: true) do |_parent|
+          queues[0].enqueue("Chunk1")
+          queues[0].close
+          sleep 0.1
+        end
+      end.not_to raise_error
+
+      expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+    end
+
     it "applies backpressure with slow writer" do
       queues, controller, stream = setup_stream_test(component_count: 1)
 
@@ -362,6 +382,32 @@ RSpec.describe ReactOnRailsPro::Stream do
         allow(stream).to receive(:write) do |chunk|
           write_count += 1
           raise Errno::EPIPE, "broken pipe" if write_count == 3
+
+          written_chunks << chunk
+        end
+
+        run_stream(controller) do |_parent|
+          queues[0].enqueue("Chunk1")
+          sleep 0.05
+          queues[0].enqueue("Chunk2")
+          sleep 0.05
+          queues[0].enqueue("Chunk3")
+          queues[0].close
+          sleep 0.1
+        end
+
+        expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+      end
+
+      it "stops writing on Errno::ECONNRESET" do
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        written_chunks = []
+        write_count = 0
+
+        allow(stream).to receive(:write) do |chunk|
+          write_count += 1
+          raise Errno::ECONNRESET, "connection reset" if write_count == 3
 
           written_chunks << chunk
         end

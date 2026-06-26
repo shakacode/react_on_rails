@@ -14,7 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "English"
-require "erb"
+require "erb/util"
 
 module ReactOnRailsPro
   module Stream
@@ -149,7 +149,7 @@ module ReactOnRailsPro
         sinceStreamStartMs: elapsed_ms(@react_on_rails_rsc_stream_started_at)
       }
       response.stream.write(rsc_stream_observability_script("react-on-rails:rsc:stream", detail))
-    rescue IOError, Errno::EPIPE => e
+    rescue IOError, Errno::EPIPE, Errno::ECONNRESET => e
       log_client_disconnect("observability", e)
     end
 
@@ -195,7 +195,7 @@ module ReactOnRailsPro
     # Consumer task: Single writer dequeues chunks and writes to response stream.
     #
     # Client disconnect handling:
-    # - If client disconnects (IOError/Errno::EPIPE), writer stops gracefully
+    # - If client disconnects (IOError/Errno::EPIPE/Errno::ECONNRESET), writer stops gracefully
     # - Barrier is stopped to cancel all producer tasks, preventing wasted work
     # - No exception propagates to the controller for client disconnects
     def drain_streams_concurrently(parent_task)
@@ -204,7 +204,7 @@ module ReactOnRailsPro
         while (chunk = @main_output_queue.dequeue)
           response.stream.write(chunk)
         end
-      rescue IOError, Errno::EPIPE => e
+      rescue IOError, Errno::EPIPE, Errno::ECONNRESET => e
         # Client disconnected - stop writing gracefully
         log_client_disconnect("writer", e)
       ensure

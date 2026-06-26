@@ -29,8 +29,25 @@ type BrowserPerformanceMarkGlobal = typeof globalThis & {
   [REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE]?: BrowserPerformanceMarkEntry[];
 };
 
+const JSON_ESCAPE_FOR_HTML_REPLACEMENTS: Record<string, string> = {
+  '&': '\\u0026',
+  '<': '\\u003c',
+  '>': '\\u003e',
+  '\u2028': '\\u2028',
+  '\u2029': '\\u2029',
+};
+
 function browserPerformanceMarkGlobal(): BrowserPerformanceMarkGlobal {
   return globalThis as BrowserPerformanceMarkGlobal;
+}
+
+function jsonEscapeForHtml(value: unknown): string {
+  const json = JSON.stringify(value);
+
+  return (json ?? 'null').replace(
+    /[<>&\u2028\u2029]/g,
+    (character) => JSON_ESCAPE_FOR_HTML_REPLACEMENTS[character],
+  );
 }
 
 function browserPerformanceMarkDetailSupported(): boolean {
@@ -72,8 +89,8 @@ export function markBrowserPerformance(markName: string, detail: BrowserPerforma
 // Keep this inline script in sync with
 // ReactOnRailsPro::Stream#rsc_stream_observability_script.
 export function createBrowserPerformanceMarkScript(markName: string, detail: BrowserPerformanceMarkDetail) {
-  const markNameJson = JSON.stringify(markName);
-  const detailJson = JSON.stringify(detail);
+  const markNameJson = jsonEscapeForHtml(markName);
+  const detailJson = jsonEscapeForHtml(detail);
 
   return (
     `(function(){var detail=${detailJson};` +

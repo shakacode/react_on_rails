@@ -256,13 +256,13 @@ for (const entry of window.REACT_ON_RAILS_PERFORMANCE_MARKS || []) {
 
 The emitted mark names are:
 
-| Mark name                                  | What it records                                                                                                     |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `react-on-rails:rsc:stream`                | Rails-side stream completion, emitted as a final safe HTML chunk with initial template bytes and render duration.   |
-| `react-on-rails:rsc:payload`               | Each inline Flight payload chunk, including component name, chunk index, raw Flight bytes, and inline script bytes. |
-| `react-on-rails:rsc:flush`                 | Each Node-side HTML/RSC combined flush, including HTML bytes, payload script bytes, stylesheet bytes, and index.    |
-| `react-on-rails:rsc:hydration:start`       | Client-side start of an RSC island root hydration or client render, including component name, DOM id, and mode.     |
-| `react-on-rails:rsc:hydration:interactive` | First committed client effect for that RSC island root, a practical interactivity boundary for browser benchmarks.  |
+| Mark name                                  | What it records                                                                                                                                                                 |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `react-on-rails:rsc:stream`                | Rails-side stream completion, emitted as a final safe HTML chunk with initial template bytes and render duration.                                                               |
+| `react-on-rails:rsc:payload`               | Each inline Flight payload chunk, including component name, chunk index, matching flush index, raw Flight bytes, and inline script bytes.                                       |
+| `react-on-rails:rsc:flush`                 | Each Node-side HTML/RSC combined flush, including HTML bytes, payload script bytes, stylesheet bytes, and index. `streamChunkBytes` excludes the flush mark script's own bytes. |
+| `react-on-rails:rsc:hydration:start`       | Client-side start of an RSC island root hydration or client render, including component name, DOM id, and mode.                                                                 |
+| `react-on-rails:rsc:hydration:interactive` | First committed client effect for that RSC island root, a practical interactivity boundary for browser benchmarks.                                                              |
 
 The details intentionally include byte counts, phase names, component names, DOM ids, hydrate/render mode, chunk indexes, and timing offsets. They do not include serialized props or Flight payload contents.
 
