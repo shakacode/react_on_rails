@@ -40,6 +40,8 @@ export type RailsContext = {
   httpAcceptLanguage: string;
   rscPayloadGenerationUrlPath?: string;
   cspNonce?: string;
+  /** Omit or leave undefined to disable; only true is a valid opt-in value. */
+  rscStreamObservability?: true;
 } & (
   | {
       serverSide: false;

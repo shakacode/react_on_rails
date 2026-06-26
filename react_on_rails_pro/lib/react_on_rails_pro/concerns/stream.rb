@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "English"
+require "erb/util"
 
 module ReactOnRailsPro
   module Stream
@@ -31,6 +32,7 @@ module ReactOnRailsPro
     #   stream write, overriding any content type inferred from the template format. When using
     #   a non-HTML `formats:` value (for example `[:text]`), pass `content_type` too unless
     #   committing the format-derived MIME type is intentional.
+    # @param rsc_stream_observability [Boolean] Whether to emit browser-observable streamed RSC timing marks.
     # @param render_options [Hash] Additional options to pass to `render_to_string`.
     #
     # components must be added to the view using the `stream_react_component` helper.
@@ -50,12 +52,14 @@ module ReactOnRailsPro
     #
     # @see ReactOnRails::Helper#stream_react_component
     def stream_view_containing_react_components(
-      template:, close_stream_at_end: true, content_type: nil, **render_options
+      template:, close_stream_at_end: true, content_type: nil, rsc_stream_observability: false, **render_options
     )
       require "async"
       require "async/barrier"
       require "async/limited_queue"
+      previous_rsc_stream_observability_state = current_rsc_stream_observability_state
       warn_on_non_html_formats_without_content_type(render_options[:formats], content_type)
+      initialize_rsc_stream_observability_state(rsc_stream_observability)
 
       Sync do |parent_task|
         # Initialize async primitives for concurrent component streaming
@@ -66,7 +70,6 @@ module ReactOnRailsPro
         # Render template - components will start streaming immediately.
         # If a shell error occurs, consumer_stream_async raises PrerenderError here
         # (BEFORE the response is committed), enabling a proper HTTP redirect.
-        template_string = render_to_string(template:, **render_options)
         # View may contain extra newlines, chunk already contains a newline
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline
@@ -75,9 +78,10 @@ module ReactOnRailsPro
         # is when ActionController::Live commits headers. render_to_string itself
         # never writes to response.stream, so this assignment is always safe.
         response.content_type = content_type if content_type
-        response.stream.write(template_string.lstrip)
+        response.stream.write(render_stream_template_chunk(template:, render_options:))
 
         drain_streams_concurrently(parent_task)
+        write_rsc_stream_observability_mark
         # Do not close the response stream in an ensure block.
         # If an error occurs we may need the stream open to send diagnostic/error details
         # (for example, ApplicationController#rescue_from in the dummy app).
@@ -91,9 +95,101 @@ module ReactOnRailsPro
         @async_barrier&.stop
         raise
       end
+    ensure
+      restore_rsc_stream_observability_state(previous_rsc_stream_observability_state)
     end
 
     private
+
+    def current_rsc_stream_observability_state
+      {
+        enabled: @react_on_rails_rsc_stream_observability,
+        started_at: @react_on_rails_rsc_stream_started_at,
+        initial_chunk_bytes: @react_on_rails_rsc_stream_initial_chunk_bytes,
+        initial_render_duration_ms: @react_on_rails_rsc_stream_initial_render_duration_ms
+      }
+    end
+
+    def initialize_rsc_stream_observability_state(rsc_stream_observability)
+      @react_on_rails_rsc_stream_observability = rsc_stream_observability == true
+      @react_on_rails_rsc_stream_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      @react_on_rails_rsc_stream_initial_chunk_bytes = nil
+      @react_on_rails_rsc_stream_initial_render_duration_ms = nil
+    end
+
+    def restore_rsc_stream_observability_state(state)
+      @react_on_rails_rsc_stream_observability = state[:enabled]
+      @react_on_rails_rsc_stream_started_at = state[:started_at]
+      @react_on_rails_rsc_stream_initial_chunk_bytes = state[:initial_chunk_bytes]
+      @react_on_rails_rsc_stream_initial_render_duration_ms = state[:initial_render_duration_ms]
+    end
+
+    def render_stream_template_chunk(template:, render_options:)
+      return render_to_string(template:, **render_options).lstrip unless rsc_stream_observability_enabled?
+
+      render_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      template_string = render_to_string(template:, **render_options)
+      render_finished_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      template_chunk = template_string.lstrip
+
+      @react_on_rails_rsc_stream_initial_chunk_bytes = template_chunk.bytesize
+      @react_on_rails_rsc_stream_initial_render_duration_ms = elapsed_ms(render_started_at, render_finished_at)
+      template_chunk
+    end
+
+    def write_rsc_stream_observability_mark
+      return unless rsc_stream_observability_enabled?
+      return if response.stream.closed? # Best-effort preflight; the rescue below covers the close/write race.
+
+      detail = {
+        source: "react-on-rails-pro",
+        phase: "stream-complete",
+        initialChunkBytes: @react_on_rails_rsc_stream_initial_chunk_bytes,
+        renderDurationMs: @react_on_rails_rsc_stream_initial_render_duration_ms,
+        sinceStreamStartMs: elapsed_ms(@react_on_rails_rsc_stream_started_at)
+      }
+      # Direct write: the component queue is already drained, so this mark must trail all component content.
+      response.stream.write(rsc_stream_observability_script("react-on-rails:rsc:stream", detail))
+    rescue IOError, Errno::EPIPE, Errno::ECONNRESET, Errno::ECONNABORTED => e
+      log_client_disconnect("observability", e)
+    end
+
+    def rsc_stream_observability_enabled?
+      defined?(@react_on_rails_rsc_stream_observability) && @react_on_rails_rsc_stream_observability
+    end
+
+    def elapsed_ms(start_time, end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC))
+      ((end_time - start_time) * 1000).round(3)
+    end
+
+    # Keep this inline script in sync with createBrowserPerformanceMarkScript in
+    # packages/react-on-rails-pro/src/browserPerformanceMarks.ts.
+    def rsc_stream_observability_script(mark_name, detail)
+      mark_name_json = ERB::Util.json_escape(mark_name.to_json)
+      detail_json = ERB::Util.json_escape(detail.to_json)
+      # The heredoc is newline-stripped, so keep generated JavaScript tokens complete on each line.
+      # Verified by the stream spec that keeps this body aligned with the TypeScript helper.
+      <<~HTML.delete("\n")
+        <script#{rsc_stream_observability_nonce_attribute}>(function(){var detail=#{detail_json};
+        var entry={name:#{mark_name_json},detail:detail};var perf=self.performance;
+        var supportsDetail=typeof PerformanceMark!=="undefined"&&PerformanceMark.prototype&&
+        "detail" in PerformanceMark.prototype;
+        if(perf&&typeof perf.mark==="function"){if(supportsDetail){try{perf.mark(#{mark_name_json},
+        {detail:detail});return;}catch(error){}}
+        try{perf.mark(#{mark_name_json});entry.fallback="mark-detail-unavailable";}
+        catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
+        else{entry.fallback="performance-mark-unavailable";}
+        (self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]).push(entry);
+        })()</script>
+      HTML
+    end
+
+    def rsc_stream_observability_nonce_attribute
+      return "" unless respond_to?(:content_security_policy_nonce, true)
+
+      nonce = content_security_policy_nonce
+      nonce.present? ? %( nonce="#{ERB::Util.html_escape(nonce)}") : ""
+    end
 
     # Drains all streaming tasks concurrently using a producer-consumer pattern.
     #
@@ -103,7 +199,7 @@ module ReactOnRailsPro
     # Consumer task: Single writer dequeues chunks and writes to response stream.
     #
     # Client disconnect handling:
-    # - If client disconnects (IOError/Errno::EPIPE), writer stops gracefully
+    # - If client disconnects (IOError/Errno::EPIPE/Errno::ECONNRESET), writer stops gracefully
     # - Barrier is stopped to cancel all producer tasks, preventing wasted work
     # - No exception propagates to the controller for client disconnects
     def drain_streams_concurrently(parent_task)
@@ -112,7 +208,7 @@ module ReactOnRailsPro
         while (chunk = @main_output_queue.dequeue)
           response.stream.write(chunk)
         end
-      rescue IOError, Errno::EPIPE => e
+      rescue IOError, Errno::EPIPE, Errno::ECONNRESET, Errno::ECONNABORTED => e
         # Client disconnected - stop writing gracefully
         log_client_disconnect("writer", e)
       ensure

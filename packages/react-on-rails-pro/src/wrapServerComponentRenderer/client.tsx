@@ -33,6 +33,12 @@ import { buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting } fr
 import { createRSCProvider } from '../RSCProvider.tsx';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
 import { chainRecoverableErrorHandlers } from '../handleRecoverableError.client.ts';
+import {
+  createRSCClientHydrationMarkDetail,
+  markRSCClientHydrationStart,
+  scheduleRSCClientHydrationInteractiveMark,
+  type RSCClientHydrationMarkDetail,
+} from '../rscClientPerformanceMarks.tsx';
 
 ensureReactUseAvailable();
 
@@ -114,11 +120,21 @@ const wrapServerComponentRenderer = (
       getServerComponent: getReactServerComponent(domNodeId, railsContext),
     });
 
+    const shouldHydrate = !!domNode.innerHTML;
+    const componentElement = <Component {...props} />;
+    let hydrationMarkDetail: RSCClientHydrationMarkDetail | undefined;
+
+    if (railsContext.rscStreamObservability === true) {
+      hydrationMarkDetail = createRSCClientHydrationMarkDetail({
+        componentName,
+        domNodeId,
+        mode: shouldHydrate ? 'hydrate' : 'render',
+        boundary: 'server-component-root',
+      });
+    }
     const rootElement = (
       <RSCProvider>
-        <React.Suspense fallback={null}>
-          <Component {...props} />
-        </React.Suspense>
+        <React.Suspense fallback={null}>{componentElement}</React.Suspense>
       </RSCProvider>
     );
 
@@ -127,13 +143,16 @@ const wrapServerComponentRenderer = (
     // Pro's internal recoverable-error handler so both run. This file is always RSC-wrapped; the
     // helper records that the internal handler already default-reports on hydrate, so the dev-mode
     // logger emits only its supplemental branded line.
-    const shouldHydrate = !!domNode.innerHTML;
     const userErrorCallbackOptions = buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting(
       { componentName, domNodeId },
       shouldHydrate,
     );
     const { onRecoverableError: userOnRecoverableError, ...rootErrorCallbackOptions } =
       userErrorCallbackOptions;
+    // Keep the start mark adjacent to root creation so it always brackets the same mount attempt.
+    if (hydrationMarkDetail) {
+      markRSCClientHydrationStart(hydrationMarkDetail);
+    }
     const reactRoot = shouldHydrate
       ? ReactDOMClient.hydrateRoot(domNode, rootElement, {
           ...rootErrorCallbackOptions,
@@ -151,11 +170,19 @@ const wrapServerComponentRenderer = (
           root.render(rootElement);
           return root;
         })();
+    const cancelHydrationInteractiveMark = hydrationMarkDetail
+      ? scheduleRSCClientHydrationInteractiveMark(hydrationMarkDetail)
+      : undefined;
 
     // Return an explicit teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks
     // navigation (the soft-navigation page swap) instead of leaking it. This closes the leak for every
     // registerServerComponent user without confusing legacy bare function returns for cleanup.
-    return { teardown: () => reactRoot.unmount() };
+    return {
+      teardown: () => {
+        cancelHydrationInteractiveMark?.();
+        reactRoot.unmount();
+      },
+    };
   };
 
   return wrapper;

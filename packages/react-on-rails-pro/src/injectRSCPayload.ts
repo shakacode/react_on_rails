@@ -22,6 +22,10 @@ import { createEmbeddedPayloadKey } from './utils.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
 import safePipe from './safePipe.ts';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
+import {
+  createBrowserPerformanceMarkScript,
+  RSC_STREAM_PERFORMANCE_MARK_PREFIX,
+} from './browserPerformanceMarks.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
 // that isn't a recognized escape character, the backslash is ignored, and the character
@@ -261,39 +265,60 @@ function stylesheetTagsForRSCClientChunks(
   return stylesheetTags;
 }
 
-function splitIncompleteLinkTagTail(htmlString: string) {
-  const lowerHtmlString = htmlString.toLowerCase();
+function splitIncompleteHtmlTagTail(htmlString: string) {
+  // Streaming renderer output is expected to be well-formed HTML where bare "<"
+  // characters are tag starts. Observability mode holds any trailing incomplete
+  // tag so flush marks never split a tag boundary.
+  // If hand-authored HTML contains a raw "<" in text, this treats it as an
+  // incomplete tag; React SSR encodes text "<" as "&lt;", so renderer output is safe.
+  // Application inline scripts that stream a bare "<" operator across chunks are
+  // outside this guard's assumptions.
   const lastCompleteTagEnd = htmlString.lastIndexOf('>');
-  const lastLinkStart = lowerHtmlString.lastIndexOf('<link');
+  const lastTagStart = htmlString.lastIndexOf('<');
 
-  if (lastLinkStart !== -1 && lastLinkStart > lastCompleteTagEnd) {
-    return {
-      completeHtml: htmlString.slice(0, lastLinkStart),
-      incompleteLinkTagTail: htmlString.slice(lastLinkStart),
-    };
-  }
-
-  const linkToken = '<link';
-  for (let suffixLength = linkToken.length - 1; suffixLength > 0; suffixLength -= 1) {
-    const possibleLinkTokenPrefix = lowerHtmlString.slice(-suffixLength);
-
-    if (linkToken.startsWith(possibleLinkTokenPrefix)) {
-      return {
-        completeHtml: htmlString.slice(0, -suffixLength),
-        incompleteLinkTagTail: htmlString.slice(-suffixLength),
-      };
-    }
-  }
-
-  if (lastLinkStart === -1 || lastLinkStart < lastCompleteTagEnd) {
-    return { completeHtml: htmlString, incompleteLinkTagTail: '' };
+  // The streamed payload is well-formed HTML, so a trailing "<" means a split tag rather than text content.
+  if (lastTagStart === -1 || lastTagStart < lastCompleteTagEnd) {
+    return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
   }
 
   return {
-    completeHtml: htmlString.slice(0, lastLinkStart),
-    incompleteLinkTagTail: htmlString.slice(lastLinkStart),
+    completeHtml: htmlString.slice(0, lastTagStart),
+    incompleteHtmlTagTail: htmlString.slice(lastTagStart),
   };
 }
+
+const LINK_TAG_PREFIX = '<link';
+const LINK_TAG_BOUNDARIES = new Set(['', ' ', '\t', '\n', '\f', '\r', '>', '/']);
+
+function isLinkTagTail(normalizedTail: string) {
+  if (LINK_TAG_PREFIX.startsWith(normalizedTail)) return true;
+  if (!normalizedTail.startsWith(LINK_TAG_PREFIX)) return false;
+
+  return LINK_TAG_BOUNDARIES.has(normalizedTail.charAt(LINK_TAG_PREFIX.length));
+}
+
+function splitIncompleteLinkTagTail(htmlString: string) {
+  const lastCompleteTagEnd = htmlString.lastIndexOf('>');
+  const lastTagStart = htmlString.lastIndexOf('<');
+
+  if (lastTagStart === -1 || lastTagStart < lastCompleteTagEnd) {
+    return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
+  }
+
+  const incompleteHtmlTagTail = htmlString.slice(lastTagStart);
+  const normalizedTail = incompleteHtmlTagTail.toLowerCase();
+
+  if (!isLinkTagTail(normalizedTail)) {
+    return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
+  }
+
+  return {
+    completeHtml: htmlString.slice(0, lastTagStart),
+    incompleteHtmlTagTail,
+  };
+}
+
+type IncompleteHtmlTailMode = 'none' | 'link' | 'tag';
 
 function promoteStylesheetPreloadTag(linkTag: string) {
   const promotedTag = linkTag
@@ -348,15 +373,21 @@ function hasIncompleteUTF8Tail(buffer: Buffer) {
   return continuationBytes < expectedContinuationBytes;
 }
 
-function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteHtmlTail: boolean) {
-  if (holdIncompleteHtmlTail && hasIncompleteUTF8Tail(html)) {
+function applyStreamedStylesheetPreloadGating(html: Buffer, incompleteHtmlTailMode: IncompleteHtmlTailMode) {
+  if (incompleteHtmlTailMode !== 'none' && hasIncompleteUTF8Tail(html)) {
     return { gatedHtmlBuffer: html, hasIncompleteHtmlTail: true };
   }
 
   const htmlString = html.toString();
-  const { completeHtml, incompleteLinkTagTail: nextIncompleteLinkTagTail } = holdIncompleteHtmlTail
-    ? splitIncompleteLinkTagTail(htmlString)
-    : { completeHtml: htmlString, incompleteLinkTagTail: '' };
+  let completeHtml = htmlString;
+  let nextIncompleteHtmlTagTail = '';
+  if (incompleteHtmlTailMode === 'tag') {
+    ({ completeHtml, incompleteHtmlTagTail: nextIncompleteHtmlTagTail } =
+      splitIncompleteHtmlTagTail(htmlString));
+  } else if (incompleteHtmlTailMode === 'link') {
+    ({ completeHtml, incompleteHtmlTagTail: nextIncompleteHtmlTagTail } =
+      splitIncompleteLinkTagTail(htmlString));
+  }
   const gatedHtml = completeHtml.replace(
     /<link\b(?=[^>]*\brel=(["'])(?:(?!\1).)*\bpreload\b(?:(?!\1).)*\1)(?=[^>]*\bas=(["'])style\2)(?=[^>]*\bhref=(["'])(?:(?!\3).)+\3)[^>]*\/?>/gi,
     (linkTag) =>
@@ -364,10 +395,15 @@ function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteHtmlTa
   );
 
   return {
-    gatedHtmlBuffer: gatedHtml === htmlString && !nextIncompleteLinkTagTail ? html : Buffer.from(gatedHtml),
-    hasIncompleteHtmlTail: Boolean(nextIncompleteLinkTagTail),
+    gatedHtmlBuffer: gatedHtml === htmlString && !nextIncompleteHtmlTagTail ? html : Buffer.from(gatedHtml),
+    hasIncompleteHtmlTail: Boolean(nextIncompleteHtmlTagTail),
   };
 }
+
+type InjectRSCPayloadOptions = {
+  rscClientChunkStylesheetHrefsByChunkName?: RSCClientChunkStylesheetHrefsByChunkName;
+  rscStreamObservability?: boolean;
+};
 
 /**
  * Embeds RSC payloads into the HTML stream for optimal hydration.
@@ -400,8 +436,12 @@ export default function injectRSCPayload(
   rscRequestTracker: RSCRequestTracker,
   domNodeId: string | undefined,
   cspNonce?: string,
-  rscClientChunkStylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
+  options: InjectRSCPayloadOptions = {},
 ) {
+  const {
+    rscClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
+    rscStreamObservability = false,
+  } = options;
   const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
   const resultStream = new PassThrough();
@@ -428,7 +468,10 @@ export default function injectRSCPayload(
    * CONSTRAINT: The first output chunk must contain HTML data to begin streaming.
    */
   const htmlBuffers: Buffer[] = [];
-  let holdIncompleteHtmlTail = true;
+  // Observability mode holds any split tag so inline mark scripts never land in
+  // the middle of markup. Without observability, preserve the older link-only
+  // hold used by stylesheet preload promotion.
+  let incompleteHtmlTailMode: IncompleteHtmlTailMode = rscStreamObservability ? 'tag' : 'link';
 
   /**
    * Buffer for stylesheet links inferred from RSC client chunk references.
@@ -443,6 +486,7 @@ export default function injectRSCPayload(
    * Can be sent after the component HTML since the arrays already exist.
    */
   const rscPayloadBuffers: Buffer[] = [];
+  const rscPayloadMarkBuffers: Buffer[] = [];
 
   // ========================================
   // FLUSH SCHEDULING SYSTEM
@@ -451,6 +495,13 @@ export default function injectRSCPayload(
   let flushFallbackTimeout: NodeJS.Timeout | null = null;
   let hasReceivedFirstHtmlChunk = false;
   let hasFlushedOutputChunk = false;
+  let flushIndex = 0;
+
+  const createPerformanceMarkBuffer = (markName: string, detail: Record<string, unknown>) => {
+    if (!rscStreamObservability) return undefined;
+
+    return Buffer.from(createScriptTag(createBrowserPerformanceMarkScript(markName, detail), sanitizedNonce));
+  };
 
   /**
    * Combines all buffered data into a single chunk and sends it to the result stream.
@@ -477,7 +528,7 @@ export default function injectRSCPayload(
     const htmlBuffer = Buffer.concat(htmlBuffers);
     const { gatedHtmlBuffer, hasIncompleteHtmlTail } = applyStreamedStylesheetPreloadGating(
       htmlBuffer,
-      holdIncompleteHtmlTail,
+      incompleteHtmlTailMode,
     );
     const shouldDeferRevealHtml =
       rscPromise &&
@@ -489,10 +540,15 @@ export default function injectRSCPayload(
       : { flushableHtmlBuffer: gatedHtmlBuffer, deferredRevealHtmlBuffer: undefined };
     const rscClientStylesheetSize = rscClientStylesheetBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const rscPayloadSize = rscPayloadBuffers.reduce((sum, buf) => sum + buf.length, 0);
-    const totalSize =
-      rscInitializationSize + rscClientStylesheetSize + flushableHtmlBuffer.length + rscPayloadSize;
+    const payloadMarkScriptBytes = rscPayloadMarkBuffers.reduce((sum, buf) => sum + buf.length, 0);
+    const totalSizeWithoutFlushMark =
+      rscInitializationSize +
+      rscClientStylesheetSize +
+      flushableHtmlBuffer.length +
+      rscPayloadSize +
+      payloadMarkScriptBytes;
 
-    if (hasIncompleteHtmlTail && holdIncompleteHtmlTail) {
+    if (hasIncompleteHtmlTail) {
       return;
     }
 
@@ -501,9 +557,25 @@ export default function injectRSCPayload(
     }
 
     // Skip flush if no data is buffered
-    if (totalSize === 0) {
+    if (totalSizeWithoutFlushMark === 0) {
       return;
     }
+
+    const flushMarkBuffer = createPerformanceMarkBuffer(`${RSC_STREAM_PERFORMANCE_MARK_PREFIX}:flush`, {
+      source: 'react-on-rails-pro',
+      flushIndex,
+      rscInitializationBytes: rscInitializationSize,
+      rscClientStylesheetBytes: rscClientStylesheetSize,
+      htmlBytes: flushableHtmlBuffer.length,
+      rscPayloadScriptBytes: rscPayloadSize,
+      payloadMarkScriptBytes,
+      // Excludes this flush mark's own script bytes, which are unknown until this detail object is serialized.
+      streamChunkBytesBeforeFlushMark: totalSizeWithoutFlushMark,
+      containsHtml: flushableHtmlBuffer.length > 0,
+      containsRscPayload: rscPayloadSize > 0,
+      firstFlush: !hasFlushedOutputChunk,
+    });
+    const totalSize = totalSizeWithoutFlushMark + (flushMarkBuffer?.length ?? 0);
 
     // Cancel the fallback timer only when we're actually flushing data.
     // If we cancelled before the early-return guards above, a flush() call
@@ -549,9 +621,22 @@ export default function injectRSCPayload(
       offset += buffer.length;
     }
 
+    for (const buffer of rscPayloadMarkBuffers) {
+      buffer.copy(combinedBuffer, offset);
+      offset += buffer.length;
+    }
+
+    if (flushMarkBuffer) {
+      flushMarkBuffer.copy(combinedBuffer, offset);
+      offset += flushMarkBuffer.length;
+    }
+
     // Send combined chunk to output stream
     resultStream.push(combinedBuffer);
     hasFlushedOutputChunk = true;
+    // Payload marks parsed since the previous flush and this flush mark share the
+    // pre-increment value, enabling exact correlation by flushIndex.
+    flushIndex += 1;
 
     // Clear all buffers to free memory and prepare for next flush cycle
     rscInitializationBuffers.length = 0;
@@ -561,10 +646,11 @@ export default function injectRSCPayload(
       htmlBuffers.push(deferredRevealHtmlBuffer);
     }
     rscPayloadBuffers.length = 0;
+    rscPayloadMarkBuffers.length = 0;
   };
 
   const endResultStream = () => {
-    holdIncompleteHtmlTail = false;
+    incompleteHtmlTailMode = 'none';
     // Cancel any pending fallback timer unconditionally.
     // flush() only clears the timer when it actually flushes data (past the
     // early-return guards). If we're closing with empty buffers, the timer
@@ -702,6 +788,7 @@ export default function injectRSCPayload(
             const parser = new LengthPrefixedStreamParser();
             const textDecoder = new TextDecoder();
             let hasEmittedDiagnosticScript = false;
+            let rscPayloadChunkIndex = 0;
             const handleParsedChunk = (content: Uint8Array, metadata: Record<string, unknown>) => {
               const flightData = textDecoder.decode(content);
               if (!hasEmittedDiagnosticScript) {
@@ -724,6 +811,24 @@ export default function injectRSCPayload(
               }
               const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
+              const payloadMarkBuffer = createPerformanceMarkBuffer(
+                `${RSC_STREAM_PERFORMANCE_MARK_PREFIX}:payload`,
+                {
+                  source: 'react-on-rails-pro',
+                  componentName,
+                  domNodeId,
+                  payloadKey: rscPayloadKey,
+                  chunkIndex: rscPayloadChunkIndex,
+                  // This is the next flush index; flush() uses the same value before incrementing after write.
+                  flushIndex,
+                  flightPayloadBytes: content.byteLength,
+                  rscPayloadScriptBytes: Buffer.byteLength(payloadScript, 'utf8'),
+                },
+              );
+              if (payloadMarkBuffer) {
+                rscPayloadMarkBuffers.push(payloadMarkBuffer);
+              }
+              rscPayloadChunkIndex += 1;
 
               // Emit console replay as a separate <script> tag (not inside the payload)
               const consoleScript = metadata.consoleReplayScript as string;

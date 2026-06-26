@@ -522,6 +522,48 @@ describe ReactOnRailsProHelper do
         expect(collected_chunks[1]).to eq(chunks[2][:html].to_s)
       end
 
+      it "does not inject observability scripts into streamed component chunks" do
+        rendered_html_stream = Struct.new(:chunks) do
+          def each_chunk(&block)
+            chunks.each(&block)
+          end
+        end.new(
+          [
+            "<di",
+            "v>observed split tag</div>"
+          ]
+        )
+        allow(self).to receive(:internal_stream_react_component).and_return(rendered_html_stream)
+        @react_on_rails_rsc_stream_observability = true
+        @react_on_rails_rsc_stream_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+        initial_result = stream_react_component(component_name, props:, **component_options)
+
+        @async_barrier.wait
+        @main_output_queue.close
+
+        collected_chunks = []
+        while (chunk = @main_output_queue.dequeue)
+          collected_chunks << chunk
+        end
+
+        expect(initial_result).to eq("<di")
+        expect(collected_chunks).to eq(["v>observed split tag</div>"])
+        expect(initial_result).not_to include("REACT_ON_RAILS_PERFORMANCE_MARKS")
+        expect(collected_chunks.first).not_to include("REACT_ON_RAILS_PERFORMANCE_MARKS")
+      ensure
+        @react_on_rails_rsc_stream_observability = false
+        @react_on_rails_rsc_stream_started_at = nil
+      end
+
+      it "adds stream observability to the Rails context when the Pro stream state enables it" do
+        @react_on_rails_rsc_stream_observability = true
+
+        expect(send(:rails_context, server_side: false)).to include(rscStreamObservability: true)
+      ensure
+        @react_on_rails_rsc_stream_observability = false
+      end
+
       it "does not trim whitespaces from html" do
         first_chunk_string = +"  <div>Chunk 1: with whitespaces</div>  "
         chunks_with_whitespaces = [

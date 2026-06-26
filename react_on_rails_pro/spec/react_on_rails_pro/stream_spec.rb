@@ -57,9 +57,9 @@ RSpec.describe ReactOnRailsPro::Stream do
       end
     end
 
-    def setup_stream_test(component_count: 2)
+    def setup_stream_test(component_count: 2, initial_response: "TEMPLATE")
       component_queues = Array.new(component_count) { Async::Queue.new }
-      controller = StreamController.new(component_queues:)
+      controller = StreamController.new(component_queues:, initial_response:)
 
       mocked_response = instance_double(ActionController::Live::Response)
       mocked_stream = instance_double(ActionController::Live::Buffer)
@@ -143,6 +143,158 @@ RSpec.describe ReactOnRailsPro::Stream do
 
       expect(stream).to have_received(:write).with("Single1")
       expect(stream).to have_received(:write).with("Single2")
+    end
+
+    it "does not emit browser performance marks by default" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      written_chunks = []
+      allow(stream).to receive(:write) { |chunk| written_chunks << chunk }
+
+      run_stream(controller) do |_parent|
+        sleep 0.1
+      end
+
+      expect(written_chunks.first).to eq("TEMPLATE")
+      expect(written_chunks.join).not_to include("REACT_ON_RAILS_PERFORMANCE_MARKS")
+      expect(written_chunks.join).not_to include("react-on-rails:rsc:stream")
+    end
+
+    it "emits opt-in browser performance marks after component chunks drain" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      written_chunks = []
+      allow(stream).to receive(:write) { |chunk| written_chunks << chunk }
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        sleep 0.1
+      end
+
+      expect(written_chunks.first).to eq("TEMPLATE")
+      expect(written_chunks.second).to include("self.REACT_ON_RAILS_PERFORMANCE_MARKS")
+      expect(written_chunks.second).to include("var supportsDetail=typeof PerformanceMark")
+      expect(written_chunks.second).to include('"detail" in PerformanceMark.prototype')
+      expect(written_chunks.second).to include("entry.fallback=\"mark-detail-unavailable\"")
+      expect(written_chunks.second).to include(
+        "self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]"
+      )
+      expect(written_chunks.second).not_to include("||=")
+      expect(written_chunks.second).to include('perf.mark("react-on-rails:rsc:stream"')
+      expect(written_chunks.second).to include('"phase":"stream-complete"')
+      expect(written_chunks.second).to include('"initialChunkBytes":8')
+    end
+
+    it "escapes the final observability mark name inside the generated script" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+
+      script = controller.send(
+        :rsc_stream_observability_script,
+        "react</script><script>alert(1)</script>",
+        { source: "react-on-rails-pro" }
+      )
+
+      expect(script).to include("react\\u003c/script\\u003e\\u003cscript\\u003ealert(1)\\u003c/script\\u003e")
+      expect(script).not_to include("react</script><script>")
+    end
+
+    it "keeps the generated inline mark script body aligned with the TypeScript helper" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+
+      script = controller.send(
+        :rsc_stream_observability_script,
+        "react-on-rails:rsc:contract",
+        { source: "react-on-rails-pro", phase: "stream-complete", bytes: 2048 }
+      )
+      expected_script_body = <<~JAVASCRIPT.delete("\n")
+        (function(){var detail={"source":"react-on-rails-pro","phase":"stream-complete","bytes":2048};
+        var entry={name:"react-on-rails:rsc:contract",detail:detail};var perf=self.performance;
+        var supportsDetail=typeof PerformanceMark!=="undefined"&&PerformanceMark.prototype&&
+        "detail" in PerformanceMark.prototype;
+        if(perf&&typeof perf.mark==="function"){if(supportsDetail){try{perf.mark("react-on-rails:rsc:contract",
+        {detail:detail});return;}catch(error){}}
+        try{perf.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}
+        catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
+        else{entry.fallback="performance-mark-unavailable";}
+        (self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]).push(entry);
+        })()
+      JAVASCRIPT
+
+      expect(script).to eq("<script>#{expected_script_body}</script>")
+    end
+
+    it "does not insert opt-in browser performance marks inside split component markup" do
+      queues, controller, stream = setup_stream_test(component_count: 1, initial_response: "<di")
+      written_chunks = []
+      allow(stream).to receive(:write) { |chunk| written_chunks << chunk }
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        queues[0].enqueue("v>observed split tag</div>")
+        queues[0].close
+        sleep 0.1
+      end
+
+      expect(written_chunks[0]).to eq("<di")
+      expect(written_chunks[1]).to eq("v>observed split tag</div>")
+      expect(written_chunks[2]).to include("react-on-rails:rsc:stream")
+      expect(written_chunks.join).not_to include("<di<script")
+    end
+
+    it "handles client disconnects while writing the final observability mark" do
+      queues, controller, stream = setup_stream_test(component_count: 1)
+      written_chunks = []
+      allow(stream).to receive(:write) do |chunk|
+        raise IOError, "client disconnected" if chunk.include?("react-on-rails:rsc:stream")
+
+        written_chunks << chunk
+      end
+
+      expect do
+        run_stream(controller, rsc_stream_observability: true) do |_parent|
+          queues[0].enqueue("Chunk1")
+          queues[0].close
+          sleep 0.1
+        end
+      end.not_to raise_error
+
+      expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+    end
+
+    it "handles connection resets while writing the final observability mark" do
+      queues, controller, stream = setup_stream_test(component_count: 1)
+      written_chunks = []
+      allow(stream).to receive(:write) do |chunk|
+        raise Errno::ECONNRESET, "connection reset" if chunk.include?("react-on-rails:rsc:stream")
+
+        written_chunks << chunk
+      end
+
+      expect do
+        run_stream(controller, rsc_stream_observability: true) do |_parent|
+          queues[0].enqueue("Chunk1")
+          queues[0].close
+          sleep 0.1
+        end
+      end.not_to raise_error
+
+      expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+    end
+
+    it "handles aborted connections while writing the final observability mark" do
+      queues, controller, stream = setup_stream_test(component_count: 1)
+      written_chunks = []
+      allow(stream).to receive(:write) do |chunk|
+        raise Errno::ECONNABORTED, "connection aborted" if chunk.include?("react-on-rails:rsc:stream")
+
+        written_chunks << chunk
+      end
+
+      expect do
+        run_stream(controller, rsc_stream_observability: true) do |_parent|
+          queues[0].enqueue("Chunk1")
+          queues[0].close
+          sleep 0.1
+        end
+      end.not_to raise_error
+
+      expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
     end
 
     it "applies backpressure with slow writer" do
@@ -279,6 +431,58 @@ RSpec.describe ReactOnRailsPro::Stream do
         allow(stream).to receive(:write) do |chunk|
           write_count += 1
           raise Errno::EPIPE, "broken pipe" if write_count == 3
+
+          written_chunks << chunk
+        end
+
+        run_stream(controller) do |_parent|
+          queues[0].enqueue("Chunk1")
+          sleep 0.05
+          queues[0].enqueue("Chunk2")
+          sleep 0.05
+          queues[0].enqueue("Chunk3")
+          queues[0].close
+          sleep 0.1
+        end
+
+        expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+      end
+
+      it "stops writing on Errno::ECONNRESET" do
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        written_chunks = []
+        write_count = 0
+
+        allow(stream).to receive(:write) do |chunk|
+          write_count += 1
+          raise Errno::ECONNRESET, "connection reset" if write_count == 3
+
+          written_chunks << chunk
+        end
+
+        run_stream(controller) do |_parent|
+          queues[0].enqueue("Chunk1")
+          sleep 0.05
+          queues[0].enqueue("Chunk2")
+          sleep 0.05
+          queues[0].enqueue("Chunk3")
+          queues[0].close
+          sleep 0.1
+        end
+
+        expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+      end
+
+      it "stops writing on Errno::ECONNABORTED" do
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        written_chunks = []
+        write_count = 0
+
+        allow(stream).to receive(:write) do |chunk|
+          write_count += 1
+          raise Errno::ECONNABORTED, "connection aborted" if write_count == 3
 
           written_chunks << chunk
         end
