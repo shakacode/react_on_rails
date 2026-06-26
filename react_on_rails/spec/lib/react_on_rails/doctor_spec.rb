@@ -6114,6 +6114,15 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages).to include(a_string_including("broad client-reference discovery fallback"))
     end
 
+    it "skips direct artifact checks when Pro path utilities are unavailable" do
+      hide_const("ReactOnRailsPro::Utils")
+
+      doctor.send(:check_rsc_artifacts)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).to include(a_string_including("RSC artifact checks skipped"))
+    end
+
     it "warns when the RSC client references manifest is missing and generated configs support discovery" do
       FileUtils.mkdir_p("app/javascript/generated")
       File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
@@ -6194,7 +6203,9 @@ RSpec.describe ReactOnRails::Doctor do
 
       warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
       info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
       expect(warning_messages).to include(a_string_including("older than the server component registration entry"))
+      expect(success_messages).not_to include(a_string_including("RSC client references manifest includes"))
       expect(info_messages).to include(a_string_including("bin/shakapacker-precompile-hook"))
     end
 

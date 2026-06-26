@@ -38,6 +38,7 @@ end
 
 namespace :react_on_rails do
   rsc_doctor_checks = ["react_server_components"].freeze
+  # Shared by both tasks so ENV option parsing and Doctor initialization stay identical.
   doctor_options = lambda do |only: nil|
     verbose = ENV["VERBOSE"] == "true"
     fix = ENV["FIX"] == "true"

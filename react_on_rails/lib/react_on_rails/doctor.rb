@@ -4401,6 +4401,11 @@ module ReactOnRails
     end
 
     def check_rsc_artifacts
+      unless defined?(ReactOnRailsPro::Utils)
+        checker.add_info("  ℹ️  RSC artifact checks skipped — upgrade react-on-rails-pro to enable path resolution")
+        return
+      end
+
       check_rsc_bundle_artifact
       check_rsc_server_client_manifest_artifact
       check_rsc_client_references_manifest
@@ -4448,8 +4453,9 @@ module ReactOnRails
       if refs.is_a?(Array)
         if rsc_client_references_manifest_stale?(artifact_path)
           report_stale_rsc_client_references_manifest(artifact_path)
+        else
+          checker.add_success("✅ RSC client references manifest includes #{refs.size} refs at #{artifact_path}")
         end
-        checker.add_success("✅ RSC client references manifest includes #{refs.size} refs at #{artifact_path}")
       else
         checker.add_warning("⚠️  RSC client references manifest must contain a refs array: #{artifact_path}")
         add_rsc_artifacts_rebuild_guidance
@@ -4462,9 +4468,15 @@ module ReactOnRails
     end
 
     def report_missing_rsc_client_references_manifest(artifact_path)
-      if rsc_client_references_manifest_required?
+      registration_entry_exists = rsc_manifest_registration_entry_exists?
+      discovery_supported = registration_entry_exists && rsc_manifest_discovery_supported?
+
+      if rsc_client_references_manifest_required?(
+        registration_entry_exists:,
+        discovery_supported:
+      )
         report_missing_rsc_artifact("RSC client references manifest", artifact_path)
-      elsif rsc_manifest_registration_entry_exists? && !rsc_manifest_discovery_supported?
+      elsif registration_entry_exists && !discovery_supported
         checker.add_warning(
           "⚠️  RSC client references manifest not found at #{artifact_path}, but this app's RSC webpack " \
           "config or precompile hook does not support manifest discovery yet; resolver will use broad " \
@@ -4479,10 +4491,15 @@ module ReactOnRails
       end
     end
 
-    def rsc_client_references_manifest_required?
+    def rsc_client_references_manifest_required?(
+      registration_entry_exists: rsc_manifest_registration_entry_exists?,
+      discovery_supported: nil
+    )
       return true unless ENV[RSC_CLIENT_REFERENCES_MANIFEST_ENV].to_s.strip.empty?
 
-      rsc_manifest_registration_entry_exists? && rsc_manifest_discovery_supported?
+      discovery_supported = rsc_manifest_discovery_supported? if discovery_supported.nil?
+
+      registration_entry_exists && discovery_supported
     end
 
     def rsc_manifest_registration_entry_exists?
