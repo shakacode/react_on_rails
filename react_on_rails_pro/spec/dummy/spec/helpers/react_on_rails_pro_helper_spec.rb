@@ -522,15 +522,15 @@ describe ReactOnRailsProHelper do
         expect(collected_chunks[1]).to eq(chunks[2][:html].to_s)
       end
 
-      it "emits opt-in browser performance marks for streamed component chunks" do
+      it "does not inject observability scripts into streamed component chunks" do
         rendered_html_stream = Struct.new(:chunks) do
           def each_chunk(&block)
             chunks.each(&block)
           end
         end.new(
           [
-            "<div>observed first chunk</div>",
-            "<div>observed second chunk</div>"
+            "<di",
+            "v>observed split tag</div>"
           ]
         )
         allow(self).to receive(:internal_stream_react_component).and_return(rendered_html_stream)
@@ -547,12 +547,10 @@ describe ReactOnRailsProHelper do
           collected_chunks << chunk
         end
 
-        expect(initial_result).to include('performance.mark("react-on-rails:rsc:stream"')
-        expect(initial_result).to include('"phase":"component-chunk"')
-        expect(initial_result).to include("\"componentName\":\"#{component_name}\"")
-        expect(initial_result).to include('"chunkIndex":0')
-        expect(collected_chunks.first).to include('"chunkIndex":1')
-        expect(collected_chunks.first).to include('"chunkBytes":')
+        expect(initial_result).to eq("<di")
+        expect(collected_chunks).to eq(["v>observed split tag</div>"])
+        expect(initial_result).not_to include("REACT_ON_RAILS_PERFORMANCE_MARKS")
+        expect(collected_chunks.first).not_to include("REACT_ON_RAILS_PERFORMANCE_MARKS")
       ensure
         @react_on_rails_rsc_stream_observability = false
         @react_on_rails_rsc_stream_started_at = nil

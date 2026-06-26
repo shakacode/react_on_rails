@@ -19,7 +19,6 @@
 
 require "react_on_rails/helper"
 require "async/promise"
-require "erb"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
@@ -165,7 +164,7 @@ module ReactOnRailsProHelper
     # Extract streaming-specific callback
     on_complete = options.delete(:on_complete)
 
-    consumer_stream_async(component_name:, on_complete:) do
+    consumer_stream_async(on_complete:) do
       internal_stream_react_component(component_name, options)
     end
   end
@@ -379,19 +378,17 @@ module ReactOnRailsProHelper
 
     # Enqueue remaining chunks asynchronously
     @async_barrier.async do
-      rest_chunks.each.with_index(1) do |chunk, chunk_index|
+      rest_chunks.each do |chunk|
         break if response.stream.closed?
 
-        @main_output_queue.enqueue(
-          append_rsc_stream_component_chunk_observability_mark(chunk, component_name:, chunk_index:)
-        )
+        @main_output_queue.enqueue(chunk)
       end
     rescue Async::Queue::ClosedError
       # Queue closed due to error/disconnect in another component — stop enqueuing
     end
 
     # Return first chunk directly
-    append_rsc_stream_component_chunk_observability_mark(initial_result, component_name:, chunk_index: 0)
+    initial_result
   end
 
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &)
@@ -531,7 +528,7 @@ module ReactOnRailsProHelper
     )
   end
 
-  def consumer_stream_async(on_complete:, component_name: nil)
+  def consumer_stream_async(on_complete:)
     if @async_barrier.nil?
       raise ReactOnRails::Error,
             "You must call stream_view_containing_react_components to render the view containing the react component"
@@ -545,7 +542,7 @@ module ReactOnRailsProHelper
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
       stream = yield
-      fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks, component_name)
+      fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks)
       on_complete&.call(all_chunks) if fully_consumed
     rescue StandardError => e
       # Propagate the error to the calling fiber via the promise.
@@ -574,9 +571,8 @@ module ReactOnRailsProHelper
 
   # Returns true if the stream was fully consumed, false if aborted (client disconnect).
   # When false, callers must NOT invoke on_complete to avoid caching partial data.
-  def process_stream_chunks(stream, first_chunk_promise, all_chunks, component_name)
+  def process_stream_chunks(stream, first_chunk_promise, all_chunks)
     is_first = true
-    chunk_index = 0
 
     stream.each_chunk do |chunk|
       # Client disconnected — abort without caching partial results
@@ -586,71 +582,20 @@ module ReactOnRailsProHelper
       end
 
       all_chunks&.push(chunk)
-      streamed_chunk = append_rsc_stream_component_chunk_observability_mark(
-        chunk,
-        component_name:,
-        chunk_index:
-      )
 
       if is_first
         # Store first chunk in promise for synchronous return
-        first_chunk_promise.resolve(streamed_chunk)
+        first_chunk_promise.resolve(chunk)
         is_first = false
       else
         # Enqueue remaining chunks to main output queue
-        @main_output_queue.enqueue(streamed_chunk)
+        @main_output_queue.enqueue(chunk)
       end
-      chunk_index += 1
     end
 
     # Handle case where stream has no chunks
     first_chunk_promise.resolve(nil) if is_first
     true
-  end
-
-  def append_rsc_stream_component_chunk_observability_mark(chunk, component_name:, chunk_index:)
-    return chunk unless component_name && rsc_stream_component_observability_enabled?
-
-    detail = {
-      source: "react-on-rails-pro",
-      phase: "component-chunk",
-      componentName: component_name,
-      chunkIndex: chunk_index,
-      chunkBytes: chunk.bytesize,
-      sinceStreamStartMs: rsc_stream_component_elapsed_ms(@react_on_rails_rsc_stream_started_at)
-    }
-    "#{chunk}#{rsc_stream_component_observability_script('react-on-rails:rsc:stream', detail)}"
-  end
-
-  def rsc_stream_component_observability_enabled?
-    defined?(@react_on_rails_rsc_stream_observability) && @react_on_rails_rsc_stream_observability
-  end
-
-  def rsc_stream_component_elapsed_ms(start_time, end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC))
-    return 0 unless start_time
-
-    ((end_time - start_time) * 1000).round(3)
-  end
-
-  def rsc_stream_component_observability_script(mark_name, detail)
-    mark_name_json = mark_name.to_json
-    detail_json = ERB::Util.json_escape(detail.to_json)
-    <<~HTML.delete("\n")
-      <script#{rsc_stream_component_observability_nonce_attribute}>(function(){var detail=#{detail_json};
-      var entry={name:#{mark_name_json},detail:detail};var perf=self.performance;
-      if(perf&&typeof perf.mark==="function"){try{performance.mark(#{mark_name_json},{detail:detail});return;}
-      catch(error){try{performance.mark(#{mark_name_json});entry.fallback="mark-detail-unavailable";}
-      catch(fallbackError){entry.fallback="performance-mark-unavailable";}}}
-      else{entry.fallback="performance-mark-unavailable";}
-      (self.REACT_ON_RAILS_PERFORMANCE_MARKS||=[]).push(entry);})()</script>
-    HTML
-  end
-
-  def rsc_stream_component_observability_nonce_attribute
-    return "" unless respond_to?(:content_security_policy_nonce, true)
-
-    nonce = content_security_policy_nonce
-    nonce.present? ? %( nonce="#{ERB::Util.html_escape(nonce)}") : ""
   end
 
   def internal_stream_react_component(component_name, options = {})
