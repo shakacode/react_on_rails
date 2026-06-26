@@ -3,6 +3,7 @@ export type SetupMode = 'standard' | 'pro' | 'rsc';
 export interface ResolvedSetupMode {
   defaulted: boolean;
   mode: SetupMode;
+  /** True for the Pro-without-RSC generator path. RSC mode uses its own Pro path. */
   pro: boolean;
   rsc: boolean;
 }
@@ -29,6 +30,7 @@ export function resolveSetupMode(rawOpts: Record<string, unknown>): ResolvedSetu
     return {
       defaulted: false,
       mode: 'rsc',
+      // RSC uses its own Pro generator path; `pro` means Pro without the RSC example.
       pro: false,
       rsc: true,
     };

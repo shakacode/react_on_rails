@@ -98,15 +98,13 @@ Now let's add a React component to one of your existing Rails views:
 # Create a new component directory
 mkdir -p app/javascript/src/SimpleCounter/ror_components
 
-# Create the client component file
+# Create the component file
 touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.client.tsx
 ```
 
 Add this content to `SimpleCounter.client.tsx`:
 
 ```tsx
-'use client';
-
 import React, { useState } from 'react';
 
 interface SimpleCounterProps {

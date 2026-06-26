@@ -455,15 +455,13 @@ Now let's add a React component to one of your existing Rails views:
 # Create a new component directory
 mkdir -p app/javascript/src/SimpleCounter/ror_components
 
-# Create the client component file
+# Create the component file
 touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.client.tsx
 ```
 
 Add this content to `SimpleCounter.client.tsx`:
 
 ```tsx
-'use client';
-
 import React, { useState } from 'react';
 
 interface SimpleCounterProps {
@@ -734,16 +732,6 @@ support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 
 Pro license note: no token is required for development, test, CI/CD, or staging. Production Pro
 deployments require a paid license.
-
-To try the latest release candidate instead of the latest stable release, use the npm `rc` tag:
-
-```bash
-npx create-react-on-rails-app@rc my-app
-```
-
-When the CLI itself is a prerelease, it pins `react_on_rails` and, for Pro/RSC setups,
-`react_on_rails_pro` to the matching RubyGems prerelease automatically. For example, an npm CLI
-version ending in `-rc.N` maps to a RubyGems version ending in `.rc.N`.
 
 To try the latest release candidate instead of the latest stable release, use the npm `rc` tag:
 

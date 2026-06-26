@@ -34,16 +34,6 @@ To try the latest release candidate instead of the latest stable release, use th
 npx create-react-on-rails-app@rc my-app
 ```
 
-When the CLI itself is a prerelease, it pins `react_on_rails` and, for Pro/RSC setups,
-`react_on_rails_pro` to the matching RubyGems prerelease automatically. For example, an npm CLI
-version ending in `-rc.N` maps to a RubyGems version ending in `.rc.N`.
-
-To try the latest release candidate instead of the latest stable release, use the npm `rc` tag:
-
-```bash
-npx create-react-on-rails-app@rc my-app
-```
-
 When the CLI itself is a prerelease, it pins `react_on_rails` to the matching RubyGems prerelease automatically.
 For `--pro` or `--rsc` modes, it also pins `react_on_rails_pro` to the same prerelease.
 For example, an npm CLI version ending in `-rc.N` maps to a RubyGems version ending in `.rc.N`
