@@ -1563,6 +1563,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(output).to include("public/webpack/development")
         expect(output).to include("public/webpack/staging")
         expect(output).to include("tmp/shakapacker-test")
+        expect(output).to include("Generated bundles and caches cleaned")
         expect(File).not_to exist("public/packs")
         expect(File).not_to exist("public/webpack/development")
         expect(File).not_to exist("public/webpack/test")
@@ -1635,6 +1636,31 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    it "removes broken symlink cleanup targets when the app root path is a symlink" do
+      Dir.mktmpdir("react-on-rails-real-root") do |real_root|
+        symlink_root = clean_test_outside_path("symlink-root")
+        File.symlink(real_root, symlink_root)
+
+        Dir.chdir(symlink_root) do
+          allow(Rails).to receive(:root).and_return(Pathname.new(symlink_root))
+          write_clean_test_shakapacker_config(<<~YAML)
+            default:
+              public_root_path: public
+              public_output_path: broken-packs
+          YAML
+          FileUtils.mkdir_p("public")
+          File.symlink("../tmp/deleted-packs", "public/broken-packs")
+
+          output = capture_stdout { described_class.clean_generated_assets_and_caches }
+
+          aggregate_failures do
+            expect(output).to include("Removed public/broken-packs")
+            expect(File).not_to be_symlink("public/broken-packs")
+          end
+        end
+      end
+    end
+
     it "skips cleanup targets when realpath is blocked by permissions" do
       write_clean_test_shakapacker_config(<<~YAML)
         default:
@@ -1650,6 +1676,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       aggregate_failures do
         expect(output).to include("Skipping unsafe cleanup path: public/restricted-packs")
+        expect(output).to include("Cleanup completed with warnings")
         expect(File).to exist("public/restricted-packs")
       end
     end
@@ -1669,6 +1696,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       aggregate_failures do
         expect(output).to include("Partially removed public/partial-packs")
+        expect(output).to include("Cleanup completed with warnings")
+        expect(output).not_to include("Generated bundles and caches cleaned")
         expect(File).to exist("public/partial-packs")
       end
     end
@@ -1711,6 +1740,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(File).to exist(File.join(outside_renderer_cache, "keep.txt"))
         expect(File).to exist("public")
         expect(output).to include("Skipping unsafe cleanup path")
+        expect(output).to include("Cleanup completed with warnings")
       end
     end
   end

@@ -86,10 +86,14 @@ module ReactOnRails
           print_shakapacker_config_status
           puts ""
 
-          remove_clean_targets(clean_targets)
+          clean_finished_without_warnings = remove_clean_targets(clean_targets)
 
           puts ""
-          puts "✅ Generated bundles and caches cleaned"
+          if clean_finished_without_warnings
+            puts "✅ Generated bundles and caches cleaned"
+          else
+            puts "⚠️  Cleanup completed with warnings"
+          end
         end
 
         # Fallback port list for the port-scan kill path. Uses the base-port
@@ -416,7 +420,7 @@ module ReactOnRails
 
         def renderer_bundle_cache_targets
           targets = []
-          renderer_cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").to_s.strip
+          renderer_cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").strip
           unless renderer_cache_path.empty?
             targets << clean_target(renderer_cache_path, "configured node renderer bundle cache")
           end
@@ -439,12 +443,15 @@ module ReactOnRails
         end
 
         def remove_clean_targets(targets)
+          all_targets_clean = true
+
           targets.each do |target|
             path = target.fetch(:path)
             label = target.fetch(:label)
             display_path = display_clean_path(path)
 
             unless safe_clean_path?(path)
+              all_targets_clean = false
               puts "⚠️  Skipping unsafe cleanup path: #{display_path} (#{label})"
               next
             end
@@ -456,11 +463,14 @@ module ReactOnRails
 
             FileUtils.rm_rf(path)
             if File.exist?(path) || File.symlink?(path)
+              all_targets_clean = false
               puts "⚠️  Partially removed #{display_path} - some files could not be deleted (#{label})"
             else
               puts "   ✓ Removed #{display_path} (#{label})"
             end
           end
+
+          all_targets_clean
         end
 
         def print_shakapacker_config_status
@@ -499,9 +509,12 @@ module ReactOnRails
         end
 
         def broken_symlink_target_inside_app_root?(path)
+          parent_real_path = File.realpath(File.dirname(path))
+          return false unless parent_real_path == real_app_root_path || path_inside_real_app_root?(parent_real_path)
+
           link_target = File.readlink(path)
           resolved_path = File.expand_path(link_target, File.dirname(path))
-          path_inside_real_app_root?(resolved_path)
+          path_inside_app_root?(resolved_path) || path_inside_real_app_root?(resolved_path)
         rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES
           false
         end
