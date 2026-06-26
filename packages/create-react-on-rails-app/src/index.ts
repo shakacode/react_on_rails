@@ -83,17 +83,13 @@ function run(appName: string, rawOpts: Record<string, unknown>, command?: Comman
     cliVersion: packageJson.version,
   };
 
-  if (Boolean(rawOpts.rsc) && Boolean(rawOpts.pro)) {
-    logInfo('Note: --rsc takes precedence over --pro; --pro will be ignored.');
-  }
-
   if (setupMode.defaulted) {
     logInfo(
-      'Default setup: React on Rails Pro for React 19.2 support. Use --standard only when you intentionally want OSS-only.',
+      'Default setup: React on Rails Pro for React 19.2 support. Use --standard only when you intentionally want an open-source-only setup.',
     );
   }
 
-  if (options.rsc || options.pro) {
+  if (setupMode.requiresPro) {
     const modeFlag = options.rsc ? '--rsc' : '--pro';
     const setupLabel = setupMode.defaulted ? 'The default setup' : modeFlag;
     logInfo(`Note: ${setupLabel} adds react_on_rails_pro and uses the Pro generator path.`);
@@ -133,8 +129,8 @@ function run(appName: string, rawOpts: Record<string, unknown>, command?: Comman
     modeLabel = ', setup: pro with RSC example';
   } else if (options.pro) {
     modeLabel = ', setup: pro without RSC example';
-  } else if (setupMode.mode === 'standard') {
-    modeLabel = ', setup: OSS-only';
+  } else {
+    modeLabel = ', setup: open-source-only';
   }
   const tailwindLabel = options.tailwind ? ', Tailwind CSS v4' : '';
   logInfo(

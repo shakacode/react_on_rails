@@ -49,6 +49,7 @@ function loadIndex(): Promise<void> {
 
 describe('setup mode resolution in run()', () => {
   const originalArgv = process.argv;
+  // The no-mode default is TTY-agnostic; the TTY state tests document that no prompt branch remains.
   const originalStdinIsTTY = process.stdin.isTTY;
   const originalStdoutIsTTY = process.stdout.isTTY;
 
@@ -127,18 +128,18 @@ describe('setup mode resolution in run()', () => {
     );
   });
 
-  it('keeps --rsc precedence over --pro for compatibility', async () => {
-    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--pro', '--rsc'];
+  it.each([
+    ['--standard and --pro', ['--standard', '--pro']],
+    ['--standard and --rsc', ['--standard', '--rsc']],
+    ['--pro and --rsc', ['--pro', '--rsc']],
+  ])('exits with an error when setup modes are combined: %s', async (_label, modeFlags) => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', ...modeFlags];
 
     await loadIndex();
 
-    expect(mockedCreateApp).toHaveBeenCalledWith(
-      'my-app',
-      expect.objectContaining({ pro: false, rsc: true }),
-    );
-    expect(mockedLogInfo).toHaveBeenCalledWith(
-      'Note: --rsc takes precedence over --pro; --pro will be ignored.',
-    );
+    expect(mockedLogError).toHaveBeenCalledWith('Choose only one setup mode: --standard, --pro, or --rsc.');
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(mockedCreateApp).not.toHaveBeenCalled();
   });
 });
 

@@ -5,6 +5,7 @@ describe('resolveSetupMode', () => {
     expect(resolveSetupMode({})).toEqual({
       defaulted: true,
       mode: 'pro',
+      requiresPro: true,
       pro: true,
       rsc: false,
     });
@@ -14,6 +15,7 @@ describe('resolveSetupMode', () => {
     expect(resolveSetupMode({ standard: true })).toEqual({
       defaulted: false,
       mode: 'standard',
+      requiresPro: false,
       pro: false,
       rsc: false,
     });
@@ -23,6 +25,7 @@ describe('resolveSetupMode', () => {
     expect(resolveSetupMode({ pro: true })).toEqual({
       defaulted: false,
       mode: 'pro',
+      requiresPro: true,
       pro: true,
       rsc: false,
     });
@@ -32,22 +35,15 @@ describe('resolveSetupMode', () => {
     expect(resolveSetupMode({ rsc: true })).toEqual({
       defaulted: false,
       mode: 'rsc',
+      requiresPro: true,
       pro: false,
       rsc: true,
     });
   });
 
-  it('keeps --rsc precedence over --pro for compatibility', () => {
-    expect(resolveSetupMode({ pro: true, rsc: true })).toEqual({
-      defaulted: false,
-      mode: 'rsc',
-      pro: false,
-      rsc: true,
-    });
-  });
-
-  it('rejects combining --standard with a Pro mode', () => {
+  it('rejects combining setup modes', () => {
     expect(() => resolveSetupMode({ standard: true, pro: true })).toThrow('Choose only one setup mode');
     expect(() => resolveSetupMode({ standard: true, rsc: true })).toThrow('Choose only one setup mode');
+    expect(() => resolveSetupMode({ pro: true, rsc: true })).toThrow('Choose only one setup mode');
   });
 });
