@@ -5377,6 +5377,20 @@ RSpec.describe ReactOnRails::Doctor do
         )
       end
 
+      it "does not report peer compatibility success when peer checks are unexpectedly empty" do
+        rsc_package = {
+          "version" => "19.2.0-rc.4",
+          "peerDependencies" => { "react" => "^19.0.4" }
+        }
+        allow(doctor).to receive(:rsc_peer_check_results).and_return([])
+
+        result = doctor.send(:check_rsc_package_peer_compatibility, rsc_package, "19.0.7")
+
+        success_msgs = checker.messages.select { |m| m[:type] == :success }.map { |m| m[:content] }
+        expect(result).to be false
+        expect(success_msgs).not_to include(a_string_including("peer dependencies are compatible"))
+      end
+
       it "reports an error when the declared RSC package cannot be resolved from node_modules" do
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do

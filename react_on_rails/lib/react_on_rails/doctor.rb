@@ -3667,6 +3667,7 @@ module ReactOnRails
         react_dom_peer_range:,
         rsc_version:
       )
+      return false if peer_checks.empty?
 
       if peer_checks.all?
         checker.add_success(
@@ -3752,25 +3753,26 @@ module ReactOnRails
       checker.add_info("  ℹ️  Checking #{RSC_PACKAGE_NAME} npm dist-tags to flag stale RSC pins")
       stdout, status = capture_rsc_dist_tags(package_root)
       unless status&.success?
-        report_rsc_dist_tag_lookup_skipped
+        report_rsc_dist_tag_lookup_skipped(package_root)
         return {}
       end
 
       tags = JSON.parse(stdout)
       return tags if tags.is_a?(Hash)
 
-      report_rsc_dist_tag_lookup_skipped
+      report_rsc_dist_tag_lookup_skipped(package_root)
       {}
     rescue StandardError
-      report_rsc_dist_tag_lookup_skipped
+      report_rsc_dist_tag_lookup_skipped(package_root)
       {}
     end
 
-    def report_rsc_dist_tag_lookup_skipped
-      return if @rsc_dist_tag_lookup_skipped_reported
+    def report_rsc_dist_tag_lookup_skipped(package_root)
+      @rsc_dist_tag_lookup_skipped_reported ||= {}
+      return if @rsc_dist_tag_lookup_skipped_reported[package_root]
 
       checker.add_info("  ℹ️  Could not fetch #{RSC_PACKAGE_NAME} dist-tags from npm; skipping stale-tag check")
-      @rsc_dist_tag_lookup_skipped_reported = true
+      @rsc_dist_tag_lookup_skipped_reported[package_root] = true
     end
 
     def capture_rsc_dist_tags(package_root)
@@ -3792,8 +3794,14 @@ module ReactOnRails
         stderr_thread = read_pipe_async(stderr_r)
         status = wait_for_rsc_dist_tag_process(pid)
         process_reaped = true
-        stdout = stdout_thread.value
-        stderr_thread.value
+        if status
+          stdout = stdout_thread.value
+          stderr_thread.value
+        else
+          close_io(stdout_r)
+          close_io(stderr_r)
+          stdout = ""
+        end
 
         [stdout, status]
       ensure
@@ -4185,6 +4193,7 @@ module ReactOnRails
       stdout, _stderr, status = Open3.capture3("node", "-e", script, package_name, chdir: package_root)
       resolved_path = status.success? ? stdout.strip : ""
       # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
+      # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.
       resolved_path = File.join(package_root, "node_modules", package_name, "package.json") if resolved_path.empty?
       return nil if resolved_path.empty? || !File.exist?(resolved_path)
 
