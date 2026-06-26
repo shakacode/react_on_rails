@@ -9,14 +9,14 @@ require "tmpdir"
 
 SCRIPT = File.expand_path("agent-coord-bounded", __dir__)
 
-class AgentCoordBoundedTest < Minitest::Test # rubocop:disable Metrics/ClassLength
+class AgentCoordBoundedTest < Minitest::Test
   def test_forwards_agent_coord_exit_status_stdout_and_stderr
     with_fake_agent_coord(<<~RUBY) do |env|
       $stderr.print "fake stderr"
       puts "fake stdout"
       exit 7
     RUBY
-      stdout, stderr, status = run_script(env, "status", "--repo", "shakacode/react_on_rails")
+      stdout, stderr, status = run_script(env, "status", "--repo", "example/repo")
 
       assert_equal 7, status.exitstatus
       assert_equal "fake stdout\n", stdout
@@ -103,12 +103,12 @@ class AgentCoordBoundedTest < Minitest::Test # rubocop:disable Metrics/ClassLeng
 
   def test_reports_missing_agent_coord_without_backtrace
     Dir.mktmpdir("agent-coord-bounded-test") do |dir|
-      stdout, stderr, status = run_script({ "PATH" => dir }, "status", "--repo", "shakacode/react_on_rails")
+      stdout, stderr, status = run_script({ "PATH" => dir }, "status", "--repo", "example/repo")
 
       assert_equal 127, status.exitstatus
       assert_empty stdout
       assert_includes stderr, "agent-coord-bounded: unable to start"
-      assert_includes stderr, "agent-coord status --repo shakacode/react_on_rails"
+      assert_includes stderr, "agent-coord status --repo example/repo"
       refute_includes stderr, "\n\tfrom "
     end
   end
@@ -170,6 +170,17 @@ class AgentCoordBoundedTest < Minitest::Test # rubocop:disable Metrics/ClassLeng
     end
   end
 
+  def test_process_alive_treats_eperm_as_alive
+    original_kill = Process.method(:kill)
+    # This patches Process globally for the duration of the assertion; the
+    # ensure block restores it so later tests do not inherit the EPERM stub.
+    Process.define_singleton_method(:kill) { |*| raise Errno::EPERM }
+
+    assert process_alive?(1234)
+  ensure
+    Process.define_singleton_method(:kill, original_kill) if original_kill
+  end
+
   private
 
   def run_script(env, *)
@@ -206,5 +217,7 @@ class AgentCoordBoundedTest < Minitest::Test # rubocop:disable Metrics/ClassLeng
     true
   rescue Errno::ESRCH
     false
+  rescue Errno::EPERM
+    true
   end
 end

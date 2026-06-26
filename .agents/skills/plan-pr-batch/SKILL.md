@@ -8,9 +8,12 @@ argument-hint: '[issue/PR numbers, labels, milestone, or search query]'
 
 Create verified scope and a goal prompt for `$pr-batch`. Do not implement items here.
 
+If the request is vague feature or bug intent, use `$spec` first to produce requirements, design, and tasks before planning the batch.
+
 If a skill picker only exposes installed/global skills, treat this skill as an
 entry point. After fetching, prefer repo-local `.agents/skills/...` and
-`.agents/workflows/...` files when they exist.
+`.agents/workflows/...` files when they exist; otherwise use the installed
+shared files adjacent to this skill.
 
 Memorable invocation:
 
@@ -34,52 +37,41 @@ Plan a PR batch
    - For every bare number, run both `gh pr view N` and `gh issue view N` when type is ambiguous.
    - For filters, run focused `gh pr list` or `gh issue list` commands and keep the query in the report.
    - Record title, URL, state, branch/author for PRs, labels, linked PR/issue refs, and blockers. If a fact cannot be verified, write `UNKNOWN`.
-   - Treat the private `shakacode/agent-coordination` backend as available when
-     `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 doctor --json`
-     and targeted status exit 0. For exact targets, run
-     `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --repo <resolved-owner/repo> --target <issue-or-pr> --json`
-     and exclude/report targets that already have active live or stale private
-     claims, including holder and heartbeat liveness. For known batch
-     dependencies, run
-     `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id <batch-id> --json`
-     and include active batches, lane `depends_on` refs, and current
-     `blocked_on` refs in the plan so workers can see cross-batch status before
-     they start.
-     Report dead or fallback-expired claims as recoverable before assigning
-     takeover work. If targeted backend state cannot be checked, exits 2, or
-     times out, write `UNKNOWN`; public claim comments are advisory only.
-     `UNKNOWN` applies to unavailable status checks, not live claim refusals
-     during `$pr-batch`; `CLAIM_REFUSED` / exit code 3 remains a hard stop. Do
-     not use broad `agent-coord status` for routine target resolution; broad
-     private reads are audit-only.
+   - Treat the repo's private coordination backend (see `AGENTS.md` →
+     **Agent Workflow Configuration**) as available when bounded
+     `agent-coord doctor --json` and targeted status probes exit 0. Resolve the
+     `pr-batch` skill directory, then run
+     `"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --repo <resolved-owner/repo> --target <issue-or-pr> --json`
+     for exact targets; for known batch dependencies, run
+     `"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --batch-id <batch-id> --json`.
+     Exclude/report targets that already have active live or stale private
+     claims, including holder and heartbeat liveness. Report dead or
+     fallback-expired claims as recoverable before assigning takeover work. If
+     targeted backend state cannot be checked or times out, write `UNKNOWN`;
+     public claim comments are advisory only. `UNKNOWN` applies to unavailable
+     status checks, not live claim refusals during `$pr-batch`; `CLAIM_REFUSED`
+     / exit code 3 remains a hard stop. Include active batches, lane
+     `depends_on` refs, and current `blocked_on` refs in the plan so workers can
+     see cross-batch status before they start. Do not use broad
+     `agent-coord status` for routine target resolution; broad private reads are
+     audit-only.
 
 3. Shape
    - Exclude issues labeled `needs-customer-feedback` from implementation batches unless the user explicitly provides customer evidence or maintainer approval for that issue; list them under "Excluded or deferred" with `needs-customer-feedback` as the reason.
-   - For any issue that is speculative, AI/code-analysis-only, over-scoped, or unclear in value, priority, or fix scope, route through `.agents/skills/evaluate-issue/SKILL.md` before assigning it to implementation work.
+   - For any issue that is speculative, AI/code-analysis-only, over-scoped, or unclear in value, priority, or fix scope, route through the installed or repo-local `evaluate-issue` skill before assigning it to implementation work.
    - Exclude closed or merged items unless the user explicitly asked to audit them.
    - Separate independent work from dependency-ordered work. Give every planned
      lane a stable agent id and a lane name; for dependency-ordered work, define
      explicit `depends_on` refs in the form `<batch-id>:<lane-name>` so
-     `agent-coord status --batch-id <batch-id> --json` can show whether the lane is blocked.
+     `agent-coord status --batch-id <batch-id> --json` can show whether the
+     lane is blocked.
      Coordinators must create or update the private backend
      `batches/<batch-id>.json` with those lane refs before dependent workers
-     start; otherwise `agent-coord status --batch-id <batch-id> --json` cannot report
-     `blocked_on` lanes.
-   - Apply `.agents/workflows/pr-processing.md` under **Batch QA Lane**. Declare
-     whether QA is required, which subset qualifies, and the planned QA owner.
-     When QA is required, plan the `qa` lane name, stable owner/heartbeat
-     expectations, and private-state representation for the launched coordinator
-     to create when the backend is available. If private state will be
-     unavailable, require the final handoff to record QA claim/heartbeat state as
-     `UNKNOWN` and include allowed fallback evidence (see
-     `.agents/workflows/pr-processing.md`, the "Allowed fallback evidence:"
-     label in the **Batch QA Lane** section) instead of downgrading QA to
-     `not required`.
-     Use that section's capitalization convention: uppercase `UNKNOWN` means
-     coordination/backend state, and lowercase `unknown` is the QA lane status.
-     When QA is omitted for low-risk work, record `not required` plus the
-     rationale. Include the final QA Evidence expectations in the Batch Plan and
-     generated goal prompt.
+     start; otherwise targeted batch status cannot report `blocked_on` lanes.
+   - Apply `.agents/workflows/pr-processing.md` under **Batch QA Lane**. Record
+     whether QA is required, which subset qualifies, the planned owner/lane, and
+     final QA Evidence expectations. If QA is omitted for low-risk work, record
+     `not required` plus the rationale.
    - Build a File-touch map for the batch: list the paths each item changes or
      intends to affect, including creates, deletes, and renames. Never guess
      paths.
@@ -191,10 +183,11 @@ Preflight first: if this session cannot run workers without blocking approval pr
 Repository: OWNER/REPO
 Batch objective: ...
 merge_authority: <none | ask | auto_merge_when_gates_pass>.
-Batch QA Lane: <required: lane/owner/scope/private-state or UNKNOWN fallback | not required: rationale>.
-Scope summary: [one paragraph: compact titles, sequencing, dependencies, exclusions, path ownership; keep bulky evidence, validation notes, and later-batch details outside.]
+Batch QA Lane: <required owner/scope or not required rationale>.
+Scope summary: [one paragraph: compact titles, sequencing, dependencies, exclusions, and path ownership for this batch. Keep bulky evidence, long validation notes, and later-batch details outside this prompt.]
 File-touch map (one line per item; pick the applicable format):
-- PR/Issue #N -> exact paths or summarized patterns, including creates/deletes/renames (owner: lane/name)
+- PR/Issue #N -> changed/affected paths, including create/delete/rename (owner: lane/name)
+- PR/Issue #N -> summarized path pattern(s) plus collision-relevant exact paths/renames/deletes (owner: lane/name)
 - PR/Issue #N -> UNKNOWN (paths not determinable from issue body/design notes; treat as serial)
 Batch-level reservations, not tied to a single item:
 - Deferred/reserved paths -> path(s) (reason: ... / later owner: lane/name)
@@ -203,27 +196,28 @@ Items:
 - PR #N: URL
   Goal: one-line outcome.
   Worker notes: short scope, branch, or dependency note.
-  Done when: final state satisfies requested `merge_authority` and matches a pr-batch split state.
+  Done when: final state is reported using the requested `merge_authority` and the split states from pr-batch.
 - Issue #N: URL
   Goal: one-line outcome.
   Worker notes: short scope, branch, or dependency note.
-  Done when: final state satisfies requested `merge_authority`, with PR/no-PR evidence or no-fix rationale.
+  Done when: final state is reported using the requested `merge_authority` and the split states from pr-batch, with PR/no-PR evidence or documented no-fix rationale.
 
 Execution rules:
-- Run `git fetch --prune origin main` first. Verify repo-local `.agents/skills/pr-batch/SKILL.md` and `.agents/workflows/pr-processing.md` before editing. If a required file is missing locally but present on `origin/main`, update that specific file before continuing; if it is still missing, report repo workflow state as `UNKNOWN`.
-- Follow `.agents/skills/pr-batch/SKILL.md`; if autoloading is unavailable, copy its safety/review/simplify/CI/readiness gates.
-- Dispatch one subagent per independent item, current file-disjoint wave only. Hold serial and `UNKNOWN` discovery lanes until no active editor lane can collide.
-- Workers edit only owned File-touch map paths. If an `UNKNOWN`, unlisted, or other-lane path is needed, stop before editing it and report discovered paths for coordinator confirmation.
+- Resolve the base branch from `AGENTS.md` -> Agent Workflow Configuration and run `git fetch --prune origin <base-branch>` first. Verify the installed or repo-local `$pr-batch` skill and `pr-processing.md` workflow are available before launching workers; if neither can be resolved, stop and report repo workflow state as `UNKNOWN`.
+- Follow the resolved `$pr-batch` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
+- Dispatch one subagent per independent item; group dependent items only when shared context is required. Dispatch only the current file-disjoint wave. Hold serial and `UNKNOWN`
+  discovery lanes until no active editor lane can collide with them.
+- Workers edit only owned File-touch map paths; this map is how the batch makes
+  pr-batch's "disjoint write scopes" concrete, since pr-batch's own template has
+  no File-touch map slot. If an `UNKNOWN`, unlisted, or other-lane path is
+  needed, stop, report discovered paths, and wait for an updated map or explicit
+  coordinator confirmation before editing.
 - Sequenced lanes may share declared files only in the stated order.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
-- For coordination, respect coordination claims and dependencies:
-  `agent-coord doctor --json`, then
-  `agent-coord status --repo <repo> --target <issue-or-pr> --json` or
-  `agent-coord status --batch-id <batch-id> --json` per `AGENTS.md`; claim,
-  heartbeat, and stop/report UNKNOWN.
-- Apply Batch QA Lane in `.agents/workflows/pr-processing.md`: declare required/not required, use private `qa` lane when available, `UNKNOWN` fallback evidence when not, and include QA Evidence in final handoff.
-- Use local validation, self-review, review-comment, CI, and readiness gates from the repo workflow. For PRs, merge only when `merge_authority` is `auto_merge_when_gates_pass` or a later explicit approval exists, current release mode permits it, and confidence/readiness gates pass; document confidence data in the PR description.
-- Final handoff must include links, tests, blockers, next action, confidence or UNKNOWN facts, `merge_authority`, and explicit final-state sections: `merged`, `ready-gates-clean`, `ready-no-merge-authority`, `waiting-on-checks-or-review`, `external-gate-failing`, `blocked-user-input`, or `no-pr-evidence`.
+- For coordination, respect coordination claims and dependencies: stable agent ids, bounded doctor/status, claim before branching, heartbeat at phase changes, and stop on unmet `blocked_on` refs or dependency `UNKNOWN`.
+- Apply Batch QA Lane; include QA Evidence in final handoff.
+- Use local validation, self-review, review-comment, CI, and readiness gates. For PRs, merge only when `merge_authority` is `auto_merge_when_gates_pass` or explicit merge approval exists, release policy allows it, and gates pass; with `auto_merge_when_gates_pass`, done means merged and closed out unless blocked; document confidence data in the PR description.
+- Final handoff must include links, tests, blockers, next action, confidence/UNKNOWN, `merge_authority`, QA Evidence or not-required rationale, and final-state sections: `merged`, `ready-gates-clean`, `ready-no-merge-authority`, `waiting-on-checks-or-review`, `external-gate-failing`, `blocked-user-input`, or `no-pr-evidence`.
 ```
 
 ## Common Mistakes

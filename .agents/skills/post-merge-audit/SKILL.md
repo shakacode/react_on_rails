@@ -40,12 +40,12 @@ The resolver is read-only. It resolves the default release-candidate base, the h
 2. Head: usually `origin/main` or the current release branch.
 3. Merged PR list: every PR merged between base and head.
 4. Worked issue list: for private coordination backend setup and CLI discovery,
-   see `internal/contributor-info/agent-coordination-backend.md`. If no
+   see `.agents/docs/coordination-backend.md`. If no
    coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
    - run bounded `agent-coord doctor --json`, then broad `agent-coord status`
-     (via `agent-coord-bounded`) only as an audit/discovery read to list
+     through the resolved `pr-batch` bounded helper only as an audit/discovery read to list
      candidate batch/run ids and lanes
    - record `worked_issue_scope: UNKNOWN (needs batch confirmation)`
    - ask for confirmation before treating any candidate as the worked-issue
@@ -59,11 +59,11 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    `agent-coord status --batch-id <batch-id> --json`, then inspect the named
    batch entry; use claims, heartbeats, and batch metadata as the primary
    worked-issue scope. If `agent-coord` is missing or bounded
-   `agent-coord doctor --json` fails/times out, record
+   `agent-coord doctor --json` fails or times out, record
    `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
-   bounded `agent-coord doctor --json` passes but targeted batch status fails,
-   exits 2, or times out, record `worked_issue_scope: UNKNOWN (access)` with the
-   exact command/error. In both UNKNOWN cases, use structured public `codex-claim`
+   bounded `agent-coord doctor --json` passes but targeted batch status fails or
+   times out, record `worked_issue_scope: UNKNOWN (access)` with the exact
+   command/error. In both UNKNOWN cases, use structured public `codex-claim`
    comments as an advisory fallback for possible no-PR, blocked, parked, or
    done-unmerged lanes before reducing scope to merged PRs. Keep advisory rows
    marked `UNKNOWN` as needed, and do not infer confirmed completeness from
@@ -99,11 +99,11 @@ After the scope algorithm identifies the batch or reports an `UNKNOWN` scope,
 collect any QA lane and QA Evidence block for that batch. Do not use missing QA
 state to shrink the worked-issue scope; report it as a QA coverage finding or
 `UNKNOWN` fact instead.
-Use the capitalization convention from `.agents/workflows/pr-processing.md`:
-uppercase `UNKNOWN` means coordination/backend state, and lowercase `unknown`
-is the QA lane status.
 
-Show included worked issues, included PRs, collected QA lanes and QA Evidence blocks, excluded near-matches, base/head SHAs, coordination status evidence, and assumptions. Ask for confirmation before deep audit unless the user explicitly asks to proceed without confirmation.
+Show included worked issues, included PRs, collected QA lanes and QA Evidence
+blocks, excluded near-matches, base/head SHAs, coordination status evidence, and
+assumptions. Ask for confirmation before deep audit unless the user explicitly
+asks to proceed without confirmation.
 
 ## Audit Checks
 
@@ -123,16 +123,11 @@ For each included PR:
   caveats, and refutable-conclusion handling.
 - Validation: compare changed areas with the validation evidence in the PR body or comments.
 - QA evidence: verify required QA Evidence exists, records `Tested at` with the
-  PR/head SHA or audited range it applies to, is current for that head/range, covers the changed
-  surfaces, and does not leave release-blocking findings untriaged. If private
-  coordination claim/heartbeat state is `UNKNOWN`, verify the documented
-  fallback evidence is complete and names a concrete QA owner and branch/worktree
-  before treating QA coverage as satisfied. Only private claim/heartbeat
-  sub-values may be `UNKNOWN` in fallback mode. If fallback evidence is absent or
-  incomplete, classify the QA lane as `unknown` and surface it as a readiness
-  blocker. Verify `Release-blocking status` is derived from QA lane status:
-  `satisfied` -> `clear`, `blocked` -> `blocked`, `waived` -> `waived`,
-  `not_applicable` -> `not_applicable`, and `in_progress` / `unknown` -> `blocked`.
+  PR/head SHA or audited range it applies to, is current for that head/range,
+  covers the changed surfaces, and does not leave release-blocking findings
+  untriaged. If private coordination claim/heartbeat state is `UNKNOWN`, verify
+  the documented fallback evidence is otherwise complete and names a concrete QA
+  owner and branch/worktree before treating QA coverage as satisfied.
 - Cross-PR interactions: compare changed files, shared behavior, assumptions, and release-sensitive areas across the batch.
 - Decision log: inspect any `Codex Decision Log` or equivalent section and verify the decisions still hold after the merge.
 
@@ -154,21 +149,13 @@ still-open lanes:
   `realized`, `partial`, `missed`, `regressed`, `stalled`, or `unknown`) and
   explain any `UNKNOWN` evidence needed to resolve the issue outcome. For QA
   lanes, use the QA-coverage result `satisfied`, `blocked`, `waived`,
-  `in_progress`, `not_applicable`, or `unknown`. Use `satisfied` when required
-  QA evidence is current, adequately scoped, and has no untriaged
-  release-blocking finding; `blocked` when a release-blocking QA finding still
-  needs a fix or waiver; `waived` when an explicit waiver exists and the auditor
-  verifies a maintainer comment URL, issue link, or PR body entry names the
-  finding, scope, and reason; `in_progress` when required QA is not complete;
-  `not_applicable` when QA was correctly omitted with `QA required: no` and a
-  documented rationale; and `unknown` when evidence is missing, stale, or
-  incomplete.
-- Post-merge intake: record healthy `in_progress` worked-issue lanes and
-  evidenced `realized` worked-issue outcomes, `satisfied` or `waived` QA lanes,
-  and `not_applicable` QA omissions in the coverage table as no-action items
-  during active batch phase;
-  treat required QA lanes still `in_progress` during readiness/release audits as
-  QA coverage findings; route
+  `in_progress`, `not_applicable`, or `unknown` from
+  `.agents/workflows/pr-processing.md`.
+- Post-merge intake: record healthy `in_progress` worked-issue lanes,
+  evidenced `realized` worked-issue outcomes, evidenced `satisfied` or `waived`
+  QA lanes, and evidenced `not_applicable` QA omissions in the coverage table as
+  no-action items; treat required QA lanes still `in_progress` during readiness
+  or release audits as QA coverage findings; route
   `stalled` lanes back to the batch coordinator as resume/reassign/drop
   decisions unless the user explicitly approves tracking the stalled lane as an
   issue; route every other non-OK worked-issue class (`partial`, `missed`,
@@ -222,11 +209,11 @@ lane was evaluated, even when the issue produced no merged PR:
 The audit should usually produce an issue plan for non-OK findings, but not create issues until approval.
 
 - **No issue**: for `OK`, duplicate findings, findings fully resolved by the
-  audit evidence, evidenced `realized` lanes, healthy `in_progress` worked-issue
-  lanes, evidenced `satisfied` or `waived` QA lanes, or evidenced QA omissions
-  marked `not_applicable`; include `realized`, worked-issue `in_progress`,
-  `satisfied`, `waived`, and `not_applicable` rows in the worked-issue/QA-lane
-  coverage table so the coordinator can see they were checked.
+  audit evidence, evidenced `realized` lanes, healthy `in_progress`
+  worked-issue lanes, evidenced `satisfied` or `waived` QA lanes, or evidenced
+  QA omissions marked `not_applicable`; include those rows in the
+  worked-issue/QA-lane coverage table so the coordinator can see they were
+  checked.
 - **Changelog only**: for missing changelog entries; prefer one bundled changelog issue or a recommendation to run `/update-changelog`, not one issue per entry.
 - **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, follow-up task, non-OK worked-issue outcome (`partial`, `missed`, `regressed`, or `unknown`), or non-OK QA coverage outcome (`blocked`, `unknown`, or release-audit `in_progress`) that needs follow-up.
 - **Parent issue**: create one parent issue only to group two or more related
@@ -273,8 +260,8 @@ Only the coordinator should create issues. Independent Codex and Claude audits s
 Return high-risk findings first, then:
 
 1. Review-gate violations, including PRs merged before requested reviews finished, before actionable review findings were triaged, or with AI review systems incorrectly counted as approval gates.
-2. QA coverage findings, including missing, stale, still-`UNKNOWN` coverage/scope,
-   or insufficient required QA evidence.
+2. QA coverage findings, including missing, stale, insufficiently scoped, or
+   still-`UNKNOWN` required QA evidence.
 3. Missing changelog candidates, with a single recommendation to run `/update-changelog` when any are found.
 4. Cross-PR interaction risks.
 5. A deduped issue plan with parent/child recommendations and fingerprints.

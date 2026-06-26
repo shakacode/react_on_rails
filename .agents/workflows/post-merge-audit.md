@@ -49,7 +49,7 @@ self-contained. Keep state-machine changes mirrored across this workflow,
   issues and open PRs active within the audit time window; use claim `batch:`
   fields to surface candidate ids until the user confirms one.
 - For private coordination backend setup and CLI discovery, see
-  `internal/contributor-info/agent-coordination-backend.md`.
+  `docs/coordination-backend.md`.
 
 Suggested hidden fingerprint:
 
@@ -86,10 +86,6 @@ List any QA lane or intentionally omitted QA lane, with:
 - `QA required`, QA required rationale, and QA lane status / coverage result
 - release-blocking status and any findings
 
-Use the capitalization convention from
-`.agents/workflows/pr-processing.md` -> **Batch QA Lane**: uppercase `UNKNOWN`
-means coordination/backend state, and lowercase `unknown` is the QA lane status.
-
 If you do not know or cannot verify an item from GitHub/local git, say UNKNOWN rather than guessing.
 ```
 
@@ -118,9 +114,9 @@ First, produce the exact worked-issue scope and merged-PR range:
 - when no coordinated batch/run is in scope, skip `agent-coord` and record
   `worked_issue_scope: not applicable`
 - when batch work is in scope but the batch id is `UNKNOWN`, run bounded
-  `agent-coord doctor --json`, then broad `agent-coord status` (via
-  `agent-coord-bounded`) only as audit/discovery to list candidate batch/run ids
-  and lanes. Record
+  `agent-coord doctor --json`, then broad `agent-coord status` through the
+  resolved `pr-batch` bounded helper only as an audit/discovery read to list candidate
+  batch/run ids and lanes. Record
   `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask me to confirm
   a candidate batch/run id before treating any candidate lane list as the
   worked-issue scope.
@@ -129,21 +125,22 @@ First, produce the exact worked-issue scope and merged-PR range:
   `worked_issue_scope: UNKNOWN (access)` instead of
   `UNKNOWN (needs batch confirmation)`, with the exact command/error.
 - when a batch id is known:
-  - run `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 doctor --json`, then
-    `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id <batch-id> --json`,
-    then inspect `<BATCH_ID>` in the status output
+  - run bounded `agent-coord doctor --json`, then bounded
+    `agent-coord status --batch-id <batch-id> --json`, then inspect
+    `<BATCH_ID>` in the status output
   - list every worked issue/lane from claims, heartbeats, branches, and
     dependency metadata
   - for each worked issue, include the lane owner, branch, heartbeat/final
     state, linked PR if known, and whether the final state is merged, open,
     blocked, parked, no-PR, done-unmerged, or UNKNOWN
-- if `agent-coord` is missing or bounded `agent-coord doctor --json` fails/times out,
-  record `worked_issue_scope: UNKNOWN (setup)` with the exact command/error and
+- if `agent-coord` is missing or bounded `agent-coord doctor --json` fails or
+  times out, record `worked_issue_scope: UNKNOWN (setup)` with the exact
+  command/error and
   use structured public `codex-claim` comments as advisory coverage when
   available before continuing with GitHub/git evidence for the merged-PR range
-- if bounded `agent-coord doctor --json` passes but targeted batch status fails,
-  exits 2, or times out,
-  record `worked_issue_scope: UNKNOWN (access)` with the exact command/error and
+- if bounded `agent-coord doctor --json` passes but targeted batch status fails
+  or times out, record `worked_issue_scope: UNKNOWN (access)` with the exact
+  command/error and
   use structured public `codex-claim` comments as advisory coverage when
   available before continuing with GitHub/git evidence for the merged-PR range
 - if bounded `agent-coord doctor --json` and targeted batch status both succeed
@@ -214,17 +211,8 @@ After confirmation, audit each known worked issue, QA lane, or advisory
   `missed`, `regressed`, `stalled`, or `unknown`, using
   `.agents/workflows/continuous-evaluation-loop.md` for the intent-achievement
   definitions; classify QA lanes with the QA-coverage result `satisfied`,
-  `blocked`, `waived`, `in_progress`, `not_applicable`, or `unknown`. Use
-  `satisfied` when required QA evidence is current, adequately scoped, and has no
-  untriaged release-blocking finding; `blocked` when a release-blocking QA
-  finding still needs a fix or waiver; `waived` when an explicit waiver exists
-  and the auditor verifies a maintainer comment URL, issue link, or PR body entry
-  names the finding, scope, and reason; `in_progress` when required QA is not
-  complete; `not_applicable` when QA was correctly omitted with `QA required: no`
-  and a documented rationale; and `unknown` when evidence is missing, stale, or
-  incomplete. Verify `Release-blocking status` is derived from QA lane status:
-  `satisfied` -> `clear`, `blocked` -> `blocked`, `waived` -> `waived`,
-  `not_applicable` -> `not_applicable`, and `in_progress` / `unknown` -> `blocked`.
+  `blocked`, `waived`, `in_progress`, `not_applicable`, or `unknown`, using the
+  Batch QA Lane section in `.agents/workflows/pr-processing.md`
 - for healthy `in_progress` worked-issue lanes, evidenced `realized` outcomes,
   evidenced `satisfied` or `waived` QA lanes, and evidenced `not_applicable` QA
   omissions, record no action in the worked-issue/QA table; treat required QA
@@ -236,7 +224,7 @@ After confirmation, audit each known worked issue, QA lane, or advisory
   coordinator action naming the missing evidence or decision; for non-OK QA
   coverage outcomes (`blocked`, `unknown`, or release-audit `in_progress`),
   prepare a post-merge audit issue-plan entry or approved coordinator action
-  naming the missing evidence, fix, or waiver decision
+  naming the missing evidence, fix, waiver, or decision
 
 Also audit each included merged PR for:
 - risky behavior change
@@ -292,19 +280,13 @@ findings, missing changelog candidates, cross-PR interaction risks, the issue
 plan, a worked-issue/QA-lane coverage table, a PR-by-PR table, and exact
 commands/data sources. Include any remaining `UNKNOWN` facts and the command or
 permission needed to resolve them. Do not make code changes, comments, labels,
-issues, reverts, or PRs without approval.
-The worked-issue/QA-lane coverage table must include issue number or QA lane id,
-coordination lane/branch, linked PR or no-PR/blocker/QA evidence, final state,
-issue intent-achievement or QA-coverage classification, and `UNKNOWN` facts.
+issues, reverts, or PRs without approval. The worked-issue/QA-lane coverage
+table must include issue number or QA lane id, coordination lane/branch, linked
+PR or no-PR/blocker/QA evidence, final state, intent-achievement or QA-coverage
+classification, and `UNKNOWN` facts.
 
 Example worked-issue coverage table (`batch-abc` and issue numbers are
 placeholders; replace them with the real batch id and issues):
-
-`Final state` is the operational lane outcome. `Classification` is the
-worked-issue intent class or QA-coverage result.
-Use `qa` for a single QA lane. Use `qa:<scope-label>` for scoped QA sub-lanes,
-matching the coordinator lane name.
-
 | Issue | Lane/branch | Evidence | Final state | Classification | UNKNOWN facts |
 | --- | --- | --- | --- | --- | --- |
 | #1234 | batch-abc:issue-1234 / codex/example | PR #2345 merged | merged | realized | none |
@@ -312,11 +294,9 @@ matching the coordinator lane name.
 | #1236 | batch-abc:issue-1236 / codex/partial-example | PR #2346 merged | merged | partial | acceptance criteria C not addressed |
 | #1237 | UNKNOWN (advisory) / no coord data | codex-claim comment URL (advisory) | UNKNOWN | unknown | coordination state needed to confirm |
 | #1238 | batch-abc:issue-1238 / codex/done-no-merge | no-PR evidence comment URL | done-unmerged | realized | none |
-| qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | done | satisfied | none |
-| qa | not required / no branch | handoff comment URL (inline QA Evidence block) | not_applicable | not_applicable | none |
-| qa | batch-abc:qa / codex/qa-lane | QA Evidence block URL | blocked | blocked | fix or waiver needed before release |
-| qa | batch-abc:qa / codex/qa-lane | maintainer waiver URL | done | waived | none |
-| qa:ci | batch-abc:qa:ci / codex/qa-ci-lane | QA Evidence block URL | done | satisfied | none |
+| qa | batch-abc:qa / codex-qa | QA Evidence block URL | done | satisfied | none |
+| qa | not required / no branch | handoff comment URL | not_applicable | not_applicable | none |
+| qa | batch-abc:qa / codex-qa | QA Evidence block URL | blocked | blocked | fix or waiver needed before release |
 ```
 
 ## Comparison Prompt
@@ -372,8 +352,8 @@ Return:
 6. deduped issue plan
 7. reconciled worked-issue/QA-lane coverage table with issue number or QA lane
    id, coordination lane/branch, linked PR or no-PR/blocker/QA evidence, final
-   state, issue intent-achievement or QA-coverage classification, and any
-   unresolved `UNKNOWN` facts
+   state, intent-achievement or QA-coverage classification, and any unresolved
+   `UNKNOWN` facts
 8. recommended next actions, including a coordinator resume/reassign/drop
    decision for `stalled` lanes instead of defaulting to issue creation
 

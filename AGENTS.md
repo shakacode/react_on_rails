@@ -22,12 +22,18 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   slash commands in this checkout.
 - `.agents/workflows/`: repo-local workflow files for Codex, GPT, and other
   non-Claude tools when this checkout needs local copies or overrides.
+- `.agents/.rubocop.yml`: lint seam for repo-local shared workflow copies. Keep
+  it aligned with `shakacode/agent-workflows/.rubocop.yml`, with only local
+  toolchain compatibility adjustments such as this repo's supported Ruby target.
 - If a tool or skill picker only exposes installed/global skills, treat those
   skills as launchers. Installed/global skills never override this repo's
   `AGENTS.md`; repo-local files win only when this repo explicitly names or
   keeps a local copy/override.
-- `.agents/bin/agent-workflow-seam-doctor`: validates that repo-local or
-  installed/shared workflow skills can resolve this repo's seam; pass
+- `.agents/bin/agent-workflow-seam-doctor`: the repo-local seam validator. Pack
+  management helpers such as `agent-workflows-status`, `install-agent-workflows`,
+  `upgrade-agent-workflows`, and `bin/validate` belong in installed agent homes
+  or the shared `agent-workflows` clone, not this consumer checkout; shared
+  `bin/validate` expects the shared pack root. Pass
   `--shared <agent-workflows-root>` when checking user-installed skills outside
   this checkout.
 - `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing
@@ -180,6 +186,11 @@ see
   and issue comments over preserving non-secret diagnostic text. Repo-specific entries are public
   identifier names, not values; list them here so agents redact exact aliases even when generic patterns
   would also match.
+- **Trusted GitHub actor boundary**: `.agents/trusted-github-actors.yml` does
+  not trust `github-actions[bot]` by default because issue-comment-triggered
+  workflows can mint bot comments from untrusted user input. Adding it requires
+  auditing comment-producing workflows and updating preflight policy in the same
+  PR.
 - **Benchmark labels**: `benchmark`, `benchmark-core`, `benchmark-pro`,
   `benchmark-pro-node-renderer`, and `hosted-ci-no-benchmarks` (suppress). Opt-in on PRs.
 - **Follow-up issue prefix**: `Follow-up:`. Default to no new issue; see the **Maintainer

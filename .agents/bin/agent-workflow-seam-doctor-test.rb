@@ -95,6 +95,50 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
     end
   end
 
+  def test_missing_secret_redaction_patterns_key_fails
+    with_repo do |root|
+      seam = REQUIRED_SEAM.dup
+      seam.delete("Secret redaction patterns")
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "missing Agent Workflow Configuration key: Secret redaction patterns"
+    end
+  end
+
+  def test_unresolved_required_seam_key_value_fails
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge(
+        "Secret redaction patterns" => "<repo-specific CI parity redaction patterns>"
+      )
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "unresolved Agent Workflow Configuration value for key: Secret redaction patterns"
+    end
+  end
+
+  def test_unresolved_extra_redaction_command_placeholder_fails
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge(
+        "Optional redaction helper" => "<secret redaction command>"
+      )
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "unresolved Agent Workflow Configuration value for key: Optional redaction helper"
+    end
+  end
+
   def test_unresolved_seam_value_fails
     with_repo do |root|
       seam = REQUIRED_SEAM.merge("Base branch" => "<main branch>.")
@@ -156,6 +200,7 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
     with_repo do |root|
       seam = REQUIRED_SEAM.merge(
         "CI change detector" => "<CI change detector command, or \"n/a\">",
+        "CI parity environment" => "<CI parity command, runner image, reproduction guide, or \"n/a\">",
         "Benchmark labels" => "<benchmark labels, or \"n/a\">"
       )
       write_agents(root, seam)
@@ -165,7 +210,116 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
 
       refute status.success?
       assert_includes out, "unresolved Agent Workflow Configuration value for key: CI change detector"
+      assert_includes out, "unresolved Agent Workflow Configuration value for key: CI parity environment"
       assert_includes out, "unresolved Agent Workflow Configuration value for key: Benchmark labels"
+    end
+  end
+
+  def test_standalone_ci_parity_placeholder_in_seam_value_fails
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge("CI parity environment" => "<runner image>")
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "unresolved Agent Workflow Configuration value for key: CI parity environment"
+    end
+  end
+
+  def test_ci_parity_placeholder_variants_in_seam_value_fail
+    with_repo do |root|
+      [
+        "<runner image, or \"n/a\">",
+        "<runner image for act>",
+        "<reproduction guide URL>",
+        "<GitHub runner image>",
+        "<local reproduction guide URL>",
+        "<runner image:>",
+        "<reproduction guide: >",
+        "<runner image, optional: value>",
+        "<runner image optional: value>"
+      ].each do |placeholder|
+        seam = REQUIRED_SEAM.merge("CI parity environment" => placeholder)
+        write_agents(root, seam)
+        write_skill(root, "No commands here.\n")
+
+        out, status = run_doctor(root)
+
+        refute status.success?, placeholder
+        assert_includes out, "unresolved Agent Workflow Configuration value for key: CI parity environment"
+      end
+    end
+  end
+
+  def test_filled_ci_parity_command_value_passes
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge(
+        "CI parity environment" => "<CI parity command: bin/ci-parity>"
+      )
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
+  def test_filled_ci_parity_runner_image_with_prefix_value_passes
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge(
+        "CI parity environment" => "act with <GitHub runner image: ghcr.io/catthehacker/ubuntu:act-22.04>"
+      )
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
+  def test_filled_ci_parity_runner_image_value_passes
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge(
+        "CI parity environment" => "act with <runner image: ghcr.io/catthehacker/ubuntu:act-22.04>"
+      )
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
+  def test_filled_ci_parity_reproduction_guide_qualified_value_passes
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge(
+        "CI parity environment" => "see <reproduction guide URL: https://wiki.example.com/ci>"
+      )
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+    end
+  end
+
+  def test_plural_runner_images_phrase_is_not_a_ci_parity_placeholder
+    with_repo do |root|
+      seam = REQUIRED_SEAM.merge(
+        "CI parity environment" => "docs mention <runner images> generally"
+      )
+      write_agents(root, seam)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
     end
   end
 
@@ -490,6 +644,117 @@ class AgentWorkflowSeamDoctorFenceContentTest < Minitest::Test
 
       refute status.success?
       assert_equal 1, out.scan("unresolved executable placeholder").length
+    end
+  end
+
+  def test_executable_ci_parity_placeholder_in_code_fence_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ```bash
+        act -P ubuntu-latest=<runner image>
+        ```
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<runner image>"
+    end
+  end
+
+  def test_filled_ci_parity_runner_image_in_code_fence_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ```bash
+        act -P ubuntu-latest=<runner image: ghcr.io/catthehacker/ubuntu:act-22.04>
+        ```
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<runner image: ghcr.io/catthehacker/ubuntu:act-22.04>"
+    end
+  end
+
+  def test_executable_filled_ci_parity_command_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ```bash
+        <CI parity command: bin/ci-parity>
+        ```
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<CI parity command: bin/ci-parity>"
+    end
+  end
+
+  def test_inline_ci_parity_placeholder_command_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "Run `act -P ubuntu-latest=<reproduction guide URL>`.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<reproduction guide URL>"
+    end
+  end
+
+  def test_executable_compound_placeholder_is_reported_once
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, <<~MARKDOWN)
+        ```bash
+        echo <hosted CI runner image>
+        ```
+      MARKDOWN
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_equal 1, out.scan("<hosted CI runner image>").length
+    end
+  end
+
+  def test_inline_act_event_command_placeholder_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "Run `act pull_request -P ubuntu-latest=<runner image>`.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<runner image>"
+    end
+  end
+
+  def test_inline_bare_act_placeholder_fails
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "Run `act <runner image>`.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "<runner image>"
+    end
+  end
+
+  def test_inline_act_prose_does_not_make_placeholder_executable
+    with_repo do |root|
+      write_agents(root)
+      write_skill(root, "Use `act on this finding <runner image>` when documenting parity.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
     end
   end
 

@@ -14,6 +14,9 @@ trusted_bots:
   - coderabbitai
   - cursor
   - dependabot
+  # Do not add github-actions without auditing comment-producing workflows:
+  # issue_comment-triggered jobs can mint github-actions[bot] comments from
+  # untrusted user input.
   - greptile-apps
 
 # Team entries are GitHub team slugs under the repository owner org. For
