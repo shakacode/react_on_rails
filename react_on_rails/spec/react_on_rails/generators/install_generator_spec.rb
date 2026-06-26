@@ -42,6 +42,15 @@ describe InstallGenerator, type: :generator do
     }
   end
 
+  def assert_rsc_dependency_requirements(dependencies)
+    dependency_manager = ReactOnRails::Generators::JsDependencyManager
+    rsc_react_range = dependency_manager::RSC_REACT_VERSION_RANGE
+
+    expect_npm_dependency_to_satisfy("react", dependencies["react"], rsc_react_range)
+    expect_npm_dependency_to_satisfy("react-dom", dependencies["react-dom"], rsc_react_range)
+    expect(dependencies["react-on-rails-rsc"]).to eq(dependency_manager::RSC_PACKAGE_VERSION_PIN)
+  end
+
   def assert_tailwind_dependencies
     assert_file "package.json" do |content|
       dependencies = JSON.parse(content).fetch("dependencies")
@@ -58,19 +67,33 @@ describe InstallGenerator, type: :generator do
             "expected #{name} dependency to be present and satisfy #{expected_requirement.inspect}"
     end
 
-    unless expected_requirement.start_with?("^")
-      expect(actual_version).to eq(expected_requirement)
-      return
+    if npm_range?(expected_requirement)
+      return expect_npm_range_dependency_to_satisfy(actual_version, expected_requirement)
     end
 
-    expected_floor = Gem::Version.new(expected_requirement.delete_prefix("^"))
-    actual = Gem::Version.new(actual_version.delete_prefix("^"))
-
-    expect(actual).to be >= expected_floor
-    expect(actual).to be < npm_caret_upper_bound(expected_floor)
+    expect(actual_version).to eq(expected_requirement)
   rescue ArgumentError
     raise RSpec::Expectations::ExpectationNotMetError,
           "expected #{name} dependency #{actual_version.inspect} to satisfy #{expected_requirement.inspect}"
+  end
+
+  def npm_range?(expected_requirement)
+    expected_requirement.start_with?("^", "~")
+  end
+
+  def expect_npm_range_dependency_to_satisfy(actual_version, expected_requirement)
+    operator = expected_requirement[0]
+    expected_floor = Gem::Version.new(expected_requirement[1..])
+    actual = Gem::Version.new(actual_version.delete_prefix("^").delete_prefix("~"))
+
+    expect(actual).to be >= expected_floor
+    expect(actual).to be < npm_range_upper_bound(operator, expected_floor)
+  end
+
+  def npm_range_upper_bound(operator, version)
+    return npm_caret_upper_bound(version) if operator == "^"
+
+    npm_tilde_upper_bound(version)
   end
 
   def npm_caret_upper_bound(version)
@@ -80,6 +103,14 @@ describe InstallGenerator, type: :generator do
     return Gem::Version.new("0.#{minor + 1}.0") if minor.positive?
 
     Gem::Version.new("0.0.#{patch + 1}")
+  end
+
+  def npm_tilde_upper_bound(version)
+    major, minor = version.segments.values_at(0, 1).map { |segment| segment || 0 }
+
+    return Gem::Version.new("#{major}.#{minor + 1}.0") if version.segments.length > 1
+
+    Gem::Version.new("#{major + 1}.0.0")
   end
 
   def assert_tailwind_ssr_setup(config_dir:, extension:)
@@ -2737,14 +2768,13 @@ describe InstallGenerator, type: :generator do
 
     it "installs RSC npm dependencies with matched version pins" do
       expected_npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION)
-      expected_rsc_npm_version = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
 
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
         deps = package_json["dependencies"] || {}
+        assert_rsc_dependency_requirements(deps)
         expect(deps["react-on-rails-pro"]).to eq(expected_npm_version)
         expect(deps["react-on-rails-pro-node-renderer"]).to eq(expected_npm_version)
-        expect(deps["react-on-rails-rsc"]).to eq(expected_rsc_npm_version)
       end
     end
 
@@ -3110,7 +3140,7 @@ describe InstallGenerator, type: :generator do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
         deps = package_json["dependencies"] || {}
-        expect(deps).to include("react-on-rails-rsc")
+        assert_rsc_dependency_requirements(deps)
         expect(deps).to include("@rspack/core")
       end
     end

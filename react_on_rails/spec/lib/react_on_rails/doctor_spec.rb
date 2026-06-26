@@ -8,6 +8,11 @@ require "tmpdir"
 RSpec.describe ReactOnRails::Doctor do
   let(:doctor) { described_class.new(verbose: false, fix: false) }
 
+  def install_package(name, package_json)
+    FileUtils.mkdir_p("node_modules/#{name}")
+    File.write("node_modules/#{name}/package.json", JSON.generate(package_json))
+  end
+
   describe "#initialize" do
     it "initializes with default options" do
       expect(doctor).to be_instance_of(described_class)
@@ -5316,6 +5321,343 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when installed package version is not semver-like" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write("package.json", '{"dependencies":{"react":"19.0.4"}}')
+            install_react("canary")
+            example.run
+          end
+        end
+      end
+
+      it "falls back to the declared package version" do
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+    end
+
+    context "when react-on-rails-rsc declares a React peer range" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.0.7",
+                  "react-dom" => "19.0.7",
+                  "react-on-rails-rsc" => "19.2.0-rc.4"
+                }
+              )
+            )
+            install_react("19.0.7")
+            install_package("react-dom", "version" => "19.0.7")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.2.0-rc.4",
+              "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
+            )
+            example.run
+          end
+        end
+      end
+
+      it "errors when installed React does not satisfy the RSC peer range" do
+        allow(doctor).to receive(:capture_rsc_dist_tags)
+
+        doctor.send(:check_rsc_react_version)
+
+        error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+        expect(error_msgs).to include(
+          a_string_including(
+            "react-on-rails-rsc 19.2.0-rc.4 requires react ^19.2.7",
+            "installed react is 19.0.7"
+          )
+        )
+        expect(warning_msgs).not_to include(a_string_including("behind the npm"))
+        expect(doctor).not_to have_received(:capture_rsc_dist_tags)
+      end
+
+      it "does not report peer compatibility success when peer checks are unexpectedly empty" do
+        rsc_package = {
+          "version" => "19.2.0-rc.4",
+          "peerDependencies" => { "react" => "^19.0.4" }
+        }
+        allow(doctor).to receive(:rsc_peer_check_results).and_return([])
+
+        result = doctor.send(:check_rsc_package_peer_compatibility, rsc_package, "19.0.7")
+
+        success_msgs = checker.messages.select { |m| m[:type] == :success }.map { |m| m[:content] }
+        expect(result).to be false
+        expect(success_msgs).not_to include(a_string_including("peer dependencies are compatible"))
+      end
+
+      it "reports an error when the declared RSC package cannot be resolved from node_modules" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.0.7",
+                  "react-on-rails-rsc" => "19.2.0-rc.4"
+                }
+              )
+            )
+            install_react("19.0.7")
+            stub_package_root(Dir.pwd)
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            expect(error_msgs).to include(
+              a_string_including(
+                "react-on-rails-rsc is declared in package.json but could not be resolved from node_modules",
+                "npm install"
+              )
+            )
+            expect(error_msgs.none? { |msg| msg.include?("requires react") }).to be true
+          end
+        end
+      end
+
+      it "keeps the React 19.0.4 security floor warning when broad RSC peer ranges allow older React" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.0.2",
+                  "react-dom" => "19.0.2",
+                  "react-on-rails-rsc" => "19.0.5"
+                }
+              )
+            )
+            install_react("19.0.2")
+            install_package("react-dom", "version" => "19.0.2")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.0.5",
+              "peerDependencies" => { "react" => "^19.0.0", "react-dom" => "^19.0.0" }
+            )
+            stub_package_root(Dir.pwd)
+            allow(doctor).to receive(:rsc_dist_tags).and_return({})
+
+            doctor.send(:check_rsc_react_version)
+
+            warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+            expect(warning_msgs).to include(a_string_including("security vulnerabilities fixed in 19.0.4+"))
+          end
+        end
+      end
+    end
+
+    context "when react-on-rails-rsc is behind the prerelease dist-tag" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.0.7",
+                  "react-dom" => "19.0.7",
+                  "react-on-rails-rsc" => "19.0.5"
+                }
+              )
+            )
+            install_react("19.0.7")
+            install_package("react-dom", "version" => "19.0.7")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.0.5",
+              "peerDependencies" => { "react" => "^19.0.4", "react-dom" => "^19.0.4" }
+            )
+            example.run
+          end
+        end
+      end
+
+      it "warns that the installed package is behind the next dist-tag" do
+        allow(doctor).to receive(:capture_rsc_dist_tags)
+          .with(Dir.pwd)
+          .and_return(
+            [
+              JSON.generate("latest" => "19.0.5", "next" => "19.2.0-rc.4"),
+              instance_double(Process::Status, success?: true)
+            ]
+          )
+
+        doctor.send(:check_rsc_react_version)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+        expect(warning_msgs).to include(
+          a_string_including(
+            "react-on-rails-rsc 19.0.5 is behind the npm next dist-tag 19.2.0-rc.4",
+            "React Server Components track React minor versions"
+          )
+        )
+      end
+
+      it "reports an info message once when the dist-tag lookup is unavailable" do
+        allow(doctor).to receive(:capture_rsc_dist_tags)
+          .with(Dir.pwd)
+          .and_return(["", instance_double(Process::Status, success?: false)])
+
+        doctor.send(:check_rsc_react_version)
+        doctor.send(:check_rsc_react_version)
+
+        info_msgs = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+        expect(
+          info_msgs.count { |msg| msg.include?("Could not fetch react-on-rails-rsc dist-tags") }
+        ).to eq(1)
+        expect(doctor).to have_received(:capture_rsc_dist_tags).with(Dir.pwd).once
+      end
+
+      it "skips the dist-tag lookup when the npm dist-tag check environment flag is set" do
+        old_skip = ENV.fetch(described_class::SKIP_NPM_DIST_TAG_CHECK_ENV, nil)
+        ENV[described_class::SKIP_NPM_DIST_TAG_CHECK_ENV] = "1"
+        allow(doctor).to receive(:capture_rsc_dist_tags)
+
+        doctor.send(:check_rsc_react_version)
+
+        info_msgs = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+        expect(info_msgs).to include(
+          a_string_including("Skipping react-on-rails-rsc npm dist-tag check")
+        )
+        expect(doctor).not_to have_received(:capture_rsc_dist_tags)
+      ensure
+        if old_skip.nil?
+          ENV.delete(described_class::SKIP_NPM_DIST_TAG_CHECK_ENV)
+        else
+          ENV[described_class::SKIP_NPM_DIST_TAG_CHECK_ENV] = old_skip
+        end
+      end
+
+      it "kills a stalled dist-tag subprocess and reports an info message" do
+        stub_const("ReactOnRails::Doctor::NPM_VIEW_FETCH_TIMEOUT_SECONDS", 0.1)
+        stub_const("ReactOnRails::Doctor::NPM_VIEW_TERMINATION_GRACE_SECONDS", 0.1)
+        allow(doctor).to receive(:rsc_dist_tag_command).and_return([Gem.ruby, "-e", "sleep 20"])
+
+        started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        doctor.send(:check_rsc_react_version)
+        elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
+
+        info_msgs = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+        expect(info_msgs).to include(a_string_including("Could not fetch react-on-rails-rsc dist-tags"))
+        expect(elapsed).to be < 2
+      end
+
+      it "cleans up the dist-tag subprocess when setup raises after spawn" do
+        allow(doctor).to receive(:rsc_dist_tag_command).and_return([Gem.ruby, "-e", "sleep 20"])
+        allow(doctor).to receive(:read_pipe_async).and_raise(IOError, "pipe setup failed")
+
+        expect(doctor).to receive(:terminate_rsc_dist_tag_process).and_call_original
+        expect { doctor.send(:capture_rsc_dist_tags, Dir.pwd) }.to raise_error(IOError, "pipe setup failed")
+      end
+
+      it "reports an info message when npm returns JSON that is not an object" do
+        allow(doctor).to receive(:capture_rsc_dist_tags)
+          .with(Dir.pwd)
+          .and_return(["null", instance_double(Process::Status, success?: true)])
+
+        doctor.send(:check_rsc_react_version)
+
+        info_msgs = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+        expect(info_msgs).to include(a_string_including("Could not fetch react-on-rails-rsc dist-tags"))
+      end
+    end
+
+    describe "RSC npm range parsing" do
+      it "supports npm hyphen ranges" do
+        expect(doctor.send(:npm_range_satisfied?, "19.1.0", "19.0.0 - 19.2.0"))
+          .to be true
+        expect(doctor.send(:npm_range_satisfied?, "19.3.0", "19.0.0 - 19.2.0"))
+          .to be false
+      end
+
+      it "uses npm tilde upper bounds for single-component versions" do
+        expect(doctor.send(:npm_range_satisfied?, "1.9.0", "~1")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "2.0.0", "~1")).to be false
+      end
+
+      it "supports npm partial x-range upper bounds" do
+        expect(doctor.send(:npm_range_satisfied?, "19.2.7", "19.x")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "20.0.0", "19.x")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.7", "19.2")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "19.3.0", "19.2")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.7", "19.2.x")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "19.3.0", "19.2.x")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.3.0", "^19.2")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "20.0.0", "^19.2")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "0.0.5", "^0.0.x")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "0.1.0", "^0.0.x")).to be false
+      end
+
+      it "excludes prereleases unless the range names the same prerelease tuple" do
+        expect(doctor.send(:npm_range_satisfied?, "1.0.0", "*")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "1.0.0-rc.1", "*")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "1.0.0-rc.1", "x")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "1.0.0-rc.1", "~*")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "^19.0.4")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", ">=19.0.4")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "19.x")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "19.0.4 - 20.0.0")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", ">=19.2.0-rc.0 <20.0.0")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "19.2.0-rc.0 - 20.0.0")).to be true
+      end
+    end
+
+    describe "installed package resolution" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "does not pass invalid package names to node resolution" do
+        allow(Open3).to receive(:capture3)
+
+        result = doctor.send(
+          :installed_package_json,
+          Dir.pwd,
+          "react'); require('child_process').execSync('echo unsafe'); require('react"
+        )
+
+        expect(result).to be_nil
+        expect(Open3).not_to have_received(:capture3)
+      end
+
+      it "rejects uppercase package names before node resolution" do
+        allow(Open3).to receive(:capture3)
+
+        result = doctor.send(:installed_package_json, Dir.pwd, "React")
+
+        expect(result).to be_nil
+        expect(Open3).not_to have_received(:capture3)
+      end
+
+      it "reports when node resolution fails before using the flat node_modules fallback" do
+        FileUtils.mkdir_p("node_modules/react")
+        File.write("node_modules/react/package.json", '{"version":"19.0.4"}')
+        allow(Open3).to receive(:capture3)
+          .and_return(
+            ["", "Cannot find module 'react/package.json'", instance_double(Process::Status, success?: false)]
+          )
+
+        result = doctor.send(:installed_package_json, Dir.pwd, "react")
+
+        expect(result.fetch("version")).to eq("19.0.4")
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("Node module resolution failed for react"))
+      end
+    end
+
     context "when React is installed in a configured nested JS workspace" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -5334,7 +5676,8 @@ RSpec.describe ReactOnRails::Doctor do
           .with(
             "node",
             "-e",
-            "console.log(require.resolve('react/package.json'))",
+            "console.log(require.resolve(process.argv[1] + '/package.json'))",
+            "react",
             chdir: package_root
           )
           .and_return(
@@ -5413,6 +5756,74 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "JSON output for RSC compatibility" do
+    let(:json_doctor) { described_class.new(format: :json) }
+    let(:checker) { json_doctor.instance_variable_get(:@checker) }
+    let(:pro_config) do
+      double(
+        "ProConfig",
+        enable_rsc_support: true,
+        server_renderer: "NodeRenderer",
+        rsc_bundle_js_file: "rsc-bundle.js",
+        rsc_payload_generation_url_path: "rsc_payload/"
+      )
+    end
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) do
+          FileUtils.mkdir_p("config/webpack")
+          File.write("config/routes.rb", "Rails.application.routes.draw do\n  rsc_payload_route\nend")
+          File.write("config/webpack/rscWebpackConfig.js", "{}")
+          File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
+          File.write(
+            "package.json",
+            JSON.generate(
+              "dependencies" => {
+                "react" => "19.0.7",
+                "react-dom" => "19.0.7",
+                "react-on-rails-rsc" => "19.2.0-rc.4"
+              }
+            )
+          )
+          install_package("react", "version" => "19.0.7")
+          install_package("react-dom", "version" => "19.0.7")
+          install_package(
+            "react-on-rails-rsc",
+            "version" => "19.2.0-rc.4",
+            "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
+          )
+          example.run
+        end
+      end
+    end
+
+    before do
+      described_class::CHECK_SECTIONS.each do |section|
+        allow(json_doctor).to receive(section[:method])
+      end
+      allow(json_doctor).to receive(:check_rsc_setup).and_call_original
+      allow(json_doctor).to receive(:ensure_rails_environment_loaded)
+      allow(json_doctor).to receive(:resolved_package_root).and_return(Dir.pwd)
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
+    end
+
+    it "includes RSC peer compatibility failures in the react_server_components check" do
+      output = []
+      allow(json_doctor).to receive(:exit)
+      allow(json_doctor).to receive(:puts) { |arg| output << arg.to_s }
+
+      json_doctor.run_diagnosis
+
+      report = JSON.parse(output.join("\n"))
+      rsc_check = report["checks"].find { |check| check["id"] == "react_server_components" }
+      expect(rsc_check["status"]).to eq("fail")
+      expect(rsc_check["message"]).to include("react-on-rails-rsc 19.2.0-rc.4 requires react ^19.2.7")
+      expect(report["status"]).to eq("fail")
+    end
+  end
+
   describe "check_rsc_procfile_watcher" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
@@ -5481,6 +5892,132 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("Procfile.dev not found") }).to be true
       end
+    end
+  end
+
+  describe "check_rsc_client_manifest" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    before do
+      stub_const("ReactOnRailsPro", Module.new)
+      ReactOnRailsPro.const_set(:Utils, Module.new)
+      ReactOnRailsPro::Utils.define_singleton_method(:react_client_manifest_file_path) { nil }
+      allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
+        .and_return(File.expand_path("public/packs/react-client-manifest.json"))
+    end
+
+    it "reports an info message when the installed Pro API is too old for manifest path resolution" do
+      stub_const("ReactOnRailsPro::Utils", Module.new)
+
+      doctor.send(:check_rsc_client_manifest)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(info_messages).to include(a_string_including("upgrade react-on-rails-pro to enable it"))
+      expect(warning_messages).not_to include(a_string_including("RSC client manifest path could not be resolved"))
+    end
+
+    it "warns when the installed Pro API resolves a nil manifest path" do
+      allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path).and_return(nil)
+
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client manifest path could not be resolved"))
+    end
+
+    it "warns when the RSC client manifest resolves to a dev-server URL" do
+      allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
+        .and_return("http://localhost:3035/packs/react-client-manifest.json")
+
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("dev-server URL"))
+      expect(info_messages).to include(a_string_including("bin/dev static"))
+    end
+
+    it "warns when the RSC client manifest file is missing" do
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client manifest not found"))
+      expect(info_messages).to include(a_string_including("bin/dev static"))
+    end
+
+    it "warns with rebuild guidance when the RSC client manifest is invalid JSON" do
+      FileUtils.mkdir_p("public/packs")
+      File.write("public/packs/react-client-manifest.json", "{not-json")
+
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client manifest is not valid JSON"))
+      expect(info_messages).to include(a_string_including("bin/dev static"))
+      expect(info_messages).to include(a_string_including("public/packs"))
+    end
+
+    it "warns when the RSC client manifest is missing client reference metadata" do
+      FileUtils.mkdir_p("public/packs")
+      File.write(
+        "public/packs/react-client-manifest.json",
+        JSON.generate("moduleLoading" => { "prefix" => "", "crossOrigin" => nil })
+      )
+
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("RSC client manifest is missing filePathToModuleMetadata")
+      )
+    end
+
+    it "warns when the RSC client manifest has no client reference metadata" do
+      FileUtils.mkdir_p("public/packs")
+      File.write(
+        "public/packs/react-client-manifest.json",
+        JSON.generate("moduleLoading" => { "prefix" => "", "crossOrigin" => nil }, "filePathToModuleMetadata" => {})
+      )
+
+      doctor.send(:check_rsc_client_manifest)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("RSC client manifest has no client reference metadata")
+      )
+      expect(info_messages).to include(a_string_including("bin/dev static"))
+      expect(info_messages).to include(a_string_including("public/packs"))
+      expect(info_messages).to include(a_string_including("ssr-generated"))
+      expect(info_messages).to include(a_string_including(".node-renderer-bundles"))
+    end
+
+    it "reports success when the RSC client manifest has client reference metadata" do
+      FileUtils.mkdir_p("public/packs")
+      File.write(
+        "public/packs/react-client-manifest.json",
+        JSON.generate(
+          "filePathToModuleMetadata" => {
+            "/app/client/Button.jsx" => { "id" => "Button", "chunks" => [], "name" => "default" }
+          }
+        )
+      )
+
+      doctor.send(:check_rsc_client_manifest)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("RSC client manifest includes 1 client reference"))
+      expect(checker.messages.none? { |msg| msg[:type] == :warning }).to be true
     end
   end
   # rubocop:enable RSpec/VerifiedDoubles

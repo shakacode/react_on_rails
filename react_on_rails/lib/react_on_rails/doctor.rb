@@ -3470,6 +3470,23 @@ module ReactOnRails
       config/webpack/rscWebpackConfig.js
       config/rspack/rscWebpackConfig.js
     ].freeze
+    RSC_PACKAGE_NAME = "react-on-rails-rsc"
+    RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
+    NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
+    NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
+    NPM_VIEW_TERMINATION_GRACE_SECONDS = 0.5
+    SKIP_NPM_DIST_TAG_CHECK_ENV = "REACT_ON_RAILS_SKIP_NPM_DIST_TAG_CHECK"
+    # npm registry package names used here must be lowercase; keep this allowlist
+    # narrow so names remain safe when reused as Node resolver args and paths.
+    PACKAGE_NAME_PATTERN = %r{
+      \A
+      (?:@[a-z0-9][a-z0-9._-]*/)?
+      [a-z0-9][a-z0-9._-]*
+      \z
+    }x
+    # Keep in sync with RSC_CLIENT_MANIFEST_GUIDANCE in
+    # packages/react-on-rails-pro/src/handleErrorRSC.ts.
+    RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
 
     def check_rsc_setup
       return unless ReactOnRails::Utils.react_on_rails_pro?
@@ -3487,6 +3504,7 @@ module ReactOnRails
       check_rsc_bundler_config
       check_rsc_react_version
       check_rsc_procfile_watcher
+      check_rsc_client_manifest
     rescue StandardError => e
       checker.add_warning("⚠️  RSC setup check encountered an error: #{e.message}")
     end
@@ -3551,7 +3569,6 @@ module ReactOnRails
       end
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity
     def check_rsc_react_version
       react_version = detect_react_version_from_deps
       unless react_version
@@ -3559,6 +3576,13 @@ module ReactOnRails
         return
       end
 
+      package_root = resolved_package_root
+      return if check_rsc_package_compatibility_if_present(package_root, react_version)
+
+      check_legacy_rsc_react_version(react_version)
+    end
+
+    def check_legacy_rsc_react_version(react_version)
       major, minor, patch = react_version.split(".").map(&:to_i)
 
       if major == 19 && minor.zero? && patch >= 4
@@ -3587,7 +3611,548 @@ module ReactOnRails
         MSG
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
+
+    def check_rsc_package_compatibility_if_present(package_root, react_version)
+      return false unless declared_package_spec(RSC_PACKAGE_NAME)
+
+      rsc_package = installed_package_json(package_root, RSC_PACKAGE_NAME)
+      unless rsc_package
+        checker.add_error(<<~MSG.strip)
+          🚫 #{RSC_PACKAGE_NAME} is declared in package.json but could not be resolved from node_modules.
+
+          React Server Components require the installed #{RSC_PACKAGE_NAME} package to validate React peer compatibility.
+
+          Fix: install dependencies in the JavaScript package root, for example:
+            npm install
+        MSG
+        return true
+      end
+
+      unless rsc_package_declares_react_peer_dependencies?(rsc_package)
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  #{RSC_PACKAGE_NAME} #{rsc_package['version']} does not declare React peer dependencies.
+
+          Falling back to the legacy React version heuristic.
+        MSG
+        return false
+      end
+
+      peer_compatible = check_rsc_package_peer_compatibility(rsc_package, react_version)
+
+      if peer_compatible && vulnerable_legacy_rsc_react_version?(react_version)
+        check_legacy_rsc_react_version(react_version)
+      end
+      check_rsc_package_dist_tags(rsc_package, package_root) if peer_compatible
+      true
+    end
+
+    def vulnerable_legacy_rsc_react_version?(react_version)
+      major, minor, patch = react_version.split(".").map(&:to_i)
+      major == 19 && minor.zero? && patch < 4
+    end
+
+    def rsc_package_declares_react_peer_dependencies?(rsc_package)
+      peer_dependencies = rsc_package["peerDependencies"] || {}
+      peer_dependencies["react"].present? || peer_dependencies["react-dom"].present?
+    end
+
+    def check_rsc_package_peer_compatibility(rsc_package, react_version)
+      rsc_version = rsc_package["version"].to_s
+      peer_dependencies = rsc_package["peerDependencies"] || {}
+      react_peer_range = peer_dependencies["react"]
+      react_dom_peer_range = peer_dependencies["react-dom"]
+
+      peer_checks = rsc_peer_check_results(
+        react_version:,
+        react_peer_range:,
+        react_dom_peer_range:,
+        rsc_version:
+      )
+      return false if peer_checks.empty?
+
+      if peer_checks.all?
+        checker.add_success(
+          "✅ #{RSC_PACKAGE_NAME} #{rsc_version} peer dependencies are compatible with React #{react_version}"
+        )
+        true
+      else
+        false
+      end
+    end
+
+    def rsc_peer_check_results(react_version:, react_peer_range:, react_dom_peer_range:, rsc_version:)
+      results = []
+      if react_peer_range.present?
+        results << check_rsc_peer_package(
+          package_name: "react",
+          installed_version: react_version,
+          peer_range: react_peer_range,
+          rsc_version:
+        )
+      end
+      if react_dom_peer_range.present?
+        results << check_rsc_peer_package(
+          package_name: "react-dom",
+          installed_version: detect_package_version_from_deps("react-dom"),
+          peer_range: react_dom_peer_range,
+          rsc_version:
+        )
+      end
+      results
+    end
+
+    def check_rsc_peer_package(package_name:, installed_version:, peer_range:, rsc_version:)
+      unless installed_version
+        checker.add_error(<<~MSG.strip)
+          🚫 #{RSC_PACKAGE_NAME} #{rsc_version} requires #{package_name} #{peer_range}, but #{package_name} is not installed or could not be detected.
+
+          Fix: install #{package_name} in the JavaScript package root configured by ReactOnRails.configuration.node_modules_location.
+        MSG
+        return false
+      end
+
+      return true if npm_range_satisfied?(installed_version, peer_range)
+
+      checker.add_error(<<~MSG.strip)
+        🚫 #{RSC_PACKAGE_NAME} #{rsc_version} requires #{package_name} #{peer_range}, but installed #{package_name} is #{installed_version}.
+
+        React Server Components depend on React internal server APIs that can change between React minors.
+
+        Fix: install matching versions, for example:
+          npm install #{package_name}@#{peer_range} #{RSC_PACKAGE_NAME}@#{rsc_version} --save-exact
+      MSG
+      false
+    end
+
+    def check_rsc_package_dist_tags(rsc_package, package_root)
+      if ENV[SKIP_NPM_DIST_TAG_CHECK_ENV].present?
+        checker.add_info(
+          "  ℹ️  Skipping #{RSC_PACKAGE_NAME} npm dist-tag check because #{SKIP_NPM_DIST_TAG_CHECK_ENV} is set"
+        )
+        return
+      end
+
+      installed_version = rsc_package["version"].to_s
+      return if installed_version.blank?
+
+      rsc_dist_tags(package_root).each do |tag, tag_version|
+        next unless RSC_DIST_TAGS_TO_CHECK.include?(tag)
+        next unless npm_version_greater?(tag_version, installed_version)
+
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  #{RSC_PACKAGE_NAME} #{installed_version} is behind the npm #{tag} dist-tag #{tag_version}.
+
+          React Server Components track React minor versions. If your React version is on the #{tag_version.split('.')[0, 2].join('.')} line, install the matching RSC package instead of relying on a stale latest tag.
+
+          Check peer requirements with:
+            npm view #{RSC_PACKAGE_NAME}@#{tag_version} peerDependencies
+        MSG
+      end
+    end
+
+    def rsc_dist_tags(package_root)
+      @rsc_dist_tags_cache ||= {}
+      return @rsc_dist_tags_cache[package_root] if @rsc_dist_tags_cache.key?(package_root)
+
+      @rsc_dist_tags_cache[package_root] = fetch_rsc_dist_tags(package_root)
+    end
+
+    def fetch_rsc_dist_tags(package_root)
+      checker.add_info("  ℹ️  Checking #{RSC_PACKAGE_NAME} npm dist-tags to flag stale RSC pins")
+      stdout, status = capture_rsc_dist_tags(package_root)
+      unless status&.success?
+        report_rsc_dist_tag_lookup_skipped(package_root)
+        return {}
+      end
+
+      tags = JSON.parse(stdout)
+      return tags if tags.is_a?(Hash)
+
+      report_rsc_dist_tag_lookup_skipped(package_root)
+      {}
+    rescue StandardError
+      report_rsc_dist_tag_lookup_skipped(package_root)
+      {}
+    end
+
+    def report_rsc_dist_tag_lookup_skipped(package_root)
+      @rsc_dist_tag_lookup_skipped_reported ||= {}
+      return if @rsc_dist_tag_lookup_skipped_reported[package_root]
+
+      checker.add_info("  ℹ️  Could not fetch #{RSC_PACKAGE_NAME} dist-tags from npm; skipping stale-tag check")
+      @rsc_dist_tag_lookup_skipped_reported[package_root] = true
+    end
+
+    def capture_rsc_dist_tags(package_root)
+      stdout_r, stdout_w = IO.pipe
+      stderr_r, stderr_w = IO.pipe
+      stdout_thread = nil
+      stderr_thread = nil
+      pid = nil
+      process_reaped = false
+
+      begin
+        pid = Process.spawn(*rsc_dist_tag_command, chdir: package_root, out: stdout_w, err: stderr_w, pgroup: true)
+        stdout_w.close
+        stdout_w = nil
+        stderr_w.close
+        stderr_w = nil
+
+        stdout_thread = read_pipe_async(stdout_r)
+        stderr_thread = read_pipe_async(stderr_r)
+        status = wait_for_rsc_dist_tag_process(pid)
+        # wait_for_rsc_dist_tag_process reaps the process or confirms it is gone.
+        process_reaped = true
+        if status
+          stdout = stdout_thread.value
+          stderr_thread.value
+        else
+          close_io(stdout_r)
+          close_io(stderr_r)
+          stdout = ""
+        end
+
+        [stdout, status]
+      ensure
+        close_io(stdout_w)
+        close_io(stderr_w)
+        close_io(stdout_r)
+        close_io(stderr_r)
+        stdout_thread&.join(0.1)
+        stderr_thread&.join(0.1)
+        cleanup_rsc_dist_tag_process(pid, process_reaped)
+      end
+    end
+
+    def cleanup_rsc_dist_tag_process(pid, process_reaped)
+      return if pid.nil? || process_reaped
+
+      terminate_rsc_dist_tag_process(pid)
+    end
+
+    def rsc_dist_tag_command
+      [
+        "npm",
+        "view",
+        RSC_PACKAGE_NAME,
+        "dist-tags",
+        "--json",
+        "--fetch-timeout=#{NPM_VIEW_FETCH_TIMEOUT_MS}"
+      ]
+    end
+
+    def read_pipe_async(pipe)
+      thread = Thread.new do
+        pipe.read
+      rescue IOError, SystemCallError
+        ""
+      end
+      thread.report_on_exception = false if thread.respond_to?(:report_on_exception=)
+      thread
+    end
+
+    def wait_for_rsc_dist_tag_process(pid)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + NPM_VIEW_FETCH_TIMEOUT_SECONDS
+      loop do
+        _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
+        return status if status
+
+        if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+          terminate_rsc_dist_tag_process(pid)
+          return nil
+        end
+
+        sleep 0.05
+      end
+    rescue Errno::ECHILD, Errno::ESRCH
+      nil
+    end
+
+    def terminate_rsc_dist_tag_process(pid)
+      signal_rsc_dist_tag_process("TERM", pid)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + NPM_VIEW_TERMINATION_GRACE_SECONDS
+      loop do
+        _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
+        return if status || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+
+        sleep 0.05
+      end
+
+      signal_rsc_dist_tag_process("KILL", pid)
+      Process.wait(pid)
+    rescue Errno::ECHILD, Errno::ESRCH
+      nil
+    end
+
+    def signal_rsc_dist_tag_process(signal, pid)
+      Process.kill(signal, -pid)
+    rescue Errno::ESRCH
+      Process.kill(signal, pid)
+    end
+
+    def close_io(io)
+      io.close if io && !io.closed?
+    rescue IOError
+      nil
+    end
+
+    def npm_range_satisfied?(version, range)
+      range.to_s.split("||").any? do |range_clause|
+        npm_range_clause_satisfied?(version, range_clause.strip)
+      end
+    end
+
+    def npm_range_clause_satisfied?(version, range_clause)
+      return false if range_clause.blank?
+      return npm_prerelease(version).blank? if range_clause.match?(/\A[~^]?\s*[*xX](?:\.[*xX]){0,2}\z/)
+
+      hyphen_range_satisfied = npm_hyphen_range_result(version, range_clause)
+      return hyphen_range_satisfied unless hyphen_range_satisfied.nil?
+
+      x_range_satisfied = npm_x_range_result(version, range_clause)
+      return x_range_satisfied unless x_range_satisfied.nil?
+
+      npm_comparators_range_result(version, range_clause)
+    end
+
+    def npm_comparators_range_result(version, range_clause)
+      comparators = range_clause.scan(/(?:>=|<=|>|<|=|\^|~)?\s*v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?/)
+      return false if comparators.empty?
+
+      target_versions = comparators.map { |comparator| npm_comparator_target_version(comparator.strip) }
+      return false unless npm_prerelease_allowed_by_versions?(version, target_versions)
+
+      comparators.all? { |comparator| npm_comparator_satisfied?(version, comparator.strip) }
+    end
+
+    def npm_x_range_result(version, range_clause)
+      match = npm_x_range_match(range_clause)
+      return nil unless match
+      return false if npm_prerelease(version).present?
+
+      segments = [match[:major], match[:minor], match[:patch]]
+      wildcard_index = segments.index { |segment| npm_wildcard_version_segment?(segment) }
+      return nil unless wildcard_index
+      return true if wildcard_index.zero?
+
+      major = segments[0].to_i
+      minor = wildcard_index >= 2 ? segments[1].to_i : 0
+      lower_bound = "#{major}.#{minor}.0"
+      upper_bound = npm_x_range_upper_bound(match[:operator], wildcard_index, major, minor, lower_bound)
+
+      npm_version_compare(version, lower_bound) >= 0 && npm_version_less_than?(version, upper_bound)
+    end
+
+    def npm_x_range_match(range_clause)
+      range_clause.match(
+        /
+          \A\s*
+          (?<operator>[=~^]?)\s*
+          v?
+          (?<major>\d+|[*xX])
+          (?:\.(?<minor>\d+|[*xX]))?
+          (?:\.(?<patch>\d+|[*xX]))?
+          \s*\z
+        /x
+      )
+    end
+
+    def npm_wildcard_version_segment?(segment)
+      segment.blank? || segment.match?(/\A[*xX]\z/)
+    end
+
+    def npm_x_range_upper_bound(operator, wildcard_index, major, minor, lower_bound)
+      return npm_caret_x_range_upper_bound(wildcard_index, major, minor, lower_bound) if operator == "^"
+      return "#{major + 1}.0.0" if wildcard_index == 1
+
+      "#{major}.#{minor + 1}.0"
+    end
+
+    def npm_caret_x_range_upper_bound(wildcard_index, major, minor, lower_bound)
+      if wildcard_index == 1
+        return major.positive? ? "#{major + 1}.0.0" : "1.0.0"
+      end
+      return "#{major}.#{minor + 1}.0" if wildcard_index == 2 && major.zero? && minor.zero?
+
+      npm_caret_upper_bound(lower_bound)
+    end
+
+    def npm_hyphen_range_result(version, range_clause)
+      match = range_clause.match(
+        /
+          \A\s*
+          (?<lower>v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?)
+          \s+-\s*
+          (?<upper>v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?)
+          \s*\z
+        /x
+      )
+      return nil unless match
+      return false unless npm_prerelease_allowed_by_versions?(version, [match[:lower], match[:upper]])
+
+      npm_version_compare(version, npm_normalize_partial_version(match[:lower])) >= 0 &&
+        npm_hyphen_upper_bound_satisfied?(version, match[:upper])
+    end
+
+    def npm_hyphen_upper_bound_satisfied?(version, upper_bound)
+      normalized_upper_bound = npm_normalize_partial_version(upper_bound)
+      if npm_version_segment_count(upper_bound) >= 3 || npm_prerelease(upper_bound).present?
+        npm_version_compare(version, normalized_upper_bound) <= 0
+      else
+        npm_version_less_than?(version, npm_partial_upper_bound(upper_bound))
+      end
+    end
+
+    def npm_comparator_satisfied?(version, comparator)
+      operator = comparator[/\A(?:>=|<=|>|<|=|\^|~)/] || "="
+      target_version = npm_comparator_target_version(comparator)
+      comparison = npm_version_compare(version, target_version)
+
+      case operator
+      when "^"
+        comparison >= 0 &&
+          npm_version_less_than?(version, npm_caret_upper_bound(target_version))
+      when "~"
+        comparison >= 0 &&
+          npm_version_less_than?(version, npm_tilde_upper_bound(target_version))
+      else
+        npm_plain_comparator_satisfied?(comparison, operator)
+      end
+    end
+
+    def npm_comparator_target_version(comparator)
+      comparator.sub(/\A(?:>=|<=|>|<|=|\^|~)\s*/, "")
+    end
+
+    def npm_prerelease_allowed_by_versions?(version, target_versions)
+      return true if npm_prerelease(version).blank?
+
+      version_tuple = npm_version_tuple(version)
+      target_versions.any? do |target_version|
+        npm_prerelease(target_version).present? && npm_version_tuple(target_version) == version_tuple
+      end
+    end
+
+    def npm_plain_comparator_satisfied?(comparison, operator)
+      case operator
+      when ">="
+        comparison >= 0
+      when ">"
+        comparison.positive?
+      when "<="
+        comparison <= 0
+      when "<"
+        comparison.negative?
+      else
+        comparison.zero?
+      end
+    end
+
+    def npm_caret_upper_bound(version)
+      major, minor, patch = npm_version_tuple(version)
+      if major.positive?
+        "#{major + 1}.0.0"
+      elsif minor.positive?
+        "0.#{minor + 1}.0"
+      else
+        "0.0.#{patch + 1}"
+      end
+    end
+
+    def npm_tilde_upper_bound(version)
+      major, minor, = npm_version_tuple(version)
+      return "#{major}.#{minor + 1}.0" if npm_version_segment_count(version) > 1
+
+      "#{major + 1}.0.0"
+    end
+
+    def npm_partial_upper_bound(version)
+      major, minor, = npm_version_tuple(version)
+      return "#{major + 1}.0.0" if npm_version_segment_count(version) <= 1
+
+      "#{major}.#{minor + 1}.0"
+    end
+
+    def npm_version_greater?(left, right)
+      npm_version_compare(left, right).positive?
+    end
+
+    def npm_version_less_than?(left, right)
+      npm_version_compare(left, right).negative?
+    end
+
+    def npm_version_compare(left, right)
+      left_tuple = npm_version_tuple(left)
+      right_tuple = npm_version_tuple(right)
+
+      left_tuple.zip(right_tuple).each do |left_part, right_part|
+        comparison = left_part <=> right_part
+        return comparison unless comparison.zero?
+      end
+
+      npm_prerelease_compare(npm_prerelease(left), npm_prerelease(right))
+    end
+
+    def npm_version_tuple(version)
+      core = npm_version_core(version)
+      parts = core.split(".").map(&:to_i)
+      [parts[0] || 0, parts[1] || 0, parts[2] || 0]
+    end
+
+    def npm_normalize_partial_version(version)
+      major, minor, patch = npm_version_tuple(version)
+      prerelease = npm_prerelease(version)
+      suffix = prerelease.present? ? "-#{prerelease}" : ""
+      "#{major}.#{minor}.#{patch}#{suffix}"
+    end
+
+    def npm_version_segment_count(version)
+      core = npm_version_core(version)
+      return 0 if core.blank?
+
+      core.split(".").length
+    end
+
+    def npm_version_core(version)
+      version.to_s
+             .delete_prefix("v")
+             .split("+", 2).first.to_s
+             .split("-", 2).first.to_s
+    end
+
+    def npm_prerelease(version)
+      version.to_s.split("+", 2).first.to_s.split("-", 2)[1].to_s
+    end
+
+    def npm_prerelease_compare(left, right)
+      return 0 if left == right
+      return 1 if left.blank?
+      return -1 if right.blank?
+
+      npm_prerelease_segments_compare(left.split("."), right.split("."))
+    end
+
+    def npm_prerelease_segments_compare(left_parts, right_parts)
+      [left_parts.length, right_parts.length].max.times do |index|
+        left_part = left_parts[index]
+        right_part = right_parts[index]
+        return -1 if left_part.nil?
+        return 1 if right_part.nil?
+
+        comparison = npm_prerelease_part_compare(left_part, right_part)
+        return comparison unless comparison.zero?
+      end
+
+      0
+    end
+
+    def npm_prerelease_part_compare(left_part, right_part)
+      if left_part.match?(/\A\d+\z/) && right_part.match?(/\A\d+\z/)
+        left_part.to_i <=> right_part.to_i
+      else
+        left_part <=> right_part
+      end
+    end
 
     def detect_react_version_from_deps
       # Prefer the actually installed version from node_modules over the declared
@@ -3610,20 +4175,68 @@ module ReactOnRails
     end
 
     def installed_react_version(package_root)
-      # Use Node's own module resolution to find the actually installed React,
-      # which handles hoisted dependencies in monorepos and pnpm workspaces.
-      # Resolve from the configured package root so nested client/ layouts work.
-      script = "console.log(require.resolve('react/package.json'))"
-      stdout, _stderr, status = Open3.capture3("node", "-e", script, chdir: package_root)
-      return nil unless status.success?
+      installed_package_version(package_root, "react")
+    end
 
-      resolved_path = stdout.strip
-      return nil if resolved_path.empty? || !File.exist?(resolved_path)
+    def detect_package_version_from_deps(package_name)
+      package_root = resolved_package_root
+      return nil if package_root_missing?(package_root)
 
-      version = JSON.parse(File.read(resolved_path))["version"]
-      version if version&.match?(/\A\d+\.\d+\.\d+/)
+      installed_package_version(package_root, package_name) || declared_package_version(package_name)
     rescue StandardError
       nil
+    end
+
+    def installed_package_version(package_root, package_name)
+      version = installed_package_json(package_root, package_name)&.fetch("version", nil)
+      version if version&.match?(/\A\d+\.\d+\.\d+/)
+    end
+
+    def installed_package_json(package_root, package_name)
+      # Use Node's own module resolution to find the actually installed package,
+      # which handles hoisted dependencies in monorepos and pnpm workspaces.
+      # Resolve from the configured package root so nested client/ layouts work.
+      return nil unless valid_package_name?(package_name)
+
+      script = "console.log(require.resolve(process.argv[1] + '/package.json'))"
+      resolved_path = resolved_node_package_json_path(package_root, package_name, script)
+      # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
+      # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.
+      # Limitation: a stale orphaned directory can still be read if Node resolution fails.
+      resolved_path = File.join(package_root, "node_modules", package_name, "package.json") if resolved_path.empty?
+      return nil if resolved_path.empty? || !File.exist?(resolved_path)
+
+      JSON.parse(File.read(resolved_path))
+    rescue StandardError
+      nil
+    end
+
+    def valid_package_name?(package_name)
+      package_name.to_s.match?(PACKAGE_NAME_PATTERN)
+    end
+
+    def resolved_node_package_json_path(package_root, package_name, script)
+      stdout, _stderr, status = Open3.capture3("node", "-e", script, package_name, chdir: package_root)
+      unless status.success?
+        report_node_package_resolution_failed(package_name)
+        return ""
+      end
+
+      stdout.strip
+    rescue StandardError
+      report_node_package_resolution_failed(package_name)
+      ""
+    end
+
+    def report_node_package_resolution_failed(package_name)
+      @node_package_resolution_failed_reported ||= {}
+      return if @node_package_resolution_failed_reported[package_name]
+
+      checker.add_info(
+        "  ℹ️  Node module resolution failed for #{package_name}; " \
+        "falling back to classic flat node_modules lookup"
+      )
+      @node_package_resolution_failed_reported[package_name] = true
     end
 
     def add_warning(message)
@@ -3640,18 +4253,123 @@ module ReactOnRails
     end
 
     def declared_react_version
-      package_json_path = package_json_path_for("declared React version")
-      return nil unless package_json_path
+      declared_package_version("react")
+    end
 
-      package_json = JSON.parse(File.read(package_json_path))
-      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
-      version_str = all_deps["react"]
+    def declared_package_version(package_name)
+      version_str = declared_package_spec(package_name)
       return nil unless version_str
 
       clean_version = version_str.gsub(/\A[^0-9]*/, "")
       clean_version if clean_version.match?(/\A\d+\.\d+\.\d+\z/)
     rescue StandardError
       nil
+    end
+
+    def declared_package_spec(package_name)
+      package_label = package_name == "react" ? "React" : package_name
+      package_json_path = package_json_path_for("declared #{package_label} version")
+      return nil unless package_json_path
+
+      package_json = parsed_package_json(package_json_path)
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
+      all_deps[package_name]
+    rescue StandardError
+      nil
+    end
+
+    def parsed_package_json(package_json_path)
+      @parsed_package_json_cache ||= {}
+      @parsed_package_json_cache[package_json_path] ||= JSON.parse(File.read(package_json_path))
+    end
+
+    def check_rsc_client_manifest
+      manifest_path = rsc_client_manifest_file_path
+      unless manifest_path
+        report_unresolved_rsc_client_manifest_path
+        return
+      end
+
+      if manifest_url?(manifest_path)
+        report_rsc_client_manifest_dev_server_url(manifest_path)
+        return
+      end
+
+      unless File.exist?(manifest_path)
+        report_missing_rsc_client_manifest(manifest_path)
+        return
+      end
+
+      report_rsc_client_manifest_metadata(manifest_path)
+    rescue JSON::ParserError => e
+      checker.add_warning("⚠️  RSC client manifest is not valid JSON: #{e.message}")
+      add_rsc_client_manifest_static_mode_guidance
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not inspect RSC client manifest: #{e.message}")
+    end
+
+    def rsc_client_manifest_file_path
+      return nil unless defined?(ReactOnRailsPro::Utils)
+      return nil unless ReactOnRailsPro::Utils.respond_to?(:react_client_manifest_file_path)
+
+      ReactOnRailsPro::Utils.react_client_manifest_file_path
+    end
+
+    def report_unresolved_rsc_client_manifest_path
+      if defined?(ReactOnRailsPro::Utils) && !ReactOnRailsPro::Utils.respond_to?(:react_client_manifest_file_path)
+        checker.add_info("  ℹ️  RSC client manifest check skipped — upgrade react-on-rails-pro to enable it")
+      else
+        checker.add_warning("⚠️  RSC client manifest path could not be resolved — cannot verify client references")
+      end
+    end
+
+    def manifest_url?(manifest_path)
+      manifest_path.to_s.match?(%r{\Ahttps?://})
+    end
+
+    def report_rsc_client_manifest_dev_server_url(manifest_path)
+      checker.add_warning("⚠️  RSC client manifest resolves to a dev-server URL: #{manifest_path}")
+      add_rsc_client_manifest_static_mode_guidance
+    end
+
+    def report_missing_rsc_client_manifest(manifest_path)
+      checker.add_warning("⚠️  RSC client manifest not found at #{manifest_path}")
+      add_rsc_client_manifest_static_mode_guidance
+    end
+
+    def report_rsc_client_manifest_metadata(manifest_path)
+      manifest_metadata = rsc_client_manifest_metadata(manifest_path)
+      if manifest_metadata.nil?
+        checker.add_warning("⚠️  RSC client manifest is missing filePathToModuleMetadata: #{manifest_path}")
+      elsif manifest_metadata.empty?
+        report_empty_rsc_client_manifest(manifest_path)
+      else
+        checker.add_success(
+          "✅ RSC client manifest includes #{manifest_metadata.size} client reference metadata entries"
+        )
+      end
+    end
+
+    def report_empty_rsc_client_manifest(manifest_path)
+      checker.add_warning(
+        "⚠️  RSC client manifest has no client reference metadata: #{manifest_path}"
+      )
+      add_rsc_client_manifest_static_mode_guidance
+    end
+
+    def rsc_client_manifest_metadata(manifest_path)
+      manifest = JSON.parse(File.read(manifest_path))
+      metadata = manifest["filePathToModuleMetadata"]
+      metadata if metadata.is_a?(Hash)
+    end
+
+    def add_rsc_client_manifest_static_mode_guidance
+      checker.add_info("  💡 For RSC development, run: ./bin/dev static")
+      checker.add_info(
+        "  💡 If this followed an in-place package or React upgrade, stop the dev server and remove: " \
+        "#{RSC_CLIENT_MANIFEST_CLEANUP_PATHS.join(', ')}"
+      )
+      checker.add_info("  💡 Then rebuild so the Node renderer reads a fresh on-disk React Client Manifest")
     end
 
     def check_rsc_procfile_watcher

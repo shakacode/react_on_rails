@@ -26,6 +26,21 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **RSC doctor now catches stale install and client-manifest setup failures**:
+  The doctor now validates installed `react-on-rails-rsc` peer requirements
+  against `react` and `react-dom`, warns when the installed RSC package is
+  behind newer prerelease npm dist-tags, and reports missing, dev-server-backed,
+  invalid, or empty RSC client manifests with `bin/dev static` and clean rebuild
+  guidance. Pro RSC render errors that fail to resolve a React Client Manifest
+  module now include the same stale/empty/cross-version manifest hint instead of
+  leaving the upstream "probably a bug in the RSC bundler" text as the only clue.
+  Fixes [Issue 4198](https://github.com/shakacode/react_on_rails/issues/4198)
+  and [Issue 4200](https://github.com/shakacode/react_on_rails/issues/4200);
+  addresses [Issue 4199](https://github.com/shakacode/react_on_rails/issues/4199)
+  and scopes [Issue 4204](https://github.com/shakacode/react_on_rails/issues/4204).
+  [PR 4213](https://github.com/shakacode/react_on_rails/pull/4213) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **ScoutApm Node renderer instrumentation no longer depends on Gemfile load order**: Pro now installs `NodeRenderingPool.exec_server_render_js` instrumentation from a Rails engine initializer that runs after `scout_apm.start`, instead of checking `defined?(ScoutApm)` at class load time. Apps without ScoutApm still boot normally, and apps that load `scout_apm` after `react_on_rails_pro` no longer silently skip the Pro Node renderer span. Fixes [Issue 4208](https://github.com/shakacode/react_on_rails/issues/4208). [PR 4210](https://github.com/shakacode/react_on_rails/pull/4210) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **RSCProvider now evicts a rejected `getComponent` promise so transient failures can retry**: When the underlying RSC fetch for `getComponent` rejected — a transient renderer/network/deploy failure — the rejected promise stayed in the provider's bounded payload cache, so every later same-key `getComponent` returned that cached rejection and the RSC route/component stayed wedged in its error state even after the backend recovered; only an explicit `refetchComponent` or a full reload cleared it. `getComponent` now attaches a rejection handler that re-throws (so React's Suspense machinery still observes the failure) and evicts the cached entry one macrotask later, guarded on promise identity so a newer same-key `getComponent`/`refetchComponent` started in that window is never evicted by the stale failure. Pins are preserved so the existing `.finally()` still owns the matching unpin. Payloads that _resolve_ with an `Error` value are intentionally left cached — that retryability is a separate `getServerComponent` contract decision. Fixes [Issue 3929](https://github.com/shakacode/react_on_rails/issues/3929). [PR 4189](https://github.com/shakacode/react_on_rails/pull/4189) by [justin808](https://github.com/justin808).
