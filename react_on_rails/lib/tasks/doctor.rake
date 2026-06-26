@@ -37,15 +37,31 @@ rescue LoadError
 end
 
 namespace :react_on_rails do
-  desc "Diagnose React on Rails setup and configuration (FORMAT=json for machine-readable output)"
-  task :doctor do
+  rsc_doctor_checks = ["react_server_components"].freeze
+  # Shared by both tasks so ENV option parsing and Doctor initialization stay identical.
+  doctor_options = lambda do |only: nil|
     verbose = ENV["VERBOSE"] == "true"
     fix = ENV["FIX"] == "true"
     # Pass unknown values through so Doctor#initialize fails fast with
     # ArgumentError instead of silently falling back to text output.
     format = ENV["FORMAT"].to_s.empty? ? :text : ENV["FORMAT"].to_sym
+    selected_checks = only || ENV["ONLY"].to_s.split(/[,\s]+/).reject(&:empty?)
+    options = { verbose:, fix:, format: }
+    options[:only] = selected_checks unless selected_checks.empty?
+    options
+  end
 
-    doctor = ReactOnRails::Doctor.new(verbose:, fix:, format:)
+  desc "Diagnose React on Rails setup and configuration (FORMAT=json for machine-readable output)"
+  task :doctor do
+    doctor = ReactOnRails::Doctor.new(**doctor_options.call)
     doctor.run_diagnosis
+  end
+
+  namespace :doctor do
+    desc "Diagnose only React Server Components setup (ONLY is ignored; FORMAT=json for machine-readable output)"
+    task :rsc do
+      doctor = ReactOnRails::Doctor.new(**doctor_options.call(only: rsc_doctor_checks))
+      doctor.run_diagnosis
+    end
   end
 end

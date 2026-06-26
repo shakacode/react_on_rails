@@ -29,6 +29,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **`bin/dev clean` clears generated bundles and caches**: The command stops development processes, reads `config/shakapacker.yml` or `SHAKAPACKER_CONFIG`, removes configured Shakapacker public/private output and cache paths plus common Rails, JavaScript, and renderer bundle caches, and skips unsafe paths outside the app root. [PR 4218](https://github.com/shakacode/react_on_rails/pull/4218) by [justin808](https://github.com/justin808).
 - **[Pro]** **Opt-in browser performance marks for streamed RSC observability**: Pro streaming can now emit inline browser marks for RSC stream completion, embedded Flight payload chunks, Node-side flushes, hydration start, and first interactive client effects, with byte counts and timing details that avoid serialized props or payload contents. The documented path uses body-delivered marks and a fallback queue instead of HTTP trailers, so apps can measure streamed RSC responses across CDN paths that may strip or hide trailer timing. Fixes [Issue 4205](https://github.com/shakacode/react_on_rails/issues/4205), [Issue 4206](https://github.com/shakacode/react_on_rails/issues/4206), and [Issue 4207](https://github.com/shakacode/react_on_rails/issues/4207). [PR 4222](https://github.com/shakacode/react_on_rails/pull/4222) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **Focused RSC doctor artifact diagnostics**: `rake react_on_rails:doctor:rsc` and
+  `Doctor.new(only: ...)` now run the RSC artifact checks directly, reporting missing,
+  stale, invalid, or dev-server-backed RSC bundle and manifest files with rebuild guidance
+  while explaining when Pro path resolution is unavailable. Closes
+  [Issue 4204](https://github.com/shakacode/react_on_rails/issues/4204).
+  [PR 4223](https://github.com/shakacode/react_on_rails/pull/4223) by
+  [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **[Pro]** **RSC doctor now catches stale install and client-manifest setup failures**:

@@ -164,8 +164,9 @@ module ReactOnRails
       { id: "react_on_rails_pro_setup", title: "React on Rails Pro Setup", method: :check_pro_setup },
       { id: "react_server_components", title: "React Server Components", method: :check_rsc_setup }
     ].freeze
+    CHECK_SECTIONS_BY_ID = CHECK_SECTIONS.to_h { |section| [section[:id], section] }.freeze
 
-    def initialize(verbose: false, fix: false, format: :text)
+    def initialize(verbose: false, fix: false, format: :text, only: nil)
       @verbose = verbose
       @fix = fix
       @format = format.respond_to?(:to_sym) ? format.to_sym : format
@@ -173,9 +174,13 @@ module ReactOnRails
         raise ArgumentError, "Invalid doctor format #{format.inspect}; expected one of #{OUTPUT_FORMATS.join(', ')}"
       end
 
+      @only_explicitly_set = explicit_check_selection?(only)
+      @check_sections = normalize_check_sections(only)
       @checker = SystemChecker.new
       @test_output_path_strategy = :unknown
       @rails_environment_loaded = false
+      @rsc_artifacts_rebuild_guidance_added = false
+      @rsc_registration_entry_warning_added = false
     end
 
     def run_diagnosis
@@ -191,7 +196,25 @@ module ReactOnRails
 
     private
 
-    attr_reader :verbose, :fix, :format, :checker
+    attr_reader :verbose, :fix, :format, :checker, :check_sections
+
+    def normalize_check_sections(only)
+      check_ids = Array(only).flat_map { |value| value.to_s.split(/[,\s]+/) }.reject(&:empty?)
+      return CHECK_SECTIONS if check_ids.empty?
+
+      invalid_check_ids = check_ids - CHECK_SECTIONS_BY_ID.keys
+      if invalid_check_ids.any?
+        raise ArgumentError,
+              "Invalid doctor check selector #{invalid_check_ids.join(', ')}; expected one of " \
+              "#{CHECK_SECTIONS_BY_ID.keys.join(', ')}"
+      end
+
+      check_ids.uniq.map { |check_id| CHECK_SECTIONS_BY_ID.fetch(check_id) }
+    end
+
+    def explicit_check_selection?(only)
+      Array(only).flat_map { |value| value.to_s.split(/[,\s]+/) }.reject(&:empty?).any?
+    end
 
     def print_header
       puts Rainbow("\n#{'=' * 80}").cyan
@@ -212,7 +235,7 @@ module ReactOnRails
     end
 
     def run_all_checks
-      CHECK_SECTIONS.each do |section|
+      check_sections.each do |section|
         initial_message_count = checker.messages.length
         send(section[:method])
 
@@ -238,7 +261,7 @@ module ReactOnRails
     end
 
     def collect_check_results
-      CHECK_SECTIONS.map do |section|
+      check_sections.map do |section|
         initial_message_count = checker.messages.length
         send(section[:method])
 
@@ -3476,6 +3499,17 @@ module ReactOnRails
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
     NPM_VIEW_TERMINATION_GRACE_SECONDS = 0.5
     SKIP_NPM_DIST_TAG_CHECK_ENV = "REACT_ON_RAILS_SKIP_NPM_DIST_TAG_CHECK"
+    RSC_REGISTRATION_ENTRY_PATH_ENV = "REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH"
+    EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME = "server-component-registration-entry.js"
+    EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules public spec test tmp vendor].freeze
+    RSC_CLIENT_REFERENCES_MANIFEST_ENV = "RSC_MANIFEST_CLIENT_REFERENCES_JSON"
+    DEFAULT_RSC_CLIENT_REFERENCES_MANIFEST_PATH = "ssr-generated/rsc-client-references.json"
+    RSC_DISCOVERY_PRECOMPILE_HOOK_PATH = "bin/shakapacker-precompile-hook"
+    RSC_DISCOVERY_WEBPACK_CONFIG_TOKENS = %w[RSC_REFERENCE_DISCOVERY_BUILD RSCReferenceDiscoveryPlugin].freeze
+    RSC_DISCOVERY_PRECOMPILE_HOOK_TOKENS = %w[
+      generate_rsc_manifest_client_references_if_needed
+      RSC_REFERENCE_DISCOVERY_BUILD
+    ].freeze
     # npm registry package names used here must be lowercase; keep this allowlist
     # narrow so names remain safe when reused as Node resolver args and paths.
     PACKAGE_NAME_PATTERN = %r{
@@ -3489,7 +3523,14 @@ module ReactOnRails
     RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
 
     def check_rsc_setup
-      return unless ReactOnRails::Utils.react_on_rails_pro?
+      unless ReactOnRails::Utils.react_on_rails_pro?
+        if rsc_check_explicitly_selected?
+          checker.add_info(
+            "ℹ️  React Server Components checks skipped — react_on_rails_pro is not installed"
+          )
+        end
+        return
+      end
 
       ensure_rails_environment_loaded
       pro_config = ReactOnRailsPro.configuration
@@ -3505,8 +3546,13 @@ module ReactOnRails
       check_rsc_react_version
       check_rsc_procfile_watcher
       check_rsc_client_manifest
+      check_rsc_artifacts
     rescue StandardError => e
       checker.add_warning("⚠️  RSC setup check encountered an error: #{e.message}")
+    end
+
+    def rsc_check_explicitly_selected?
+      @only_explicitly_set && check_sections.any? { |section| section[:id] == "react_server_components" }
     end
 
     def check_rsc_renderer_mode(pro_config)
@@ -4370,6 +4416,288 @@ module ReactOnRails
         "#{RSC_CLIENT_MANIFEST_CLEANUP_PATHS.join(', ')}"
       )
       checker.add_info("  💡 Then rebuild so the Node renderer reads a fresh on-disk React Client Manifest")
+    end
+
+    def check_rsc_artifacts
+      unless defined?(ReactOnRailsPro::Utils)
+        checker.add_info("  ℹ️  RSC artifact checks skipped — upgrade react-on-rails-pro to enable path resolution")
+        return
+      end
+
+      check_rsc_bundle_artifact
+      check_rsc_server_client_manifest_artifact
+      check_rsc_client_references_manifest
+    end
+
+    def check_rsc_bundle_artifact
+      artifact_path = rsc_pro_utils_artifact_path(:rsc_bundle_js_file_path, "RSC bundle")
+      return unless artifact_path
+
+      if manifest_url?(artifact_path)
+        checker.add_warning("⚠️  RSC bundle resolves to a dev-server URL: #{artifact_path}")
+        add_rsc_artifacts_rebuild_guidance
+      elsif File.exist?(artifact_path)
+        checker.add_success("✅ RSC bundle exists at #{artifact_path}")
+      else
+        report_missing_rsc_artifact("RSC bundle", artifact_path)
+      end
+    end
+
+    def check_rsc_server_client_manifest_artifact
+      artifact_path = rsc_pro_utils_artifact_path(
+        :react_server_client_manifest_file_path,
+        "RSC server client manifest"
+      )
+      return unless artifact_path
+
+      if manifest_url?(artifact_path)
+        checker.add_warning("⚠️  RSC server client manifest resolves to a dev-server URL: #{artifact_path}")
+        add_rsc_artifacts_rebuild_guidance
+      elsif File.exist?(artifact_path)
+        report_rsc_json_artifact("RSC server client manifest", artifact_path)
+      else
+        report_missing_rsc_artifact("RSC server client manifest", artifact_path)
+      end
+    end
+
+    def check_rsc_client_references_manifest
+      artifact_path = rsc_client_references_manifest_path
+      unless File.exist?(artifact_path)
+        report_missing_rsc_client_references_manifest(artifact_path)
+        return
+      end
+
+      refs = rsc_client_references_manifest_refs(artifact_path)
+      if refs.is_a?(Array)
+        if rsc_client_references_manifest_stale?(artifact_path)
+          report_stale_rsc_client_references_manifest(artifact_path)
+        else
+          checker.add_success("✅ RSC client references manifest includes #{refs.size} refs at #{artifact_path}")
+        end
+      else
+        checker.add_warning("⚠️  RSC client references manifest must contain a refs array: #{artifact_path}")
+        add_rsc_artifacts_rebuild_guidance
+      end
+    rescue JSON::ParserError => e
+      checker.add_warning("⚠️  RSC client references manifest is not valid JSON: #{e.message}")
+      add_rsc_artifacts_rebuild_guidance
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not inspect RSC client references manifest: #{e.message}")
+    end
+
+    def report_missing_rsc_client_references_manifest(artifact_path)
+      registration_entry_exists = rsc_manifest_registration_entry_exists?
+      discovery_supported = registration_entry_exists && rsc_manifest_discovery_supported?
+
+      if rsc_client_references_manifest_required?(
+        registration_entry_exists:,
+        discovery_supported:
+      )
+        report_configured_rsc_client_references_manifest(artifact_path)
+        report_missing_rsc_artifact("RSC client references manifest", artifact_path)
+      elsif registration_entry_exists && !discovery_supported
+        checker.add_warning(
+          "⚠️  RSC client references manifest not found at #{artifact_path}, but this app's RSC webpack " \
+          "config or precompile hook does not support manifest discovery yet; resolver will use broad " \
+          "client-reference discovery fallback"
+        )
+        checker.add_info("  💡 Re-run rails g react_on_rails:rsc to update generated configs")
+      else
+        checker.add_info(
+          "  ℹ️  RSC client references manifest not found at #{artifact_path} — " \
+          "resolver will use broad client-reference discovery fallback"
+        )
+      end
+    end
+
+    def rsc_client_references_manifest_required?(registration_entry_exists:, discovery_supported:)
+      return true unless ENV[RSC_CLIENT_REFERENCES_MANIFEST_ENV].to_s.strip.empty?
+
+      registration_entry_exists && discovery_supported
+    end
+
+    def report_configured_rsc_client_references_manifest(artifact_path)
+      configured_path = ENV[RSC_CLIENT_REFERENCES_MANIFEST_ENV].to_s.strip
+      return if configured_path.empty?
+
+      checker.add_warning(
+        "⚠️  #{RSC_CLIENT_REFERENCES_MANIFEST_ENV}=#{configured_path.inspect} requires an existing " \
+        "RSC client references manifest at #{artifact_path}"
+      )
+    end
+
+    def rsc_manifest_registration_entry_exists?
+      registration_entry = rsc_manifest_registration_entry
+      registration_entry && File.exist?(registration_entry)
+    end
+
+    def rsc_client_references_manifest_stale?(artifact_path)
+      registration_entry = rsc_manifest_registration_entry
+      return false unless registration_entry && File.exist?(registration_entry)
+
+      File.mtime(registration_entry) > File.mtime(artifact_path)
+    rescue StandardError
+      false
+    end
+
+    def report_stale_rsc_client_references_manifest(artifact_path)
+      checker.add_warning(
+        "⚠️  RSC client references manifest is older than the server component registration entry: " \
+        "#{artifact_path}"
+      )
+      checker.add_info("  💡 Re-run bin/shakapacker-precompile-hook before bin/shakapacker")
+    end
+
+    def rsc_manifest_discovery_supported?
+      RSC_BUNDLER_CONFIG_PATHS.any? do |config_path|
+        file_contains_all?(config_path, RSC_DISCOVERY_WEBPACK_CONFIG_TOKENS)
+      end &&
+        file_contains_all?(RSC_DISCOVERY_PRECOMPILE_HOOK_PATH, RSC_DISCOVERY_PRECOMPILE_HOOK_TOKENS)
+    end
+
+    def file_contains_all?(file_path, tokens)
+      resolved_path = File.expand_path(file_path, doctor_app_root)
+      return false unless File.exist?(resolved_path)
+
+      content = File.read(resolved_path)
+      tokens.all? { |token| content.include?(token) }
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not read #{file_path} during RSC discovery check: #{e.message}")
+      false
+    end
+
+    def rsc_manifest_registration_entry
+      configured_entry = configured_rsc_manifest_registration_entry
+      return configured_entry if configured_entry
+
+      default_rsc_manifest_registration_entry
+    end
+
+    def configured_rsc_manifest_registration_entry
+      configured_path = ENV[RSC_REGISTRATION_ENTRY_PATH_ENV].to_s.strip
+      return nil if configured_path.empty?
+
+      resolved_path = File.absolute_path(configured_path, doctor_app_root)
+      unless valid_rsc_manifest_registration_entry?(resolved_path)
+        warn_invalid_rsc_registration_entry(configured_path)
+        return nil
+      end
+
+      resolved_path
+    end
+
+    def warn_invalid_rsc_registration_entry(configured_path)
+      return if @rsc_registration_entry_warning_added
+
+      checker.add_warning(
+        "⚠️  #{RSC_REGISTRATION_ENTRY_PATH_ENV}=#{configured_path.inspect} was set but did not pass " \
+        "validation; falling back to default discovery"
+      )
+      @rsc_registration_entry_warning_added = true
+    end
+
+    def default_rsc_manifest_registration_entry
+      source_entry_path = ReactOnRails::PackerUtils.packer_source_entry_path.to_s
+      return nil if source_entry_path.strip.empty? || source_entry_path == "/"
+
+      File.expand_path(
+        File.join(File.dirname(source_entry_path), "generated", EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME),
+        doctor_app_root
+      )
+    rescue StandardError
+      nil
+    end
+
+    def valid_rsc_manifest_registration_entry?(path)
+      return false unless File.file?(path)
+      return false unless File.basename(path.to_s) == EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME
+
+      path_components = rsc_registration_entry_path_components(path)
+      EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS.none? { |component| path_components.include?(component) }
+    end
+
+    def rsc_registration_entry_path_components(path)
+      expanded_path = File.expand_path(path.to_s)
+      expanded_root = "#{File.expand_path(doctor_app_root)}#{File::SEPARATOR}"
+      expanded_path = expanded_path.delete_prefix(expanded_root) if expanded_path.start_with?(expanded_root)
+
+      expanded_path.split(File::SEPARATOR).reject(&:empty?)
+    end
+
+    def rsc_pro_utils_artifact_path(method_name, label)
+      unless defined?(ReactOnRailsPro::Utils) && ReactOnRailsPro::Utils.respond_to?(method_name)
+        checker.add_info("  ℹ️  #{label} check skipped — upgrade react-on-rails-pro to enable path resolution")
+        return nil
+      end
+
+      artifact_path = ReactOnRailsPro::Utils.public_send(method_name)
+      if artifact_path.to_s.strip.empty?
+        checker.add_warning("⚠️  #{label} path could not be resolved")
+        return nil
+      end
+
+      artifact_path
+    rescue StandardError => e
+      checker.add_warning("⚠️  #{label} path could not be resolved: #{e.message}")
+      nil
+    end
+
+    def report_rsc_json_artifact(label, artifact_path)
+      payload = JSON.parse(File.read(artifact_path))
+      if payload.is_a?(Hash)
+        checker.add_success("✅ #{label} exists at #{artifact_path}")
+      else
+        checker.add_warning("⚠️  #{label} must contain a JSON object: #{artifact_path}")
+        add_rsc_artifacts_rebuild_guidance
+      end
+    rescue JSON::ParserError => e
+      checker.add_warning("⚠️  #{label} is not valid JSON: #{e.message}")
+      add_rsc_artifacts_rebuild_guidance
+    rescue Errno::EACCES => e
+      checker.add_warning("⚠️  Could not read #{label} (permission denied): #{e.message}")
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not inspect #{label}: #{e.message}")
+      add_rsc_artifacts_rebuild_guidance
+    end
+
+    def rsc_client_references_manifest_refs(artifact_path)
+      payload = JSON.parse(File.read(artifact_path))
+      return nil unless payload.is_a?(Hash)
+
+      payload["refs"]
+    end
+
+    def rsc_client_references_manifest_path
+      configured_path = ENV.fetch(RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil).to_s.strip
+      File.expand_path(
+        configured_path.empty? ? DEFAULT_RSC_CLIENT_REFERENCES_MANIFEST_PATH : configured_path,
+        doctor_app_root
+      )
+    end
+
+    def doctor_app_root
+      rails_root = Rails.root if defined?(Rails) && Rails.respond_to?(:root)
+      rails_root = rails_root.to_s
+      rails_root.empty? ? Dir.pwd : rails_root
+    rescue StandardError
+      Dir.pwd
+    end
+
+    def report_missing_rsc_artifact(label, artifact_path)
+      checker.add_warning("⚠️  #{label} not found at #{artifact_path}")
+      add_rsc_artifacts_rebuild_guidance
+    end
+
+    def add_rsc_artifacts_rebuild_guidance
+      return if @rsc_artifacts_rebuild_guidance_added
+
+      checker.add_info("  💡 For RSC development, run: ./bin/dev static")
+      checker.add_info("  💡 Re-run bin/shakapacker-precompile-hook before rebuilding RSC assets")
+      checker.add_info(
+        "  💡 If artifacts look stale after a package or React upgrade, stop the dev server and remove: " \
+        "#{RSC_CLIENT_MANIFEST_CLEANUP_PATHS.join(', ')}"
+      )
+      @rsc_artifacts_rebuild_guidance_added = true
     end
 
     def check_rsc_procfile_watcher

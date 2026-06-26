@@ -284,6 +284,55 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "selected check sections" do
+    def stub_all_check_sections(doctor)
+      described_class::CHECK_SECTIONS.each do |section|
+        allow(doctor).to receive(section[:method])
+      end
+    end
+
+    it "runs only the selected check in human-readable output" do
+      rsc_doctor = described_class.new(only: "react_server_components")
+      checker = rsc_doctor.instance_variable_get(:@checker)
+      stub_all_check_sections(rsc_doctor)
+      allow(rsc_doctor).to receive(:check_rsc_setup) do
+        checker.messages << { type: :success, content: "RSC-only doctor check ran" }
+      end
+      allow(rsc_doctor).to receive(:exit)
+
+      expect { rsc_doctor.run_diagnosis }
+        .to output(/React Server Components:.*RSC-only doctor check ran/m).to_stdout
+
+      expect(rsc_doctor).to have_received(:check_rsc_setup)
+      expect(rsc_doctor).not_to have_received(:check_environment)
+    end
+
+    it "emits only the selected check in JSON output" do
+      rsc_doctor = described_class.new(format: :json, only: [:react_server_components])
+      checker = rsc_doctor.instance_variable_get(:@checker)
+      stub_all_check_sections(rsc_doctor)
+      allow(rsc_doctor).to receive(:check_rsc_setup) do
+        checker.messages << { type: :warning, content: "RSC artifact missing" }
+      end
+      allow(rsc_doctor).to receive(:exit)
+
+      output = []
+      allow(rsc_doctor).to receive(:puts) { |arg| output << arg.to_s }
+
+      rsc_doctor.run_diagnosis
+
+      report = JSON.parse(output.join("\n"))
+      expect(report["checks"].map { |check| check["id"] }).to eq(["react_server_components"])
+      expect(report["summary"]).to eq("pass" => 0, "warn" => 1, "fail" => 0)
+      expect(report["status"]).to eq("warn")
+    end
+
+    it "rejects unknown check selectors" do
+      expect { described_class.new(only: "missing_section") }
+        .to raise_error(ArgumentError, /Invalid doctor check selector/)
+    end
+  end
+
   describe "#dev_server_label" do
     it "uses the canonical webpack-dev-server spelling for webpack apps" do
       allow(doctor).to receive(:configured_assets_bundler).and_return("webpack")
@@ -4960,6 +5009,33 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_rsc_setup)
         expect(checker.messages.length).to eq(initial_count)
       end
+
+      it "reports a skip reason for the RSC-only doctor" do
+        rsc_only_doctor = described_class.new(verbose: false, fix: false, only: ["react_server_components"])
+        rsc_only_checker = rsc_only_doctor.instance_variable_get(:@checker)
+        allow(rsc_only_doctor).to receive(:puts)
+        allow(rsc_only_doctor).to receive(:exit)
+
+        rsc_only_doctor.send(:check_rsc_setup)
+
+        info_messages = rsc_only_checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("React Server Components checks skipped"))
+        expect(info_messages).to include(a_string_including("react_on_rails_pro is not installed"))
+      end
+
+      it "reports a skip reason when RSC is part of an explicit mixed selection" do
+        mixed_doctor = described_class.new(verbose: false, fix: false,
+                                           only: %w[environment_prerequisites react_server_components])
+        mixed_checker = mixed_doctor.instance_variable_get(:@checker)
+        allow(mixed_doctor).to receive(:puts)
+        allow(mixed_doctor).to receive(:exit)
+
+        mixed_doctor.send(:check_rsc_setup)
+
+        info_messages = mixed_checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("React Server Components checks skipped"))
+        expect(info_messages).to include(a_string_including("react_on_rails_pro is not installed"))
+      end
     end
 
     context "when Pro is installed but RSC is disabled" do
@@ -6018,6 +6094,295 @@ RSpec.describe ReactOnRails::Doctor do
       success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
       expect(success_messages).to include(a_string_including("RSC client manifest includes 1 client reference"))
       expect(checker.messages.none? { |msg| msg[:type] == :warning }).to be true
+    end
+  end
+
+  describe "check_rsc_artifacts" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    before do
+      allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
+      stub_const("ReactOnRailsPro", Module.new)
+      ReactOnRailsPro.const_set(:Utils, Module.new)
+      ReactOnRailsPro::Utils.define_singleton_method(:rsc_bundle_js_file_path) { nil }
+      ReactOnRailsPro::Utils.define_singleton_method(:react_server_client_manifest_file_path) { nil }
+      allow(ReactOnRailsPro::Utils).to receive_messages(
+        rsc_bundle_js_file_path: File.expand_path("ssr-generated/rsc-bundle.js"),
+        react_server_client_manifest_file_path: File.expand_path("ssr-generated/react-server-client-manifest.json")
+      )
+      allow(ReactOnRails::PackerUtils).to receive(:packer_source_entry_path).and_return("app/javascript/packs")
+    end
+
+    def write_rsc_discovery_support_files(bundler: "webpack")
+      config_dir = "config/#{bundler}"
+      FileUtils.mkdir_p(config_dir)
+      FileUtils.mkdir_p("bin")
+      File.write("#{config_dir}/rscWebpackConfig.js", "RSC_REFERENCE_DISCOVERY_BUILD RSCReferenceDiscoveryPlugin")
+      File.write(
+        "bin/shakapacker-precompile-hook",
+        "generate_rsc_manifest_client_references_if_needed RSC_REFERENCE_DISCOVERY_BUILD"
+      )
+    end
+
+    it "uses the client-reference discovery fallback when the registration entry is absent" do
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC bundle not found"))
+      expect(warning_messages).to include(a_string_including("RSC server client manifest not found"))
+      expect(warning_messages).not_to include(a_string_including("RSC client references manifest not found"))
+      expect(info_messages).to include(a_string_including("broad client-reference discovery fallback"))
+    end
+
+    it "warns when a configured RSC registration entry path is invalid" do
+      previous_entry_path = ENV.fetch(described_class::RSC_REGISTRATION_ENTRY_PATH_ENV, nil)
+      ENV[described_class::RSC_REGISTRATION_ENTRY_PATH_ENV] = "missing-registration-entry.js"
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("#{described_class::RSC_REGISTRATION_ENTRY_PATH_ENV}=\"missing-registration-entry.js\"")
+      )
+      expect(warning_messages).to include(a_string_including("falling back to default discovery"))
+    ensure
+      if previous_entry_path.nil?
+        ENV.delete(described_class::RSC_REGISTRATION_ENTRY_PATH_ENV)
+      else
+        ENV[described_class::RSC_REGISTRATION_ENTRY_PATH_ENV] = previous_entry_path
+      end
+    end
+
+    it "skips direct artifact checks when Pro path utilities are unavailable" do
+      hide_const("ReactOnRailsPro::Utils")
+
+      doctor.send(:check_rsc_artifacts)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).to include(a_string_including("RSC artifact checks skipped"))
+    end
+
+    it "warns when the RSC client references manifest is missing and generated configs support discovery" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+      write_rsc_discovery_support_files
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+    end
+
+    it "resolves relative RSC discovery paths from Rails.root when invoked from a subdirectory" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+      write_rsc_discovery_support_files
+      FileUtils.mkdir_p("tmp/subdir")
+
+      Dir.chdir("tmp/subdir") { doctor.send(:check_rsc_artifacts) }
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+    end
+
+    it "does not treat a blank Shakapacker source entry path as ./generated" do
+      allow(ReactOnRails::PackerUtils).to receive(:packer_source_entry_path).and_return("")
+      FileUtils.mkdir_p("generated")
+      File.write("generated/server-component-registration-entry.js", "// wrong default when source_entry_path is blank")
+      write_rsc_discovery_support_files
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).not_to include(a_string_including("RSC client references manifest not found"))
+      expect(info_messages).to include(a_string_including("broad client-reference discovery fallback"))
+    end
+
+    it "warns when the Rspack RSC config supports manifest discovery and the manifest is missing" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+      write_rsc_discovery_support_files(bundler: "rspack")
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+    end
+
+    it "warns when RSC discovery support files exist but cannot be read" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+      write_rsc_discovery_support_files
+      config_path = File.expand_path("config/webpack/rscWebpackConfig.js", Dir.pwd)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(config_path).and_raise(Errno::EACCES, "Permission denied")
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("Could not read config/webpack/rscWebpackConfig.js during RSC discovery check")
+      )
+    end
+
+    it "warns with generator guidance when missing manifest discovery support requires broad fallback" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("does not support manifest discovery yet"))
+      expect(warning_messages).to include(a_string_including("broad client-reference discovery fallback"))
+      expect(info_messages).to include(a_string_including("rails g react_on_rails:rsc"))
+    end
+
+    it "warns when a configured RSC client references manifest is missing" do
+      previous_manifest_path = ENV.fetch(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil)
+      ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = "missing-rsc-client-references.json"
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+      expect(info_messages).not_to include(a_string_including("broad client-reference discovery fallback"))
+    ensure
+      if previous_manifest_path.nil?
+        ENV.delete(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV)
+      else
+        ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = previous_manifest_path
+      end
+    end
+
+    it "names the configured RSC client references manifest env var when the path is missing" do
+      previous_manifest_path = ENV.fetch(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil)
+      ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = "true"
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("#{described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV}=\"true\"")
+      )
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+    ensure
+      if previous_manifest_path.nil?
+        ENV.delete(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV)
+      else
+        ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = previous_manifest_path
+      end
+    end
+
+    it "reports success when the RSC bundle, server manifest, and client references manifest exist" do
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("ssr-generated/rsc-bundle.js", "// RSC bundle")
+      File.write("ssr-generated/react-server-client-manifest.json", JSON.generate("module" => {}))
+      File.write("ssr-generated/rsc-client-references.json", JSON.generate("refs" => []))
+
+      doctor.send(:check_rsc_artifacts)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("RSC bundle exists"))
+      expect(success_messages).to include(a_string_including("RSC server client manifest exists"))
+      expect(success_messages).to include(a_string_including("RSC client references manifest includes 0 refs"))
+      expect(checker.messages.none? { |msg| msg[:type] == :warning }).to be true
+    end
+
+    it "warns when the RSC client references manifest is older than the registration entry" do
+      FileUtils.mkdir_p("app/javascript/generated")
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("app/javascript/generated/server-component-registration-entry.js", "// registration entry")
+      File.write("ssr-generated/rsc-client-references.json", JSON.generate("refs" => []))
+      File.utime(Time.now - 120, Time.now - 120, "ssr-generated/rsc-client-references.json")
+      File.utime(Time.now, Time.now, "app/javascript/generated/server-component-registration-entry.js")
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("older than the server component registration entry"))
+      expect(success_messages).not_to include(a_string_including("RSC client references manifest includes"))
+      expect(info_messages).to include(a_string_including("bin/shakapacker-precompile-hook"))
+    end
+
+    it "warns when JSON RSC artifacts cannot be parsed or have the wrong shape" do
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("ssr-generated/rsc-bundle.js", "// RSC bundle")
+      File.write("ssr-generated/react-server-client-manifest.json", "{not-json")
+      File.write("ssr-generated/rsc-client-references.json", JSON.generate("refs" => {}))
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC server client manifest is not valid JSON"))
+      expect(warning_messages).to include(
+        a_string_including("RSC client references manifest must contain a refs array")
+      )
+    end
+
+    it "continues client-reference diagnostics when the server manifest cannot be read" do
+      previous_manifest_path = ENV.fetch(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil)
+      ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = "missing-rsc-client-references.json"
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("ssr-generated/rsc-bundle.js", "// RSC bundle")
+      File.write("ssr-generated/react-server-client-manifest.json", JSON.generate("module" => {}))
+      server_manifest_path = File.expand_path("ssr-generated/react-server-client-manifest.json")
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(server_manifest_path).and_raise(Errno::EACCES, "Permission denied")
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("Could not read RSC server client manifest"))
+      expect(warning_messages).to include(a_string_including("RSC client references manifest not found"))
+    ensure
+      if previous_manifest_path.nil?
+        ENV.delete(described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV)
+      else
+        ENV[described_class::RSC_CLIENT_REFERENCES_MANIFEST_ENV] = previous_manifest_path
+      end
+    end
+
+    it "does not add rebuild guidance when a JSON artifact exists but cannot be read" do
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("ssr-generated/react-server-client-manifest.json", JSON.generate("module" => {}))
+      server_manifest_path = File.expand_path("ssr-generated/react-server-client-manifest.json")
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(server_manifest_path).and_raise(Errno::EACCES, "Permission denied")
+
+      doctor.send(:report_rsc_json_artifact, "RSC server client manifest", server_manifest_path)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("Could not read RSC server client manifest"))
+      expect(info_messages).not_to include(a_string_including("Re-run bin/shakapacker-precompile-hook"))
+    end
+
+    it "warns clearly when the RSC client references manifest is a JSON array" do
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("ssr-generated/rsc-bundle.js", "// RSC bundle")
+      File.write("ssr-generated/react-server-client-manifest.json", JSON.generate("module" => {}))
+      File.write("ssr-generated/rsc-client-references.json", JSON.generate([]))
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("RSC client references manifest must contain a refs array")
+      )
+      expect(warning_messages).not_to include(a_string_including("no implicit conversion of String into Integer"))
     end
   end
   # rubocop:enable RSpec/VerifiedDoubles
