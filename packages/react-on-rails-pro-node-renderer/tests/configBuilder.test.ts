@@ -343,7 +343,7 @@ describe('configBuilder', () => {
       expect(() => buildConfig()).not.toThrow();
     });
 
-    it('throws when neither NODE_ENV nor RAILS_ENV is set (fail-closed)', () => {
+    it('throws with local dev guidance when neither NODE_ENV nor RAILS_ENV is set', () => {
       delete process.env.NODE_ENV;
       delete process.env.RAILS_ENV;
       delete process.env.RENDERER_PASSWORD;
@@ -354,7 +354,10 @@ describe('configBuilder', () => {
       expect(() => buildConfig()).toThrow('process.exit: 1');
       expect(processExit).toHaveBeenCalledWith(1);
       expect(error).toHaveBeenCalledWith(
-        expect.stringContaining('(neither set) — treated as production-like; RENDERER_PASSWORD required'),
+        expect.stringContaining('export RAILS_ENV=development NODE_ENV=development'),
+      );
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('(both unset) — treated as production-like; RENDERER_PASSWORD required'),
       );
     });
 

@@ -709,15 +709,12 @@ For detailed proof criteria and migration contribution guidance, see
 - Note: this is a ShakaCode-built demo modeled on a Gumroad-style UI, not an
   official Gumroad product or integration.
 
-## Live Demos
+### Octochangelog RSC Demo
 
-- [hn.reactonrails.com](https://hn.reactonrails.com/) — Hacker News reader
-  showing React on Rails Pro with React 19 and React Server Components on a
-  familiar read-heavy UI.
-- [www.reactrails.com](https://www.reactrails.com) — production-style React on Rails app
-  you can click through in your browser without any local setup. Backed by the
-  legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
-  source.
+- Repo: [shakacode/react_on_rails-demo-octochangelog-on-rails-pro](https://github.com/shakacode/react_on_rails-demo-octochangelog-on-rails-pro)
+- Live demo: [changelog.reactonrails.com](https://changelog.reactonrails.com/)
+- Use it when you want a real-app migration to React on Rails Pro showing Rails
+  routing, React 19, and streamed React Server Components.
 
 ## Control Plane Cost Posture
 
@@ -748,7 +745,7 @@ repos are useful historical references, but they are not the primary starting
 point for new evaluations.
 
 - Legacy full app: [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) —
-  older production-style app (see Live Demos above for the running site at www.reactrails.com).
+  older production-style app with a running site at [www.reactrails.com](https://www.reactrails.com).
   Still useful as a historical reference, but not the recommended starting point for new projects.
 - Minimal RSC sample: [shakacode/react-on-rails-rsc-demo](https://github.com/shakacode/react-on-rails-rsc-demo) —
   older minimal React Server Components sample. Use the TanStack Starter above
@@ -816,14 +813,14 @@ npx create-react-on-rails-app my-app --template javascript
 # Add Tailwind CSS v4 to the generated SSR example
 npx create-react-on-rails-app my-app --tailwind
 
-# Use Rspack for ~20x faster builds
-npx create-react-on-rails-app my-app --rspack
+# Use Webpack instead of the default Rspack bundler
+npx create-react-on-rails-app my-app --webpack
 
 # Specify package manager
 npx create-react-on-rails-app my-app --package-manager pnpm
 
-# Combine RSC with Rspack
-npx create-react-on-rails-app my-app --rspack --rsc
+# RSC uses Rspack by default; no bundler flag needed
+npx create-react-on-rails-app my-app --rsc
 ```
 
 ### All Options
@@ -831,7 +828,8 @@ npx create-react-on-rails-app my-app --rspack --rsc
 | Option                       | Description                                                    | Default                  |
 | ---------------------------- | -------------------------------------------------------------- | ------------------------ |
 | `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`             |
-| `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`                  |
+| `--rspack`                   | Use Rspack as the bundler (~20x faster; Rspack is the default) | `true`                   |
+| `--webpack`, `--no-rspack`   | Use Webpack instead of Rspack                                  | `false`                  |
 | `--standard`                 | Use open-source React on Rails (skip prompt)                   | `false`                  |
 | `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)      | `false`                  |
 | `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`                  |
@@ -853,7 +851,7 @@ The CLI runs these steps automatically:
 After completion, you get:
 
 - A Rails 7+ app with PostgreSQL
-- Shakapacker configured with Webpack (or Rspack) and HMR
+- Shakapacker configured with Rspack by default (or Webpack when requested) and HMR
 - A working HelloWorld React component (TypeScript by default)
 - A generated home page at `/` with links to the example pages, important project files, and Pro/RSC learning resources
 - A teaching-friendly git history that separates Rails creation, gem installation, generator output, and pnpm normalization

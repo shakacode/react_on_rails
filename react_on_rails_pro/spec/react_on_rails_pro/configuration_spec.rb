@@ -459,15 +459,19 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
         end
 
-        it "raises when RAILS_ENV is unset (fail-closed, matching Node-side behavior)" do
+        it "raises with local dev guidance when RAILS_ENV and NODE_ENV are unset" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return(nil)
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return(nil)
 
           expect do
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "NodeRenderer"
               config.renderer_url = "https://localhost:3800"
             end
-          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+          end.to raise_error(ReactOnRailsPro::Error) { |error|
+            expect(error.message).to include("export RAILS_ENV=development NODE_ENV=development")
+            expect(error.message).to include("(both unset)").and include("treated as production-like")
+          }
         end
 
         it "raises when NODE_ENV is production even if RAILS_ENV is development" do

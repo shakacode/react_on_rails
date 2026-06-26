@@ -1,0 +1,800 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "optparse"
+require "open3"
+require "digest"
+
+# rubocop:disable Metrics/ClassLength
+class ReleaseForwardPort
+  VERSION_FILE = "react_on_rails/lib/react_on_rails/version.rb"
+  # Project convention is `X.Y.Z.rc.N`, but a release branch can still contain a
+  # bare `X.Y.Z.rc` bump. Treat both as release-only version bumps.
+  RC_VERSION_BUMP_SUBJECT = /
+    \Abump\s+version\s+to\s+v?\d+\.\d+\.\d+[.-]rc(?:[.-]?\d+)?\b
+  /ix
+  VERSION_BUMP_SUBJECT = /
+    \Abump\s+version\s+to\s+v?
+    (?<version>\d+\.\d+\.\d+(?:(?:[.-])(?:alpha|beta|rc|pre|dev|test)(?:[.-]?\d+)?)?)\b
+  /ix
+  PRERELEASE_RANKS = {
+    "dev" => 0,
+    "test" => 1,
+    "alpha" => 2,
+    "beta" => 3,
+    "pre" => 4,
+    "rc" => 5
+  }.freeze
+  EMPTY_PATCH_ID = "__empty_patch__"
+  HUNKLESS_PATCH_ID_PREFIX = "__hunkless_patch__:"
+  CHERRY_PICK_FOOTER_FORMAT = "(cherry picked from commit %s)"
+  CHERRY_PICK_FOOTER_PATTERN = /\(cherry picked from commit (?<sha>[0-9a-f]{40})\)/
+  ASCII_WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
+
+  PlanEntry = Struct.new(:sha, :subject, :action, :reason, :manual, keyword_init: true) do
+    def short_sha
+      sha[0, 12]
+    end
+
+    def manual?
+      !!manual
+    end
+  end
+
+  ManualSkipReason = Struct.new(:message, keyword_init: true)
+
+  class UsageError < StandardError; end
+  class GitError < StandardError; end
+
+  def initialize(argv)
+    @argv = argv.dup
+    @explicit_options = { source: false, target: false }
+    @options = {
+      dry_run: false,
+      ack_manual: [],
+      target: "main"
+    }
+    @parser = build_parser
+  end
+
+  def run
+    parse_options!
+
+    source = @options.fetch(:source)
+    target = @options.fetch(:target)
+
+    verify_ref!(source, label: "source")
+    verify_ref!(target, label: "target")
+    normalize_acknowledged_manual_shas!
+    ensure_local_target_branch!(target) unless @options[:dry_run]
+
+    commits = source_only_commits(source, target)
+    equiv_commits = patch_equivalent_candidates(source, target)
+    target_version = version_at(target)
+
+    # Build the operator-facing plan before the normal-mode dirty-worktree
+    # guard, so normal mode and dry-run report the same plan before refusing to
+    # checkout or cherry-pick.
+    plan = build_plan(commits, target, target_version, equiv_commits)
+    validate_acknowledged_manual_shas!(plan)
+
+    print_plan(source, target, target_version, plan)
+
+    if @options[:dry_run]
+      puts "\nDRY RUN: no branches were checked out and no commits were cherry-picked."
+      return 0
+    end
+
+    ensure_clean_worktree!
+    checkout_target!(target)
+    # This final expression is the process exit status.
+    apply_plan(plan)
+  rescue OptionParser::ParseError, UsageError => e
+    warn "ERROR: #{e.message}"
+    warn @parser
+    2
+  rescue GitError => e
+    warn "ERROR: #{e.message}"
+    1
+  end
+
+  private
+
+  def parse_options!
+    argv = @argv.dup
+    @parser.parse!(argv)
+
+    # Only consume positional source/target when the corresponding flag was not
+    # supplied. A leftover positional after an explicit flag is an error, not a
+    # silent override of the flagged value.
+    @options[:source] = argv.shift unless @explicit_options[:source]
+    raise UsageError, "too many arguments: #{argv.join(' ')}" if @explicit_options[:target] && argv.any?
+
+    @options[:target] = argv.shift if argv.any?
+
+    raise UsageError, "source ref is required" if @options[:source].nil? || @options[:source].empty?
+    raise UsageError, "too many arguments: #{argv.join(' ')}" unless argv.empty?
+  end
+
+  def build_parser
+    OptionParser.new do |parser|
+      parser.banner = usage_banner
+
+      parser.on("--source REF", "Release branch or ref to forward-port from") do |source|
+        @options[:source] = source
+        @explicit_options[:source] = true
+      end
+      parser.on("--target REF", "Target local branch to forward-port onto (default: main)") do |target|
+        @options[:target] = target
+        @explicit_options[:target] = true
+      end
+      parser.on("--dry-run", "Print the plan without checking out or cherry-picking") do
+        @options[:dry_run] = true
+      end
+      add_ack_manual_option(parser)
+      parser.on("-h", "--help", "Show this help") do
+        puts parser
+        exit 0
+      end
+    end
+  end
+
+  def usage_banner
+    <<~BANNER
+      Usage: script/release-forward-port --source release/X.Y.Z [--target main] [--dry-run]
+             script/release-forward-port release/X.Y.Z [main] [--dry-run]
+
+      Forward-port commits that are on a release branch but not on the target branch.
+      The helper cherry-picks with -x, skips commits already forward-ported with -x
+      evidence or patches present in the target tree, and excludes RC version bump commits.
+    BANNER
+  end
+
+  def add_ack_manual_option(parser)
+    parser.on(
+      "--ack-manual SHA",
+      "Acknowledge an inspected MANUAL commit and skip it in normal mode (repeatable)"
+    ) do |sha|
+      @options[:ack_manual] << sha
+    end
+  end
+
+  def source_only_commits(source, target)
+    git_lines("rev-list", "--reverse", "#{target}..#{source}")
+  end
+
+  def patch_equivalent_candidates(source, target)
+    # git cherry uses patch-id, which covers content hunks but not mode-only
+    # changes. Mode-only commit idempotency is covered by the -x footer path.
+    git_lines("cherry", target, source).each_with_object({}) do |line, commits|
+      marker, sha = line.split(/\s+/, 2)
+      commits[sha] = true if marker == "-"
+    end
+  end
+
+  def build_plan(commits, target, target_version, patch_equivalent_commits)
+    commits.map do |sha|
+      subject = git("log", "-1", "--format=%s", sha).strip
+      skip_decision = skip_reason(sha, subject, target, target_version, patch_equivalent_commits)
+      reason = skip_reason_message(skip_decision)
+
+      PlanEntry.new(
+        sha:,
+        subject:,
+        action: reason ? :skip : :pick,
+        reason:,
+        manual: manual_skip_reason?(skip_decision)
+      )
+    end
+  end
+
+  def skip_reason(sha, subject, target, target_version, patch_equivalent_commits)
+    special_reason = special_skip_reason(sha, subject, target, target_version)
+    return special_reason if special_reason
+
+    return "already forward-ported to #{target} via cherry-pick -x evidence with no later target revert" if
+      already_forward_ported_with_x?(sha, target)
+
+    return "empty commit; cherry-picking would only create a no-op commit on #{target}" if
+      patch_id_for_commit(sha) == EMPTY_PATCH_ID
+
+    # Origin was reverted on target: the fix was applied and then undone, so
+    # re-apply it even if git cherry reports a patch match.
+    return if source_cherry_pick_origin_reverted_on_target?(sha, target)
+
+    if patch_equivalent_commits[sha] &&
+       patch_equivalent_commit_present_on_target?(sha, target)
+      return "patch already exists on #{target} according to target history with no later standard revert"
+    end
+
+    version_bump_skip_reason(subject, target, target_version)
+  end
+
+  def special_skip_reason(sha, subject, target, target_version)
+    return "rc version bump commit; release train forward-ports must keep prerelease bumps off #{target}" if
+      rc_version_bump?(subject)
+
+    if merge_commit?(sha)
+      return manual_skip_reason(
+        "merge commit; inspect manually for conflict-resolution hunks before marking forward-port complete"
+      )
+    end
+
+    skipped_version_bump_revert_skip_reason(sha, subject, target, target_version) ||
+      reverse_pick_revert_skip_reason(sha, target)
+  end
+
+  def rc_version_bump?(subject)
+    subject.match?(RC_VERSION_BUMP_SUBJECT)
+  end
+
+  def merge_commit?(sha)
+    git("rev-list", "--parents", "-n", "1", sha).split.length > 2
+  end
+
+  def manual_skip_reason?(reason)
+    reason.is_a?(ManualSkipReason)
+  end
+
+  def skip_reason_message(reason)
+    reason.is_a?(ManualSkipReason) ? reason.message : reason
+  end
+
+  def manual_skip_reason(message)
+    ManualSkipReason.new(message:)
+  end
+
+  def skipped_version_bump_revert_skip_reason(sha, subject, target, target_version)
+    return unless standard_revert_subject?(subject)
+
+    reverted_sha = standard_revert_target(sha)
+    return unless reverted_sha
+
+    reverted_subject = subject_for_commit(reverted_sha)
+    return unless reverted_subject
+
+    return unless skipped_version_bump_subject?(reverted_subject, target, target_version)
+
+    "reverts a release-only version bump that is skipped for #{target}; skipping this revert avoids " \
+      "an empty or target-regressing cherry-pick"
+  end
+
+  def skipped_version_bump_subject?(subject, target, target_version)
+    !!(rc_version_bump?(subject) || version_bump_skip_reason(subject, target, target_version))
+  end
+
+  def version_bump_skip_reason(subject, target, target_version)
+    version = version_from_bump_subject(subject)
+    return unless version
+
+    parsed_version = parse_version(version)
+    return stable_version_bump_skip_reason(target) if stable_version_bump?(parsed_version)
+
+    if prerelease_version_bump?(parsed_version) && target_version.nil?
+      return unknown_target_prerelease_skip_reason(target)
+    end
+
+    return unless target_version
+
+    comparison = compare_versions(target_version, version)
+    return unless comparison && comparison >= 0
+
+    "target #{target} is already at #{target_version}; skipping version bump to #{version} to avoid " \
+      "regressing or duplicating the target version. If this commit also contains CHANGELOG changes, " \
+      "use the runbook's manual fallback to take only the CHANGELOG hunks."
+  end
+
+  def stable_version_bump?(parsed_version)
+    parsed_version && parsed_version.fetch(:prerelease).nil?
+  end
+
+  def prerelease_version_bump?(parsed_version)
+    parsed_version&.fetch(:prerelease)
+  end
+
+  def stable_version_bump_skip_reason(target)
+    manual_skip_reason(
+      "stable release version bump commit; use the runbook's manual fallback to take only " \
+      "the CHANGELOG hunks and keep release branch version changes off #{target}"
+    )
+  end
+
+  def unknown_target_prerelease_skip_reason(target)
+    "prerelease version bump commit with target version UNKNOWN; use the runbook's manual fallback " \
+      "to take only the CHANGELOG hunks and keep release branch version changes off #{target}"
+  end
+
+  def version_from_bump_subject(subject)
+    match = subject.match(VERSION_BUMP_SUBJECT)
+    match && match[:version].tr("-", ".")
+  end
+
+  def reverse_pick_revert_skip_reason(sha, target)
+    reverted_sha = standard_revert_target(sha)
+    return unless reverted_sha && commit_exists?(reverted_sha)
+    return merge_revert_skip_reason(target) if merge_commit?(reverted_sha)
+    return unless reverted_commit_live_on_target?(reverted_sha, target)
+
+    manual_skip_reason(
+      "reverts a release-only application of a commit already live on #{target}; inspect manually " \
+      "before applying this rollback to #{target}"
+    )
+  end
+
+  def merge_revert_skip_reason(target)
+    manual_skip_reason(
+      "reverts a release-branch merge commit; inspect manually before applying this rollback to #{target}"
+    )
+  end
+
+  def standard_revert_target(sha)
+    body = git("log", "-1", "--format=%B", sha)
+    match = body.match(/This reverts commit (?<sha>[0-9a-f]{40})[.,]/)
+    match && match[:sha]
+  end
+
+  def standard_revert_subject?(subject)
+    subject.start_with?("Revert ")
+  end
+
+  def already_forward_ported_with_x?(sha, target)
+    return true if source_cherry_pick_origin_on_target?(sha, target)
+
+    footer = format(CHERRY_PICK_FOOTER_FORMAT, sha)
+    # This history search can false-positive if a later target commit quotes the
+    # footer verbatim. The runbook documents that boundary for release operators.
+    forwarded_shas = git_lines("log", target, "--fixed-strings", "--grep", footer, "--format=%H")
+    return false if forwarded_shas.empty?
+
+    # True if at least one copy of the cherry-pick is still live on the target.
+    # Multiple copies are fine: pick -> revert -> re-pick is handled because the
+    # re-pick copy passes.
+    forwarded_shas.any? { |forwarded_sha| target_commit_live_on_target?(forwarded_sha, target) }
+  end
+
+  def source_cherry_pick_origin_on_target?(sha, target)
+    origin_sha = cherry_pick_origin(sha)
+    origin_sha && commit_on_target?(origin_sha, target) && target_commit_live_on_target?(origin_sha, target)
+  end
+
+  def source_cherry_pick_origin_reverted_on_target?(sha, target)
+    origin_sha = cherry_pick_origin(sha)
+    origin_sha && commit_on_target?(origin_sha, target) && !target_commit_live_on_target?(origin_sha, target)
+  end
+
+  def reverted_commit_live_on_target?(sha, target)
+    source_cherry_pick_origin_on_target?(sha, target) || patch_equivalent_commit_present_on_target?(sha, target)
+  end
+
+  def cherry_pick_origin(sha)
+    body = git("log", "-1", "--format=%B", sha)
+    match = body.match(CHERRY_PICK_FOOTER_PATTERN)
+    match && match[:sha]
+  end
+
+  def commit_on_target?(sha, target)
+    _stdout, _stderr, status = capture_git("merge-base", "--is-ancestor", sha, target)
+    status.success?
+  end
+
+  def commit_descends_from?(descendant_sha, ancestor_sha)
+    _stdout, _stderr, status = capture_git("merge-base", "--is-ancestor", ancestor_sha, descendant_sha)
+    status.success?
+  end
+
+  def standard_revert_on_target?(sha, target)
+    @standard_revert_cache ||= {}
+    cache_key = [sha, target]
+    return @standard_revert_cache.fetch(cache_key) if @standard_revert_cache.key?(cache_key)
+
+    revert_shas = standard_revert_shas_on_target(sha, target)
+    # Seed the cache before recursive descent so mutual-revert cycles terminate.
+    @standard_revert_cache[cache_key] = false
+    @standard_revert_cache[cache_key] =
+      revert_shas.any? do |revert_sha|
+        commit_descends_from?(revert_sha, sha) && !standard_revert_on_target?(revert_sha, target)
+      end
+  end
+
+  def standard_revert_shas_on_target(sha, target)
+    # Git writes simple reverts as "sha." and merge reverts as "sha, reversing...".
+    [".", ","].flat_map do |suffix|
+      revert_message = "This reverts commit #{sha}#{suffix}"
+      git_lines("log", target, "--fixed-strings", "--grep", revert_message, "--format=%H")
+    end.uniq
+  end
+
+  def patch_equivalent_commit_present_on_target?(sha, target)
+    source_patch_id = patch_id_for_commit(sha)
+
+    patch_equivalent_target_candidates(sha, target).any? do |target_sha|
+      patch_id_for_commit(target_sha) == source_patch_id && target_commit_live_on_target?(target_sha, target)
+    end
+  end
+
+  def target_commit_live_on_target?(sha, target)
+    !standard_revert_on_target?(sha, target) && !target_commit_reverted_through_merge?(sha, target)
+  end
+
+  def target_commit_reverted_through_merge?(sha, target)
+    # Intentionally conservative: if any merge that included this commit was
+    # reverted, treat the commit as not live. Re-picking a present change is
+    # safer than skipping a release fix that the target tree no longer has.
+    @target_merge_revert_cache ||= {}
+    cache_key = [sha, target]
+    return @target_merge_revert_cache.fetch(cache_key) if @target_merge_revert_cache.key?(cache_key)
+
+    @target_merge_revert_cache[cache_key] =
+      target_merge_descendants(sha, target).any? { |merge_sha| standard_revert_on_target?(merge_sha, target) }
+  end
+
+  def target_merge_descendants(sha, target)
+    git_lines("log", target, "--merges", "--ancestry-path", "#{sha}..#{target}", "--format=%H")
+  end
+
+  def patch_equivalent_target_candidates(sha, target)
+    paths = git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
+    return [] if paths.empty?
+
+    # This path-history walk can be broad for high-churn files, but it only runs
+    # for no-footer patch-equivalent candidates after git cherry marks a commit
+    # equivalent. Normal helper reruns use the faster -x footer path.
+    git_lines("log", target, "--format=%H", "--no-merges", "--", *paths)
+  end
+
+  def patch_id_for_commit(sha)
+    # git show --format= emits diff-only output. git patch-id still hashes the
+    # hunk content and emits a commit field we discard; the first token is the
+    # content hash used for comparisons.
+    patch = git("show", "--format=", "--full-index", "--find-renames", sha).b
+    # Empty commits carry no file changes; cherry-picking them would only create
+    # a no-op commit, so treat the patch as already present.
+    return EMPTY_PATCH_ID if empty_patch?(patch)
+
+    stdout, stderr, status = capture_git("patch-id", "--stable", stdin_data: patch)
+    raise GitError, "#{git_error(['patch-id', '--stable'], stdout, stderr, status)} for #{sha}" unless status.success?
+
+    patch_id = stdout.split.first
+    return hunkless_patch_id(patch) if patch_id.nil?
+
+    patch_id
+  end
+
+  def version_at(ref)
+    version_file = git("show", "#{ref}:#{VERSION_FILE}").strip
+    match = version_file.match(/VERSION\s*=\s*["'](?<version>[^"']+)["']/)
+    unless match
+      warn "WARNING: VERSION constant not found in #{VERSION_FILE} at #{ref}; " \
+           "version-drift guard is disabled for non-RC version bump commits."
+      return nil
+    end
+
+    match[:version]
+  rescue GitError
+    warn "WARNING: unable to read #{VERSION_FILE} at #{ref}; " \
+         "version-drift guard is disabled for non-RC version bump commits."
+    nil
+  end
+
+  def compare_versions(left, right)
+    left_version = parse_version(left)
+    right_version = parse_version(right)
+    return unless left_version && right_version
+
+    base_comparison = left_version.fetch(:base) <=> right_version.fetch(:base)
+    return base_comparison unless base_comparison.zero?
+
+    compare_prerelease(left_version.fetch(:prerelease), right_version.fetch(:prerelease))
+  end
+
+  def parse_version(version)
+    normalized = version.to_s.delete_prefix("v").tr("-", ".")
+    match = normalized.match(
+      /\A(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:\.(?<label>[A-Za-z]+)(?:\.?(?<number>\d+))?)?\z/
+    )
+    return unless match
+
+    {
+      base: [match[:major].to_i, match[:minor].to_i, match[:patch].to_i],
+      prerelease: prerelease_from_match(match)
+    }
+  end
+
+  def prerelease_from_match(match)
+    return nil unless match[:label]
+
+    {
+      label: match[:label].downcase,
+      number: match[:number] ? match[:number].to_i : 0
+    }
+  end
+
+  def compare_prerelease(left, right)
+    return 0 if left.nil? && right.nil?
+    return 1 if left.nil?
+    return -1 if right.nil?
+
+    left_rank = prerelease_rank(left.fetch(:label))
+    right_rank = prerelease_rank(right.fetch(:label))
+    return unless left_rank && right_rank
+
+    label_comparison = left_rank <=> right_rank
+    return label_comparison unless label_comparison.zero?
+
+    left.fetch(:number) <=> right.fetch(:number)
+  end
+
+  def prerelease_rank(label)
+    # Unknown labels disable version-bump skipping. Picking an uncertain bump is
+    # safer than silently dropping a version commit that may still be needed.
+    PRERELEASE_RANKS[label]
+  end
+
+  def print_plan(source, target, target_version, plan)
+    puts "Release forward-port plan"
+    puts "  source: #{source}"
+    puts "  target: #{target}"
+    puts "  target version: #{target_version || 'UNKNOWN'}"
+    puts
+
+    if plan.empty?
+      puts "No commits found in #{target}..#{source}."
+      return
+    end
+
+    plan.each { |entry| print_plan_entry(entry) }
+
+    puts
+    puts plan_summary(plan)
+  end
+
+  def plan_summary(plan)
+    counts = plan_counts(plan)
+    parts = [
+      "#{commit_count(counts.fetch(:picks))} to cherry-pick",
+      "#{commit_count(counts.fetch(:skips))} skipped"
+    ]
+    parts << "#{commit_count(counts.fetch(:acknowledged_manual))} acknowledged manual skipped" if
+      counts.fetch(:acknowledged_manual).positive?
+    parts << manual_inspection_summary(counts.fetch(:manual)) if counts.fetch(:manual).positive?
+    "Summary: #{parts.join(', ')}."
+  end
+
+  def plan_counts(plan)
+    picks = plan.count { |entry| entry.action == :pick }
+    acknowledged_manual = plan.count { |entry| acknowledged_manual_entry?(entry) }
+    manual = plan.count { |entry| entry.manual? && !acknowledged_manual_entry?(entry) }
+
+    {
+      picks:,
+      acknowledged_manual:,
+      manual:,
+      skips: plan.length - picks - manual - acknowledged_manual
+    }
+  end
+
+  def commit_count(count)
+    "#{count} commit#{'s' unless count == 1}"
+  end
+
+  def manual_inspection_summary(count)
+    "#{commit_count(count)} #{count == 1 ? 'needs' : 'need'} manual inspection"
+  end
+
+  def print_plan_entry(entry)
+    case entry.action
+    when :pick
+      puts "PICK #{entry.short_sha} #{entry.subject}"
+    when :skip
+      puts "#{plan_entry_label(entry)} #{entry.short_sha} #{entry.subject}"
+      puts "     #{entry.reason}"
+      puts "     acknowledged by --ack-manual; skipping after operator inspection" if
+        acknowledged_manual_entry?(entry)
+    else
+      raise GitError, "unexpected plan entry action: #{entry.action.inspect}"
+    end
+  end
+
+  def ensure_clean_worktree!
+    if cherry_pick_in_progress?
+      raise GitError, "a cherry-pick is already in progress; run git cherry-pick --continue or --abort first"
+    end
+
+    return if git("status", "--porcelain").strip.empty?
+
+    raise GitError, "working tree is not clean; commit, stash, or discard local changes before normal mode"
+  end
+
+  def ensure_local_target_branch!(target)
+    run_git("show-ref", "--verify", "--quiet", "refs/heads/#{target}") do |_stdout, stderr, status|
+      unless status.success?
+        raise GitError,
+              "normal mode target must be a local branch (got #{target.inspect}): #{stderr.strip}"
+      end
+    end
+  end
+
+  def checkout_target!(target)
+    puts "\nChecking out #{target}..."
+    git("checkout", target)
+  end
+
+  def apply_plan(plan)
+    unless actionable_plan?(plan)
+      puts "\nNothing to cherry-pick."
+      return 0
+    end
+
+    completed_picks = 0
+    plan.each_with_index do |entry, index|
+      next if entry.action == :skip && !entry.manual?
+      next if acknowledged_manual_entry?(entry)
+
+      if entry.manual?
+        warn_manual_entry(entry, completed: completed_picks, remaining: remaining_picks(plan, index))
+        return 1
+      end
+
+      if cherry_pick_entry(entry)
+        completed_picks += 1
+        next
+      end
+
+      warn_cherry_pick_failure(entry, completed: completed_picks, remaining: remaining_picks(plan, index))
+      return 1
+    end
+
+    puts "\nForward-port complete."
+    0
+  end
+
+  def actionable_plan?(plan)
+    plan.any? { |entry| entry.action == :pick || (entry.manual? && !acknowledged_manual_entry?(entry)) }
+  end
+
+  def remaining_picks(plan, index)
+    plan[index + 1..].count { |entry| entry.action == :pick }
+  end
+
+  def cherry_pick_entry(entry)
+    puts "\nCherry-picking #{entry.short_sha} #{entry.subject}"
+    stdout, stderr, status = capture_git("cherry-pick", "-x", entry.sha)
+    puts stdout unless stdout.empty?
+    warn stderr unless stderr.empty?
+    status.success?
+  end
+
+  def warn_cherry_pick_failure(entry, completed:, remaining:)
+    warn "Cherry-pick failed for #{entry.sha}."
+
+    if cherry_pick_in_progress?
+      warn "Resolve the conflict and run git cherry-pick --continue to finish THIS commit."
+      warn_later_commits(remaining, "after continuing to apply the rest", continue_context: true)
+      warn "If you run git cherry-pick --abort, only the current conflicting commit is abandoned."
+    else
+      warn "Git did not leave a cherry-pick in progress; fix the git error above and rerun " \
+           "script/release-forward-port."
+      warn_later_commits(remaining, "after fixing the failed pick", continue_context: false)
+    end
+
+    warn "Earlier successful picks from this run are already committed and safe." if completed.positive?
+  end
+
+  def warn_manual_entry(entry, completed:, remaining:)
+    warn "Manual inspection required for #{entry.sha}."
+    warn entry.reason
+    warn "After inspection, apply any needed manual hunks so a rerun can skip this commit, or rerun with " \
+         "--ack-manual #{entry.sha} to record a no-hunks-needed decision and continue."
+    warn_later_commits(remaining, "after acknowledging the manual item", continue_context: false)
+    warn "Earlier successful picks from this run are already committed and safe." if completed.positive?
+  end
+
+  def warn_later_commits(remaining, rerun_after, continue_context:)
+    return unless remaining.positive?
+
+    queue_note = continue_context ? "not queued by --continue" : "not attempted after this failure"
+    warn "Note: #{remaining} later eligible commit#{'s' unless remaining == 1} in this plan " \
+         "#{remaining == 1 ? 'is' : 'are'} #{queue_note}. Rerun " \
+         "script/release-forward-port #{rerun_after} " \
+         "(it is idempotent and skips commits already applied)."
+  end
+
+  def cherry_pick_in_progress?
+    git_dir = git("rev-parse", "--git-dir").strip
+    path = File.expand_path("CHERRY_PICK_HEAD", git_dir)
+    File.exist?(path)
+  rescue GitError
+    false
+  end
+
+  def normalize_acknowledged_manual_shas!
+    @acknowledged_manual_shas = @options.fetch(:ack_manual).map do |sha|
+      git("rev-parse", "--verify", "#{sha}^{commit}").strip
+    rescue GitError => e
+      raise UsageError, "--ack-manual #{sha.inspect} is not a commit: #{e.message}"
+    end.uniq
+  end
+
+  def validate_acknowledged_manual_shas!(plan)
+    return if @acknowledged_manual_shas.empty?
+
+    manual_shas = plan.select(&:manual?).map(&:sha)
+    unmatched = @acknowledged_manual_shas - manual_shas
+    return if unmatched.empty?
+
+    raise UsageError, "--ack-manual only accepts commits currently marked MANUAL in the plan; " \
+                      "unmatched: #{unmatched.join(', ')}"
+  end
+
+  def acknowledged_manual_entry?(entry)
+    entry.manual? && @acknowledged_manual_shas&.include?(entry.sha)
+  end
+
+  def plan_entry_label(entry)
+    return "ACK-MANUAL" if acknowledged_manual_entry?(entry)
+
+    entry.manual? ? "MANUAL" : "SKIP"
+  end
+
+  def subject_for_commit(sha)
+    git("log", "-1", "--format=%s", sha).strip
+  rescue GitError
+    nil
+  end
+
+  def commit_exists?(sha)
+    _stdout, _stderr, status = capture_git("cat-file", "-e", "#{sha}^{commit}")
+    status.success?
+  end
+
+  def empty_patch?(patch)
+    patch.each_byte.all? { |byte| ASCII_WHITESPACE_BYTES.include?(byte) }
+  end
+
+  def hunkless_patch_id(patch)
+    "#{HUNKLESS_PATCH_ID_PREFIX}#{Digest::SHA256.hexdigest(patch)}"
+  end
+
+  def verify_ref!(ref, label:)
+    git("rev-parse", "--verify", "#{ref}^{commit}")
+  rescue GitError => e
+    raise GitError, "#{label} ref #{ref.inspect} is not a commit: #{e.message}"
+  end
+
+  # The repo requires Ruby >= 3.3, so anonymous forwarding is valid and keeps
+  # these small git wrappers aligned with RuboCop's preferred style. git raises
+  # on failure; capture_git/run_git are the non-raising escape hatches.
+  def git_lines(*)
+    output = git(*)
+    output.lines.map(&:strip).reject(&:empty?)
+  end
+
+  def git(*args)
+    stdout, stderr, status = capture_git(*args)
+    raise GitError, git_error(args, stdout, stderr, status) unless status.success?
+
+    stdout
+  end
+
+  def capture_git(*, stdin_data: "")
+    git_env = { "GIT_TERMINAL_PROMPT" => "0", "GIT_PAGER" => "cat" }
+    Open3.capture3(git_env, "git", *, stdin_data:)
+  end
+
+  def run_git(*)
+    raise ArgumentError, "run_git requires a block" unless block_given?
+
+    stdout, stderr, status = capture_git(*)
+    yield(stdout, stderr, status)
+  end
+
+  def git_error(args, stdout, stderr, status)
+    message = ["git #{args.join(' ')} failed with status #{status.exitstatus}"]
+    message << stderr.strip unless stderr.strip.empty?
+    message << stdout.strip unless stdout.strip.empty?
+    message.join(": ")
+  end
+end
+# rubocop:enable Metrics/ClassLength
+
+exit ReleaseForwardPort.new(ARGV).run if $PROGRAM_NAME == __FILE__

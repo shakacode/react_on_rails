@@ -613,6 +613,36 @@ describe('ClientSideRenderer', () => {
     expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
   });
 
+  it('clears page-scoped RSC globals before the next page initializes payload state', () => {
+    const rscPayloadKey = 'TestComponent-stableHash-dom-id';
+    expect(window.REACT_ON_RAILS_RSC_PAYLOADS).toBeUndefined();
+
+    (window.REACT_ON_RAILS_RSC_PAYLOADS ||= {})[rscPayloadKey] ||= [];
+    window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page1-chunk-a');
+    window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page1-chunk-b');
+    (window.REACT_ON_RAILS_RSC_ERRORS ||= {})[rscPayloadKey] = { hasErrors: false };
+
+    // Verify same-page append: a second injection via ||= must not reset existing state.
+    (window.REACT_ON_RAILS_RSC_PAYLOADS ||= {})[rscPayloadKey] ||= [];
+    window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page1-chunk-c');
+    expect(window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual([
+      'page1-chunk-a',
+      'page1-chunk-b',
+      'page1-chunk-c',
+    ]);
+
+    unmountAll();
+
+    expect(window.REACT_ON_RAILS_RSC_PAYLOADS).toBeUndefined();
+    expect(window.REACT_ON_RAILS_RSC_ERRORS).toBeUndefined();
+
+    (window.REACT_ON_RAILS_RSC_PAYLOADS ||= {})[rscPayloadKey] ||= [];
+    window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey].push('page2-chunk-a');
+    expect(window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual(['page2-chunk-a']);
+    (window.REACT_ON_RAILS_RSC_ERRORS ||= {})[rscPayloadKey] = { hasErrors: true };
+    expect(window.REACT_ON_RAILS_RSC_ERRORS[rscPayloadKey]).toEqual({ hasErrors: true });
+  });
+
   it('runs a teardown returned asynchronously by a renderer on unmount', async () => {
     const teardown = jest.fn();
     const TestRenderer: RendererFunction = (

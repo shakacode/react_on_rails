@@ -39,6 +39,7 @@ import {
 import { isThenable } from 'react-on-rails/@internal/isThenable';
 import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderRegistry.ts';
 import { chainRecoverableErrorHandlers } from './handleRecoverableError.client.ts';
+import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
 
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -615,7 +616,19 @@ function unmountAllStores(): void {
   storeRenderers.clear();
 }
 
+function clearRSCPreloadedPayloadGlobals(): void {
+  // `Partial<>` keeps the two globals optional here (matching the `Window` augmentation
+  // in getReactServerComponent.client.ts) so the `delete`s below type-check.
+  const rscGlobal = globalThis as typeof globalThis & Partial<RSCPreloadedPayloadGlobals>;
+  delete rscGlobal.REACT_ON_RAILS_RSC_PAYLOADS;
+  delete rscGlobal.REACT_ON_RAILS_RSC_ERRORS;
+}
+
 export function unmountAll(): void {
   unmountAllComponents();
   unmountAllStores();
+  // Keep this synchronous and after component/store unmounts. Mid-stream RSC payload/error
+  // scripts use `||=`, so moving or delaying cleanup could let previous-page writes recreate
+  // these globals and land in the next page's state.
+  clearRSCPreloadedPayloadGlobals();
 }
