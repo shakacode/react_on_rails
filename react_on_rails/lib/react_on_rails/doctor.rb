@@ -3475,6 +3475,7 @@ module ReactOnRails
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
     NPM_VIEW_TERMINATION_GRACE_SECONDS = 0.5
+    SKIP_NPM_DIST_TAG_CHECK_ENV = "REACT_ON_RAILS_SKIP_NPM_DIST_TAG_CHECK"
     # npm registry package names used here must be lowercase; keep this allowlist
     # narrow so names remain safe when reused as Node resolver args and paths.
     PACKAGE_NAME_PATTERN = %r{
@@ -3724,6 +3725,13 @@ module ReactOnRails
     end
 
     def check_rsc_package_dist_tags(rsc_package, package_root)
+      if ENV[SKIP_NPM_DIST_TAG_CHECK_ENV].present?
+        checker.add_info(
+          "  ℹ️  Skipping #{RSC_PACKAGE_NAME} npm dist-tag check because #{SKIP_NPM_DIST_TAG_CHECK_ENV} is set"
+        )
+        return
+      end
+
       installed_version = rsc_package["version"].to_s
       return if installed_version.blank?
 
@@ -4194,6 +4202,7 @@ module ReactOnRails
       resolved_path = status.success? ? stdout.strip : ""
       # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
       # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.
+      # Limitation: a stale orphaned directory can still be read if Node resolution fails.
       resolved_path = File.join(package_root, "node_modules", package_name, "package.json") if resolved_path.empty?
       return nil if resolved_path.empty? || !File.exist?(resolved_path)
 

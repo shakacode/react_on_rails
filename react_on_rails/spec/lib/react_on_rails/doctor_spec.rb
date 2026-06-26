@@ -5514,6 +5514,26 @@ RSpec.describe ReactOnRails::Doctor do
         expect(doctor).to have_received(:capture_rsc_dist_tags).with(Dir.pwd).once
       end
 
+      it "skips the dist-tag lookup when the npm dist-tag check environment flag is set" do
+        old_skip = ENV.fetch(described_class::SKIP_NPM_DIST_TAG_CHECK_ENV, nil)
+        ENV[described_class::SKIP_NPM_DIST_TAG_CHECK_ENV] = "1"
+        allow(doctor).to receive(:capture_rsc_dist_tags)
+
+        doctor.send(:check_rsc_react_version)
+
+        info_msgs = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+        expect(info_msgs).to include(
+          a_string_including("Skipping react-on-rails-rsc npm dist-tag check")
+        )
+        expect(doctor).not_to have_received(:capture_rsc_dist_tags)
+      ensure
+        if old_skip.nil?
+          ENV.delete(described_class::SKIP_NPM_DIST_TAG_CHECK_ENV)
+        else
+          ENV[described_class::SKIP_NPM_DIST_TAG_CHECK_ENV] = old_skip
+        end
+      end
+
       it "kills a stalled dist-tag subprocess and reports an info message" do
         stub_const("ReactOnRails::Doctor::NPM_VIEW_FETCH_TIMEOUT_SECONDS", 0.1)
         stub_const("ReactOnRails::Doctor::NPM_VIEW_TERMINATION_GRACE_SECONDS", 0.1)
