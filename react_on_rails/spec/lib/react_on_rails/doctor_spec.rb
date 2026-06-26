@@ -6304,6 +6304,21 @@ RSpec.describe ReactOnRails::Doctor do
         a_string_including("RSC client references manifest must contain a refs array")
       )
     end
+
+    it "warns clearly when the RSC client references manifest is a JSON array" do
+      FileUtils.mkdir_p("ssr-generated")
+      File.write("ssr-generated/rsc-bundle.js", "// RSC bundle")
+      File.write("ssr-generated/react-server-client-manifest.json", JSON.generate("module" => {}))
+      File.write("ssr-generated/rsc-client-references.json", JSON.generate([]))
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("RSC client references manifest must contain a refs array")
+      )
+      expect(warning_messages).not_to include(a_string_including("no implicit conversion of String into Integer"))
+    end
   end
   # rubocop:enable RSpec/VerifiedDoubles
 end

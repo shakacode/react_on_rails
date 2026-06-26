@@ -4651,7 +4651,10 @@ module ReactOnRails
     end
 
     def rsc_client_references_manifest_refs(artifact_path)
-      JSON.parse(File.read(artifact_path))["refs"]
+      payload = JSON.parse(File.read(artifact_path))
+      return nil unless payload.is_a?(Hash)
+
+      payload["refs"]
     end
 
     def rsc_client_references_manifest_path
