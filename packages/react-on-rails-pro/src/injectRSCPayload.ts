@@ -265,37 +265,17 @@ function stylesheetTagsForRSCClientChunks(
   return stylesheetTags;
 }
 
-function splitIncompleteLinkTagTail(htmlString: string) {
-  const lowerHtmlString = htmlString.toLowerCase();
+function splitIncompleteHtmlTagTail(htmlString: string) {
   const lastCompleteTagEnd = htmlString.lastIndexOf('>');
-  const lastLinkStart = lowerHtmlString.lastIndexOf('<link');
+  const lastTagStart = htmlString.lastIndexOf('<');
 
-  if (lastLinkStart !== -1 && lastLinkStart > lastCompleteTagEnd) {
-    return {
-      completeHtml: htmlString.slice(0, lastLinkStart),
-      incompleteLinkTagTail: htmlString.slice(lastLinkStart),
-    };
-  }
-
-  const linkToken = '<link';
-  for (let suffixLength = linkToken.length - 1; suffixLength > 0; suffixLength -= 1) {
-    const possibleLinkTokenPrefix = lowerHtmlString.slice(-suffixLength);
-
-    if (linkToken.startsWith(possibleLinkTokenPrefix)) {
-      return {
-        completeHtml: htmlString.slice(0, -suffixLength),
-        incompleteLinkTagTail: htmlString.slice(-suffixLength),
-      };
-    }
-  }
-
-  if (lastLinkStart === -1 || lastLinkStart < lastCompleteTagEnd) {
-    return { completeHtml: htmlString, incompleteLinkTagTail: '' };
+  if (lastTagStart === -1 || lastTagStart < lastCompleteTagEnd) {
+    return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
   }
 
   return {
-    completeHtml: htmlString.slice(0, lastLinkStart),
-    incompleteLinkTagTail: htmlString.slice(lastLinkStart),
+    completeHtml: htmlString.slice(0, lastTagStart),
+    incompleteHtmlTagTail: htmlString.slice(lastTagStart),
   };
 }
 
@@ -358,9 +338,9 @@ function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteHtmlTa
   }
 
   const htmlString = html.toString();
-  const { completeHtml, incompleteLinkTagTail: nextIncompleteLinkTagTail } = holdIncompleteHtmlTail
-    ? splitIncompleteLinkTagTail(htmlString)
-    : { completeHtml: htmlString, incompleteLinkTagTail: '' };
+  const { completeHtml, incompleteHtmlTagTail: nextIncompleteHtmlTagTail } = holdIncompleteHtmlTail
+    ? splitIncompleteHtmlTagTail(htmlString)
+    : { completeHtml: htmlString, incompleteHtmlTagTail: '' };
   const gatedHtml = completeHtml.replace(
     /<link\b(?=[^>]*\brel=(["'])(?:(?!\1).)*\bpreload\b(?:(?!\1).)*\1)(?=[^>]*\bas=(["'])style\2)(?=[^>]*\bhref=(["'])(?:(?!\3).)+\3)[^>]*\/?>/gi,
     (linkTag) =>
@@ -368,8 +348,8 @@ function applyStreamedStylesheetPreloadGating(html: Buffer, holdIncompleteHtmlTa
   );
 
   return {
-    gatedHtmlBuffer: gatedHtml === htmlString && !nextIncompleteLinkTagTail ? html : Buffer.from(gatedHtml),
-    hasIncompleteHtmlTail: Boolean(nextIncompleteLinkTagTail),
+    gatedHtmlBuffer: gatedHtml === htmlString && !nextIncompleteHtmlTagTail ? html : Buffer.from(gatedHtml),
+    hasIncompleteHtmlTail: Boolean(nextIncompleteHtmlTagTail),
   };
 }
 

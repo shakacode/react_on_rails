@@ -244,6 +244,29 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain('"containsRscPayload":true');
   });
 
+  it('does not insert opt-in flush marks inside split fallback HTML tags', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream({
+      0: '<di',
+      10: 'v>observed split tag</div>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithStylesheetMap(
+      mockHTML,
+      rscRequestTracker,
+      domNodeId,
+      undefined,
+      new Map(),
+      true,
+    );
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<div>observed split tag</div>');
+    expect(resultStr).toContain('performance.mark("react-on-rails:rsc:flush"');
+    expect(resultStr).not.toContain('<di<script');
+  });
+
   it('should handle multiple RSC payloads', async () => {
     const mockRSC = createMockRSCStream(['{"test": "data"}', '{"test": "data2"}']);
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
