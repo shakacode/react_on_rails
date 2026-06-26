@@ -5514,6 +5514,14 @@ RSpec.describe ReactOnRails::Doctor do
         expect(elapsed).to be < 2
       end
 
+      it "cleans up the dist-tag subprocess when setup raises after spawn" do
+        allow(doctor).to receive(:rsc_dist_tag_command).and_return([Gem.ruby, "-e", "sleep 20"])
+        allow(doctor).to receive(:read_pipe_async).and_raise(IOError, "pipe setup failed")
+
+        expect(doctor).to receive(:terminate_rsc_dist_tag_process).and_call_original
+        expect { doctor.send(:capture_rsc_dist_tags, Dir.pwd) }.to raise_error(IOError, "pipe setup failed")
+      end
+
       it "reports an info message when npm returns JSON that is not an object" do
         allow(doctor).to receive(:capture_rsc_dist_tags)
           .with(Dir.pwd)
@@ -5914,6 +5922,24 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages).to include(a_string_including("public/packs"))
       expect(info_messages).to include(a_string_including("ssr-generated"))
       expect(info_messages).to include(a_string_including(".node-renderer-bundles"))
+    end
+
+    it "reports success when the RSC client manifest has client reference metadata" do
+      FileUtils.mkdir_p("public/packs")
+      File.write(
+        "public/packs/react-client-manifest.json",
+        JSON.generate(
+          "filePathToModuleMetadata" => {
+            "/app/client/Button.jsx" => { "id" => "Button", "chunks" => [], "name" => "default" }
+          }
+        )
+      )
+
+      doctor.send(:check_rsc_client_manifest)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("RSC client manifest includes 1 client reference"))
+      expect(checker.messages.none? { |msg| msg[:type] == :warning }).to be true
     end
   end
   # rubocop:enable RSpec/VerifiedDoubles

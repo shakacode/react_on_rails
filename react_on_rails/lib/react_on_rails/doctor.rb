@@ -3475,6 +3475,8 @@ module ReactOnRails
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
     NPM_VIEW_TERMINATION_GRACE_SECONDS = 0.5
+    # npm registry package names used here must be lowercase; keep this allowlist
+    # narrow so names remain safe when reused as Node resolver args and paths.
     PACKAGE_NAME_PATTERN = %r{
       \A
       (?:@[a-z0-9][a-z0-9._-]*/)?
@@ -3776,6 +3778,8 @@ module ReactOnRails
       stderr_r, stderr_w = IO.pipe
       stdout_thread = nil
       stderr_thread = nil
+      pid = nil
+      process_reaped = false
 
       begin
         pid = Process.spawn(*rsc_dist_tag_command, chdir: package_root, out: stdout_w, err: stderr_w, pgroup: true)
@@ -3787,6 +3791,7 @@ module ReactOnRails
         stdout_thread = read_pipe_async(stdout_r)
         stderr_thread = read_pipe_async(stderr_r)
         status = wait_for_rsc_dist_tag_process(pid)
+        process_reaped = true
         stdout = stdout_thread.value
         stderr_thread.value
 
@@ -3798,7 +3803,14 @@ module ReactOnRails
         close_io(stderr_r)
         stdout_thread&.join(0.1)
         stderr_thread&.join(0.1)
+        cleanup_rsc_dist_tag_process(pid, process_reaped)
       end
+    end
+
+    def cleanup_rsc_dist_tag_process(pid, process_reaped)
+      return if pid.nil? || process_reaped
+
+      terminate_rsc_dist_tag_process(pid)
     end
 
     def rsc_dist_tag_command
@@ -4172,6 +4184,7 @@ module ReactOnRails
       script = "console.log(require.resolve(process.argv[1] + '/package.json'))"
       stdout, _stderr, status = Open3.capture3("node", "-e", script, package_name, chdir: package_root)
       resolved_path = status.success? ? stdout.strip : ""
+      # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
       resolved_path = File.join(package_root, "node_modules", package_name, "package.json") if resolved_path.empty?
       return nil if resolved_path.empty? || !File.exist?(resolved_path)
 
