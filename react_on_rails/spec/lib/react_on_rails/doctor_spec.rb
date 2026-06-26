@@ -6114,6 +6114,25 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages).to include(a_string_including("broad client-reference discovery fallback"))
     end
 
+    it "warns when a configured RSC registration entry path is invalid" do
+      previous_entry_path = ENV.fetch(described_class::RSC_REGISTRATION_ENTRY_PATH_ENV, nil)
+      ENV[described_class::RSC_REGISTRATION_ENTRY_PATH_ENV] = "missing-registration-entry.js"
+
+      doctor.send(:check_rsc_artifacts)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("#{described_class::RSC_REGISTRATION_ENTRY_PATH_ENV}=\"missing-registration-entry.js\"")
+      )
+      expect(warning_messages).to include(a_string_including("falling back to default discovery"))
+    ensure
+      if previous_entry_path.nil?
+        ENV.delete(described_class::RSC_REGISTRATION_ENTRY_PATH_ENV)
+      else
+        ENV[described_class::RSC_REGISTRATION_ENTRY_PATH_ENV] = previous_entry_path
+      end
+    end
+
     it "skips direct artifact checks when Pro path utilities are unavailable" do
       hide_const("ReactOnRailsPro::Utils")
 

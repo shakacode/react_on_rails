@@ -178,6 +178,7 @@ module ReactOnRails
       @checker = SystemChecker.new
       @test_output_path_strategy = :unknown
       @rails_environment_loaded = false
+      @rsc_artifacts_rebuild_guidance_added = false
     end
 
     def run_diagnosis
@@ -4553,7 +4554,13 @@ module ReactOnRails
       return nil if configured_path.empty?
 
       resolved_path = File.absolute_path(configured_path, Dir.pwd)
-      return nil unless valid_rsc_manifest_registration_entry?(resolved_path)
+      unless valid_rsc_manifest_registration_entry?(resolved_path)
+        checker.add_warning(
+          "⚠️  #{RSC_REGISTRATION_ENTRY_PATH_ENV}=#{configured_path.inspect} was set but did not pass " \
+          "validation; falling back to default discovery"
+        )
+        return nil
+      end
 
       resolved_path
     end
@@ -4622,8 +4629,11 @@ module ReactOnRails
     end
 
     def rsc_client_references_manifest_path
-      configured_path = ENV.fetch(RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil)
-      File.expand_path(configured_path.presence || DEFAULT_RSC_CLIENT_REFERENCES_MANIFEST_PATH)
+      configured_path = ENV.fetch(RSC_CLIENT_REFERENCES_MANIFEST_ENV, nil).to_s.strip
+      File.expand_path(
+        configured_path.empty? ? DEFAULT_RSC_CLIENT_REFERENCES_MANIFEST_PATH : configured_path,
+        Dir.pwd
+      )
     end
 
     def report_missing_rsc_artifact(label, artifact_path)
