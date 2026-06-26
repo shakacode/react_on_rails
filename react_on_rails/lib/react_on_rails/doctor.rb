@@ -3473,12 +3473,14 @@ module ReactOnRails
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
+    NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
+    NPM_VIEW_TERMINATION_GRACE_SECONDS = 0.5
     PACKAGE_NAME_PATTERN = %r{
       \A
       (?:@[a-z0-9][a-z0-9._-]*/)?
       [a-z0-9][a-z0-9._-]*
       \z
-    }ix
+    }x
     # Keep in sync with RSC_CLIENT_MANIFEST_GUIDANCE in
     # packages/react-on-rails-pro/src/handleErrorRSC.ts.
     RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
@@ -3611,13 +3613,39 @@ module ReactOnRails
       return false unless declared_package_spec(RSC_PACKAGE_NAME)
 
       rsc_package = installed_package_json(package_root, RSC_PACKAGE_NAME)
-      return false unless rsc_package
-      return false unless rsc_package_declares_react_peer_dependencies?(rsc_package)
+      unless rsc_package
+        checker.add_error(<<~MSG.strip)
+          🚫 #{RSC_PACKAGE_NAME} is declared in package.json but could not be resolved from node_modules.
+
+          React Server Components require the installed #{RSC_PACKAGE_NAME} package to validate React peer compatibility.
+
+          Fix: install dependencies in the JavaScript package root, for example:
+            npm install
+        MSG
+        return true
+      end
+
+      unless rsc_package_declares_react_peer_dependencies?(rsc_package)
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  #{RSC_PACKAGE_NAME} #{rsc_package['version']} does not declare React peer dependencies.
+
+          Falling back to the legacy React version heuristic.
+        MSG
+        return false
+      end
 
       peer_compatible = check_rsc_package_peer_compatibility(rsc_package, react_version)
 
-      check_rsc_package_dist_tags(rsc_package, package_root) if peer_compatible
+      if peer_compatible && vulnerable_legacy_rsc_react_version?(react_version)
+        check_legacy_rsc_react_version(react_version)
+      end
+      check_rsc_package_dist_tags(rsc_package, package_root)
       true
+    end
+
+    def vulnerable_legacy_rsc_react_version?(react_version)
+      major, minor, patch = react_version.split(".").map(&:to_i)
+      major == 19 && minor.zero? && patch < 4
     end
 
     def rsc_package_declares_react_peer_dependencies?(rsc_package)
@@ -3720,21 +3748,17 @@ module ReactOnRails
 
     def fetch_rsc_dist_tags(package_root)
       checker.add_info("  ℹ️  Checking #{RSC_PACKAGE_NAME} npm dist-tags to flag stale RSC pins")
-      stdout, _stderr, status = Open3.capture3(
-        "npm",
-        "view",
-        RSC_PACKAGE_NAME,
-        "dist-tags",
-        "--json",
-        "--fetch-timeout=#{NPM_VIEW_FETCH_TIMEOUT_MS}",
-        chdir: package_root
-      )
-      unless status.success?
+      stdout, status = capture_rsc_dist_tags(package_root)
+      unless status&.success?
         report_rsc_dist_tag_lookup_skipped
         return {}
       end
 
-      JSON.parse(stdout)
+      tags = JSON.parse(stdout)
+      return tags if tags.is_a?(Hash)
+
+      report_rsc_dist_tag_lookup_skipped
+      {}
     rescue StandardError
       report_rsc_dist_tag_lookup_skipped
       {}
@@ -3745,6 +3769,102 @@ module ReactOnRails
 
       checker.add_info("  ℹ️  Could not fetch #{RSC_PACKAGE_NAME} dist-tags from npm; skipping stale-tag check")
       @rsc_dist_tag_lookup_skipped_reported = true
+    end
+
+    def capture_rsc_dist_tags(package_root)
+      stdout_r, stdout_w = IO.pipe
+      stderr_r, stderr_w = IO.pipe
+      stdout_thread = nil
+      stderr_thread = nil
+
+      begin
+        pid = Process.spawn(*rsc_dist_tag_command, chdir: package_root, out: stdout_w, err: stderr_w, pgroup: true)
+        stdout_w.close
+        stdout_w = nil
+        stderr_w.close
+        stderr_w = nil
+
+        stdout_thread = read_pipe_async(stdout_r)
+        stderr_thread = read_pipe_async(stderr_r)
+        status = wait_for_rsc_dist_tag_process(pid)
+        stdout = stdout_thread.value
+        stderr_thread.value
+
+        [stdout, status]
+      ensure
+        close_io(stdout_w)
+        close_io(stderr_w)
+        close_io(stdout_r)
+        close_io(stderr_r)
+        stdout_thread&.join(0.1)
+        stderr_thread&.join(0.1)
+      end
+    end
+
+    def rsc_dist_tag_command
+      [
+        "npm",
+        "view",
+        RSC_PACKAGE_NAME,
+        "dist-tags",
+        "--json",
+        "--fetch-timeout=#{NPM_VIEW_FETCH_TIMEOUT_MS}"
+      ]
+    end
+
+    def read_pipe_async(pipe)
+      thread = Thread.new do
+        pipe.read
+      rescue IOError
+        ""
+      end
+      thread.report_on_exception = false if thread.respond_to?(:report_on_exception=)
+      thread
+    end
+
+    def wait_for_rsc_dist_tag_process(pid)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + NPM_VIEW_FETCH_TIMEOUT_SECONDS
+      loop do
+        _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
+        return status if status
+
+        if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+          terminate_rsc_dist_tag_process(pid)
+          return nil
+        end
+
+        sleep 0.05
+      end
+    rescue Errno::ECHILD, Errno::ESRCH
+      nil
+    end
+
+    def terminate_rsc_dist_tag_process(pid)
+      signal_rsc_dist_tag_process("TERM", pid)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + NPM_VIEW_TERMINATION_GRACE_SECONDS
+      loop do
+        _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
+        return if status || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+
+        sleep 0.05
+      end
+
+      signal_rsc_dist_tag_process("KILL", pid)
+      Process.wait(pid)
+    rescue Errno::ECHILD, Errno::ESRCH
+      nil
+    end
+
+    def signal_rsc_dist_tag_process(signal, pid)
+      Process.kill(signal, -pid)
+    rescue Errno::ESRCH, Errno::EINVAL
+      Process.kill(signal, pid)
+    end
+
+    def close_io(io)
+      io.close if io && !io.closed?
+    rescue IOError
+      nil
     end
 
     def npm_range_satisfied?(version, range)
@@ -3760,10 +3880,58 @@ module ReactOnRails
       hyphen_range_satisfied = npm_hyphen_range_result(version, range_clause)
       return hyphen_range_satisfied unless hyphen_range_satisfied.nil?
 
+      x_range_satisfied = npm_x_range_result(version, range_clause)
+      return x_range_satisfied unless x_range_satisfied.nil?
+
       comparators = range_clause.scan(/(?:>=|<=|>|<|=|\^|~)?\s*v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?/)
       return false if comparators.empty?
 
       comparators.all? { |comparator| npm_comparator_satisfied?(version, comparator.strip) }
+    end
+
+    def npm_x_range_result(version, range_clause)
+      match = npm_x_range_match(range_clause)
+      return nil unless match
+
+      segments = [match[:major], match[:minor], match[:patch]]
+      wildcard_index = segments.index { |segment| npm_wildcard_version_segment?(segment) }
+      return nil unless wildcard_index
+      return true if wildcard_index.zero?
+
+      major = segments[0].to_i
+      minor = wildcard_index >= 2 ? segments[1].to_i : 0
+      lower_bound = "#{major}.#{minor}.0"
+      upper_bound = npm_x_range_upper_bound(match[:operator], wildcard_index, major, minor, lower_bound)
+
+      npm_version_compare(version, lower_bound) >= 0 && npm_version_less_than?(version, upper_bound)
+    end
+
+    def npm_x_range_match(range_clause)
+      range_clause.match(
+        /
+          \A\s*
+          (?<operator>[=~^]?)\s*
+          v?
+          (?<major>\d+|[*xX])
+          (?:\.(?<minor>\d+|[*xX]))?
+          (?:\.(?<patch>\d+|[*xX]))?
+          \s*\z
+        /x
+      )
+    end
+
+    def npm_wildcard_version_segment?(segment)
+      segment.blank? || segment.match?(/\A[*xX]\z/)
+    end
+
+    def npm_x_range_upper_bound(operator, wildcard_index, major, minor, lower_bound)
+      if operator == "^" && wildcard_index == 1
+        return major.positive? ? "#{major + 1}.0.0" : "1.0.0"
+      end
+      return npm_caret_upper_bound(lower_bound) if operator == "^"
+      return "#{major + 1}.0.0" if wildcard_index == 1
+
+      "#{major}.#{minor + 1}.0"
     end
 
     def npm_hyphen_range_result(version, range_clause)
@@ -4046,6 +4214,7 @@ module ReactOnRails
       report_rsc_client_manifest_metadata(manifest_path)
     rescue JSON::ParserError => e
       checker.add_warning("⚠️  RSC client manifest is not valid JSON: #{e.message}")
+      add_rsc_client_manifest_static_mode_guidance
     rescue StandardError => e
       checker.add_warning("⚠️  Could not inspect RSC client manifest: #{e.message}")
     end
