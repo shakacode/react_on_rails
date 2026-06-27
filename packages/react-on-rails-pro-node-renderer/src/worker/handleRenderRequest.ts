@@ -22,6 +22,7 @@
 
 import cluster from 'cluster';
 import path from 'path';
+import { performance } from 'perf_hooks';
 import { mkdir, stat } from 'fs/promises';
 import { lock, unlock } from '../shared/locks.js';
 import fileExistsAsync from '../shared/fileExistsAsync.js';
@@ -63,6 +64,31 @@ export type ProvidedNewBundle = {
   timestamp: string | number;
   bundle: Asset;
 };
+
+/**
+ * Attributes the renderer-internal contribution to a streamed RSC response's `responseEnd`
+ * tail by attaching a `Server-Timing` header (GitHub issue #4239).
+ *
+ * Scoped to streamed responses only: the header rides on the renderer's HTTP response head,
+ * which the Rails gem receives before the body chunks. The measured window spans execution
+ * context build (cold or cached) plus the synchronous render that produces the stream object —
+ * i.e. the work before the first chunk is emitted. Per-chunk and total render time are not
+ * known until the stream is consumed, so they are intentionally excluded here.
+ *
+ * Non-streaming (buffered `data`) responses are left untouched: the issue targets the streamed
+ * path, and their full duration is already attributable via the renderer's tracing spans.
+ *
+ * Exported for unit testing.
+ */
+export function addRendererServerTiming(response: ResponseResult, startedAtMs: number): void {
+  if (!response.stream) {
+    return;
+  }
+  const durMs = (performance.now() - startedAtMs).toFixed(3);
+  const entry = `ror_renderer_prepare;dur=${durMs};desc="Node renderer prepare (exec context build + render start)"`;
+  const existing = response.headers['Server-Timing'];
+  response.headers['Server-Timing'] = existing ? `${existing}, ${entry}` : entry;
+}
 
 async function prepareResult(
   renderingRequest: string,
@@ -260,6 +286,9 @@ export async function handleRenderRequest({
   assetsToCopy?: Asset[] | null;
   tracingContext?: TracingContext;
 }): Promise<{ response: ResponseResult; executionContext?: ExecutionContext }> {
+  // Monotonic clock; spans exec-context build + render start so streamed responses can expose
+  // the renderer-internal slice of the responseEnd tail via Server-Timing (issue #4239).
+  const renderStartedAt = performance.now();
   try {
     // const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
     const allBundleFilePaths = Array.from(
@@ -291,15 +320,14 @@ export async function handleRenderRequest({
         },
         () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false),
       );
-      return {
-        response: await prepareResult(
-          renderingRequest,
-          bundleTimestamp,
-          entryBundleFilePath,
-          executionContext,
-        ),
+      const response = await prepareResult(
+        renderingRequest,
+        bundleTimestamp,
+        entryBundleFilePath,
         executionContext,
-      };
+      );
+      addRendererServerTiming(response, renderStartedAt);
+      return { response, executionContext };
     } catch (e) {
       // Ignore VMContextNotFoundError, it means the bundle does not exist.
       // The following code will handle this case.
@@ -357,10 +385,14 @@ export async function handleRenderRequest({
       },
       () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true),
     );
-    return {
-      response: await prepareResult(renderingRequest, bundleTimestamp, entryBundleFilePath, executionContext),
+    const response = await prepareResult(
+      renderingRequest,
+      bundleTimestamp,
+      entryBundleFilePath,
       executionContext,
-    };
+    );
+    addRendererServerTiming(response, renderStartedAt);
+    return { response, executionContext };
   } catch (error) {
     const msg = formatExceptionMessage(
       { renderingRequest },

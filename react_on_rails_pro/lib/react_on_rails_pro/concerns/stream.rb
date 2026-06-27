@@ -78,7 +78,12 @@ module ReactOnRailsPro
         # is when ActionController::Live commits headers. render_to_string itself
         # never writes to response.stream, so this assignment is always safe.
         response.content_type = content_type if content_type
-        response.stream.write(render_stream_template_chunk(template:, render_options:))
+        # Render the shell chunk first so its measured duration is available, then emit the
+        # Server-Timing header, then write. Both steps run BEFORE the first
+        # response.stream.write, which is when ActionController::Live commits response headers.
+        initial_chunk = render_stream_template_chunk(template:, render_options:)
+        emit_rsc_stream_server_timing_header
+        response.stream.write(initial_chunk)
 
         drain_streams_concurrently(parent_task)
         write_rsc_stream_observability_mark
@@ -135,6 +140,37 @@ module ReactOnRailsPro
       @react_on_rails_rsc_stream_initial_chunk_bytes = template_chunk.bytesize
       @react_on_rails_rsc_stream_initial_render_duration_ms = elapsed_ms(render_started_at, render_finished_at)
       template_chunk
+    end
+
+    # Attributes the streamed RSC `responseEnd` tail by exposing renderer-side timing as a
+    # `Server-Timing` response header, so it appears in the browser's resource-timing entries
+    # and in benchmark harnesses (see GitHub issue #4239).
+    #
+    # Constraints (intentional):
+    # - This MUST run before the first `response.stream.write`, because ActionController::Live
+    #   commits headers on the first write. Only timing known before the first chunk can be
+    #   surfaced here — the shell render duration, which includes the blocking wait for each
+    #   streamed component's first renderer chunk.
+    # - Total/stream-complete renderer time is only known after the body is flushed. Rails'
+    #   ActionController::Live does not support HTTP trailers, so that figure is exposed via the
+    #   `rsc_stream_observability` PerformanceMark (`sinceStreamStartMs`) instead of a header.
+    # - The renderer worker's own internal breakdown (exec-context build + render start) is
+    #   emitted as a `Server-Timing` header on the Node renderer's HTTP response; merging it
+    #   into this header is a documented follow-up because RendererHttpClient::Response does not
+    #   yet capture renderer response headers.
+    def emit_rsc_stream_server_timing_header
+      return unless rsc_stream_observability_enabled?
+
+      duration = @react_on_rails_rsc_stream_initial_render_duration_ms
+      return if duration.nil?
+
+      desc = "RoR Pro streamed RSC shell render (includes first renderer chunk)"
+      entry = "ror_stream_shell;dur=#{duration};desc=\"#{desc}\""
+      existing = response.headers["Server-Timing"]
+      response.headers["Server-Timing"] = existing.present? ? "#{existing}, #{entry}" : entry
+    rescue StandardError => e
+      # Observability must never break a real response. Swallow and log.
+      Rails.logger.debug { "[React on Rails Pro] Failed to emit RSC stream Server-Timing header: #{e.class}" }
     end
 
     def write_rsc_stream_observability_mark

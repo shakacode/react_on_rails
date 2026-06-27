@@ -276,6 +276,24 @@ The initial RSC payload remains inline in the navigation response by design. A s
 
 `Server-Timing` headers are useful for non-streamed responses, but `ActionController::Live` commits headers on the first stream write. HTTP trailers can theoretically carry late timing data, but browser, proxy, and CDN support varies, and intermediaries may buffer, strip, rewrite, or hide trailer/header timing values. React on Rails Pro therefore does not make HTTP trailers the default streamed observability path. Inline marks travel in the response body, so they survive the same CDN path as the streamed HTML and are visible to `PerformanceObserver` or the fallback queue after the browser parses them.
 
+#### Server-Timing Attribution
+
+The browser-observable marks above close the client loop. To attribute the server/renderer side of a streamed RSC response's `responseEnd` tail (see [issue #4239](https://github.com/shakacode/react_on_rails/issues/4239)), `rsc_stream_observability: true` also emits a `Server-Timing` **response header**. Because the header is set in the narrow window before the first stream write — the only point at which `ActionController::Live` will still accept header changes — it can only carry timing known before the first byte is flushed:
+
+| `Server-Timing` metric | Emitted by               | What it records                                                                                                                 |
+| ---------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ror_stream_shell`     | Rails (gem)              | Duration of the shell `render_to_string`, which blocks on the first renderer chunk for each streamed component — the wait tail. |
+| `ror_renderer_prepare` | Node renderer (response) | Execution-context build (cold or cached) plus the synchronous render that produces the stream object, before the first chunk.   |
+
+`ror_stream_shell` appears on the navigation response your browser sees (visible in the Network panel and in `PerformanceResourceTiming.serverTiming`). `ror_renderer_prepare` rides on the renderer's HTTP response to Rails; it is visible to anything inspecting that hop (logs, tracing, a direct probe of the renderer).
+
+Two figures are intentionally **not** on the browser-facing header:
+
+- **Total / stream-complete renderer time** is only known after the body is flushed, and `ActionController::Live` does not support HTTP trailers (see the caveat above). It remains available via the `react-on-rails:rsc:stream` mark's `sinceStreamStartMs`.
+- **Merging `ror_renderer_prepare` into the browser-facing header** would require Rails to read the renderer's response headers from the streaming hop; the gem's renderer HTTP client does not yet surface those. Until it does, read `ror_renderer_prepare` from the renderer hop and `ror_stream_shell` from the browser response.
+
+Existing `Server-Timing` entries set by your app or middleware (for example route-level `action_total`) are preserved — the gem appends to them rather than replacing.
+
 #### Loading Multiple Slow Sources in Parallel
 
 When several sources are slow and independent, run them concurrently with the [`async` gem](https://github.com/socketry/async) (already a dependency of React on Rails Pro and loaded by the streaming helper). Pro's streaming stack is fiber-based, so fan out with fibers from the running reactor rather than introducing a separate Ruby-thread concurrency model. The emit block runs inside an `Async` task — capture it with `Async::Task.current` and spawn one child task per source with `parent.async`, so each prop is emitted the moment its own query resolves:

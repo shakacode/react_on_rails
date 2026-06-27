@@ -65,6 +65,9 @@ RSpec.describe ReactOnRailsPro::Stream do
       mocked_stream = instance_double(ActionController::Live::Buffer)
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(mocked_response).to receive(:content_type=)
+      # `and_return` yields the same Hash instance on every call, so header writes performed
+      # before the first stream write (e.g. Server-Timing) persist and are observable in tests.
+      allow(mocked_response).to receive(:headers).and_return({})
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
       allow(mocked_stream).to receive(:closed?).and_return(false)
@@ -180,6 +183,43 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(written_chunks.second).to include('perf.mark("react-on-rails:rsc:stream"')
       expect(written_chunks.second).to include('"phase":"stream-complete"')
       expect(written_chunks.second).to include('"initialChunkBytes":8')
+    end
+
+    it "emits a Server-Timing response header for the shell render when observability is on" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      allow(stream).to receive(:write)
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        sleep 0.1
+      end
+
+      server_timing = controller.response.headers["Server-Timing"]
+      expect(server_timing).to be_present
+      expect(server_timing).to match(/\Aror_stream_shell;dur=\d+(\.\d+)?;desc="[^"]+"\z/)
+    end
+
+    it "does not emit a Server-Timing header when observability is off" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      allow(stream).to receive(:write)
+
+      run_stream(controller) do |_parent|
+        sleep 0.1
+      end
+
+      expect(controller.response.headers["Server-Timing"]).to be_nil
+    end
+
+    it "appends to an existing Server-Timing header rather than replacing it" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      allow(stream).to receive(:write)
+      controller.response.headers["Server-Timing"] = 'action_total;dur=5'
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        sleep 0.1
+      end
+
+      server_timing = controller.response.headers["Server-Timing"]
+      expect(server_timing).to start_with("action_total;dur=5, ror_stream_shell;dur=")
     end
 
     it "escapes the final observability mark name inside the generated script" do
