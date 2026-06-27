@@ -1110,9 +1110,15 @@ describe InstallGenerator, type: :generator do
         </html>
       ERB
       simulate_existing_layout("react_on_rails_default", original_layout)
+      skip_generator = base_generator_fixture(tailwind: true, skip: true)
+      allow(skip_generator).to receive(:say_status)
+      allow(skip_generator).to receive(:say)
 
-      base_generator_fixture(tailwind: true, skip: true).send(:copy_or_update_tailwind_layout)
+      skip_generator.send(:copy_or_update_tailwind_layout)
 
+      expect(skip_generator).to have_received(:say_status)
+        .with(:skip, "#{layout_path} exists and was not updated (--skip)", :yellow)
+      expect(skip_generator).not_to have_received(:say)
       assert_file layout_path do |content|
         expect(content).to eq(original_layout)
       end

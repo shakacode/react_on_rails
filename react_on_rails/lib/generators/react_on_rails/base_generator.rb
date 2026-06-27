@@ -427,10 +427,9 @@ module ReactOnRails
         end
 
         if options[:skip]
-          warn_tailwind_layout_manual_step(
-            REACT_ON_RAILS_DEFAULT_LAYOUT_PATH,
-            reason: "file exists and --skip was used"
-          )
+          say_status :skip,
+                     "#{REACT_ON_RAILS_DEFAULT_LAYOUT_PATH} exists and was not updated (--skip)",
+                     :yellow
           return
         end
 
