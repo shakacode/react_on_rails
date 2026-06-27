@@ -3521,6 +3521,11 @@ module ReactOnRails
     # Keep in sync with RSC_CLIENT_MANIFEST_GUIDANCE in
     # packages/react-on-rails-pro/src/handleErrorRSC.ts.
     RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
+    RSC_RSPACK_DEVELOPMENT_CONFIG_PATH = "config/rspack/development.js"
+    RSC_RSPACK_LAZY_COMPILATION_DISABLED_PATTERN = /
+      (?:\b\w+WebpackConfig|\b\w+Config|\b\w+)\.lazyCompilation\s*=\s*false\b |
+      \blazyCompilation\s*:\s*false\b
+    /x
 
     def check_rsc_setup
       unless ReactOnRails::Utils.react_on_rails_pro?
@@ -3543,6 +3548,7 @@ module ReactOnRails
       check_rsc_renderer_mode(pro_config)
       check_rsc_payload_route
       check_rsc_bundler_config
+      check_rsc_rspack_lazy_compilation
       check_rsc_react_version
       check_rsc_procfile_watcher
       check_rsc_client_manifest
@@ -3613,6 +3619,33 @@ module ReactOnRails
             rails g react_on_rails:rsc
         MSG
       end
+    end
+
+    def check_rsc_rspack_lazy_compilation
+      return unless active_assets_bundler == "rspack"
+      return unless File.exist?("config/rspack/rscWebpackConfig.js")
+
+      unless File.exist?(RSC_RSPACK_DEVELOPMENT_CONFIG_PATH)
+        checker.add_warning("⚠️  RSC Rspack development config not found: #{RSC_RSPACK_DEVELOPMENT_CONFIG_PATH}")
+        checker.add_info("  💡 Cannot verify that Rspack lazyCompilation is disabled for RSC dev-server mode")
+        return
+      end
+
+      development_config = File.read(RSC_RSPACK_DEVELOPMENT_CONFIG_PATH)
+      if development_config.match?(RSC_RSPACK_LAZY_COMPILATION_DISABLED_PATTERN)
+        checker.add_success("✅ Rspack lazy compilation disabled for RSC dev-server")
+      else
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  Rspack lazyCompilation can leave the RSC client manifest empty in normal bin/dev mode.
+
+          #{RSC_RSPACK_DEVELOPMENT_CONFIG_PATH} does not appear to disable lazyCompilation while the dev server is running.
+        MSG
+        checker.add_info("  💡 Add this inside the Rspack WEBPACK_SERVE branch:")
+        checker.add_info("     clientWebpackConfig.lazyCompilation = false;")
+        checker.add_info("  💡 Or rerun the RSC generator to refresh generated Rspack config files")
+      end
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not inspect RSC Rspack lazyCompilation config: #{e.message}")
     end
 
     def check_rsc_react_version

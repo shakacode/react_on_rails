@@ -5274,6 +5274,46 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "check_rsc_rspack_lazy_compilation" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) do
+          FileUtils.mkdir_p("config/rspack")
+          File.write("config/rspack/rscWebpackConfig.js", "module.exports = {}")
+          File.write("config/rspack/development.js", "module.exports = {};")
+          FileUtils.mkdir_p("config")
+          File.write("config/shakapacker.yml", "default:\n  assets_bundler: rspack\n")
+          example.run
+        end
+      end
+    end
+
+    it "warns when RSC Rspack dev-server config does not disable lazy compilation" do
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages)
+        .to include(a_string_including("Rspack lazyCompilation can leave the RSC client manifest empty"))
+      expect(warning_messages).to include(a_string_including("config/rspack/development.js"))
+      expect(info_messages).to include(a_string_including("clientWebpackConfig.lazyCompilation = false"))
+    end
+
+    it "reports success when RSC Rspack dev-server config disables lazy compilation" do
+      File.write("config/rspack/development.js", "clientWebpackConfig.lazyCompilation = false;\n")
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("Rspack lazy compilation disabled for RSC dev-server"))
+      expect(warning_messages).to be_empty
+    end
+  end
+
   describe "check_rsc_react_version" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }

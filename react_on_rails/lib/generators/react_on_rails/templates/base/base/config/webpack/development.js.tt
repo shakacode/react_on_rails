@@ -1,12 +1,10 @@
 <%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/development.js") %>
 
 const { devServer, inliningCss, config } = require('shakapacker');
-const { existsSync } = require('fs');
-const { resolve } = require('path');
 
 const serverClientOrBoth = require('./ServerClientOrBoth');
 
-const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
+const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig, rscWebpackConfig) => {
   // React Refresh (Fast Refresh) setup - only when dev server is running (HMR mode)
   if (process.env.WEBPACK_SERVE) {
     // eslint-disable-next-line global-require
@@ -15,7 +13,7 @@ const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
       const { ReactRefreshRspackPlugin } = require('@rspack/plugin-react-refresh');
       clientWebpackConfig.plugins.push(new ReactRefreshRspackPlugin());
 
-      if (existsSync(resolve(__dirname, 'rscWebpackConfig.js'))) {
+      if (rscWebpackConfig) {
         // RSC client references must be compiled before the server render reads the client manifest.
         clientWebpackConfig.lazyCompilation = false;
       }
