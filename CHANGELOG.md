@@ -55,6 +55,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   conflicting `RUBYOPT`. The shipped generated `bin/shakapacker-precompile-hook` template now uses
   the same UTF-8 subprocess environment for RSC client-reference discovery. Follow-up to
   [PR 4169](https://github.com/shakacode/react_on_rails/pull/4169).
+  [PR 4231](https://github.com/shakacode/react_on_rails/pull/4231) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **Generated RSC + Rspack apps render in normal `bin/dev`**:
   RSC + Rspack generator output now disables Rspack lazy compilation while the
