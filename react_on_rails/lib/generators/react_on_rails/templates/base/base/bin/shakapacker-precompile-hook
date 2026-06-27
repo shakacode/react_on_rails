@@ -63,9 +63,10 @@ end
 # fallback for systems where the C.UTF-8 locale is not installed and LANG/LC_ALL alone would not
 # take effect. If RUBYOPT already pins an encoding it is an explicit, deliberate request that we
 # honor rather than override or duplicate (Ruby raises "default_external already set" on a
-# conflicting second -E).
+# conflicting second -E). The encoding can be embedded in a short-option cluster (e.g. -wEUS-ASCII,
+# -W0EUS-ASCII), so match -E/-K after any run of preceding short flags, plus the long-option forms.
 def utf8_widened_rubyopt(rubyopt)
-  return rubyopt if rubyopt.match?(/(?:\A|\s)(?:-E|-K|--encoding|--external-encoding|--internal-encoding)/)
+  return rubyopt if rubyopt.match?(/(?:\A|\s)(?:-[a-zA-Z0-9]*[EK]|--(?:external-|internal-)?encoding)/)
 
   "-EUTF-8 #{rubyopt}".strip
 end

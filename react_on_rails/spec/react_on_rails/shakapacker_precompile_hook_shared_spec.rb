@@ -213,6 +213,19 @@ RSpec.describe "Shakapacker precompile hook shared script" do
         end
       end
 
+      it "honors an encoding pinned inside a short-option cluster (no double -E crash)" do
+        # -E/-K can be embedded in a cluster like -wEUS-ASCII or -W0EUS-ASCII (no whitespace before
+        # E). Prepending -EUTF-8 there would make Ruby raise "default_external already set", so these
+        # must be detected and left untouched too.
+        with_locale_encoding(Encoding::US_ASCII) do
+          ["-wEUS-ASCII", "-W0EUS-ASCII", "-wKs"].each do |rubyopt|
+            with_env("RUBYOPT" => rubyopt) do
+              expect(utf8_subprocess_env["RUBYOPT"]).to eq(rubyopt)
+            end
+          end
+        end
+      end
+
       it "still applies caller-supplied functional env keys while widening" do
         with_locale_encoding(Encoding::US_ASCII) do
           with_env("RUBYOPT" => nil) do
