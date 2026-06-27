@@ -3522,9 +3522,8 @@ module ReactOnRails
     # packages/react-on-rails-pro/src/handleErrorRSC.ts.
     RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
     RSC_RSPACK_DEVELOPMENT_CONFIG_PATH = "config/rspack/development.js"
-    RSC_RSPACK_LAZY_COMPILATION_DISABLED_PATTERN = /
-      (?:\b\w+WebpackConfig|\b\w+Config|\b\w+)\.lazyCompilation\s*=\s*false\b |
-      \blazyCompilation\s*:\s*false\b
+    RSC_RSPACK_CLIENT_LAZY_COMPILATION_DISABLED_PATTERN = /
+      \bclientWebpackConfig\.lazyCompilation\s*=\s*false\b
     /x
 
     def check_rsc_setup
@@ -3632,7 +3631,7 @@ module ReactOnRails
       end
 
       development_config = File.read(RSC_RSPACK_DEVELOPMENT_CONFIG_PATH)
-      if development_config.match?(RSC_RSPACK_LAZY_COMPILATION_DISABLED_PATTERN)
+      if development_config.match?(RSC_RSPACK_CLIENT_LAZY_COMPILATION_DISABLED_PATTERN)
         checker.add_success("✅ Rspack lazy compilation disabled for RSC dev-server")
       else
         checker.add_warning(<<~MSG.strip)

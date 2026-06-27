@@ -5312,6 +5312,28 @@ RSpec.describe ReactOnRails::Doctor do
       expect(success_messages).to include(a_string_including("Rspack lazy compilation disabled for RSC dev-server"))
       expect(warning_messages).to be_empty
     end
+
+    it "continues warning when only unrelated lazy compilation settings are disabled" do
+      File.write(
+        "config/rspack/development.js",
+        <<~JAVASCRIPT
+          module.exports = {
+            lazyCompilation: false,
+          };
+
+          serverWebpackConfig.lazyCompilation = false;
+          rscWebpackConfig.lazyCompilation = false;
+        JAVASCRIPT
+      )
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(success_messages).to be_empty
+      expect(warning_messages)
+        .to include(a_string_including("Rspack lazyCompilation can leave the RSC client manifest empty"))
+    end
   end
 
   describe "check_rsc_react_version" do
