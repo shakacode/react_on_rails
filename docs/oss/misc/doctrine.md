@@ -18,7 +18,7 @@ The React on Rails setup provides several key components related to front-end de
 
 1. [Hot reloading of both JavaScript and CSS](https://gaearon.github.io/react-hot-loader/), using the [webpack-dev-server](https://webpack.js.org/configuration/dev-server/) package. This works for both using an [Express server](http://expressjs.com/) to load stubs for the ajax requests, as well as using a live Rails server. **Oh yes**, your Rails server can do hot reloading!
 2. [CSS modules](https://github.com/css-modules/webpack-demo) which remove the madness of a global namespace for CSS. We organize our CSS (Sass, actually) right next to our JavaScript React component files. This means no more creating long class names to ensure that CSS picks up the right styles.
-3. [ES6 JavaScript](http://es6-features.org/#Constants) is a great language for client side coding, much more so than Ruby due to the asynchronous nature of UI programming.
+3. [JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript) is a great language for client side coding, much more so than Ruby due to the asynchronous nature of UI programming.
 4. JavaScript libraries and tooling work better in the native node way, rather than via some aspect of Sprockets and the Rails Asset Pipeline. We find way less frustration this way, especially from being able to get the latest advances with the rest of the JavaScript community. Why complicated beautiful JavaScript tooling Rails asset pipeline complexity?
 5. We want our JavaScript from NPM. Getting JavaScript from rubygems.org is comparatively frustrating.
 6. Happiness for us is actively participating in open source, so we want to be where the action is, which is with the NPM libraries on github.com.
