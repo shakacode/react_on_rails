@@ -218,7 +218,7 @@ RSpec.describe "Shakapacker precompile hook shared script" do
         # E). Prepending -EUTF-8 there would make Ruby raise "default_external already set", so these
         # must be detected and left untouched too.
         with_locale_encoding(Encoding::US_ASCII) do
-          ["-wEUS-ASCII", "-W0EUS-ASCII", "-wKs"].each do |rubyopt|
+          ["-wEUS-ASCII", "-W0EUS-ASCII", "-wKs", "-dEUS-ASCII"].each do |rubyopt|
             with_env("RUBYOPT" => rubyopt) do
               expect(utf8_subprocess_env["RUBYOPT"]).to eq(rubyopt)
             end
