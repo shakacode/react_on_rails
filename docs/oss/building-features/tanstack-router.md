@@ -126,3 +126,4 @@ end
 - [Render-Functions Guide](../core-concepts/render-functions.md)
 - [View Helpers API](../api-reference/view-helpers-api.md)
 - [React Router Guide](./react-router.md)
+- [TanStack Query Guide](./tanstack-query.md) (the client-side server-state layer this pairs with)

@@ -382,6 +382,8 @@ Calling `emit.call` from concurrent fibers is safe: the reactor is single-thread
 
 ## Migrating from React Query / TanStack Query
 
+> **New to TanStack Query on Rails?** This section covers _migrating_ an existing React Query setup into RSC. For a from-scratch guide to the recommended patterns (CSRF-aware fetch, stable query keys, first-paint seeding, and mutations), see [Using TanStack Query](../building-features/tanstack-query.md).
+
 React Query remains valuable in the RSC world for features like polling, optimistic updates, and infinite scrolling. But for simple data display, Server Components replace it entirely.
 
 ### Pattern 1: Simple Replacement (No Client Cache Needed)
