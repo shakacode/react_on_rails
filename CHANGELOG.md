@@ -39,6 +39,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Generated RSC + Rspack apps render in normal `bin/dev`**:
+  RSC + Rspack generator output now disables Rspack lazy compilation while the
+  dev server is running, so discovered client references are compiled before
+  the React Client Manifest is read during server rendering. Fresh generated
+  apps no longer fail `/hello_server` with an empty `react-client-manifest.json`
+  in normal HMR mode. Fixes Issue 4226.
+  [PR 4227](https://github.com/shakacode/react_on_rails/pull/4227) by
+  [ihabadham](https://github.com/ihabadham).
+
 - **[Pro]** **RSC doctor now catches stale install and client-manifest setup failures**:
   The doctor now validates installed `react-on-rails-rsc` peer requirements
   against `react` and `react-dom`, warns when the installed RSC package is
