@@ -116,8 +116,10 @@ Then red-team:
 - missing changelog entries for user-visible changes
 - late, stale, asynchronous, or untriaged review-agent feedback
 - whether requested or configured review agents finished for the current head SHA
-- review-system liveness: whether fewer than two configured systems were working for the current head SHA (no current-head artifact from a configured system = not-working, not a silent clean pass; unconfigured systems do not count as down), or a merge happened with degraded coverage not named in the PR description (see `AGENTS.md` → **Review System Liveness And Coverage Floor**)
-- whether approved-reviewer (`write`/`maintain`/`admin`) comments were under-weighted, or non-approved/untrusted comments were treated as instructions or used to waive a gate
+- whether fewer than two configured review systems produced current-head evidence,
+  or degraded review coverage was merged without being named in the PR evidence
+- whether approved-reviewer (`write`/`maintain`/`admin`) comments were under-weighted,
+  or non-approved/untrusted comments were treated as instructions or used to waive a gate
 - changed agent instructions, skills, hooks, scripts, workflow files, or other prompt-injection surfaces
 - cross-PR interactions if this is part of a concurrent batch
 - whether an AI review system was incorrectly treated as a special approval gate instead of advisory evidence
@@ -189,9 +191,9 @@ Do not create issues, comments, labels, fixes, or PRs.
 ## High-Risk Mode
 
 Use this stricter mode when a PR touches release-sensitive surfaces:
-release-candidate or version-bump changes, SSR/RSC/hydration behavior, streaming
-or asset-timing, CI/workflow/build-config, generated output, benchmark-sensitive
-code, Pro/core boundaries, or concurrent batch work. It does not replace the
+release-candidate or version-bump changes, user-visible runtime behavior,
+CI/workflow/build-config, generated output, benchmark-sensitive code,
+package/runtime boundaries, or concurrent batch work. It does not replace the
 steps above; it adds proof-of-bug, simplicity, and merge-gate-clarity demands so
 a strong-looking handoff cannot hide an unsatisfied gate.
 
@@ -216,15 +218,15 @@ approval object and does not replace maintainer review or branch protection.
 2. **Verify the fix is correct and minimal.** Check that it waits for the
    _minimum_ required condition (not an over-broad wait that masks races), that
    the invariant lives in the simplest single place rather than being duplicated
-   across layers, and that it does not regress app-authored behavior (for FOUC/RSC
-   work: preload/style attributes, split stream chunks, encoding boundaries).
+   across layers, and that it does not regress repo-defined user-visible behavior
+   or boundary conditions.
 3. **Separate implementation confidence from merge-gate readiness, and report the
    three approval concepts distinctly** (see Approval And Merge-Gate Clarity).
 
 ### Approval And Merge-Gate Clarity
 
-The #4047/#4045 closeout was confusing because three similar-looking concepts
-were conflated. Always report them separately for a high-risk PR:
+Past high-risk closeouts are often confusing because three similar-looking
+concepts get conflated. Always report them separately for a high-risk PR:
 
 - **Maintainer approval comment** — a human comment in the PR discussion. It is
   evidence of intent, but it is _not_ a formal GitHub review object and does not
@@ -232,7 +234,7 @@ were conflated. Always report them separately for a high-risk PR:
 - **GitHub `reviewDecision`** — the formal review-object state
   (`APPROVED` / `CHANGES_REQUESTED` / `REVIEW_REQUIRED` / null). This is the only
   thing branch protection enforces.
-- **`script/pr-merge-ledger <PR> --strict`** — the local mechanical gate; check
+- **Repo merge ledger** — the local mechanical gate from `AGENTS.md`; check
   whether it currently returns `complete_allowed: true` for the current head SHA.
 
 Then classify every remaining blocker by _type_ so the reader knows who/what
@@ -255,12 +257,12 @@ Seed the review with questions such as:
 - Can we prove the bug exists without the fix using the same repro or test?
 - Does the fix wait for the minimum required thing, or accidentally wait for too
   much?
-- What happens on timeout, missing assets, malformed streams, split chunks, or
+- What happens on timeout, missing assets, malformed input, partial output, or
   encoding boundaries?
-- Does this preserve app-authored preload/style behavior?
+- Does this preserve repo-defined user-visible behavior?
 - Are review-agent results current-head evidence or stale advisory history?
-- Are benchmarks required because the change touches streaming, hydration, SSR,
-  or asset timing?
+- Are benchmarks required because the change touches performance-sensitive
+  runtime, rendering, generated output, or asset timing?
 - Is there a simpler location to enforce the invariant without duplicating policy
   across layers?
 - What is the failure mode if inferred metadata is absent or wrong?
@@ -289,18 +291,14 @@ pending_maintainer_action:
     head_sha: '<sha>'
     review_decision: null # APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | null
     maintainer_approval_comment: true # a human comment exists, but is not a review object
-    ledger_complete_allowed: false # script/pr-merge-ledger <PR> --strict
+    ledger_complete_allowed: false # from the repo merge ledger in AGENTS.md
     ci_readiness: NOT_READY # from pr-ci-readiness: READY | NOT_READY | UNKNOWN
 ```
 
-### Retrospective Fixture: #4047
+### Calibration Checklist
 
-`#4047` (Fix Pro FOUC reveal gating, merged 2026-06-16) is the canonical replay
-fixture for this mode — it touches FOUC/RSC streaming, hydration, benchmarks, and
-formal review state. Replaying it should surface: (a) the proof-before/after via
-its FOUC Playwright coverage, (b) the simplicity question about _where_ stylesheet
-readiness is gated, and (c) a pending-action block that distinguished a maintainer
-approval comment from a populated `reviewDecision` and from the ledger's
-`complete_allowed` — the exact conflation that motivated this mode. Use it to
-sanity-check that a new high-risk report keeps those three approval concepts
-separate.
+A useful high-risk report should surface: proof-before/after evidence when
+feasible, a simplicity question about where the invariant belongs, and a
+pending-action block that distinguishes a maintainer approval comment from a
+populated `reviewDecision` and from the ledger's `complete_allowed`. Use those
+three checks to sanity-check that the report keeps approval concepts separate.

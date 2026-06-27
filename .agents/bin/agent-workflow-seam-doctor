@@ -6,7 +6,6 @@
 require "json"
 require "optparse"
 
-# rubocop:disable Metrics/ModuleLength
 module AgentWorkflowSeamDoctor
   SECTION = "Agent Workflow Configuration"
   SECTION_HEADING = /^##\s+#{Regexp.escape(SECTION)}\s*$/
@@ -15,6 +14,8 @@ module AgentWorkflowSeamDoctor
     "Pre-push local validation",
     "CI change detector",
     "Hosted-CI trigger",
+    "CI parity environment",
+    "Secret redaction patterns",
     "Benchmark labels",
     "Follow-up issue prefix",
     "Changelog",
@@ -35,6 +36,7 @@ module AgentWorkflowSeamDoctor
       follow-up\ prefix |
       hosted[-\ ]CI |
       benchmark\ labels? |
+      (?:secret\ )?redaction\ (?:patterns?|commands?) |
       changelog\ path |
       main\ branch |
       base\ branch |
@@ -55,8 +57,19 @@ module AgentWorkflowSeamDoctor
     )
     [^>\n]*>
   }ix
+  CI_PARITY_KEYWORDS = /(?:CI\ parity\ (?:environment|command)|parity\ environment|runner\ image|reproduction\ guide)/
+  CI_PARITY_FILLED_VALUE = /\s*(?![^>,:\n]*\boptional\b)[^>,:\n]*:\s*[^>\s]/
+  # CI_PARITY_SEAM_PLACEHOLDER matches unfilled values only. The negative
+  # lookahead lets filled seam values like <runner image: ghcr.io/...> pass.
+  # The [^>,:\n]* span intentionally excludes commas so
+  # <runner image, optional: value> still counts as unresolved.
+  CI_PARITY_SEAM_PLACEHOLDER = /<(?=[^>\n]*(?:#{CI_PARITY_KEYWORDS.source})\b(?!#{CI_PARITY_FILLED_VALUE.source}))[^>\n]*>/i
+  # CI_PARITY_EXECUTABLE_PLACEHOLDER matches any runnable CI parity angle token:
+  # filled or unfilled, it still needs repo substitution before copy/paste use.
+  CI_PARITY_EXECUTABLE_PLACEHOLDER = /<[^>\n]*(?:#{CI_PARITY_KEYWORDS.source})\b[^>\n]*>/i
   EXECUTABLE_FENCE_LANGS = ["", "bash", "sh", "shell", "zsh", "ruby", "python", "js", "javascript"].freeze
   COMMAND_LIKE = %r{
+    (?:\bact\s+(?:--?|\S+\s+--?|\S*<)) |
     (?:\b(?:bash|bundle|codex|gh|git|node|npm|pnpm|rake|ruby|script|sh|yarn)\b) |
     (?:\b(?:bin|script|\.agents)/)
   }x
@@ -76,6 +89,7 @@ module AgentWorkflowSeamDoctor
       issues << "missing AGENTS.md section: #{SECTION}"
     else
       issues.concat(missing_key_issues(config))
+      issues.concat(unresolved_extra_key_issues(config))
     end
 
     issues.concat(shared_root_issues(shared_roots))
@@ -144,9 +158,18 @@ module AgentWorkflowSeamDoctor
     end
   end
 
+  def unresolved_extra_key_issues(config)
+    config.filter_map do |key, value|
+      next if REQUIRED_KEYS.include?(key)
+      next unless unresolved_template_value?(value)
+
+      "unresolved #{SECTION} value for key: #{key}"
+    end
+  end
+
   def unresolved_template_value?(value)
     stripped = value.strip
-    stripped.empty? || stripped.match?(SEAM_PLACEHOLDER)
+    stripped.empty? || stripped.match?(SEAM_PLACEHOLDER) || stripped.match?(CI_PARITY_SEAM_PLACEHOLDER)
   end
 
   def shared_markdown_paths(root, shared_roots: [])
@@ -236,16 +259,22 @@ module AgentWorkflowSeamDoctor
   def placeholders_from_line(line, in_fence:, executable_fence:)
     placeholders = []
 
-    placeholders.concat(line.scan(SEAM_PLACEHOLDER)) if in_fence && executable_fence && executable_line?(line)
+    if in_fence && executable_fence && executable_line?(line)
+      placeholders.concat(line.scan(SEAM_PLACEHOLDER))
+      placeholders.concat(line.scan(CI_PARITY_EXECUTABLE_PLACEHOLDER))
+    end
 
     inline_code_snippets(line).each do |snippet|
       next if in_fence
       next unless command_like?(snippet)
 
       placeholders.concat(snippet.scan(SEAM_PLACEHOLDER))
+      placeholders.concat(snippet.scan(CI_PARITY_EXECUTABLE_PLACEHOLDER))
     end
 
-    placeholders
+    # The two placeholder regexes intentionally overlap for compound runnable
+    # tokens such as <hosted CI runner image>; keep this dedupe.
+    placeholders.uniq
   end
 
   def executable_line?(line)
@@ -286,7 +315,6 @@ module AgentWorkflowSeamDoctor
     "#{JSON.pretty_generate(payload)}\n"
   end
 end
-# rubocop:enable Metrics/ModuleLength
 
 if $PROGRAM_NAME == __FILE__
   options = { root: Dir.pwd, json: false, shared_roots: [] }

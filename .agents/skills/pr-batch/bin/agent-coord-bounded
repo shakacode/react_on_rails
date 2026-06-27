@@ -88,9 +88,11 @@ timeout = parse_timeout(
 )
 
 command = ["agent-coord", *ARGV]
-stdout_file = Tempfile.new("agent-coord-bounded-stdout")
-stderr_file = Tempfile.new("agent-coord-bounded-stderr")
+stdout_file = nil
+stderr_file = nil
 begin
+  stdout_file = Tempfile.new("agent-coord-bounded-stdout")
+  stderr_file = Tempfile.new("agent-coord-bounded-stderr")
   interrupted_signal = nil
 
   %w[INT TERM HUP].each do |signal|
@@ -129,11 +131,16 @@ begin
     sleep 0.05
   end
 
+  if interrupted_signal
+    terminate_process_group(pid, signal: interrupted_signal)
+    exit(128 + Signal.list.fetch(interrupted_signal))
+  end
+
   terminate_process_group(pid) if timed_out
 
   if timed_out
     warn "agent-coord-bounded: timed out after #{timeout}s: #{Shellwords.join(command)}"
-    exit 124 # stdout intentionally suppressed; partial output would mislead callers.
+    exit 124
   end
 
   stdout_file.rewind
@@ -143,6 +150,6 @@ begin
 
   exit(exit_code_for_status(status))
 ensure
-  stdout_file.close!
-  stderr_file.close!
+  stdout_file&.close!
+  stderr_file&.close!
 end

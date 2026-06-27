@@ -25,17 +25,18 @@ role, not a maker role.
 
 Gather live evidence from git, GitHub, and agent-coord, not chat memory:
 
-1. Run `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 doctor --json`,
-   then `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id <batch-id> --json`
+1. Run bounded coordination reads through the resolved `pr-batch` helper:
+   `PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-.agents/skills/pr-batch}"; "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 doctor --json`,
+   then `"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --batch-id <batch-id> --json`
    when a batch id is known, or
-   `.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --repo <owner/repo> --target <issue-or-pr> --json`
+   `"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --repo <owner/repo> --target <issue-or-pr> --json`
    for a specific target without a batch id. Use broad `agent-coord status` only
-   for a repo-wide audit sweep, also through `agent-coord-bounded`. Record
-   active, stale, dead (lost-heartbeat), blocked, done, released, and
-   done-unmerged lanes plus `blocked_on` refs. If `agent-coord` is not installed,
-   doctor exits non-zero or times out, or the selected bounded status command
-   fails, exits 2, or times out, record coordination state as `UNKNOWN` and rely
-   on GitHub state plus git history only.
+   for a repo-wide audit sweep, also through the bounded helper. Record active,
+   stale, dead (lost-heartbeat), blocked, done, released, and done-unmerged lanes
+   plus `blocked_on` refs. If `agent-coord` is not installed, doctor exits
+   non-zero or times out, or the selected bounded status command fails or times
+   out, record coordination state as `UNKNOWN` and rely on GitHub state plus git
+   history only.
 
    Note: `agent-coord` lane state is operational status only. The Classification
    section defines separate intent-achievement classes; a `done` or `released`

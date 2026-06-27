@@ -34,8 +34,9 @@ BLOCKING_SUSPICIOUS_PATTERN = /
   base64\s+-d
 /ix
 
-# These terms can appear in legitimate trusted CI/docs discussion, so comments
-# only warn; newly added PR diff lines still treat them as blocking.
+# These terms can appear in legitimate trusted CI/docs discussion, so comment
+# bodies only warn. Diff lines from trusted PR sources also warn; diffs from
+# untrusted PR sources block.
 WARNING_SUSPICIOUS_PATTERN = /
   GITHUB_TOKEN|
   private\s+key|
@@ -46,9 +47,6 @@ WARNING_SUSPICIOUS_PATTERN = /
   sudo\s|
   ssh-key
 /ix
-
-# Diffs get stricter scrutiny: both blocking and warning terms are treated as blocking.
-DIFF_SUSPICIOUS_PATTERN = Regexp.union(BLOCKING_SUSPICIOUS_PATTERN, WARNING_SUSPICIOUS_PATTERN)
 
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--trust-config PATH] " \
@@ -181,143 +179,6 @@ def trusted_actor?(repo, login, trust_config, team_cache)
   trusted_team_member?(repo, login, trust_config, team_cache)
 end
 
-def github_actions_bot?(login)
-  normalized_login(login) == "github-actions[bot]"
-end
-
-def normalized_comment_lines(body)
-  body.to_s.gsub(/\r\n?/, "\n").sub(/\n+\z/, "").split("\n", -1)
-end
-
-HOSTED_CI_REQUEST_METADATA_LINE_SETS = [
-  [
-    "## Hosted CI Requested",
-    "",
-    /\ATriggered \d+ workflow\(s\) for `[0-9a-f]{12}`\.\z/,
-    "Mode: optimized hosted CI (path-selected by `script/ci-changes-detector`).",
-    "Added `ready-for-hosted-ci`, so future commits will keep running optimized hosted CI " \
-    "until `+ci-stop-hosted` is used.",
-    "",
-    "View progress in the Actions tab."
-  ],
-  [
-    "## Force-Full Hosted CI Requested",
-    "",
-    /\ATriggered \d+ workflow\(s\) for `[0-9a-f]{12}`\.\z/,
-    "Mode: force-full hosted CI (bypasses optimized change selection).",
-    "Added `ready-for-hosted-ci` and `force-full-hosted-ci`, so future commits will bypass " \
-    "optimized hosted CI selection until `+ci-stop-full` is used.",
-    "",
-    "View progress in the Actions tab."
-  ]
-].map(&:freeze).freeze
-
-HOSTED_CI_STOP_METADATA_LINE_SETS = [
-  [
-    "## Hosted CI Mode Disabled",
-    "",
-    "Removed hosted CI labels. Future commits will use only the required gate until hosted CI is requested again.",
-    "",
-    "Use `+ci-run-hosted` to re-enable optimized hosted CI."
-  ],
-  [
-    "## Hosted CI Mode Disabled",
-    "",
-    "No hosted CI labels were present. Future commits are already using only the required gate.",
-    "",
-    "Use `+ci-run-hosted` to re-enable optimized hosted CI."
-  ],
-  [
-    "## Force-Full Hosted CI Disabled",
-    "",
-    "Removed `force-full-hosted-ci`. If `ready-for-hosted-ci` is still present, future commits keep running " \
-    "optimized hosted CI.",
-    "",
-    "Use `+ci-force-full` to re-enable the force-full hosted override."
-  ],
-  [
-    "## Force-Full Hosted CI Disabled",
-    "",
-    "No force-full hosted CI label was present.",
-    "",
-    "Use `+ci-force-full` to re-enable the force-full hosted override."
-  ]
-].map(&:freeze).freeze
-
-HOSTED_CI_STATUS_METADATA_LINE_SETS = [
-  [
-    "## CI Status",
-    "",
-    /\AHead SHA: `[0-9a-f]{12}`\z/,
-    /\AChanged files: \d+\z/,
-    /\ADocs-only heuristic \(matches ci-changes-detector metadata paths\): (yes|no)\z/,
-    /\A`ready-for-hosted-ci` label: (present|absent)\z/,
-    /\A`force-full-hosted-ci` label: (present|absent)\z/,
-    /\ACurrent hosted-CI waiver: (present for this SHA|not present for this SHA)\z/,
-    "",
-    "Force-full hosted CI is enabled for this PR."
-  ],
-  [
-    "## CI Status",
-    "",
-    /\AHead SHA: `[0-9a-f]{12}`\z/,
-    /\AChanged files: \d+\z/,
-    /\ADocs-only heuristic \(matches ci-changes-detector metadata paths\): (yes|no)\z/,
-    /\A`ready-for-hosted-ci` label: (present|absent)\z/,
-    /\A`force-full-hosted-ci` label: (present|absent)\z/,
-    /\ACurrent hosted-CI waiver: (present for this SHA|not present for this SHA)\z/,
-    "",
-    "Optimized hosted CI is enabled for this PR."
-  ],
-  [
-    "## CI Status",
-    "",
-    /\AHead SHA: `[0-9a-f]{12}`\z/,
-    /\AChanged files: \d+\z/,
-    /\ADocs-only heuristic \(matches ci-changes-detector metadata paths\): (yes|no)\z/,
-    /\A`ready-for-hosted-ci` label: (present|absent)\z/,
-    /\A`force-full-hosted-ci` label: (present|absent)\z/,
-    /\ACurrent hosted-CI waiver: (present for this SHA|not present for this SHA)\z/,
-    "",
-    "Only the required gate is active unless hosted CI is requested."
-  ]
-].map(&:freeze).freeze
-
-HOSTED_CI_WAIVER_RECORDED_LINE_PATTERN = /
-  \A@[^[:space:]]+\srecorded\sa\shosted-CI\swaiver\sfor\s`[0-9a-f]{12}`\s
-  \(audit\srecord\sonly\s-\sno\sworkflow\srun\swas\scancelled\sor\sblocked\)\.\z
-/x
-HOSTED_CI_WAIVER_REASON_LINE = lambda do |line|
-  match = /\AReason: `([^`]*)`\z/.match(line)
-
-  match && !match[1].match?(DIFF_SUSPICIOUS_PATTERN)
-end
-
-HOSTED_CI_WAIVER_METADATA_LINE_SETS = [
-  [
-    /\A<!-- ci-skip-hosted:[0-9a-f]{40} -->\z/,
-    "## Hosted CI Waiver Recorded for This SHA",
-    "",
-    HOSTED_CI_WAIVER_RECORDED_LINE_PATTERN,
-    HOSTED_CI_WAIVER_REASON_LINE,
-    "",
-    "This waiver is bound to the current head SHA and does not apply after another push.",
-    "The required fast gate still applies for this PR."
-  ],
-  [
-    /\A<!-- ci-skip-hosted:[0-9a-f]{40} -->\z/,
-    "## Hosted CI Waiver Recorded for This SHA",
-    "",
-    HOSTED_CI_WAIVER_RECORDED_LINE_PATTERN,
-    HOSTED_CI_WAIVER_REASON_LINE,
-    "",
-    "This waiver is bound to the current head SHA and does not apply after another push.",
-    "The required fast gate still applies for this PR.",
-    "",
-    "Removed hosted CI labels from this PR."
-  ]
-].map(&:freeze).freeze
-
 RESOLVED_REVIEW_THREADS_QUERY = <<~GRAPHQL
   query($owner:String!, $name:String!, $number:Int!, $after:String) {
     repository(owner:$owner, name:$name) {
@@ -336,57 +197,6 @@ RESOLVED_REVIEW_THREADS_QUERY = <<~GRAPHQL
     }
   }
 GRAPHQL
-
-def comment_lines_match?(lines, expected_lines)
-  lines.size == expected_lines.size &&
-    expected_lines.zip(lines).all? do |expected, actual|
-      if expected.respond_to?(:call)
-        expected.call(actual)
-      elsif expected.is_a?(Regexp)
-        actual.match?(expected)
-      else
-        actual == expected
-      end
-    end
-end
-
-def hosted_ci_metadata_lines?(lines, line_sets)
-  line_sets.any? { |expected_lines| comment_lines_match?(lines, expected_lines) }
-end
-
-def hosted_ci_request_metadata_lines?(lines)
-  hosted_ci_metadata_lines?(lines, HOSTED_CI_REQUEST_METADATA_LINE_SETS)
-end
-
-def hosted_ci_stop_metadata_lines?(lines)
-  hosted_ci_metadata_lines?(lines, HOSTED_CI_STOP_METADATA_LINE_SETS)
-end
-
-def hosted_ci_status_metadata_lines?(lines)
-  hosted_ci_metadata_lines?(lines, HOSTED_CI_STATUS_METADATA_LINE_SETS)
-end
-
-def hosted_ci_waiver_metadata_lines?(lines)
-  hosted_ci_metadata_lines?(lines, HOSTED_CI_WAIVER_METADATA_LINE_SETS)
-end
-
-def hosted_ci_metadata_body?(body)
-  lines = normalized_comment_lines(body)
-
-  hosted_ci_request_metadata_lines?(lines) ||
-    hosted_ci_stop_metadata_lines?(lines) ||
-    hosted_ci_status_metadata_lines?(lines) ||
-    hosted_ci_waiver_metadata_lines?(lines)
-end
-
-def hosted_ci_metadata_comment?(comment)
-  return false unless github_actions_bot?(comment.dig("user", "login"))
-
-  app_slug = comment.dig("performed_via_github_app", "slug")
-  return false unless app_slug.nil? || app_slug == "github-actions"
-
-  hosted_ci_metadata_body?(comment["body"])
-end
 
 def resolved_review_threads_page(repo, number, after)
   owner, name = repo.split("/", 2)
@@ -474,12 +284,6 @@ def visible_rest_actor_logins(rest_context)
   users
 end
 
-def hosted_ci_metadata_actor_logins(rest_context)
-  rest_context.fetch(:issue_comments).filter_map do |comment|
-    comment.dig("user", "login") if hosted_ci_metadata_comment?(comment)
-  end.to_set
-end
-
 def paginated_reaction_users(repo, endpoint)
   reactions = run_gh_paginated_json_array(
     "api",
@@ -533,6 +337,34 @@ def suspicious_added_lines(diff, pattern:)
   end
 end
 
+def pr_source_actor_logins(target)
+  logins = Set.new
+  logins << target.dig("author", "login")
+
+  Array(target.dig("timelineItems", "nodes")).each do |item|
+    next unless item["__typename"] == "PullRequestCommit"
+
+    item.dig("commit", "authors", "nodes")&.each do |author|
+      logins << author.dig("user", "login")
+    end
+  end
+
+  logins.delete(nil)
+  logins
+end
+
+def trusted_pr_source?(repo, target, trust_config:, team_cache:)
+  logins = pr_source_actor_logins(target)
+  return false if logins.empty?
+
+  # If timelineItems pagination failed, nodes is nil and only the PR author is
+  # checked here. That same nil-nodes path also produces a graph coverage
+  # blocker, so a false-positive trust result is still caught before success.
+  # Unlinked commit authors are similarly dropped from this trust set, but
+  # commit_author_coverage_findings emits a blocker for that same target.
+  logins.all? { |login| trusted_actor?(repo, login, trust_config, team_cache) }
+end
+
 def suspicious_issue_text(rest_context, repo, trust_config:, team_cache:, pattern:)
   findings = []
   issue = rest_context.fetch(:issue)
@@ -545,6 +377,8 @@ def suspicious_issue_text(rest_context, repo, trust_config:, team_cache:, patter
   rest_context.fetch(:issue_comments).each do |comment|
     author = comment.dig("user", "login")
     next unless trusted_actor?(repo, author, trust_config, team_cache)
+    # Issue comments have no review-thread resolved state. Keep trusted-bot
+    # warning text visible until a human removes or explicitly triages it.
     next unless (comment["body"] || "").match?(pattern)
 
     findings << {
@@ -564,11 +398,17 @@ def suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:
   rest_context.fetch(:review_comments).each do |comment|
     author = comment.dig("user", "login")
     next unless trusted_actor?(repo, author, trust_config, team_cache)
-    # Resolved trusted-bot review comments are historical review metadata. Keep
-    # unresolved/current bot findings blocking, and fail closed if resolution
-    # state could not be fetched.
-    next if trusted_bot?(author, trust_config) && resolved_review_comment_ids.include?(comment["id"])
-    next unless (comment["body"] || "").match?(pattern)
+
+    body = comment["body"] || ""
+    resolved_trusted_bot = trusted_bot?(author, trust_config) && resolved_review_comment_ids.include?(comment["id"])
+    if resolved_trusted_bot
+      # Resolved trusted-bot review comments are usually historical metadata, but
+      # blocking-pattern text should still surface as a warning instead of going
+      # completely invisible.
+      next unless pattern.equal?(BLOCKING_SUSPICIOUS_PATTERN) && body.match?(BLOCKING_SUSPICIOUS_PATTERN)
+    else
+      next unless body.match?(pattern)
+    end
 
     findings << {
       location: "review comment #{comment.fetch('id')}",
@@ -615,16 +455,16 @@ def warnings_not_already_blocking(suspicious_warnings, suspicious)
   suspicious_warnings.reject { |finding| blocking_locations.include?(finding.fetch(:location)) }
 end
 
-def suspicious_findings_for_target(repo:, number:, rest:, target_is_pr:, trust_config:, team_cache:)
-  suspicious = suspicious_text_findings(
+def suspicious_findings_for_target(repo:, number:, rest:, target:, target_is_pr:, trust_config:, team_cache:)
+  suspicious = []
+  suspicious_warnings = suspicious_text_findings(
     rest:,
     target_is_pr:,
     repo:,
     trust_config:,
     team_cache:,
     pattern: BLOCKING_SUSPICIOUS_PATTERN
-  )
-  suspicious_warnings = suspicious_text_findings(
+  ) + suspicious_text_findings(
     rest:,
     target_is_pr:,
     repo:,
@@ -635,7 +475,14 @@ def suspicious_findings_for_target(repo:, number:, rest:, target_is_pr:, trust_c
 
   if target_is_pr
     diff = run_gh("pr", "diff", number.to_s, "--repo", repo)
-    suspicious.concat(suspicious_added_lines(diff, pattern: DIFF_SUSPICIOUS_PATTERN))
+    blocking_diff_findings = suspicious_added_lines(diff, pattern: BLOCKING_SUSPICIOUS_PATTERN)
+    warning_diff_findings = suspicious_added_lines(diff, pattern: WARNING_SUSPICIOUS_PATTERN)
+    if trusted_pr_source?(repo, target, trust_config:, team_cache:)
+      suspicious.concat(blocking_diff_findings)
+      suspicious_warnings.concat(warning_diff_findings)
+    else
+      suspicious.concat((blocking_diff_findings + warning_diff_findings).uniq)
+    end
   end
 
   suspicious_warnings = warnings_not_already_blocking(suspicious_warnings, suspicious)
@@ -651,8 +498,6 @@ end
 
 def untrusted_issue_comment_findings(rest_context, repo, trust_config:, team_cache:)
   rest_context.fetch(:issue_comments).filter_map do |comment|
-    next if hosted_ci_metadata_comment?(comment)
-
     untrusted_interaction_finding(
       repo,
       comment.dig("user", "login"),
@@ -727,8 +572,59 @@ def high_risk_files(files)
   end
 end
 
-def fetch_target_graph(owner:, name:, number:, query:)
-  run_gh_json(
+PARTICIPANT_NODES_FRAGMENT = <<~GRAPHQL
+  login
+  url
+  __typename
+GRAPHQL
+
+PR_TIMELINE_NODES_FRAGMENT = <<~GRAPHQL
+  __typename
+  ... on IssueComment { author { login } }
+  ... on PullRequestReview { author { login } }
+  ... on CrossReferencedEvent { actor { login } }
+  ... on ReadyForReviewEvent { actor { login } }
+  ... on ReviewRequestedEvent { actor { login } }
+  ... on MentionedEvent { actor { login } }
+  ... on SubscribedEvent { actor { login } }
+  ... on UnsubscribedEvent { actor { login } }
+  ... on ClosedEvent { actor { login } }
+  ... on ReopenedEvent { actor { login } }
+  ... on PullRequestCommit {
+    commit {
+      authors(first:10) {
+        totalCount
+        pageInfo { hasNextPage }
+        nodes { user { login } }
+      }
+    }
+  }
+GRAPHQL
+
+ISSUE_TIMELINE_NODES_FRAGMENT = <<~GRAPHQL
+  __typename
+  ... on IssueComment { author { login } }
+  ... on CrossReferencedEvent { actor { login } }
+  ... on MentionedEvent { actor { login } }
+  ... on SubscribedEvent { actor { login } }
+  ... on UnsubscribedEvent { actor { login } }
+  ... on ClosedEvent { actor { login } }
+  ... on ReopenedEvent { actor { login } }
+GRAPHQL
+
+PAGINATED_CONNECTIONS = %w[participants timelineItems].freeze
+DEFAULT_MAX_GRAPH_CONNECTION_PAGES = 200
+
+def max_graph_connection_pages
+  value = Integer(
+    ENV.fetch("PR_SECURITY_PREFLIGHT_MAX_PAGES", DEFAULT_MAX_GRAPH_CONNECTION_PAGES.to_s),
+    exception: false
+  )
+  value&.positive? ? value : DEFAULT_MAX_GRAPH_CONNECTION_PAGES
+end
+
+def fetch_target_graph(owner:, name:, number:, query:, variables: {})
+  args = [
     "api",
     "graphql",
     "-f",
@@ -736,14 +632,140 @@ def fetch_target_graph(owner:, name:, number:, query:)
     "-f",
     "name=#{name}",
     "-F",
-    "number=#{number}",
-    "-f",
-    "query=#{query}"
-  )
+    "number=#{number}"
+  ]
+  # Cursor pagination variables are GraphQL String values; keep numeric variables
+  # on explicit typed flags like the `number` argument above.
+  variables.each do |key, value|
+    args.concat(["-f", "#{key}=#{value}"])
+  end
+  args.concat(["-f", "query=#{query}"])
+  run_gh_json(*args)
+end
+
+def participant_connection_page_query(graph_field)
+  <<~GRAPHQL
+    query($owner:String!, $name:String!, $number:Int!, $after:String!) {
+      repository(owner:$owner, name:$name) {
+        #{graph_field}(number:$number) {
+          participants(first:100, after:$after) {
+            totalCount
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              #{PARTICIPANT_NODES_FRAGMENT}
+            }
+          }
+        }
+      }
+    }
+  GRAPHQL
+end
+
+def timeline_connection_page_query(graph_field)
+  fragment = graph_field == "pullRequest" ? PR_TIMELINE_NODES_FRAGMENT : ISSUE_TIMELINE_NODES_FRAGMENT
+
+  <<~GRAPHQL
+    query($owner:String!, $name:String!, $number:Int!, $after:String!) {
+      repository(owner:$owner, name:$name) {
+        #{graph_field}(number:$number) {
+          timelineItems(first:100, after:$after) {
+            totalCount
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              #{fragment}
+            }
+          }
+        }
+      }
+    }
+  GRAPHQL
+end
+
+def connection_page_query(graph_field, connection_name)
+  case connection_name
+  when "participants"
+    participant_connection_page_query(graph_field)
+  when "timelineItems"
+    timeline_connection_page_query(graph_field)
+  else
+    raise "Unsupported GraphQL connection: #{connection_name}"
+  end
+end
+
+def append_graph_connection_pages!(owner:, name:, number:, graph_field:, target:, connection_name:)
+  connection = target[connection_name]
+  return unless connection.is_a?(Hash)
+
+  nodes = connection["nodes"]
+  return unless nodes.is_a?(Array)
+
+  seen_cursors = Set.new
+  pages_fetched = 0
+  max_pages = max_graph_connection_pages
+  while connection.dig("pageInfo", "hasNextPage")
+    if pages_fetched >= max_pages
+      connection["nodes"] = nil
+      return
+    end
+
+    cursor = connection.dig("pageInfo", "endCursor")
+    if cursor.to_s.empty? || seen_cursors.include?(cursor)
+      connection["nodes"] = nil
+      return
+    end
+
+    seen_cursors << cursor
+    page_graph = begin
+      fetch_target_graph(
+        owner:,
+        name:,
+        number:,
+        query: connection_page_query(graph_field, connection_name),
+        variables: { after: cursor }
+      )
+    rescue StandardError => e
+      warn "WARN: could not fetch #{connection_name} page (#{owner}/#{name}##{number}): " \
+           "#{e.message.lines.first&.strip}"
+      connection["nodes"] = nil
+      return
+    end
+    pages_fetched += 1
+    page_connection = page_graph.dig("data", "repository", graph_field, connection_name)
+    unless page_connection.is_a?(Hash)
+      connection["nodes"] = nil
+      return
+    end
+
+    page_nodes = page_connection["nodes"]
+    unless page_nodes.is_a?(Array)
+      connection["nodes"] = nil
+      return
+    end
+
+    nodes.concat(page_nodes)
+    page_info = page_connection["pageInfo"]
+    unless page_info.is_a?(Hash)
+      connection["nodes"] = nil
+      return
+    end
+
+    connection["totalCount"] = [connection["totalCount"].to_i, page_connection["totalCount"].to_i].max
+    connection["pageInfo"] = page_info
+  end
+end
+
+def append_target_graph_pages!(owner:, name:, number:, graph_field:, target:)
+  PAGINATED_CONNECTIONS.each do |connection_name|
+    append_graph_connection_pages!(owner:, name:, number:, graph_field:, target:, connection_name:)
+  end
 end
 
 def connection_coverage_finding(target, connection_name)
-  connection = target.fetch(connection_name)
+  connection = target[connection_name]
+  unless connection.is_a?(Hash)
+    return { connection: connection_name, fetched_count: 0, reason: "nodes unavailable", total_count: 0 }
+  end
+
   total_count = connection["totalCount"].to_i
   nodes = connection["nodes"]
 
@@ -757,11 +779,47 @@ def connection_coverage_finding(target, connection_name)
 end
 
 def graph_coverage_findings(target)
-  %w[participants timelineItems].filter_map { |connection_name| connection_coverage_finding(target, connection_name) }
+  PAGINATED_CONNECTIONS.filter_map { |connection_name| connection_coverage_finding(target, connection_name) } +
+    commit_author_coverage_findings(target)
+end
+
+def commit_author_coverage_findings(target)
+  timeline_nodes = target.dig("timelineItems", "nodes")
+  return [] unless timeline_nodes.is_a?(Array)
+
+  timeline_nodes.filter_map do |item|
+    next unless item["__typename"] == "PullRequestCommit"
+
+    authors = item.dig("commit", "authors")
+    next unless authors.is_a?(Hash)
+
+    nodes = authors["nodes"]
+    total_count = authors["totalCount"].to_i
+    unless nodes.is_a?(Array)
+      next({ connection: "commit authors", fetched_count: 0, reason: "nodes unavailable", total_count: })
+    end
+
+    if nodes.any? { |author| author.dig("user", "login").to_s.empty? }
+      next({
+        connection: "commit authors",
+        fetched_count: nodes.size,
+        reason: "nodes unavailable",
+        total_count: [total_count, nodes.size].max
+      })
+    end
+
+    next unless authors.dig("pageInfo", "hasNextPage")
+
+    { connection: "commit authors", fetched_count: nodes.size, reason: "truncated", total_count: }
+  end
 end
 
 def participant_logins_and_unknown_count(target)
-  participant_connection = target.fetch("participants")
+  participant_connection = target["participants"]
+  unless participant_connection.is_a?(Hash)
+    return { participants: Set.new, unknown_count: 1 }
+  end
+
   participant_nodes = participant_connection["nodes"]
   unless participant_nodes.is_a?(Array)
     # A missing/null nodes array means participant coverage is unknown; fail closed
@@ -797,8 +855,7 @@ def unknown_participant_findings(unknown_count)
   }]
 end
 
-def participant_findings(repo:, target:, visible:, hosted_ci_metadata_actors:, permission_cache:, trust_config:,
-                         team_cache:)
+def participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:)
   participant_data = participant_logins_and_unknown_count(target)
   findings = unknown_participant_findings(participant_data.fetch(:unknown_count))
 
@@ -806,7 +863,6 @@ def participant_findings(repo:, target:, visible:, hosted_ci_metadata_actors:, p
     # Trusted bots cannot delete comments, so a hidden bot participant does not
     # carry the same prompt-injection risk as a hidden human. Skip entirely.
     next if trusted_bot?(login, trust_config)
-    next if hosted_ci_metadata_actors.include?(login) && visible.include?(login)
 
     trusted = trusted_actor?(repo, login, trust_config, team_cache)
     hidden = !visible.include?(login)
@@ -827,18 +883,6 @@ def participant_findings(repo:, target:, visible:, hosted_ci_metadata_actors:, p
   findings
 end
 
-def participant_findings_for_target(repo:, target:, rest:, visible:, permission_cache:, trust_config:, team_cache:)
-  participant_findings(
-    repo:,
-    target:,
-    visible:,
-    hosted_ci_metadata_actors: hosted_ci_metadata_actor_logins(rest),
-    permission_cache:,
-    trust_config:,
-    team_cache:
-  )
-end
-
 def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_reactions:, permission_cache:,
                 trust_config:, team_cache:)
   issue = issue_payload(repo, number)
@@ -847,6 +891,9 @@ def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_
   query = target_is_pr ? pr_query : issue_query
   graph = fetch_target_graph(owner:, name:, number:, query:)
   target = graph.fetch("data").fetch("repository").fetch(graph_field)
+  # Must run before visible_actor_logins: target aliases graph, so pagination
+  # mutations must be in place before the visibility pass reads from graph.
+  append_target_graph_pages!(owner:, name:, number:, graph_field:, target:)
   rest = rest_context(repo, number, include_pull_comments: target_is_pr, issue:, trust_config:, team_cache:)
   visible = visible_actor_logins(graph, graph_field)
   visible.merge(visible_rest_actor_logins(rest))
@@ -857,7 +904,15 @@ def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_
     visible.merge(reaction_users(repo, number, rest_context: rest, include_pull_comments: target_is_pr))
   end
   files = target_is_pr ? changed_files(repo, number) : []
-  suspicious_findings = suspicious_findings_for_target(repo:, number:, rest:, target_is_pr:, trust_config:, team_cache:)
+  suspicious_findings = suspicious_findings_for_target(
+    repo:,
+    number:,
+    rest:,
+    target:,
+    target_is_pr:,
+    trust_config:,
+    team_cache:
+  )
   untrusted_interactions = untrusted_interaction_findings(
     rest,
     repo,
@@ -870,15 +925,7 @@ def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_
     files:,
     number:,
     graph_coverage_findings: graph_coverage_findings(target),
-    participant_findings: participant_findings_for_target(
-      repo:,
-      target:,
-      rest:,
-      visible:,
-      permission_cache:,
-      trust_config:,
-      team_cache:
-    ),
+    participant_findings: participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:),
     risky_files: high_risk_files(files),
     suspicious: suspicious_findings.fetch(:suspicious),
     suspicious_warnings: suspicious_findings.fetch(:suspicious_warnings),
@@ -1016,27 +1063,16 @@ pr_query = <<~GRAPHQL
         author { login }
         participants(first:100) {
           totalCount
-          pageInfo { hasNextPage }
-          nodes { login url __typename }
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            #{PARTICIPANT_NODES_FRAGMENT}
+          }
         }
         timelineItems(first:100) {
           totalCount
-          pageInfo { hasNextPage }
+          pageInfo { hasNextPage endCursor }
           nodes {
-            __typename
-            ... on IssueComment { author { login } }
-            ... on PullRequestReview { author { login } }
-            ... on CrossReferencedEvent { actor { login } }
-            ... on ReadyForReviewEvent { actor { login } }
-            ... on ReviewRequestedEvent { actor { login } }
-            ... on MentionedEvent { actor { login } }
-            ... on SubscribedEvent { actor { login } }
-            ... on UnsubscribedEvent { actor { login } }
-            ... on ClosedEvent { actor { login } }
-            ... on ReopenedEvent { actor { login } }
-            ... on PullRequestCommit {
-              commit { authors(first:10) { nodes { user { login } } } }
-            }
+            #{PR_TIMELINE_NODES_FRAGMENT}
           }
         }
       }
@@ -1054,21 +1090,16 @@ issue_query = <<~GRAPHQL
         author { login }
         participants(first:100) {
           totalCount
-          pageInfo { hasNextPage }
-          nodes { login url __typename }
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            #{PARTICIPANT_NODES_FRAGMENT}
+          }
         }
         timelineItems(first:100) {
           totalCount
-          pageInfo { hasNextPage }
+          pageInfo { hasNextPage endCursor }
           nodes {
-            __typename
-            ... on IssueComment { author { login } }
-            ... on CrossReferencedEvent { actor { login } }
-            ... on MentionedEvent { actor { login } }
-            ... on SubscribedEvent { actor { login } }
-            ... on UnsubscribedEvent { actor { login } }
-            ... on ClosedEvent { actor { login } }
-            ... on ReopenedEvent { actor { login } }
+            #{ISSUE_TIMELINE_NODES_FRAGMENT}
           }
         }
       }

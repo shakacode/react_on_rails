@@ -56,9 +56,8 @@ handoffs, Codex/Claude comparison, and output templates.
 
 ## Merge Gate
 
-This review is a **required** gate for PRs whose target branch is in the `rc` or
-`final` release phase (target `release/*`), per `AGENTS.md` ->
-**Release-Train Branching And Phase Gating**. For `beta`-phase PRs (target `main`)
+This review is a **required** gate for any release phase or target class that
+`AGENTS.md` marks as requiring adversarial review. For ordinary base-branch work
 it remains advisory unless a maintainer or high-risk policy requests it.
 
 Before marking a PR ready or merging it, all `BLOCKING` and `DISCUSS` findings
@@ -72,12 +71,12 @@ post-merge audit issue plan instead of editing GitHub state without approval.
 ## High-Risk Mode
 
 Apply this stricter mode when a PR touches release-sensitive surfaces:
-release-candidate or version-bump changes, SSR/RSC/hydration behavior, streaming
-or asset-timing, CI/workflow/build-config, generated output, benchmark-sensitive
-code, Pro/core boundaries, or concurrent batch work. It adds three demands on top
-of the steps above; see `.agents/workflows/adversarial-pr-review.md` under
-**High-Risk Mode** for the full checklist, adversarial-question seed, the
-`pending_maintainer_action` dashboard block, and the #4047 retrospective fixture.
+release-candidate or version-bump changes, user-visible runtime behavior,
+CI/workflow/build-config, generated output, benchmark-sensitive code,
+package/runtime boundaries, or concurrent batch work. It adds three demands on
+top of the steps above; see `.agents/workflows/adversarial-pr-review.md` under
+**High-Risk Mode** for the full checklist, adversarial-question seed, and the
+`pending_maintainer_action` dashboard block.
 For high-risk or concurrent-batch PRs, the review is required before readiness
 only in the sense that its `BLOCKING` and `DISCUSS` findings must be fixed,
 explicitly decided, or waived; it remains report-only and is not a GitHub
@@ -97,8 +96,8 @@ approval object.
    evidence does not mean the merge gate is satisfied.
 3. **Report merge-gate state without conflating the three approval concepts.** A
    maintainer approval _comment_, a formal GitHub _review object_ (`reviewDecision`),
-   and the local `script/pr-merge-ledger <PR> --strict` result
-   (`complete_allowed`) are distinct. Report each separately and classify every
+   and the repo's merge ledger result from `AGENTS.md` (`complete_allowed`) are
+   distinct. Report each separately and classify every
    remaining blocker by type: policy gate, GitHub API state, CI/check failure, or
    real code concern. If a plain maintainer comment is intended to suffice for a
    lane, that waiver must be stated explicitly in the handoff — never silently

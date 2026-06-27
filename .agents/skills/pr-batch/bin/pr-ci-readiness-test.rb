@@ -104,7 +104,7 @@ class PrCiReadinessTest < Minitest::Test
 end
 
 # CLI / Runner integration via a fake gh on PATH.
-class PrCiReadinessCliTest < Minitest::Test # rubocop:disable Metrics/ClassLength
+class PrCiReadinessCliTest < Minitest::Test
   # Build a temp dir with a fake `gh` executable that emits canned `gh pr
   # checks` JSON, then run the real script with that dir prepended to PATH.
   def with_fake_gh(required_json:, full_json:)

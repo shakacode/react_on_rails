@@ -1,0 +1,48 @@
+# RuboCop settings for repo-local copies of shared agent workflow tools.
+# Keep this aligned with shakacode/agent-workflows/.rubocop.yml so copied
+# workflow scripts are linted as workflow assets, not product code.
+
+AllCops:
+  NewCops: disable
+  # Directory-local config for bin/lefthook/ruby-lint branch on .agents files.
+  # Keep this aligned with the root target when this repo's RuboCop supports it.
+  TargetRubyVersion: 3.3
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Layout/EmptyLinesAroundBlockBody:
+  Enabled: false
+
+Layout/LineLength:
+  Enabled: false
+
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/BlockLength:
+  Enabled: false
+
+Metrics/ClassLength:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+Metrics/MethodLength:
+  Enabled: false
+
+Metrics/ModuleLength:
+  Enabled: false
+
+Metrics/ParameterLists:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
+
+Style/IfUnlessModifier:
+  Enabled: false

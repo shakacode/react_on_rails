@@ -13,7 +13,7 @@ require "shellwords"
 SCRIPT = File.expand_path("pr-file-touch-map", __dir__)
 load SCRIPT
 
-class PrFileTouchMapTest < Minitest::Test # rubocop:disable Metrics/ClassLength
+class PrFileTouchMapTest < Minitest::Test
   def test_name_status_rename_and_copy_own_both_paths
     out = PrFileTouchMap.parse_name_status(
       "M\tlib/a.rb\nA\tlib/b.rb\nD\tlib/c.rb\nR096\tlib/old.rb\tlib/new.rb\nC100\tsrc/orig.rb\tsrc/copy.rb\n",
