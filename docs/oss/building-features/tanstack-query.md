@@ -12,6 +12,12 @@ It is the recommended client-side server-state layer for Rails-backed React apps
 
 This guide mirrors the official [React on Rails + TanStack starter](https://github.com/shakacode/react-on-rails-starter-tanstack) ([live demo](https://starter.reactonrails.com)). Every snippet below is drawn from that app.
 
+## Install
+
+```bash
+pnpm add @tanstack/react-query
+```
+
 ## Rails Stays the Source of Truth
 
 A normal Rails controller returns explicit JSON, never raw Active Record:
@@ -40,6 +46,10 @@ Put the same-origin and CSRF handling in exactly one place so every query and mu
 
 ```ts
 // app/javascript/lib/apiFetch.ts
+import { getCsrfToken } from './getCsrfToken';
+
+type ApiFetchOptions = RequestInit & { json?: unknown };
+
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
@@ -82,7 +92,7 @@ export const createQueryClient = () =>
   });
 ```
 
-Mount the provider once, and keep the client stable across renders with `useMemo` (or `useState`). Creating `new QueryClient()` inline on every render throws the cache away on each render. See [Mistake 5 in the RSC context & state guide](../migrating/rsc-context-and-state.md) for the failure mode.
+Mount the provider once, and keep the client stable across renders with `useMemo` (or `useState`). Creating `new QueryClient()` inline on every render throws the cache away on each render. See [Mistake 5 in the RSC context & state guide](../migrating/rsc-context-and-state.md#mistake-5-creating-new-queryclient-on-every-render) for the failure mode.
 
 ```tsx
 const queryClient = useMemo(() => createQueryClient(), []);
@@ -161,6 +171,8 @@ const projectsQuery = useQuery({
   initialData, // first page seeded from Rails; any other filter/sort/page fetches normally
 });
 ```
+
+Because the seed is passed as `initialData` without `initialDataUpdatedAt`, TanStack Query timestamps it at `0`, so the table does one background refetch on mount to confirm freshness — the rows still paint immediately, with no spinner. To treat the seed as fresh for `staleTime` and skip that first refetch, also pass `initialDataUpdatedAt` set to the server's render time.
 
 > **`initialData` vs `dehydrate`/`HydrationBoundary`.** TanStack Query also ships a server-prefetch pattern: build a `QueryClient`, `prefetchQuery`, `dehydrate` it into the HTML, and wrap the client tree in `HydrationBoundary`. See the [TanStack Query SSR guide](https://tanstack.com/query/latest/docs/framework/react/guides/ssr). The starter uses the simpler props-to-`initialData` seed because Rails already renders the first page; reach for `dehydrate`/`HydrationBoundary` when you need to seed many queries at once.
 

@@ -5250,6 +5250,7 @@ end
 - [Render-Functions Guide](../core-concepts/render-functions.md)
 - [View Helpers API](../api-reference/view-helpers-api.md)
 - [React Router Guide](./react-router.md)
+- [TanStack Query Guide](./tanstack-query.md) (the client-side server-state layer this pairs with)
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/building-features/client-side-routing-instant-navigation
@@ -8722,6 +8723,12 @@ It is the recommended client-side server-state layer for Rails-backed React apps
 
 This guide mirrors the official [React on Rails + TanStack starter](https://github.com/shakacode/react-on-rails-starter-tanstack) ([live demo](https://starter.reactonrails.com)). Every snippet below is drawn from that app.
 
+## Install
+
+```bash
+pnpm add @tanstack/react-query
+```
+
 ## Rails Stays the Source of Truth
 
 A normal Rails controller returns explicit JSON, never raw Active Record:
@@ -8750,6 +8757,10 @@ Put the same-origin and CSRF handling in exactly one place so every query and mu
 
 ```ts
 // app/javascript/lib/apiFetch.ts
+import { getCsrfToken } from './getCsrfToken';
+
+type ApiFetchOptions = RequestInit & { json?: unknown };
+
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
@@ -8792,7 +8803,7 @@ export const createQueryClient = () =>
   });
 ```
 
-Mount the provider once, and keep the client stable across renders with `useMemo` (or `useState`). Creating `new QueryClient()` inline on every render throws the cache away on each render. See [Mistake 5 in the RSC context & state guide](../migrating/rsc-context-and-state.md) for the failure mode.
+Mount the provider once, and keep the client stable across renders with `useMemo` (or `useState`). Creating `new QueryClient()` inline on every render throws the cache away on each render. See [Mistake 5 in the RSC context & state guide](../migrating/rsc-context-and-state.md#mistake-5-creating-new-queryclient-on-every-render) for the failure mode.
 
 ```tsx
 const queryClient = useMemo(() => createQueryClient(), []);
@@ -8871,6 +8882,8 @@ const projectsQuery = useQuery({
   initialData, // first page seeded from Rails; any other filter/sort/page fetches normally
 });
 ```
+
+Because the seed is passed as `initialData` without `initialDataUpdatedAt`, TanStack Query timestamps it at `0`, so the table does one background refetch on mount to confirm freshness — the rows still paint immediately, with no spinner. To treat the seed as fresh for `staleTime` and skip that first refetch, also pass `initialDataUpdatedAt` set to the server's render time.
 
 > **`initialData` vs `dehydrate`/`HydrationBoundary`.** TanStack Query also ships a server-prefetch pattern: build a `QueryClient`, `prefetchQuery`, `dehydrate` it into the HTML, and wrap the client tree in `HydrationBoundary`. See the [TanStack Query SSR guide](https://tanstack.com/query/latest/docs/framework/react/guides/ssr). The starter uses the simpler props-to-`initialData` seed because Rails already renders the first page; reach for `dehydrate`/`HydrationBoundary` when you need to seed many queries at once.
 
@@ -19236,7 +19249,7 @@ RSC builds on React on Rails Pro's Node rendering infrastructure. The generator 
 
 In addition to all Pro files:
 
-- `config/webpack/rscWebpackConfig.js` - RSC-specific webpack configuration
+- `config/webpack/rscWebpackConfig.js` or `config/rspack/rscWebpackConfig.js` - RSC-specific bundler configuration
 - `app/javascript/src/HelloServer/` - Example RSC component (replaces HelloWorld)
 - `app/controllers/hello_server_controller.rb` - Controller with streaming support
 - `app/views/hello_server/index.html.erb` - View using `stream_react_component`
@@ -26245,6 +26258,8 @@ Calling `emit.call` from concurrent fibers is safe: the reactor is single-thread
 
 ## Migrating from React Query / TanStack Query
 
+> **New to TanStack Query on Rails?** This section covers _migrating_ an existing React Query setup into RSC. For a from-scratch guide to the recommended patterns (CSRF-aware fetch, stable query keys, first-paint seeding, and mutations), see [Using TanStack Query](../building-features/tanstack-query.md).
+
 React Query remains valuable in the RSC world for features like polling, optimistic updates, and infinite scrolling. But for simple data display, Server Components replace it entirely.
 
 ### Pattern 1: Simple Replacement (No Client Cache Needed)
@@ -27880,6 +27895,7 @@ When something goes wrong during RSC migration, start here. This table maps symp
 | `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                               | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                      |
 | `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)             |
 | `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                 | [MessageChannel Not Defined](#messagechannel-not-defined)                                     |
+| RSC says a module is missing from the React Client Manifest and the manifest is empty in Rspack `bin/dev`      | Rspack lazy compilation deferred RSC client references before the server renderer read them  | [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server) |
 | SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                 |
 | Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                 |
 | 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)              |
@@ -28630,6 +28646,54 @@ class Api::UsersController < ApplicationController
 end
 ```
 
+## Empty Client Manifest with Rspack Dev Server
+
+In RSC apps that use Rspack, normal `bin/dev` dev-server mode must compile RSC client references before the server renderer reads the React Client Manifest. If Rspack lazy compilation is still enabled, the first server render can see an empty manifest and fail with an error like:
+
+```text
+Could not find the module ".../LikeButton.jsx#default" in the React Client Manifest.
+```
+
+Common signs:
+
+- `react-client-manifest.json` contains `"filePathToModuleMetadata": {}`
+- the generated Rspack client bundle mentions `lazy-compilation-proxy`
+- the browser sends `POST /_rspack/lazy/trigger` and Rails returns `404`
+- `bin/dev static` works, but normal `bin/dev` fails
+
+Run the RSC doctor first:
+
+```bash
+bundle exec rails react_on_rails:doctor:rsc
+```
+
+For existing generated apps, update `config/rspack/development.js` so the Rspack dev-server branch disables lazy compilation when an RSC config is present:
+
+```js
+const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig, rscWebpackConfig) => {
+  if (process.env.WEBPACK_SERVE) {
+    if (config.assets_bundler === 'rspack') {
+      const { ReactRefreshRspackPlugin } = require('@rspack/plugin-react-refresh');
+      clientWebpackConfig.plugins.push(new ReactRefreshRspackPlugin());
+
+      if (rscWebpackConfig) {
+        clientWebpackConfig.lazyCompilation = false;
+      }
+    }
+  }
+};
+```
+
+Also verify that `config/rspack/ServerClientOrBoth.js` passes the RSC config as the third argument to the environment-specific config hook:
+
+```js
+envSpecific(clientConfig, serverConfig, rscConfig);
+```
+
+If it only passes `clientConfig` and `serverConfig`, rerun the RSC generator to refresh both `ServerClientOrBoth.js` and `development.js`.
+
+Fresh generator output includes this guard. If your config has been heavily customized, keep the important behavior: RSC + Rspack + dev-server mode should set `clientWebpackConfig.lazyCompilation = false`.
+
 ## Bundle Analysis Tools
 
 | Tool                                                                                                                          | Purpose                                                          |
@@ -28666,6 +28730,7 @@ end
 | `ReferenceError: require is not defined`                                                                                     | Server or RSC bundle webpack config uses `externals` for Node builtins, generating `require()` calls that fail in VM sandbox                                                                       | Use `resolve.fallback: { path: false, fs: false }` instead of `externals`. See [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)                                                                                                       |
 | `ReferenceError: MessageChannel is not defined`                                                                              | `react-dom/server.browser` instantiates `MessageChannel` at module load time; VM sandbox lacks this global                                                                                         | Inject a `BannerPlugin` polyfill in the server webpack config. See [MessageChannel Not Defined](#messagechannel-not-defined)                                                                                                                                           |
 | `"global object mismatch"`                                                                                                   | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc)                                                                                                      | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch)                                                                                                                           |
+| Missing module in React Client Manifest with empty `filePathToModuleMetadata` in Rspack `bin/dev`                            | Rspack lazy compilation deferred RSC client references before manifest generation                                                                                                                  | Disable Rspack lazy compilation for RSC dev-server mode. See [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server)                                                                                                             |
 | SSR hangs indefinitely / request timeout on large RSC payloads                                                               | Stream backpressure deadlock when RSC payload exceeds 16 KB                                                                                                                                        | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                                                                                                                                                 |
 | `"The 'react-on-rails' package version does not match the gem version"`                                                      | Gem and npm package installed at different versions                                                                                                                                                | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                   |
 | `"The 'react-on-rails' package version is not an exact version"`                                                             | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json                                                                                                                    | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                    |
