@@ -3134,6 +3134,13 @@ describe InstallGenerator, type: :generator do
           expect(content).to include("rscConfig")
         end
       end
+
+      it "disables Rspack lazy compilation while serving RSC apps" do
+        assert_file "config/rspack/development.js" do |content|
+          expect(content).to include("existsSync(resolve(__dirname, 'rscWebpackConfig.js'))")
+          expect(content).to include("clientWebpackConfig.lazyCompilation = false")
+        end
+      end
     end
 
     it "installs both RSC and Rspack dependencies" do
