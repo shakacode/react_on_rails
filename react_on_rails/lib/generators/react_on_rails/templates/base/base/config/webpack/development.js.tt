@@ -1,6 +1,8 @@
 <%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/development.js") %>
 
 const { devServer, inliningCss, config } = require('shakapacker');
+const { existsSync } = require('fs');
+const { resolve } = require('path');
 
 const serverClientOrBoth = require('./ServerClientOrBoth');
 
@@ -12,6 +14,11 @@ const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
       // Rspack uses @rspack/plugin-react-refresh for React Fast Refresh
       const { ReactRefreshRspackPlugin } = require('@rspack/plugin-react-refresh');
       clientWebpackConfig.plugins.push(new ReactRefreshRspackPlugin());
+
+      if (existsSync(resolve(__dirname, 'rscWebpackConfig.js'))) {
+        // RSC client references must be compiled before the server render reads the client manifest.
+        clientWebpackConfig.lazyCompilation = false;
+      }
     } else {
       // Webpack uses @pmmmwh/react-refresh-webpack-plugin
       const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
