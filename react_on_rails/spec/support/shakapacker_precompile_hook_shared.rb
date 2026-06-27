@@ -37,111 +37,43 @@ def find_rails_root
   nil
 end
 
-# Remove Ruby encoding flags that would conflict with the canonical UTF-8 pin below.
-SHORT_ENCODING_RUBYOPT_SWITCHES = %w[E K].freeze unless defined?(SHORT_ENCODING_RUBYOPT_SWITCHES)
-SHORT_ARGUMENT_RUBYOPT_SWITCHES = %w[I r].freeze unless defined?(SHORT_ARGUMENT_RUBYOPT_SWITCHES)
-
-def short_rubyopt_token?(token)
-  token.start_with?("-") && !token.start_with?("--")
-end
-
-def short_encoding_rubyopt_switch?(char)
-  SHORT_ENCODING_RUBYOPT_SWITCHES.include?(char)
-end
-
-def short_argument_rubyopt_switch?(char)
-  SHORT_ARGUMENT_RUBYOPT_SWITCHES.include?(char)
-end
-
-def short_encoding_rubyopt_switch_consumes_next?(char, index, chars)
-  short_encoding_rubyopt_switch?(char) && index == chars.length - 1
-end
-
-def append_short_warning_rubyopt_flag(preserved_flags, chars, index)
-  preserved_flags << "W"
-  index += 1
-  if index < chars.length && chars[index].match?(/\d/)
-    preserved_flags << chars[index]
-    index += 1
-  end
-  index
-end
-
-def sanitize_short_rubyopt_token(token)
-  return [token, false] unless short_rubyopt_token?(token)
-  return [nil, %w[-E -K].include?(token)] if token.start_with?("-E", "-K")
-
-  preserved_flags = +""
-  chars = token[1..].chars
-  index = 0
-
-  while index < chars.length
-    char = chars[index]
-
-    if short_encoding_rubyopt_switch?(char)
-      consume_next = short_encoding_rubyopt_switch_consumes_next?(char, index, chars)
-      return [preserved_flags.empty? ? nil : "-#{preserved_flags}", consume_next]
-    end
-
-    return [token, false] if short_argument_rubyopt_switch?(char)
-
-    if char == "W"
-      index = append_short_warning_rubyopt_flag(preserved_flags, chars, index)
-      next
-    end
-
-    preserved_flags << char
-    index += 1
-  end
-
-  [token, false]
-end
-
-def force_utf8_rubyopt(rubyopt)
-  # RUBYOPT is parsed by Ruby as whitespace-separated options, not shell words.
-  # Keep backslashes literal so Windows-style paths in non-encoding flags survive unchanged.
-  tokens = rubyopt.to_s.split
-  sanitized_tokens = []
-  skip_next_token = false
-
-  tokens.each do |token|
-    if skip_next_token
-      skip_next_token = false
-      next
-    end
-
-    case token
-    when "-E", "-K", "--encoding", "--external-encoding", "--internal-encoding"
-      skip_next_token = true
-    else
-      next if token.start_with?("--encoding=", "--external-encoding=", "--internal-encoding=")
-
-      sanitized_token, skip_next_token = sanitize_short_rubyopt_token(token)
-      sanitized_tokens << sanitized_token if sanitized_token
-    end
-  end
-
-  (["-EUTF-8:UTF-8"] + sanitized_tokens).join(" ")
-end
-
-# Build a subprocess env that forces a UTF-8 locale.
+# Build the env for a spawned `bundle exec` / shakapacker child so it can read the UTF-8 files in
+# the bundle (Gemfiles, and dependency gemspecs that carry accented author names, etc.).
 #
-# Under a C/POSIX locale (no LANG/LC_ALL) the parent's Encoding.default_external is US-ASCII, and a
-# spawned `bundle exec` / shakapacker child inherits it, then dies parsing any Gemfile that contains
-# non-ASCII bytes (e.g. react_on_rails_pro/Gemfile.loader) with "invalid byte sequence in US-ASCII".
-# `-EUTF-8:UTF-8` pins the child Ruby's external/internal encodings regardless of locale and strips
-# conflicting encoding flags; LANG/LC_ALL are set as a belt-and-suspenders for tools that read the
-# locale directly. This is the subprocess-boundary companion to the UTF-8-safe File.read calls in this
-# script. `extra` keys override/extend the base env, then RUBYOPT is sanitized so callers cannot drop
-# the UTF-8 guarantee or leave conflicting encodings.
+# We intervene ONLY under a bare C/POSIX locale, where the locale-derived encoding is US-ASCII and
+# the child dies on the first non-ASCII byte with "invalid byte sequence in US-ASCII". US-ASCII is a
+# strict subset of UTF-8, so widening that child to UTF-8 is loss-free for genuinely-ASCII content.
+#
+# We deliberately do NOT touch a real national locale. A developer with, say, LANG=pt_BR.ISO8859-1
+# has a non-US-ASCII locale and latin-1/CP1252 source files that Ruby already reads correctly;
+# forcing UTF-8 there would re-decode those files and raise the very "invalid byte sequence in
+# UTF-8" error we are trying to avoid. Under that locale (and under a normal UTF-8 locale) we pass
+# the caller's `extra` env through untouched and let the child inherit the working locale.
+#
+# The gate is Encoding.find("locale"), not Encoding.default_external: it reflects the encoding the
+# child computes from the inherited locale and is immune to a runtime `Encoding.default_external =`
+# override (e.g. the UTF-8 one Rails applies during boot when the shipped hook loads the env).
+#
+# `extra` keys (functional flags like REACT_ON_RAILS_SKIP_VALIDATION) are always applied.
 def utf8_subprocess_env(extra = {})
+  return extra.dup unless Encoding.find("locale") == Encoding::US_ASCII
+
   {
-    "LANG" => ENV.fetch("LANG", "C.UTF-8"),
-    "LC_ALL" => ENV.fetch("LC_ALL", "C.UTF-8"),
-    "RUBYOPT" => ENV.fetch("RUBYOPT", "")
-  }.merge(extra).tap do |env|
-    env["RUBYOPT"] = force_utf8_rubyopt(env["RUBYOPT"])
-  end
+    "LANG" => "C.UTF-8",
+    "LC_ALL" => "C.UTF-8",
+    "RUBYOPT" => utf8_widened_rubyopt(ENV.fetch("RUBYOPT", ""))
+  }.merge(extra)
+end
+
+# Prepend a UTF-8 external-encoding pin to RUBYOPT for the C/POSIX widening case — a portable
+# fallback for systems where the C.UTF-8 locale is not installed and LANG/LC_ALL alone would not
+# take effect. If RUBYOPT already pins an encoding it is an explicit, deliberate request that we
+# honor rather than override or duplicate (Ruby raises "default_external already set" on a
+# conflicting second -E).
+def utf8_widened_rubyopt(rubyopt)
+  return rubyopt if rubyopt.match?(/(?:\A|\s)(?:-E|-K|--encoding|--external-encoding|--internal-encoding)/)
+
+  "-EUTF-8 #{rubyopt}".strip
 end
 
 # Detect which package manager to use based on package.json's packageManager field,
