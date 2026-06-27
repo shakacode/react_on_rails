@@ -31,6 +31,43 @@ RSC_REGISTRATION_ENTRY_PATH_ENV = "REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH"
 EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME = "server-component-registration-entry.js"
 EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules public spec test tmp vendor].freeze
 
+def force_utf8_rubyopt(rubyopt)
+  # RUBYOPT is parsed by Ruby as whitespace-separated options, not shell words.
+  # Keep backslashes literal so Windows-style paths in non-encoding flags survive unchanged.
+  tokens = rubyopt.to_s.split
+  sanitized_tokens = []
+  skip_next_token = false
+
+  tokens.each do |token|
+    if skip_next_token
+      skip_next_token = false
+      next
+    end
+
+    case token
+    when "-E", "--encoding", "--external-encoding", "--internal-encoding"
+      skip_next_token = true
+    else
+      next if token.start_with?("-E")
+      next if token.start_with?("--encoding=", "--external-encoding=", "--internal-encoding=")
+
+      sanitized_tokens << token
+    end
+  end
+
+  (sanitized_tokens + ["-EUTF-8"]).join(" ")
+end
+
+def utf8_subprocess_env(extra = {})
+  {
+    "LANG" => ENV.fetch("LANG", "C.UTF-8"),
+    "LC_ALL" => ENV.fetch("LC_ALL", "C.UTF-8"),
+    "RUBYOPT" => ENV.fetch("RUBYOPT", "")
+  }.merge(extra).tap do |env|
+    env["RUBYOPT"] = force_utf8_rubyopt(env["RUBYOPT"])
+  end
+end
+
 def clear_stale_rsc_manifest_client_references
   stale_manifest = Rails.root.join("ssr-generated", "rsc-client-references.json")
   FileUtils.rm_f(stale_manifest)
@@ -98,13 +135,14 @@ def generate_rsc_manifest_client_references_if_needed
 
   puts Rainbow("🔎 Generating RSC manifest client references...").cyan
 
-  env = {
+  env = utf8_subprocess_env(
+    "REACT_ON_RAILS_SKIP_VALIDATION" => "true",
     "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => "true",
     "RSC_REFERENCE_DISCOVERY_BUILD" => "true",
     "RSC_BUNDLE_ONLY" => "true",
     "CLIENT_BUNDLE_ONLY" => nil,
     "SERVER_BUNDLE_ONLY" => nil
-  }
+  )
 
   Dir.chdir(Rails.root) do
     system(env, shakapacker_bin.to_s, exception: true)

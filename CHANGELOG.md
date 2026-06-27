@@ -48,6 +48,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Precompile hook UTF-8 hardening now handles conflicting `RUBYOPT` encoding flags**:
+  The shared Shakapacker precompile hook strips pre-existing Ruby encoding flags such as
+  `-EUS-ASCII`, `--encoding=US-ASCII`, and `--external-encoding=US-ASCII` before pinning
+  subprocesses to `-EUTF-8`, so C/POSIX-locale builds do not crash when the parent shell exports a
+  conflicting `RUBYOPT`. The shipped generated `bin/shakapacker-precompile-hook` template now uses
+  the same UTF-8 subprocess environment for RSC client-reference discovery. Follow-up to
+  [PR 4169](https://github.com/shakacode/react_on_rails/pull/4169).
+
 - **[Pro]** **Generated RSC + Rspack apps render in normal `bin/dev`**:
   RSC + Rspack generator output now disables Rspack lazy compilation while the
   dev server is running, so discovered client references are compiled before

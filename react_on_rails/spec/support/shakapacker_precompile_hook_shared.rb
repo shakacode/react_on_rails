@@ -37,22 +37,52 @@ def find_rails_root
   nil
 end
 
+# Remove Ruby encoding flags that would conflict with the canonical `-EUTF-8` pin below.
+def force_utf8_rubyopt(rubyopt)
+  # RUBYOPT is parsed by Ruby as whitespace-separated options, not shell words.
+  # Keep backslashes literal so Windows-style paths in non-encoding flags survive unchanged.
+  tokens = rubyopt.to_s.split
+  sanitized_tokens = []
+  skip_next_token = false
+
+  tokens.each do |token|
+    if skip_next_token
+      skip_next_token = false
+      next
+    end
+
+    case token
+    when "-E", "--encoding", "--external-encoding", "--internal-encoding"
+      skip_next_token = true
+    else
+      next if token.start_with?("-E")
+      next if token.start_with?("--encoding=", "--external-encoding=", "--internal-encoding=")
+
+      sanitized_tokens << token
+    end
+  end
+
+  (sanitized_tokens + ["-EUTF-8"]).join(" ")
+end
+
 # Build a subprocess env that forces a UTF-8 locale.
 #
 # Under a C/POSIX locale (no LANG/LC_ALL) the parent's Encoding.default_external is US-ASCII, and a
 # spawned `bundle exec` / shakapacker child inherits it, then dies parsing any Gemfile that contains
 # non-ASCII bytes (e.g. react_on_rails_pro/Gemfile.loader) with "invalid byte sequence in US-ASCII".
-# `-EUTF-8` pins the child Ruby's external/internal encodings regardless of locale; LANG/LC_ALL are
-# set as a belt-and-suspenders for tools that read the locale directly. This is the subprocess-boundary
-# companion to the UTF-8-safe File.read calls in this script. `extra` keys override/extend the base env.
+# `-EUTF-8` pins the child Ruby's external encoding regardless of locale and strips conflicting
+# encoding flags; LANG/LC_ALL are set as a belt-and-suspenders for tools that read the locale directly.
+# This is the subprocess-boundary companion to the UTF-8-safe File.read calls in this script. `extra`
+# keys override/extend the base env, then RUBYOPT is sanitized so callers cannot drop the UTF-8
+# guarantee or leave conflicting encodings.
 def utf8_subprocess_env(extra = {})
-  rubyopt = ENV.fetch("RUBYOPT", "")
-  rubyopt = "#{rubyopt} -EUTF-8".strip unless rubyopt.include?("-EUTF-8")
   {
     "LANG" => ENV.fetch("LANG", "C.UTF-8"),
     "LC_ALL" => ENV.fetch("LC_ALL", "C.UTF-8"),
-    "RUBYOPT" => rubyopt
-  }.merge(extra)
+    "RUBYOPT" => ENV.fetch("RUBYOPT", "")
+  }.merge(extra).tap do |env|
+    env["RUBYOPT"] = force_utf8_rubyopt(env["RUBYOPT"])
+  end
 end
 
 # Detect which package manager to use based on package.json's packageManager field,

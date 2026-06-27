@@ -190,6 +190,43 @@ RSpec.describe "Shakapacker precompile hook shared script" do
       expect(utf8_subprocess_env("FOO" => "bar")).to include("FOO" => "bar", "RUBYOPT" => a_string_matching(/-EUTF-8/))
     end
 
+    it "strips conflicting RUBYOPT encoding flags before pinning UTF-8" do
+      conflicting_flags = [
+        "-EUS-ASCII",
+        "-E US-ASCII",
+        "--encoding=US-ASCII",
+        "--encoding US-ASCII",
+        "--external-encoding=US-ASCII",
+        "--external-encoding US-ASCII"
+      ]
+
+      conflicting_flags.each do |rubyopt|
+        with_env("RUBYOPT" => "-W0 #{rubyopt}") do
+          expect(utf8_subprocess_env["RUBYOPT"]).to eq("-W0 -EUTF-8")
+        end
+      end
+    end
+
+    it "sanitizes caller-supplied RUBYOPT extras instead of dropping the UTF-8 guarantee" do
+      with_env("RUBYOPT" => "-W0") do
+        env = utf8_subprocess_env("RUBYOPT" => "--encoding=US-ASCII --disable-gems")
+
+        expect(env["RUBYOPT"]).to eq("--disable-gems -EUTF-8")
+      end
+    end
+
+    it "preserves non-encoding RUBYOPT flags without shell escaping" do
+      with_env("RUBYOPT" => "-IC:\\Ruby\\lib -r json -W0 -EUS-ASCII") do
+        expect(utf8_subprocess_env["RUBYOPT"]).to eq("-IC:\\Ruby\\lib -r json -W0 -EUTF-8")
+      end
+    end
+
+    it "preserves the UTF-8 guarantee when caller-supplied RUBYOPT is nil" do
+      with_env("RUBYOPT" => "-W0") do
+        expect(utf8_subprocess_env("RUBYOPT" => nil)["RUBYOPT"]).to eq("-EUTF-8")
+      end
+    end
+
     it "does not duplicate -EUTF-8 when RUBYOPT already requests it" do
       with_env("RUBYOPT" => "-EUTF-8") do
         expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8")
