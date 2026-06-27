@@ -1467,4 +1467,84 @@ describe('RSCRoute successful-version error reset', () => {
     const key = createRSCPayloadKey('Card', { id: 0 });
     await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
   });
+
+  it('p. rejected replacement loads evict their promise and restore the evicted-success marker', async () => {
+    process.env.NODE_ENV = 'production';
+
+    type PendingEntry = Deferred & { args: GetServerComponentArgs };
+    const pending: PendingEntry[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      pending.push({ ...d, args: _args[0] });
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+    await renderInAct(
+      <RSCProvider>
+        <Probe />
+      </RSCProvider>,
+    );
+
+    const startLoad = async (id: number) => {
+      let promise!: Promise<React.ReactNode>;
+      await act(async () => {
+        promise = rscApi.getComponent('Card', { id });
+        await Promise.resolve();
+      });
+      return { promise, deferred: findPendingForId(pending, id) };
+    };
+
+    const resolveLoad = async (started: Awaited<ReturnType<typeof startLoad>>, payload: React.ReactNode) => {
+      await act(async () => {
+        started.deferred.resolve(payload);
+        await started.promise;
+      });
+    };
+
+    // Give ids 0..CACHE_CAP a successful payload. Loading the (cap+1)-th key
+    // evicts id 0 and records its "last successful payload was evicted" marker.
+    for (let id = 0; id <= CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`initial ${id}`}</span>);
+    }
+
+    const key = createRSCPayloadKey('Card', { id: 0 });
+    expect(rscApi.successfulVersions[key] ?? 0).toBe(0);
+
+    // Start id 0's replacement load while its evicted-success marker is
+    // present, then churn enough other successful evictions to push that marker
+    // out of the bounded marker LRU before the replacement rejects. The retry
+    // below only notifies routes if the rejection path restores the marker from
+    // the in-flight latch.
+    const failedReplacement = await startLoad(0);
+    for (let id = CACHE_CAP + 1; id <= CACHE_CAP + MARKER_CAP + 2; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const started = await startLoad(id);
+      // eslint-disable-next-line no-await-in-loop
+      await resolveLoad(started, <span>{`marker churn ${id}`}</span>);
+    }
+
+    await act(async () => {
+      failedReplacement.deferred.reject(new Error('replacement boom 0'));
+      await expect(failedReplacement.promise).rejects.toThrow('replacement boom 0');
+      await flushMacrotasks();
+    });
+
+    expect(fetchCount(0)).toBe(2);
+    expect(rscApi.successfulVersions[key] ?? 0).toBe(0);
+
+    const retryReplacement = await startLoad(0);
+    expect(fetchCount(0)).toBe(3);
+    await resolveLoad(retryReplacement, <span>replacement after rejection</span>);
+
+    await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+  });
 });
