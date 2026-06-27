@@ -82,6 +82,7 @@ exclude = [
   '^https://angularjs\.org/?$',            # Connection failed from CI
   '^https://frigade\.com/blog/bundle-size-reduction-with-rsc-and-frigade/?$', # Connection failed from CI
   '^https://tanstack\.com/router',           # Connection failed from CI
+  '^https://tanstack\.com/start',            # Connection failed from CI (tanstack.com blocks/timeouts in CI)
   '^https://tanstack\.com/query/latest/docs/framework/react/guides/ssr$', # Connection failed from CI
   '^https://lodash\.com',                    # Connection reset from CI
   '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI

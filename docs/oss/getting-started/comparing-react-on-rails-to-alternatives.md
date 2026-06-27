@@ -1,13 +1,13 @@
 ---
 sidebar_label: 'Decision Guide'
-description: Narrative decision guide for choosing React on Rails vs Hotwire, Inertia, Next.js, Vite, and react-rails.
+description: Narrative decision guide for choosing React on Rails vs Hotwire, Inertia, Next.js, TanStack Start, Vite, and react-rails.
 ---
 
 # Comparing React on Rails to Alternatives
 
 If you are evaluating frontend approaches for a Rails application, the right choice depends on how much of your UI should live in React, how much Rails should keep rendering, and whether server rendering is a requirement from day one.
 
-This page is intentionally practical. It focuses on the tradeoffs teams usually care about when choosing between React on Rails, Hotwire/Turbo, Inertia Rails, a Next.js frontend with a separate Rails backend API, react-rails, and Vite as a build tool.
+This page is intentionally practical. It focuses on the tradeoffs teams usually care about when choosing between React on Rails, Hotwire/Turbo, Inertia Rails, a Next.js frontend with a separate Rails backend API, TanStack Start, react-rails, and Vite as a build tool.
 
 ## Short Version
 
@@ -19,17 +19,20 @@ Choose **Inertia Rails** when you want its controller-to-page-props protocol and
 
 Choose **Next.js + separate Rails backend** when you want a hard frontend/backend boundary and are prepared to run two apps with an explicit API contract between them.
 
+Choose **TanStack Start** when you are greenfield with no existing Rails backend, want a single language across client and server, and are optimizing for raw velocity. If you have, or want, Rails, adopt the TanStack client libraries (Query, Router, Table) on top of Rails instead.
+
 If you are currently on **react-rails**, prefer the migration path to React on Rails rather than starting new work on react-rails.
 
 ## At a Glance
 
-| Option                   | Primary view model                                                  | Best fit                                                                              | What to watch                                                                                                                                         |
-| ------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **React on Rails**       | Rails views rendering React components with tight Rails integration | Existing Rails apps, SSR, mixed Rails + React pages, progressive adoption             | More setup than lightweight helper-based integrations                                                                                                 |
-| **Hotwire/Turbo**        | Rails renders HTML, Turbo updates the page                          | Rails-first apps with minimal client-side complexity                                  | Not a React solution, so React ecosystem reuse is limited                                                                                             |
-| **Inertia Rails**        | Controllers return page props to a client-rendered frontend shell   | Teams that want SPA-style page transitions without building a separate JSON API first | Every navigation is a server round-trip; replaces Rails views per-route rather than incremental adoption; review current SSR support in official docs |
-| **Next.js + Rails API**  | Next.js app consumes Rails API responses                            | Teams prioritizing frontend autonomy, edge delivery, or multi-client API reuse        | Two deployables, duplicated auth/session concerns, and stricter API lifecycle management                                                              |
-| **react-rails (legacy)** | Rails views mount React components with helper-based integration    | Existing legacy apps already on react-rails                                           | Maintenance-focused path; plan migration to React on Rails for newer capabilities                                                                     |
+| Option                   | Primary view model                                                  | Best fit                                                                                   | What to watch                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **React on Rails**       | Rails views rendering React components with tight Rails integration | Existing Rails apps, SSR, mixed Rails + React pages, progressive adoption                  | More setup than lightweight helper-based integrations                                                                                                 |
+| **Hotwire/Turbo**        | Rails renders HTML, Turbo updates the page                          | Rails-first apps with minimal client-side complexity                                       | Not a React solution, so React ecosystem reuse is limited                                                                                             |
+| **Inertia Rails**        | Controllers return page props to a client-rendered frontend shell   | Teams that want SPA-style page transitions without building a separate JSON API first      | Every navigation is a server round-trip; replaces Rails views per-route rather than incremental adoption; review current SSR support in official docs |
+| **Next.js + Rails API**  | Next.js app consumes Rails API responses                            | Teams prioritizing frontend autonomy, edge delivery, or multi-client API reuse             | Two deployables, duplicated auth/session concerns, and stricter API lifecycle management                                                              |
+| **TanStack Start**       | Full-stack React framework (client-first; SSR opt-in per route)     | Greenfield React apps with no existing backend; one-language teams optimizing for velocity | Bring-your-own backend (database, ORM, auth, jobs); business logic runs in the JS runtime                                                             |
+| **react-rails (legacy)** | Rails views mount React components with helper-based integration    | Existing legacy apps already on react-rails                                                | Maintenance-focused path; plan migration to React on Rails for newer capabilities                                                                     |
 
 ## React on Rails vs Hotwire/Turbo
 
@@ -109,6 +112,36 @@ Choose React on Rails when your priority is delivering substantial React UI whil
 If this architecture is central to your evaluation, see the dedicated guide: [Next.js with a Separate Rails Backend: Pros and Drawbacks](./nextjs-with-separate-rails-backend.md).
 
 If React Server Components are central to your evaluation, see how the two stacks implement RSC at the architecture level — and the one ownership difference that drives the rest — in [React on Rails Pro and Next.js: RSC Architectures Compared](../../pro/react-server-components/nextjs-comparison.md).
+
+## React on Rails vs TanStack Start
+
+TanStack Start is a full-stack React framework built on TanStack Router and Vite. Unlike the Next.js App Router model, it is client-first: client-side interactivity is the default, and you opt into server-side rendering per route. Server logic lives in colocated **server functions**, and the data layer is bring-your-own — Start ships no ORM or database integration of its own.
+
+That makes this less of an "either/or" than it first looks, because the libraries TanStack publishes do not all play the same role for a Rails team:
+
+- **TanStack Query, Router, and Table are complementary.** They work well in front of a Rails backend, and React on Rails Pro can server-render TanStack Router (see the [TanStack Router guide](../building-features/tanstack-router.md)). Adopting them does not require leaving Rails.
+- **TanStack Start's server functions are the part that overlaps with Rails.** They put business logic, authorization, and data access into TypeScript functions on a Node server — the job Rails already does. If you have, or want, Rails, that is the layer you are choosing between.
+
+**TanStack Start:**
+
+- Pros: one language end to end, type safety across the client/server boundary, fine-grained per-route rendering, and a fast Vite dev loop. A strong fit for greenfield apps with no existing backend and a small team optimizing for velocity.
+- Drawbacks: you still assemble and own the backend — database, ORM, auth, background jobs — from separate libraries, and your business logic shares a runtime with your UI.
+
+**React on Rails:**
+
+- Pros: keep Rails for business logic, persistence, authorization, and jobs, with React — and the TanStack client libraries — as the view layer. React Server Components in React on Rails Pro give the same colocation benefit server functions are known for (server work next to the component, no `/api` round-trip or serializer for that view), except the data comes from Rails: your controller prepares it and passes it as props or streams it as async props.
+- Drawbacks: two languages (Ruby and TypeScript) rather than one, and an untyped JSON boundary between Rails and the client unless you generate types from your API.
+
+Choose TanStack Start when you are greenfield, have no Rails investment, want a single language end to end, and are optimizing for raw velocity.
+
+Choose React on Rails when you want a real backend — Rails — under a modern React frontend, and would rather adopt the TanStack client libraries on top of Rails than move your business logic into JavaScript.
+
+A runnable example of this architecture — React on Rails Pro with TanStack Query, Router, and Table against a Rails backend — is the [React on Rails Pro + TanStack starter](https://github.com/shakacode/react-on-rails-starter-tanstack). React Server Components require React on Rails Pro with the Node renderer.
+
+Official docs:
+
+- [TanStack Start documentation](https://tanstack.com/start/latest)
+- [TanStack Router on React on Rails](../building-features/tanstack-router.md)
 
 ## React on Rails vs react-rails (Legacy Path)
 
