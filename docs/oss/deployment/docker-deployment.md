@@ -400,7 +400,7 @@ cpflow deploy-image -a myapp   # deploy the pushed image to Control Plane
   a compatible autoscaling metric for that separate scaling posture. Use
   `serverless` scale-to-zero only as an explicit first-deploy choice or planned
   delete/recreate migration. See the
-  [Control Plane Cost Posture](../getting-started/examples-and-references.md#control-plane-cost-posture).
+  [Control Plane Flow capacity tips](https://github.com/shakacode/control-plane-flow/blob/main/docs/tips.md#enable-capacity-ai-for-demo-and-starter-staging-apps).
 - **Multiple locations**: Control Plane supports multi-region deployment. Add locations to your GVC to deploy globally.
 
 ## Node Renderer in containers

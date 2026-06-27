@@ -3,19 +3,22 @@ import chalk from 'chalk';
 import { CliOptions } from './types.js';
 import { validateAll } from './validators.js';
 import { createApp, validateAppName } from './create-app.js';
+import type { ResolvedSetupMode } from './mode.js';
+import { resolveSetupMode } from './mode.js';
 import { detectPackageManager, logError, logInfo } from './utils.js';
-import { promptForMode, promptForTailwind, PROMPT_CANCELLED } from './prompt.js';
 
 // Use require() for CJS compatibility - avoids __dirname + fs.readFileSync
 // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
 const packageJson = require('../package.json') as { version: string };
 
-async function run(appName: string, rawOpts: Record<string, unknown>, command?: Command): Promise<void> {
-  const { template } = rawOpts;
-  if (typeof template !== 'string' || (template !== 'javascript' && template !== 'typescript')) {
-    logError(`Invalid template "${String(template)}". Must be "javascript" or "typescript".`);
+function run(appName: string, rawOpts: Record<string, unknown>, command?: Command): void {
+  const { template: rawTemplate } = rawOpts;
+  if (typeof rawTemplate !== 'string' || (rawTemplate !== 'javascript' && rawTemplate !== 'typescript')) {
+    logError(`Invalid template "${String(rawTemplate)}". Must be "javascript" or "typescript".`);
     process.exit(1);
+    return;
   }
+  const template = rawTemplate;
 
   let packageManager = rawOpts.packageManager as string | undefined;
   if (packageManager) {
@@ -27,9 +30,13 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
     packageManager = detectPackageManager() ?? 'npm';
   }
 
-  if (rawOpts.standard && (rawOpts.pro || rawOpts.rsc)) {
-    logError('--standard cannot be combined with --pro or --rsc.');
+  let setupMode: ResolvedSetupMode;
+  try {
+    setupMode = resolveSetupMode(rawOpts);
+  } catch (error) {
+    logError(error instanceof Error ? error.message : String(error));
     process.exit(1);
+    return;
   }
 
   // --webpack is a friendly alias for --no-rspack. Commander reports --no-rspack's declared
@@ -44,10 +51,6 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
     process.exit(1);
   }
 
-  let pro = Boolean(rawOpts.pro);
-  let rsc = Boolean(rawOpts.rsc);
-  let tailwind = Boolean(rawOpts.tailwind);
-
   console.log('');
   console.log(`${chalk.bold('create-react-on-rails-app')} v${packageJson.version}`);
   console.log('');
@@ -56,26 +59,6 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
   if (!nameValidation.success) {
     logError(nameValidation.error ?? 'Invalid app name');
     process.exit(1);
-  }
-
-  // When no mode flag is explicitly passed, prompt interactively (TTY only).
-  // Non-interactive environments (CI, pipes) fall back to standard mode.
-  const modeExplicit =
-    rawOpts.pro !== undefined || rawOpts.rsc !== undefined || rawOpts.standard !== undefined;
-  if (!modeExplicit) {
-    if (process.stdin.isTTY && process.stdout.isTTY) {
-      const choice = await promptForMode();
-      pro = choice.pro;
-      rsc = choice.rsc;
-      // Explicit mode flags keep the command deterministic; no-flag interactive runs get the Tailwind prompt.
-      if (rawOpts.tailwind === undefined) {
-        tailwind = await promptForTailwind();
-      }
-    } else {
-      logInfo(
-        'No mode flag specified and not running interactively (stdin/stdout is not a TTY); using standard mode.',
-      );
-    }
   }
 
   const options: CliOptions = {
@@ -90,9 +73,9 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
     // generator, so the generator's own fresh-install fallback (fresh_install_rspack_default,
     // which consults the Shakapacker version) is never reached via create-react-on-rails-app.
     rspack: webpackRequested ? false : (rawOpts.rspack ?? true) === true,
-    tailwind,
-    pro,
-    rsc,
+    tailwind: Boolean(rawOpts.tailwind),
+    pro: setupMode.pro,
+    rsc: setupMode.rsc,
     // Commander's `--no-agent-files` declares a default of true on rawOpts.agentFiles,
     // so undefined (no flag) and true (default) both map to true; only --no-agent-files
     // sets it false.
@@ -100,17 +83,22 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
     cliVersion: packageJson.version,
   };
 
-  if (options.rsc && options.pro) {
-    logInfo('Note: --rsc takes precedence over --pro; --pro will be ignored.');
+  if (setupMode.defaulted) {
+    logInfo(
+      'Default setup: React on Rails Pro for React 19.2 support. Use --standard only when you intentionally want an open-source-only setup.',
+    );
   }
 
-  if (options.rsc || options.pro) {
+  if (setupMode.requiresPro) {
     const modeFlag = options.rsc ? '--rsc' : '--pro';
-    logInfo(`Note: ${modeFlag} installs react_on_rails_pro and requires that gem to be installable.`);
-    logInfo(
-      `If installation fails, verify your Bundler/RubyGems setup for react_on_rails_pro, then rerun with ${modeFlag}.`,
-    );
+    const setupLabel = setupMode.defaulted ? 'The default setup' : modeFlag;
+    logInfo(`Note: ${setupLabel} adds react_on_rails_pro and uses the Pro generator path.`);
+    logInfo('If installation fails, verify your Bundler/RubyGems setup, then rerun the command.');
     logInfo('Pro setup docs: https://reactonrails.com/docs/pro/installation/');
+    logInfo('Pro pricing and sign up: https://pro.reactonrails.com/');
+    logInfo(
+      'License: no token is required for development, test, CI/CD, or staging. Production Pro deployments need a paid license, with free or low-cost options for startups and small projects.',
+    );
     console.log('');
   }
 
@@ -138,9 +126,11 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
   console.log('');
   let modeLabel = '';
   if (options.rsc) {
-    modeLabel = ', mode: rsc';
+    modeLabel = ', setup: pro with RSC example';
   } else if (options.pro) {
-    modeLabel = ', mode: pro';
+    modeLabel = ', setup: pro without RSC example';
+  } else {
+    modeLabel = ', setup: open-source-only';
   }
   const tailwindLabel = options.tailwind ? ', Tailwind CSS v4' : '';
   logInfo(
@@ -167,40 +157,45 @@ program
   .option('--no-rspack', 'Use Webpack instead of Rspack')
   .option('--webpack', 'Use Webpack as the bundler (alias for --no-rspack)')
   .option('--tailwind', 'Install Tailwind CSS v4 and style the generated SSR example')
-  .option('--standard', 'Generate open-source React on Rails setup (skip prompt)')
-  .option('--pro', 'Generate React on Rails Pro setup (installs react_on_rails_pro)')
-  .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)')
+  .option('--standard', 'Advanced: generate open-source React on Rails without Pro React 19.2 features')
+  .option('--pro', 'Generate the default React on Rails Pro setup explicitly')
+  .option('--rsc', 'Advanced: generate React on Rails Pro with the RSC example')
   .option('--no-agent-files', 'Skip AI-agent guidance files (AGENTS.md + editor pointers)')
   .addHelpText(
     'after',
     `
 Examples:
-  $ npx create-react-on-rails-app my-app                        # prompts for mode
-  $ npx create-react-on-rails-app my-app --rsc                  # skip prompt, use RSC
-  $ npx create-react-on-rails-app my-app --pro                  # skip prompt, use Pro
-  $ npx create-react-on-rails-app my-app --standard             # skip prompt, use Standard
+  $ npx create-react-on-rails-app my-app                        # default: Pro for React 19.2 support
   $ npx create-react-on-rails-app my-app --template javascript
   $ npx create-react-on-rails-app my-app --no-rspack             # use Webpack instead of Rspack
   $ npx create-react-on-rails-app my-app --webpack               # same as --no-rspack
   $ npx create-react-on-rails-app my-app --tailwind
+  $ npx create-react-on-rails-app my-app --pro                   # explicit default Pro setup
+  $ npx create-react-on-rails-app my-app --rsc                   # advanced: Pro with RSC example
+  $ npx create-react-on-rails-app my-app --standard              # advanced: OSS-only setup
   $ npx create-react-on-rails-app my-app --no-rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
   $ npx create-react-on-rails-app my-app --no-agent-files            # skip AGENTS.md + editor pointers
 
-When no mode flag (--standard, --pro, or --rsc) is given, an interactive prompt
-lets you choose between Standard, Pro, and RSC modes (default: RSC). When stdin
-or stdout is not a TTY (for example in CI, piped input, or redirected output),
-standard mode is used automatically.
+No setup questions are asked. New apps use React on Rails Pro by default because
+that is where React 19.2 feature support lives. Use --standard only when you
+intentionally want an open-source-only scaffold. Use --rsc when you want the
+generated React Server Components example.
+
+Pro license note: no token is required for development, test, CI/CD, or
+staging. Production Pro deployments need a paid license, with free or low-cost
+options for startups and small projects. See pricing and sign up:
+https://pro.reactonrails.com/
 
 What it does:
   1. Creates a new Rails app with PostgreSQL
-  2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro for Pro/RSC)
+  2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro unless --standard)
   3. Runs the React on Rails generator (Shakapacker, components, webpack config)
   4. Creates educational git commits for each major scaffold step
 
 After setup, run bin/dev and visit:
   - http://localhost:3000 (generated home page)
-  - /hello_world (default and --pro example page)
+  - /hello_world (default, --standard, and --pro example page)
   - /hello_server (--rsc example page)
 
 Inspect the generated setup history with:
@@ -215,14 +210,10 @@ The generated app includes one git commit per logical setup step.`,
 
 Documentation: https://reactonrails.com/docs/`,
   )
-  .action(async (appName: string, opts: Record<string, unknown>, command: Command) => {
+  .action((appName: string, opts: Record<string, unknown>, command: Command) => {
     try {
-      await run(appName, opts, command);
+      run(appName, opts, command);
     } catch (error) {
-      if (error instanceof Error && error.message === PROMPT_CANCELLED) {
-        console.log('');
-        process.exit(0);
-      }
       logError(error instanceof Error ? error.message : String(error));
       process.exit(1);
     }

@@ -3,7 +3,7 @@
 > **Get your first React component running in Rails in 15 minutes**
 
 > [!NOTE]
-> **Summary for AI agents:** Use this page when the user wants the shortest path to a working React on Rails install in a new Rails app. For adding React to an existing app, use [Install into an Existing Rails App](./installation-into-an-existing-rails-app.md) instead. For a guided walkthrough, use the [Tutorial](./tutorial.md).
+> **Summary for AI agents:** Use this page when the user wants the shortest path to a working React on Rails app. For new apps, start with `npx create-react-on-rails-app my-app`; it defaults to React on Rails Pro because Pro is where React 19.2 feature support lives. For adding React to an existing app, use [Install into an Existing Rails App](./installation-into-an-existing-rails-app.md) instead.
 
 This guide will have you rendering React components in your Rails app as quickly as possible. We'll skip the theory for now and focus on getting something working.
 
@@ -12,59 +12,42 @@ This guide will have you rendering React components in your Rails app as quickly
 Before starting, make sure you have:
 
 - **🚨 React on Rails 17.0.0+** (this guide)
-- **Shakapacker 6+** — installed automatically by the React on Rails generator (7+ recommended for React on Rails 17)
-- **Rails 7+** application
+- **Rails 7+** (`gem install rails`)
 - **Ruby 3.3+** (required)
-- **Node.js 18+** and a package manager (**npm**, **pnpm**, **Yarn**, or **bun**)
+- **Node.js 18+** and a package manager (**npm** or **pnpm**)
+- **git**
+- **PostgreSQL** running locally
 - **Foreman or Overmind** (for running `bin/dev`)
 - **Basic familiarity** with React and Rails
 
-> 💡 **Don't have a Rails app?** Run `rails new my_react_app` first.
+> 💡 **Already have a Rails app?** Use [Install into an Existing Rails App](./installation-into-an-existing-rails-app.md).
 
-## 📦 Step 1: Install React on Rails (3 minutes)
+## 📦 Step 1: Create the App (3 minutes)
 
-Add the React on Rails gem and run its installer:
-
-```bash
-# Add the gem
-bundle add react_on_rails --strict
-
-# Optional but recommended: commit or stash first so generated files show as a clean diff
-# git add . && git commit -m "Prepare for React on Rails install"
-
-# Run the installer for TypeScript
-bin/rails generate react_on_rails:install --typescript
-
-# Fresh installs use Rspack by default when supported (Shakapacker 9+).
-# To force Webpack instead, pass --no-rspack:
-# bin/rails generate react_on_rails:install --typescript --no-rspack
-
-# For JavaScript instead of TypeScript, omit --typescript
-# bin/rails generate react_on_rails:install
-```
-
-If the generator reports dependency-install warnings (for example, `JavaScript dependencies installation failed ...`), run your package manager install and compile once before moving on:
+Create a new React on Rails app:
 
 ```bash
-npm install
-# or: pnpm install
-# or: yarn install
-# or: bun install
-
-bundle exec rails shakapacker:compile
+npx create-react-on-rails-app my-app
+cd my-app
+bin/rails db:prepare
 ```
 
-Take a look at the files created by the generator.
+New apps use React on Rails Pro by default because Pro is where React 19.2 feature support lives. Use
+`--template javascript` for JavaScript, `--tailwind` to style the generated example, `--rsc` for the
+React Server Components example, or `--standard` only when you intentionally want an
+open-source-only scaffold.
 
-- Component files (`.tsx` for TypeScript, `.jsx` for JavaScript)
-- Shakapacker install
-- React component files in `app/javascript/src/`
-- A sample controller and view
-- Bundler configuration
+To try the latest release candidate, use:
 
-> 💡 **Performance Tip:** Fresh installs use Rspack by default when supported by your Shakapacker version (9+) for significantly faster builds. To compare or temporarily force Webpack, run the installer with `--no-rspack`; you can also switch bundlers later with `bin/switch-bundler webpack` or `bin/switch-bundler rspack`.
->
-> **Note on `bin/switch-bundler`:** This utility safely switches between webpack and rspack by updating `shakapacker.yml` and managing dependencies. However, it does not modify custom webpack configuration code. If you have custom webpack plugins or loaders, you may need to update those manually to work with rspack. See [Rspack documentation](../api-reference/generator-details.md#rspack-support) for details on unified configuration patterns.
+```bash
+npx create-react-on-rails-app@rc my-app
+```
+
+Take a look at the generated app history when you want to understand what the CLI changed:
+
+```bash
+git log --oneline --reverse
+```
 
 ## 🎯 Step 2: Start the Development Server (1 minute)
 
@@ -89,10 +72,10 @@ This starts both:
 Open your browser and navigate to:
 
 ```text
-http://localhost:3000/hello_world
+http://localhost:3000
 ```
 
-You should see a page with a React component saying "Hello World"!
+The generated home page links to the example pages and the files React on Rails created for you.
 
 🎉 **Congratulations!** You have React running in your Rails app.
 
@@ -101,7 +84,7 @@ You should see a page with a React component saying "Hello World"!
 Let's make a quick change to see hot reloading in action:
 
 1. Open the generated HelloWorld component (`app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx`)
-2. Change the text from "Hello World" to "Hello from React!"
+2. Change `<h3>Hello, {name}!</h3>` to `<h3>Hello from React on Rails Pro, {name}!</h3>`
 3. Save the file
 4. Watch your browser automatically refresh
 
@@ -116,15 +99,19 @@ Now let's add a React component to one of your existing Rails views:
 mkdir -p app/javascript/src/SimpleCounter/ror_components
 
 # Create the component file
-touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.tsx
+touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.client.tsx
 ```
 
-Add this content to `SimpleCounter.tsx`:
+Add this content to `SimpleCounter.client.tsx`:
 
 ```tsx
 import React, { useState } from 'react';
 
-const SimpleCounter = ({ initialCount = 0 }) => {
+interface SimpleCounterProps {
+  initialCount?: number;
+}
+
+const SimpleCounter = ({ initialCount = 0 }: SimpleCounterProps) => {
   const [count, setCount] = useState(initialCount);
 
   return (
@@ -145,7 +132,7 @@ export default SimpleCounter;
 
 ### Use It in a Rails View (Auto-Bundling)
 
-With React on Rails auto-bundling, you don't need manual registration! Just add this to any Rails view (like `app/views/application/index.html.erb`):
+With React on Rails auto-bundling, you don't need manual registration! Just add this to a Rails view, such as the generated home page at `app/views/home/index.html.erb`:
 
 ```erb
 <h1>My Rails App</h1>
@@ -155,7 +142,7 @@ With React on Rails auto-bundling, you don't need manual registration! Just add 
 <%= react_component("SimpleCounter", { initialCount: 5 }, { auto_load_bundle: true }) %>
 ```
 
-Note, your layout needs to include this in the `<head>` section:
+The generated layouts already include these tags. If you add React on Rails to another layout, make sure the `<head>` section includes:
 
 ```erb
     <%= stylesheet_pack_tag %>
@@ -206,14 +193,14 @@ Now that you have React on Rails working, here's what to explore next:
 1. **[Redux Integration](../building-features/react-and-redux.md)** - Manage application state
 2. **[React Router](../building-features/react-router.md)** - Client-side routing
 
-### Go Pro
+### Pro Features
 
-:::tip Pro Upgrade
-Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to the [upgrade guide](../../pro/upgrading-to-pro.md), [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Friendly license model: no token is required for development, test, CI/CD, or staging.
+:::tip Pro Features
+Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Friendly license model: no token is required for development, test, CI/CD, or staging.
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
-- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - Three-step migration from OSS
+- **[React Server Components](../../pro/react-server-components/tutorial.md)** - Add the RSC path when you need it
 - **[Pro pricing and sign up](https://pro.reactonrails.com/)** - Current plans and production licenses
 
 ## 🆘 Need Help?
