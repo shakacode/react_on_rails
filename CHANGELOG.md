@@ -68,6 +68,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4227](https://github.com/shakacode/react_on_rails/pull/4227) by
   [ihabadham](https://github.com/ihabadham).
 
+- **[Pro]** **Rspack RSC dev-server setup is easier to diagnose and customize**:
+  Generated RSC helper code now verifies client-reference discovery support
+  through the sibling `rscWebpackConfig.js` file instead of assuming
+  `config/webpack`, so Rspack apps keep using `config/rspack/rscWebpackConfig.js`.
+  The RSC doctor also warns existing Rspack apps when normal `bin/dev` can leave
+  the React Client Manifest empty because `lazyCompilation` is still enabled,
+  and the troubleshooting guide documents the `lazy-compilation-proxy` /
+  `POST /_rspack/lazy/trigger` 404 symptom path. Follow-up to
+  [PR 4227](https://github.com/shakacode/react_on_rails/pull/4227).
+  [PR 4234](https://github.com/shakacode/react_on_rails/pull/4234) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **RSC doctor now catches stale install and client-manifest setup failures**:
   The doctor now validates installed `react-on-rails-rsc` peer requirements
   against `react` and `react-dom`, warns when the installed RSC package is
