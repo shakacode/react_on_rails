@@ -813,6 +813,14 @@ const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig, rscWebpac
 };
 ```
 
+Also verify that `config/rspack/ServerClientOrBoth.js` passes the RSC config as the third argument to the environment-specific config hook:
+
+```js
+envSpecific(clientConfig, serverConfig, rscConfig);
+```
+
+If it only passes `clientConfig` and `serverConfig`, rerun the RSC generator to refresh both `ServerClientOrBoth.js` and `development.js`.
+
 Fresh generator output includes this guard. If your config has been heavily customized, keep the important behavior: RSC + Rspack + dev-server mode should set `clientWebpackConfig.lazyCompilation = false`.
 
 ## Bundle Analysis Tools
