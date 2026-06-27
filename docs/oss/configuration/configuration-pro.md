@@ -94,10 +94,13 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_use_fallback_exec_js` is true.
   config.renderer_use_fallback_exec_js = false
 
-  # Currently has no effect. The async-http adapter creates a new client per request,
-  # so this pool limit is never reached. The setting is kept for forward-compatibility
-  # with planned persistent connection support (see issue #3283).
-  # Setting a non-default value emits a warning explaining this.
+  # Maximum number of concurrent HTTP/2 streams to the Node renderer per persistent client.
+  # When a Fiber.scheduler is present — which is the case for streaming SSR/RSC, since the
+  # streaming helper runs inside a `Sync {}` block — the async-http client is reused across
+  # requests within that scheduler (persistent connection / keep-alive, issue #3283), so this
+  # limit is effective and bounds how many renders multiplex over the pooled connection(s).
+  # Without a scheduler (non-streaming paths), a client is created per request and this limit
+  # applies to that single request. See "Renderer performance tuning for streamed RSC" below.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
 
@@ -171,6 +174,42 @@ ReactOnRailsPro.configure do |config|
   # - Progressive rendering with Suspense boundaries
 end
 ```
+
+## Renderer Performance Tuning for Streamed RSC
+
+The dominant contributors to a streamed route's `responseEnd` tail are Node renderer round-trip overhead, cold or under-warmed renderer workers, and per-request connection setup between Rails and the renderer. Three levers address these (see [issue #4240](https://github.com/shakacode/react_on_rails/issues/4240)). To measure the effect of each, enable the streamed RSC `Server-Timing` attribution described in the [Streaming SSR guide](../../pro/streaming-ssr.md) and watch the `ror_renderer_prepare` and `ror_stream_shell` metrics before/after.
+
+### 1. Warm up renderer workers
+
+Each worker compiles its bundle on its **first** render request, so the first measured render after a deploy is cold. Pre-warm every worker before serving real traffic so cold-start cost does not land on a user (or skew a benchmark):
+
+- Send a warm-up render (or hit `/ready` after a warm-up render) to each replica during deploy.
+- With `workersCount > 1`, a single warm-up render is not enough — the load balancer may route it to one worker. Fan out enough warm-up renders to reach **every** worker, or run a single worker intentionally.
+
+Full warm-up patterns (Kubernetes probes, `postStart` hooks, the `/ready` cold-start contract) are in [Node renderer health checks → Gating traffic on `/ready`](../building-features/node-renderer/health-checks.md#gating-traffic-on-ready).
+
+### 2. Size the worker pool and the connection pool together
+
+Two independent limits gate renderer throughput:
+
+| Setting                                                                                             | Where    | Default  | Governs                                                          |
+| --------------------------------------------------------------------------------------------------- | -------- | -------- | ---------------------------------------------------------------- |
+| [`workersCount`](../building-features/node-renderer/js-configuration.md) / `RENDERER_WORKERS_COUNT` | Renderer | CPUs − 1 | How many renders the renderer can execute concurrently.          |
+| `renderer_http_pool_size`                                                                           | Rails    | 10       | Max concurrent HTTP/2 streams Rails multiplexes to the renderer. |
+
+Guidance:
+
+- Keep `renderer_http_pool_size` close to (and generally not far above) `workersCount`; sending many more concurrent streams than there are workers just queues renders at the renderer.
+- Account for your Rails concurrency: with many Puma threads/workers all streaming, a renderer with only one or two workers becomes the bottleneck. Scale `workersCount` (and renderer replicas) to your real concurrent streamed-render load.
+- Raise `ssr_timeout` for long-running streamed responses — it is the per-read socket timeout for the streaming connection.
+
+### 3. Rails ↔ renderer keep-alive (already on for streaming)
+
+Connection reuse is automatic on the streaming path. The streaming helper runs inside a `Sync {}` block, so a `Fiber.scheduler` is present and the async-http client is **reused across requests** within that scheduler — an HTTP/2 connection is kept alive and renders multiplex over it instead of paying TCP/TLS setup per request (issue #3283). No configuration is required to enable this.
+
+`config.renderer_http_keep_alive_timeout` is **deprecated** and ignored: the async-http adapter manages connection lifecycle automatically (connections are reused within the scheduler and cleaned up when it ends). Setting it only logs a deprecation warning.
+
+To confirm reuse, watch for the absence of repeated connection-setup cost in the `ror_renderer_prepare` Server-Timing metric across consecutive streamed requests, or trace the renderer connection at the socket level.
 
 ## Need Help?
 
