@@ -1046,7 +1046,7 @@ bundle exec rails generate react_on_rails:install --rsc
 bundle exec rails generate react_on_rails:rsc
 ```
 
-The RSC generator creates `rscWebpackConfig.js`, adds `RSCWebpackPlugin` to both server and client webpack configs, configures `RSC_BUNDLE_ONLY` handling in `ServerClientOrBoth.js`, and sets up the RSC bundle watcher process. See [React Server Components](./react-server-components/tutorial.md) for more information.
+The RSC generator creates `rscWebpackConfig.js` in the active bundler config directory (`config/webpack/` or `config/rspack/`), adds the RSC bundler plugin to both server and client configs, configures `RSC_BUNDLE_ONLY` handling in `ServerClientOrBoth.js`, and sets up the RSC bundle watcher process. See [React Server Components](./react-server-components/tutorial.md) for more information.
 
 ---
 
