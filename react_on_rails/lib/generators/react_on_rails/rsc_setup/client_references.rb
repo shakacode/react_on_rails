@@ -156,7 +156,7 @@ module ReactOnRails
               };
 
               const rscConfigSupportsDiscovery = () => {
-                const rscWebpackConfig = resolve('config/webpack/rscWebpackConfig.js');
+                const rscWebpackConfig = resolve(__dirname, 'rscWebpackConfig.js');
                 const precompileHook = resolve('bin/shakapacker-precompile-hook');
 
                 return (

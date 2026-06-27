@@ -286,7 +286,7 @@ RSC builds on React on Rails Pro's Node rendering infrastructure. The generator 
 
 In addition to all Pro files:
 
-- `config/webpack/rscWebpackConfig.js` - RSC-specific webpack configuration
+- `config/webpack/rscWebpackConfig.js` or `config/rspack/rscWebpackConfig.js` - RSC-specific bundler configuration
 - `app/javascript/src/HelloServer/` - Example RSC component (replaces HelloWorld)
 - `app/controllers/hello_server_controller.rb` - Controller with streaming support
 - `app/views/hello_server/index.html.erb` - View using `stream_react_component`

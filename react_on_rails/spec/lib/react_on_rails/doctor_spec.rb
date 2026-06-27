@@ -5274,6 +5274,131 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "check_rsc_rspack_lazy_compilation" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    before do
+      allow(doctor).to receive(:shakapacker_assets_bundler_config_path).and_return(nil)
+    end
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) do
+          FileUtils.mkdir_p("config/rspack")
+          File.write("config/rspack/rscWebpackConfig.js", "module.exports = {}")
+          File.write("config/rspack/rspack.config.js", "module.exports = {};")
+          File.write("config/rspack/development.js", "module.exports = {};")
+          FileUtils.mkdir_p("config")
+          File.write("config/shakapacker.yml", "default:\n  assets_bundler: rspack\n")
+          example.run
+        end
+      end
+    end
+
+    it "warns when RSC Rspack dev-server config does not disable lazy compilation" do
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages)
+        .to include(a_string_including("Rspack lazyCompilation can leave the RSC client manifest empty"))
+      expect(warning_messages).to include(a_string_including("config/rspack/development.js"))
+      expect(info_messages).to include(a_string_including("clientWebpackConfig.lazyCompilation = false"))
+      expect(info_messages).to include(a_string_including("rsc-troubleshooting.md#empty-client-manifest"))
+    end
+
+    it "warns when the RSC Rspack development config is missing" do
+      File.delete("config/rspack/development.js")
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC Rspack development config not found"))
+      expect(info_messages)
+        .to include(a_string_including("Cannot verify that Rspack lazyCompilation is disabled"))
+    end
+
+    it "skips the lazy compilation warning when the RSC Rspack config is not present" do
+      File.delete("config/rspack/rscWebpackConfig.js")
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      expect(checker.messages).to be_empty
+    end
+
+    it "reports success when RSC Rspack dev-server config disables lazy compilation" do
+      File.write("config/rspack/development.js", "clientWebpackConfig.lazyCompilation = false;\n")
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(success_messages)
+        .to include(a_string_including("Rspack lazy compilation appears disabled for RSC dev-server"))
+      expect(warning_messages).to be_empty
+    end
+
+    it "uses the configured Shakapacker Rspack config directory" do
+      FileUtils.mkdir_p("config/custom-rspack")
+      File.write("config/custom-rspack/rspack.custom.js", "module.exports = {};")
+      File.write("config/custom-rspack/rscWebpackConfig.js", "module.exports = {};")
+      File.write("config/custom-rspack/development.js", "clientWebpackConfig.lazyCompilation = false;\n")
+      allow(doctor)
+        .to receive(:shakapacker_assets_bundler_config_path)
+        .and_return("config/custom-rspack/rspack.custom.js")
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(success_messages)
+        .to include(a_string_including("Rspack lazy compilation appears disabled for RSC dev-server"))
+      expect(warning_messages).to be_empty
+    end
+
+    it "continues warning when only unrelated lazy compilation settings are disabled" do
+      File.write(
+        "config/rspack/development.js",
+        <<~JAVASCRIPT
+          module.exports = {
+            lazyCompilation: false,
+          };
+
+          serverWebpackConfig.lazyCompilation = false;
+          rscWebpackConfig.lazyCompilation = false;
+        JAVASCRIPT
+      )
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(success_messages).to be_empty
+      expect(warning_messages)
+        .to include(a_string_including("Rspack lazyCompilation can leave the RSC client manifest empty"))
+    end
+
+    it "continues warning when the client lazy compilation assignment is only commented out" do
+      File.write(
+        "config/rspack/development.js",
+        <<~JAVASCRIPT
+          // clientWebpackConfig.lazyCompilation = false;
+          module.exports = {};
+        JAVASCRIPT
+      )
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(success_messages).to be_empty
+      expect(warning_messages)
+        .to include(a_string_including("Rspack lazyCompilation can leave the RSC client manifest empty"))
+    end
+  end
+
   describe "check_rsc_react_version" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }

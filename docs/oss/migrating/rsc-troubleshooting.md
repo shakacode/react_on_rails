@@ -20,6 +20,7 @@ When something goes wrong during RSC migration, start here. This table maps symp
 | `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                               | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                      |
 | `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)             |
 | `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                 | [MessageChannel Not Defined](#messagechannel-not-defined)                                     |
+| RSC says a module is missing from the React Client Manifest and the manifest is empty in Rspack `bin/dev`      | Rspack lazy compilation deferred RSC client references before the server renderer read them  | [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server) |
 | SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                 |
 | Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                 |
 | 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)              |
@@ -774,6 +775,54 @@ class Api::UsersController < ApplicationController
 end
 ```
 
+## Empty Client Manifest with Rspack Dev Server
+
+In RSC apps that use Rspack, normal `bin/dev` dev-server mode must compile RSC client references before the server renderer reads the React Client Manifest. If Rspack lazy compilation is still enabled, the first server render can see an empty manifest and fail with an error like:
+
+```text
+Could not find the module ".../LikeButton.jsx#default" in the React Client Manifest.
+```
+
+Common signs:
+
+- `react-client-manifest.json` contains `"filePathToModuleMetadata": {}`
+- the generated Rspack client bundle mentions `lazy-compilation-proxy`
+- the browser sends `POST /_rspack/lazy/trigger` and Rails returns `404`
+- `bin/dev static` works, but normal `bin/dev` fails
+
+Run the RSC doctor first:
+
+```bash
+bundle exec rails react_on_rails:doctor:rsc
+```
+
+For existing generated apps, update `config/rspack/development.js` so the Rspack dev-server branch disables lazy compilation when an RSC config is present:
+
+```js
+const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig, rscWebpackConfig) => {
+  if (process.env.WEBPACK_SERVE) {
+    if (config.assets_bundler === 'rspack') {
+      const { ReactRefreshRspackPlugin } = require('@rspack/plugin-react-refresh');
+      clientWebpackConfig.plugins.push(new ReactRefreshRspackPlugin());
+
+      if (rscWebpackConfig) {
+        clientWebpackConfig.lazyCompilation = false;
+      }
+    }
+  }
+};
+```
+
+Also verify that `config/rspack/ServerClientOrBoth.js` passes the RSC config as the third argument to the environment-specific config hook:
+
+```js
+envSpecific(clientConfig, serverConfig, rscConfig);
+```
+
+If it only passes `clientConfig` and `serverConfig`, rerun the RSC generator to refresh both `ServerClientOrBoth.js` and `development.js`.
+
+Fresh generator output includes this guard. If your config has been heavily customized, keep the important behavior: RSC + Rspack + dev-server mode should set `clientWebpackConfig.lazyCompilation = false`.
+
 ## Bundle Analysis Tools
 
 | Tool                                                                                                                          | Purpose                                                          |
@@ -810,6 +859,7 @@ end
 | `ReferenceError: require is not defined`                                                                                     | Server or RSC bundle webpack config uses `externals` for Node builtins, generating `require()` calls that fail in VM sandbox                                                                       | Use `resolve.fallback: { path: false, fs: false }` instead of `externals`. See [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)                                                                                                       |
 | `ReferenceError: MessageChannel is not defined`                                                                              | `react-dom/server.browser` instantiates `MessageChannel` at module load time; VM sandbox lacks this global                                                                                         | Inject a `BannerPlugin` polyfill in the server webpack config. See [MessageChannel Not Defined](#messagechannel-not-defined)                                                                                                                                           |
 | `"global object mismatch"`                                                                                                   | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc)                                                                                                      | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch)                                                                                                                           |
+| Missing module in React Client Manifest with empty `filePathToModuleMetadata` in Rspack `bin/dev`                            | Rspack lazy compilation deferred RSC client references before manifest generation                                                                                                                  | Disable Rspack lazy compilation for RSC dev-server mode. See [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server)                                                                                                             |
 | SSR hangs indefinitely / request timeout on large RSC payloads                                                               | Stream backpressure deadlock when RSC payload exceeds 16 KB                                                                                                                                        | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                                                                                                                                                 |
 | `"The 'react-on-rails' package version does not match the gem version"`                                                      | Gem and npm package installed at different versions                                                                                                                                                | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                   |
 | `"The 'react-on-rails' package version is not an exact version"`                                                             | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json                                                                                                                    | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                    |
