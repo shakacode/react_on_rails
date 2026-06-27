@@ -236,6 +236,16 @@ RSpec.describe "Shakapacker precompile hook shared script" do
           end
         end
       end
+
+      it "keeps the UTF-8 pin even when a caller passes RUBYOPT in extra" do
+        # The widening is applied last (authoritative), so an extra RUBYOPT key cannot silently drop
+        # the pin and leave the child on US-ASCII.
+        with_locale_encoding(Encoding::US_ASCII) do
+          with_env("RUBYOPT" => "-W0") do
+            expect(utf8_subprocess_env("RUBYOPT" => nil)["RUBYOPT"]).to eq("-EUTF-8 -W0")
+          end
+        end
+      end
     end
 
     context "when the locale is a real UTF-8 locale" do

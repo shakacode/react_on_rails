@@ -52,11 +52,14 @@ EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules publi
 def utf8_subprocess_env(extra = {})
   return extra.dup unless Encoding.find("locale") == Encoding::US_ASCII
 
-  {
+  # Merge the UTF-8 widening last so it is authoritative: a caller-supplied key cannot accidentally
+  # drop the pin (callers pass functional flags like REACT_ON_RAILS_SKIP_VALIDATION here, not locale
+  # vars). The pin is derived from the parent's own RUBYOPT, so existing non-encoding flags survive.
+  extra.merge(
     "LANG" => "C.UTF-8",
     "LC_ALL" => "C.UTF-8",
     "RUBYOPT" => utf8_widened_rubyopt(ENV.fetch("RUBYOPT", ""))
-  }.merge(extra)
+  )
 end
 
 # Prepend a UTF-8 external-encoding pin to RUBYOPT for the C/POSIX widening case — a portable
