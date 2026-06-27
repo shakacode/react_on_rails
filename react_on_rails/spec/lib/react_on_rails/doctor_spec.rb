@@ -5305,6 +5305,7 @@ RSpec.describe ReactOnRails::Doctor do
         .to include(a_string_including("Rspack lazyCompilation can leave the RSC client manifest empty"))
       expect(warning_messages).to include(a_string_including("config/rspack/development.js"))
       expect(info_messages).to include(a_string_including("clientWebpackConfig.lazyCompilation = false"))
+      expect(info_messages).to include(a_string_including("rsc-troubleshooting.md#empty-client-manifest"))
     end
 
     it "warns when the RSC Rspack development config is missing" do

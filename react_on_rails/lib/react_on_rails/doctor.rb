@@ -3648,7 +3648,9 @@ module ReactOnRails
         MSG
         checker.add_info("  💡 Add this inside the Rspack WEBPACK_SERVE branch:")
         checker.add_info("     clientWebpackConfig.lazyCompilation = false;")
-        checker.add_info("  💡 Or rerun the RSC generator to refresh generated Rspack config files")
+        checker.add_info(
+          "  💡 See docs/oss/migrating/rsc-troubleshooting.md#empty-client-manifest-with-rspack-dev-server"
+        )
       end
     rescue StandardError => e
       checker.add_warning("⚠️  Could not inspect RSC Rspack lazyCompilation config: #{e.message}")
