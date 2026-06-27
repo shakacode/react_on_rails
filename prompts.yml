@@ -67,7 +67,7 @@ prompts:
     title: Start a new app
     category: get-started
     doc_route: /docs/getting-started/create-react-on-rails-app
-    prompt: "Set up a new Rails app using the default React on Rails Pro path (no license required for development) with TypeScript and server-side rendering. Follow the official guide at {{doc_url}} exactly; don't improvise commands or versions. Use --standard only when the user's request explicitly requires an open-source-only scaffold."
+    prompt: "Set up a new Rails app using the default React on Rails Pro path (no token required for development, test, CI/CD, or staging; production requires a paid license) with TypeScript and server-side rendering. Follow the official guide at {{doc_url}} exactly; don't improvise commands or versions. Use --standard only when you intentionally want an open-source-only scaffold."
 
   - id: install-existing
     title: Add to an existing Rails app
