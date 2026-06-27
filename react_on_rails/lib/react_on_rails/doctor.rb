@@ -3650,7 +3650,7 @@ module ReactOnRails
     # The static check only recognizes the generated literal
     # `clientWebpackConfig.lazyCompilation = false` assignment. Equivalent custom configs (object form,
     # Object.assign, a helper, a ternary, or a different config file) cannot be confirmed statically, so the
-    # wording stays honest about that limitation instead of asserting lazyCompilation is enabled (issue #4243).
+    # wording stays honest about that limitation instead of asserting lazyCompilation is enabled.
     def warn_rsc_rspack_lazy_compilation_unconfirmed(development_config_path)
       checker.add_warning(<<~MSG.strip)
         ⚠️  Rspack lazyCompilation can leave the RSC client manifest empty in normal bin/dev mode.
@@ -3662,9 +3662,8 @@ module ReactOnRails
       checker.add_info("  💡 If lazyCompilation is not disabled, add this inside the Rspack WEBPACK_SERVE branch:")
       checker.add_info("     clientWebpackConfig.lazyCompilation = false;")
       checker.add_info(
-        "  💡 Doctor only detects that literal assignment. If you disable lazyCompilation another way " \
-        "(object form, Object.assign, a helper, a ternary, or a different config file), confirm your " \
-        "effective dev-server config and you can ignore this warning."
+        "  💡 If you disable lazyCompilation another way (object form, Object.assign, a helper, a ternary, " \
+        "or a different config file), confirm your effective dev-server config and you can ignore this warning."
       )
       checker.add_info(
         "  💡 See docs/oss/migrating/rsc-troubleshooting.md#empty-client-manifest-with-rspack-dev-server"
