@@ -67,7 +67,7 @@ prompts:
     title: Start a new app
     category: get-started
     doc_route: /docs/getting-started/create-react-on-rails-app
-    prompt: "Set up a new Rails app with React on Rails, using TypeScript and server-side rendering. Follow the official guide at {{doc_url}} and use the exact commands and versions it specifies — don't improvise."
+    prompt: "Set up a new Rails app with the default React on Rails Pro path for React 19.2 feature support. Follow the official guide at {{doc_url}} exactly, use `--standard` only if I explicitly need an open-source-only scaffold, and don't improvise commands or versions."
 
   - id: install-existing
     title: Add to an existing Rails app
