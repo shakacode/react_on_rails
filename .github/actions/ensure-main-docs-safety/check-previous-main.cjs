@@ -1,0 +1,279 @@
+const FAILURE_CONCLUSIONS = new Set(['failure', 'timed_out', 'cancelled', 'action_required']);
+const MAX_GUARD_ONLY_HOPS = 10;
+
+function parseExcludeWorkflows(excludeWorkflowsInput) {
+  return (excludeWorkflowsInput || '')
+    .split(',')
+    .map((workflow) => workflow.trim())
+    .filter(Boolean);
+}
+
+function summarizeRun(run) {
+  return `- [${run.name} #${run.run_number}](${run.html_url}) concluded ${run.conclusion}`;
+}
+
+function latestRunsByWorkflow(workflowRuns) {
+  const latestByWorkflow = new Map();
+
+  for (const run of workflowRuns) {
+    const existing = latestByWorkflow.get(run.workflow_id);
+    if (!existing || run.run_number > existing.run_number) {
+      latestByWorkflow.set(run.workflow_id, run);
+    }
+  }
+
+  return latestByWorkflow;
+}
+
+function latestAttemptJobs(jobs) {
+  const latestAttempt = Math.max(...jobs.map((job) => job.run_attempt));
+  return jobs.filter((job) => job.run_attempt === latestAttempt);
+}
+
+function failedJobs(jobs) {
+  return jobs.filter((job) => FAILURE_CONCLUSIONS.has(job.conclusion));
+}
+
+function isGuardOnlyFailure(jobs) {
+  const failed = failedJobs(jobs);
+
+  return (
+    failed.length > 0 &&
+    failed.every(
+      (job) =>
+        job.name === 'detect-changes' &&
+        job.steps?.some(
+          (step) => step.name === 'Guard docs-only main pushes' && FAILURE_CONCLUSIONS.has(step.conclusion),
+        ),
+    )
+  );
+}
+
+async function listWorkflowRunsForSha({ github, context, sha, createdAfter }) {
+  const workflowRuns = [];
+
+  for await (const response of github.paginate.iterator(github.rest.actions.listWorkflowRunsForRepo, {
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    event: 'push',
+    per_page: 30,
+    created: `>${createdAfter}`,
+    sort: 'created',
+    direction: 'desc',
+  })) {
+    const pageRuns = response.data;
+    const relevantInPage = pageRuns.filter((run) => run.head_sha === sha);
+
+    if (relevantInPage.length > 0) {
+      workflowRuns.push(...relevantInPage);
+    }
+
+    // Early exit: if we found relevant runs and now see different SHAs,
+    // we've likely collected all runs for this commit.
+    if (workflowRuns.length > 0 && relevantInPage.length === 0) {
+      break;
+    }
+  }
+
+  return workflowRuns;
+}
+
+async function evaluateCommitRuns({ github, context, core, sha, createdAfter, excludeWorkflows }) {
+  const workflowRuns = await listWorkflowRunsForSha({ github, context, sha, createdAfter });
+
+  if (workflowRuns.length === 0) {
+    return { status: 'no-runs', workflowRuns };
+  }
+
+  const latestByWorkflow = latestRunsByWorkflow(workflowRuns);
+
+  for (const [workflowId, run] of latestByWorkflow) {
+    if (excludeWorkflows.includes(run.name)) {
+      core.info(`Excluding workflow "${run.name}" from failure checks (not a CI quality gate).`);
+      latestByWorkflow.delete(workflowId);
+    }
+  }
+
+  const runsToCheck = Array.from(latestByWorkflow.values());
+  const incompleteRuns = runsToCheck.filter((run) => run.status !== 'completed');
+  const completedRuns = runsToCheck.filter((run) => run.status === 'completed');
+
+  const completedRunResults = await Promise.all(
+    completedRuns.map(async (run) => {
+      const {
+        data: { jobs },
+      } = await github.rest.actions.listJobsForWorkflowRun({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        run_id: run.id,
+        per_page: 100,
+      });
+
+      if (jobs.length === 0) {
+        core.warning(`No jobs found for workflow run ${run.id} (${run.name}). Skipping.`);
+        return { kind: 'no-jobs' };
+      }
+
+      const latestJobs = latestAttemptJobs(jobs);
+      const failed = failedJobs(latestJobs);
+
+      if (failed.length === 0) {
+        return { kind: 'passing' };
+      }
+
+      return {
+        kind: isGuardOnlyFailure(latestJobs) ? 'guard-only' : 'failing',
+        run,
+      };
+    }),
+  );
+  const failingRuns = [];
+  const guardOnlyRuns = [];
+
+  for (const runResult of completedRunResults) {
+    if (runResult.kind === 'failing') {
+      failingRuns.push(runResult.run);
+    } else if (runResult.kind === 'guard-only') {
+      guardOnlyRuns.push(runResult.run);
+    }
+  }
+
+  return {
+    status: 'runs-found',
+    workflowRuns,
+    incompleteRuns,
+    failingRuns,
+    guardOnlyRuns,
+  };
+}
+
+async function firstParentSha({ github, context, sha }) {
+  const response = await github.rest.repos.getCommit({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    ref: sha,
+  });
+
+  return response.data.parents?.[0]?.sha;
+}
+
+async function checkPreviousMainCommitStatus({
+  github,
+  context,
+  core,
+  previousSha,
+  excludeWorkflowsInput,
+  maxGuardOnlyHops = MAX_GUARD_ONLY_HOPS,
+  createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
+}) {
+  const excludeWorkflows = parseExcludeWorkflows(excludeWorkflowsInput);
+
+  if (excludeWorkflows.length > 0) {
+    core.info(`Excluding workflows from failure checks: ${excludeWorkflows.join(', ')}`);
+  }
+
+  const guardOnlyTrail = [];
+
+  async function checkSha(shaToCheck, remainingGuardOnlyHops) {
+    if (remainingGuardOnlyHops < 0) {
+      core.setFailed(
+        `Cannot determine prior real CI status after ${maxGuardOnlyHops} docs-only guard-only commits. Push a non-docs change to trigger hosted CI.`,
+      );
+      return;
+    }
+
+    const result = await evaluateCommitRuns({
+      github,
+      context,
+      core,
+      sha: shaToCheck,
+      createdAfter,
+      excludeWorkflows,
+    });
+
+    if (result.status === 'no-runs') {
+      core.info(`No workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`);
+      return;
+    }
+
+    if (result.incompleteRuns.length > 0) {
+      const details = result.incompleteRuns
+        .map((run) => `- [${run.name} #${run.run_number}](${run.html_url}) is still ${run.status}`)
+        .join('\n');
+      core.info(
+        [
+          `Main commit ${shaToCheck} still has running workflows:`,
+          details,
+          '',
+          'Allowing docs-only skip because running workflows have not failed yet.',
+        ].join('\n'),
+      );
+    }
+
+    if (result.failingRuns.length > 0) {
+      const details = result.failingRuns.map(summarizeRun).join('\n');
+      const guardTrailDetails =
+        guardOnlyTrail.length > 0
+          ? [
+              '',
+              'Ignored docs-only guard-only failures while looking for the underlying CI state:',
+              ...guardOnlyTrail.map(
+                ({ sha, runs }) =>
+                  `- ${sha}: ${runs.map((run) => `${run.name} #${run.run_number}`).join(', ')}`,
+              ),
+            ].join('\n')
+          : '';
+
+      core.setFailed(
+        [
+          `Cannot skip CI for docs-only commit because main commit ${shaToCheck} still has failing workflows:`,
+          details,
+          guardTrailDetails,
+          '',
+          'Fix these failures before pushing docs-only changes, or push non-docs changes to trigger hosted CI.',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      );
+      return;
+    }
+
+    if (result.guardOnlyRuns.length === 0) {
+      if (result.incompleteRuns.length > 0) {
+        core.info(
+          `Main commit ${shaToCheck} has ${result.incompleteRuns.length} running workflow(s) but no completed failures. Docs-only skip allowed.`,
+        );
+      } else {
+        core.info(`Main commit ${shaToCheck} completed without failures. Docs-only skip allowed.`);
+      }
+      return;
+    }
+
+    const parentSha = await firstParentSha({ github, context, sha: shaToCheck });
+    if (!parentSha) {
+      core.info(
+        `Main commit ${shaToCheck} only has docs-only guard failures, but no parent commit was found. Allowing docs-only skip.`,
+      );
+      return;
+    }
+
+    core.info(
+      `Main commit ${shaToCheck} only has docs-only guard failures. Checking first parent ${parentSha} for the underlying CI state.`,
+    );
+    guardOnlyTrail.push({ sha: shaToCheck, runs: result.guardOnlyRuns });
+    await checkSha(parentSha, remainingGuardOnlyHops - 1);
+  }
+
+  await checkSha(previousSha, maxGuardOnlyHops);
+}
+
+module.exports = {
+  FAILURE_CONCLUSIONS,
+  checkPreviousMainCommitStatus,
+  evaluateCommitRuns,
+  failedJobs,
+  isGuardOnlyFailure,
+  latestAttemptJobs,
+  latestRunsByWorkflow,
+  parseExcludeWorkflows,
+};

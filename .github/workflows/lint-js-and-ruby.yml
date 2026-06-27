@@ -202,6 +202,8 @@ jobs:
 
       - name: Lint JS
         run: pnpm run eslint --report-unused-disable-directives
+      - name: Test GitHub Action helpers
+        run: node .github/actions/ensure-main-docs-safety/check-previous-main.test.cjs
       - name: Check formatting
         run: pnpm start format.listDifferent
       - name: Lint SCSS with stylelint
