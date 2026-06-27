@@ -2067,6 +2067,69 @@ end
 
 The controller just renders — the async prop's query runs in the view's `emit` block (Step 3) so the shell can stream before the query finishes. The controller still owns request-level concerns: authentication, authorization, and any fast props you pass synchronously.
 
+### Browser-Observable RSC Stream Marks
+
+For streamed React Server Component pages, the initial Flight payload is embedded in the HTML stream. It is not a separate browser resource, so `PerformanceResourceTiming` will not show a named RSC payload request for the initial page load. To inspect streamed payload bytes and flush timing from browser tooling without changing that transport, opt in to inline performance marks:
+
+```ruby
+stream_view_containing_react_components(
+  template: "example/show",
+  rsc_stream_observability: true
+)
+```
+
+When enabled, React on Rails Pro appends small inline scripts to the streamed response and enables matching client-side hydration marks for RSC island roots. Each mark first tries:
+
+```js
+performance.mark('react-on-rails:rsc:payload', { detail });
+```
+
+If the browser does not support mark details, or if `performance.mark` is unavailable, the same entry is appended to:
+
+```js
+self.REACT_ON_RAILS_PERFORMANCE_MARKS;
+```
+
+Use a `PerformanceObserver` for the normal path and read the queue as a fallback:
+
+```js
+const observer = new PerformanceObserver((list) => {
+  for (const entry of list.getEntries()) {
+    if (entry.name.startsWith('react-on-rails:rsc:')) {
+      console.log(entry.name, entry.detail);
+    }
+  }
+});
+
+observer.observe({ type: 'mark', buffered: true });
+
+for (const entry of self.REACT_ON_RAILS_PERFORMANCE_MARKS || []) {
+  console.log(entry.name, entry.detail, entry.fallback);
+}
+```
+
+The emitted mark names are:
+
+| Mark name                                  | What it records                                                                                                                                                                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `react-on-rails:rsc:stream`                | Rails-side stream completion, emitted as a final safe HTML chunk with initial template bytes, `renderDurationMs`, and `sinceStreamStartMs`. `sinceStreamStartMs` is total wall-clock through component stream drain.      |
+| `react-on-rails:rsc:payload`               | Each inline Flight payload chunk, including component name, chunk index, matching flush index, raw Flight bytes, and RSC payload script bytes.                                                                            |
+| `react-on-rails:rsc:flush`                 | Each Node-side HTML/RSC combined flush, including HTML bytes, payload script bytes, payload mark script bytes, stylesheet bytes, and index. `streamChunkBytesBeforeFlushMark` excludes the flush mark script's own bytes. |
+| `react-on-rails:rsc:hydration:start`       | Client-side start of an RSC island root hydration or client render, including component name, DOM id, and mode.                                                                                                           |
+| `react-on-rails:rsc:hydration:interactive` | Browser task scheduled after root creation for that RSC island root, a practical interactivity boundary for browser benchmarks without changing the React tree shape.                                                     |
+
+The details intentionally include byte counts, phase names, component names, DOM ids, hydrate/render mode, chunk indexes, and timing offsets. They do not include serialized props or Flight payload contents.
+
+For flush marks, `streamChunkBytesBeforeFlushMark` is the sum of the flush detail subfields and excludes the flush mark's own inline script bytes. `payloadMarkScriptBytes` counts only payload-mark inline scripts co-flushed with that chunk.
+
+Hydration start marks are emitted immediately before root creation. Interactive marks are scheduled outside the React element tree after root creation so observability does not add client-only wrapper components that could affect `useId()` hydration parity. If `hydrateRoot` or `createRoot` throws synchronously before returning a root, if root creation or hydration throws before mounting, or if the root is torn down before the scheduled mark runs, the paired `react-on-rails:rsc:hydration:interactive` mark will be absent. A hydration error that surfaces after root creation may still leave the scheduled interactive mark in place; treat it as a root-created browser task boundary, not proof that every nested Suspense boundary resolved.
+
+The initial RSC payload remains inline in the navigation response by design. A separate `/rsc_payload/*` request exists for client-side RSC payload generation, but the streamed initial page does not switch to that fetch path unless your application deliberately renders that route separately.
+
+#### CDN And Trailer Caveats
+
+`Server-Timing` headers are useful for non-streamed responses, but `ActionController::Live` commits headers on the first stream write. HTTP trailers can theoretically carry late timing data, but browser, proxy, and CDN support varies, and intermediaries may buffer, strip, rewrite, or hide trailer/header timing values. React on Rails Pro therefore does not make HTTP trailers the default streamed observability path. Inline marks travel in the response body, so they survive the same CDN path as the streamed HTML and are visible to `PerformanceObserver` or the fallback queue after the browser parses them.
+
 #### Loading Multiple Slow Sources in Parallel
 
 When several sources are slow and independent, run them concurrently with the [`async` gem](https://github.com/socketry/async) (already a dependency of React on Rails Pro and loaded by the streaming helper). Pro's streaming stack is fiber-based, so fan out with fibers from the running reactor rather than introducing a separate Ruby-thread concurrency model. The emit block runs inside an `Async` task — capture it with `Async::Task.current` and spawn one child task per source with `parent.async`, so each prop is emitted the moment its own query resolves:
