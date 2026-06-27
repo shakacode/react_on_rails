@@ -5302,6 +5302,26 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages).to include(a_string_including("clientWebpackConfig.lazyCompilation = false"))
     end
 
+    it "warns when the RSC Rspack development config is missing" do
+      File.delete("config/rspack/development.js")
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("RSC Rspack development config not found"))
+      expect(info_messages)
+        .to include(a_string_including("Cannot verify that Rspack lazyCompilation is disabled"))
+    end
+
+    it "skips the lazy compilation warning when the RSC Rspack config is not present" do
+      File.delete("config/rspack/rscWebpackConfig.js")
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      expect(checker.messages).to be_empty
+    end
+
     it "reports success when RSC Rspack dev-server config disables lazy compilation" do
       File.write("config/rspack/development.js", "clientWebpackConfig.lazyCompilation = false;\n")
 
@@ -5309,7 +5329,8 @@ RSpec.describe ReactOnRails::Doctor do
 
       success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
       warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
-      expect(success_messages).to include(a_string_including("Rspack lazy compilation disabled for RSC dev-server"))
+      expect(success_messages)
+        .to include(a_string_including("Rspack lazy compilation appears disabled for RSC dev-server"))
       expect(warning_messages).to be_empty
     end
 
@@ -5323,6 +5344,24 @@ RSpec.describe ReactOnRails::Doctor do
 
           serverWebpackConfig.lazyCompilation = false;
           rscWebpackConfig.lazyCompilation = false;
+        JAVASCRIPT
+      )
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(success_messages).to be_empty
+      expect(warning_messages)
+        .to include(a_string_including("Rspack lazyCompilation can leave the RSC client manifest empty"))
+    end
+
+    it "continues warning when the client lazy compilation assignment is only commented out" do
+      File.write(
+        "config/rspack/development.js",
+        <<~JAVASCRIPT
+          // clientWebpackConfig.lazyCompilation = false;
+          module.exports = {};
         JAVASCRIPT
       )
 

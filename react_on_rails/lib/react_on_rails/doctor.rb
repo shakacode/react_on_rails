@@ -3523,7 +3523,7 @@ module ReactOnRails
     RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
     RSC_RSPACK_DEVELOPMENT_CONFIG_PATH = "config/rspack/development.js"
     RSC_RSPACK_CLIENT_LAZY_COMPILATION_DISABLED_PATTERN = /
-      \bclientWebpackConfig\.lazyCompilation\s*=\s*false\b
+      ^\s*clientWebpackConfig\.lazyCompilation\s*=\s*false\b
     /x
 
     def check_rsc_setup
@@ -3632,7 +3632,7 @@ module ReactOnRails
 
       development_config = File.read(RSC_RSPACK_DEVELOPMENT_CONFIG_PATH)
       if development_config.match?(RSC_RSPACK_CLIENT_LAZY_COMPILATION_DISABLED_PATTERN)
-        checker.add_success("✅ Rspack lazy compilation disabled for RSC dev-server")
+        checker.add_success("✅ Rspack lazy compilation appears disabled for RSC dev-server")
       else
         checker.add_warning(<<~MSG.strip)
           ⚠️  Rspack lazyCompilation can leave the RSC client manifest empty in normal bin/dev mode.
