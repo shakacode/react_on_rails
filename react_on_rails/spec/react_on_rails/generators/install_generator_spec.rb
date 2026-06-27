@@ -1016,6 +1016,38 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "reports a pretend manual step instead of warning when a customized layout needs Tailwind wiring" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag "application" %>
+            <%= javascript_pack_tag "application" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      pretend_generator = base_generator_fixture(tailwind: true, pretend: true)
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(pretend_generator).to receive(:say_status)
+      allow(pretend_generator).to receive(:say)
+
+      pretend_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(pretend_generator).to have_received(:say_status)
+        .with(
+          :pretend,
+          "#{layout_path} is customized and would need the Tailwind pack-tag block added manually",
+          :yellow
+        )
+      expect(pretend_generator).not_to have_received(:say)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
     it "warns instead of rewriting layouts without the generated pack-tag comment" do
       original_layout = <<~ERB
         <!DOCTYPE html>
@@ -1023,6 +1055,67 @@ describe InstallGenerator, type: :generator do
           <head>
             <!-- TODO: add react_on_rails_tailwind when Tailwind is enabled -->
             <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind pack tags that only appear inside an HTML comment" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!--
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+            -->
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind pack tags that are not a contiguous helper block" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <meta name="theme-color" content="#ffffff">
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
             <%= javascript_pack_tag %>
           </head>
           <body>

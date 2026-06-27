@@ -146,18 +146,17 @@ module ReactOnRails
         \k<indent><%=\s*stylesheet_pack_tag\s*%>\r?\n
         \k<indent><%=\s*javascript_pack_tag\s*%>
       }x
-      TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN = /
-        <%\s*prepend_javascript_pack_tag(?:\s|\()\s*["']react_on_rails_tailwind["']
+      TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN = /
+        ^[ \t]*<%\s*prepend_javascript_pack_tag(?:\s|\()
+        \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
+        [ \t]*<%=\s*stylesheet_pack_tag(?:\s|\()
+        \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
+        [ \t]*<%=\s*javascript_pack_tag(?:\s|\(|%>)
       /x
-      TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN = /
-        <%=\s*stylesheet_pack_tag(?:\s|\()\s*["']react_on_rails_tailwind["']
-      /x
-      TAILWIND_LAYOUT_PACK_FLUSH_PATTERN = /<%=\s*javascript_pack_tag(?:\s|\(|%>)/x
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED, :REACT_ON_RAILS_DEFAULT_LAYOUT_PATH,
                        :TAILWIND_LAYOUT_HELPER_LINES, :DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN,
-                       :TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN, :TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN,
-                       :TAILWIND_LAYOUT_PACK_FLUSH_PATTERN
+                       :TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN
 
       def add_root_route
         return unless options.new_app?
@@ -434,15 +433,21 @@ module ReactOnRails
         end
 
         layout_match = content.match(DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN)
-        unless layout_match
-          warn_tailwind_layout_manual_step(REACT_ON_RAILS_DEFAULT_LAYOUT_PATH, reason: "layout is customized")
+        if options[:pretend]
+          pretend_message =
+            if layout_match
+              "Would update #{REACT_ON_RAILS_DEFAULT_LAYOUT_PATH} to link #{tailwind_pack_name}"
+            else
+              "#{REACT_ON_RAILS_DEFAULT_LAYOUT_PATH} is customized and would need the Tailwind pack-tag block " \
+                "added manually"
+            end
+
+          say_status :pretend, pretend_message, :yellow
           return
         end
 
-        if options[:pretend]
-          say_status :pretend,
-                     "Would update #{REACT_ON_RAILS_DEFAULT_LAYOUT_PATH} to link #{tailwind_pack_name}",
-                     :yellow
+        unless layout_match
+          warn_tailwind_layout_manual_step(REACT_ON_RAILS_DEFAULT_LAYOUT_PATH, reason: "layout is customized")
           return
         end
 
@@ -478,12 +483,9 @@ module ReactOnRails
       end
 
       def layout_links_tailwind_pack?(content)
-        javascript_match = content.match(TAILWIND_LAYOUT_JAVASCRIPT_PACK_PATTERN)
-        stylesheet_match = content.match(TAILWIND_LAYOUT_STYLESHEET_PACK_PATTERN)
-        return false unless javascript_match && stylesheet_match
+        content_without_html_comments = content.gsub(/<!--.*?-->/m, "")
 
-        tailwind_block_end = [javascript_match.end(0), stylesheet_match.end(0)].max
-        content[tailwind_block_end..].match?(TAILWIND_LAYOUT_PACK_FLUSH_PATTERN)
+        content_without_html_comments.match?(TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN)
       end
 
       def warn_tailwind_layout_manual_step(layout_path, reason:)
