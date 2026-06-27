@@ -31,6 +31,65 @@ RSC_REGISTRATION_ENTRY_PATH_ENV = "REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH"
 EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME = "server-component-registration-entry.js"
 EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules public spec test tmp vendor].freeze
 
+SHORT_ENCODING_RUBYOPT_SWITCHES = %w[E K].freeze unless defined?(SHORT_ENCODING_RUBYOPT_SWITCHES)
+SHORT_ARGUMENT_RUBYOPT_SWITCHES = %w[I r].freeze unless defined?(SHORT_ARGUMENT_RUBYOPT_SWITCHES)
+
+def short_rubyopt_token?(token)
+  token.start_with?("-") && !token.start_with?("--")
+end
+
+def short_encoding_rubyopt_switch?(char)
+  SHORT_ENCODING_RUBYOPT_SWITCHES.include?(char)
+end
+
+def short_argument_rubyopt_switch?(char)
+  SHORT_ARGUMENT_RUBYOPT_SWITCHES.include?(char)
+end
+
+def short_encoding_rubyopt_switch_consumes_next?(char, index, chars)
+  short_encoding_rubyopt_switch?(char) && index == chars.length - 1
+end
+
+def append_short_warning_rubyopt_flag(preserved_flags, chars, index)
+  preserved_flags << "W"
+  index += 1
+  if index < chars.length && chars[index].match?(/\d/)
+    preserved_flags << chars[index]
+    index += 1
+  end
+  index
+end
+
+def sanitize_short_rubyopt_token(token)
+  return [token, false] unless short_rubyopt_token?(token)
+  return [nil, %w[-E -K].include?(token)] if token.start_with?("-E", "-K")
+
+  preserved_flags = +""
+  chars = token[1..].chars
+  index = 0
+
+  while index < chars.length
+    char = chars[index]
+
+    if short_encoding_rubyopt_switch?(char)
+      consume_next = short_encoding_rubyopt_switch_consumes_next?(char, index, chars)
+      return [preserved_flags.empty? ? nil : "-#{preserved_flags}", consume_next]
+    end
+
+    return [token, false] if short_argument_rubyopt_switch?(char)
+
+    if char == "W"
+      index = append_short_warning_rubyopt_flag(preserved_flags, chars, index)
+      next
+    end
+
+    preserved_flags << char
+    index += 1
+  end
+
+  [token, false]
+end
+
 def force_utf8_rubyopt(rubyopt)
   # RUBYOPT is parsed by Ruby as whitespace-separated options, not shell words.
   # Keep backslashes literal so Windows-style paths in non-encoding flags survive unchanged.
@@ -45,19 +104,29 @@ def force_utf8_rubyopt(rubyopt)
     end
 
     case token
-    when "-E", "--encoding", "--external-encoding", "--internal-encoding"
+    when "-E", "-K", "--encoding", "--external-encoding", "--internal-encoding"
       skip_next_token = true
     else
-      next if token.start_with?("-E")
       next if token.start_with?("--encoding=", "--external-encoding=", "--internal-encoding=")
 
-      sanitized_tokens << token
+      sanitized_token, skip_next_token = sanitize_short_rubyopt_token(token)
+      sanitized_tokens << sanitized_token if sanitized_token
     end
   end
 
-  (sanitized_tokens + ["-EUTF-8"]).join(" ")
+  (["-EUTF-8:UTF-8"] + sanitized_tokens).join(" ")
 end
 
+# Build a subprocess env that forces a UTF-8 locale.
+#
+# Under a C/POSIX locale (no LANG/LC_ALL) the parent's Encoding.default_external is US-ASCII, and a
+# spawned `bundle exec` / shakapacker child inherits it, then dies parsing any Gemfile that contains
+# non-ASCII bytes (e.g. react_on_rails_pro/Gemfile.loader) with "invalid byte sequence in US-ASCII".
+# `-EUTF-8:UTF-8` pins the child Ruby's external/internal encodings regardless of locale and strips
+# conflicting encoding flags; LANG/LC_ALL are set as a belt-and-suspenders for tools that read the
+# locale directly. This is the subprocess-boundary companion to the UTF-8-safe File.read calls in this
+# script. `extra` keys override/extend the base env, then RUBYOPT is sanitized so callers cannot drop
+# the UTF-8 guarantee or leave conflicting encodings.
 def utf8_subprocess_env(extra = {})
   {
     "LANG" => ENV.fetch("LANG", "C.UTF-8"),

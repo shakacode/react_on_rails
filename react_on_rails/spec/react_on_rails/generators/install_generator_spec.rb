@@ -5131,6 +5131,17 @@ describe InstallGenerator, type: :generator do
         install_generator.send(:add_bin_scripts)
       end
 
+      shared_hook_content = File.read(File.expand_path("../../support/shakapacker_precompile_hook_shared.rb", __dir__))
+      extract_utf8_helper = lambda do |source|
+        start_index = source.index("SHORT_ENCODING_RUBYOPT_SWITCHES")
+        end_index = source.index(/\n(?:# Detect which package manager|def clear_stale_rsc_manifest_client_references)/)
+
+        expect(start_index).not_to be_nil
+        expect(end_index).not_to be_nil
+
+        source[start_index...end_index]
+      end
+
       assert_file "bin/shakapacker-precompile-hook" do |content|
         expect(content).to include("generate_rsc_manifest_client_references_if_needed")
         expect(content).to include("REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH")
@@ -5153,6 +5164,7 @@ describe InstallGenerator, type: :generator do
         expect(content).to include('"SERVER_BUNDLE_ONLY" => nil')
         expect(content).to include("Dir.chdir(Rails.root) do")
         expect(content).to include("system(env, shakapacker_bin.to_s, exception: true)")
+        expect(extract_utf8_helper.call(content)).to eq(extract_utf8_helper.call(shared_hook_content))
       end
     end
 
