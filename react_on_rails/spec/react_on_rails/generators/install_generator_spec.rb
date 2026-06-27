@@ -5131,6 +5131,17 @@ describe InstallGenerator, type: :generator do
         install_generator.send(:add_bin_scripts)
       end
 
+      shared_hook_content = File.read(File.expand_path("../../support/shakapacker_precompile_hook_shared.rb", __dir__))
+      extract_utf8_helper = lambda do |source|
+        start_index = source.index("SHORT_ENCODING_RUBYOPT_SWITCHES")
+        end_index = source.index(/\n(?:# Detect which package manager|def clear_stale_rsc_manifest_client_references)/)
+
+        expect(start_index).not_to be_nil
+        expect(end_index).not_to be_nil
+
+        source[start_index...end_index]
+      end
+
       assert_file "bin/shakapacker-precompile-hook" do |content|
         expect(content).to include("generate_rsc_manifest_client_references_if_needed")
         expect(content).to include("REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH")
@@ -5141,11 +5152,19 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS")
         expect(content).to include('ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"')
         expect(content).to include("ReactOnRailsPro::Utils.rsc_support_enabled?")
+        expect(content).to include("def utf8_subprocess_env")
+        expect(content).to include("def force_utf8_rubyopt")
+        expect(content).to include("RUBYOPT is parsed by Ruby as whitespace-separated options")
+        expect(content).to include('"LANG" => ENV.fetch("LANG", "C.UTF-8")')
+        expect(content).to include('"LC_ALL" => ENV.fetch("LC_ALL", "C.UTF-8")')
+        expect(content).to include('env["RUBYOPT"] = force_utf8_rubyopt(env["RUBYOPT"])')
+        expect(content).to include('"REACT_ON_RAILS_SKIP_VALIDATION" => "true"')
         expect(content).to include('"RSC_BUNDLE_ONLY" => "true"')
         expect(content).to include('"CLIENT_BUNDLE_ONLY" => nil')
         expect(content).to include('"SERVER_BUNDLE_ONLY" => nil')
         expect(content).to include("Dir.chdir(Rails.root) do")
         expect(content).to include("system(env, shakapacker_bin.to_s, exception: true)")
+        expect(extract_utf8_helper.call(content)).to eq(extract_utf8_helper.call(shared_hook_content))
       end
     end
 
