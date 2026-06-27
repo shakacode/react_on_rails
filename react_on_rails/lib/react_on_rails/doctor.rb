@@ -3521,7 +3521,8 @@ module ReactOnRails
     # Keep in sync with RSC_CLIENT_MANIFEST_GUIDANCE in
     # packages/react-on-rails-pro/src/handleErrorRSC.ts.
     RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
-    RSC_RSPACK_DEVELOPMENT_CONFIG_PATH = "config/rspack/development.js"
+    RSC_RSPACK_CONFIG_FILENAME = "rscWebpackConfig.js"
+    RSC_RSPACK_DEVELOPMENT_CONFIG_FILENAME = "development.js"
     RSC_RSPACK_CLIENT_LAZY_COMPILATION_DISABLED_PATTERN = /
       ^\s*clientWebpackConfig\.lazyCompilation\s*=\s*false\b
     /x
@@ -3622,22 +3623,28 @@ module ReactOnRails
 
     def check_rsc_rspack_lazy_compilation
       return unless active_assets_bundler == "rspack"
-      return unless File.exist?("config/rspack/rscWebpackConfig.js")
 
-      unless File.exist?(RSC_RSPACK_DEVELOPMENT_CONFIG_PATH)
-        checker.add_warning("⚠️  RSC Rspack development config not found: #{RSC_RSPACK_DEVELOPMENT_CONFIG_PATH}")
+      config_directory = rsc_rspack_config_directory
+      return unless config_directory
+
+      rsc_config_path = File.join(config_directory, RSC_RSPACK_CONFIG_FILENAME)
+      return unless File.exist?(rsc_config_path)
+
+      development_config_path = File.join(config_directory, RSC_RSPACK_DEVELOPMENT_CONFIG_FILENAME)
+      unless File.exist?(development_config_path)
+        checker.add_warning("⚠️  RSC Rspack development config not found: #{development_config_path}")
         checker.add_info("  💡 Cannot verify that Rspack lazyCompilation is disabled for RSC dev-server mode")
         return
       end
 
-      development_config = File.read(RSC_RSPACK_DEVELOPMENT_CONFIG_PATH)
+      development_config = File.read(development_config_path)
       if development_config.match?(RSC_RSPACK_CLIENT_LAZY_COMPILATION_DISABLED_PATTERN)
         checker.add_success("✅ Rspack lazy compilation appears disabled for RSC dev-server")
       else
         checker.add_warning(<<~MSG.strip)
           ⚠️  Rspack lazyCompilation can leave the RSC client manifest empty in normal bin/dev mode.
 
-          #{RSC_RSPACK_DEVELOPMENT_CONFIG_PATH} does not appear to disable lazyCompilation while the dev server is running.
+          #{development_config_path} does not appear to disable lazyCompilation while the dev server is running.
         MSG
         checker.add_info("  💡 Add this inside the Rspack WEBPACK_SERVE branch:")
         checker.add_info("     clientWebpackConfig.lazyCompilation = false;")
@@ -3645,6 +3652,14 @@ module ReactOnRails
       end
     rescue StandardError => e
       checker.add_warning("⚠️  Could not inspect RSC Rspack lazyCompilation config: #{e.message}")
+    end
+
+    def rsc_rspack_config_directory
+      explicit_config_path = shakapacker_assets_bundler_config_path
+      return bundler_config_directory(explicit_config_path) if explicit_config_path && File.file?(explicit_config_path)
+
+      default_config_path = ConfigPathResolver::RSPACK_DEFAULT_CONFIG_CANDIDATES.find { |path| File.file?(path) }
+      bundler_config_directory(default_config_path)
     end
 
     def check_rsc_react_version

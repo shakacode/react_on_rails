@@ -5278,11 +5278,16 @@ RSpec.describe ReactOnRails::Doctor do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
+    before do
+      allow(doctor).to receive(:shakapacker_assets_bundler_config_path).and_return(nil)
+    end
+
     around do |example|
       Dir.mktmpdir do |tmpdir|
         Dir.chdir(tmpdir) do
           FileUtils.mkdir_p("config/rspack")
           File.write("config/rspack/rscWebpackConfig.js", "module.exports = {}")
+          File.write("config/rspack/rspack.config.js", "module.exports = {};")
           File.write("config/rspack/development.js", "module.exports = {};")
           FileUtils.mkdir_p("config")
           File.write("config/shakapacker.yml", "default:\n  assets_bundler: rspack\n")
@@ -5324,6 +5329,24 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "reports success when RSC Rspack dev-server config disables lazy compilation" do
       File.write("config/rspack/development.js", "clientWebpackConfig.lazyCompilation = false;\n")
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(success_messages)
+        .to include(a_string_including("Rspack lazy compilation appears disabled for RSC dev-server"))
+      expect(warning_messages).to be_empty
+    end
+
+    it "uses the configured Shakapacker Rspack config directory" do
+      FileUtils.mkdir_p("config/custom-rspack")
+      File.write("config/custom-rspack/rspack.custom.js", "module.exports = {};")
+      File.write("config/custom-rspack/rscWebpackConfig.js", "module.exports = {};")
+      File.write("config/custom-rspack/development.js", "clientWebpackConfig.lazyCompilation = false;\n")
+      allow(doctor)
+        .to receive(:shakapacker_assets_bundler_config_path)
+        .and_return("config/custom-rspack/rspack.custom.js")
 
       doctor.send(:check_rsc_rspack_lazy_compilation)
 
