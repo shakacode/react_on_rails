@@ -8776,7 +8776,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     body: options.json === undefined ? options.body : JSON.stringify(options.json),
   });
 
-  // ...parse JSON, throw ApiError on !response.ok
+  const body = await response.json(); // the starter also handles non-JSON and throws ApiError on !response.ok
   return body as T;
 }
 ```
@@ -8885,7 +8885,7 @@ const projectsQuery = useQuery({
 
 Because the seed is passed as `initialData` without `initialDataUpdatedAt`, TanStack Query timestamps it at `0`, so the table does one background refetch on mount to confirm freshness — the rows still paint immediately, with no spinner. To treat the seed as fresh for `staleTime` and skip that first refetch, also pass `initialDataUpdatedAt` set to the server's render time.
 
-> **`initialData` vs `dehydrate`/`HydrationBoundary`.** TanStack Query also ships a server-prefetch pattern: build a `QueryClient`, `prefetchQuery`, `dehydrate` it into the HTML, and wrap the client tree in `HydrationBoundary`. See the [TanStack Query SSR guide](https://tanstack.com/query/latest/docs/framework/react/guides/ssr). The starter uses the simpler props-to-`initialData` seed because Rails already renders the first page; reach for `dehydrate`/`HydrationBoundary` when you need to seed many queries at once.
+> **`initialData` vs `dehydrate`/`HydrationBoundary`.** TanStack Query also ships a server-prefetch pattern: build a `QueryClient`, `prefetchQuery`, `dehydrate` it into the HTML, and wrap the client tree in `HydrationBoundary`. See the [TanStack Query SSR guide](https://tanstack.com/query/latest/docs/framework/react/guides/ssr). The starter uses the simpler props-to-`initialData` seed because Rails already renders the first page; reach for `dehydrate`/`HydrationBoundary` when you need to seed many queries at once. Note that the `prefetchQuery`/`dehydrate` path needs an awaitable server-render boundary (the Pro [TanStack Router SSR](./tanstack-router.md) path), whereas the props-to-`initialData` seed works in open source.
 
 ## Mutations and Cache Invalidation
 
