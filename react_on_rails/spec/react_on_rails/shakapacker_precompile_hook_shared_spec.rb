@@ -226,6 +226,42 @@ RSpec.describe "Shakapacker precompile hook shared script" do
         end
       end
 
+      it "honors long-form encoding options" do
+        ["--encoding=US-ASCII", "--encoding US-ASCII",
+         "--external-encoding=US-ASCII", "--external-encoding US-ASCII",
+         "--internal-encoding=US-ASCII", "--internal-encoding US-ASCII"].each do |rubyopt|
+          with_locale_encoding(Encoding::US_ASCII) do
+            with_env("RUBYOPT" => rubyopt) do
+              expect(utf8_subprocess_env["RUBYOPT"]).to eq(rubyopt)
+            end
+          end
+        end
+      end
+
+      it "still pins UTF-8 for argument-taking flags whose operand begins with E/K" do
+        # -r/-I consume their operand, so -rEnglish / -rKconv / -IEpath are NOT encoding requests.
+        # The pin must still be added (a regex that matched any E/K after - would wrongly skip these).
+        with_locale_encoding(Encoding::US_ASCII) do
+          ["-rEnglish", "-rKconv", "-IEpath"].each do |rubyopt|
+            with_env("RUBYOPT" => rubyopt) do
+              expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8 #{rubyopt}")
+            end
+          end
+        end
+      end
+
+      it "also widens when the locale encoding is ASCII-8BIT (musl/empty C charmap)" do
+        # Some libc/Ruby combinations report a binary/empty locale charmap as ASCII-8BIT rather than
+        # US-ASCII; that still means "no real charset", so it must widen the same way.
+        with_locale_encoding(Encoding::ASCII_8BIT) do
+          with_env("RUBYOPT" => nil) do
+            env = utf8_subprocess_env
+            expect(env["LANG"]).to match(/UTF-8/i)
+            expect(env["RUBYOPT"]).to eq("-EUTF-8")
+          end
+        end
+      end
+
       it "still applies caller-supplied functional env keys while widening" do
         with_locale_encoding(Encoding::US_ASCII) do
           with_env("RUBYOPT" => nil) do

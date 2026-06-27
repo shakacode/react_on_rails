@@ -56,7 +56,9 @@ end
 #
 # `extra` keys (functional flags like REACT_ON_RAILS_SKIP_VALIDATION) are always applied.
 def utf8_subprocess_env(extra = {})
-  return extra.dup unless Encoding.find("locale") == Encoding::US_ASCII
+  # US-ASCII (glibc) and ASCII-8BIT (some musl/empty-charmap C locales) both mean the libc reported
+  # no real charset, so both are the bare C/POSIX fallback that is safe to widen to UTF-8.
+  return extra.dup unless [Encoding::US_ASCII, Encoding::ASCII_8BIT].include?(Encoding.find("locale"))
 
   # Merge the UTF-8 widening last so it is authoritative: a caller-supplied key cannot accidentally
   # drop the pin (callers pass functional flags like REACT_ON_RAILS_SKIP_VALIDATION here, not locale
@@ -72,12 +74,32 @@ end
 # fallback for systems where the C.UTF-8 locale is not installed and LANG/LC_ALL alone would not
 # take effect. If RUBYOPT already pins an encoding it is an explicit, deliberate request that we
 # honor rather than override or duplicate (Ruby raises "default_external already set" on a
-# conflicting second -E). The encoding can be embedded in a short-option cluster (e.g. -wEUS-ASCII,
-# -W0EUS-ASCII), so match -E/-K after any run of preceding short flags, plus the long-option forms.
+# conflicting second -E).
 def utf8_widened_rubyopt(rubyopt)
-  return rubyopt if rubyopt.match?(/(?:\A|\s)(?:-[a-zA-Z0-9]*[EK]|--(?:external-|internal-)?encoding)/)
+  return rubyopt if rubyopt_pins_encoding?(rubyopt)
 
   "-EUTF-8 #{rubyopt}".strip
+end
+
+# Short options that consume the rest of the token as an operand (which may itself begin with E/K,
+# e.g. -rEnglish or -rKconv), so a scan for a clustered encoding flag must stop at the first of them.
+ARGUMENT_TAKING_SHORT_RUBYOPT_SWITCHES = "CIeSrx" unless defined?(ARGUMENT_TAKING_SHORT_RUBYOPT_SWITCHES)
+
+# True when RUBYOPT already pins a source encoding: a -E/-K (including inside a short-option cluster
+# such as -wEUS-ASCII), or a --encoding/--external-encoding/--internal-encoding long option.
+def rubyopt_pins_encoding?(rubyopt)
+  rubyopt.to_s.split.any? { |token| rubyopt_token_pins_encoding?(token) }
+end
+
+def rubyopt_token_pins_encoding?(token)
+  return true if token.start_with?("--encoding", "--external-encoding", "--internal-encoding")
+  return false unless token.start_with?("-") && !token.start_with?("--") && token.length > 1
+
+  token[1..].each_char do |char|
+    break if ARGUMENT_TAKING_SHORT_RUBYOPT_SWITCHES.include?(char)
+    return true if "EK".include?(char)
+  end
+  false
 end
 
 # Detect which package manager to use based on package.json's packageManager field,
