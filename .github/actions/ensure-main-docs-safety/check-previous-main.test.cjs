@@ -30,6 +30,18 @@ function guardOnlyJob() {
   };
 }
 
+function mixedDetectChangesFailureJob() {
+  return {
+    name: 'detect-changes',
+    run_attempt: 1,
+    conclusion: 'failure',
+    steps: [
+      { name: 'Guard docs-only main pushes', conclusion: 'failure' },
+      { name: 'Resolve changed files', conclusion: 'failure' },
+    ],
+  };
+}
+
 function buildFailureJob() {
   return {
     name: 'build',
@@ -167,6 +179,7 @@ async function main() {
   ]);
   assert.equal(isGuardOnlyFailure([guardOnlyJob()]), true);
   assert.equal(isGuardOnlyFailure([buildFailureJob()]), false);
+  assert.equal(isGuardOnlyFailure([mixedDetectChangesFailureJob()]), false);
   assert.equal(
     latestRunsByWorkflow([
       run({ id: 6, workflowId: 10, sha: 'a', runNumber: 1 }),

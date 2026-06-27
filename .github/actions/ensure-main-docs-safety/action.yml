@@ -23,7 +23,9 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
       with:
         script: |
-          const { checkPreviousMainCommitStatus } = require(`${process.env.ACTION_PATH}/check-previous-main.cjs`);
+          const {
+            checkPreviousMainCommitStatus
+          } = require(`${process.env.ACTION_PATH}/check-previous-main.cjs`);
 
           await checkPreviousMainCommitStatus({
             github,

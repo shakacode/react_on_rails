@@ -39,13 +39,17 @@ function isGuardOnlyFailure(jobs) {
 
   return (
     failed.length > 0 &&
-    failed.every(
-      (job) =>
-        job.name === 'detect-changes' &&
-        job.steps?.some(
-          (step) => step.name === 'Guard docs-only main pushes' && FAILURE_CONCLUSIONS.has(step.conclusion),
-        ),
-    )
+    failed.every((job) => {
+      if (job.name !== 'detect-changes') {
+        return false;
+      }
+
+      const failedSteps = (job.steps || []).filter((step) => FAILURE_CONCLUSIONS.has(step.conclusion));
+
+      return (
+        failedSteps.length > 0 && failedSteps.every((step) => step.name === 'Guard docs-only main pushes')
+      );
+    })
   );
 }
 
