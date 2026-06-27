@@ -1962,7 +1962,7 @@ If you are currently on **react-rails**, prefer the migration path to React on R
 | **Hotwire/Turbo**        | Rails renders HTML, Turbo updates the page                          | Rails-first apps with minimal client-side complexity                                       | Not a React solution, so React ecosystem reuse is limited                                                                                             |
 | **Inertia Rails**        | Controllers return page props to a client-rendered frontend shell   | Teams that want SPA-style page transitions without building a separate JSON API first      | Every navigation is a server round-trip; replaces Rails views per-route rather than incremental adoption; review current SSR support in official docs |
 | **Next.js + Rails API**  | Next.js app consumes Rails API responses                            | Teams prioritizing frontend autonomy, edge delivery, or multi-client API reuse             | Two deployables, duplicated auth/session concerns, and stricter API lifecycle management                                                              |
-| **TanStack Start**       | Full-stack React framework (client-first; SSR opt-in per route)     | Greenfield React apps with no existing backend; one-language teams optimizing for velocity | Bring-your-own backend (database, ORM, auth, jobs); business logic runs in the JS runtime                                                             |
+| **TanStack Start**       | Full-stack React framework (SSR-first; selective per-route SSR)     | Greenfield React apps with no existing backend; one-language teams optimizing for velocity | Bring-your-own backend (database, ORM, auth, jobs); business logic runs in the JS runtime                                                             |
 | **react-rails (legacy)** | Rails views mount React components with helper-based integration    | Existing legacy apps already on react-rails                                                | Maintenance-focused path; plan migration to React on Rails for newer capabilities                                                                     |
 
 ## React on Rails vs Hotwire/Turbo
@@ -2046,7 +2046,7 @@ If React Server Components are central to your evaluation, see how the two stack
 
 ## React on Rails vs TanStack Start
 
-TanStack Start is a full-stack React framework built on TanStack Router and Vite. Unlike the Next.js App Router model, it is client-first: client-side interactivity is the default, and you opt into server-side rendering per route. Server logic lives in colocated **server functions**, and the data layer is bring-your-own — Start ships no ORM or database integration of its own.
+TanStack Start is a full-stack React framework built on TanStack Router and Vite/Nitro. Like Remix, it is SSR-first: routes are server-rendered by default, with fine-grained selective SSR to opt a route out (or SPA mode) where you want it. Server logic lives in colocated **server functions**, and the data layer is bring-your-own — Start ships no ORM or database integration of its own.
 
 That makes this less of an "either/or" than it first looks, because the libraries TanStack publishes do not all play the same role for a Rails team:
 
@@ -2060,7 +2060,7 @@ That makes this less of an "either/or" than it first looks, because the librarie
 
 **React on Rails:**
 
-- Pros: keep Rails for business logic, persistence, authorization, and jobs, with React — and the TanStack client libraries — as the view layer. React Server Components in React on Rails Pro give the same colocation benefit server functions are known for (server work next to the component, no `/api` round-trip or serializer for that view), except the data comes from Rails: your controller prepares it and passes it as props or streams it as async props.
+- Pros: keep Rails for business logic, persistence, authorization, and jobs, with React — and the TanStack client libraries — as the view layer. React Server Components in React on Rails Pro remove the extra client-side `/api` round-trip for a view: data is prepared in your Rails controller and passed as props (or streamed as async props), and the React component tree renders on the Node renderer. (Start's server functions colocate logic in the same file with end-to-end types; on Rails that logic stays in Rails, across a JSON boundary — see the drawback below.)
 - Drawbacks: two languages (Ruby and TypeScript) rather than one, and an untyped JSON boundary between Rails and the client unless you generate types from your API.
 
 Choose TanStack Start when you are greenfield, have no Rails investment, want a single language end to end, and are optimizing for raw velocity.
