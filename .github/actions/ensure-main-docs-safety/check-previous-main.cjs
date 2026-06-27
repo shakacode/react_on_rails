@@ -1,4 +1,6 @@
 const FAILURE_CONCLUSIONS = new Set(['failure', 'timed_out', 'cancelled', 'action_required']);
+const GUARD_JOB_NAME = 'detect-changes';
+const GUARD_STEP_NAME = 'Guard docs-only main pushes';
 const MAX_GUARD_ONLY_HOPS = 10;
 
 function parseExcludeWorkflows(excludeWorkflowsInput) {
@@ -40,15 +42,15 @@ function isGuardOnlyFailure(jobs) {
   return (
     failed.length > 0 &&
     failed.every((job) => {
-      if (job.name !== 'detect-changes') {
+      if (job.name !== GUARD_JOB_NAME) {
         return false;
       }
 
-      const failedSteps = (job.steps || []).filter((step) => FAILURE_CONCLUSIONS.has(step.conclusion));
+      const failedSteps = Array.isArray(job.steps)
+        ? job.steps.filter((step) => FAILURE_CONCLUSIONS.has(step.conclusion))
+        : [];
 
-      return (
-        failedSteps.length > 0 && failedSteps.every((step) => step.name === 'Guard docs-only main pushes')
-      );
+      return failedSteps.length > 0 && failedSteps.every((step) => step.name === GUARD_STEP_NAME);
     })
   );
 }
@@ -71,15 +73,34 @@ async function listWorkflowRunsForSha({ github, context, sha, createdAfter }) {
     if (relevantInPage.length > 0) {
       workflowRuns.push(...relevantInPage);
     }
-
-    // Early exit: if we found relevant runs and now see different SHAs,
-    // we've likely collected all runs for this commit.
-    if (workflowRuns.length > 0 && relevantInPage.length === 0) {
-      break;
-    }
   }
 
   return workflowRuns;
+}
+
+async function listJobsForRun({ github, context, run }) {
+  const jobs = [];
+
+  for await (const response of github.paginate.iterator(github.rest.actions.listJobsForWorkflowRun, {
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    run_id: run.id,
+    per_page: 100,
+  })) {
+    jobs.push(...response.data.jobs);
+  }
+
+  return jobs;
+}
+
+function warnForMissingGuardSteps({ core, run, jobs }) {
+  for (const job of failedJobs(jobs)) {
+    if (job.name === GUARD_JOB_NAME && !Array.isArray(job.steps)) {
+      core.warning(
+        `Job "${GUARD_JOB_NAME}" in workflow run ${run.id} (${run.name}) has no steps data; cannot determine if it is a guard-only failure.`,
+      );
+    }
+  }
 }
 
 async function evaluateCommitRuns({ github, context, core, sha, createdAfter, excludeWorkflows }) {
@@ -104,14 +125,7 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
 
   const completedRunResults = await Promise.all(
     completedRuns.map(async (run) => {
-      const {
-        data: { jobs },
-      } = await github.rest.actions.listJobsForWorkflowRun({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        run_id: run.id,
-        per_page: 100,
-      });
+      const jobs = await listJobsForRun({ github, context, run });
 
       if (jobs.length === 0) {
         core.warning(`No jobs found for workflow run ${run.id} (${run.name}). Skipping.`);
@@ -124,6 +138,8 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
       if (failed.length === 0) {
         return { kind: 'passing' };
       }
+
+      warnForMissingGuardSteps({ core, run, jobs: latestJobs });
 
       return {
         kind: isGuardOnlyFailure(latestJobs) ? 'guard-only' : 'failing',
@@ -179,7 +195,7 @@ async function checkPreviousMainCommitStatus({
   const guardOnlyTrail = [];
 
   async function checkSha(shaToCheck, remainingGuardOnlyHops) {
-    if (remainingGuardOnlyHops < 0) {
+    if (remainingGuardOnlyHops <= 0) {
       core.setFailed(
         `Cannot determine prior real CI status after ${maxGuardOnlyHops} docs-only guard-only commits. Push a non-docs change to trigger hosted CI.`,
       );
@@ -273,6 +289,8 @@ async function checkPreviousMainCommitStatus({
 
 module.exports = {
   FAILURE_CONCLUSIONS,
+  GUARD_JOB_NAME,
+  GUARD_STEP_NAME,
   checkPreviousMainCommitStatus,
   evaluateCommitRuns,
   failedJobs,

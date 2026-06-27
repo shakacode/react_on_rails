@@ -1,5 +1,7 @@
 const assert = require('assert/strict');
 const {
+  GUARD_JOB_NAME,
+  GUARD_STEP_NAME,
   checkPreviousMainCommitStatus,
   isGuardOnlyFailure,
   latestRunsByWorkflow,
@@ -23,20 +25,20 @@ function run({ id, workflowId = id, sha, name = `Workflow ${id}`, runNumber = id
 
 function guardOnlyJob() {
   return {
-    name: 'detect-changes',
+    name: GUARD_JOB_NAME,
     run_attempt: 1,
     conclusion: 'failure',
-    steps: [{ name: 'Guard docs-only main pushes', conclusion: 'failure' }],
+    steps: [{ name: GUARD_STEP_NAME, conclusion: 'failure' }],
   };
 }
 
 function mixedDetectChangesFailureJob() {
   return {
-    name: 'detect-changes',
+    name: GUARD_JOB_NAME,
     run_attempt: 1,
     conclusion: 'failure',
     steps: [
-      { name: 'Guard docs-only main pushes', conclusion: 'failure' },
+      { name: GUARD_STEP_NAME, conclusion: 'failure' },
       { name: 'Resolve changed files', conclusion: 'failure' },
     ],
   };
@@ -60,10 +62,23 @@ function successJob(name = 'build') {
   };
 }
 
-function makeGithub({ pages, jobsByRunId, parentsBySha }) {
+function makeGithub({ pages, jobsByRunId, jobPagesByRunId, parentsBySha }) {
+  const listWorkflowRunsForRepo = async () => {};
+  const listJobsForWorkflowRun = async ({ run_id: runId }) => ({
+    data: { jobs: jobsByRunId[runId] || [] },
+  });
+
   return {
     paginate: {
-      iterator: async function* iterator() {
+      iterator: async function* iterator(endpoint, options = {}) {
+        if (endpoint === listJobsForWorkflowRun) {
+          const jobPages = jobPagesByRunId?.[options.run_id] || [jobsByRunId[options.run_id] || []];
+          for (const jobs of jobPages) {
+            yield { data: { jobs } };
+          }
+          return;
+        }
+
         for (const page of pages) {
           yield { data: page };
         }
@@ -71,10 +86,8 @@ function makeGithub({ pages, jobsByRunId, parentsBySha }) {
     },
     rest: {
       actions: {
-        listWorkflowRunsForRepo: async () => {},
-        listJobsForWorkflowRun: async ({ run_id: runId }) => ({
-          data: { jobs: jobsByRunId[runId] || [] },
-        }),
+        listWorkflowRunsForRepo,
+        listJobsForWorkflowRun,
       },
       repos: {
         getCommit: async ({ ref }) => ({
@@ -100,6 +113,96 @@ function makeCore() {
       this.warnings.push(message);
     },
   };
+}
+
+async function testNonContiguousWorkflowRunPagesAreChecked() {
+  const previous = 'previous';
+  const targetPassingRun = run({ id: 8, workflowId: 80, sha: previous, name: 'Lint JS and Ruby' });
+  const otherRun1 = run({ id: 9, workflowId: 90, sha: 'other-1', name: 'Other workflow 1' });
+  const otherRun2 = run({ id: 10, workflowId: 100, sha: 'other-2', name: 'Other workflow 2' });
+  const targetFailingRun = run({
+    id: 11,
+    workflowId: 110,
+    sha: previous,
+    name: 'JS unit tests for Renderer package',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[targetPassingRun, otherRun1], [otherRun2], [targetFailingRun]],
+    jobsByRunId: {
+      8: [successJob()],
+      11: [buildFailureJob()],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /JS unit tests for Renderer package/);
+}
+
+async function testPaginatedJobsAreChecked() {
+  const previous = 'previous';
+  const failingRun = run({ id: 12, sha: previous, name: 'Large workflow', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[failingRun]],
+    jobsByRunId: {},
+    jobPagesByRunId: {
+      12: [[successJob('setup')], [buildFailureJob()]],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Large workflow/);
+}
+
+async function testGuardOnlyHopLimitStopsAtConfiguredLimit() {
+  const previous = 'docs-2';
+  const parent = 'docs-1';
+  const guardRun = run({ id: 13, sha: previous, name: 'Lint JS and Ruby', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[guardRun]],
+    jobsByRunId: {
+      13: [guardOnlyJob()],
+    },
+    parentsBySha: {
+      [previous]: parent,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    maxGuardOnlyHops: 1,
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /after 1 docs-only guard-only commits/);
 }
 
 async function testGuardOnlyFailuresLookThroughToParentFailure() {
@@ -190,6 +293,9 @@ async function main() {
 
   await testGuardOnlyFailuresLookThroughToParentFailure();
   await testGuardOnlyFailuresLookThroughToParentSuccess();
+  await testNonContiguousWorkflowRunPagesAreChecked();
+  await testPaginatedJobsAreChecked();
+  await testGuardOnlyHopLimitStopsAtConfiguredLimit();
 }
 
 main().catch((error) => {
