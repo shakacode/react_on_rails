@@ -158,6 +158,10 @@ describe InstallGenerator, type: :generator do
   def assert_tailwind_stylesheet(path: "app/javascript/stylesheets/application.css",
                                  source_directive: '@import "tailwindcss" source("../..");')
     assert_file path do |content|
+      expect(content).to include("Tailwind v4 scans Rails app/ for utility class names by default")
+      expect(content).to include("add @source directives here")
+      expect(content).to include('@source "../../../lib";')
+      expect(content).to include('@source "../../../engines/my_engine/app";')
       expect(content).to include(source_directive)
     end
   end
@@ -1015,6 +1019,38 @@ describe InstallGenerator, type: :generator do
 
         expect(viewport_index).to be < csrf_index
         expect(content).to include("<%= csp_meta_tag %>")
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+      end
+    end
+
+    it "warns when the generated layout has no viewport insertion anchor" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Custom app</title>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      allow(base_generator).to receive(:say_status).and_call_original
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(
+          :warning,
+          include("Could not insert viewport meta into #{layout_path}: no title or csrf_meta_tags anchor found"),
+          :yellow
+        )
+      assert_file layout_path do |content|
+        expect(content).not_to include('<meta name="viewport" content="width=device-width,initial-scale=1">')
         expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
       end
     end

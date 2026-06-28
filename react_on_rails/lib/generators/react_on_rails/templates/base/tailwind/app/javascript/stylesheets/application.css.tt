@@ -1,1 +1,7 @@
+/* Tailwind v4 scans Rails app/ for utility class names by default.
+   If you use Tailwind classes outside app/ (lib/, engines/, monorepo packages),
+   add @source directives here, for example:
+     @source "../../../lib";
+     @source "../../../engines/my_engine/app";
+*/
 <%= tailwind_css_source_directives %>

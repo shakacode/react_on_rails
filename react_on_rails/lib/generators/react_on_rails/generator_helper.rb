@@ -13,8 +13,17 @@ module GeneratorHelper
   TAILWIND_PACK_NAME = "react_on_rails_tailwind"
   TAILWIND_STYLESHEET_NAME = "application.css"
   RAILS_APP_SOURCE_PATH = "app"
+  TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN = /
+    ^[ \t]*<%\s*prepend_javascript_pack_tag(?:\s|\()
+    \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
+    [ \t]*<%=\s*stylesheet_pack_tag(?:\s|\()
+    \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
+    [ \t]*<%=\s*javascript_pack_tag(?:\s|\(|%>)
+  /x
+  HTML_COMMENT_PATTERN = /<!--(?:[^-]|-(?!-)|--(?!>))*-->/m
   private_constant :DEFAULT_SHAKAPACKER_SOURCE_PATH, :DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH,
-                   :TAILWIND_PACK_NAME, :TAILWIND_STYLESHEET_NAME, :RAILS_APP_SOURCE_PATH
+                   :TAILWIND_PACK_NAME, :TAILWIND_STYLESHEET_NAME, :RAILS_APP_SOURCE_PATH,
+                   :TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN, :HTML_COMMENT_PATTERN
 
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
@@ -157,6 +166,29 @@ module GeneratorHelper
 
       [tailwind_import_statement(source: "none"), *sources].join("\n")
     end
+  end
+
+  def layout_links_tailwind_pack?(content)
+    comment_ranges = html_comment_ranges(content)
+    return content.match?(TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN) if comment_ranges.empty?
+
+    content.to_enum(:scan, TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN).any? do
+      helper_match = Regexp.last_match
+
+      !range_overlaps_any?(helper_match.begin(0)...helper_match.end(0), comment_ranges)
+    end
+  end
+
+  def html_comment_ranges(content)
+    content.to_enum(:scan, HTML_COMMENT_PATTERN).map do
+      comment_match = Regexp.last_match
+
+      comment_match.begin(0)...comment_match.end(0)
+    end
+  end
+
+  def range_overlaps_any?(range, ranges)
+    ranges.any? { |candidate| range.begin < candidate.end && candidate.begin < range.end }
   end
 
   def example_component_source_directory(component_name)

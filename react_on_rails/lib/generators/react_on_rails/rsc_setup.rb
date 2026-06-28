@@ -34,14 +34,6 @@ module ReactOnRails
       RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
       RSC_GENERATED_LAYOUT_NAME_PATTERN = /\Areact_on_rails_rsc(?:_(?:[2-9]|[1-9]\d+))?\z/
       MAX_LAYOUT_NAME_ATTEMPTS = 99
-      TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN = /
-        ^[ \t]*<%\s*prepend_javascript_pack_tag(?:\s|\()
-        \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
-        [ \t]*<%=\s*stylesheet_pack_tag(?:\s|\()
-        \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
-        [ \t]*<%=\s*javascript_pack_tag(?:\s|\(|%>)
-      /x
-      HTML_COMMENT_PATTERN = /<!--(?:[^-]|-(?!-)|--(?!>))*-->/m
 
       # Main entry point for RSC setup.
       # Orchestrates creation of all RSC-related files and configuration.
@@ -306,28 +298,6 @@ module ReactOnRails
         return false unless File.exist?(layout_full_path)
 
         layout_links_tailwind_pack?(File.read(layout_full_path))
-      end
-
-      def layout_links_tailwind_pack?(layout_content)
-        comment_ranges = html_comment_ranges(layout_content)
-
-        layout_content.to_enum(:scan, TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN).any? do
-          helper_match = Regexp.last_match
-
-          !range_overlaps_any?(helper_match.begin(0)...helper_match.end(0), comment_ranges)
-        end
-      end
-
-      def html_comment_ranges(content)
-        content.to_enum(:scan, HTML_COMMENT_PATTERN).map do
-          comment_match = Regexp.last_match
-
-          comment_match.begin(0)...comment_match.end(0)
-        end
-      end
-
-      def range_overlaps_any?(range, ranges)
-        ranges.any? { |candidate| range.begin < candidate.end && candidate.begin < range.end }
       end
 
       def add_rsc_routes

@@ -146,19 +146,11 @@ module ReactOnRails
         [ \t]*<%=\s*stylesheet_pack_tag\s*%>\r?\n
         [ \t]*<%=\s*javascript_pack_tag\s*%>
       }x
-      TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN = /
-        ^[ \t]*<%\s*prepend_javascript_pack_tag(?:\s|\()
-        \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
-        [ \t]*<%=\s*stylesheet_pack_tag(?:\s|\()
-        \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
-        [ \t]*<%=\s*javascript_pack_tag(?:\s|\(|%>)
-      /x
-      HTML_COMMENT_PATTERN = /<!--(?:[^-]|-(?!-)|--(?!>))*-->/m
       CSRF_META_TAG_PATTERN = /^(?<indent>[ \t]*)<%=\s*csrf_meta_tags\s*%>\r?\n/
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED, :REACT_ON_RAILS_DEFAULT_LAYOUT_PATH,
                        :TAILWIND_LAYOUT_HELPER_LINES, :DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN,
-                       :TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN, :HTML_COMMENT_PATTERN, :CSRF_META_TAG_PATTERN
+                       :CSRF_META_TAG_PATTERN
 
       def add_root_route
         return unless options.new_app?
@@ -468,19 +460,27 @@ module ReactOnRails
         content = File.read(layout_full_path)
         title_match = content.match(%r{^(?<indent>[ \t]*)<title>React on Rails</title>\r?\n})
         csrf_match = content.match(CSRF_META_TAG_PATTERN)
+        viewport_tag = '<meta name="viewport" content="width=device-width,initial-scale=1">'
 
         unless content.match?(/<meta\s+name=["']viewport["']/)
           if title_match
             insert_into_file(
               layout_path,
-              %(#{title_match[:indent]}<meta name="viewport" content="width=device-width,initial-scale=1">\n),
+              %(#{title_match[:indent]}#{viewport_tag}\n),
               after: title_match[0]
             )
           elsif csrf_match
             insert_into_file(
               layout_path,
-              %(#{csrf_match[:indent]}<meta name="viewport" content="width=device-width,initial-scale=1">\n),
+              %(#{csrf_match[:indent]}#{viewport_tag}\n),
               before: csrf_match[0]
+            )
+          else
+            say_status(
+              :warning,
+              "Could not insert viewport meta into #{layout_path}: no title or csrf_meta_tags anchor found. " \
+              "Add #{viewport_tag} manually.",
+              :yellow
             )
           end
 
@@ -492,29 +492,6 @@ module ReactOnRails
         return unless (csrf_match = content.match(CSRF_META_TAG_PATTERN))
 
         insert_into_file(layout_path, %(#{csrf_match[:indent]}<%= csp_meta_tag %>\n), after: csrf_match[0])
-      end
-
-      def layout_links_tailwind_pack?(content)
-        comment_ranges = html_comment_ranges(content)
-        return content.match?(TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN) if comment_ranges.empty?
-
-        content.to_enum(:scan, TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN).any? do
-          helper_match = Regexp.last_match
-
-          !range_overlaps_any?(helper_match.begin(0)...helper_match.end(0), comment_ranges)
-        end
-      end
-
-      def html_comment_ranges(content)
-        content.to_enum(:scan, HTML_COMMENT_PATTERN).map do
-          comment_match = Regexp.last_match
-
-          comment_match.begin(0)...comment_match.end(0)
-        end
-      end
-
-      def range_overlaps_any?(range, ranges)
-        ranges.any? { |candidate| range.begin < candidate.end && candidate.begin < range.end }
       end
 
       def warn_tailwind_layout_manual_step(layout_path, reason:)
