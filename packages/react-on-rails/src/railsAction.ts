@@ -96,20 +96,29 @@ const warnOnDiscardedDeleteBody = (method: string, requestBody: unknown): boolea
 };
 
 const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
-  if (requestBody instanceof FormData) {
+  if (typeof FormData !== 'undefined' && requestBody instanceof FormData) {
     return 'FormData';
   }
-  if (requestBody instanceof Blob) {
+  if (typeof Blob !== 'undefined' && requestBody instanceof Blob) {
     return 'Blob';
   }
-  if (requestBody instanceof URLSearchParams) {
+  if (typeof URLSearchParams !== 'undefined' && requestBody instanceof URLSearchParams) {
     return 'URLSearchParams';
+  }
+  if (typeof ArrayBuffer !== 'undefined' && requestBody instanceof ArrayBuffer) {
+    return 'ArrayBuffer';
+  }
+  if (typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView(requestBody)) {
+    return requestBody.constructor.name || 'ArrayBufferView';
+  }
+  if (typeof ReadableStream !== 'undefined' && requestBody instanceof ReadableStream) {
+    return 'ReadableStream';
   }
   return null;
 };
 
-const warnOnNonJsonBodyValue = (requestBody: unknown, hasJsonBody: boolean): void => {
-  if (process.env.NODE_ENV === 'production' || !hasJsonBody) {
+const assertJsonBodyValue = (requestBody: unknown, hasJsonBody: boolean): void => {
+  if (!hasJsonBody) {
     return;
   }
 
@@ -118,8 +127,8 @@ const warnOnNonJsonBodyValue = (requestBody: unknown, hasJsonBody: boolean): voi
     return;
   }
 
-  console.warn(
-    `[createRailsAction] The body callback returned ${bodyTypeName}, which cannot be JSON serialized correctly. ` +
+  throw new TypeError(
+    `[createRailsAction] The request body resolved to ${bodyTypeName}, which cannot be JSON serialized correctly. ` +
       'Return a plain JSON value, null, or undefined instead.',
   );
 };
@@ -202,6 +211,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     variables?: TVariables,
     callOptions: RailsActionCallOptions = {},
   ): Promise<TResponse> => {
+    // The public conditional type only permits omitted variables when TVariables is undefined.
     const typedVariables = variables as TVariables;
     assertBrowserContext();
 
@@ -223,7 +233,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     if (!warnedOnDiscardedDeleteBody) {
       warnedOnDiscardedDeleteBody = warnOnDiscardedDeleteBody(method, requestBody);
     }
-    warnOnNonJsonBodyValue(requestBody, hasJsonBody);
+    assertJsonBodyValue(requestBody, hasJsonBody);
     let response: Response;
     try {
       response = await fetch(requestUrl, {

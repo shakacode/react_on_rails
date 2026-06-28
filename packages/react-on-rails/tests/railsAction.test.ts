@@ -47,6 +47,19 @@ const fetchMock = jest.fn<Promise<Response>, [string, RequestInit]>();
 const headerValue = (headers: RequestInit['headers'], name: string): string | null =>
   new Headers(headers).get(name);
 
+const nonJsonRequestBodyFactories: Array<[string, () => unknown]> = [
+  ['FormData', () => new FormData()],
+  ['URLSearchParams', () => new URLSearchParams({ name: 'Apollo' })],
+  ['Blob', () => new Blob(['Apollo'], { type: 'text/plain' })],
+  ['ArrayBuffer', () => new ArrayBuffer(8)],
+  ['Uint8Array', () => new Uint8Array([1, 2, 3])],
+  ['DataView', () => new DataView(new ArrayBuffer(8))],
+];
+
+if (typeof ReadableStream !== 'undefined') {
+  nonJsonRequestBodyFactories.push(['ReadableStream', () => new ReadableStream()]);
+}
+
 beforeAll(() => {
   originalFetch = globalThis.fetch;
   csrfMeta = document.createElement('meta');
@@ -168,6 +181,15 @@ describe('createRailsAction', () => {
     const [, init] = fetchMock.mock.calls[0];
     expect(init.body).toBeUndefined();
     expect(headerValue(init.headers, 'Content-Type')).toBeNull();
+  });
+
+  it('resolves successful non-JSON responses as null', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, body: '<p>created</p>' }));
+    const createProject = createRailsAction<{ name: string }, null>({
+      path: '/api/projects',
+    });
+
+    await expect(createProject({ name: 'Apollo' })).resolves.toBeNull();
   });
 
   it('omits the JSON body for DELETE requests even when variables are provided', async () => {
@@ -388,23 +410,28 @@ describe('createRailsAction', () => {
     await expect(createProject({ name: 'Apollo' })).rejects.toBe(bodyError);
   });
 
-  it('warns in development when the body callback returns a non-JSON body value', async () => {
-    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    const createProject = createRailsAction<{ name: string }, { ok: true }>({
-      path: '/api/projects',
-      body: ({ name }) => new URLSearchParams({ name }),
-    });
+  it.each(nonJsonRequestBodyFactories)(
+    'rejects before fetch when the body resolves to %s',
+    async (bodyTypeName, makeBody) => {
+      const createProject = createRailsAction<{ name: string }, { ok: true }>({
+        path: '/api/projects',
+        body: () => makeBody(),
+      });
 
-    try {
-      await createProject({ name: 'Apollo' });
+      let caughtError: unknown;
+      try {
+        await createProject({ name: 'Apollo' });
+      } catch (error) {
+        caughtError = error;
+      }
 
-      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('URLSearchParams'));
-      const [, init] = fetchMock.mock.calls[0];
-      expect(init.body).toBe('{}');
-    } finally {
-      consoleWarn.mockRestore();
-    }
-  });
+      expect(caughtError).toBeInstanceOf(TypeError);
+      if (caughtError instanceof TypeError) {
+        expect(caughtError.message).toContain(bodyTypeName);
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 
   it('warns in development when a fetch rejection could be a redirect or network failure', async () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
