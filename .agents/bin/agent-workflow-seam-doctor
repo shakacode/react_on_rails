@@ -172,7 +172,8 @@ module AgentWorkflowSeamDoctor
       end
     end
 
-    if config["follow_up_prefix"] != "Follow-up:"
+    follow_up_prefix = config["follow_up_prefix"]
+    if !follow_up_prefix.nil? && !unresolved_yaml_value?(follow_up_prefix) && follow_up_prefix != "Follow-up:"
       issues << 'invalid agent workflow config value for key: follow_up_prefix (expected "Follow-up:")'
     end
 
@@ -187,14 +188,13 @@ module AgentWorkflowSeamDoctor
   end
 
   def load_yaml_config(path)
-    parsed = YAML.safe_load(File.read(path), permitted_classes: [], permitted_symbols: [], aliases: false)
+    parsed = YAML.safe_load(File.binread(path).force_encoding("UTF-8").scrub,
+                            permitted_classes: [], permitted_symbols: [], aliases: false)
     return ["#{CONFIG_RELATIVE_PATH} must be a mapping"] unless parsed.is_a?(Hash)
 
     parsed
   rescue Psych::SyntaxError => e
     ["invalid #{CONFIG_RELATIVE_PATH}: #{e.message}"]
-  rescue Errno::ENOENT
-    ["missing #{CONFIG_RELATIVE_PATH}"]
   end
 
   def unresolved_yaml_value?(value)

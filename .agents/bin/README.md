@@ -11,7 +11,7 @@ means that capability is n/a here.
 | `validate`  | Pre-push gate (`--changed`/`--all`/`--fast`) | `bin/ci-local`                                                                                       |
 | `test`      | Run tests                                    | `(cd react_on_rails && bundle exec rake run_rspec:all_but_examples)` + `pnpm run test`               |
 | `lint`      | Lint / format (`rake autofix` to fix)        | `(cd react_on_rails && bundle exec rake lint)` + `pnpm run lint` + `pnpm start format.listDifferent` |
-| `build`     | Build / type-check                           | `pnpm run build` + `pnpm run type-check` + `rake rbs:validate`                                       |
+| `build`     | Build / type-check                           | `pnpm run build` + `pnpm run type-check` + `(cd react_on_rails && bundle exec rake rbs:validate)`    |
 | `docs`      | Docs checks                                  | `script/check-docs-sidebar` + `bin/check-links`                                                      |
 | `ci-detect` | CI change detector                           | `script/ci-changes-detector [base-ref]` (default `origin/main`)                                      |
 

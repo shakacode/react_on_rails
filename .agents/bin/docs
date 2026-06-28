@@ -2,5 +2,7 @@
 # Docs checks (sidebar coverage + markdown links).
 set -euo pipefail
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-script/check-docs-sidebar
-bin/check-links
+rc=0
+script/check-docs-sidebar || rc=1
+bin/check-links || rc=1
+exit "$rc"

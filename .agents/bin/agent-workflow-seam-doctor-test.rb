@@ -141,6 +141,25 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
 
       refute status.success?
       assert_includes out, "missing agent workflow config key: follow_up_prefix"
+      refute_includes out, "invalid agent workflow config value for key: follow_up_prefix"
+    end
+  end
+
+  def test_portable_contract_missing_agents_md_pointer_fails
+    with_repo do |root|
+      body = +"# AGENTS.md\n\n"
+      body << "## Agent Workflow Configuration\n\n"
+      body << "See `.agents/agent-workflow.yml`.\n"
+      body << "\n## Commands\n"
+      File.write(File.join(root, "AGENTS.md"), body)
+      write_agent_workflow_config(root)
+      write_agent_workflow_scripts(root)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "AGENTS.md section must point to .agents/bin/README.md and .agents/bin/<name>"
     end
   end
 
