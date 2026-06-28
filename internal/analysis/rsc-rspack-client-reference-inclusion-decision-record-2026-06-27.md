@@ -194,7 +194,7 @@ Empirical variants that produced effective `lazyCompilation: false` but still wa
 
 ## `addInclude` implementation tests
 
-Three concrete `compilation.addInclude` shapes were tested after the lazyCompilation failure. Each shape answered a specific question about whether `addInclude` can replace source-level dynamic imports for RSC client-reference inclusion.
+Three concrete `compilation.addInclude` shapes were tested after the lazyCompilation failure. Each shape answered a specific question about whether `addInclude` can replace source-level dynamic imports for RSC client-reference inclusion. These were June 2026 local implementation tests, not merged package changes; rerun them against current `react_on_rails_rsc` before using any result as design proof.
 
 ### Test 1: separate `addInclude` entry/group
 
@@ -308,7 +308,7 @@ Relevant work:
 
 - [web-infra-dev/rspack#13136](https://github.com/web-infra-dev/rspack/pull/13136) replaced loader-generated dynamic imports with a custom `ClientEntryDependency` / `ClientEntryModule` approach so native RSC is compatible with lazy compilation. The PR explains the same bug class: loader-created `import()` becomes `DynamicImport`, lazy compilation proxies it, and Flight expects real modules synchronously after chunk load.
 - [web-infra-dev/rspack#13880](https://github.com/web-infra-dev/rspack/pull/13880) groups RSC client chunks by server-entry ownership.
-- Current Rspack native RSC source uses internal Rust `AsyncDependenciesBlock` creation in [`crates/rspack_plugin_rsc/src/rsc_entry_module.rs`](https://github.com/web-infra-dev/rspack/blob/main/crates/rspack_plugin_rsc/src/rsc_entry_module.rs).
+- Current Rspack native RSC source uses internal Rust `AsyncDependenciesBlock` creation in [`crates/rspack_plugin_rsc/src/rsc_entry_module.rs`](https://github.com/web-infra-dev/rspack/blob/main/crates/rspack_plugin_rsc/src/rsc_entry_module.rs). `rspack_plugin_rsc` is a Rust crate compiled into the Rspack binary, not an npm package or public JavaScript plugin API.
 
 This is useful prior art. It is not a drop-in replacement for RORP today because RORP's RSC integration, generated pack layout, Rails routing, SSR/node-renderer flow, and manifest consumption differ from Rspack native RSC's same-name entry/layer model.
 
@@ -329,11 +329,12 @@ If Rspack lazy compilation injects a runtime trigger using the page origin, dyna
 POST /_rspack/lazy/trigger -> Rails -> 404
 ```
 
-Public evidence outside the RORP RSC fresh-app repro:
+Evidence outside the RORP RSC fresh-app repro:
 
 - In [shakacode/shakapacker#984](https://github.com/shakacode/shakapacker/issues/984#issuecomment-4089667879), a Shakapacker/Rspack adopter said they had to disable Rspack lazy compilation because the Shakapacker server did not handle it out of the box.
 - In [web-infra-dev/rspack#14194](https://github.com/web-infra-dev/rspack/issues/14194), a Rails + Shakapacker + Rspack starter hit lazy-trigger 404s around optional dynamic imports. The workaround was top-level `lazyCompilation: false`.
-- Hichee's Rspack migration also disabled top-level `lazyCompilation` in its Rails/Rspack dev-server wiring; see `shakacode/hichee#9508` for the RSC + Rspack migration context.
+
+Internal context: Hichee's Rspack migration also disabled top-level `lazyCompilation` in its Rails/Rspack dev-server wiring; see private PR `shakacode/hichee#9508` for the RSC + Rspack migration context.
 
 Implication:
 
@@ -347,7 +348,7 @@ Implication:
 | Injection-loader dynamic imports, lazy off             |                                   Yes |                          Yes | Needs server-side handling/fallbacks depending graph | Loader/runtime matching, module-global loader state, splitChunks guardrails  |
 | Injection-loader dynamic imports, lazy on              | Theoretically yes, practically broken |                           No |                                    No for normal dev | Lazy proxies dynamic imports; manifest can be empty or proxy-backed          |
 | `addInclude` with new generated include entries        |           Looks split, but wrong kind |                          Yes |                                                Risky | Separate runtime/IIFE, node externals crash, duplicated deps, hydration risk |
-| `addInclude` into existing generated owner entry       |  No: refs become eager (`chunks: []`) |                          Yes |                                               Better | Loses async client-ref chunking; needs ownership/multi-owner policy          |
+| `addInclude` into existing generated owner entry       |  No: refs become eager (`chunks: []`) |                          Yes |                 Better, but server side needs retest | Loses async client-ref chunking; needs ownership/multi-owner policy          |
 | Native Rspack RSC plugin                               |          Yes, via internal primitives | Rspack solved in native path |                                         Native model | Bigger architecture migration; not drop-in for RORP                          |
 | Public JS `module.addBlock` / `AsyncDependenciesBlock` |                               Desired |     Would avoid fake imports |                         Desired with server handling | Not available today; track Rspack #7174                                      |
 
@@ -393,10 +394,11 @@ Client bundle:
 
 Server bundle:
   use addInclude into existing server entry when needed for manifest parity
+  reuse existing generated entry names, not new include entries
   mark exports used in unknown way
 ```
 
-This matches the #36 research direction: client async chunks need bundler code-splitting; server bundle can safely use existing-entry `addInclude` because server output is usually merged into one server bundle and does not need browser async chunk semantics.
+This matches the #36 research direction: client async chunks need bundler code-splitting; server bundle can use existing-entry `addInclude` because server output is usually merged into one server bundle and does not need browser async chunk semantics. Existing-entry reuse is a hard constraint: new include entries can trigger Rspack node-target external chunk errors such as `Cannot fulfil chunk condition of external node-commonjs "fs"`.
 
 This candidate still needs implementation and validation against current `react_on_rails_rsc` main before PR work.
 
@@ -427,6 +429,7 @@ But adopting it in RORP is a larger architecture migration, not a narrow fix for
      - document Rails proxy requirements if lazy remains enabled.
 
 3. **RORP hybrid implementation follow-up**
+   - Track package-side follow-up in [react_on_rails_rsc#72](https://github.com/shakacode/react_on_rails_rsc/issues/72).
    - Revalidate the hybrid client/server design against current `react_on_rails_rsc` main.
    - Required checks:
      - client manifest chunks remain non-empty for split refs;
@@ -472,6 +475,7 @@ Rspack / Shakapacker:
 - [Rspack lazyCompilation guide](https://rspack.rs/guide/features/lazy-compilation)
 - [web-infra-dev/rspack#7174 — Module.addBlock API](https://github.com/web-infra-dev/rspack/issues/7174)
 - [web-infra-dev/rspack#8469 — missing RSC framework APIs](https://github.com/web-infra-dev/rspack/issues/8469)
+- [web-infra-dev/rspack#9661 — JS identity support for dependency blocks](https://github.com/web-infra-dev/rspack/pull/9661)
 - [web-infra-dev/rspack#13136 — native RSC lazy-compatible client entry module](https://github.com/web-infra-dev/rspack/pull/13136)
 - [web-infra-dev/rspack#13880 — RSC ownership-based client chunk grouping](https://github.com/web-infra-dev/rspack/pull/13880)
 - [web-infra-dev/rspack#14194 — Rails/Shakapacker lazyCompilation opt-out issue](https://github.com/web-infra-dev/rspack/issues/14194)
