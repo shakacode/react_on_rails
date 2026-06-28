@@ -20,6 +20,7 @@ export interface RailsActionCallOptions {
   signal?: AbortSignal;
 }
 
+// Brackets prevent distribution over union TVariables, preserving a single caller signature.
 export type RailsActionCaller<TVariables, TResponse> = [TVariables] extends [undefined]
   ? (variables?: undefined, options?: RailsActionCallOptions) => Promise<TResponse>
   : (variables: TVariables, options?: RailsActionCallOptions) => Promise<TResponse>;
@@ -193,6 +194,7 @@ const assertBrowserContext = (): void => {
  * The returned function is directly usable as a TanStack Query `mutationFn`.
  * It always requests JSON, rejects browser-followed redirects, and resolves 204 or non-JSON success
  * responses as `null`. Include `null` in `TResponse` when a successful empty response is expected.
+ * A 200 response with `text/html`, such as an unexpected Rails error page, also resolves as `null`.
  * `options.headers` can override the default `Accept: application/json`; include `null` in `TResponse`
  * when that custom Accept header may produce a successful non-JSON response.
  * Omitting `body` sends `variables` as the JSON body verbatim; supply `body` to map or filter fields before
@@ -205,6 +207,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
   options: RailsActionOptions<TVariables>,
 ): RailsActionCaller<TVariables, TResponse> {
   const method = (options.method ?? 'POST').toUpperCase();
+  // Warn once per action factory; DELETE body discard is an action configuration problem, not per-call data.
   let warnedOnDiscardedDeleteBody = false;
 
   const callRailsAction = async (
