@@ -61,6 +61,18 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
     end.to raise_error(ReactOnRails::Error, /Unknown scalar response type alias: :String/)
   end
 
+  it "parenthesizes raw composite array members before appending array brackets" do
+    described_class.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: {
+        project_ids: { array: { raw: "string & { __brand: 'ProjectId' }" } }
+      }
+    )
+
+    expect(described_class.to_d_ts).to include("  project_ids: (string & { __brand: 'ProjectId' })[];")
+  end
+
   it "reports unknown option keys on wrapper-looking specs" do
     described_class.define_response(
       "payload.show",

@@ -275,7 +275,7 @@ module ReactOnRails
 
         member_type = render_type(member_spec, indentation:, closing_indentation:)
         member_type = "#{member_type} | null" if member_options.fetch(:nullable, false)
-        member_type = "(#{member_type})" if member_type.include?("\n") || member_type.include?(" | ")
+        member_type = "(#{member_type})" if member_type.match?(/[\n|&]|=>|\s\?\s/)
         "#{member_type}[]"
       end
 
