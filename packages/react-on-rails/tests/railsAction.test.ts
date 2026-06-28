@@ -347,6 +347,33 @@ describe('createRailsAction', () => {
     }
   });
 
+  it('throws RailsActionRequestError when parsing an error body stream fails', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      clone: () =>
+        ({
+          json: () => Promise.reject(new TypeError('stream failed')),
+        }) as unknown as Response,
+    } as unknown as Response);
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    let caughtError: unknown;
+    try {
+      await createProject({ name: 'Apollo' });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(RailsActionRequestError);
+    if (caughtError instanceof RailsActionRequestError) {
+      expect(caughtError.response.status).toBe(500);
+      expect(caughtError.responseBody).toBeNull();
+    }
+  });
+
   it('propagates response body stream errors instead of treating them as empty JSON', async () => {
     const bodyError = new TypeError('body already used');
     fetchMock.mockResolvedValueOnce({

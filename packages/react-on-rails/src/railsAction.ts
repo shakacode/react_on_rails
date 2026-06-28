@@ -38,16 +38,11 @@ export class RailsActionRequestError<TResponseBody = unknown> extends Error {
 }
 
 const resolveSameOriginRequestUrl = (url: string): string | null => {
-  const currentLocation = typeof window === 'undefined' ? null : window.location;
-  if (currentLocation === null || typeof document === 'undefined') {
-    return null;
-  }
-
   try {
-    const resolvedUrl = new URL(url, currentLocation.href);
+    const resolvedUrl = new URL(url, window.location.href);
     if (
       (resolvedUrl.protocol === 'http:' || resolvedUrl.protocol === 'https:') &&
-      resolvedUrl.origin === currentLocation.origin
+      resolvedUrl.origin === window.location.origin
     ) {
       return resolvedUrl.href;
     }
@@ -101,13 +96,13 @@ const warnOnDiscardedDeleteBody = (method: string, requestBody: unknown): boolea
 };
 
 const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
-  if (typeof FormData !== 'undefined' && requestBody instanceof FormData) {
+  if (requestBody instanceof FormData) {
     return 'FormData';
   }
-  if (typeof Blob !== 'undefined' && requestBody instanceof Blob) {
+  if (requestBody instanceof Blob) {
     return 'Blob';
   }
-  if (typeof URLSearchParams !== 'undefined' && requestBody instanceof URLSearchParams) {
+  if (requestBody instanceof URLSearchParams) {
     return 'URLSearchParams';
   }
   return null;
@@ -252,7 +247,12 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
 
     if (!response.ok) {
       // Keep this clone before any error-body reads so callers can still inspect the original response body.
-      const responseBody = await parseJsonBody(response.clone());
+      let responseBody: unknown = null;
+      try {
+        responseBody = await parseJsonBody(response.clone());
+      } catch {
+        responseBody = null;
+      }
       throw new RailsActionRequestError(response, responseBody);
     }
 
