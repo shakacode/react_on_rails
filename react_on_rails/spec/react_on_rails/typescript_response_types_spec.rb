@@ -159,7 +159,7 @@ module ReactOnRails
 
       expect do
         described_class.to_d_ts
-      end.to raise_error(ReactOnRails::Error, /only use one of :array, :fields, or :type/)
+      end.to raise_error(ReactOnRails::Error, /only use one of :array, :fields, :raw, or :type/)
     end
 
     it "preserves nullable array member wrappers" do

@@ -21,6 +21,48 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
     end.to raise_error(ReactOnRails::Error, /array elements cannot be optional/)
   end
 
+  it "emits raw TypeScript expressions for explicit raw wrappers" do
+    described_class.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: {
+        starts_at: { raw: "Date" },
+        metadata: { raw: "Record<string, string>", optional: true }
+      }
+    )
+
+    declaration = described_class.to_d_ts
+
+    expect(declaration).to include("  starts_at: Date;")
+    expect(declaration).to include("  metadata?: Record<string, string>;")
+  end
+
+  it "rejects unsafe raw TypeScript expressions" do
+    described_class.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: { starts_at: { raw: "Date;\nexport type Leak = string" } }
+    )
+
+    expect do
+      described_class.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
+  end
+
+  it "reports unknown option keys on wrapper-looking specs" do
+    described_class.define_response(
+      "payload.show",
+      type_name: "PayloadShowResponse",
+      fields: {
+        value: { type: :string, nullablee: true }
+      }
+    )
+
+    expect do
+      described_class.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /Unrecognized option key\(s\).*:nullablee/)
+  end
+
   it "omits keyed response helpers when no responses are registered" do
     described_class.define_type("Project", fields: { id: :number })
 
