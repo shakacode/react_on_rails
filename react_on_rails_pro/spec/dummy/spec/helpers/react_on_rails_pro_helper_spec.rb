@@ -1097,15 +1097,55 @@ describe ReactOnRailsProHelper do
           end
 
           first_result = render_cached.call
+          Rails.cache.write(expected_cache_key, String.new(first_result), expires_in: 60)
           @rendered_rails_context = nil
           second_result = render_cached.call
         end
 
         expect(first_result).to include(chunks.first[:html], chunks.second[:html], chunks.third[:html])
         expect(second_result).to eq(first_result)
+        expect(first_result).to be_html_safe
+        expect(second_result).to be_html_safe
         expect(Rails.cache.read(expected_cache_key)).to eq(first_result)
         expect(props_calls).to eq(1)
         expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "does not require an RSC bundle hash when RSC support is disabled" do
+        original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+        ReactOnRailsPro.configuration.enable_rsc_support = false
+        props_calls = 0
+        result = nil
+        expected_cache_key = nil
+
+        Sync do
+          mock_request_and_response
+          allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_raise(
+            Errno::ENOENT,
+            "missing rsc bundle"
+          )
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["buffered-stream-cache-spec-no-rsc", component_name],
+            prerender: true
+          )
+
+          result = cached_buffered_stream_react_component(
+            component_name,
+            cache_key: ["buffered-stream-cache-spec-no-rsc", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props_calls += 1
+            props
+          end
+        end
+
+        expect(result).to be_html_safe
+        expect(Rails.cache.read(expected_cache_key)).to eq(result)
+        expect(props_calls).to eq(1)
+      ensure
+        ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
       end
     end
 

@@ -312,20 +312,24 @@ module ReactOnRailsProHelper
           raw_cache_key = raw_options[:cache_key]
           cache_key_value = raw_cache_key.respond_to?(:call) ? raw_cache_key.call : raw_cache_key
 
-          [cache_key_value, ReactOnRailsPro::Utils.rsc_bundle_hash]
+          if ReactOnRailsPro.configuration.enable_rsc_support
+            [cache_key_value, ReactOnRailsPro::Utils.rsc_bundle_hash]
+          else
+            cache_key_value
+          end
         end,
         prerender: true
       )
 
-      fetch_react_component(component_name, cache_options) do
+      cached_result = fetch_react_component(component_name, cache_options) do
         options = raw_options.merge(
           props: yield,
-          prerender: true,
           skip_prerender_cache: true,
           auto_load_bundle: ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
         )
         buffered_stream_react_component(component_name, options)
       end
+      cached_result.html_safe
     end
   end
 
