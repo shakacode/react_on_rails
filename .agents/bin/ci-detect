@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 # CI change detector (inspect suite routing). Optional base ref (default origin/main).
 set -euo pipefail
+cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 exec script/ci-changes-detector "${1:-origin/main}"

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Docs checks (sidebar coverage + markdown links).
 set -euo pipefail
+cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 script/check-docs-sidebar
 bin/check-links
