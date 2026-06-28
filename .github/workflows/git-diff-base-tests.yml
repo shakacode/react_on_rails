@@ -11,6 +11,10 @@ on:
       - 'script/lib/git-diff-base-test.bash'
       - 'script/ci-changes-detector'
       - 'script/ci-changes-detector-test.bash'
+      - 'script/release-forward-port'
+      - 'script/release-forward-port-test.bash'
+      - 'script/release-finish'
+      - 'script/release-finish-test.bash'
       - '.github/workflows/git-diff-base-tests.yml'
   pull_request:
     paths:
@@ -18,6 +22,10 @@ on:
       - 'script/lib/git-diff-base-test.bash'
       - 'script/ci-changes-detector'
       - 'script/ci-changes-detector-test.bash'
+      - 'script/release-forward-port'
+      - 'script/release-forward-port-test.bash'
+      - 'script/release-finish'
+      - 'script/release-finish-test.bash'
       - '.github/workflows/git-diff-base-tests.yml'
   workflow_dispatch:
 
@@ -30,10 +38,23 @@ jobs:
           persist-credentials: false
 
       - name: Shellcheck detector scripts and test harnesses
-        run: shellcheck -x script/lib/git-diff-base script/lib/git-diff-base-test.bash script/ci-changes-detector script/ci-changes-detector-test.bash
+        run: |
+          shellcheck -x \
+            script/lib/git-diff-base \
+            script/lib/git-diff-base-test.bash \
+            script/ci-changes-detector \
+            script/ci-changes-detector-test.bash \
+            script/release-forward-port-test.bash \
+            script/release-finish-test.bash
 
       - name: Run git-diff-base test harness
         run: bash script/lib/git-diff-base-test.bash
 
       - name: Run CI changes detector test harness
         run: bash script/ci-changes-detector-test.bash
+
+      - name: Run release forward-port test harness
+        run: bash script/release-forward-port-test.bash
+
+      - name: Run release finish test harness
+        run: bash script/release-finish-test.bash
