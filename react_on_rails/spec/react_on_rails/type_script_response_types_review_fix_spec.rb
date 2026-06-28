@@ -49,6 +49,41 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
     end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
   end
 
+  it "rejects raw TypeScript expressions with line comments" do
+    described_class.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: { values: { array: { raw: "string //" } } }
+    )
+
+    expect do
+      described_class.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
+  end
+
+  it "rejects raw TypeScript expressions with ECMAScript line separators" do
+    described_class.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: { starts_at: { raw: "Date\u2028export type Leak = string" } }
+    )
+
+    expect do
+      described_class.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
+
+    described_class.reset!
+    described_class.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: { starts_at: { raw: "Date\u2029export type Leak = string" } }
+    )
+
+    expect do
+      described_class.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
+  end
+
   it "rejects raw TypeScript expressions with unbalanced braces" do
     described_class.define_response(
       "events.show",
@@ -85,6 +120,25 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
     expect(described_class.to_d_ts).to include("  project_ids: (string & { __brand: 'ProjectId' })[];")
   end
 
+  it "parenthesizes raw function, conditional, and unary array members" do
+    described_class.define_type("Project", fields: { id: :number, slug: :string })
+    described_class.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: {
+        project_key: { array: { raw: "keyof Project" } },
+        formatter: { array: { raw: "(value: Project) => string" } },
+        labels: { array: { raw: "Project extends { id: number } ? string : number" } }
+      }
+    )
+
+    declaration = described_class.to_d_ts
+
+    expect(declaration).to include("  project_key: (keyof Project)[];")
+    expect(declaration).to include("  formatter: ((value: Project) => string)[];")
+    expect(declaration).to include("  labels: (Project extends { id: number } ? string : number)[];")
+  end
+
   it "reports unknown option keys on wrapper-looking specs" do
     described_class.define_response(
       "payload.show",
@@ -97,6 +151,20 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
     expect do
       described_class.to_d_ts
     end.to raise_error(ReactOnRails::Error, /Unrecognized option key\(s\).*:nullablee/)
+  end
+
+  it "reports unknown option keys when multiple wrapper keys make the spec ambiguous" do
+    described_class.define_response(
+      "payload.show",
+      type_name: "PayloadShowResponse",
+      fields: {
+        value: { array: :string, fields: :json, typo: true }
+      }
+    )
+
+    expect do
+      described_class.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /Unrecognized option key\(s\).*:typo/)
   end
 
   it "preserves plain object fields when wrapper-like keys are paired with regular field names" do
@@ -112,6 +180,26 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
       "  event: {",
       "    type: string;",
       "    source: string;",
+      "  };"
+    ].join("\n")
+
+    expect(described_class.to_d_ts).to include(expected_event_type)
+  end
+
+  it "preserves plain object fields whose names look like option-key typos" do
+    described_class.define_response(
+      "payload.show",
+      type_name: "PayloadShowResponse",
+      fields: {
+        event: { type: :string, types: :string, rawness: :boolean }
+      }
+    )
+
+    expected_event_type = [
+      "  event: {",
+      "    type: string;",
+      "    types: string;",
+      "    rawness: boolean;",
       "  };"
     ].join("\n")
 

@@ -193,11 +193,16 @@ module ReactOnRails
     end
 
     it "rejects names that would collide with TypeScript or generated declarations" do
-      %w[string default await type readonly JsonValue].each do |type_name|
+      %w[string bigint default await type readonly JsonValue].each do |type_name|
         expect do
           described_class.define_type(type_name, fields: {})
         end.to raise_error(ReactOnRails::Error, /reserved/)
       end
+    end
+
+    it "rejects blank response keys" do
+      expect { described_class.define_response("", type_name: "BlankResponse", fields: {}) }
+        .to raise_error(ReactOnRails::Error, /Response type key must be present/)
     end
 
     it "rejects invalid fields at registration time" do

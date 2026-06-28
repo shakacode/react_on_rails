@@ -9116,7 +9116,11 @@ controller/action-style name such as `projects.index` so later route changes do 
 | `:string`                            | `string`                          |
 | `:number`, `:integer`, `:float`      | `number`                          |
 | `:boolean`, `:bool`                  | `boolean`                         |
+| `:date`                              | `string`                          |
 | `:json`                              | `JsonValue`                       |
+| `:any`                               | `any`                             |
+| `:unknown`                           | `unknown`                         |
+| `:null`                              | `null`                            |
 | `"Project"`                          | `Project`                         |
 | `{ raw: "Date" }`                    | `Date`                            |
 | `{ array: "Project" }` or `[:string]` | `Project[]` or `string[]`         |

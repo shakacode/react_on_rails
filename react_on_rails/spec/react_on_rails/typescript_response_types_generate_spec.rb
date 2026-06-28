@@ -57,5 +57,39 @@ module ReactOnRails
         end
       end
     end
+
+    it "allows output paths under the real Rails.root when Rails.root is a symlink" do
+      Dir.mktmpdir do |dir|
+        real_root = File.join(dir, "real-root")
+        linked_root = File.join(dir, "linked-root")
+        FileUtils.mkdir_p(File.join(real_root, "generated"))
+        File.symlink(real_root, linked_root)
+        allow(Rails).to receive(:root).and_return(Pathname.new(linked_root))
+        described_class.define_response("health.show", type_name: "HealthResponse", fields: { ok: :boolean })
+
+        output_path = File.join(real_root, "generated/rails_response_types.d.ts")
+
+        expect(described_class.generate(output_path:)).to eq(output_path)
+        expect(File.read(output_path)).to include("export interface HealthResponse")
+      end
+    end
+
+    it "does not create the output directory when generation fails" do
+      Dir.mktmpdir do |dir|
+        allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+        described_class.define_response(
+          "health.show",
+          type_name: "HealthResponse",
+          fields: { ok: { raw: "string //" } }
+        )
+
+        output_dir = File.join(dir, "generated")
+
+        expect do
+          described_class.generate(output_path: "generated/rails_response_types.d.ts")
+        end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
+        expect(File).not_to exist(output_dir)
+      end
+    end
   end
 end
