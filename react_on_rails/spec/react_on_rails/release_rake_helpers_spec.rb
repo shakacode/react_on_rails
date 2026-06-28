@@ -3990,9 +3990,12 @@ RSpec.describe "release.rake helper methods" do
       end.not_to raise_error
     end
 
-    it "prints the intended offer during a dry run without touching git or prompting" do
-      expect(self).not_to receive(:local_or_remote_branch_exists?)
+    it "prints the create plan during a dry run (branch missing) without prompting or creating" do
+      allow(self).to receive(:local_or_remote_branch_exists?)
+        .with(monorepo_root: "/tmp/repo", branch: "release/17.0.0")
+        .and_return(false)
       expect(self).not_to receive(:start_release_line!)
+      expect($stdin).not_to receive(:gets)
 
       expect do
         maybe_offer_release_branch_cut!(
@@ -4002,6 +4005,25 @@ RSpec.describe "release.rake helper methods" do
           dry_run: true
         )
       end.to output(%r{DRY RUN: would offer to create release/17.0.0}).to_stdout
+    end
+
+    it "reports the existence-guard stop during a dry run when the branch already exists" do
+      # Dry-run must evaluate existence (read-only git) so the plan is honest:
+      # an existing branch would stop the offer, not create a new line.
+      allow(self).to receive(:local_or_remote_branch_exists?)
+        .with(monorepo_root: "/tmp/repo", branch: "release/17.0.0")
+        .and_return(true)
+      expect(self).not_to receive(:start_release_line!)
+      expect($stdin).not_to receive(:gets)
+
+      expect do
+        maybe_offer_release_branch_cut!(
+          monorepo_root: "/tmp/repo",
+          current_branch: "main",
+          target_gem_version: "17.0.0.rc.0",
+          dry_run: true
+        )
+      end.to output(%r{DRY RUN: would stop.*release/17.0.0 already exists}m).to_stdout
     end
   end
 

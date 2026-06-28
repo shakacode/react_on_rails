@@ -620,11 +620,15 @@ def maybe_offer_release_branch_cut!(monorepo_root:, current_branch:, target_gem_
   release_branch = "release/#{release_base_version(target_gem_version)}"
 
   case release_branch_cut_offer_decision(monorepo_root:, release_branch:, dry_run:)
-  when :dry_run
+  when :dry_run_branch_exists
+    # Mirror the real existence-guard outcome in dry-run, so the plan is honest:
+    # an existing branch would stop the offer, not create a new line.
+    puts "⚠️ DRY RUN: would stop — #{release_branch_already_exists_message(release_branch:).sub(/\A❌\s*/, '')}"
+  when :dry_run_create
     puts "ℹ️ DRY RUN: would offer to create #{release_branch} from origin/main and stop for CI " \
          "(rc cut detected on main)."
   when :branch_exists
-    handle_release_branch_cut_offer_branch_exists!(release_branch:, dry_run:)
+    abort release_branch_already_exists_message(release_branch:)
   when :non_interactive
     abort release_branch_cut_offer_non_interactive_message(release_branch:)
   when :prompt
@@ -633,24 +637,17 @@ def maybe_offer_release_branch_cut!(monorepo_root:, current_branch:, target_gem_
 end
 
 # Pure decision step so the matrix is unit-testable without exit/abort/prompt
-# side effects. Dry-run wins first (it must never touch git beyond existence),
-# then the existence guard, then the TTY check, else prompt.
+# side effects. The existence guard is evaluated FIRST in every mode (including
+# dry-run) so the dry-run plan reflects the real outcome; only after that does
+# dry-run short-circuit (it must not prompt, abort, or touch the working tree).
+# Then the TTY check, else prompt.
 def release_branch_cut_offer_decision(monorepo_root:, release_branch:, dry_run:)
-  return :dry_run if dry_run
-  return :branch_exists if local_or_remote_branch_exists?(monorepo_root:, branch: release_branch)
+  branch_exists = local_or_remote_branch_exists?(monorepo_root:, branch: release_branch)
+  return branch_exists ? :dry_run_branch_exists : :dry_run_create if dry_run
+  return :branch_exists if branch_exists
   return :non_interactive unless $stdin.tty?
 
   :prompt
-end
-
-def handle_release_branch_cut_offer_branch_exists!(release_branch:, dry_run:)
-  message = release_branch_already_exists_message(release_branch:)
-  if dry_run
-    puts "⚠️ DRY RUN: #{message.sub(/\A❌\s*/, '')}"
-    return
-  end
-
-  abort message
 end
 
 def release_branch_cut_offer_non_interactive_message(release_branch:)
