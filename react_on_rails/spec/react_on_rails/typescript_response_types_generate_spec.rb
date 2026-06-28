@@ -153,5 +153,31 @@ module ReactOnRails
         expect(File).not_to exist(generated_root)
       end
     end
+
+    it "rejects output parent symlink swaps before creating the generated file" do
+      described_class.define_response("health.show", type_name: "HealthResponse", fields: { ok: :boolean })
+
+      Dir.mktmpdir do |dir|
+        Dir.mktmpdir do |outside_dir|
+          allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+          output_path = "generated/escape/rails_response_types.d.ts"
+          output_dir = File.join(dir, "generated")
+          escape_link = File.join(output_dir, "escape")
+          escaped_path = File.join(outside_dir, "rails_response_types.d.ts")
+
+          allow(FileUtils).to receive(:mkdir_p).and_call_original
+          allow(FileUtils).to receive(:mkdir_p).with(Pathname.new(File.join(dir, "generated/escape"))) do
+            FileUtils.mkdir_p(output_dir)
+            File.symlink(outside_dir, escape_link)
+          end
+
+          expect do
+            described_class.generate(output_path:)
+          end.to raise_error(ReactOnRails::Error, /must be inside Rails\.root/)
+          expect(File).not_to exist(escaped_path)
+          expect(File).not_to exist(output_dir)
+        end
+      end
+    end
   end
 end

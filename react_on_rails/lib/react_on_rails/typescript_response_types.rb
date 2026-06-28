@@ -181,11 +181,11 @@ module ReactOnRails
 
     class << self
       def define_type(type_name, fields:)
-        registry.define_type(type_name, fields:)
+        REGISTRY_MUTEX.synchronize { current_registry.define_type(type_name, fields:) }
       end
 
       def define_response(response_key, type_name:, fields:)
-        registry.define_response(response_key, type_name:, fields:)
+        REGISTRY_MUTEX.synchronize { current_registry.define_response(response_key, type_name:, fields:) }
       end
 
       def generate(output_path: nil)
@@ -196,18 +196,22 @@ module ReactOnRails
       end
 
       def to_d_ts
-        Emitter.new(registry).to_d_ts
+        REGISTRY_MUTEX.synchronize { Emitter.new(current_registry).to_d_ts }
       end
 
       def reset!
-        REGISTRY_MUTEX.synchronize { @registry = Registry.new }
+        REGISTRY_MUTEX.synchronize { @current_registry = Registry.new }
       end
 
       def registry
-        REGISTRY_MUTEX.synchronize { @registry ||= Registry.new }
+        REGISTRY_MUTEX.synchronize { current_registry }
       end
 
       private
+
+      def current_registry
+        @current_registry ||= Registry.new
+      end
 
       def root_relative_output_path(output_path)
         path = Pathname.new(output_path)
@@ -231,6 +235,7 @@ module ReactOnRails
       def write_generated_file(path, content)
         cleanup_directory = highest_missing_ancestor(path.dirname)
         FileUtils.mkdir_p(path.dirname)
+        validate_generated_file_parent!(path)
         tempfile = Tempfile.new([".react_on_rails_types", ".tmp"], path.dirname)
         tempfile.write(content)
         tempfile.close
@@ -261,6 +266,16 @@ module ReactOnRails
         end
 
         missing_path
+      end
+
+      def validate_generated_file_parent!(path)
+        real_root = Rails.root.expand_path.realpath
+        real_parent = path.dirname.realpath
+        return if same_or_child_path?(real_parent, real_root)
+
+        output_path_error!(path.to_s)
+      rescue ArgumentError, Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES, Errno::EPERM
+        output_path_error!(path.to_s)
       end
 
       def nearest_existing_path(path)
