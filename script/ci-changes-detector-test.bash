@@ -895,6 +895,125 @@ test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint() {
   assert_contains "$out" '"run_ruby_tests": false' "benchmark comment output"
 }
 
+# Release tooling (rakelib/release.rake + script/release-* helpers) is covered
+# ONLY by the release rspec suite, never by generators or JS. It must request the
+# Ruby tests (so those specs run) AND lint (rubocop covers this Ruby/Bash) while
+# keeping run_generators / run_js_tests false, so required-pr-gate
+# (script/ci-required-hosted-gate) does not force the full hosted matrix. Before
+# this arm existed, rakelib/release.rake hit the uncategorized catch-all and set
+# run_generators=true.
+#
+# All five release-tooling paths share one contract, asserted identically via
+# this helper so a one-character typo in any pattern can't silently fall through
+# to the generator-sensitive script/* CI-infra arm.
+assert_release_tooling_contract() {
+  local out="$1"
+  local label="$2"
+  assert_contains "$out" '"docs_only": false' "$label"
+  assert_contains "$out" '"non_runtime_only": false' "$label"
+  # Rubocop must run so release tooling is linted (the lint job is hosted-gated
+  # on run_lint; without this it would never lint these paths).
+  assert_contains "$out" '"run_lint": true' "$label"
+  # Release specs run (release_rake_helpers_spec / release_forward_port_script_spec).
+  assert_contains "$out" '"run_ruby_tests": true' "$label"
+  # Primary goal: NOT generator-sensitive, so required-pr-gate won't force hosted CI.
+  assert_contains "$out" '"run_generators": false' "$label"
+  assert_contains "$out" '"run_js_tests": false' "$label"
+  # Release tooling does not exercise the dummy app, E2E, or benchmarks. Assert
+  # the FULL benchmark contract so a regression that flips any benchmark suite
+  # (e.g. a stray BENCH_PRO_CHANGED) cannot pass.
+  assert_contains "$out" '"run_dummy_tests": false' "$label"
+  assert_contains "$out" '"run_e2e_tests": false' "$label"
+  assert_contains "$out" '"run_core_benchmarks": false' "$label"
+  assert_contains "$out" '"run_pro_benchmarks": false' "$label"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "$label"
+}
+
+test_release_rake_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "rakelib/release.rake" "task :release do; end"
+
+  assert_release_tooling_contract "$(detector_output)" "release rake output"
+}
+
+# The release helper scripts under script/ must be caught by the release-tooling
+# arm, not the broad script/* CI-infrastructure arm (which would set
+# run_generators=true and force hosted CI). Same contract as release.rake.
+test_release_finish_script_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "script/release-finish" "#!/usr/bin/env bash"
+
+  assert_release_tooling_contract "$(detector_output)" "release-finish output"
+}
+
+# Per-path coverage for the remaining three release-tooling globs. Without these,
+# a typo in any single pattern would route that path to the generator-sensitive
+# script/* CI-infra arm undetected.
+test_release_forward_port_script_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "script/release-forward-port" "#!/usr/bin/env bash"
+
+  assert_release_tooling_contract "$(detector_output)" "release-forward-port output"
+}
+
+test_release_forward_port_test_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "script/release-forward-port-test.bash" "#!/usr/bin/env bash"
+
+  assert_release_tooling_contract "$(detector_output)" "release-forward-port-test output"
+}
+
+test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "script/release-finish-test.bash" "#!/usr/bin/env bash"
+
+  assert_release_tooling_contract "$(detector_output)" "release-finish-test output"
+}
+
+# Comment-only change to release tooling takes the SOURCE_COMMENT_ONLY_CHANGED
+# branch of the release arm (not RELEASE_TOOLING_CHANGED), so it stays
+# non-runtime — rubocop still runs (lint catches comment-affecting style) but the
+# release rspec suite does not. Mirrors
+# test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint. The fixture
+# uses plain Ruby with no heredoc so source_file_has_multiline_string_construct
+# does not (correctly, conservatively) force a full run.
+test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint() {
+  setup_repo
+  mkdir -p rakelib
+  printf 'namespace :release do\n  task :stub do\n    puts "ok"\n  end\nend\n' > rakelib/release.rake
+  commit_change "add release rake stub"
+  perl -0pi -e 's/namespace :release do/# Describe the release tasks.\nnamespace :release do/' \
+    rakelib/release.rake
+  commit_change "release rake comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release comment output"
+  assert_contains "$out" '"non_runtime_only": true' "release comment output"
+  assert_contains "$out" '"run_lint": true' "release comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "release comment output"
+  assert_contains "$out" '"run_generators": false' "release comment output"
+}
+
+# Regression guard: a CHANGELOG.md-only change is documentation (matched by the
+# *.md docs arm) and must stay skippable — docs_only / non_runtime_only true,
+# every run_* false. Release stamping touches CHANGELOG.md, so this keeps that
+# path from ever forcing CI.
+test_changelog_only_change_is_non_runtime_only() {
+  setup_repo
+  write_file_change "CHANGELOG.md" "## [Unreleased]"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": true' "changelog output"
+  assert_contains "$out" '"non_runtime_only": true' "changelog output"
+  assert_contains "$out" '"run_lint": false' "changelog output"
+  assert_contains "$out" '"run_ruby_tests": false' "changelog output"
+  assert_contains "$out" '"run_js_tests": false' "changelog output"
+  assert_contains "$out" '"run_generators": false' "changelog output"
+  assert_contains "$out" '"benchmarks_changed": false' "changelog output"
+}
+
 test_empty_diff_skips_everything() {
   setup_repo
   git commit --allow-empty -m "no file changes" >/dev/null
@@ -908,6 +1027,13 @@ test_empty_diff_skips_everything() {
 }
 
 run_test test_empty_diff_skips_everything
+run_test test_release_rake_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_finish_script_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_forward_port_script_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_forward_port_test_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint
+run_test test_changelog_only_change_is_non_runtime_only
 run_test test_docs_changes_are_non_runtime_only
 run_test test_internal_non_markdown_docs_are_non_runtime_only
 run_test test_issue_template_changes_are_non_runtime_only
