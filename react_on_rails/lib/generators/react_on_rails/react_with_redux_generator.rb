@@ -40,6 +40,13 @@ module ReactOnRails
                    default: false,
                    hide: true
 
+      def validate_standalone_tailwind
+        return unless unsupported_standalone_tailwind?
+
+        raise Thor::Error,
+              "The standalone react_on_rails:react_with_redux generator does not support --tailwind"
+      end
+
       def create_redux_directories
         component_dir = example_component_source_directory("HelloWorldApp")
 
@@ -134,6 +141,23 @@ module ReactOnRails
       end
 
       private
+
+      def unsupported_standalone_tailwind?
+        return false unless use_tailwind?
+        return false if options[:invoked_by_install]
+
+        GeneratorMessages.add_error(<<~MSG.strip)
+          🚫 The standalone react_on_rails:react_with_redux generator does not support --tailwind.
+
+          Tailwind setup requires the base React on Rails installer so it can create the
+          react_on_rails_tailwind pack, stylesheet, dependencies, and webpack/Rspack config.
+
+          Use the install generator for Redux + Tailwind setup:
+
+            rails generate react_on_rails:install --redux --tailwind
+        MSG
+        true
+      end
 
       def install_packages_with_fallback(packages, dev:, package_manager:)
         install_args = build_install_args(package_manager, dev, packages)

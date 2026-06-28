@@ -20,6 +20,7 @@ module GeneratorHelper
     \s*["']react_on_rails_tailwind["'][^\n]*%>(?:\r?\n[ \t]*)*
     ^[ \t]*<%=\s*javascript_pack_tag(?:
       \s*%> |
+      \s*\(\s*\)\s*%> |
       \s+(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:)[^\n]*%> |
       \(\s*(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:)[^\n]*\)\s*%>
     )

@@ -460,7 +460,7 @@ module ReactOnRails
         return unless File.exist?(controller_full_path)
 
         layout_name = extract_declared_layout_name(File.read(controller_full_path)) || inherited_application_layout_name
-        return if layout_name == File.basename(REACT_ON_RAILS_DEFAULT_LAYOUT_PATH, ".html.erb")
+        return if layout_name == File.basename(REACT_ON_RAILS_DEFAULT_LAYOUT_PATH, ".html.erb") && !options[:skip]
         return if layout_file_links_tailwind_pack?(layout_name)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -481,23 +481,31 @@ module ReactOnRails
       def ensure_generated_layout_head_tags(layout_path)
         layout_full_path = File.join(destination_root, layout_path)
         content = File.read(layout_full_path)
-        title_match = content.match(%r{^(?<indent>[ \t]*)<title>React on Rails</title>\r?\n})
-        csrf_match = content.match(CSRF_META_TAG_PATTERN)
-        viewport_tag = '<meta name="viewport" content="width=device-width,initial-scale=1">'
 
+        content = ensure_generated_layout_viewport_tag(layout_path, layout_full_path, content)
+        ensure_generated_layout_csp_tag(layout_path, content)
+      end
+
+      def ensure_generated_layout_viewport_tag(layout_path, layout_full_path, content)
         unless content.match?(/<meta\b[^>]*\bname=["']viewport["']/)
+          title_match = content.match(%r{^(?<indent>[ \t]*)<title>React on Rails</title>\r?\n})
+          csrf_match = content.match(CSRF_META_TAG_PATTERN)
+          viewport_tag = '<meta name="viewport" content="width=device-width,initial-scale=1">'
+
           if title_match
             insert_into_file(
               layout_path,
               %(#{title_match[:indent]}#{viewport_tag}\n),
               after: title_match[0]
             )
+            say_status :insert, "Added viewport meta to #{layout_path}", :green
           elsif csrf_match
             insert_into_file(
               layout_path,
               %(#{csrf_match[:indent]}#{viewport_tag}\n),
               before: csrf_match[0]
             )
+            say_status :insert, "Added viewport meta to #{layout_path}", :green
           else
             say_status(
               :warning,
@@ -510,6 +518,10 @@ module ReactOnRails
           content = File.read(layout_full_path) # Re-read after viewport insertion before checking CSP.
         end
 
+        content
+      end
+
+      def ensure_generated_layout_csp_tag(layout_path, content)
         csp_tag = "<%= csp_meta_tag %>"
         return if content.match?(/<%=\s*csp_meta_tag\s*%>/)
 
@@ -524,6 +536,7 @@ module ReactOnRails
         end
 
         insert_into_file(layout_path, %(#{csrf_match[:indent]}#{csp_tag}\n), after: csrf_match[0])
+        say_status :insert, "Added csp_meta_tag to #{layout_path}", :green
       end
 
       def warn_tailwind_layout_manual_step(layout_path, reason:)

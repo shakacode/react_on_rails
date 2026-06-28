@@ -993,6 +993,33 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "announces generated viewport and CSP tag insertions" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>React on Rails</title>
+            <%= csrf_meta_tags %>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      allow(base_generator).to receive(:say_status).and_call_original
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:insert, "Added viewport meta to #{layout_path}", :green)
+      expect(base_generator).to have_received(:say_status)
+        .with(:insert, "Added csp_meta_tag to #{layout_path}", :green)
+    end
+
     it "adds the generated viewport tag when only the default title was customized" do
       simulate_existing_layout("react_on_rails_default", <<~ERB)
         <!DOCTYPE html>
@@ -1419,6 +1446,34 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "skips Tailwind layouts that use an empty-parentheses JavaScript pack flush" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag() %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:skip, "#{layout_path} already links react_on_rails_tailwind", :yellow)
+      expect(base_generator).not_to have_received(:say)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
     it "warns instead of skipping Tailwind layouts without a JavaScript pack flush" do
       original_layout = <<~ERB
         <!DOCTYPE html>
@@ -1525,6 +1580,42 @@ describe InstallGenerator, type: :generator do
       assert_file layout_path do |content|
         expect(content).to eq(original_layout)
       end
+    end
+
+    it "warns when --skip leaves the existing HelloWorldController default layout without Tailwind tags" do
+      skip_generator = base_generator_fixture(tailwind: true, skip: true)
+      simulate_existing_file("app/controllers/application_controller.rb", <<~RUBY)
+        class ApplicationController < ActionController::Base
+          layout "react_on_rails_default"
+        end
+      RUBY
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          def index
+          end
+        end
+      RUBY
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag "application" %>
+            <%= javascript_pack_tag "application" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      GeneratorMessages.clear
+
+      skip_generator.send(:warn_existing_hello_world_tailwind_layout)
+
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include(
+        "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout."
+      )
+      expect(warning_text).to include("app/views/layouts/react_on_rails_default.html.erb")
     end
 
     it "warns when the existing HelloWorldController renders through a non-Tailwind layout" do
@@ -4539,6 +4630,30 @@ describe InstallGenerator, type: :generator do
         .with(:pretend, "Tailwind stylesheet would be linked from the React on Rails layout", :yellow)
 
       redux_generator.send(:copy_base_files)
+    end
+
+    it "rejects standalone Redux Tailwind setup instead of creating unstyled components" do
+      redux_generator = redux_generator_fixture(tailwind: true)
+      GeneratorMessages.clear
+
+      expect { redux_generator.validate_standalone_tailwind }
+        .to raise_error(Thor::Error, /react_with_redux generator does not support --tailwind/)
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include(
+        "standalone react_on_rails:react_with_redux generator does not support --tailwind"
+      )
+      expect(error_text).to include("rails generate react_on_rails:install --redux --tailwind")
+    end
+
+    it "allows Redux Tailwind setup when invoked by the install generator" do
+      redux_generator = redux_generator_fixture(tailwind: true, invoked_by_install: true)
+      GeneratorMessages.clear
+
+      expect { redux_generator.validate_standalone_tailwind }.not_to raise_error
+      expect(GeneratorMessages.messages.join("\n")).not_to include(
+        "standalone react_on_rails:react_with_redux generator does not support --tailwind"
+      )
     end
   end
 
