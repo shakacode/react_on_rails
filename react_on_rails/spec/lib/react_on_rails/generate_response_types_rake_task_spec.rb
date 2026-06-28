@@ -17,6 +17,7 @@ RSpec.describe "generate_response_types rake task" do
 
   after do
     ENV.delete("REACT_ON_RAILS_RESPONSE_TYPES_OUT")
+    Rake::Task.clear
   end
 
   it "generates response types with the default output path" do

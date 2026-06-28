@@ -3,6 +3,7 @@
 require "fileutils"
 require "json"
 require "pathname"
+require "react_on_rails/error"
 
 module ReactOnRails
   module TypeScriptResponseTypes
@@ -75,15 +76,35 @@ module ReactOnRails
         REGISTRY_MUTEX.synchronize { @registry ||= Registry.new }
       end
 
-      def suspicious_option_key_typos(keys)
-        keys.select do |key|
-          key_name = key.to_s
-          OPTION_KEYS.any? { |option_key| option_key_typo?(key_name, option_key.to_s) }
-        end
-      end
+      private
 
       def unsafe_raw_type_expression?(expression)
         expression.match?(RAW_TYPE_UNSAFE_PATTERN) || unsafe_raw_type_nesting?(expression)
+      end
+
+      def unsafe_raw_type_nesting?(expression)
+        expected_group_ends = []
+
+        expression.scan(RAW_TYPE_NESTING_TOKEN_PATTERN) do |token|
+          return true if token == "," && expected_group_ends.empty?
+
+          group_end = RAW_TYPE_GROUP_CLOSES[token]
+          if group_end
+            expected_group_ends << group_end
+            next
+          end
+
+          next if token == ">" && expected_group_ends.last != ">"
+          next unless RAW_TYPE_GROUP_ENDS.include?(token)
+
+          return true unless expected_group_ends.pop == token
+        end
+
+        expected_group_ends.any?
+      end
+
+      def wrapper_keys_for(normalized)
+        WRAPPER_TYPE_KEYS.select { |key| normalized.key?(key) }
       end
 
       def unrecognized_option_keys_with_unsupported_values(spec)
@@ -94,12 +115,6 @@ module ReactOnRails
           key
         end
       end
-
-      def wrapper_keys_for(normalized)
-        WRAPPER_TYPE_KEYS.select { |key| normalized.key?(key) }
-      end
-
-      private
 
       def plain_object_field_value?(value)
         value.is_a?(Array) || value.is_a?(Hash) || value.is_a?(String) || value.is_a?(Symbol)
@@ -150,65 +165,6 @@ module ReactOnRails
 
         path.exist? && path.realpath.to_s == real_root.to_s
       end
-
-      def option_key_typo?(key_name, option_key)
-        return false if key_name == "#{option_key}s" || option_key == "#{key_name}s"
-        return false unless (key_name.length - option_key.length).abs <= 1
-
-        single_edit_distance?(key_name, option_key)
-      end
-
-      def single_edit_distance?(left, right)
-        return true if left == right
-
-        left_index = 0
-        right_index = 0
-        edits = 0
-        while left_index < left.length && right_index < right.length
-          if left[left_index] == right[right_index]
-            left_index += 1
-            right_index += 1
-            next
-          end
-
-          edits += 1
-          return false if edits > 1
-
-          if left.length > right.length
-            left_index += 1
-          elsif right.length > left.length
-            right_index += 1
-          else
-            left_index += 1
-            right_index += 1
-          end
-        end
-
-        edits += (left.length - left_index) + (right.length - right_index)
-        edits == 1
-      end
-
-      def unsafe_raw_type_nesting?(expression)
-        expected_group_ends = []
-
-        expression.scan(RAW_TYPE_NESTING_TOKEN_PATTERN) do |token|
-          return true if token == "," && expected_group_ends.empty?
-
-          group_end = RAW_TYPE_GROUP_CLOSES[token]
-          if group_end
-            expected_group_ends << group_end
-            next
-          end
-
-          next if token == ">" && expected_group_ends.last != ">"
-
-          next unless RAW_TYPE_GROUP_ENDS.include?(token)
-
-          return true unless expected_group_ends.pop == token
-        end
-
-        expected_group_ends.any?
-      end
     end
 
     class Registry
@@ -227,7 +183,7 @@ module ReactOnRails
       end
 
       def define_response(response_key, type_name:, fields:)
-        key = response_key.to_s
+        key = response_key.to_s.strip
         validate_response_key!(key)
         name = normalize_type_name(type_name)
         validate_fields!(fields)
@@ -395,7 +351,7 @@ module ReactOnRails
         end
 
         raw_expression = type.strip
-        if TypeScriptResponseTypes.unsafe_raw_type_expression?(raw_expression)
+        if TypeScriptResponseTypes.__send__(:unsafe_raw_type_expression?, raw_expression)
           raise ReactOnRails::Error, "Raw TypeScript type specs must be safe single-line type expressions"
         end
 
@@ -436,7 +392,7 @@ module ReactOnRails
         return false unless spec.is_a?(Hash)
 
         normalized ||= normalize_option_hash(spec)
-        wrapper_keys = TypeScriptResponseTypes.wrapper_keys_for(normalized)
+        wrapper_keys = TypeScriptResponseTypes.__send__(:wrapper_keys_for, normalized)
 
         if normalized.length != spec.length
           validate_wrapper_option_keys!(spec, wrapper_keys)
@@ -452,7 +408,8 @@ module ReactOnRails
       def validate_wrapper_option_keys!(spec, wrapper_keys)
         return if wrapper_keys.empty?
 
-        unrecognized_keys = TypeScriptResponseTypes.unrecognized_option_keys_with_unsupported_values(spec)
+        unrecognized_keys =
+          TypeScriptResponseTypes.__send__(:unrecognized_option_keys_with_unsupported_values, spec)
         return if unrecognized_keys.empty?
 
         raise ReactOnRails::Error,

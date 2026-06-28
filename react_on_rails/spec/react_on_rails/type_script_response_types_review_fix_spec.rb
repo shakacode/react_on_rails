@@ -228,4 +228,13 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
     expect(declaration).not_to include("export type RailsResponseTypeName")
     expect(declaration).not_to include("export type RailsResponseType<")
   end
+
+  it "trims response keys before storing them" do
+    described_class.define_response(" projects.index ", type_name: "ProjectsIndexResponse", fields: {})
+
+    declaration = described_class.to_d_ts
+
+    expect(declaration).to include('  "projects.index": ProjectsIndexResponse;')
+    expect(declaration).not_to include('" projects.index "')
+  end
 end
