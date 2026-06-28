@@ -24,6 +24,7 @@ module ReactOnRails
       public
       readonly return satisfies static string super switch symbol this throw true try type typeof undefined unique
       unknown using var void while with yield
+      Array Date Promise ReadonlyArray Record
     ].freeze
     GENERATED_TYPE_NAMES = %w[
       JsonValue RailsResponseTypes RailsResponseTypeName RailsResponseType

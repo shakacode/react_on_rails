@@ -120,6 +120,14 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
     end.to raise_error(ReactOnRails::Error, /Unknown scalar response type alias: :String/)
   end
 
+  it "reserves TypeScript globals commonly used in raw type specs" do
+    %w[Array Date Promise ReadonlyArray Record].each do |type_name|
+      expect do
+        described_class.define_type(type_name, fields: {})
+      end.to raise_error(ReactOnRails::Error, /reserved/)
+    end
+  end
+
   it "parenthesizes raw composite array members before appending array brackets" do
     described_class.define_response(
       "events.show",
