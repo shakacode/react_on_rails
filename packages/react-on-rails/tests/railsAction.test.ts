@@ -166,9 +166,9 @@ describe('createRailsAction', () => {
     expect(headerValue(init.headers, 'Content-Type')).toBeNull();
   });
 
-  it('warns in development when a DELETE body callback returns a discarded body', async () => {
+  it('warns once and omits the JSON body when a DELETE action has a body option', async () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
+    fetchMock.mockResolvedValue(mockResponse({ status: 204 }));
 
     try {
       const deleteProject = createRailsAction<{ id: number; reason: string }, null>({
@@ -177,37 +177,37 @@ describe('createRailsAction', () => {
         body: ({ reason }) => ({ reason }),
       });
 
+      expect(consoleWarn).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE request but will not be sent'),
+      );
+
       await expect(deleteProject({ id: 7, reason: 'spam' })).resolves.toBeNull();
+      await expect(deleteProject({ id: 8, reason: 'spam' })).resolves.toBeNull();
 
       const [, init] = fetchMock.mock.calls[0];
       expect(init.body).toBeUndefined();
       expect(headerValue(init.headers, 'Content-Type')).toBeNull();
-      expect(consoleWarn).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE request but will not be sent'),
-      );
+      expect(consoleWarn).toHaveBeenCalledTimes(1);
     } finally {
       consoleWarn.mockRestore();
     }
   });
 
-  it('warns in development when a DELETE action is created with a body option', async () => {
+  it('warns before fetch when a DELETE action is created with a body option', () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
 
     try {
-      const deleteProject = createRailsAction<{ id: number }, null>({
+      createRailsAction<{ id: number }, null>({
         method: 'DELETE',
         path: ({ id }) => `/api/projects/${id}`,
         body: () => null,
       });
 
-      await expect(deleteProject({ id: 7 })).resolves.toBeNull();
-
-      const [, init] = fetchMock.mock.calls[0];
-      expect(init.body).toBeUndefined();
       expect(consoleWarn).toHaveBeenCalledWith(
         expect.stringContaining('DELETE request but will not be sent'),
       );
+      expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       consoleWarn.mockRestore();
     }

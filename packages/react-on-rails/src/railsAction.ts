@@ -151,6 +151,8 @@ const assertBrowserContext = (): void => {
  * The returned function is directly usable as a TanStack Query `mutationFn`.
  * It always requests JSON, rejects browser-followed redirects, and resolves 204 or non-JSON success
  * responses as `null`. Include `null` in `TResponse` when a successful empty response is expected.
+ * `options.headers` can override the default `Accept: application/json`; include `null` in `TResponse`
+ * when that custom Accept header may produce a successful non-JSON response.
  * Omitting `body` sends `variables` as the JSON body verbatim; supply `body` to map or filter fields before
  * serialization.
  * When `variables` only populate `path`, supply `body: () => null` or a mapper to avoid forwarding them.
@@ -161,6 +163,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
   options: RailsActionOptions<TVariables>,
 ): RailsActionCaller<TVariables, TResponse> {
   const method = (options.method ?? 'POST').toUpperCase();
+  warnOnDiscardedDeleteBody(method, options.body);
 
   const callRailsAction = async (
     variables?: TVariables,
@@ -184,7 +187,6 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
 
     const requestBody = options.body !== undefined ? options.body(typedVariables) : variables;
     const hasJsonBody = method !== 'DELETE' && requestBody !== undefined && requestBody !== null;
-    warnOnDiscardedDeleteBody(method, options.body);
     let response: Response;
     try {
       response = await fetch(requestUrl, {
@@ -207,6 +209,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     }
 
     if (!response.ok) {
+      // Keep this clone before any error-body reads so callers can still inspect the original response body.
       const responseBody = await parseJsonBody(response.clone());
       throw new RailsActionRequestError(response, responseBody);
     }
