@@ -159,6 +159,13 @@ Portable shared skills resolve this repo's commands and policy through:
   (base branch, hosted-CI trigger, benchmark labels, changelog, merge ledger, review
   gate, secret redaction, coordination backend, and other non-command keys).
 
+Compatibility for older repo-local skills that still name the former inline keys:
+
+- **Tests** → `.agents/bin/test`
+- **Pre-push local validation** → `.agents/bin/validate`
+- **CI change detector** → `.agents/bin/ci-detect`
+- **Follow-up issue prefix** → `.agents/agent-workflow.yml` key `follow_up_prefix`
+
 The shared source lives at
 [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows); see
 [`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
