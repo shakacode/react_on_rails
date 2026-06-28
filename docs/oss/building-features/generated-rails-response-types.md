@@ -131,6 +131,73 @@ const projectsQuery = useQuery({
 The key string in `RailsResponseTypes` is intentionally independent of the route path. Use a stable
 controller/action-style name such as `projects.index` so later route changes do not churn client types.
 
+## Use With Typed Rails Actions
+
+For mutations, pair the generated response lookup with the CSRF-aware caller from
+`react-on-rails/railsAction`. The helper does not generate routes or validate payloads at runtime; Rails
+still owns the route, strong parameters, authorization, and JSON rendering. The generated type only
+connects the client call site to the response contract you declared in Rails:
+
+```ruby
+ReactOnRails::TypeScriptResponseTypes.define_response(
+  "projects.create",
+  type_name: "ProjectsCreateResponse",
+  fields: {
+    project: "Project"
+  }
+)
+```
+
+```tsx
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { createRailsAction, RailsActionRequestError } from 'react-on-rails/railsAction';
+import type { RailsResponseType } from '../generated/react_on_rails_response_types';
+
+type ProjectFormValues = {
+  name: string;
+  status: string;
+};
+
+type CreateProjectVariables = {
+  project: ProjectFormValues;
+};
+
+type CreateProjectResponse = RailsResponseType<'projects.create'>;
+
+const createProject = createRailsAction<CreateProjectVariables, CreateProjectResponse>({
+  path: '/api/projects',
+});
+
+function NewProjectButton() {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: createProject,
+    onSuccess: ({ project }) => {
+      queryClient.setQueryData(['project', String(project.id)], { project });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (error) => {
+      if (error instanceof RailsActionRequestError && error.response.status === 422) {
+        // Map your app's validation-error JSON into form state here.
+      }
+    },
+  });
+
+  return <button onClick={() => mutation.mutate({ project: { name: 'Apollo', status: 'active' } })}>Create</button>;
+}
+```
+
+Use `body` when the Rails endpoint expects a wrapper that differs from the variables passed to
+`mutation.mutate`, and use a `path` function for member actions:
+
+```ts
+const archiveProject = createRailsAction<{ id: number }, RailsResponseType<'projects.archive'>>({
+  method: 'PATCH',
+  path: ({ id }) => `/api/projects/${id}/archive`,
+  body: () => ({}),
+});
+```
+
 ## Supported Field Specs
 
 | Rails contract spec                  | TypeScript output                 |
@@ -173,8 +240,9 @@ fields: {
 ## Boundary
 
 This task generates TypeScript declarations only. It does not validate payloads at runtime, infer schema
-from serializers, create routes, or generate a client caller. Serializer adapters and typed mutation/RPC
-helpers can build on the same `RailsResponseTypes` map later without changing the generated type shape.
+from serializers, create routes, or generate route-specific callers. The optional
+`react-on-rails/railsAction` helper builds on the same `RailsResponseTypes` map by letting the client
+choose `RailsResponseType<'projects.create'>` for the response generic.
 
 ## Related
 

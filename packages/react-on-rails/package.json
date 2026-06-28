@@ -38,6 +38,7 @@
     "./pageLifecycle": "./lib/pageLifecycle.js",
     "./createReactOutput": "./lib/createReactOutput.js",
     "./isServerRenderResult": "./lib/isServerRenderResult.js",
+    "./railsAction": "./lib/railsAction.js",
     "./reactApis": "./lib/reactApis.cjs",
     "./webpackHelpers": "./lib/webpackHelpers.cjs",
     "./reactHydrateOrRender": "./lib/reactHydrateOrRender.js",

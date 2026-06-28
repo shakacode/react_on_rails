@@ -196,6 +196,42 @@ const mutation = useMutation({
 });
 ```
 
+If your app generates Rails response types with
+`react_on_rails:generate_response_types`, use the package's thin Rails action caller so the mutation
+response stays tied to the Rails-side contract:
+
+```tsx
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { createRailsAction } from 'react-on-rails/railsAction';
+import type { RailsResponseType } from '../generated/react_on_rails_response_types';
+
+type ProjectFormValues = {
+  name: string;
+  status: string;
+};
+
+const createProject = createRailsAction<{ project: ProjectFormValues }, RailsResponseType<'projects.create'>>(
+  {
+    path: api.projectsPath,
+  },
+);
+
+const queryClient = useQueryClient();
+
+const mutation = useMutation({
+  mutationFn: createProject,
+  onSuccess: ({ project }) => {
+    queryClient.setQueryData(['project', String(project.id)], { project });
+    queryClient.invalidateQueries({ queryKey: ['projects'] });
+    queryClient.invalidateQueries({ queryKey: ['metrics'] });
+  },
+});
+```
+
+`createRailsAction` uses the same same-origin, JSON, and CSRF assumptions as the starter's `apiFetch`
+pattern, but returns a standalone function that drops directly into `useMutation`. It does not replace
+Rails routes, strong parameters, authorization, or runtime response validation.
+
 This is cleaner than threading "reload this section" callbacks through many components: the cache is the single place that knows what is stale.
 
 ## TanStack Query and React Server Components
