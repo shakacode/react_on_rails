@@ -1,0 +1,30 @@
+module ReactOnRails
+  module TypeScriptResponseTypes
+    DEFAULT_OUTPUT_PATH: String
+    GENERATED_HEADER: String
+    IDENTIFIER_PATTERN: Regexp
+    OPTION_KEYS: Array[Symbol]
+    SCALAR_TYPES: Hash[Symbol, String]
+
+    def self.define_type: (untyped type_name, fields: Hash[untyped, untyped]) -> untyped
+    def self.define_response: (untyped response_key, type_name: untyped, fields: Hash[untyped, untyped]) -> untyped
+    def self.generate: (?output_path: String?) -> String
+    def self.to_d_ts: () -> String
+    def self.reset!: () -> Registry
+    def self.registry: () -> Registry
+
+    class Registry
+      attr_reader types: Array[untyped]
+      attr_reader responses: Array[untyped]
+
+      def initialize: () -> void
+      def define_type: (untyped type_name, fields: Hash[untyped, untyped]) -> void
+      def define_response: (untyped response_key, type_name: untyped, fields: Hash[untyped, untyped]) -> void
+    end
+
+    class Emitter
+      def initialize: (Registry registry) -> void
+      def to_d_ts: () -> String
+    end
+  end
+end
