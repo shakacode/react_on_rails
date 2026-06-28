@@ -128,6 +128,26 @@ flowchart TD
 
 Do this when maintainers decide `main` is feature-complete for the target and want to start stabilizing.
 
+Starting a release line is two steps with a CI run between them — cutting the branch and tagging rc.0
+**cannot** be one command. The release CI gate evaluates the branch tip, and a freshly pushed
+`release/X.Y.Z` has no checks yet (`no_checks`), so you create + push the branch, wait for CI, then
+cut rc.0.
+
+**Step 1a — create and push the release branch.** From `main`, run:
+
+```bash
+git checkout main && git pull --rebase
+bundle exec rake "release:start[17.0.0]"   # create + push release/17.0.0 from origin/main, then stop for CI
+```
+
+`release:start` fetches `origin`, refuses if `release/17.0.0` already exists (local or remote), creates
+the branch from `origin/main`, pushes it, and prints the next steps. With no version argument it derives
+the release line from the top `### [X.Y.Z.rc.N]` CHANGELOG.md header. Pass the **stable base**
+(`17.0.0`), never `17.0.0.rc.0` — the rc index lives in the changelog, not the branch name. Add a
+second `true` argument for a dry run (`rake "release:start[17.0.0,true]"`).
+
+If you prefer to do it by hand, the equivalent is:
+
 ```bash
 git fetch origin
 # Cut from the exact main commit you intend to stabilize.
@@ -135,13 +155,20 @@ git checkout -b release/17.0.0 origin/main
 git push -u origin release/17.0.0
 ```
 
-Then tag and publish the first RC from the release branch, following the mechanical steps in
-[`releasing.md`](releasing.md):
+**Step 1b — cut rc.0 from the branch.** After at least one CI run finishes on the `release/17.0.0` tip,
+ensure the rc changelog header is present (`/update-changelog rc` on the branch), then cut rc.0 with a
+bare release — the version is read from CHANGELOG.md, so you do **not** pass `17.0.0.rc.0`:
 
 ```bash
-# On release/17.0.0. Update CHANGELOG.md for the rc, then:
-bundle exec rake "release[17.0.0.rc.0]"   # bumps version.rb, tags v17.0.0.rc.0, publishes
+# On release/17.0.0, with CHANGELOG.md stamped ### [17.0.0.rc.0]:
+bundle exec rake release   # reads 17.0.0.rc.0 from CHANGELOG.md, bumps version.rb, tags v17.0.0.rc.0, publishes
 ```
+
+**Forgot to start the line first?** If you run `bundle exec rake release` for an rc while still on
+`main` and `release/X.Y.Z` does not exist yet, the release task **offers to start the release line for
+you** (`Start the 17.0.0 release line now? [y/N]`); accepting runs the same `release:start` logic and
+stops before tagging. If `release/X.Y.Z` already exists, the task stops and tells you to
+`git checkout release/X.Y.Z` and re-run — this guards against tagging an rc off a drifted `main`.
 
 > **The release task's CI gate evaluates the branch you release from.** `rakelib/release.rake` runs
 > `validate_main_ci_status!`, which now fetches and evaluates the tip of the branch the release is cut

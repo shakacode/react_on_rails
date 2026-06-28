@@ -512,6 +512,171 @@ def same_release_base?(first_version, second_version)
   end
 end
 
+# True only for `rc` prereleases (e.g. 17.0.0.rc.0). beta/alpha/pre/test and
+# stable versions are false. Used to gate the `release start` auto-offer to the
+# rc-cut path the release train cares about.
+def rc_prerelease_version?(gem_version)
+  parse_gem_version_components(gem_version)[:prerelease_type] == "rc"
+end
+
+# Whether `branch` exists either locally or on `origin`. The remote check mirrors
+# the abort-on-unexpected-git-error contract of `remote_git_tag_exists?` so a
+# transient transport failure is never silently treated as "branch absent" — that
+# would let `release start` create a branch that already exists.
+#
+# The two git commands signal "absent" differently:
+# - `git rev-parse --verify --quiet refs/heads/<b>` exits 1 (not 2) for a
+#   well-formed missing ref; `--quiet` exists precisely to collapse that into a
+#   clean non-success, so (as in `peeled_git_tag_sha`) any non-success local
+#   result means "not a local branch" and falls through to the remote check.
+# - `git ls-remote --exit-code --heads origin refs/heads/<b>` exits 2 for "no
+#   matching refs" and 0 for a hit; any other status (e.g. 128 transport error)
+#   is a real failure and aborts.
+def local_or_remote_branch_exists?(monorepo_root:, branch:)
+  _local_output, local_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/heads/#{branch}"
+  )
+  return true if local_status.success?
+
+  remote_output, remote_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/#{branch}"
+  )
+  return true if remote_status.success?
+  return false if remote_status.exitstatus == 2
+
+  abort_unexpected_branch_existence_error!(branch:, details: remote_output)
+end
+
+def abort_unexpected_branch_existence_error!(branch:, details: nil)
+  message = "❌ Unable to verify whether branch #{branch.inspect} exists before starting the release line."
+  message += "\n\n#{details.strip}" if details && !details.strip.empty?
+  abort message
+end
+
+# Shared by `rake "release:start"` and the in-`rake release` offer: create and
+# publish the `release/X.Y.Z` line off `origin/main`, then stop so CI can run on
+# the fresh branch tip before rc.0 is cut. Cut + tag-rc.0 cannot be one atomic
+# command — the release CI gate evaluates the branch tip, and a just-pushed
+# branch has no checks yet. See internal/contributor-info/release-train-runbook.md.
+def start_release_line!(monorepo_root:, release_branch:, dry_run:)
+  if dry_run
+    puts "ℹ️ DRY RUN: would create #{release_branch} from origin/main, push, and stop for CI"
+    return
+  end
+
+  sh_in_dir_for_release(monorepo_root, "git fetch origin")
+
+  if local_or_remote_branch_exists?(monorepo_root:, branch: release_branch)
+    abort release_branch_already_exists_message(release_branch:)
+  end
+
+  sh_in_dir_for_release(monorepo_root, "git checkout -b #{release_branch} origin/main")
+  sh_in_dir_for_release(monorepo_root, "git push -u origin #{release_branch}")
+
+  puts release_line_started_next_steps(release_branch:)
+end
+
+def release_branch_already_exists_message(release_branch:)
+  <<~MESSAGE.chomp
+    ❌ #{release_branch} already exists.
+
+    Continue the existing release line instead of starting a new one:
+      git checkout #{release_branch} && bundle exec rake release
+  MESSAGE
+end
+
+def release_line_started_next_steps(release_branch:)
+  <<~MESSAGE.chomp
+
+    ✅ Started #{release_branch} (created from origin/main and pushed).
+
+    Next steps:
+      1. Wait for at least one CI run to finish on the #{release_branch} tip
+         (the release gate evaluates the branch tip; a just-pushed branch has no checks yet).
+      2. Ensure the rc changelog header is present on the branch: /update-changelog rc
+      3. Cut rc.0 from the branch: bundle exec rake release
+         (the version is read from CHANGELOG.md).
+  MESSAGE
+end
+
+# Manual recipe printed when the offer cannot run interactively (non-TTY) — the
+# operator runs these two commands themselves, then re-runs `rake release`.
+def release_branch_manual_cut_recipe(release_branch:)
+  <<~MESSAGE.chomp
+    git checkout -b #{release_branch} origin/main
+    git push -u origin #{release_branch}
+  MESSAGE
+end
+
+# The main-only / rc-only decision matrix for the in-`rake release` offer. A
+# no-op unless we are on `main` cutting an `rc` — feature-branch prerelease cuts
+# (the existing escape hatch) and rc.1+ cut from the release branch are
+# untouched. When it does fire it either creates the release line (after a
+# prompt) and exits before any tagging, or aborts with guidance.
+def maybe_offer_release_branch_cut!(monorepo_root:, current_branch:, target_gem_version:, dry_run:)
+  return unless current_branch == "main"
+  return unless rc_prerelease_version?(target_gem_version)
+
+  release_branch = "release/#{release_base_version(target_gem_version)}"
+
+  case release_branch_cut_offer_decision(monorepo_root:, release_branch:, dry_run:)
+  when :dry_run
+    puts "ℹ️ DRY RUN: would offer to create #{release_branch} from origin/main and stop for CI " \
+         "(rc cut detected on main)."
+  when :branch_exists
+    handle_release_branch_cut_offer_branch_exists!(release_branch:, dry_run:)
+  when :non_interactive
+    abort release_branch_cut_offer_non_interactive_message(release_branch:)
+  when :prompt
+    prompt_and_start_release_line!(monorepo_root:, release_branch:)
+  end
+end
+
+# Pure decision step so the matrix is unit-testable without exit/abort/prompt
+# side effects. Dry-run wins first (it must never touch git beyond existence),
+# then the existence guard, then the TTY check, else prompt.
+def release_branch_cut_offer_decision(monorepo_root:, release_branch:, dry_run:)
+  return :dry_run if dry_run
+  return :branch_exists if local_or_remote_branch_exists?(monorepo_root:, branch: release_branch)
+  return :non_interactive unless $stdin.tty?
+
+  :prompt
+end
+
+def handle_release_branch_cut_offer_branch_exists!(release_branch:, dry_run:)
+  message = release_branch_already_exists_message(release_branch:)
+  if dry_run
+    puts "⚠️ DRY RUN: #{message.sub(/\A❌\s*/, '')}"
+    return
+  end
+
+  abort message
+end
+
+def release_branch_cut_offer_non_interactive_message(release_branch:)
+  <<~MESSAGE.chomp
+    ❌ Refusing to auto-create #{release_branch} without a terminal (non-interactive shell).
+
+    Start the release line manually, then re-run the release:
+    #{release_branch_manual_cut_recipe(release_branch:)}
+  MESSAGE
+end
+
+def prompt_and_start_release_line!(monorepo_root:, release_branch:)
+  base_version = release_branch.delete_prefix("release/")
+  print "Start the #{base_version} release line now? [y/N]: "
+  $stdout.flush
+  answer = $stdin.gets&.strip&.downcase
+
+  unless answer == "y"
+    abort "Release aborted. No release branch was created. " \
+          "Re-run when you are ready to start the #{base_version} release line."
+  end
+
+  start_release_line!(monorepo_root:, release_branch:, dry_run: false)
+  exit 0
+end
+
 def peeled_git_tag_sha(monorepo_root:, tag:)
   tag_output, tag_status = Open3.capture2e(
     "git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/#{tag}^{}"
@@ -2686,6 +2851,18 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     resolved_target_npm_version = version_converter.rubygem_to_npm(resolved_target_gem_version)
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
 
+    # When cutting an rc from `main` and `release/X.Y.Z` does not yet exist, offer
+    # to start the release line here instead of tagging the rc off `main`. If the
+    # operator accepts (or the branch already exists), this exits before any
+    # tagging. `release_root == monorepo_root` in normal mode, so the offer
+    # operates on the real repo; `main` was already refreshed by `git pull --rebase`.
+    maybe_offer_release_branch_cut!(
+      monorepo_root: release_root,
+      current_branch:,
+      target_gem_version: resolved_target_gem_version,
+      dry_run: is_dry_run
+    )
+
     ensure_release_branch_matches_target_base!(
       current_branch:,
       target_gem_version: resolved_target_gem_version
@@ -3058,5 +3235,90 @@ task :sync_github_release, %i[gem_version dry_run] do |_t, args|
   verify_gh_auth(monorepo_root:)
   release_context = prepare_github_release_context(monorepo_root:, gem_version: requested_gem_version)
   publish_or_update_github_release(monorepo_root:, release_context:, dry_run: is_dry_run)
+end
+# rubocop:enable Metrics/BlockLength
+
+# Resolve the base `X.Y.Z` for `rake "release:start"`. An explicit arg is the
+# branch base and must be a strict stable version (rc/prerelease forms are
+# rejected — the rc index belongs in the changelog, not the branch name). With no
+# arg, derive the base from the top changelog header when it is an `X.Y.Z.rc.N`
+# rc; otherwise abort asking for an explicit `X.Y.Z`.
+def resolve_release_start_base_version(version_arg, monorepo_root:)
+  requested = version_arg.to_s.strip
+  unless requested.empty?
+    unless requested.match?(/\A\d+\.\d+\.\d+\z/)
+      abort <<~ERROR
+        ❌ Invalid release line version: #{requested.inspect}
+
+        Pass the stable base of the release line as X.Y.Z (e.g. 17.0.0). The rc
+        index lives in CHANGELOG.md, not the branch name — do not pass 17.0.0.rc.0.
+      ERROR
+    end
+    return requested
+  end
+
+  changelog_version = extract_latest_changelog_version(monorepo_root:)
+  if changelog_version && rc_prerelease_version?(changelog_version)
+    base = release_base_version(changelog_version)
+    puts "ℹ️ Derived release line #{base} from the top CHANGELOG.md header (#{changelog_version})."
+    return base
+  end
+
+  abort <<~ERROR
+    ❌ Could not determine which release line to start.
+
+    The top CHANGELOG.md header is not an rc (found: #{changelog_version || 'none'}).
+    Pass the release line explicitly: bundle exec rake "release:start[17.0.0]"
+  ERROR
+end
+
+# rubocop:disable Metrics/BlockLength
+namespace :release do
+  desc("Start a release line: create + push release/X.Y.Z from origin/main, then stop for CI.
+
+Cuts the ephemeral release branch the release train stabilizes on. It does NOT tag rc.0 — the
+release CI gate evaluates the branch tip and a just-pushed branch has no checks yet, so creating
+the branch and cutting rc.0 must be two steps with a CI run between them. After CI runs on the new
+branch tip, run `bundle exec rake release` to cut rc.0 (version read from CHANGELOG.md).
+
+Arguments:
+1st argument: Release line base version X.Y.Z (optional). When omitted, derived from the top
+              CHANGELOG.md rc header. Pass the stable base (17.0.0), never 17.0.0.rc.0.
+2nd argument: Dry run (true/false, default: false)
+
+Examples:
+  rake \"release:start[17.0.0]\"        # create + push release/17.0.0 from origin/main
+  rake release:start                   # derive the release line from CHANGELOG.md
+  rake \"release:start[17.0.0,true]\"   # dry run (create nothing)")
+  task :start, %i[version dry_run] do |_t, args|
+    monorepo_root = current_monorepo_root
+    args_hash = args.to_hash
+    is_dry_run = release_truthy?(args_hash[:dry_run])
+
+    current_branch_output, current_branch_status = Open3.capture2e(
+      "git", "-C", monorepo_root, "rev-parse", "--abbrev-ref", "HEAD"
+    )
+    abort "❌ Failed to determine current git branch.\n\n#{current_branch_output}" unless current_branch_status.success?
+    current_branch = current_branch_output.strip
+
+    unless current_branch == "main"
+      abort <<~ERROR
+        ❌ Release lines are cut from `main` (the branch is created from origin/main).
+
+        Current branch: #{current_branch}
+
+        Switch to main first:
+          git checkout main && git pull --rebase
+      ERROR
+    end
+
+    # Reuse the standard uncommitted-changes guard (raises with guidance when dirty).
+    ReactOnRails::GitUtils.uncommitted_changes?(RaisingMessageHandler.new)
+
+    base_version = resolve_release_start_base_version(args_hash.fetch(:version, ""), monorepo_root:)
+    release_branch = "release/#{base_version}"
+
+    start_release_line!(monorepo_root:, release_branch:, dry_run: is_dry_run)
+  end
 end
 # rubocop:enable Metrics/BlockLength

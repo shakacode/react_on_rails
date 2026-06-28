@@ -3783,4 +3783,299 @@ RSpec.describe "release.rake helper methods" do
       expect(release_ci_branch("jg/some-fix")).to eq("main")
     end
   end
+
+  describe "#rc_prerelease_version?" do
+    it "is true for rc prereleases" do
+      expect(rc_prerelease_version?("17.0.0.rc.0")).to be true
+      expect(rc_prerelease_version?("17.0.0.rc.3")).to be true
+    end
+
+    it "is false for non-rc prereleases" do
+      expect(rc_prerelease_version?("17.0.0.beta.1")).to be false
+      expect(rc_prerelease_version?("17.0.0.alpha.2")).to be false
+      expect(rc_prerelease_version?("17.0.0.pre.1")).to be false
+    end
+
+    it "is false for stable versions" do
+      expect(rc_prerelease_version?("17.0.0")).to be false
+    end
+  end
+
+  describe "#local_or_remote_branch_exists?" do
+    def git!(dir, *args)
+      _output, status = Open3.capture2e("git", "-C", dir, *args)
+      raise "git #{args.join(' ')} failed" unless status.success?
+    end
+
+    def init_repo_with_commit(dir)
+      git!(dir, "init", "--quiet")
+      git!(dir, "config", "user.email", "test@example.com")
+      git!(dir, "config", "user.name", "Test")
+      git!(dir, "config", "commit.gpgsign", "false")
+      File.write(File.join(dir, "README.md"), "seed\n")
+      git!(dir, "add", "-A")
+      git!(dir, "commit", "--quiet", "-m", "seed")
+    end
+
+    it "returns true when the branch exists locally" do
+      Dir.mktmpdir do |dir|
+        init_repo_with_commit(dir)
+        git!(dir, "branch", "release/17.0.0")
+
+        expect(local_or_remote_branch_exists?(monorepo_root: dir, branch: "release/17.0.0")).to be true
+      end
+    end
+
+    it "returns true when the branch exists only on origin" do
+      Dir.mktmpdir do |remote_dir|
+        Dir.mktmpdir do |local_dir|
+          init_repo_with_commit(remote_dir)
+          git!(remote_dir, "branch", "release/17.0.0")
+
+          git!(local_dir, "init", "--quiet")
+          git!(local_dir, "remote", "add", "origin", remote_dir)
+          git!(local_dir, "fetch", "--quiet", "origin")
+
+          # The release branch is not a local head here, only on origin.
+          expect(local_or_remote_branch_exists?(monorepo_root: local_dir, branch: "release/17.0.0")).to be true
+        end
+      end
+    end
+
+    it "returns false when the branch exists neither locally nor on origin" do
+      Dir.mktmpdir do |remote_dir|
+        Dir.mktmpdir do |local_dir|
+          init_repo_with_commit(remote_dir)
+
+          git!(local_dir, "init", "--quiet")
+          git!(local_dir, "remote", "add", "origin", remote_dir)
+          git!(local_dir, "fetch", "--quiet", "origin")
+
+          expect(local_or_remote_branch_exists?(monorepo_root: local_dir, branch: "release/17.0.0")).to be false
+        end
+      end
+    end
+
+    it "treats a non-success local rev-parse (exit 1 = absent ref) as 'not local' and checks origin" do
+      # `git rev-parse --verify --quiet` exits 1 for a well-formed missing ref, so
+      # a non-success local result must fall through to the remote check, not abort.
+      absent_local_status = instance_double(Process::Status, success?: false, exitstatus: 1)
+      remote_hit_status = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/heads/release/17.0.0")
+        .and_return(["", absent_local_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/release/17.0.0")
+        .and_return(["abc123\trefs/heads/release/17.0.0", remote_hit_status])
+
+      expect(local_or_remote_branch_exists?(monorepo_root: "/tmp/repo", branch: "release/17.0.0")).to be true
+    end
+
+    it "aborts when the remote git check fails with an unexpected status" do
+      absent_local_status = instance_double(Process::Status, success?: false, exitstatus: 1)
+      unexpected_remote_status = instance_double(Process::Status, success?: false, exitstatus: 128)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/heads/release/17.0.0")
+        .and_return(["", absent_local_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/release/17.0.0")
+        .and_return(["fatal: unable to connect to origin", unexpected_remote_status])
+
+      expect do
+        local_or_remote_branch_exists?(monorepo_root: "/tmp/repo", branch: "release/17.0.0")
+      end.to raise_error(SystemExit, %r{Unable to verify whether branch "release/17.0.0" exists})
+    end
+  end
+
+  describe "#maybe_offer_release_branch_cut!" do
+    it "offers (prompts and creates) for an rc cut on main when the branch is missing" do
+      allow(self).to receive(:local_or_remote_branch_exists?)
+        .with(monorepo_root: "/tmp/repo", branch: "release/17.0.0")
+        .and_return(false)
+      allow($stdin).to receive_messages(tty?: true, gets: "y\n")
+      allow(self).to receive(:start_release_line!)
+
+      # On acceptance the offer runs the shared start helper and then `exit 0`
+      # before any tagging; `exit 0` raises a catchable SystemExit.
+      expect do
+        expect do
+          maybe_offer_release_branch_cut!(
+            monorepo_root: "/tmp/repo",
+            current_branch: "main",
+            target_gem_version: "17.0.0.rc.0",
+            dry_run: false
+          )
+        end.to raise_error(SystemExit) { |error| expect(error.status).to eq(0) }
+      end.to output(%r{Start the 17.0.0 release line now\? \[y/N\]}).to_stdout
+
+      expect(self).to have_received(:start_release_line!)
+        .with(monorepo_root: "/tmp/repo", release_branch: "release/17.0.0", dry_run: false)
+    end
+
+    it "aborts without creating anything when the operator declines the prompt" do
+      allow(self).to receive(:local_or_remote_branch_exists?)
+        .with(monorepo_root: "/tmp/repo", branch: "release/17.0.0")
+        .and_return(false)
+      allow($stdin).to receive_messages(tty?: true, gets: "n\n")
+      expect(self).not_to receive(:start_release_line!)
+
+      expect do
+        maybe_offer_release_branch_cut!(
+          monorepo_root: "/tmp/repo",
+          current_branch: "main",
+          target_gem_version: "17.0.0.rc.0",
+          dry_run: false
+        )
+      end.to raise_error(SystemExit, /No release branch was created/)
+    end
+
+    it "stops with the checkout-and-re-run guard when the release branch already exists" do
+      allow(self).to receive(:local_or_remote_branch_exists?)
+        .with(monorepo_root: "/tmp/repo", branch: "release/17.0.0")
+        .and_return(true)
+      expect(self).not_to receive(:start_release_line!)
+
+      expect do
+        maybe_offer_release_branch_cut!(
+          monorepo_root: "/tmp/repo",
+          current_branch: "main",
+          target_gem_version: "17.0.0.rc.0",
+          dry_run: false
+        )
+      end.to raise_error(SystemExit, %r{release/17.0.0 already exists.*git checkout release/17.0.0}m)
+    end
+
+    it "aborts with the manual recipe when stdin is not a TTY" do
+      allow(self).to receive(:local_or_remote_branch_exists?)
+        .with(monorepo_root: "/tmp/repo", branch: "release/17.0.0")
+        .and_return(false)
+      allow($stdin).to receive(:tty?).and_return(false)
+      expect(self).not_to receive(:start_release_line!)
+
+      expect do
+        maybe_offer_release_branch_cut!(
+          monorepo_root: "/tmp/repo",
+          current_branch: "main",
+          target_gem_version: "17.0.0.rc.0",
+          dry_run: false
+        )
+      end.to raise_error(SystemExit, %r{without a terminal.*git checkout -b release/17.0.0 origin/main}m)
+    end
+
+    it "is a no-op for a non-rc target on main" do
+      expect(self).not_to receive(:local_or_remote_branch_exists?)
+      expect(self).not_to receive(:start_release_line!)
+
+      expect do
+        maybe_offer_release_branch_cut!(
+          monorepo_root: "/tmp/repo",
+          current_branch: "main",
+          target_gem_version: "17.0.0",
+          dry_run: false
+        )
+      end.not_to raise_error
+    end
+
+    it "is a no-op for an rc target when not on main" do
+      expect(self).not_to receive(:local_or_remote_branch_exists?)
+      expect(self).not_to receive(:start_release_line!)
+
+      expect do
+        maybe_offer_release_branch_cut!(
+          monorepo_root: "/tmp/repo",
+          current_branch: "release/17.0.0",
+          target_gem_version: "17.0.0.rc.1",
+          dry_run: false
+        )
+      end.not_to raise_error
+    end
+
+    it "prints the intended offer during a dry run without touching git or prompting" do
+      expect(self).not_to receive(:local_or_remote_branch_exists?)
+      expect(self).not_to receive(:start_release_line!)
+
+      expect do
+        maybe_offer_release_branch_cut!(
+          monorepo_root: "/tmp/repo",
+          current_branch: "main",
+          target_gem_version: "17.0.0.rc.0",
+          dry_run: true
+        )
+      end.to output(%r{DRY RUN: would offer to create release/17.0.0}).to_stdout
+    end
+  end
+
+  describe "#start_release_line!" do
+    it "prints the plan and creates nothing during a dry run" do
+      expect(self).not_to receive(:sh_in_dir_for_release)
+      expect(self).not_to receive(:local_or_remote_branch_exists?)
+
+      expect do
+        start_release_line!(monorepo_root: "/tmp/repo", release_branch: "release/17.0.0", dry_run: true)
+      end.to output(%r{DRY RUN: would create release/17.0.0 from origin/main}).to_stdout
+    end
+
+    it "fetches, guards, creates, pushes, and prints next steps in normal mode" do
+      allow(self).to receive(:sh_in_dir_for_release)
+      allow(self).to receive(:local_or_remote_branch_exists?)
+        .with(monorepo_root: "/tmp/repo", branch: "release/17.0.0")
+        .and_return(false)
+
+      expect do
+        start_release_line!(monorepo_root: "/tmp/repo", release_branch: "release/17.0.0", dry_run: false)
+      end.to output(%r{Started release/17.0.0.*update-changelog rc.*bundle exec rake release}m).to_stdout
+
+      expect(self).to have_received(:sh_in_dir_for_release).with("/tmp/repo", "git fetch origin")
+      expect(self).to have_received(:sh_in_dir_for_release)
+        .with("/tmp/repo", "git checkout -b release/17.0.0 origin/main")
+      expect(self).to have_received(:sh_in_dir_for_release).with("/tmp/repo", "git push -u origin release/17.0.0")
+    end
+
+    it "aborts after fetching when the release branch already exists" do
+      allow(self).to receive(:sh_in_dir_for_release)
+      allow(self).to receive(:local_or_remote_branch_exists?)
+        .with(monorepo_root: "/tmp/repo", branch: "release/17.0.0")
+        .and_return(true)
+
+      expect do
+        start_release_line!(monorepo_root: "/tmp/repo", release_branch: "release/17.0.0", dry_run: false)
+      end.to raise_error(SystemExit, %r{release/17.0.0 already exists})
+
+      expect(self).to have_received(:sh_in_dir_for_release).with("/tmp/repo", "git fetch origin")
+      expect(self).not_to have_received(:sh_in_dir_for_release)
+        .with("/tmp/repo", "git checkout -b release/17.0.0 origin/main")
+    end
+  end
+
+  describe "#resolve_release_start_base_version" do
+    it "accepts an explicit stable X.Y.Z" do
+      expect(resolve_release_start_base_version("17.0.0", monorepo_root: "/tmp/repo")).to eq("17.0.0")
+    end
+
+    it "rejects an rc/prerelease argument (the branch name is the base)" do
+      expect do
+        resolve_release_start_base_version("17.0.0.rc.0", monorepo_root: "/tmp/repo")
+      end.to raise_error(SystemExit, /Invalid release line version.*do not pass 17.0.0.rc.0/m)
+    end
+
+    it "derives the base from the top changelog header when it is an rc" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.2")
+
+      expect do
+        expect(resolve_release_start_base_version("", monorepo_root: "/tmp/repo")).to eq("17.0.0")
+      end.to output(/Derived release line 17.0.0 from the top CHANGELOG.md header/).to_stdout
+    end
+
+    it "aborts asking for an explicit X.Y.Z when the top changelog header is not an rc" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0")
+
+      expect do
+        resolve_release_start_base_version("", monorepo_root: "/tmp/repo")
+      end.to raise_error(SystemExit, /Could not determine which release line to start/)
+    end
+  end
 end
