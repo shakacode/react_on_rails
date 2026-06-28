@@ -454,6 +454,19 @@ location / {
 
 **Option B — keep buffering on globally and let Rails opt specific streamed responses out** with the `X-Accel-Buffering: no` response header. nginx honors it per-response, so only streaming routes bypass the buffer while everything else keeps nginx buffering:
 
+```nginx
+location / {
+  proxy_pass http://rails_app;
+
+  # No proxy_buffering directive here; inherit the default `on`.
+  # Rails sets X-Accel-Buffering: no on streaming responses that need it.
+
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
+
 ```ruby
 # In the streaming controller action, before the first stream write:
 def show
