@@ -895,6 +895,65 @@ test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint() {
   assert_contains "$out" '"run_ruby_tests": false' "benchmark comment output"
 }
 
+# Release tooling (rakelib/release.rake + script/release-* helpers) is covered
+# ONLY by the release rspec suite, never by generators or JS. It must request the
+# Ruby tests (so those specs run) while keeping run_generators / run_js_tests
+# false, so required-pr-gate (script/ci-required-hosted-gate) does not force the
+# full hosted matrix. Before this arm existed, rakelib/release.rake hit the
+# uncategorized catch-all and set run_generators=true.
+test_release_rake_change_runs_ruby_tests_without_generators() {
+  setup_repo
+  write_file_change "rakelib/release.rake" "task :release do; end"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release rake output"
+  assert_contains "$out" '"non_runtime_only": false' "release rake output"
+  assert_contains "$out" '"run_ruby_tests": true' "release rake output"
+  assert_contains "$out" '"run_generators": false' "release rake output"
+  assert_contains "$out" '"run_js_tests": false' "release rake output"
+  # Release tooling does not exercise the dummy app, E2E, or benchmarks.
+  assert_contains "$out" '"run_dummy_tests": false' "release rake output"
+  assert_contains "$out" '"run_e2e_tests": false' "release rake output"
+  assert_contains "$out" '"run_core_benchmarks": false' "release rake output"
+}
+
+# The release helper scripts under script/ must be caught by the release-tooling
+# arm, not the broad script/* CI-infrastructure arm (which would set
+# run_generators=true and force hosted CI). Same contract as release.rake.
+test_release_finish_script_change_runs_ruby_tests_without_generators() {
+  setup_repo
+  write_file_change "script/release-finish" "#!/usr/bin/env bash"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release-finish output"
+  assert_contains "$out" '"non_runtime_only": false' "release-finish output"
+  assert_contains "$out" '"run_ruby_tests": true' "release-finish output"
+  assert_contains "$out" '"run_generators": false' "release-finish output"
+  assert_contains "$out" '"run_js_tests": false' "release-finish output"
+  assert_contains "$out" '"run_dummy_tests": false' "release-finish output"
+}
+
+# Regression guard: a CHANGELOG.md-only change is documentation (matched by the
+# *.md docs arm) and must stay skippable — docs_only / non_runtime_only true,
+# every run_* false. Release stamping touches CHANGELOG.md, so this keeps that
+# path from ever forcing CI.
+test_changelog_only_change_is_non_runtime_only() {
+  setup_repo
+  write_file_change "CHANGELOG.md" "## [Unreleased]"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": true' "changelog output"
+  assert_contains "$out" '"non_runtime_only": true' "changelog output"
+  assert_contains "$out" '"run_lint": false' "changelog output"
+  assert_contains "$out" '"run_ruby_tests": false' "changelog output"
+  assert_contains "$out" '"run_js_tests": false' "changelog output"
+  assert_contains "$out" '"run_generators": false' "changelog output"
+  assert_contains "$out" '"benchmarks_changed": false' "changelog output"
+}
+
 test_empty_diff_skips_everything() {
   setup_repo
   git commit --allow-empty -m "no file changes" >/dev/null
@@ -908,6 +967,9 @@ test_empty_diff_skips_everything() {
 }
 
 run_test test_empty_diff_skips_everything
+run_test test_release_rake_change_runs_ruby_tests_without_generators
+run_test test_release_finish_script_change_runs_ruby_tests_without_generators
+run_test test_changelog_only_change_is_non_runtime_only
 run_test test_docs_changes_are_non_runtime_only
 run_test test_internal_non_markdown_docs_are_non_runtime_only
 run_test test_issue_template_changes_are_non_runtime_only

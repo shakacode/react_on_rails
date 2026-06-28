@@ -464,6 +464,29 @@ while IFS= read -r file; do
       PRO_LINT_CONFIG_CHANGED=true
       ;;
 
+    # Release tooling (rake release tasks + their helper scripts). The ONLY
+    # automated coverage for these paths is the release rspec suite
+    # (react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb and
+    # release_forward_port_script_spec.rb), so route them to RSPEC_CHANGED rather
+    # than the CI-infrastructure arm below. That arm's catch-all-equivalent
+    # behavior set RUN_GENERATORS=true, which makes required-pr-gate force the
+    # full hosted matrix (Generator/Playwright/Integration/JS) — none of which
+    # exercise release tooling (see script/ci-required-hosted-gate). This arm is
+    # deliberately NOT generator-/JS-sensitive: it sets no GENERATORS_CHANGED or
+    # JS_CHANGED, so run_generators / run_js_tests stay false and hosted CI is
+    # optional rather than gate-forced. It must precede the script/* CI-infra arm
+    # (which would otherwise swallow script/release-*) and follow the more
+    # specific source/spec arms above. Sets no BENCH_* flag: release tooling is
+    # never shipped in the gem and cannot move runtime performance.
+    rakelib/release.rake|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
+      DOCS_ONLY=false
+      if source_file_comment_only_change "$file"; then
+        SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        RSPEC_CHANGED=true
+      fi
+      ;;
+
     # CI infrastructure files (scripts, workflows, CI configs).
     # These change HOW the suite runs but never the gem/package runtime, so they
     # trigger the full TEST suite to validate the change (see the CI_INFRA_CHANGED
