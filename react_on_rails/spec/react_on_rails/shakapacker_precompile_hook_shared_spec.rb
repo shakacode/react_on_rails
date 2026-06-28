@@ -303,6 +303,15 @@ RSpec.describe "Shakapacker precompile hook shared script" do
           end
         end
       end
+
+      it "ignores empty RUBYOPT fragments while preserving caller-supplied flags" do
+        with_locale_encoding(Encoding::US_ASCII) do
+          with_env("RUBYOPT" => "") do
+            expect(utf8_subprocess_env("RUBYOPT" => "-rbundler/setup")["RUBYOPT"])
+              .to eq("-EUTF-8 -rbundler/setup")
+          end
+        end
+      end
     end
 
     context "when the locale is a real UTF-8 locale" do

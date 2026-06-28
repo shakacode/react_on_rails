@@ -71,7 +71,7 @@ def utf8_subprocess_env(extra = {})
 end
 
 def subprocess_rubyopt(extra)
-  [ENV.fetch("RUBYOPT", nil), extra["RUBYOPT"]].compact.join(" ")
+  [ENV.fetch("RUBYOPT", nil), extra["RUBYOPT"]].compact.reject(&:empty?).join(" ")
 end
 
 # Prepend a UTF-8 external-encoding pin to RUBYOPT for the C/POSIX widening case — a portable
