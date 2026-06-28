@@ -46,8 +46,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   that intentionally checks or creates an open-source-only scaffold. Use `--rsc` when you want Pro with the
   generated React Server Components example.
 
-- **[Pro]** **Documented renderer performance tuning for streamed RSC and corrected stale pool-size docs**: Added a "Renderer Performance Tuning for Streamed RSC" guide covering worker warmup, sizing `renderer_http_pool_size` against the renderer's `workersCount`, and Rails↔renderer keep-alive. Corrected the `renderer_http_pool_size` configuration comment, which incorrectly stated the setting "has no effect" with "planned" persistent connections — persistent HTTP/2 connection reuse within the streaming `Fiber.scheduler` is implemented (issue #3283), so the limit is effective on the streaming path, and `renderer_http_keep_alive_timeout` is deprecated/ignored. Closes [Issue 4240](https://github.com/shakacode/react_on_rails/issues/4240). [PR 4253](https://github.com/shakacode/react_on_rails/pull/4253) by [justin808](https://github.com/justin808).
-
 #### Fixed
 
 - **[Pro]** **RSC Rspack doctor no longer false-warns on equivalent `lazyCompilation` configs**:
