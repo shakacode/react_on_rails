@@ -53,7 +53,7 @@ RSpec.describe "Streamed RSC compression" do
   end
 
   def read_body(body)
-    buffer = +""
+    buffer = +"".b
     body.each { |chunk| buffer << chunk }
     body.close if body.respond_to?(:close)
     buffer
