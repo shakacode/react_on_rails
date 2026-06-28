@@ -8974,7 +8974,7 @@ function useCreateProjectMutation() {
 }
 ```
 
-`createRailsAction` uses the same same-origin, JSON, and CSRF assumptions as the starter's `apiFetch`
+`createRailsAction` shares the same-origin, JSON-only, and CSRF assumptions as the starter's `apiFetch`
 pattern, but returns a standalone function that drops directly into `useMutation`. It does not replace
 Rails routes, strong parameters, authorization, or runtime response validation.
 Endpoints should return JSON for 2xx responses unless the caller's response type is `null`; browser
@@ -9156,6 +9156,9 @@ For mutations, pair the generated response lookup with the CSRF-aware caller fro
 `react-on-rails/railsAction`. The helper does not generate routes or validate payloads at runtime; Rails
 still owns the route, strong parameters, authorization, and JSON rendering. The generated type only
 connects the client call site to the response contract you declared in Rails:
+
+React on Rails Pro apps that depend on `react-on-rails-pro` can use the mirrored
+`react-on-rails-pro/railsAction` export.
 
 ```ruby
 ReactOnRails::TypeScriptResponseTypes.define_response(
