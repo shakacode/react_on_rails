@@ -209,6 +209,33 @@ async function testOctokitJobIteratorArrayPagesAreChecked() {
   assert.match(core.failed[0], /Main push lint/);
 }
 
+async function testUnexpectedJobIteratorShapeFailsClearly() {
+  const previous = 'previous';
+  const failingRun = run({ id: 15, sha: previous, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[failingRun]],
+    jobsByRunId: {},
+    jobIteratorDataByRunId: {
+      15: [{}],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await assert.rejects(
+    () =>
+      checkPreviousMainCommitStatus({
+        github,
+        context,
+        core,
+        previousSha: previous,
+        excludeWorkflowsInput: '',
+        createdAfter: '2026-01-01T00:00:00.000Z',
+      }),
+    /Expected jobs array while listing workflow run 15 \(Main push lint\)\./,
+  );
+}
+
 async function testGuardOnlyHopLimitStopsAtConfiguredLimit() {
   const previous = 'docs-2';
   const parent = 'docs-1';
@@ -329,6 +356,7 @@ async function main() {
   await testNonContiguousWorkflowRunPagesAreChecked();
   await testPaginatedJobsAreChecked();
   await testOctokitJobIteratorArrayPagesAreChecked();
+  await testUnexpectedJobIteratorShapeFailsClearly();
   await testGuardOnlyHopLimitStopsAtConfiguredLimit();
 }
 

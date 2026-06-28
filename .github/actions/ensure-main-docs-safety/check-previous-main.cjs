@@ -218,7 +218,13 @@ async function checkPreviousMainCommitStatus({
     });
 
     if (result.status === 'no-runs') {
-      core.info(`No workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`);
+      core.info(
+        [
+          `No push-event workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
+          'For batched merge queues, github.event.merge_group.base_sha can be a synthetic queue commit',
+          'that was never pushed to main, so there may be no push-event runs to inspect.',
+        ].join(' '),
+      );
       return;
     }
 
