@@ -230,7 +230,7 @@ ReactOnRailsPro.revalidate_tag(post) # => number of cache entries deleted
 ReactOnRailsPro.revalidate_tags(post, post.author)
 ```
 
-`cache_tags:` is accepted by all four cached helpers — `cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, and `cached_async_react_component` — and is purely additive: `cache_key:` semantics are unchanged, and `cache_key:` is still required.
+`cache_tags:` is accepted by the cached helpers — `cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, `cached_buffered_stream_react_component`, and `cached_async_react_component` — and is purely additive: `cache_key:` semantics are unchanged, and `cache_key:` is still required.
 
 ### Tag forms and normalization
 

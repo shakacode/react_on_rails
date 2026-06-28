@@ -414,6 +414,7 @@ describe ReactOnRailsProHelper do
     def mock_request_and_response(mock_chunks = chunks, count: 1)
       install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks
+      stub_pro_bundle_hashes
 
       chunks_read.clear
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
@@ -432,6 +433,31 @@ describe ReactOnRailsProHelper do
             yielder.call(to_length_prefixed(chunk))
           end
         end
+      end
+    end
+
+    def stub_pro_bundle_hashes
+      allow(ReactOnRailsPro::Utils).to receive_messages(
+        bundle_hash: "#{'a' * 32}-test",
+        rsc_bundle_hash: "#{'b' * 32}-test"
+      )
+    end
+
+    describe "#buffered_stream_react_component" do
+      it "buffers all streamed chunks into one normal Rails helper result" do
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = buffered_stream_react_component(component_name, props:, **component_options)
+        end
+
+        expect(result).to include(react_component_div_with_initial_chunk)
+        expect(result).to include(chunks.second[:html])
+        expect(result).to include(chunks.third[:html])
+        expect(result).to script_tag_be_included(rails_context_tag)
+        expect(result).to script_tag_be_included(react_component_specification_tag)
+        expect(chunks_read.count).to eq(chunks.count)
       end
     end
 
@@ -1032,6 +1058,54 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count) # Both calls went to Node
 
         expect(second_run_chunks).to eq(first_run_chunks) # Same template/props, same result
+      end
+    end
+
+    describe "#cached_buffered_stream_react_component", :caching do
+      around do |example|
+        Rails.cache.clear
+        example.run
+      ensure
+        Rails.cache.clear
+      end
+
+      it "caches the fully buffered result without requiring the streaming view context" do
+        props_calls = 0
+        first_result = nil
+        second_result = nil
+        expected_cache_key = nil
+
+        Sync do
+          mock_request_and_response
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: [["buffered-stream-cache-spec", component_name], "#{'b' * 32}-test"],
+            prerender: true
+          )
+
+          render_cached = lambda do
+            cached_buffered_stream_react_component(
+              component_name,
+              cache_key: ["buffered-stream-cache-spec", component_name],
+              id: "#{component_name}-react-component-0",
+              trace: true,
+              cache_options: { expires_in: 60 }
+            ) do
+              props_calls += 1
+              props
+            end
+          end
+
+          first_result = render_cached.call
+          @rendered_rails_context = nil
+          second_result = render_cached.call
+        end
+
+        expect(first_result).to include(chunks.first[:html], chunks.second[:html], chunks.third[:html])
+        expect(second_result).to eq(first_result)
+        expect(Rails.cache.read(expected_cache_key)).to eq(first_result)
+        expect(props_calls).to eq(1)
+        expect(chunks_read.count).to eq(chunks.count)
       end
     end
 

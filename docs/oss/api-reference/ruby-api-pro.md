@@ -55,6 +55,20 @@ Requires the controller to use `stream_view_containing_react_components`.
 <%= stream_react_component("App", props: { data: @data }) %>
 ```
 
+### `buffered_stream_react_component(component_name, options = {})`
+
+Renders through the same streaming/RSC renderer as `stream_react_component`, but buffers every chunk and returns the complete HTML string to Rails. Use this for public, static, or cacheable pages where all props are available before rendering and progressive flushing is not needed.
+
+Unlike `stream_react_component`, this helper does not require the controller to use `stream_view_containing_react_components`.
+
+`buffered_stream_react_component` forces `prerender: true`; passing `prerender: false` has no effect. Common options mirror `stream_react_component`, including `props`, `id`, `html_options`, `trace`, and `raise_on_prerender_error`.
+
+```ruby
+<%= buffered_stream_react_component("MarketingPage",
+      props: @marketing_page_props,
+      id: "marketing-page") %>
+```
+
 ### `stream_react_component_with_async_props(component_name, options = {}, &block)`
 
 Async-props variant of `stream_react_component`. Use this when the view has synchronous props plus slower values that should stream to React behind Suspense boundaries.
@@ -82,6 +96,22 @@ end %>
 Fragment-cached version of `stream_react_component`. Cache hits replay stored chunks without re-rendering.
 
 Same caching options as `cached_react_component`.
+
+### `cached_buffered_stream_react_component(component_name, options = {}, &block)`
+
+Fragment-cached version of `buffered_stream_react_component`. Cache hits return the complete buffered HTML string without evaluating the props block or re-rendering in Node.
+
+Same caching options as `cached_react_component`.
+
+```ruby
+<%= cached_buffered_stream_react_component("MarketingPage",
+      cache_key: ["marketing-page", I18n.locale],
+      cache_tags: ["marketing-page"],
+      cache_options: { expires_in: 30.minutes },
+      id: "marketing-page") do
+  @marketing_page_props
+end %>
+```
 
 ### `rsc_payload_react_component(component_name, options = {})`
 

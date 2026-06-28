@@ -169,6 +169,29 @@ module ReactOnRailsProHelper
     end
   end
 
+  # Renders a stream-capable component through the streaming/RSC renderer, but buffers every chunk
+  # before returning HTML to Rails. Use this for static/cacheable responses that need RSC rendering
+  # without ActionController::Live committing headers on the first streamed byte.
+  def buffered_stream_react_component(component_name, options = {})
+    options[:prerender] = true
+    if options.key?(:immediate_hydration)
+      ReactOnRails::Helper.warn_removed_immediate_hydration_option("buffered_stream_react_component")
+      options.delete(:immediate_hydration)
+    end
+
+    on_complete = options.delete(:on_complete)
+    chunks = [] if on_complete
+    html = +""
+
+    internal_stream_react_component(component_name, options).each_chunk do |chunk|
+      chunks&.push(chunk)
+      html << chunk.to_s
+    end
+    on_complete&.call(chunks)
+
+    html.html_safe
+  end
+
   def stream_react_component_with_async_props(component_name, options = {}, &props_block)
     unless ReactOnRailsPro.configuration.enable_rsc_support
       raise ReactOnRailsPro::Error,
@@ -277,6 +300,35 @@ module ReactOnRailsProHelper
     end
   end
 
+  # Cached version of buffered_stream_react_component. Unlike cached_stream_react_component,
+  # this returns the complete HTML string from the cache/miss path and does not require
+  # stream_view_containing_react_components.
+  def cached_buffered_stream_react_component(component_name, raw_options = {}, &block)
+    ReactOnRailsPro::Utils.with_trace(component_name) do
+      check_caching_options!(raw_options, block)
+
+      cache_options = raw_options.merge(
+        cache_key: lambda do
+          raw_cache_key = raw_options[:cache_key]
+          cache_key_value = raw_cache_key.respond_to?(:call) ? raw_cache_key.call : raw_cache_key
+
+          [cache_key_value, ReactOnRailsPro::Utils.rsc_bundle_hash]
+        end,
+        prerender: true
+      )
+
+      fetch_react_component(component_name, cache_options) do
+        options = raw_options.merge(
+          props: yield,
+          prerender: true,
+          skip_prerender_cache: true,
+          auto_load_bundle: ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
+        )
+        buffered_stream_react_component(component_name, options)
+      end
+    end
+  end
+
   # Renders a React component asynchronously, returning an AsyncValue immediately.
   # Multiple async_react_component calls will execute their HTTP rendering requests
   # concurrently instead of sequentially.
@@ -340,6 +392,11 @@ module ReactOnRailsProHelper
     instrument_method :cached_react_component, type: "ReactOnRails", name: "cached_react_component"
     instrument_method :cached_react_component_hash, type: "ReactOnRails", name: "cached_react_component_hash"
     instrument_method :cached_stream_react_component, type: "ReactOnRails", name: "cached_stream_react_component"
+    instrument_method(
+      :cached_buffered_stream_react_component,
+      type: "ReactOnRails",
+      name: "cached_buffered_stream_react_component"
+    )
   end
 
   private
