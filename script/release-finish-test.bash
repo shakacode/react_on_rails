@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Test harness for script/release-finish. Requires bash and git. Run with
+# Test harness for script/release-finish. Requires bash, git, and ruby (the
+# script under test is a Ruby program, invoked via `ruby`). Run with
 # `bash script/release-finish-test.bash`.
 #
 # Every case runs against a throwaway `mktemp -d` git repo and exercises only the
