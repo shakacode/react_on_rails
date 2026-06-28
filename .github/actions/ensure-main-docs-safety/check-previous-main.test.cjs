@@ -8,7 +8,7 @@ const {
   parseExcludeWorkflows,
 } = require('./check-previous-main.cjs');
 
-const context = { repo: { owner: 'shakacode', repo: 'react_on_rails' } };
+const context = { eventName: 'push', repo: { owner: 'shakacode', repo: 'react_on_rails' } };
 
 function run({ id, workflowId = id, sha, name = `Workflow ${id}`, runNumber = id, conclusion = 'success' }) {
   return {
@@ -62,7 +62,14 @@ function successJob(name = 'build') {
   };
 }
 
-function makeGithub({ pages, jobsByRunId, jobPagesByRunId, jobIteratorDataByRunId, parentsBySha }) {
+function makeGithub({
+  pages,
+  jobsByRunId,
+  jobPagesByRunId,
+  jobIteratorDataByRunId,
+  parentsBySha,
+  defaultBranchContainsSha = {},
+}) {
   const listWorkflowRunsForRepo = async () => {};
   const listJobsForWorkflowRun = async ({ run_id: runId }) => ({
     data: { jobs: jobsByRunId[runId] || [] },
@@ -91,12 +98,19 @@ function makeGithub({ pages, jobsByRunId, jobPagesByRunId, jobIteratorDataByRunI
         }
       },
     },
+    request: async (_route, { basehead }) => {
+      const [base] = basehead.split('...');
+      return { data: { status: defaultBranchContainsSha[base] ? 'ahead' : 'diverged' } };
+    },
     rest: {
       actions: {
         listWorkflowRunsForRepo,
         listJobsForWorkflowRun,
       },
       repos: {
+        compareCommitsWithBasehead: async ({ base }) => ({
+          data: { status: defaultBranchContainsSha[base] ? 'ahead' : 'diverged' },
+        }),
         getCommit: async ({ ref }) => ({
           data: { parents: parentsBySha[ref] ? [{ sha: parentsBySha[ref] }] : [] },
         }),
@@ -262,7 +276,7 @@ async function testGuardOnlyHopLimitStopsAtConfiguredLimit() {
   });
 
   assert.equal(core.failed.length, 1);
-  assert.match(core.failed[0], /after 1 docs-only guard-only commits/);
+  assert.match(core.failed[0], /after 1 docs-only guard-only or no-run candidate commits/);
 }
 
 async function testGuardOnlyFailuresLookThroughToParentFailure() {
@@ -303,6 +317,125 @@ async function testGuardOnlyFailuresLookThroughToParentFailure() {
   assert.equal(core.failed.length, 1);
   assert.match(core.failed[0], /main commit real-failure still has failing workflows/);
   assert.match(core.failed[0], /Ignored docs-only guard-only failures/);
+}
+
+async function testNoRunSyntheticBaseLooksThroughToParentFailure() {
+  const syntheticBase = 'synthetic-base';
+  const realFailure = 'real-failure';
+  const realRun = run({ id: 16, sha: realFailure, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[realRun]],
+    jobsByRunId: {
+      16: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [syntheticBase]: realFailure,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit real-failure still has failing workflows/);
+}
+
+async function testNoRunPushBaseAllowsQuietMainSkip() {
+  const quietMain = 'quiet-main';
+  const olderFailure = 'older-failure';
+  const realRun = run({ id: 17, sha: olderFailure, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[realRun]],
+    jobsByRunId: {
+      17: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [quietMain]: olderFailure,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: quietMain,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.deepEqual(core.failed, []);
+  assert.match(core.infoMessages.at(-1), /Allowing docs-only skip/);
+}
+
+async function testNoRunSyntheticBaseAllowsQuietParentSkip() {
+  const syntheticBase = 'synthetic-base';
+  const quietMain = 'quiet-main';
+  const olderFailure = 'older-failure';
+  const realRun = run({ id: 18, sha: olderFailure, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[realRun]],
+    jobsByRunId: {
+      18: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [syntheticBase]: quietMain,
+      [quietMain]: olderFailure,
+    },
+    defaultBranchContainsSha: {
+      [quietMain]: true,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.deepEqual(core.failed, []);
+  assert.match(core.infoMessages.at(-1), /Allowing docs-only skip/);
+}
+
+async function testNoRunSyntheticChainLooksThroughToParentFailure() {
+  const syntheticBase = 'synthetic-base';
+  const priorSyntheticBase = 'prior-synthetic-base';
+  const realFailure = 'real-failure';
+  const realRun = run({ id: 19, sha: realFailure, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[realRun]],
+    jobsByRunId: {
+      19: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [syntheticBase]: priorSyntheticBase,
+      [priorSyntheticBase]: realFailure,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit real-failure still has failing workflows/);
 }
 
 async function testGuardOnlyFailuresLookThroughToParentSuccess() {
@@ -352,6 +485,10 @@ async function main() {
   );
 
   await testGuardOnlyFailuresLookThroughToParentFailure();
+  await testNoRunSyntheticBaseLooksThroughToParentFailure();
+  await testNoRunPushBaseAllowsQuietMainSkip();
+  await testNoRunSyntheticBaseAllowsQuietParentSkip();
+  await testNoRunSyntheticChainLooksThroughToParentFailure();
   await testGuardOnlyFailuresLookThroughToParentSuccess();
   await testNonContiguousWorkflowRunPagesAreChecked();
   await testPaginatedJobsAreChecked();

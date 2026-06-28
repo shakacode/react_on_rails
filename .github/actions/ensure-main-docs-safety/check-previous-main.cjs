@@ -183,6 +183,26 @@ async function firstParentSha({ github, context, sha }) {
   return response.data.parents?.[0]?.sha;
 }
 
+async function isCommitReachableFromDefaultBranch({ github, context, sha }) {
+  const defaultBranch = context.payload?.repository?.default_branch || 'main';
+
+  try {
+    const response = await github.request('GET /repos/{owner}/{repo}/compare/{basehead}', {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      basehead: `${sha}...${defaultBranch}`,
+    });
+
+    return response.data.status === 'ahead' || response.data.status === 'identical';
+  } catch (error) {
+    if (error.status === 404) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
 async function checkPreviousMainCommitStatus({
   github,
   context,
@@ -199,11 +219,12 @@ async function checkPreviousMainCommitStatus({
   }
 
   const guardOnlyTrail = [];
+  const noRunsTrail = [];
 
   async function checkSha(shaToCheck, remainingGuardOnlyHops) {
     if (remainingGuardOnlyHops <= 0) {
       core.setFailed(
-        `Cannot determine prior real CI status after ${maxGuardOnlyHops} docs-only guard-only commits. Push a non-docs change to trigger hosted CI.`,
+        `Cannot determine prior real CI status after ${maxGuardOnlyHops} docs-only guard-only or no-run candidate commits. Push a non-docs change to trigger hosted CI.`,
       );
       return;
     }
@@ -218,11 +239,32 @@ async function checkPreviousMainCommitStatus({
     });
 
     if (result.status === 'no-runs') {
+      const shouldTraceNoRunsParent =
+        context.eventName === 'merge_group' &&
+        !(await isCommitReachableFromDefaultBranch({ github, context, sha: shaToCheck }));
+      const parentSha = shouldTraceNoRunsParent
+        ? await firstParentSha({ github, context, sha: shaToCheck })
+        : null;
+
+      if (parentSha) {
+        core.info(
+          [
+            `No push-event workflow runs found for ${shaToCheck} in the last 7 days.`,
+            'For batched merge queues, github.event.merge_group.base_sha can be a synthetic queue commit',
+            `that was never pushed to main. Checking first parent ${parentSha} for the underlying CI state.`,
+          ].join(' '),
+        );
+        noRunsTrail.push(shaToCheck);
+        await checkSha(parentSha, remainingGuardOnlyHops - 1);
+        return;
+      }
+
       core.info(
         [
           `No push-event workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
-          'For batched merge queues, github.event.merge_group.base_sha can be a synthetic queue commit',
-          'that was never pushed to main, so there may be no push-event runs to inspect.',
+          shouldTraceNoRunsParent
+            ? 'No parent commit was found to inspect for an underlying CI state.'
+            : 'Only merge_group SHAs outside the default branch history are traced through their first parent.',
         ].join(' '),
       );
       return;
@@ -244,6 +286,14 @@ async function checkPreviousMainCommitStatus({
 
     if (result.failingRuns.length > 0) {
       const details = result.failingRuns.map(summarizeRun).join('\n');
+      const noRunsTrailDetails =
+        noRunsTrail.length > 0
+          ? [
+              '',
+              'Skipped candidate commits with no push-event runs while looking for the underlying CI state:',
+              ...noRunsTrail.map((sha) => `- ${sha}`),
+            ].join('\n')
+          : '';
       const guardTrailDetails =
         guardOnlyTrail.length > 0
           ? [
@@ -260,6 +310,7 @@ async function checkPreviousMainCommitStatus({
         [
           `Cannot skip CI for docs-only commit because main commit ${shaToCheck} still has failing workflows:`,
           details,
+          noRunsTrailDetails,
           guardTrailDetails,
           '',
           'Fix these failures before pushing docs-only changes, or push non-docs changes to trigger hosted CI.',
