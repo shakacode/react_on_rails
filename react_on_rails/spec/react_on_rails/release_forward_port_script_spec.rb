@@ -7,6 +7,8 @@ require "tmpdir"
 require_relative "spec_helper"
 
 release_forward_port_script = File.expand_path("../../../script/release-forward-port", __dir__)
+# Guard against re-loading when this spec file is required more than once. The
+# helper constant is defined only by script/release-forward-port.
 load release_forward_port_script unless defined?(ReleaseForwardPort)
 
 RSpec.describe "script/release-forward-port" do
@@ -182,6 +184,35 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "does not require a clean worktree or checkout target for a no-op normal run" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "feature-work")
+      write_file(repo, "scratch.txt", "local notes\n")
+
+      stdout, stderr, status = run_script(repo, "--source", "main", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("No commits found in main..main.")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(git(repo, "rev-parse", "--abbrev-ref", "HEAD").strip).to eq("feature-work")
+      expect(File.read(File.join(repo, "scratch.txt"))).to eq("local notes\n")
+    end
+  end
+
+  it "rejects no-op normal runs while a cherry-pick is in progress" do
+    with_release_repo do |repo|
+      git_dir = git(repo, "rev-parse", "--git-dir").strip
+      File.write(File.join(repo, git_dir, "CHERRY_PICK_HEAD"), git(repo, "rev-parse", "HEAD"))
+
+      stdout, stderr, status = run_script(repo, "--source", "main", "--target", "main")
+
+      expect(status).not_to be_success
+      expect(stdout).to include("No commits found in main..main.")
+      expect(stdout).not_to include("Nothing to cherry-pick")
+      expect(stderr).to include("a cherry-pick is already in progress")
+    end
+  end
+
   it "skips initially empty release commits before cherry-picking" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
@@ -306,6 +337,56 @@ RSpec.describe "script/release-forward-port" do
 
       latest_commit_body = git(repo, "log", "-1", "--format=%B")
       expect(latest_commit_body).to include("(cherry picked from commit #{fix_sha})")
+    end
+  end
+
+  it "skips no-footer manual reapplications after source-sha reverts" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      git(repo, "cherry-pick", fix_sha)
+      git(repo, "revert", "--no-edit", fix_sha)
+      write_file(repo, "app.txt", "base\nrelease fix\n")
+      commit_all(repo, "Reapply release fix manually")
+      reapplied_count = git(repo, "rev-list", "--count", "main").strip
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("patch already exists on main according to target history")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(reapplied_count)
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+    end
+  end
+
+  it "skips live patches after empty source-sha reverts" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      git(repo, "cherry-pick", fix_sha)
+      git(
+        repo,
+        "commit",
+        "--allow-empty",
+        "--no-gpg-sign",
+        "-m",
+        "Record empty source revert",
+        "-m",
+        "This reverts commit #{fix_sha}."
+      )
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("patch already exists on main according to target history")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
     end
   end
 
@@ -469,6 +550,35 @@ RSpec.describe "script/release-forward-port" do
       expect(second_stdout).to include("Nothing to cherry-pick")
       expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
       expect(File.read(File.join(repo, "app.txt"))).to eq("base updated on main\nrelease fix\n")
+    end
+  end
+
+  it "skips -x cherry-picks after unrelated target merges are reverted" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).to be_success, first_stderr
+      expect(first_stdout).to include("Forward-port complete")
+
+      git(repo, "checkout", "-b", "unrelated-main-work")
+      write_file(repo, "notes.txt", "unrelated target work\n")
+      commit_all(repo, "Add unrelated target notes")
+      git(repo, "checkout", "main")
+      git(repo, "merge", "--no-ff", "unrelated-main-work", "-m", "Merge unrelated target work")
+      unrelated_merge_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "revert", "-m", "1", "--no-edit", unrelated_merge_sha)
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(second_stdout).to include("Nothing to cherry-pick")
+      expect(second_stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
     end
   end
 
@@ -737,6 +847,280 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "does not skip an -x cherry-pick when the source commit was later reverted on target" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).to be_success, first_stderr
+      expect(first_stdout).to include("Forward-port complete")
+
+      git(repo, "revert", "--no-commit", fix_sha)
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Undo release regression manually",
+        "-m",
+        "This reverts commit #{fix_sha}."
+      )
+      source_revert_body = git(repo, "log", "-1", "--format=%B")
+      expect(source_revert_body).to include("Undo release regression manually")
+      expect(source_revert_body).to include("This reverts commit #{fix_sha}.")
+      reverted_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\n")
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(second_stdout).not_to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+      expect(git(repo, "rev-list", "--count", "main").strip.to_i).to eq(reverted_count.to_i + 1)
+
+      repicked_count = git(repo, "rev-list", "--count", "main").strip
+      third_stdout, third_stderr, third_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(third_status).to be_success, third_stderr
+      expect(third_stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(third_stdout).to include("Nothing to cherry-pick")
+      expect(third_stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(repicked_count)
+    end
+  end
+
+  it "does not trust -x evidence after conflict-resolved source-sha reverts" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).to be_success, first_stderr
+      expect(first_stdout).to include("Forward-port complete")
+
+      write_file(repo, "app.txt", "base updated on main\nrelease fix\n")
+      commit_all(repo, "Adjust target context around release fix")
+
+      _stdout, _stderr, revert_status =
+        Open3.capture3(git_env, "git", "revert", "--no-commit", fix_sha, chdir: repo)
+      expect(revert_status).not_to be_success
+      write_file(repo, "app.txt", "base updated on main\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Undo release regression after context update",
+        "-m",
+        "This reverts commit #{fix_sha}."
+      )
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(stdout).not_to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base updated on main\n")
+    end
+  end
+
+  it "skips source-sha reverts superseded by merged no-footer reapplications" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).to be_success, first_stderr
+      expect(first_stdout).to include("Forward-port complete")
+
+      base_sha = git(repo, "rev-list", "--max-parents=0", "HEAD").strip
+      git(repo, "checkout", "-b", "side-reapply", base_sha)
+      write_file(repo, "app.txt", "base\nrelease fix\n")
+      commit_all(repo, "Independently reapply release fix")
+
+      git(repo, "checkout", "main")
+      git(repo, "revert", "--no-commit", fix_sha)
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Undo release regression manually",
+        "-m",
+        "This reverts commit #{fix_sha}."
+      )
+      git(repo, "merge", "--no-ff", "side-reapply", "-m", "Merge independent reapply")
+      restored_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("Nothing to cherry-pick")
+      expect(second_stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(restored_count)
+    end
+  end
+
+  it "skips source-sha reverts superseded by merged conflict-resolved -x reapplications" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "app.txt", "release branch\n")
+      fix_sha = commit_all(repo, "Fix release regression")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "app.txt", "main branch\n")
+      commit_all(repo, "Change same line on main")
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).not_to be_success
+      expect(first_stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(first_stderr).to include("Cherry-pick failed for #{fix_sha}")
+      write_file(repo, "app.txt", "main branch\nrelease branch\n")
+      git(repo, "add", "app.txt")
+      git(repo, "-c", "core.editor=true", "cherry-pick", "--continue")
+
+      git(repo, "checkout", "-b", "side-reapply", "main~1")
+      write_file(repo, "side.txt", "side branch marker\n")
+      commit_all(repo, "Prepare side branch")
+      _stdout, _stderr, side_status =
+        Open3.capture3(git_env, "git", "cherry-pick", "-x", fix_sha, chdir: repo)
+      expect(side_status).not_to be_success
+      write_file(repo, "app.txt", "main branch\nrelease branch\n")
+      git(repo, "add", "app.txt")
+      git(repo, "-c", "core.editor=true", "cherry-pick", "--continue")
+
+      git(repo, "checkout", "main")
+      _stdout, _stderr, revert_status =
+        Open3.capture3(git_env, "git", "revert", "--no-commit", fix_sha, chdir: repo)
+      expect(revert_status).not_to be_success
+      write_file(repo, "app.txt", "main branch\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Undo release regression manually",
+        "-m",
+        "This reverts commit #{fix_sha}."
+      )
+
+      _stdout, _stderr, merge_status =
+        Open3.capture3(git_env, "git", "merge", "--no-ff", "side-reapply", "-m", "Merge side reapply", chdir: repo)
+      unless merge_status.success?
+        write_file(repo, "app.txt", "main branch\nrelease branch\n")
+        git(repo, "add", "app.txt")
+        git(repo, "commit", "--no-gpg-sign", "-m", "Merge side reapply")
+      end
+      restored_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "app.txt"))).to eq("main branch\nrelease branch\n")
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(second_stdout).to include("Nothing to cherry-pick")
+      expect(second_stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(restored_count)
+    end
+  end
+
+  it "does not treat -x side commits merged with ours as source-revert supersession" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).to be_success, first_stderr
+      expect(first_stdout).to include("Forward-port complete")
+
+      base_sha = git(repo, "rev-parse", "main~1").strip
+      git(repo, "checkout", "-b", "side-reapply", base_sha)
+      write_file(repo, "side.txt", "side branch marker\n")
+      commit_all(repo, "Prepare side branch")
+      git(repo, "cherry-pick", "-x", fix_sha)
+
+      git(repo, "checkout", "main")
+      git(repo, "revert", "--no-commit", fix_sha)
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Undo release regression manually",
+        "-m",
+        "This reverts commit #{fix_sha}."
+      )
+      git(repo, "merge", "--no-ff", "-s", "ours", "side-reapply", "-m", "Merge side but keep reverted content")
+      reverted_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\n")
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(second_stdout).not_to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+      expect(git(repo, "rev-list", "--count", "main").strip.to_i).to eq(reverted_count.to_i + 1)
+    end
+  end
+
+  it "ignores source-sha reverts merged with ours when the target kept the fix" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).to be_success, first_stderr
+      expect(first_stdout).to include("Forward-port complete")
+
+      git(repo, "checkout", "-b", "side-revert")
+      git(repo, "revert", "--no-edit", fix_sha)
+      git(repo, "checkout", "main")
+      git(repo, "merge", "--no-ff", "-s", "ours", "side-revert", "-m", "Merge side revert but keep fix")
+      kept_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(second_stdout).to include("Nothing to cherry-pick")
+      expect(second_stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(kept_count)
+    end
+  end
+
+  it "keeps stable version bumps manual after source-sha reverts" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
+      stable_bump_sha = commit_all(repo, "Bump version to 1.0.1")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "target.txt", "target-only work\n")
+      commit_all(repo, "Advance target branch")
+      git(repo, "cherry-pick", stable_bump_sha)
+      git(repo, "revert", "--no-edit", stable_bump_sha)
+      restored_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "react_on_rails/lib/react_on_rails/version.rb"))).to include("1.0.0")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("MANUAL #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).to include("stable release version bump commit")
+      expect(stdout).not_to include("PICK #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(restored_count)
+      expect(File.read(File.join(repo, "react_on_rails/lib/react_on_rails/version.rb"))).to include("1.0.0")
+    end
+  end
+
   it "skips an -x cherry-pick restored by reverting its revert" do
     with_release_repo do |repo|
       add_rc_bump_and_fix(repo)
@@ -818,6 +1202,26 @@ RSpec.describe "script/release-forward-port" do
       expect(stderr).to include("--ack-manual #{stable_bump_sha}")
       expect(stdout).not_to include("Forward-port complete")
       expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+    end
+  end
+
+  it "requires a clean worktree before completing acknowledged manual-only plans" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
+      write_file(repo, "CHANGELOG.md", "# Change Log\n\n### [1.0.1]\n- Final notes\n")
+      stable_bump_sha = commit_all(repo, "Bump version to 1.0.1")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "CHANGELOG.md", "# Change Log\n\n### [1.0.1]\n- Manually copied final notes\n")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--ack-manual", stable_bump_sha)
+
+      expect(status).not_to be_success
+      expect(stdout).to include("ACK-MANUAL #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).not_to include("Nothing to cherry-pick")
+      expect(stderr).to include("working tree is not clean")
     end
   end
 
