@@ -44,7 +44,7 @@ const resolveSameOriginRequestUrl = (url: string): string | null => {
   }
 
   try {
-    const resolvedUrl = new URL(url, document.baseURI);
+    const resolvedUrl = new URL(url, currentLocation.href);
     if (
       (resolvedUrl.protocol === 'http:' || resolvedUrl.protocol === 'https:') &&
       resolvedUrl.origin === currentLocation.origin
@@ -61,7 +61,10 @@ const resolveSameOriginRequestUrl = (url: string): string | null => {
 const parseJsonBody = async (response: Response): Promise<unknown> => {
   try {
     return (await response.json()) as unknown;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
     return null;
   }
 };
@@ -80,14 +83,49 @@ const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
   );
 };
 
-const warnOnDiscardedDeleteBody = (method: string, bodyOption: unknown): void => {
-  if (process.env.NODE_ENV === 'production' || method !== 'DELETE' || bodyOption === undefined) {
+const warnOnDiscardedDeleteBody = (method: string, requestBody: unknown): boolean => {
+  if (
+    process.env.NODE_ENV === 'production' ||
+    method !== 'DELETE' ||
+    requestBody === undefined ||
+    requestBody === null
+  ) {
+    return false;
+  }
+
+  console.warn(
+    '[createRailsAction] A DELETE request resolved a JSON body that will not be sent. ' +
+      'Use `body: () => null` when variables only populate the path, or identify the resource in the URL instead.',
+  );
+  return true;
+};
+
+const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
+  if (typeof FormData !== 'undefined' && requestBody instanceof FormData) {
+    return 'FormData';
+  }
+  if (typeof Blob !== 'undefined' && requestBody instanceof Blob) {
+    return 'Blob';
+  }
+  if (typeof URLSearchParams !== 'undefined' && requestBody instanceof URLSearchParams) {
+    return 'URLSearchParams';
+  }
+  return null;
+};
+
+const warnOnNonJsonBodyValue = (requestBody: unknown, hasJsonBody: boolean): void => {
+  if (process.env.NODE_ENV === 'production' || !hasJsonBody) {
+    return;
+  }
+
+  const bodyTypeName = nonJsonBodyTypeName(requestBody);
+  if (bodyTypeName === null) {
     return;
   }
 
   console.warn(
-    '[createRailsAction] A `body` option was supplied for a DELETE request but will not be sent. ' +
-      'Identify the resource in the URL instead.',
+    `[createRailsAction] The body callback returned ${bodyTypeName}, which cannot be JSON serialized correctly. ` +
+      'Return a plain JSON value, null, or undefined instead.',
   );
 };
 
@@ -163,7 +201,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
   options: RailsActionOptions<TVariables>,
 ): RailsActionCaller<TVariables, TResponse> {
   const method = (options.method ?? 'POST').toUpperCase();
-  warnOnDiscardedDeleteBody(method, options.body);
+  let warnedOnDiscardedDeleteBody = false;
 
   const callRailsAction = async (
     variables?: TVariables,
@@ -187,6 +225,10 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
 
     const requestBody = options.body !== undefined ? options.body(typedVariables) : variables;
     const hasJsonBody = method !== 'DELETE' && requestBody !== undefined && requestBody !== null;
+    if (!warnedOnDiscardedDeleteBody) {
+      warnedOnDiscardedDeleteBody = warnOnDiscardedDeleteBody(method, requestBody);
+    }
+    warnOnNonJsonBodyValue(requestBody, hasJsonBody);
     let response: Response;
     try {
       response = await fetch(requestUrl, {

@@ -197,7 +197,7 @@ Use `body` when the Rails endpoint expects a wrapper that differs from the varia
 const archiveProject = createRailsAction<{ id: number }, RailsResponseType<'projects.archive'>>({
   method: 'PATCH',
   path: ({ id }) => `/api/projects/${id}/archive`,
-  body: () => ({}),
+  body: () => null,
 });
 ```
 

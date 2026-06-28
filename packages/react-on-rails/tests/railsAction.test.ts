@@ -28,7 +28,7 @@ const mockResponse = (options: MockResponseOptions = {}): Response => {
       }
       bodyUsed = true;
       if (body === null || typeof body === 'string') {
-        return Promise.reject(new Error('no JSON body'));
+        return Promise.reject(new SyntaxError('no JSON body'));
       }
       return Promise.resolve(body);
     },
@@ -81,7 +81,7 @@ describe('createRailsAction', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe(new URL('/api/projects', document.baseURI).href);
+    expect(url).toBe(new URL('/api/projects', window.location.href).href);
     expect(init.method).toBe('POST');
     expect(init.mode).toBe('same-origin');
     expect(init.credentials).toBe('same-origin');
@@ -112,7 +112,7 @@ describe('createRailsAction', () => {
     );
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe(new URL('/api/projects/3', document.baseURI).href);
+    expect(url).toBe(new URL('/api/projects/3', window.location.href).href);
     expect(init.method).toBe('PATCH');
     expect(init.signal).toBe(abortController.signal);
     expect(init.body).toBe(JSON.stringify({ project: { name: 'Hermes' } }));
@@ -121,6 +121,25 @@ describe('createRailsAction', () => {
     expect(headerValue(init.headers, 'X-Requested-With')).toBe('XMLHttpRequest');
     expect(headerValue(init.headers, 'X-Project-Id')).toBe('3');
     expect(headerValue(init.headers, 'X-Request-Source')).toBe('test');
+  });
+
+  it('resolves relative paths against the current location when a base tag is present', async () => {
+    const base = document.createElement('base');
+    base.href = 'https://cdn.example.com/assets/';
+    document.head.appendChild(base);
+
+    try {
+      const createProject = createRailsAction<{ name: string }, { ok: true }>({
+        path: '/api/projects',
+      });
+
+      await createProject({ name: 'Apollo' });
+
+      const [url] = fetchMock.mock.calls[0];
+      expect(url).toBe(new URL('/api/projects', window.location.href).href);
+    } finally {
+      base.remove();
+    }
   });
 
   it('omits the JSON body and content type when called without variables', async () => {
@@ -152,23 +171,30 @@ describe('createRailsAction', () => {
   });
 
   it('omits the JSON body for DELETE requests even when variables are provided', async () => {
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
-    const deleteProject = createRailsAction<{ id: number }, null>({
-      method: 'DELETE',
-      path: ({ id }) => `/api/projects/${id}`,
-    });
 
-    await expect(deleteProject({ id: 7 })).resolves.toBeNull();
+    try {
+      const deleteProject = createRailsAction<{ id: number }, null>({
+        method: 'DELETE',
+        path: ({ id }) => `/api/projects/${id}`,
+      });
 
-    const [, init] = fetchMock.mock.calls[0];
-    expect(init.method).toBe('DELETE');
-    expect(init.body).toBeUndefined();
-    expect(headerValue(init.headers, 'Content-Type')).toBeNull();
+      await expect(deleteProject({ id: 7 })).resolves.toBeNull();
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.method).toBe('DELETE');
+      expect(init.body).toBeUndefined();
+      expect(headerValue(init.headers, 'Content-Type')).toBeNull();
+      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('resolved a JSON body'));
+    } finally {
+      consoleWarn.mockRestore();
+    }
   });
 
-  it('warns once and omits the JSON body when a DELETE action has a body option', async () => {
+  it('warns once and omits the JSON body when a DELETE action resolves a body', async () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    fetchMock.mockResolvedValue(mockResponse({ status: 204 }));
+    fetchMock.mockImplementation(() => Promise.resolve(mockResponse({ status: 204 })));
 
     try {
       const deleteProject = createRailsAction<{ id: number; reason: string }, null>({
@@ -177,12 +203,13 @@ describe('createRailsAction', () => {
         body: ({ reason }) => ({ reason }),
       });
 
-      expect(consoleWarn).toHaveBeenCalledTimes(1);
-      expect(consoleWarn).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE request but will not be sent'),
-      );
+      expect(consoleWarn).not.toHaveBeenCalled();
 
       await expect(deleteProject({ id: 7, reason: 'spam' })).resolves.toBeNull();
+
+      expect(consoleWarn).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('resolved a JSON body'));
+
       await expect(deleteProject({ id: 8, reason: 'spam' })).resolves.toBeNull();
 
       const [, init] = fetchMock.mock.calls[0];
@@ -194,20 +221,22 @@ describe('createRailsAction', () => {
     }
   });
 
-  it('warns before fetch when a DELETE action is created with a body option', () => {
+  it('does not warn when a DELETE action resolves a null body', async () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
 
     try {
-      createRailsAction<{ id: number }, null>({
+      const deleteProject = createRailsAction<{ id: number }, null>({
         method: 'DELETE',
         path: ({ id }) => `/api/projects/${id}`,
         body: () => null,
       });
 
-      expect(consoleWarn).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE request but will not be sent'),
-      );
-      expect(fetchMock).not.toHaveBeenCalled();
+      await expect(deleteProject({ id: 7 })).resolves.toBeNull();
+
+      expect(consoleWarn).not.toHaveBeenCalled();
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.body).toBeUndefined();
     } finally {
       consoleWarn.mockRestore();
     }
@@ -315,6 +344,38 @@ describe('createRailsAction', () => {
     if (caughtError instanceof RailsActionRequestError) {
       expect(caughtError.responseBody).toBeNull();
       await expect(caughtError.response.text()).resolves.toBe('<html>boom</html>');
+    }
+  });
+
+  it('propagates response body stream errors instead of treating them as empty JSON', async () => {
+    const bodyError = new TypeError('body already used');
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.reject(bodyError),
+    } as unknown as Response);
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    await expect(createProject({ name: 'Apollo' })).rejects.toBe(bodyError);
+  });
+
+  it('warns in development when the body callback returns a non-JSON body value', async () => {
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+      body: ({ name }) => new URLSearchParams({ name }),
+    });
+
+    try {
+      await createProject({ name: 'Apollo' });
+
+      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('URLSearchParams'));
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.body).toBe('{}');
+    } finally {
+      consoleWarn.mockRestore();
     }
   });
 
