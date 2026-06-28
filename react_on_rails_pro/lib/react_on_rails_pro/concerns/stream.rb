@@ -171,7 +171,8 @@ module ReactOnRailsPro
       desc = "RoR Pro streamed RSC shell render (includes first renderer chunk)"
       entry = "ror_stream_shell;dur=#{duration};desc=\"#{desc}\""
       existing = response.headers["Server-Timing"]
-      response.headers["Server-Timing"] = existing.present? ? "#{existing}, #{entry}" : entry
+      entries = Array(existing).flatten.compact.reject(&:blank?) + [entry]
+      response.headers["Server-Timing"] = entries.join(", ")
     rescue StandardError => e
       # Observability must never break a real response. Swallow and log.
       begin

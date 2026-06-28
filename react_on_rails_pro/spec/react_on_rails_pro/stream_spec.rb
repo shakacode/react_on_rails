@@ -225,6 +225,20 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(server_timing).to start_with("action_total;dur=5, ror_stream_shell;dur=")
     end
 
+    it "appends to array-valued Server-Timing headers without stringifying the array" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      allow(stream).to receive(:write)
+      controller.response.headers["Server-Timing"] = ["cdn-cache;dur=10"]
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        sleep 0.1
+      end
+
+      server_timing = controller.response.headers["Server-Timing"]
+      expect(server_timing).to start_with("cdn-cache;dur=10, ror_stream_shell;dur=")
+      expect(server_timing).not_to include("[")
+    end
+
     it "swallows Server-Timing header emission errors even when logging fails" do
       _queues, controller, _stream = setup_stream_test(component_count: 0)
       failing_headers = instance_double(Hash)
