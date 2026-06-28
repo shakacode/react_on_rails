@@ -33,12 +33,12 @@ the libraries are complementary, and only the framework is a genuine either/or.
 
 ## "TanStack" is two different things
 
-| What                | What it is                                                                   | Role for a Rails team                                                                                                                   |
-| ------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **TanStack Query**  | Client-side server-state cache (fetch, cache, invalidate)                    | **Complement.** Point it at a Rails JSON API.                                                                                           |
-| **TanStack Router** | Type-safe client router with data loading + search-param validation          | **Complement.** Client-only works in OSS; SSR is a Pro feature (see [TanStack Router](../../oss/building-features/tanstack-router.md)). |
-| **TanStack Table**  | Headless table/data-grid primitives                                          | **Complement.** Renders from Rails-served data.                                                                                         |
-| **TanStack Start**  | Full-stack React framework (TanStack Router + Vite/Nitro + server functions) | **Substitute.** This is the layer that overlaps with Rails.                                                                             |
+| What                | What it is                                                                     | Role for a Rails team                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **TanStack Query**  | Client-side server-state cache (fetch, cache, invalidate)                      | **Complement.** Point it at a Rails JSON API.                                                                                           |
+| **TanStack Router** | Type-safe client router with data loading + search-param validation            | **Complement.** Client-only works in OSS; SSR is a Pro feature (see [TanStack Router](../../oss/building-features/tanstack-router.md)). |
+| **TanStack Table**  | Headless table/data-grid primitives                                            | **Complement.** Renders from Rails-served data.                                                                                         |
+| **TanStack Start**  | Full-stack React framework (TanStack Router + Vite + Nitro + server functions) | **Substitute.** This is the layer that overlaps with Rails.                                                                             |
 
 Adopting Query, Router, and Table does **not** require leaving Rails — React on Rails apps use them on
 top of a Rails backend today. The only part you are choosing _between_ is the framework: **TanStack
@@ -104,9 +104,9 @@ is solving a problem you have already solved, in a second language.
 - **TanStack Start** is **SSR-first**: routes are server-rendered by default. It offers fine-grained
   **selective SSR** — opt a route out with `ssr: false` or `ssr: 'data-only'`, or use SPA mode — which
   is a genuine strength for tuning per-route rendering.
-- **React on Rails** server-renders React from Rails (via the Node renderer in Pro), and **React on
-  Rails Pro** adds streaming SSR and RSC: the HTML shell streams immediately and server-rendered data
-  streams in progressively. TanStack Router state can be SSR'd and hydrated via Pro
+- **React on Rails** server-renders React from Rails — in open-source via ExecJS, or via the Node
+  renderer in **React on Rails Pro**, which adds streaming SSR and RSC: the HTML shell streams
+  immediately and server-rendered data streams in progressively. TanStack Router state can be SSR'd and hydrated via Pro
   ([TanStack Router](../../oss/building-features/tanstack-router.md)), and a TanStack Query cache can be
   seeded from Rails so the first page of data is in the initial HTML rather than fetched after
   hydration.
