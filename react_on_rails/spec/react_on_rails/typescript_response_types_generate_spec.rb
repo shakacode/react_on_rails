@@ -31,5 +31,15 @@ module ReactOnRails
         end.to raise_error(ReactOnRails::Error, /must be inside Rails\.root/)
       end
     end
+
+    it "rejects Rails.root itself as an output path" do
+      Dir.mktmpdir do |dir|
+        allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+
+        expect do
+          described_class.generate(output_path: dir)
+        end.to raise_error(ReactOnRails::Error, /must be inside Rails\.root/)
+      end
+    end
   end
 end

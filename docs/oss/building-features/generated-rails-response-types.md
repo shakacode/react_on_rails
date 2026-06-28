@@ -72,7 +72,7 @@ bundle exec rake react_on_rails:generate_response_types
 By default, the task writes:
 
 ```text
-app/javascript/generated/react_on_rails_response_types.d.ts
+app/javascript/types/react_on_rails_response_types.d.ts
 ```
 
 Override the destination when needed:
@@ -107,7 +107,8 @@ export interface RailsResponseTypes {
   "projects.index": ProjectsIndexResponse;
 }
 
-export type RailsResponseType<TName extends keyof RailsResponseTypes> = RailsResponseTypes[TName];
+export type RailsResponseTypeName = keyof RailsResponseTypes;
+export type RailsResponseType<TName extends RailsResponseTypeName> = RailsResponseTypes[TName];
 ```
 
 ## Use With TanStack Query
@@ -116,7 +117,7 @@ Import either the concrete response type or the keyed lookup helper:
 
 ```tsx
 import { useQuery } from '@tanstack/react-query';
-import type { RailsResponseType } from '../generated/react_on_rails_response_types';
+import type { RailsResponseType } from '../types/react_on_rails_response_types';
 import { apiFetch } from '../lib/apiFetch';
 
 type ProjectsIndexResponse = RailsResponseType<'projects.index'>;
@@ -147,14 +148,15 @@ controller/action-style name such as `projects.index` so later route changes do 
 Use symbols for built-in scalar aliases and strings for named TypeScript contract references.
 String references must match a registered contract `type_name`; unknown identifiers fail generation.
 
-When an object field itself has a property named `type`, wrap it in `fields:` so the contract is
-unambiguous:
+When an object field itself uses option-like property names (`type`, `array`, `fields`, `nullable`, or
+`optional`), wrap it in `fields:` so the contract is unambiguous:
 
 ```ruby
 fields: {
   event: {
     fields: {
       type: :string,
+      optional: :boolean,
       payload: :json
     }
   }
