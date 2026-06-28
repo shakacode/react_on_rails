@@ -5397,6 +5397,29 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages)
         .to include(a_string_including("Rspack lazyCompilation can leave the RSC client manifest empty"))
     end
+
+    it "describes the detector limitation instead of asserting lazyCompilation is enabled for equivalent configs" do
+      # Issue #4243: equivalent configs (here Object.assign) effectively set
+      # lazyCompilation: false, but the static check only recognizes the literal
+      # generated assignment. The warning must not claim lazyCompilation is still enabled.
+      File.write(
+        "config/rspack/development.js",
+        "Object.assign(clientWebpackConfig, { lazyCompilation: false });\n"
+      )
+
+      doctor.send(:check_rsc_rspack_lazy_compilation)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(warning_messages)
+        .to include(a_string_including("could not confirm lazyCompilation is disabled"))
+      expect(warning_messages).not_to include(a_string_including("does not appear to disable"))
+      expect(info_messages)
+        .to include(a_string_including("disable lazyCompilation another way"))
+      # An equivalent config must not also produce a spurious success alongside the warning.
+      expect(success_messages).to be_empty
+    end
   end
 
   describe "check_rsc_react_version" do
