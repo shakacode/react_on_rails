@@ -4304,6 +4304,37 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when Tailwind RSC fallback creates a new layout after earlier layouts are unusable" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_layout_missing_stylesheet_pack_tag("hello_world")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force", "--tailwind"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "creates a Tailwind-aware fallback layout" do
+      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+        expect(content).to include("<%= javascript_pack_tag %>")
+      end
+    end
+  end
+
   context "when earlier layouts are unusable and a compatible react_on_rails_rsc layout already exists" do
     before(:all) do
       prepare_destination

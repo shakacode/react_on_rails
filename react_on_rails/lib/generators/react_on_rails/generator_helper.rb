@@ -18,7 +18,7 @@ module GeneratorHelper
     \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
     [ \t]*<%=\s*stylesheet_pack_tag(?:\s|\()
     \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
-    [ \t]*<%=\s*javascript_pack_tag(?:\s|\(|%>)
+    [ \t]*<%=\s*javascript_pack_tag\s*%>
   /x
   HTML_COMMENT_PATTERN = /<!--(?:[^-]|-(?!-)|--(?!>))*-->/m
   CONTROLLER_LAYOUT_DECLARATION_PATTERN =
@@ -123,17 +123,6 @@ module GeneratorHelper
     File.join(shakapacker_source_path, "stylesheets", filename)
   end
 
-  def relative_stylesheet_import_path(entry_path, filename: "application.css")
-    # InstallGenerator copies the final Shakapacker config before path-dependent demo files are generated.
-    safe_entry_path = safe_generator_destination_path(entry_path, default: nil)
-    raise ArgumentError, "entry_path must stay inside the generator destination" if safe_entry_path.nil?
-
-    entry_dir = Pathname.new(File.join(destination_root, safe_entry_path)).dirname
-    stylesheet = Pathname.new(File.join(destination_root, shakapacker_stylesheet_path(filename)))
-
-    stylesheet.relative_path_from(entry_dir).to_s
-  end
-
   def tailwind_pack_name
     TAILWIND_PACK_NAME
   end
@@ -204,6 +193,17 @@ module GeneratorHelper
     return "application" unless File.exist?(application_controller_path)
 
     extract_declared_layout_name(File.read(application_controller_path)) || "application"
+  end
+
+  def layout_destination_path(layout_name)
+    "app/views/layouts/#{layout_name}.html.erb"
+  end
+
+  def layout_file_links_tailwind_pack?(layout_name)
+    layout_full_path = File.join(destination_root, layout_destination_path(layout_name))
+    return false unless File.exist?(layout_full_path)
+
+    layout_links_tailwind_pack?(File.read(layout_full_path))
   end
 
   def example_component_source_directory(component_name)

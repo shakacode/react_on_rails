@@ -292,15 +292,6 @@ module ReactOnRails
         layout_file_links_tailwind_pack?(layout_name)
       end
 
-      def layout_file_links_tailwind_pack?(layout_name)
-        layout_path = layout_destination_path(layout_name)
-        layout_full_path = File.join(destination_root, layout_path)
-
-        return false unless File.exist?(layout_full_path)
-
-        layout_links_tailwind_pack?(File.read(layout_full_path))
-      end
-
       def add_rsc_routes
         routes_file = File.join(destination_root, "config/routes.rb")
 

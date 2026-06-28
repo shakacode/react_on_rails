@@ -62,14 +62,10 @@ module ReactOnRails
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.#{ext}",
                   "#{component_dir}/ror_components/HelloWorldApp.server.#{ext}")
 
-        unless use_tailwind?
-          copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
-                    "#{component_dir}/components/HelloWorld.module.css")
-        end
+        return if use_tailwind?
 
-        return unless use_tailwind? && options[:pretend]
-
-        say_status :pretend, "Tailwind stylesheet would be linked from the React on Rails layout", :yellow
+        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
+                  "#{component_dir}/components/HelloWorld.module.css")
       end
 
       def copy_base_redux_files

@@ -460,7 +460,7 @@ module ReactOnRails
         return unless File.exist?(controller_full_path)
 
         layout_name = extract_declared_layout_name(File.read(controller_full_path)) || inherited_application_layout_name
-        return if layout_name_links_tailwind_pack?(layout_name)
+        return if layout_file_links_tailwind_pack?(layout_name)
 
         say_status :warning, "#{controller_path} may not use the Tailwind-aware React on Rails layout.", :yellow
         say <<~MSG, :yellow
@@ -468,14 +468,6 @@ module ReactOnRails
 
           #{tailwind_layout_helper_block}
         MSG
-      end
-
-      def layout_name_links_tailwind_pack?(layout_name)
-        layout_path = "app/views/layouts/#{layout_name}.html.erb"
-        layout_full_path = File.join(destination_root, layout_path)
-        return false unless File.exist?(layout_full_path)
-
-        layout_links_tailwind_pack?(File.read(layout_full_path))
       end
 
       def tailwind_layout_helper_block(indent = "")

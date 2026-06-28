@@ -373,39 +373,6 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
-  describe "#relative_stylesheet_import_path" do
-    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
-
-    before do
-      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
-      File.write(shakapacker_yml_path, <<~YAML)
-        development:
-          source_path: client/app
-      YAML
-      reset_shakapacker_memoization!
-    end
-
-    after do
-      FileUtils.rm_rf(File.join(destination_root, "config"))
-      reset_shakapacker_memoization!
-    end
-
-    it "computes the stylesheet import path from the generated entry file" do
-      expect(relative_stylesheet_import_path("client/app/src/HelloServer/components/LikeButton.jsx"))
-        .to eq("../../../stylesheets/application.css")
-    end
-
-    it "adjusts when the generated entry moves deeper under the source path" do
-      expect(relative_stylesheet_import_path("client/app/src/HelloServer/components/nested/LikeButton.jsx"))
-        .to eq("../../../../stylesheets/application.css")
-    end
-
-    it "rejects entry paths outside the generator destination" do
-      expect { relative_stylesheet_import_path("../../outside/LikeButton.jsx") }
-        .to raise_error(ArgumentError, "entry_path must stay inside the generator destination")
-    end
-  end
-
   describe "Tailwind layout pack helpers" do
     let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
 

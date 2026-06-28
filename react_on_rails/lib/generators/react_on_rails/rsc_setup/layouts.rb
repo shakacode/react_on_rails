@@ -123,10 +123,6 @@ module ReactOnRails
           end
         end
 
-        def layout_destination_path(layout_name)
-          "app/views/layouts/#{layout_name}.html.erb"
-        end
-
         def layout_has_required_pack_tags?(layout_content)
           pack_tag_present?(layout_content, "javascript_pack_tag") &&
             pack_tag_present?(layout_content, "stylesheet_pack_tag")
@@ -185,7 +181,8 @@ module ReactOnRails
 
           say "📝 Creating #{layout_path} for HelloServerController...", :yellow
           empty_directory("app/views/layouts")
-          copy_file("templates/base/base/app/views/layouts/react_on_rails_default.html.erb", layout_path)
+          template_dir = use_tailwind? ? "base/tailwind" : "base/base"
+          copy_file("templates/#{template_dir}/app/views/layouts/react_on_rails_default.html.erb", layout_path)
           say "✅ Created #{layout_path}", :green
 
           layout_name
@@ -200,8 +197,16 @@ module ReactOnRails
 
             Those file(s) do not include both `stylesheet_pack_tag` and `javascript_pack_tag`, so the generator
             will create #{new_layout_path} instead of overwriting them.
-            New generated layouts use empty pack tags by default.
+            #{fallback_layout_description}
           MSG
+        end
+
+        def fallback_layout_description
+          if use_tailwind?
+            "The new generated layout will include the layout-owned Tailwind pack block."
+          else
+            "New generated layouts use empty pack tags by default."
+          end
         end
 
         def next_available_hello_server_layout_name
