@@ -264,6 +264,7 @@ module ReactOnRails
         base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         copy_react_on_rails_default_layout(base_path)
+        warn_existing_hello_world_tailwind_layout
         base_templates.each do |file|
           template("#{base_path}/#{file}.tt", file)
         end
@@ -449,6 +450,37 @@ module ReactOnRails
           tailwind_layout_helper_block(layout_match[:indent])
         end
         ensure_generated_layout_head_tags(REACT_ON_RAILS_DEFAULT_LAYOUT_PATH)
+      end
+
+      def warn_existing_hello_world_tailwind_layout
+        return unless use_tailwind?
+
+        controller_path = "app/controllers/hello_world_controller.rb"
+        controller_full_path = File.join(destination_root, controller_path)
+        return unless File.exist?(controller_full_path)
+
+        layout_name = literal_controller_layout_name(File.read(controller_full_path)) || "application"
+        return if layout_name_links_tailwind_pack?(layout_name)
+
+        say_status :warning, "#{controller_path} may not use the Tailwind-aware React on Rails layout.", :yellow
+        say <<~MSG, :yellow
+          Ensure app/views/layouts/#{layout_name}.html.erb includes:
+
+          #{tailwind_layout_helper_block}
+        MSG
+      end
+
+      def literal_controller_layout_name(controller_content)
+        match = controller_content.match(/^\s*layout(?:\s+|\s*\(\s*)(?:"([^"]+)"|'([^']+)')(?=\s*(?:\)|,|#|$))/)
+        match&.captures&.compact&.first
+      end
+
+      def layout_name_links_tailwind_pack?(layout_name)
+        layout_path = "app/views/layouts/#{layout_name}.html.erb"
+        layout_full_path = File.join(destination_root, layout_path)
+        return false unless File.exist?(layout_full_path)
+
+        layout_links_tailwind_pack?(File.read(layout_full_path))
       end
 
       def tailwind_layout_helper_block(indent = "")

@@ -1434,6 +1434,31 @@ describe InstallGenerator, type: :generator do
         expect(content).to eq(original_layout)
       end
     end
+
+    it "warns when the existing HelloWorldController renders through a non-Tailwind layout" do
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          layout "hello_world"
+
+          def index
+          end
+        end
+      RUBY
+      simulate_named_pack_tag_layout("hello_world")
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:warn_existing_hello_world_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(
+          :warning,
+          "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout.",
+          :yellow
+        )
+      expect(base_generator).to have_received(:say)
+        .with(include('prepend_javascript_pack_tag "react_on_rails_tailwind"'), :yellow)
+    end
   end
 
   context "with --tailwind --no-rspack" do
