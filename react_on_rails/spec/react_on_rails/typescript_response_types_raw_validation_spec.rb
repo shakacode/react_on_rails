@@ -222,6 +222,33 @@ RSpec.describe "TypeScript response type raw validation" do
     end.to raise_error(ReactOnRails::Error, /Modifier-only response type spec.*:type, :array, :fields, or :raw/)
   end
 
+  it "rejects non-boolean modifier values" do
+    response_types.define_response(
+      "payload.show",
+      type_name: "PayloadShowResponse",
+      fields: {
+        name: { type: :string, optional: "false" }
+      }
+    )
+
+    expect do
+      response_types.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /:optional modifier must be true or false/)
+
+    response_types.reset!
+    response_types.define_response(
+      "payload.show",
+      type_name: "PayloadShowResponse",
+      fields: {
+        name: { nullable: "false" }
+      }
+    )
+
+    expect do
+      response_types.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /:nullable modifier must be true or false/)
+  end
+
   it "reports unknown option keys on wrapper-looking specs" do
     response_types.define_response(
       "payload.show",

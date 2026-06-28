@@ -43,6 +43,20 @@ module ReactOnRails
       end
     end
 
+    it "rejects existing directories as output paths" do
+      Dir.mktmpdir do |dir|
+        allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+        described_class.define_response("health.show", type_name: "HealthResponse", fields: { ok: :boolean })
+        output_dir = File.join(dir, "generated")
+        FileUtils.mkdir_p(output_dir)
+
+        expect do
+          described_class.generate(output_path: "generated")
+        end.to raise_error(ReactOnRails::Error, /must be inside Rails\.root/)
+        expect(Dir.children(output_dir)).to be_empty
+      end
+    end
+
     it "rejects output paths that escape Rails.root through a symlink" do
       Dir.mktmpdir do |dir|
         Dir.mktmpdir do |outside_dir|
