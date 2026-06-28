@@ -98,11 +98,9 @@ ReactOnRailsPro.configure do |config|
   # When a Fiber.scheduler already exists before the renderer request enters `Sync {}`, the
   # client is reused across requests within that long-lived scheduler (persistent connection /
   # keep-alive; see the tuning section below), so this limit bounds streamed renders sharing one client.
-  # Under standard Puma streaming, `Sync {}` creates a per-request scheduler and the client is
-  # cleaned up when that response ends; the stream limit still applies within the
-  # streaming request.
-  # When no scheduler exists before the renderer request, the adapter uses a request-scoped client. See
-  # "Renderer Performance Tuning for Streamed RSC" below.
+  # Otherwise the adapter uses a request-scoped client. Under standard Puma streaming, `Sync {}`
+  # creates that scheduler/client for the response and cleans it up when the response ends.
+  # See "Renderer Performance Tuning for Streamed RSC" below.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
 
@@ -186,7 +184,7 @@ The dominant contributors to a streamed route's `responseEnd` tail are Node rend
 Each worker compiles its bundle on its **first** render request, so the first measured render after a deploy is cold. Pre-warm every worker before serving real traffic so cold-start cost does not land on a user (or skew a benchmark):
 
 - Send a warm-up render (or hit `/ready` after a warm-up render) to each replica during deploy.
-- With `workersCount > 1`, a single warm-up render is not enough — the load balancer may route it to one worker. Fan out enough warm-up renders to reach **every** worker, or run a single worker intentionally.
+- With `workersCount > 1`, a single warm-up render is not enough. Route warm-up traffic so it reaches **every** worker under your actual load-balancing policy; sticky or hash-based routing may require replica-local hooks or an explicit fan-out endpoint.
 
 Full warm-up patterns (Kubernetes probes, `postStart` hooks, the `/ready` cold-start contract) are in [Node renderer health checks → Gating traffic on `/ready`](../building-features/node-renderer/health-checks.md#gating-traffic-on-ready).
 
@@ -204,7 +202,7 @@ Guidance:
 - With Falcon or another long-lived scheduler, keep `renderer_http_pool_size` close to (and generally not far above) `workersCount`; streamed renders sharing that scheduler multiplex through the same async-http client, and sending many more concurrent renderer requests than there are workers just queues renders at the renderer while adding stream overhead.
 - Under standard Puma streaming, `Sync {}` creates a request-scoped client, so `renderer_http_pool_size` only bounds concurrent renderer calls inside one streamed response. Use a value near the number of renderer calls one response can overlap; scale `workersCount` and renderer replicas for cross-request concurrency.
 - Account for your Rails concurrency: with many Puma threads/workers all streaming, a renderer with only one or two workers becomes the bottleneck. Scale `workersCount` (and renderer replicas) to your real concurrent streamed-render load.
-- Raise `ssr_timeout` for long-running streamed responses — it is the per-read socket timeout on the renderer connection. It fires when the renderer sends no data during a single read for `ssr_timeout` seconds, not when the total response duration exceeds that value.
+- Tune `ssr_timeout` for legitimate long gaps between streamed chunks — it is the per-read socket timeout on the renderer connection. It fires when the renderer sends no data during a single read for `ssr_timeout` seconds, not when the total response duration exceeds that value; avoid masking renderer hangs with an unnecessarily high value.
 
 ### 3. Rails ↔ renderer keep-alive (persistent on Falcon/async scheduler; per-request on standard Puma)
 
