@@ -1506,6 +1506,14 @@ describe('RSCRoute successful-version error reset', () => {
       });
     };
 
+    const rejectLoad = async (started: Awaited<ReturnType<typeof startLoad>>, message: string) => {
+      await act(async () => {
+        started.deferred.reject(new Error(message));
+        await expect(started.promise).rejects.toThrow(message);
+        await flushMacrotasks();
+      });
+    };
+
     // Give ids 0..CACHE_CAP a successful payload. Loading the (cap+1)-th key
     // evicts id 0 and records its "last successful payload was evicted" marker.
     for (let id = 0; id <= CACHE_CAP; id += 1) {
@@ -1531,11 +1539,7 @@ describe('RSCRoute successful-version error reset', () => {
       await resolveLoad(started, <span>{`marker churn ${id}`}</span>);
     }
 
-    await act(async () => {
-      failedReplacement.deferred.reject(new Error('replacement boom 0'));
-      await expect(failedReplacement.promise).rejects.toThrow('replacement boom 0');
-      await flushMacrotasks();
-    });
+    await rejectLoad(failedReplacement, 'replacement boom 0');
 
     expect(fetchCount(0)).toBe(2);
     expect(rscApi.successfulVersions[key] ?? 0).toBe(0);
