@@ -64,6 +64,31 @@ assert_status() {
   fi
 }
 
+# General string equality (used for SHA / ref comparisons, where assert_status's
+# "expected exit N" wording would be misleading).
+assert_equal() {
+  local expected="$1"
+  local actual="$2"
+  local label="${3:-value}"
+  if [ "$expected" != "$actual" ]; then
+    fail "$label: expected '$expected', got '$actual'"
+    return 1
+  fi
+}
+
+# Initialize a git repo on a `main` branch portably. `git init -b main` needs
+# Git >= 2.28; on older Git it silently creates `master`, which would make the
+# later `main` assertions fail confusingly. Fall back to creating the branch
+# explicitly so the harness works on any supported Git.
+git_init_main() {
+  local dir="$1"
+  if git init -q -b main "$dir" 2>/dev/null; then
+    return 0
+  fi
+  git init -q "$dir"
+  git -C "$dir" symbolic-ref HEAD refs/heads/main
+}
+
 run_test() {
   local test_fn="$1"
   CURRENT_TEST="$test_fn"
@@ -120,7 +145,7 @@ setup_release_repo() {
   local origin_dir="$PWD/origin.git"
   git init -q --bare "$origin_dir"
 
-  git init -q -b main work
+  git_init_main work
   cd work || exit 1
   git config user.email test@example.com
   git config user.name "Release Finish Test"
@@ -183,7 +208,7 @@ test_promote_dry_run_does_not_execute_release() {
   if git rev-parse -q --verify refs/tags/v1.0.0 >/dev/null 2>&1; then
     fail "promote dry-run created the final tag v1.0.0"
   fi
-  assert_status "$head_before" "$(git rev-parse HEAD)" "promote dry-run HEAD unchanged"
+  assert_equal "$head_before" "$(git rev-parse HEAD)" "promote dry-run HEAD unchanged"
 }
 
 # --- promote: explicit rc tag ----------------------------------------------
@@ -212,15 +237,33 @@ test_promote_aborts_when_not_on_release_branch() {
 
 test_promote_aborts_when_tip_drifted_from_rc_tag() {
   setup_release_repo
-  # Add a commit after the rc tag so the tip no longer matches v1.0.0.rc.0.
+  # Add a content commit after the rc tag so the tip no longer matches v1.0.0.rc.0
+  # (different commit AND different tree). The identity check fires first.
   printf 'drift\n' > drift.txt
   git add .
   git commit -qm "post-rc drift"
   run_rf promote 1.0.0 --dry-run
 
   assert_status 1 "$RF_STATUS" "promote drift status"
-  assert_contains "$RF_OUT" "has drifted from the accepted RC tag v1.0.0.rc.0" "promote drift"
+  assert_contains "$RF_OUT" "is not the accepted RC commit v1.0.0.rc.0" "promote drift"
   assert_not_contains "$RF_OUT" "would run: bundle exec rake release" "promote drift should stop before release"
+}
+
+# #3: an EMPTY (or metadata-only) commit layered on top of the RC has the SAME
+# tree, so `git diff --stat <rc_tag>` is empty and would pass the tree check
+# alone. The commit-identity check must still abort: HEAD != the rc tag's SHA.
+test_promote_aborts_on_empty_commit_atop_rc_despite_equal_tree() {
+  setup_release_repo
+  git commit -q --allow-empty -m "empty commit on top of the RC"
+  # Sanity: the tree is unchanged vs the rc tag (the gap the old check missed).
+  if [ -n "$(git diff --stat v1.0.0.rc.0)" ]; then
+    fail "fixture invalid: expected an empty tree diff vs the rc tag"
+  fi
+  run_rf promote 1.0.0 --dry-run
+
+  assert_status 1 "$RF_STATUS" "promote empty-commit status"
+  assert_contains "$RF_OUT" "is not the accepted RC commit v1.0.0.rc.0" "promote empty-commit message"
+  assert_not_contains "$RF_OUT" "would run: bundle exec rake release" "promote empty-commit stops before release"
 }
 
 # --- promote: guard — dirty tree -------------------------------------------
@@ -311,6 +354,95 @@ test_close_out_dry_run_does_not_delete_branch() {
   fi
 }
 
+# Simulate the operator having forward-ported the fix onto main AND pushed it,
+# so origin/main carries the cherry-pick. This is the precondition the durable
+# branch-delete gate requires. Leaves the checkout on a synced local main.
+push_forward_port_to_origin_main() {
+  git checkout -q main
+  git cherry-pick -x "$(git rev-parse release/1.0.0)" >/dev/null 2>&1
+  git push -q origin main
+  git fetch -q origin
+}
+
+# --- close-out: real apply (--yes, no TTY) deletes the branch ---------------
+
+# #5 coverage: the --yes non-dry-run path must proceed through confirm_outward!
+# WITHOUT a TTY (no prompt, no abort) and actually perform the outward ops. Here
+# the forward-port was already pushed to the throwaway local origin, so the
+# durability gate passes and the branch is deleted on that local bare origin
+# only (never a network remote).
+test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed() {
+  setup_release_repo
+  push_forward_port_to_origin_main
+  # Branch exists on origin before close-out.
+  if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
+    fail "precondition: release branch should exist on origin"
+  fi
+
+  run_rf close-out 1.0.0 --yes
+
+  assert_status 0 "$RF_STATUS" "close-out --yes status"
+  # The fix was already pushed to origin/main, so the forward-port helper sees it
+  # as already-ported (a no-op). What matters for #5: --yes proceeded through
+  # confirm_outward! with NO TTY (no "no TTY" abort, no prompt) and actually ran
+  # the outward delete.
+  assert_not_contains "$RF_OUT" "no TTY for confirmation" "close-out --yes should not stop on TTY"
+  assert_contains "$RF_OUT" "+ git push origin --delete release/1.0.0" "close-out --yes deleted branch"
+  # The branch is actually gone from the (local bare) origin.
+  if git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
+    fail "close-out --yes did not delete the release branch on origin"
+  fi
+}
+
+# --- close-out: P1 durability gate — refuse delete if main not pushed -------
+
+# #1: a single close-out run forward-ports the fix onto LOCAL main but never
+# pushes main itself. The fix now exists only locally, so the durable-delete gate
+# MUST abort before deleting the source branch (otherwise the commit is lost).
+# Local main starts in sync with origin/main, so the stale-main guard passes and
+# control reaches the durability gate the in-run cherry-pick triggers.
+test_close_out_refuses_delete_when_forward_port_only_local() {
+  setup_release_repo
+  git checkout -q main   # local main == origin/main (synced by setup's fetch)
+
+  run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out local-only status"
+  # The forward-port DID apply locally...
+  assert_contains "$RF_OUT" "Forward-port complete" "close-out local-only applied the pick"
+  # ...but the gate refused the delete because main was not pushed.
+  assert_contains "$RF_OUT" "not yet on origin/main" "close-out local-only message"
+  assert_not_contains "$RF_OUT" "git push origin --delete" "close-out local-only must not delete"
+  # Critical: the branch still exists on origin (its unique commits are safe).
+  if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
+    fail "durability gate deleted the release branch while commits were only local"
+  fi
+}
+
+# --- close-out: P1 stale-main guard ----------------------------------------
+
+# #2: local main behind origin/main must abort before forward-porting, so the
+# cherry-picks never land on a stale main.
+test_close_out_aborts_when_local_main_behind_origin() {
+  setup_release_repo
+  # Advance origin/main past local main via a second clone-less push.
+  git checkout -q main
+  local synced_main
+  synced_main="$(git rev-parse main)"
+  # Create a commit, push it to origin, then move local main back so it is stale.
+  printf 'newer\n' > newer.txt
+  git add .
+  git commit -qm "later main work"
+  git push -q origin main
+  git reset -q --hard "$synced_main"   # local main now behind origin/main
+  git fetch -q origin
+
+  run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out stale-main status"
+  assert_contains "$RF_OUT" "local main is not in sync" "close-out stale-main message"
+}
+
 # --- close-out: guard — not on main ----------------------------------------
 
 test_close_out_aborts_when_not_on_main() {
@@ -373,6 +505,7 @@ run_test test_promote_dry_run_does_not_execute_release
 run_test test_promote_accepts_explicit_rc_tag
 run_test test_promote_aborts_when_not_on_release_branch
 run_test test_promote_aborts_when_tip_drifted_from_rc_tag
+run_test test_promote_aborts_on_empty_commit_atop_rc_despite_equal_tree
 run_test test_promote_aborts_on_dirty_worktree
 run_test test_promote_aborts_when_no_rc_tag_found
 run_test test_promote_aborts_when_explicit_rc_tag_absent
@@ -380,6 +513,9 @@ run_test test_promote_selects_highest_rc_tag
 run_test test_promote_without_tty_and_without_yes_aborts_before_release
 run_test test_close_out_dry_run_prints_plan_and_runs_nothing
 run_test test_close_out_dry_run_does_not_delete_branch
+run_test test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed
+run_test test_close_out_refuses_delete_when_forward_port_only_local
+run_test test_close_out_aborts_when_local_main_behind_origin
 run_test test_close_out_aborts_when_not_on_main
 run_test test_close_out_aborts_on_dirty_worktree
 run_test test_rejects_rc_version_argument

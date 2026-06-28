@@ -54,11 +54,10 @@ class ReleaseFinish
   def run
     subcommand = parse_options!
 
+    # parse_options! has already validated subcommand is one of SUBCOMMANDS.
     case subcommand
     when "promote" then promote
     when "close-out" then close_out
-    else
-      raise UsageError, "unknown subcommand: #{subcommand.inspect}"
     end
   rescue OptionParser::ParseError, UsageError => e
     warn "ERROR: #{e.message}"
@@ -199,8 +198,23 @@ class ReleaseFinish
   end
 
   def ensure_tip_matches_rc_tag!(rc_tag)
-    # The runbook check: `git diff --stat <rc_tag>` against the working tree must
-    # be empty (no drift since the accepted RC). HEAD is already the branch tip.
+    # Two checks, because `git diff --stat` compares TREES: an empty or
+    # metadata-only commit layered on top of the accepted RC has the same tree
+    # and would pass the diff alone. First require HEAD to be the exact tagged
+    # commit (identity), then keep the tree check as defense in depth.
+    head_sha = git("rev-parse", "--verify", "HEAD").strip
+    tag_sha = peeled_tag_sha(rc_tag)
+    unless head_sha == tag_sha
+      raise AbortError, <<~ERROR.strip
+        release tip is not the accepted RC commit #{rc_tag}.
+          HEAD:   #{head_sha}
+          #{rc_tag}: #{tag_sha}
+        Even an empty or metadata-only commit on top of the RC breaks the
+        "promote in place, no re-cut" invariant. Reset the branch to the RC tip
+        (git reset --hard #{rc_tag}) or cut and validate a new RC before promoting.
+      ERROR
+    end
+
     diff = git("diff", "--stat", rc_tag).strip
     return if diff.empty?
 
@@ -251,15 +265,17 @@ class ReleaseFinish
   def close_out
     version = @options.fetch(:version)
     release_branch = "release/#{version}"
-    source = "#{@options.fetch(:remote)}/#{release_branch}"
+    remote = @options.fetch(:remote)
+    source = "#{remote}/#{release_branch}"
 
     section "Close out #{version} (runbook step 5)"
-    run_or_print("git", "fetch", @options.fetch(:remote))
+    run_or_print("git", "fetch", remote)
     ensure_on_main!
+    ensure_local_main_matches_remote!(remote)
     ensure_clean_worktree!
 
     forward_port_to_main!(source)
-    delete_release_branch!(release_branch)
+    delete_release_branch!(release_branch, remote)
 
     finish_dry_run_notice
     0
@@ -293,9 +309,21 @@ class ReleaseFinish
           "then re-run close-out; the helper is idempotent and the branch deletion below was not run."
   end
 
-  def delete_release_branch!(release_branch)
-    remote = @options.fetch(:remote)
+  def delete_release_branch!(release_branch, remote)
     section "Delete the ephemeral branch #{release_branch} on #{remote} (tags are the durable record)"
+
+    if @options[:dry_run]
+      puts "DRY RUN: would verify the forward-ported commits are on #{remote}/main, then run:"
+      run_or_print("git", "push", remote, "--delete", release_branch)
+      return
+    end
+
+    # SAFETY: never delete the source branch while its forward-ported commits
+    # exist only on LOCAL main. close-out applies the cherry-picks locally but
+    # deliberately does not push main (main may be protected), so the operator
+    # must push first. Re-fetch and verify local main is now on origin/main
+    # before allowing the delete.
+    ensure_forward_port_durable_on_remote!(remote)
 
     confirm_outward!(
       "Delete #{release_branch} on #{remote} now? Tags persist; this only removes the branch.",
@@ -330,6 +358,48 @@ class ReleaseFinish
     ERROR
   end
 
+  # Require local main to equal the freshly-fetched remote main before
+  # forward-porting, so the cherry-picks never land on a stale or diverged main.
+  def ensure_local_main_matches_remote!(remote)
+    local = git("rev-parse", "main").strip
+    remote_main = "#{remote}/main"
+    upstream = git("rev-parse", remote_main).strip
+    return if local == upstream
+
+    raise AbortError, <<~ERROR.strip
+      local main is not in sync with #{remote_main}
+        local:  #{local}
+        remote: #{upstream}
+      Sync before forward-porting so the cherry-picks land on current main:
+        git checkout main && git pull --rebase
+    ERROR
+  end
+
+  # SAFETY GATE for the branch delete: the forward-port applies cherry-picks to
+  # LOCAL main but close-out never pushes main itself (main may be protected), so
+  # the operator must push (or merge the forward-port PR) first. Re-fetch and
+  # require local main — which carries those cherry-picks — to be reachable from
+  # the remote main. If the operator has not pushed, local main holds commits
+  # absent from #{remote}/main and this aborts, making it impossible to delete
+  # the source branch while its unique forward-ported commits exist only locally.
+  # (Cherry-picks get new SHAs, so this checks the pushed local-main tip, not the
+  # original release-branch commit identities, which are never ancestors of main
+  # under the trunk-based -x model.)
+  def ensure_forward_port_durable_on_remote!(remote)
+    run_or_print("git", "fetch", remote)
+    remote_main = "#{remote}/main"
+    local_main = git("rev-parse", "main").strip
+    return if commit_reachable_from?(local_main, remote_main)
+
+    raise AbortError, <<~ERROR.strip
+      the forward-ported commits on local main are not yet on #{remote_main}.
+      Push main before deleting the source branch — its unique commits would
+      otherwise be lost (tags do not preserve the forward-port onto main):
+        git push   # or merge the forward-port PR into main
+      Then re-run: script/release-finish close-out #{@options.fetch(:version)}
+    ERROR
+  end
+
   def ensure_clean_worktree!
     return if git("status", "--porcelain").strip.empty?
 
@@ -353,9 +423,8 @@ class ReleaseFinish
   # available, so the script never runs an outward op unattended.
   def confirm_outward!(question, command)
     return if @options[:dry_run]
-    return if confirm?(question)
 
-    raise AbortError, "declined: #{command}"
+    raise AbortError, "declined: #{command}" unless confirm?(question)
   end
 
   def confirm?(question)
@@ -417,6 +486,17 @@ class ReleaseFinish
 
   def tag_exists?(tag)
     _stdout, _stderr, status = capture_git("rev-parse", "--verify", "--quiet", "refs/tags/#{tag}")
+    status.success?
+  end
+
+  # The commit a tag points at, dereferencing annotated tags (^{}) so the value
+  # is a commit SHA comparable to a branch HEAD.
+  def peeled_tag_sha(tag)
+    git("rev-parse", "--verify", "#{tag}^{commit}").strip
+  end
+
+  def commit_reachable_from?(commit, ref)
+    _stdout, _stderr, status = capture_git("merge-base", "--is-ancestor", commit, ref)
     status.success?
   end
 
