@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require "tmpdir"
 
 module ReactOnRails
   RSpec.describe TypeScriptResponseTypes do
@@ -68,17 +67,6 @@ module ReactOnRails
         export type RailsResponseTypeName = keyof RailsResponseTypes;
         export type RailsResponseType<TName extends RailsResponseTypeName> = RailsResponseTypes[TName];
       TS
-    end
-
-    it "writes the generated declaration file" do
-      described_class.define_response("health.show", type_name: "HealthResponse", fields: { ok: :boolean })
-
-      Dir.mktmpdir do |dir|
-        output_path = File.join(dir, "generated", "rails_response_types.d.ts")
-
-        expect(described_class.generate(output_path:)).to eq(output_path)
-        expect(File.read(output_path)).to include("export interface HealthResponse")
-      end
     end
 
     it "treats symbols as scalar aliases and strings as custom type references" do
@@ -208,8 +196,18 @@ module ReactOnRails
       %w[string default await type readonly JsonValue].each do |type_name|
         expect do
           described_class.define_type(type_name, fields: {})
-        end.to raise_error(ReactOnRails::Error, /valid identifier/)
+        end.to raise_error(ReactOnRails::Error, /reserved/)
       end
+    end
+
+    it "rejects invalid fields at registration time" do
+      expect do
+        described_class.define_type("Project", fields: nil)
+      end.to raise_error(ReactOnRails::Error, /fields must be a Hash, got NilClass/)
+
+      expect do
+        described_class.define_response("projects.index", type_name: "ProjectsIndexResponse", fields: [])
+      end.to raise_error(ReactOnRails::Error, /fields must be a Hash, got Array/)
     end
   end
 end

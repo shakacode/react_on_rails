@@ -47,7 +47,7 @@ module ReactOnRails
       end
 
       def generate(output_path: nil)
-        path = Pathname.new(output_path || default_output_path)
+        path = output_path ? root_relative_output_path(output_path) : default_output_path
         FileUtils.mkdir_p(path.dirname)
         File.write(path, to_d_ts)
         path.to_s
@@ -70,6 +70,18 @@ module ReactOnRails
       def default_output_path
         Rails.root.join(DEFAULT_OUTPUT_PATH)
       end
+
+      def root_relative_output_path(output_path)
+        path = Pathname.new(output_path)
+        path = Rails.root.join(path) unless path.absolute?
+
+        expanded_path = path.expand_path
+        expanded_root = Rails.root.expand_path
+        root_prefix = "#{expanded_root}#{File::SEPARATOR}"
+        return expanded_path if expanded_path.to_s == expanded_root.to_s || expanded_path.to_s.start_with?(root_prefix)
+
+        raise ReactOnRails::Error, "Response types output path must be inside Rails.root: #{output_path.inspect}"
+      end
     end
 
     class Registry
@@ -82,6 +94,7 @@ module ReactOnRails
 
       def define_type(type_name, fields:)
         name = normalize_type_name(type_name)
+        validate_fields!(fields)
         ensure_unique_type_name!(name)
         @types << Definition.new(name:, fields:, response_key: nil)
       end
@@ -89,6 +102,7 @@ module ReactOnRails
       def define_response(response_key, type_name:, fields:)
         key = response_key.to_s
         name = normalize_type_name(type_name)
+        validate_fields!(fields)
         ensure_unique_response_key!(key)
         ensure_unique_type_name!(name)
         @responses << Definition.new(name:, fields:, response_key: key)
@@ -98,13 +112,23 @@ module ReactOnRails
 
       def normalize_type_name(type_name)
         name = type_name.to_s
-        return name if name.match?(IDENTIFIER_PATTERN) && !reserved_type_name?(name)
+        unless name.match?(IDENTIFIER_PATTERN)
+          raise ReactOnRails::Error, "TypeScript type name must be a valid identifier: #{type_name.inspect}"
+        end
 
-        raise ReactOnRails::Error, "TypeScript type name must be a valid identifier: #{type_name.inspect}"
+        raise ReactOnRails::Error, "TypeScript type name is reserved: #{type_name.inspect}" if reserved_type_name?(name)
+
+        name
       end
 
       def reserved_type_name?(type_name)
         RESERVED_TYPE_NAMES.include?(type_name) || GENERATED_TYPE_NAMES.include?(type_name)
+      end
+
+      def validate_fields!(fields)
+        return if fields.is_a?(Hash)
+
+        raise ReactOnRails::Error, "Response type fields must be a Hash, got #{fields.class}"
       end
 
       def ensure_unique_type_name!(type_name)

@@ -82,6 +82,8 @@ REACT_ON_RAILS_RESPONSE_TYPES_OUT=app/frontend/types/rails_response_types.d.ts \
   bundle exec rake react_on_rails:generate_response_types
 ```
 
+The override must resolve inside `Rails.root`; the task rejects absolute paths or traversal outside the app.
+
 The generated file contains named interfaces and a response lookup map:
 
 ```ts
