@@ -2,6 +2,7 @@ const FAILURE_CONCLUSIONS = new Set(['failure', 'timed_out', 'cancelled', 'actio
 const GUARD_JOB_NAME = 'detect-changes';
 const GUARD_STEP_NAME = 'Guard docs-only main pushes';
 const MAX_GUARD_ONLY_HOPS = 10;
+const MAX_NO_RUNS_HOPS = 50;
 
 function parseExcludeWorkflows(excludeWorkflowsInput) {
   return (excludeWorkflowsInput || '')
@@ -203,6 +204,32 @@ async function isCommitReachableFromDefaultBranch({ github, context, sha }) {
   }
 }
 
+function formatNoRunsTrailDetails(noRunsTrail) {
+  if (noRunsTrail.length === 0) {
+    return '';
+  }
+
+  return [
+    '',
+    'Skipped candidate commits with no push-event runs while looking for the underlying CI state:',
+    ...noRunsTrail.map((sha) => `- ${sha}`),
+  ].join('\n');
+}
+
+function formatGuardOnlyTrailDetails(guardOnlyTrail) {
+  if (guardOnlyTrail.length === 0) {
+    return '';
+  }
+
+  return [
+    '',
+    'Ignored docs-only guard-only failures while looking for the underlying CI state:',
+    ...guardOnlyTrail.map(
+      ({ sha, runs }) => `- ${sha}: ${runs.map((run) => `${run.name} #${run.run_number}`).join(', ')}`,
+    ),
+  ].join('\n');
+}
+
 async function checkPreviousMainCommitStatus({
   github,
   context,
@@ -210,6 +237,7 @@ async function checkPreviousMainCommitStatus({
   previousSha,
   excludeWorkflowsInput,
   maxGuardOnlyHops = MAX_GUARD_ONLY_HOPS,
+  maxNoRunsHops = MAX_NO_RUNS_HOPS,
   createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
 }) {
   const excludeWorkflows = parseExcludeWorkflows(excludeWorkflowsInput);
@@ -221,10 +249,22 @@ async function checkPreviousMainCommitStatus({
   const guardOnlyTrail = [];
   const noRunsTrail = [];
 
-  async function checkSha(shaToCheck, remainingGuardOnlyHops) {
-    if (remainingGuardOnlyHops <= 0) {
+  async function checkSha(shaToCheck, remainingGuardOnlyHops, remainingNoRunsHops) {
+    if (remainingGuardOnlyHops <= 0 || remainingNoRunsHops <= 0) {
+      const exhaustedLimit =
+        remainingGuardOnlyHops <= 0
+          ? `${maxGuardOnlyHops} docs-only guard-only commits`
+          : `${maxNoRunsHops} no-run merge queue candidate commits`;
+
       core.setFailed(
-        `Cannot determine prior real CI status after ${maxGuardOnlyHops} docs-only guard-only or no-run candidate commits. Push a non-docs change to trigger hosted CI.`,
+        [
+          `Cannot determine prior real CI status after ${exhaustedLimit}.`,
+          formatNoRunsTrailDetails(noRunsTrail),
+          formatGuardOnlyTrailDetails(guardOnlyTrail),
+          'Push a non-docs change to trigger hosted CI.',
+        ]
+          .filter(Boolean)
+          .join('\n'),
       );
       return;
     }
@@ -255,18 +295,24 @@ async function checkPreviousMainCommitStatus({
           ].join(' '),
         );
         noRunsTrail.push(shaToCheck);
-        await checkSha(parentSha, remainingGuardOnlyHops - 1);
+        await checkSha(parentSha, remainingGuardOnlyHops, remainingNoRunsHops - 1);
         return;
       }
 
-      core.info(
-        [
+      if (context.eventName === 'merge_group') {
+        core.info(
+          [
+            `No push-event workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
+            shouldTraceNoRunsParent
+              ? 'No parent commit was found to inspect for an underlying CI state.'
+              : 'This SHA is already in the default branch history; no parent tracing needed.',
+          ].join('\n'),
+        );
+      } else {
+        core.info(
           `No push-event workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
-          shouldTraceNoRunsParent
-            ? 'No parent commit was found to inspect for an underlying CI state.'
-            : 'Only merge_group SHAs outside the default branch history are traced through their first parent.',
-        ].join('\n'),
-      );
+        );
+      }
       return;
     }
 
@@ -286,32 +332,13 @@ async function checkPreviousMainCommitStatus({
 
     if (result.failingRuns.length > 0) {
       const details = result.failingRuns.map(summarizeRun).join('\n');
-      const noRunsTrailDetails =
-        noRunsTrail.length > 0
-          ? [
-              '',
-              'Skipped candidate commits with no push-event runs while looking for the underlying CI state:',
-              ...noRunsTrail.map((sha) => `- ${sha}`),
-            ].join('\n')
-          : '';
-      const guardTrailDetails =
-        guardOnlyTrail.length > 0
-          ? [
-              '',
-              'Ignored docs-only guard-only failures while looking for the underlying CI state:',
-              ...guardOnlyTrail.map(
-                ({ sha, runs }) =>
-                  `- ${sha}: ${runs.map((run) => `${run.name} #${run.run_number}`).join(', ')}`,
-              ),
-            ].join('\n')
-          : '';
 
       core.setFailed(
         [
           `Cannot skip CI for docs-only commit because main commit ${shaToCheck} still has failing workflows:`,
           details,
-          noRunsTrailDetails,
-          guardTrailDetails,
+          formatNoRunsTrailDetails(noRunsTrail),
+          formatGuardOnlyTrailDetails(guardOnlyTrail),
           '',
           'Fix these failures before pushing docs-only changes, or push non-docs changes to trigger hosted CI.',
         ]
@@ -344,10 +371,10 @@ async function checkPreviousMainCommitStatus({
       `Main commit ${shaToCheck} only has docs-only guard failures. Checking first parent ${parentSha} for the underlying CI state.`,
     );
     guardOnlyTrail.push({ sha: shaToCheck, runs: result.guardOnlyRuns });
-    await checkSha(parentSha, remainingGuardOnlyHops - 1);
+    await checkSha(parentSha, remainingGuardOnlyHops - 1, remainingNoRunsHops);
   }
 
-  await checkSha(previousSha, maxGuardOnlyHops);
+  await checkSha(previousSha, maxGuardOnlyHops, maxNoRunsHops);
 }
 
 module.exports = {

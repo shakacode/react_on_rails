@@ -108,9 +108,6 @@ function makeGithub({
         listJobsForWorkflowRun,
       },
       repos: {
-        compareCommitsWithBasehead: async ({ base }) => ({
-          data: { status: defaultBranchContainsSha[base] ? 'ahead' : 'diverged' },
-        }),
         getCommit: async ({ ref }) => ({
           data: { parents: parentsBySha[ref] ? [{ sha: parentsBySha[ref] }] : [] },
         }),
@@ -276,7 +273,7 @@ async function testGuardOnlyHopLimitStopsAtConfiguredLimit() {
   });
 
   assert.equal(core.failed.length, 1);
-  assert.match(core.failed[0], /after 1 docs-only guard-only or no-run candidate commits/);
+  assert.match(core.failed[0], /after 1 docs-only guard-only commits/);
 }
 
 async function testGuardOnlyFailuresLookThroughToParentFailure() {
@@ -438,6 +435,33 @@ async function testNoRunSyntheticChainLooksThroughToParentFailure() {
   assert.match(core.failed[0], /main commit real-failure still has failing workflows/);
 }
 
+async function testNoRunHopLimitStopsAtConfiguredLimitWithTrail() {
+  const syntheticBase = 'synthetic-base';
+  const priorSyntheticBase = 'prior-synthetic-base';
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {
+      [syntheticBase]: priorSyntheticBase,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    maxNoRunsHops: 1,
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /after 1 no-run merge queue candidate commits/);
+  assert.match(core.failed[0], /synthetic-base/);
+}
+
 async function testGuardOnlyFailuresLookThroughToParentSuccess() {
   const previous = 'docs-1';
   const parent = 'green';
@@ -489,6 +513,7 @@ async function main() {
   await testNoRunPushBaseAllowsQuietMainSkip();
   await testNoRunSyntheticBaseAllowsQuietParentSkip();
   await testNoRunSyntheticChainLooksThroughToParentFailure();
+  await testNoRunHopLimitStopsAtConfiguredLimitWithTrail();
   await testGuardOnlyFailuresLookThroughToParentSuccess();
   await testNonContiguousWorkflowRunPagesAreChecked();
   await testPaginatedJobsAreChecked();
