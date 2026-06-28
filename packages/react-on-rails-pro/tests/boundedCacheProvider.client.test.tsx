@@ -1469,8 +1469,6 @@ describe('RSCRoute successful-version error reset', () => {
   });
 
   it('p. rejected replacement loads evict their promise and restore the evicted-success marker', async () => {
-    process.env.NODE_ENV = 'production';
-
     type PendingEntry = Deferred & { args: GetServerComponentArgs };
     const pending: PendingEntry[] = [];
     getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
@@ -1504,6 +1502,7 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.resolve(payload);
         await started.promise;
+        await flushMacrotasks();
       });
     };
 
