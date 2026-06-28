@@ -402,7 +402,8 @@ class ReleaseForwardPort
 
   def source_revert_superseded_on_target?(sha, target, revert_sha)
     source_reapplied_with_x_after_revert?(sha, target, revert_sha) ||
-      source_reapplied_without_x_after_revert?(sha, target, revert_sha)
+      source_reapplied_without_x_after_revert?(sha, target, revert_sha) ||
+      source_reapplied_by_merge_after_revert?(sha, target, revert_sha)
   end
 
   def source_reapplied_with_x_after_revert?(sha, target, revert_sha)
@@ -420,6 +421,30 @@ class ReleaseForwardPort
         target_commit_introduced_after_revert?(target_sha, target, revert_sha) &&
         target_commit_live_on_target?(target_sha, target)
     end
+  end
+
+  def source_reapplied_by_merge_after_revert?(sha, target, revert_sha)
+    source_patch_id = patch_id_for_commit(sha)
+
+    target_first_parent_merges_after(revert_sha, target).any? do |merge_sha|
+      target_commit_live_on_target?(merge_sha, target) &&
+        patch_id_for_merge_source_paths(merge_sha, sha) == source_patch_id
+    end
+  end
+
+  def target_first_parent_merges_after(sha, target)
+    git_lines("log", target, "--first-parent", "--merges", "#{sha}..#{target}", "--format=%H")
+  end
+
+  def patch_id_for_merge_source_paths(merge_sha, sha)
+    parents = git("rev-list", "--parents", "-n", "1", merge_sha).split.drop(1)
+    return if parents.length < 2
+
+    first_parent = parents.first
+    paths = source_paths_for_target_diff(first_parent, sha)
+    return if paths.empty?
+
+    patch_id_for_diff(first_parent, merge_sha, paths)
   end
 
   def target_commit_introduced_after_revert?(sha, target, revert_sha)
@@ -528,7 +553,7 @@ class ReleaseForwardPort
   end
 
   def merge_changes_commit_paths?(first_parent, merge_sha, sha)
-    paths = changed_paths_for_commit(sha)
+    paths = source_paths_for_target_diff(first_parent, sha)
     return false if paths.empty?
 
     diff_changes_paths?(first_parent, merge_sha, paths)
@@ -560,6 +585,23 @@ class ReleaseForwardPort
     git_lines("log", target, "--format=%H", "--no-merges", "--", *paths)
   end
 
+  def source_paths_for_target_diff(first_parent, sha)
+    paths = changed_paths_for_commit(sha)
+    return [] if paths.empty?
+
+    (paths + renamed_target_paths_for_source_paths(first_parent, sha, paths)).uniq
+  end
+
+  def renamed_target_paths_for_source_paths(first_parent, sha, paths)
+    merge_base = git("merge-base", first_parent, sha).strip
+    source_paths = paths.to_h { |path| [path, true] }
+
+    git_lines("diff", "--name-status", "--find-renames", merge_base, first_parent).filter_map do |line|
+      status, old_path, new_path = line.split("\t", 3)
+      new_path if status.start_with?("R") && new_path && source_paths.key?(old_path)
+    end.uniq
+  end
+
   def changed_paths_for_commit(sha)
     git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
   end
@@ -569,12 +611,21 @@ class ReleaseForwardPort
     # hunk content and emits a commit field we discard; the first token is the
     # content hash used for comparisons.
     patch = git("show", "--format=", "--full-index", "--find-renames", sha).b
+    patch_id_for_patch(patch, sha)
+  end
+
+  def patch_id_for_diff(from_ref, to_ref, paths)
+    patch = git("diff", "--full-index", "--find-renames", from_ref, to_ref, "--", *paths).b
+    patch_id_for_patch(patch, "#{from_ref}..#{to_ref}")
+  end
+
+  def patch_id_for_patch(patch, label)
     # Empty commits carry no file changes; cherry-picking them would only create
     # a no-op commit, so treat the patch as already present.
     return EMPTY_PATCH_ID if empty_patch?(patch)
 
     stdout, stderr, status = capture_git("patch-id", "--stable", stdin_data: patch)
-    raise GitError, "#{git_error(['patch-id', '--stable'], stdout, stderr, status)} for #{sha}" unless status.success?
+    raise GitError, "#{git_error(['patch-id', '--stable'], stdout, stderr, status)} for #{label}" unless status.success?
 
     patch_id = stdout.split.first
     return hunkless_patch_id(patch) if patch_id.nil?

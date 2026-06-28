@@ -1030,6 +1030,72 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips source-sha reverts superseded by merge-only reapplications" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      first_stdout, first_stderr, first_status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      expect(first_status).to be_success, first_stderr
+      expect(first_stdout).to include("Forward-port complete")
+
+      git(repo, "checkout", "-b", "side-reapply")
+      write_file(repo, "side.txt", "side branch marker\n")
+      commit_all(repo, "Prepare side branch")
+
+      git(repo, "checkout", "main")
+      git(repo, "revert", "--no-commit", fix_sha)
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Undo release regression manually",
+        "-m",
+        "This reverts commit #{fix_sha}."
+      )
+      git(repo, "merge", "--no-ff", "--no-commit", "side-reapply")
+      write_file(repo, "app.txt", "base\nrelease fix\n")
+      git(repo, "add", "app.txt")
+      git(repo, "commit", "--no-gpg-sign", "-m", "Merge side reapply with manual fix")
+      restored_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+
+      second_stdout, second_stderr, second_status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(second_status).to be_success, second_stderr
+      expect(second_stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(second_stdout).to include("Nothing to cherry-pick")
+      expect(second_stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(restored_count)
+    end
+  end
+
+  it "skips side-merged -x reapplications when the target renamed the changed file before merge" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      git(repo, "checkout", "-b", "side-reapply", "main")
+      git(repo, "cherry-pick", "-x", fix_sha)
+
+      git(repo, "checkout", "main")
+      git(repo, "mv", "app.txt", "renamed.txt")
+      commit_all(repo, "Rename target file")
+      git(repo, "merge", "--no-ff", "side-reapply", "-m", "Merge side reapply after rename")
+      merged_count = git(repo, "rev-list", "--count", "main").strip
+      expect(File.read(File.join(repo, "renamed.txt"))).to eq("base\nrelease fix\n")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(File.read(File.join(repo, "renamed.txt"))).to eq("base\nrelease fix\n")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(merged_count)
+    end
+  end
+
   it "does not treat -x side commits merged with ours as source-revert supersession" do
     with_release_repo do |repo|
       _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
