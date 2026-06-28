@@ -4077,7 +4077,7 @@ describe RscGenerator, type: :generator do
       simulate_canonical_pack_tag_layout("hello_world")
 
       Dir.chdir(destination_root) do
-        run_generator(["--force", "--tailwind"])
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
       end
     end
 
@@ -4132,7 +4132,7 @@ describe RscGenerator, type: :generator do
       ERB
 
       Dir.chdir(destination_root) do
-        run_generator(["--force", "--tailwind"])
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
       end
     end
 
@@ -4183,7 +4183,7 @@ describe RscGenerator, type: :generator do
       ERB
 
       Dir.chdir(destination_root) do
-        run_generator(["--force", "--tailwind"])
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
       end
     end
 
@@ -4237,7 +4237,7 @@ describe RscGenerator, type: :generator do
       ERB
 
       Dir.chdir(destination_root) do
-        run_generator(["--force", "--tailwind"])
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
       end
     end
 
@@ -4287,7 +4287,7 @@ describe RscGenerator, type: :generator do
       ERB
 
       Dir.chdir(destination_root) do
-        run_generator(["--force", "--tailwind"])
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
       end
     end
 
@@ -4350,7 +4350,7 @@ describe RscGenerator, type: :generator do
       simulate_canonical_pack_tag_layout("hello_world")
 
       Dir.chdir(destination_root) do
-        run_generator(["--force", "--tailwind"])
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
       end
     end
 
@@ -4387,7 +4387,7 @@ describe RscGenerator, type: :generator do
       simulate_layout_missing_stylesheet_pack_tag("hello_world")
 
       Dir.chdir(destination_root) do
-        run_generator(["--force", "--tailwind"])
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
       end
     end
 
