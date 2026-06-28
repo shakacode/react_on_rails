@@ -24,13 +24,11 @@ require "zlib"
 # unchanged. This is the gem-side evidence for GitHub issue #4238: streamed RSC HTML compresses
 # just like a buffered response, closing the raw-transfer-bytes gap versus the Inertia baseline.
 RSpec.describe "Streamed RSC compression" do
-  # Mimics ActionController::Live::Buffer's Rack body: enumerable, chunked, and deliberately
+  # Mimics ActionController::Live::Buffer's Rack body: chunked and deliberately
   # WITHOUT `to_ary`, so the Rack SPEC requires middleware to stream via `each` (sync flush per
   # chunk) rather than buffer the whole response.
   let(:streaming_body_class) do
     Class.new do
-      include Enumerable
-
       def initialize(chunks)
         @chunks = chunks
       end
@@ -55,7 +53,7 @@ RSpec.describe "Streamed RSC compression" do
   end
 
   def read_body(body)
-    buffer = +"".b
+    buffer = +""
     body.each { |chunk| buffer << chunk }
     body.close if body.respond_to?(:close)
     buffer
@@ -67,13 +65,17 @@ RSpec.describe "Streamed RSC compression" do
   end
 
   it "sets Content-Encoding: gzip on a streamed body" do
-    _status, headers, _body = deflater_response(accept_encoding: "gzip")
+    _status, headers, body = deflater_response(accept_encoding: "gzip")
     expect(header(headers, "Content-Encoding")).to eq("gzip")
+    body.close if body.respond_to?(:close)
   end
 
   it "does not buffer the stream into a Content-Length (stays chunked)" do
-    _status, headers, _body = deflater_response(accept_encoding: "gzip")
+    _status, headers, body = deflater_response(accept_encoding: "gzip")
+
+    expect(header(headers, "Content-Encoding")).to eq("gzip")
     expect(header(headers, "Content-Length")).to be_nil
+    expect(read_body(body).byteslice(0, 2)).to eq("\x1f\x8b".b)
   end
 
   it "produces gzip-compressed bytes that decompress to the original HTML unchanged" do
