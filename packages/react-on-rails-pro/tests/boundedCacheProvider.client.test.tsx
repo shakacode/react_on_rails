@@ -1502,8 +1502,9 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.resolve(payload);
         await started.promise;
-        // Flush the timer-scheduled unpin so the next insertion can evict an
-        // actually cold key and record its evicted-success marker.
+        // Unlike peers k-o, flush the timer-scheduled unpin after each resolve;
+        // otherwise the fill loop keeps every entry pinned and never records
+        // the evicted-success marker that the retry assertions depend on.
         await flushMacrotasks();
       });
     };
