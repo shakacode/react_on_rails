@@ -67,6 +67,7 @@ RSpec.describe "Streamed RSC compression" do
   it "sets Content-Encoding: gzip on a streamed body" do
     _status, headers, body = deflater_response(accept_encoding: "gzip")
     expect(header(headers, "Content-Encoding")).to eq("gzip")
+    expect(header(headers, "Vary")).to include("Accept-Encoding")
     body.close if body.respond_to?(:close)
   end
 
