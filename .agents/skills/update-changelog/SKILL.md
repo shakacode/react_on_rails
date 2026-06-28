@@ -49,7 +49,7 @@ The agent-coordination backend also publishes the active phase per line; when it
 
 ### Choosing the target
 
-1. **Explicit `target=` argument wins.** `target=release/X.Y.Z` selects that exact branch (verify it exists on `origin`; abort with a clear message if not). `target=release` with no version resolves the lone active `release/*` branch (abort and ask which one if more than one exists). `target=main` forces the main target with no prompt.
+1. **Explicit `target=` argument wins.** `target=release/X.Y.Z` selects that exact branch (verify it exists on `origin`; abort with a clear message if not). `target=release` with no version resolves the lone active `release/*` branch (abort and ask which one if more than one exists). `target=main` forces the main target with no prompt. If an explicit `target=release` (or `target=release/X.Y.Z`) is requested but **no matching `release/*` branch exists on `origin`**, do not silently fall back to `main` — stop and report, for example: `target=release requested but no release/* branch exists. Start one with `rake "release:start[X.Y.Z]"` (see the release-train runbook), then retry; or use target=main to land on [Unreleased].`
 2. **No `target=` argument, no active `release/*` branch:** default to `main` **without prompting**. This keeps the common development path frictionless.
 3. **No `target=` argument, exactly one active `release/*` branch:** **ask the user "release or main?"** — this is the core decision. Present the detected branch, for example:
 
@@ -64,7 +64,7 @@ The agent-coordination backend also publishes the active phase per line; when it
 
 4. **No `target=` argument, multiple active `release/*` branches:** list them and ask which release line (or `main`) to target; do not guess.
 
-Once the target is `main`, follow the rest of this document exactly as written — nothing else changes. Once the target is `release`, apply the **Release-target adjustments** below at the version-stamping and finalize steps; every other step (fetching, classification, entry formatting, curation) is identical.
+Once the target is `main`, follow the rest of this document exactly as written — nothing else changes. Once the target is `release`, apply the **Release-target adjustments** below: they change the fetch/compare/branch base and the PR base (substituting `release/X.Y.Z` for the base branch); the changelog mechanics themselves — classification, entry formatting, version-stamping, and curation — are unchanged.
 
 ### Release-target adjustments
 
@@ -353,7 +353,7 @@ When a new version is released:
 
 #### Step 1: Fetch and read current state
 
-- First resolve the **target** (see **Target: release or main?**). For the `main` target use the base branch below; for the `release` target substitute the resolved `release/X.Y.Z` everywhere this step says `BASE_BRANCH`.
+- First resolve the **target** (see **Target: release or main?**). For the `main` target use the base branch below. For the `release` target, substitute the resolved `release/X.Y.Z` for `BASE_BRANCH` **throughout the Process section** (here in Step 1 and in Step 3's `git log` / comparison commands), so fetches and post-tag commit scans run against the release line rather than the base branch.
 - Resolve `BASE_BRANCH` from `AGENTS.md` -> **Agent Workflow Configuration**, then run `git fetch origin "${BASE_BRANCH}"` to ensure you have the latest commits
 - After fetching, use `origin/${BASE_BRANCH}` for all comparisons, not the local base branch
 - Read the current changelog to understand the existing structure
@@ -388,6 +388,8 @@ When a new version is released:
 5. Get the tag date with: `git log -1 --format="%Y-%m-%d" TAG_NAME`
 
 #### Step 3: Add new entries for post-tag commits
+
+> For the `release` target, substitute the resolved `release/X.Y.Z` for `BASE_BRANCH` in the commands below (see Step 1), so the post-tag commit scan runs against the release line.
 
 1. Resolve `BASE_BRANCH` from `AGENTS.md` -> **Agent Workflow Configuration**, then run `git log --oneline "LATEST_TAG..origin/${BASE_BRANCH}"` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
 2. Extract PR numbers: `git log --oneline "LATEST_TAG..origin/${BASE_BRANCH}" | grep -oE "#[0-9]+" | sort -u`
