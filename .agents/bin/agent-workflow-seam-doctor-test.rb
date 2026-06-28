@@ -212,7 +212,8 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
       out, status = run_doctor(root)
 
       refute status.success?
-      assert_includes out, "AGENTS.md section must point to .agents/bin/README.md and .agents/bin/<name>"
+      assert_includes out, "AGENTS.md section must point to .agents/bin/README.md"
+      assert_includes out, "AGENTS.md section must include .agents/bin/<name> as the generic invocation form"
     end
   end
 

@@ -136,8 +136,12 @@ module AgentWorkflowSeamDoctor
 
   def portable_contract_issues(section)
     issues = []
-    unless section.include?(COMMAND_README_RELATIVE_PATH) && section.include?(".agents/bin/<name>")
-      issues << "AGENTS.md section must point to #{COMMAND_README_RELATIVE_PATH} and .agents/bin/<name>"
+    unless section.include?(COMMAND_README_RELATIVE_PATH)
+      issues << "AGENTS.md section must point to #{COMMAND_README_RELATIVE_PATH}"
+    end
+
+    unless section.include?(".agents/bin/<name>")
+      issues << "AGENTS.md section must include .agents/bin/<name> as the generic invocation form"
     end
 
     unless section.include?(CONFIG_RELATIVE_PATH)
