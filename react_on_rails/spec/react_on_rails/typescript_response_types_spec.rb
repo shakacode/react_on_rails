@@ -94,5 +94,19 @@ module ReactOnRails
         described_class.define_type("project-response", fields: {})
       end.to raise_error(ReactOnRails::Error, /valid identifier/)
     end
+
+    it "rejects names that would collide with TypeScript or generated declarations" do
+      expect do
+        described_class.define_type("string", fields: {})
+      end.to raise_error(ReactOnRails::Error, /valid identifier/)
+
+      expect do
+        described_class.define_type("default", fields: {})
+      end.to raise_error(ReactOnRails::Error, /valid identifier/)
+
+      expect do
+        described_class.define_type("JsonValue", fields: {})
+      end.to raise_error(ReactOnRails::Error, /valid identifier/)
+    end
   end
 end

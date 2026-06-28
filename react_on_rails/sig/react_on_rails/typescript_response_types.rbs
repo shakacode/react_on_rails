@@ -4,6 +4,8 @@ module ReactOnRails
     GENERATED_HEADER: String
     IDENTIFIER_PATTERN: Regexp
     OPTION_KEYS: Array[Symbol]
+    RESERVED_TYPE_NAMES: Array[String]
+    GENERATED_TYPE_NAMES: Array[String]
     SCALAR_TYPES: Hash[Symbol, String]
 
     def self.define_type: (untyped type_name, fields: Hash[untyped, untyped]) -> untyped
