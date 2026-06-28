@@ -225,13 +225,21 @@ module ReactOnRails
       end
 
       def render_named_type(name)
-        scalar_type = SCALAR_TYPES[name.to_s.downcase.to_sym] if name.is_a?(Symbol)
-        return scalar_type if scalar_type
+        if name.is_a?(Symbol)
+          scalar_type = SCALAR_TYPES[name.to_s.downcase.to_sym]
+          return scalar_type if scalar_type
+
+          raise ReactOnRails::Error, "Unknown scalar response type alias: #{name.inspect}"
+        end
 
         type_name = name.to_s
-        return type_name if type_name.match?(IDENTIFIER_PATTERN)
+        unless type_name.match?(IDENTIFIER_PATTERN)
+          raise ReactOnRails::Error, "TypeScript type reference must be a valid identifier: #{name.inspect}"
+        end
 
-        raise ReactOnRails::Error, "TypeScript type reference must be a valid identifier: #{name.inspect}"
+        return type_name if definitions.any? { |definition| definition.name == type_name }
+
+        raise ReactOnRails::Error, "Unknown TypeScript type reference: #{name.inspect}"
       end
 
       def options_for(spec)

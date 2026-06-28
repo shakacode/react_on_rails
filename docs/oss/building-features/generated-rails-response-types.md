@@ -143,6 +143,7 @@ controller/action-style name such as `projects.index` so later route changes do 
 | `{ type: :string, nullable: true }`   | `field: string \| null`           |
 
 Use symbols for built-in scalar aliases and strings for named TypeScript contract references.
+String references must match a registered contract `type_name`; unknown identifiers fail generation.
 
 When an object field itself has a property named `type`, wrap it in `fields:` so the contract is
 unambiguous:

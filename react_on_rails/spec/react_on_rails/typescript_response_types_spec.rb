@@ -96,6 +96,22 @@ module ReactOnRails
       expect(described_class.to_d_ts).to include("created_on: string;")
     end
 
+    it "rejects unresolved custom type references" do
+      fields = { project: "Project" }
+      described_class.define_response("projects.show", type_name: "ProjectsShowResponse", fields:)
+
+      expect do
+        described_class.to_d_ts
+      end.to raise_error(ReactOnRails::Error, /Unknown TypeScript type reference: "Project"/)
+      described_class.reset!
+      described_class.define_type("Project", fields: { id: :number })
+      described_class.define_response("projects.show", type_name: "ProjectsShowResponse", fields: { project: :Project })
+
+      expect do
+        described_class.to_d_ts
+      end.to raise_error(ReactOnRails::Error, /Unknown scalar response type alias: :Project/)
+    end
+
     it "does not treat shorthand object child fields as parent modifiers" do
       described_class.define_response(
         "metadata.show",
