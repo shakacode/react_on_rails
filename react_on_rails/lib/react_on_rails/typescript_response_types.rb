@@ -115,6 +115,22 @@ module ReactOnRails
           normalized[key.to_sym] = value if OPTION_KEYS.include?(key.to_sym)
         end
       end
+
+      def raw_wrapper_hash?(spec)
+        return false unless spec.is_a?(Hash)
+
+        normalized = normalize_option_hash(spec)
+        normalized.key?(:raw) && option_wrapper_hash?(spec, normalized)
+      end
+
+      def nullable_type(type, raw:)
+        type = "(#{type})" if raw && raw_type_needs_parentheses_for_union?(type)
+        "#{type} | null"
+      end
+
+      def raw_type_needs_parentheses_for_union?(type)
+        type.match?(/=>|\s\?\s/)
+      end
     end
 
     class << self
@@ -314,7 +330,7 @@ module ReactOnRails
         fields.map do |field_name, spec|
           options = options_for(spec)
           type = render_type(spec, indentation: "#{indentation}  ", closing_indentation: indentation)
-          type = "#{type} | null" if options.fetch(:nullable, false)
+          type = nullable_type(type, raw: raw_wrapper_hash?(spec)) if options.fetch(:nullable, false)
           suffix = options.fetch(:optional, false) ? "?" : ""
           "#{indentation}#{quote_property(field_name)}#{suffix}: #{type};"
         end
@@ -364,9 +380,8 @@ module ReactOnRails
         end
 
         member_type = render_type(member_spec, indentation:, closing_indentation:)
-        member_type = "#{member_type} | null" if member_options.fetch(:nullable, false)
-        normalized_member = member_spec.is_a?(Hash) ? normalize_option_hash(member_spec) : {}
-        raw_member = normalized_member.key?(:raw) && option_wrapper_hash?(member_spec, normalized_member)
+        raw_member = raw_wrapper_hash?(member_spec)
+        member_type = nullable_type(member_type, raw: raw_member) if member_options.fetch(:nullable, false)
         member_type = "(#{member_type})" if raw_member || member_type.match?(/[\n|&]|=>|\s\?\s/)
         "#{member_type}[]"
       end

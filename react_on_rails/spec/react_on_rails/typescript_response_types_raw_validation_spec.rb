@@ -173,6 +173,25 @@ RSpec.describe "TypeScript response type raw validation" do
     expect(declaration).to include("  labels: (Project extends { id: number } ? string : number)[];")
   end
 
+  it "parenthesizes nullable raw function and conditional wrappers before adding null" do
+    response_types.define_type("Project", fields: { id: :number, slug: :string })
+    response_types.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: {
+        formatter: { raw: "(value: Project) => string", nullable: true },
+        label: { raw: "Project extends { id: number } ? string : number", nullable: true },
+        labels: { array: { raw: "Project extends { id: number } ? string : number", nullable: true } }
+      }
+    )
+
+    declaration = response_types.to_d_ts
+
+    expect(declaration).to include("  formatter: ((value: Project) => string) | null;")
+    expect(declaration).to include("  label: (Project extends { id: number } ? string : number) | null;")
+    expect(declaration).to include("  labels: ((Project extends { id: number } ? string : number) | null)[];")
+  end
+
   it "reports unknown option keys on wrapper-looking specs" do
     response_types.define_response(
       "payload.show",
