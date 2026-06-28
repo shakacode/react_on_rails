@@ -62,6 +62,19 @@ const parseJsonBody = async (response: Response): Promise<unknown> => {
   }
 };
 
+const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
+  if (process.env.NODE_ENV === 'production' || !(fetchError instanceof TypeError)) {
+    return;
+  }
+  if (!/failed to fetch|networkerror|load failed/i.test(fetchError.message)) {
+    return;
+  }
+  console.warn(
+    '[createRailsAction] The request may have been rejected because the server responded with a redirect. ' +
+      'createRailsAction requires JSON responses; Rails `redirect_to` is not supported for mutation endpoints.',
+  );
+};
+
 const mergeHeaders = (...headersList: Array<HeadersInit | undefined>): Headers => {
   const headers = new Headers();
 
@@ -116,7 +129,9 @@ const resolveHeaders = <TVariables>(
  *
  * The returned function is directly usable as a TanStack Query `mutationFn`.
  * It always requests JSON, rejects browser-followed redirects, and resolves 204 or non-JSON success
- * responses as `null`. Return `null` or `undefined` from `body` when the request should not send JSON.
+ * responses as `null`. Include `null` in `TResponse` when a successful empty response is expected.
+ * Return `null` or `undefined` from `body` when the request should not send JSON. DELETE requests never
+ * send a JSON body; identify the resource in the URL instead.
  */
 export function createRailsAction<TVariables = undefined, TResponse = unknown>(
   options: RailsActionOptions<TVariables>,
@@ -134,7 +149,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     }
 
     const csrfToken = authenticityToken();
-    if (csrfToken === null) {
+    if (!csrfToken) {
       throw new Error(
         'createRailsAction requires a <meta name="csrf-token"> tag before submitting. ' +
           'Add <%= csrf_meta_tags %> to your Rails layout.',
@@ -142,20 +157,26 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     }
 
     const requestBody = options.body ? options.body(typedVariables) : variables;
-    const hasJsonBody = requestBody !== undefined && requestBody !== null;
-    const response = await fetch(requestUrl, {
-      method,
-      credentials: 'same-origin',
-      redirect: 'error',
-      signal: callOptions.signal,
-      headers: buildRailsActionHeaders(
-        csrfToken,
-        hasJsonBody,
-        resolveHeaders(options.headers, typedVariables),
-        callOptions.headers,
-      ),
-      body: hasJsonBody ? JSON.stringify(requestBody) : undefined,
-    });
+    const hasJsonBody = method !== 'DELETE' && requestBody !== undefined && requestBody !== null;
+    let response: Response;
+    try {
+      response = await fetch(requestUrl, {
+        method,
+        credentials: 'same-origin',
+        redirect: 'error',
+        signal: callOptions.signal,
+        headers: buildRailsActionHeaders(
+          csrfToken,
+          hasJsonBody,
+          resolveHeaders(options.headers, typedVariables),
+          callOptions.headers,
+        ),
+        body: hasJsonBody ? JSON.stringify(requestBody) : undefined,
+      });
+    } catch (fetchError) {
+      warnOnPossibleRedirectFetchError(fetchError);
+      throw fetchError;
+    }
 
     if (!response.ok) {
       const responseBody = await parseJsonBody(response.clone());

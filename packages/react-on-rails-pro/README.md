@@ -64,6 +64,7 @@ This package wraps and extends the base `react-on-rails` package. You only need 
 | ------------------------------------------------------- | ------------------------------------------------------- |
 | `react-on-rails-pro`                                    | Main entry — full ReactOnRails API (same as base + Pro) |
 | `react-on-rails-pro/client`                             | Client-only build (no SSR utilities)                    |
+| `react-on-rails-pro/railsAction`                        | CSRF-aware typed Rails action caller                    |
 | `react-on-rails-pro/RSCRoute`                           | React Server Components route component                 |
 | `react-on-rails-pro/RSCProvider`                        | RSC provider component                                  |
 | `react-on-rails-pro/rscPayloadNode`                     | Browser helper for RSC payloads as route data           |

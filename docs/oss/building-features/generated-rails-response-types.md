@@ -138,6 +138,9 @@ For mutations, pair the generated response lookup with the CSRF-aware caller fro
 still owns the route, strong parameters, authorization, and JSON rendering. The generated type only
 connects the client call site to the response contract you declared in Rails:
 
+React on Rails Pro apps that depend on `react-on-rails-pro` can use the mirrored
+`react-on-rails-pro/railsAction` export.
+
 ```ruby
 ReactOnRails::TypeScriptResponseTypes.define_response(
   "projects.create",

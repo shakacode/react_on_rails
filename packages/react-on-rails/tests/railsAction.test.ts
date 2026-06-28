@@ -105,6 +105,7 @@ describe('createRailsAction', () => {
       { id: 3, name: 'Hermes' },
       {
         signal: abortController.signal,
+        // The meta-tag CSRF token always wins; caller headers cannot override it.
         headers: { 'X-Request-Source': 'test', 'X-CSRF-Token': 'CUSTOM' },
       },
     );
@@ -148,6 +149,21 @@ describe('createRailsAction', () => {
     expect(headerValue(init.headers, 'Content-Type')).toBeNull();
   });
 
+  it('omits the JSON body for DELETE requests even when variables are provided', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
+    const deleteProject = createRailsAction<{ id: number }, null>({
+      method: 'DELETE',
+      path: ({ id }) => `/api/projects/${id}`,
+    });
+
+    await expect(deleteProject({ id: 7 })).resolves.toBeNull();
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.method).toBe('DELETE');
+    expect(init.body).toBeUndefined();
+    expect(headerValue(init.headers, 'Content-Type')).toBeNull();
+  });
+
   it('rejects before fetch when the Rails CSRF meta tag is missing', async () => {
     const csrfMeta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]');
     csrfMeta?.remove();
@@ -163,6 +179,22 @@ describe('createRailsAction', () => {
       if (csrfMeta) {
         document.head.appendChild(csrfMeta);
       }
+    }
+  });
+
+  it('rejects before fetch when the Rails CSRF meta tag has empty content', async () => {
+    const originalContent = csrfMeta.content;
+    csrfMeta.content = '';
+
+    try {
+      const createProject = createRailsAction<{ name: string }, { ok: true }>({
+        path: '/api/projects',
+      });
+
+      await expect(createProject({ name: 'Apollo' })).rejects.toThrow(/csrf-token/);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      csrfMeta.content = originalContent;
     }
   });
 
@@ -212,6 +244,23 @@ describe('createRailsAction', () => {
     if (caughtError instanceof RailsActionRequestError) {
       expect(caughtError.responseBody).toBeNull();
       await expect(caughtError.response.text()).resolves.toBe('<html>boom</html>');
+    }
+  });
+
+  it('warns in development when a fetch rejection looks like a Rails redirect', async () => {
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const redirectError = new TypeError('Failed to fetch');
+    fetchMock.mockRejectedValueOnce(redirectError);
+
+    try {
+      const createProject = createRailsAction<{ name: string }, { ok: true }>({
+        path: '/api/projects',
+      });
+
+      await expect(createProject({ name: 'Apollo' })).rejects.toBe(redirectError);
+      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('createRailsAction'));
+    } finally {
+      consoleWarn.mockRestore();
     }
   });
 });

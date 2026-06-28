@@ -230,7 +230,7 @@ function useCreateProjectMutation() {
 }
 ```
 
-`createRailsAction` uses the same same-origin, JSON, and CSRF assumptions as the starter's `apiFetch`
+`createRailsAction` shares the same-origin, JSON-only, and CSRF assumptions as the starter's `apiFetch`
 pattern, but returns a standalone function that drops directly into `useMutation`. It does not replace
 Rails routes, strong parameters, authorization, or runtime response validation.
 Endpoints should return JSON for 2xx responses unless the caller's response type is `null`; browser
