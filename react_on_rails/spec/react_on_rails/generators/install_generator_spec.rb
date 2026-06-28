@@ -158,7 +158,7 @@ describe InstallGenerator, type: :generator do
   def assert_tailwind_stylesheet(path: "app/javascript/stylesheets/application.css",
                                  source_directive: '@import "tailwindcss" source("../..");')
     assert_file path do |content|
-      expect(content).to include("Tailwind v4 scans Rails app/ for utility class names by default")
+      expect(content).to include("Tailwind v4 scans generated Rails app and Shakapacker source paths by default")
       expect(content).to include("add @source directives here")
       expect(content).to include('@source "../../../lib";')
       expect(content).to include('@source "../../../engines/my_engine/app";')
