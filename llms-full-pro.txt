@@ -602,13 +602,14 @@ Before upgrading:
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
-- Run the node renderer client from the normal Rails request path. Async Rails servers or middleware should call the
-  renderer from inside the request's running scheduler/task context so the async-http client can use scheduler-scoped
-  connection reuse. Avoid invoking renderer requests from a scheduler-only context that lacks an `Async::Task.current?`
-  task; that path may still fall back to a nested reactor.
+- Run the node renderer client from the normal Rails request path. Async Rails servers (Falcon, Puma with an async
+  scheduler) are supported: the async-http client uses scheduler-scoped connection reuse automatically. Middleware
+  should call the renderer from inside the request's running scheduler/task context. Avoid invoking renderer requests
+  from a scheduler-only context that lacks an `Async::Task.current?` task; that path may still fall back to a nested
+  reactor.
 - `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
   async-http manages connection lifecycle through its scheduler-scoped clients and ephemeral request clients. Setting
-  it now emits a deprecation warning.
+  it to a non-`nil` value emits a deprecation warning; `nil` is accepted silently.
 
 #### Upgrading to 16.4.0 or later
 
