@@ -95,6 +95,7 @@ const sidebars: SidebarsConfig = {
             'building-features/accessibility',
             'building-features/forms',
             'building-features/react-and-redux',
+            'building-features/tanstack-query',
             'building-features/styling-with-tailwind',
             'building-features/i18n',
             'building-features/images',
@@ -252,6 +253,7 @@ const sidebars: SidebarsConfig = {
             'pro/react-server-components/per-request-data',
             'pro/react-server-components/rspack-compatibility',
             'pro/react-server-components/nextjs-comparison',
+            'pro/react-server-components/tanstack-start-comparison',
             'pro/react-server-components/glossary',
             {
               type: 'category',

@@ -81,7 +81,7 @@ end
 # outright ("invalid switch in RUBYOPT"), so it can never appear here.
 ARGUMENT_TAKING_SHORT_RUBYOPT_SWITCHES = %w[I r].freeze unless defined?(ARGUMENT_TAKING_SHORT_RUBYOPT_SWITCHES)
 
-# True when RUBYOPT already pins a source encoding: a -E/-K (including inside a short-option cluster
+# True when RUBYOPT already pins a source encoding: a -E (including inside a short-option cluster
 # such as -wEUS-ASCII), or a --encoding/--external-encoding/--internal-encoding long option.
 def rubyopt_pins_encoding?(rubyopt)
   rubyopt.split.any? { |token| rubyopt_token_pins_encoding?(token) }
@@ -93,7 +93,7 @@ def rubyopt_token_pins_encoding?(token)
 
   token[1..].each_char do |char|
     break if ARGUMENT_TAKING_SHORT_RUBYOPT_SWITCHES.include?(char)
-    return true if "EK".include?(char)
+    return true if char == "E"
   end
   false
 end
