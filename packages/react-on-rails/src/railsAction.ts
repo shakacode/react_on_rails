@@ -7,6 +7,10 @@ export type RailsActionPath<TVariables> = string | ((variables: TVariables) => s
 export interface RailsActionOptions<TVariables> {
   path: RailsActionPath<TVariables>;
   method?: RailsActionMethod;
+  /**
+   * Maps variables to the JSON request body. Omit to send variables verbatim;
+   * supply `() => null` to send no body when variables only populate the path.
+   */
   body?: (variables: TVariables) => unknown;
   headers?: HeadersInit | ((variables: TVariables) => HeadersInit);
 }
@@ -107,8 +111,7 @@ const buildRailsActionHeaders = (
   hasJsonBody: boolean,
   ...headersList: Array<HeadersInit | undefined>
 ): Headers => {
-  const headers = mergeHeaders(...headersList);
-  headers.set('Accept', 'application/json');
+  const headers = mergeHeaders({ Accept: 'application/json' }, ...headersList);
   if (hasJsonBody) {
     headers.set('Content-Type', 'application/json');
   } else {
@@ -126,6 +129,12 @@ const resolveHeaders = <TVariables>(
   headers: RailsActionOptions<TVariables>['headers'],
   variables: TVariables,
 ): HeadersInit | undefined => (typeof headers === 'function' ? headers(variables) : headers);
+
+const assertBrowserContext = (): void => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    throw new Error('createRailsAction can only be used in browser contexts.');
+  }
+};
 
 /**
  * Creates a CSRF-aware JSON caller for a Rails controller action.
@@ -158,6 +167,8 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     callOptions: RailsActionCallOptions = {},
   ): Promise<TResponse> => {
     const typedVariables = variables as TVariables;
+    assertBrowserContext();
+
     const requestUrl = resolveSameOriginRequestUrl(resolvePath(options.path, typedVariables));
     if (requestUrl === null) {
       throw new Error('createRailsAction can only call same-origin Rails action URLs.');
@@ -171,7 +182,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
       );
     }
 
-    const requestBody = options.body ? options.body(typedVariables) : variables;
+    const requestBody = options.body !== undefined ? options.body(typedVariables) : variables;
     const hasJsonBody = method !== 'DELETE' && requestBody !== undefined && requestBody !== null;
     warnOnDiscardedDeleteBody(method, options.body);
     let response: Response;

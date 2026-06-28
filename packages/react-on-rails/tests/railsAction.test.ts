@@ -106,8 +106,8 @@ describe('createRailsAction', () => {
       { id: 3, name: 'Hermes' },
       {
         signal: abortController.signal,
-        // The meta-tag CSRF token always wins; caller headers cannot override it.
-        headers: { 'X-Request-Source': 'test', 'X-CSRF-Token': 'CUSTOM' },
+        // Security-critical Rails headers always win; caller headers cannot override them.
+        headers: { 'X-Request-Source': 'test', 'X-CSRF-Token': 'CUSTOM', 'X-Requested-With': 'fetch' },
       },
     );
 
@@ -116,8 +116,9 @@ describe('createRailsAction', () => {
     expect(init.method).toBe('PATCH');
     expect(init.signal).toBe(abortController.signal);
     expect(init.body).toBe(JSON.stringify({ project: { name: 'Hermes' } }));
-    expect(headerValue(init.headers, 'Accept')).toBe('application/json');
+    expect(headerValue(init.headers, 'Accept')).toBe('text/plain');
     expect(headerValue(init.headers, 'X-CSRF-Token')).toBe(TEST_CSRF_TOKEN);
+    expect(headerValue(init.headers, 'X-Requested-With')).toBe('XMLHttpRequest');
     expect(headerValue(init.headers, 'X-Project-Id')).toBe('3');
     expect(headerValue(init.headers, 'X-Request-Source')).toBe('test');
   });
@@ -189,7 +190,7 @@ describe('createRailsAction', () => {
     }
   });
 
-  it('warns in development when a DELETE body callback returns null', async () => {
+  it('warns in development when a DELETE action is created with a body option', async () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
 
@@ -253,6 +254,28 @@ describe('createRailsAction', () => {
 
     await expect(createProject({ name: 'Apollo' })).rejects.toThrow(/same-origin Rails action URLs/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects before fetch when called outside a browser context', async () => {
+    const originalWindow = globalThis.window;
+
+    try {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: undefined,
+      });
+      const createProject = createRailsAction<{ name: string }, { ok: true }>({
+        path: '/api/projects',
+      });
+
+      await expect(createProject({ name: 'Apollo' })).rejects.toThrow(/browser contexts/);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: originalWindow,
+      });
+    }
   });
 
   it('throws RailsActionRequestError with the parsed response body on non-2xx responses', async () => {
