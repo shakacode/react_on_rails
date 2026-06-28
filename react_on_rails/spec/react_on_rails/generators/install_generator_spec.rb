@@ -4311,7 +4311,7 @@ describe InstallGenerator, type: :generator do
 
       expect(File).not_to receive(:read).with(File.join(destination_root, client_entry))
       expect(redux_generator).to receive(:say_status)
-        .with(:pretend, "Tailwind stylesheet is linked from the React on Rails layout", :yellow)
+        .with(:pretend, "Tailwind stylesheet would be linked from the React on Rails layout", :yellow)
 
       redux_generator.send(:copy_base_files)
     end

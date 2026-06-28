@@ -287,9 +287,16 @@ module ReactOnRails
       def hello_server_controller_uses_tailwind_layout?(controller_path)
         controller_full_path = File.join(destination_root, controller_path)
         layout_name = extract_declared_layout_name(File.read(controller_full_path))
-        layout_name ||= "react_on_rails_default"
+        layout_name ||= inherited_application_layout_name
 
         layout_file_links_tailwind_pack?(layout_name)
+      end
+
+      def inherited_application_layout_name
+        application_controller_path = File.join(destination_root, "app/controllers/application_controller.rb")
+        return "application" unless File.exist?(application_controller_path)
+
+        extract_declared_layout_name(File.read(application_controller_path)) || "application"
       end
 
       def layout_file_links_tailwind_pack?(layout_name)

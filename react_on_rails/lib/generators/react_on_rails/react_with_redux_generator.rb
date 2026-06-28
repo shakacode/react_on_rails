@@ -69,7 +69,7 @@ module ReactOnRails
 
         return unless use_tailwind? && options[:pretend]
 
-        say_status :pretend, "Tailwind stylesheet is linked from the React on Rails layout", :yellow
+        say_status :pretend, "Tailwind stylesheet would be linked from the React on Rails layout", :yellow
       end
 
       def copy_base_redux_files
