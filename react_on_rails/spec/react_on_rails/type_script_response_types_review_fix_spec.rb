@@ -27,14 +27,14 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
       type_name: "EventsShowResponse",
       fields: {
         starts_at: { raw: "Date" },
-        metadata: { raw: "Record<string, string>", optional: true }
+        metadata: { raw: "Record<string, { value: number, label: string }>", optional: true }
       }
     )
 
     declaration = described_class.to_d_ts
 
     expect(declaration).to include("  starts_at: Date;")
-    expect(declaration).to include("  metadata?: Record<string, string>;")
+    expect(declaration).to include("  metadata?: Record<string, { value: number, label: string }>;")
   end
 
   it "rejects unsafe raw TypeScript expressions" do
@@ -89,6 +89,18 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
       "events.show",
       type_name: "EventsShowResponse",
       fields: { starts_at: { raw: "string } export type Injected = any" } }
+    )
+
+    expect do
+      described_class.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
+  end
+
+  it "rejects raw TypeScript expressions with top-level commas" do
+    described_class.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: { starts_at: { raw: "string, injected: any" } }
     )
 
     expect do
