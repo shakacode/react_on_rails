@@ -2,8 +2,9 @@
 # Test harness for `script/release-forward-port --changelog` (the CHANGELOG.md
 # re-homing mode). Mirrors the structure of script/ci-changes-detector-test.bash:
 # each case runs in an isolated mktemp git repo subshell, so the real repo's
-# branches, remote, and working tree are never touched. Requires bash and git.
-# Run with `bash script/release-forward-port-test.bash`.
+# branches, remote, and working tree are never touched. Requires bash, git, and
+# ruby (each case runs `ruby` on the script under test). Run with
+# `bash script/release-forward-port-test.bash`.
 
 set -uo pipefail
 
