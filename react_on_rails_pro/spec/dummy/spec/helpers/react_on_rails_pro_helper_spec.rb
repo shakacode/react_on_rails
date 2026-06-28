@@ -414,6 +414,9 @@ describe ReactOnRailsProHelper do
     def mock_request_and_response(mock_chunks = chunks, count: 1)
       install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks
+      # Streaming helper specs run without generated SSR bundle files, but the
+      # helpers still read bundle metadata before the HTTP mock responds.
+      # Keep all stream specs on deterministic test hashes.
       stub_pro_bundle_hashes
 
       chunks_read.clear
@@ -1073,6 +1076,7 @@ describe ReactOnRailsProHelper do
         props_calls = 0
         first_result = nil
         second_result = nil
+        cached_miss_result = nil
         expected_cache_key = nil
 
         Sync do
@@ -1097,6 +1101,7 @@ describe ReactOnRailsProHelper do
           end
 
           first_result = render_cached.call
+          cached_miss_result = Rails.cache.read(expected_cache_key)
           Rails.cache.write(expected_cache_key, String.new(first_result), expires_in: 60)
           @rendered_rails_context = nil
           second_result = render_cached.call
@@ -1106,7 +1111,7 @@ describe ReactOnRailsProHelper do
         expect(second_result).to eq(first_result)
         expect(first_result).to be_html_safe
         expect(second_result).to be_html_safe
-        expect(Rails.cache.read(expected_cache_key)).to eq(first_result)
+        expect(cached_miss_result).to eq(first_result)
         expect(props_calls).to eq(1)
         expect(chunks_read.count).to eq(chunks.count)
       end
