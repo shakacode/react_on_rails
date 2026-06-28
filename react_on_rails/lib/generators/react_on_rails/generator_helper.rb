@@ -16,9 +16,9 @@ module GeneratorHelper
   TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN = /
     ^[ \t]*<%\s*prepend_javascript_pack_tag(?:\s|\()
     \s*["']react_on_rails_tailwind["'][^\n]*%>(?:\r?\n[ \t]*)*
-    <%=\s*stylesheet_pack_tag(?:\s|\()
+    ^[ \t]*<%=\s*stylesheet_pack_tag(?:\s|\()
     \s*["']react_on_rails_tailwind["'][^\n]*%>(?:\r?\n[ \t]*)*
-    <%=\s*javascript_pack_tag(?:
+    ^[ \t]*<%=\s*javascript_pack_tag(?:
       \s*%> |
       \s+(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:)[^\n]*%> |
       \(\s*(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:)[^\n]*\)\s*%>
@@ -308,6 +308,7 @@ module GeneratorHelper
       raise ArgumentError, "Tailwind source paths cannot contain control characters"
     end
 
+    # JSON quoting keeps CSS punctuation inside the string literal.
     JSON.generate(css_string)
   end
 

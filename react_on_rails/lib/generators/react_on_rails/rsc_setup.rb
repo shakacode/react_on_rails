@@ -281,6 +281,8 @@ module ReactOnRails
             <% prepend_javascript_pack_tag "#{tailwind_pack_name}" %>
             <%= stylesheet_pack_tag "#{tailwind_pack_name}", media: "all" %>
             <%= javascript_pack_tag %>
+
+          Merge these Tailwind pack tags into the existing layout pack-tag block and preserve app-specific pack names.
         MSG
       end
 

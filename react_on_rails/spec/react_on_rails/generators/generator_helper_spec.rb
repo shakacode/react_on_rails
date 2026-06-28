@@ -421,6 +421,18 @@ RSpec.describe GeneratorHelper, type: :generator do
       CSS
     end
 
+    it "does not accept Tailwind layout helper tags embedded mid-line" do
+      layout_content = <<~ERB
+        <head>
+          <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+          text <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+          <%= javascript_pack_tag %>
+        </head>
+      ERB
+
+      expect(layout_links_tailwind_pack?(layout_content)).to be false
+    end
+
     it "escapes quoted Tailwind source paths with JSON string quoting" do
       expect(tailwind_source_statement(%(../quoted"path\\dir)))
         .to eq('@source "../quoted\\"path\\\\dir";')

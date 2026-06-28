@@ -1547,10 +1547,45 @@ describe InstallGenerator, type: :generator do
       expect(warning_text).to include(
         "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout."
       )
-      expect(warning_text).to include("preserving any existing app-specific pack tags")
+      expect(warning_text).to include("preserving any existing app-specific pack names")
+      expect(warning_text).to include("Keep an existing javascript_pack_tag call if it already renders your app packs")
       expect(warning_text).to include('  <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
       expect(base_generator).not_to have_received(:say_status)
       expect(base_generator).not_to have_received(:say)
+    end
+
+    it "does not duplicate the manual Tailwind warning for the default generated layout" do
+      simulate_existing_file("app/controllers/application_controller.rb", <<~RUBY)
+        class ApplicationController < ActionController::Base
+          layout "react_on_rails_default"
+        end
+      RUBY
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          def index
+          end
+        end
+      RUBY
+      simulate_named_pack_tag_layout("application")
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag "application" %>
+            <%= javascript_pack_tag "application" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      GeneratorMessages.clear
+
+      base_generator.send(:warn_existing_hello_world_tailwind_layout)
+
+      expect(GeneratorMessages.messages.join("\n")).not_to include(
+        "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout."
+      )
     end
 
     it "does not warn when HelloWorldController inherits a Tailwind-aware ApplicationController layout" do
@@ -1620,7 +1655,9 @@ describe InstallGenerator, type: :generator do
       )
 
       expect(rsc_generator).to have_received(:say)
-        .with(include("do not include the layout-owned Tailwind pack block required by `--tailwind`"), :yellow)
+        .with(include("lack the Tailwind pack block"), :yellow)
+      expect(rsc_generator).to have_received(:say)
+        .with(include("update/remove the old layout if replacing"), :yellow)
     end
   end
 

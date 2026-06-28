@@ -460,13 +460,16 @@ module ReactOnRails
         return unless File.exist?(controller_full_path)
 
         layout_name = extract_declared_layout_name(File.read(controller_full_path)) || inherited_application_layout_name
+        return if layout_name == File.basename(REACT_ON_RAILS_DEFAULT_LAYOUT_PATH, ".html.erb")
         return if layout_file_links_tailwind_pack?(layout_name)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           #{controller_path} may not use the Tailwind-aware React on Rails layout.
 
-          Ensure app/views/layouts/#{layout_name}.html.erb includes the Tailwind layout pack tags while
-          preserving any existing app-specific pack tags:
+          Merge the Tailwind layout pack tags into app/views/layouts/#{layout_name}.html.erb while
+          preserving any existing app-specific pack names.
+          Keep an existing javascript_pack_tag call if it already renders your app packs; otherwise include the
+          empty javascript_pack_tag flush shown here:
           #{tailwind_layout_helper_block('  ')}
         MSG
       end
@@ -504,7 +507,7 @@ module ReactOnRails
             )
           end
 
-          content = File.read(layout_full_path)
+          content = File.read(layout_full_path) # Re-read after viewport insertion before checking CSP.
         end
 
         csp_tag = "<%= csp_meta_tag %>"

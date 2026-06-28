@@ -202,17 +202,17 @@ module ReactOnRails
             ℹ️  Found existing layout file(s) in your app that were not reused for HelloServerController:
             #{skipped_paths}
 
-            #{skipped_layout_fallback_reason(skipped_layouts)}
+            #{skipped_layout_fallback_reason(skipped_layouts, new_layout_path)}
             The generator will create #{new_layout_path} instead of overwriting them.
             #{fallback_layout_description}
           MSG
         end
 
-        def skipped_layout_fallback_reason(skipped_layouts)
+        def skipped_layout_fallback_reason(skipped_layouts, new_layout_path)
           if !use_tailwind? || skipped_layouts.any? { |layout| layout.fetch(:classification) == :missing_pack_tags }
             "Those file(s) do not include both `stylesheet_pack_tag` and `javascript_pack_tag`."
           else
-            "Those file(s) do not include the layout-owned Tailwind pack block required by `--tailwind`."
+            "Those file(s) lack the Tailwind pack block; update/remove the old layout if replacing #{new_layout_path}."
           end
         end
 

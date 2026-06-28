@@ -20,6 +20,7 @@ module ReactOnRails
     #       ValidationHelpers (~80 lines for Node/package manager checks).
     # rubocop:disable Metrics/ClassLength
     class InstallGenerator < Rails::Generators::Base
+      # Keep this Tailwind-only layout gate local so non-Tailwind installs can keep the lower gemspec floor.
       MINIMUM_SHAKAPACKER_VERSION_FOR_TAILWIND_LAYOUT = "6.5.6"
 
       include GeneratorHelper
