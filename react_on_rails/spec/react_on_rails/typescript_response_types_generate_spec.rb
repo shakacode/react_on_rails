@@ -58,6 +58,16 @@ module ReactOnRails
       end
     end
 
+    it "wraps invalid path arguments in ReactOnRails::Error" do
+      Dir.mktmpdir do |dir|
+        allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+
+        expect do
+          described_class.generate(output_path: "generated/\0rails_response_types.d.ts")
+        end.to raise_error(ReactOnRails::Error, /must be inside Rails\.root/)
+      end
+    end
+
     it "allows output paths under the real Rails.root when Rails.root is a symlink" do
       Dir.mktmpdir do |dir|
         real_root = File.join(dir, "real-root")

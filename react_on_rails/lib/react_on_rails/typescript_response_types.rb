@@ -48,6 +48,75 @@ module ReactOnRails
 
     Definition = Struct.new(:name, :fields, :response_key, keyword_init: true)
 
+    module TypeSpecHelpers
+      private
+
+      def validate_fields!(fields)
+        return if fields.is_a?(Hash)
+
+        raise ReactOnRails::Error, "Response type fields must be a Hash, got #{fields.class}"
+      end
+
+      def unsafe_raw_type_expression?(expression)
+        expression.match?(RAW_TYPE_UNSAFE_PATTERN) || unsafe_raw_type_nesting?(expression)
+      end
+
+      def unsafe_raw_type_nesting?(expression)
+        expected_group_ends = []
+
+        expression.scan(RAW_TYPE_NESTING_TOKEN_PATTERN) do |token|
+          return true if unsafe_raw_type_nesting_token?(token, expected_group_ends)
+        end
+
+        expected_group_ends.any?
+      end
+
+      def unsafe_raw_type_nesting_token?(token, expected_group_ends)
+        return true if token == "," && expected_group_ends.empty?
+
+        group_end = RAW_TYPE_GROUP_CLOSES[token]
+        if group_end
+          expected_group_ends << group_end
+          return false
+        end
+
+        return expected_group_ends.empty? if token == ">" && expected_group_ends.last != ">"
+        return false unless RAW_TYPE_GROUP_ENDS.include?(token)
+
+        expected_group_ends.pop != token
+      end
+
+      def wrapper_keys_for(normalized)
+        WRAPPER_TYPE_KEYS.select { |key| normalized.key?(key) }
+      end
+
+      def non_option_keys_for(spec)
+        spec.filter_map do |key, _value|
+          key = key.to_sym
+          key unless OPTION_KEYS.include?(key)
+        end
+      end
+
+      def unrecognized_option_keys_with_unsupported_values(spec)
+        spec.filter_map do |key, value|
+          key = key.to_sym
+          next if OPTION_KEYS.include?(key) || plain_object_field_value?(value)
+
+          key
+        end
+      end
+
+      def plain_object_field_value?(value)
+        value.is_a?(Array) || value.is_a?(Hash) || value.is_a?(String) || value.is_a?(Symbol)
+      end
+
+      def normalize_option_hash(spec)
+        spec.each_with_object({}) do |(key, value), normalized|
+          normalized[key.to_sym] = value if OPTION_KEYS.include?(key.to_sym)
+        end
+      end
+    end
+
     class << self
       def define_type(type_name, fields:)
         registry.define_type(type_name, fields:)
@@ -79,48 +148,6 @@ module ReactOnRails
 
       private
 
-      def unsafe_raw_type_expression?(expression)
-        expression.match?(RAW_TYPE_UNSAFE_PATTERN) || unsafe_raw_type_nesting?(expression)
-      end
-
-      def unsafe_raw_type_nesting?(expression)
-        expected_group_ends = []
-
-        expression.scan(RAW_TYPE_NESTING_TOKEN_PATTERN) do |token|
-          return true if token == "," && expected_group_ends.empty?
-
-          group_end = RAW_TYPE_GROUP_CLOSES[token]
-          if group_end
-            expected_group_ends << group_end
-            next
-          end
-
-          next if token == ">" && expected_group_ends.last != ">"
-          next unless RAW_TYPE_GROUP_ENDS.include?(token)
-
-          return true unless expected_group_ends.pop == token
-        end
-
-        expected_group_ends.any?
-      end
-
-      def wrapper_keys_for(normalized)
-        WRAPPER_TYPE_KEYS.select { |key| normalized.key?(key) }
-      end
-
-      def unrecognized_option_keys_with_unsupported_values(spec)
-        spec.filter_map do |key, value|
-          key = key.to_sym
-          next if OPTION_KEYS.include?(key) || plain_object_field_value?(value)
-
-          key
-        end
-      end
-
-      def plain_object_field_value?(value)
-        value.is_a?(Array) || value.is_a?(Hash) || value.is_a?(String) || value.is_a?(Symbol)
-      end
-
       def root_relative_output_path(output_path)
         path = Pathname.new(output_path)
         path = Rails.root.join(path) unless path.absolute?
@@ -134,7 +161,7 @@ module ReactOnRails
         end
 
         output_path_error!(output_path)
-      rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES, Errno::EPERM
+      rescue ArgumentError, Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES, Errno::EPERM
         output_path_error!(output_path)
       end
 
@@ -169,6 +196,8 @@ module ReactOnRails
     end
 
     class Registry
+      include TypeSpecHelpers
+
       attr_reader :types, :responses
 
       def initialize
@@ -210,12 +239,6 @@ module ReactOnRails
         RESERVED_TYPE_NAMES.include?(type_name) || GENERATED_TYPE_NAMES.include?(type_name)
       end
 
-      def validate_fields!(fields)
-        return if fields.is_a?(Hash)
-
-        raise ReactOnRails::Error, "Response type fields must be a Hash, got #{fields.class}"
-      end
-
       def ensure_unique_type_name!(type_name)
         return unless definitions.any? { |definition| definition.name == type_name }
 
@@ -240,6 +263,8 @@ module ReactOnRails
     end
 
     class Emitter
+      include TypeSpecHelpers
+
       def initialize(registry)
         @registry = registry
       end
@@ -352,7 +377,7 @@ module ReactOnRails
         end
 
         raw_expression = type.strip
-        if TypeScriptResponseTypes.__send__(:unsafe_raw_type_expression?, raw_expression)
+        if unsafe_raw_type_expression?(raw_expression)
           raise ReactOnRails::Error, "Raw TypeScript type specs must be safe single-line type expressions"
         end
 
@@ -393,10 +418,11 @@ module ReactOnRails
         return false unless spec.is_a?(Hash)
 
         normalized ||= normalize_option_hash(spec)
-        wrapper_keys = TypeScriptResponseTypes.__send__(:wrapper_keys_for, normalized)
+        wrapper_keys = wrapper_keys_for(normalized)
 
-        if normalized.length != spec.length
-          validate_wrapper_option_keys!(spec, wrapper_keys)
+        non_option_keys = non_option_keys_for(spec)
+        if non_option_keys.any?
+          validate_non_option_wrapper_keys!(spec, normalized, wrapper_keys, non_option_keys)
           return false
         end
 
@@ -406,27 +432,23 @@ module ReactOnRails
         raise ReactOnRails::Error, "Response type specs can only use one of :array, :fields, :raw, or :type"
       end
 
+      def validate_non_option_wrapper_keys!(spec, normalized, wrapper_keys, non_option_keys)
+        if wrapper_keys.any? && (normalized.key?(:nullable) || normalized.key?(:optional))
+          raise ReactOnRails::Error,
+                "Unrecognized option key(s) in response type spec: #{non_option_keys.map(&:inspect).join(', ')}"
+        end
+
+        validate_wrapper_option_keys!(spec, wrapper_keys)
+      end
+
       def validate_wrapper_option_keys!(spec, wrapper_keys)
         return if wrapper_keys.empty?
 
-        unrecognized_keys =
-          TypeScriptResponseTypes.__send__(:unrecognized_option_keys_with_unsupported_values, spec)
+        unrecognized_keys = unrecognized_option_keys_with_unsupported_values(spec)
         return if unrecognized_keys.empty?
 
         raise ReactOnRails::Error,
               "Unrecognized option key(s) in response type spec: #{unrecognized_keys.map(&:inspect).join(', ')}"
-      end
-
-      def normalize_option_hash(spec)
-        spec.each_with_object({}) do |(key, value), normalized|
-          normalized[key.to_sym] = value if OPTION_KEYS.include?(key.to_sym)
-        end
-      end
-
-      def validate_fields!(fields)
-        return if fields.is_a?(Hash)
-
-        raise ReactOnRails::Error, "Response type fields must be a Hash, got #{fields.class}"
       end
 
       def quote_property(property_name)
