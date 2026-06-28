@@ -85,6 +85,8 @@ class ReleaseForwardPort
       return 0
     end
 
+    return finish_no_action_plan(plan, target) unless actionable_plan?(plan)
+
     ensure_clean_worktree!
     checkout_target!(target)
     # This final expression is the process exit status.
@@ -99,6 +101,18 @@ class ReleaseForwardPort
   end
 
   private
+
+  def finish_no_action_plan(plan, target)
+    if acknowledged_manual_entries?(plan)
+      ensure_clean_worktree!
+      checkout_target!(target)
+    else
+      ensure_no_cherry_pick_in_progress!
+    end
+
+    puts "\nNothing to cherry-pick."
+    0
+  end
 
   def parse_options!
     argv = @argv.dup
@@ -192,21 +206,38 @@ class ReleaseForwardPort
     special_reason = special_skip_reason(sha, subject, target, target_version)
     return special_reason if special_reason
 
-    return "already forward-ported to #{target} via cherry-pick -x evidence with no later target revert" if
-      already_forward_ported_with_x?(sha, target)
+    version_bump_reason = version_bump_skip_reason(subject, target, target_version)
+    return version_bump_reason if version_bump_reason
 
     return "empty commit; cherry-picking would only create a no-op commit on #{target}" if
       patch_id_for_commit(sha) == EMPTY_PATCH_ID
+
+    return active_source_revert_skip_reason(subject, target, target_version) if
+      source_standard_revert_on_target?(sha, target)
+
+    return "already forward-ported to #{target} via cherry-pick -x evidence with no later target revert" if
+      already_forward_ported_with_x?(sha, target)
 
     # Origin was reverted on target: the fix was applied and then undone, so
     # re-apply it even if git cherry reports a patch match.
     return if source_cherry_pick_origin_reverted_on_target?(sha, target)
 
-    if patch_equivalent_commits[sha] &&
-       patch_equivalent_commit_present_on_target?(sha, target)
-      return "patch already exists on #{target} according to target history with no later standard revert"
-    end
+    patch_equivalent_skip_reason(sha, target, patch_equivalent_commits)
+  end
 
+  def patch_equivalent_skip_reason(sha, target, patch_equivalent_commits)
+    return unless patch_equivalent_commits[sha] || target_has_renamed_source_paths?(target, sha)
+    return unless patch_equivalent_commit_present_on_target?(sha, target)
+
+    "patch already exists on #{target} according to target history with no later standard revert"
+  end
+
+  def active_source_revert_skip_reason(subject, target, target_version)
+    # A target-side `git revert <source-sha>` names the release commit rather
+    # than the earlier target cherry-pick, so do not trust either -x footer or
+    # patch-equivalence evidence while that source revert is still active.
+    # Version-bump guards still win because reapplying release-only version files
+    # to the target branch is never an automatic forward-port.
     version_bump_skip_reason(subject, target, target_version)
   end
 
@@ -339,11 +370,9 @@ class ReleaseForwardPort
 
   def already_forward_ported_with_x?(sha, target)
     return true if source_cherry_pick_origin_on_target?(sha, target)
+    return false if source_standard_revert_on_target?(sha, target)
 
-    footer = format(CHERRY_PICK_FOOTER_FORMAT, sha)
-    # This history search can false-positive if a later target commit quotes the
-    # footer verbatim. The runbook documents that boundary for release operators.
-    forwarded_shas = git_lines("log", target, "--fixed-strings", "--grep", footer, "--format=%H")
+    forwarded_shas = forwarded_shas_with_x(sha, target)
     return false if forwarded_shas.empty?
 
     # True if at least one copy of the cherry-pick is still live on the target.
@@ -360,6 +389,88 @@ class ReleaseForwardPort
   def source_cherry_pick_origin_reverted_on_target?(sha, target)
     origin_sha = cherry_pick_origin(sha)
     origin_sha && commit_on_target?(origin_sha, target) && !target_commit_live_on_target?(origin_sha, target)
+  end
+
+  def source_standard_revert_on_target?(sha, target)
+    active_revert_shas =
+      standard_revert_shas_on_target(sha, target)
+      .select { |revert_sha| target_commit_live_on_target?(revert_sha, target) }
+      .select { |revert_sha| revert_changes_source_paths?(revert_sha, sha) }
+    return false if active_revert_shas.empty?
+
+    active_revert_shas.any? do |revert_sha|
+      !source_revert_superseded_on_target?(sha, target, revert_sha)
+    end
+  end
+
+  def revert_changes_source_paths?(revert_sha, sha)
+    parents = git("rev-list", "--parents", "-n", "1", revert_sha).split.drop(1)
+    return false if parents.empty?
+
+    paths = source_paths_for_target_diff(parents.first, sha)
+    return false if paths.empty?
+
+    diff_changes_paths?(parents.first, revert_sha, paths)
+  end
+
+  def source_revert_superseded_on_target?(sha, target, revert_sha)
+    source_reapplied_with_x_after_revert?(sha, target, revert_sha) ||
+      source_reapplied_without_x_after_revert?(sha, target, revert_sha) ||
+      source_reapplied_by_merge_after_revert?(sha, target, revert_sha)
+  end
+
+  def source_reapplied_with_x_after_revert?(sha, target, revert_sha)
+    forwarded_shas_with_x(sha, target).any? do |forwarded_sha|
+      target_commit_introduced_after_revert?(forwarded_sha, target, revert_sha) &&
+        target_commit_live_on_target?(forwarded_sha, target)
+    end
+  end
+
+  def source_reapplied_without_x_after_revert?(sha, target, revert_sha)
+    source_patch_id = patch_id_for_commit(sha)
+
+    patch_equivalent_target_candidates(sha, target).any? do |target_sha|
+      target_commit_introduced_after_revert?(target_sha, target, revert_sha) &&
+        target_commit_live_on_target?(target_sha, target) &&
+        patch_id_for_target_candidate(target_sha, sha) == source_patch_id
+    end
+  end
+
+  def source_reapplied_by_merge_after_revert?(sha, target, revert_sha)
+    source_patch_id = patch_id_for_commit(sha)
+
+    target_first_parent_merges_after(revert_sha, target).any? do |merge_sha|
+      target_commit_live_on_target?(merge_sha, target) &&
+        patch_id_for_merge_source_paths(merge_sha, sha) == source_patch_id
+    end
+  end
+
+  def target_first_parent_merges_after(sha, target)
+    git_lines("log", target, "--first-parent", "--merges", "#{sha}..#{target}", "--format=%H")
+  end
+
+  def patch_id_for_merge_source_paths(merge_sha, sha)
+    parents = git("rev-list", "--parents", "-n", "1", merge_sha).split.drop(1)
+    return if parents.length < 2
+
+    first_parent = parents.first
+    target_to_source_paths = target_to_source_path_map(first_parent, sha)
+    return if target_to_source_paths.empty?
+
+    patch_id_for_diff(first_parent, merge_sha, target_to_source_paths.keys, target_to_source_paths:)
+  end
+
+  def target_commit_introduced_after_revert?(sha, target, revert_sha)
+    commit_descends_from?(sha, revert_sha) ||
+      target_merge_descendants(sha, target).any? { |merge_sha| commit_descends_from?(merge_sha, revert_sha) }
+  end
+
+  def forwarded_shas_with_x(sha, target)
+    footer = format(CHERRY_PICK_FOOTER_FORMAT, sha)
+    # This history search can false-positive if a later target commit quotes the
+    # footer verbatim. The live-target check by callers mitigates reverted target
+    # copies; the runbook documents the remaining quoted-footer boundary.
+    git_lines("log", target, "--fixed-strings", "--grep", footer, "--format=%H")
   end
 
   def reverted_commit_live_on_target?(sha, target)
@@ -408,18 +519,28 @@ class ReleaseForwardPort
     source_patch_id = patch_id_for_commit(sha)
 
     patch_equivalent_target_candidates(sha, target).any? do |target_sha|
-      patch_id_for_commit(target_sha) == source_patch_id && target_commit_live_on_target?(target_sha, target)
+      patch_id_for_target_candidate(target_sha, sha) == source_patch_id &&
+        target_commit_live_on_target?(target_sha, target)
     end
   end
 
   def target_commit_live_on_target?(sha, target)
-    !standard_revert_on_target?(sha, target) && !target_commit_reverted_through_merge?(sha, target)
+    return false if standard_revert_on_target?(sha, target)
+    return false if target_commit_reverted_through_merge?(sha, target)
+
+    commit_on_first_parent?(sha, target) || target_merge_descendants(sha, target).any?
+  end
+
+  def commit_on_first_parent?(sha, target)
+    @first_parent_commits ||= {}
+    @first_parent_commits[target] ||= git_lines("rev-list", "--first-parent", target).to_h { |commit| [commit, true] }
+    @first_parent_commits[target].key?(sha)
   end
 
   def target_commit_reverted_through_merge?(sha, target)
-    # Intentionally conservative: if any merge that included this commit was
-    # reverted, treat the commit as not live. Re-picking a present change is
-    # safer than skipping a release fix that the target tree no longer has.
+    # Only merge reverts that introduced this commit can make it non-live. Later
+    # unrelated merges often descend from already-forward-ported fixes through
+    # first-parent history; their reverts should not make an older fix look absent.
     @target_merge_revert_cache ||= {}
     cache_key = [sha, target]
     return @target_merge_revert_cache.fetch(cache_key) if @target_merge_revert_cache.key?(cache_key)
@@ -429,30 +550,215 @@ class ReleaseForwardPort
   end
 
   def target_merge_descendants(sha, target)
-    git_lines("log", target, "--merges", "--ancestry-path", "#{sha}..#{target}", "--format=%H")
+    git_lines("log", target, "--merges", "--ancestry-path", "#{sha}..#{target}", "--format=%H").select do |merge_sha|
+      merge_introduces_commit?(merge_sha, sha)
+    end
+  end
+
+  def merge_introduces_commit?(merge_sha, sha)
+    parents = git("rev-list", "--parents", "-n", "1", merge_sha).split.drop(1)
+    return false if parents.length < 2
+
+    first_parent, *merged_side_parents = parents
+    return false if commit_descends_from?(first_parent, sha)
+    return false unless merged_side_parents.any? { |parent| commit_descends_from?(parent, sha) }
+
+    merge_changes_commit_paths?(first_parent, merge_sha, sha)
+  end
+
+  def merge_changes_commit_paths?(first_parent, merge_sha, sha)
+    paths = source_paths_for_target_diff(first_parent, sha)
+    return false if paths.empty?
+
+    diff_changes_paths?(first_parent, merge_sha, paths)
+  end
+
+  def diff_changes_paths?(from_ref, to_ref, paths)
+    args = ["diff", "--quiet", from_ref, to_ref, "--", *paths]
+    stdout, stderr, status = capture_git(*args)
+    return true if status.exitstatus == 1
+    raise GitError, git_error(args, stdout, stderr, status) unless status.success?
+
+    false
   end
 
   def patch_equivalent_target_candidates(sha, target)
-    paths = git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
+    paths = source_paths_for_target_diff(target, sha)
     return [] if paths.empty?
 
     # This path-history walk can be broad for high-churn files, but it only runs
     # for no-footer patch-equivalent candidates after git cherry marks a commit
-    # equivalent. Normal helper reruns use the faster -x footer path.
+    # equivalent or when target-side renames need a path-aware fallback. Normal
+    # helper reruns use the faster -x footer path.
     git_lines("log", target, "--format=%H", "--no-merges", "--", *paths)
   end
 
-  def patch_id_for_commit(sha)
+  def target_has_renamed_source_paths?(target, sha)
+    (source_paths_for_target_diff(target, sha) - changed_paths_for_commit(sha)).any?
+  end
+
+  def patch_id_for_target_candidate(target_sha, source_sha)
+    parents = git("rev-list", "--parents", "-n", "1", target_sha).split.drop(1)
+    return patch_id_for_commit(target_sha) if parents.empty?
+
+    target_to_source_paths = target_to_source_path_map(target_sha, source_sha)
+    patch_id_for_commit(target_sha, target_to_source_paths:)
+  end
+
+  def source_paths_for_target_diff(first_parent, sha)
+    target_to_source_path_map(first_parent, sha).keys
+  end
+
+  def target_to_source_path_map(first_parent, sha)
+    paths = changed_paths_for_commit(sha)
+    return {} if paths.empty?
+
+    path_map = paths.to_h { |path| [path, path] }
+    renamed_target_path_pairs_for_source_paths(first_parent, sha, paths).each do |source_path, target_path|
+      path_map[target_path] = source_path
+    end
+
+    path_map
+  end
+
+  def renamed_target_path_pairs_for_source_paths(first_parent, sha, paths)
+    @renamed_target_path_pairs_cache ||= {}
+    cache_key = [first_parent, sha]
+    return @renamed_target_path_pairs_cache.fetch(cache_key) if @renamed_target_path_pairs_cache.key?(cache_key)
+
+    source_paths = paths.to_h { |path| [path, true] }
+    rename_base_refs = [git("merge-base", first_parent, sha).strip, sha].uniq
+
+    @renamed_target_path_pairs_cache[cache_key] =
+      rename_base_refs.flat_map do |from_ref|
+        renamed_target_path_pairs_from_ref(from_ref, first_parent, source_paths)
+      end.uniq
+  end
+
+  def renamed_target_path_pairs_from_ref(from_ref, first_parent, source_paths)
+    git_lines("diff", "--name-status", "--find-renames=20%", from_ref, first_parent).filter_map do |line|
+      status, old_path, new_path = line.split("\t", 3)
+      [old_path, new_path] if status.start_with?("R") && new_path && source_paths.key?(old_path)
+    end
+  end
+
+  def changed_paths_for_commit(sha)
+    @changed_paths_cache ||= {}
+    @changed_paths_cache[sha] ||= git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
+  end
+
+  def patch_id_for_commit(sha, target_to_source_paths: {})
     # git show --format= emits diff-only output. git patch-id still hashes the
     # hunk content and emits a commit field we discard; the first token is the
     # content hash used for comparisons.
-    patch = git("show", "--format=", "--full-index", "--find-renames", sha).b
+    patch =
+      git(
+        "show",
+        "--no-ext-diff",
+        "--format=",
+        "--full-index",
+        rename_detection_option(target_to_source_paths),
+        sha
+      ).b
+    patch = normalize_patch_paths(patch, target_to_source_paths)
+    patch_id_for_patch(patch, sha)
+  end
+
+  def patch_id_for_diff(from_ref, to_ref, paths, target_to_source_paths: {})
+    patch =
+      git(
+        "diff",
+        "--no-ext-diff",
+        "--full-index",
+        rename_detection_option(target_to_source_paths),
+        from_ref,
+        to_ref,
+        "--",
+        *paths
+      ).b
+    patch = normalize_patch_paths(patch, target_to_source_paths)
+    patch_id_for_patch(patch, "#{from_ref}..#{to_ref}")
+  end
+
+  def rename_detection_option(target_to_source_paths)
+    return "--find-renames=20%" if target_to_source_paths.any? { |target_path, source_path| target_path != source_path }
+
+    "--find-renames"
+  end
+
+  def normalize_patch_paths(patch, target_to_source_paths)
+    changed_paths = target_to_source_paths.reject { |target_path, source_path| target_path == source_path }
+    return patch if changed_paths.empty?
+
+    patch.each_line.map { |line| normalize_patch_path_line(line, changed_paths) }.join.b
+  end
+
+  def normalize_patch_path_line(line, target_to_source_paths)
+    return normalize_patch_diff_header(line, target_to_source_paths) if line.start_with?("diff --git ")
+    return normalize_prefixed_patch_path_line(line, target_to_source_paths) if line.start_with?("--- ", "+++ ")
+
+    normalize_unprefixed_patch_path_line(line, target_to_source_paths)
+  end
+
+  def normalize_patch_diff_header(line, target_to_source_paths)
+    trailing_newline = line.end_with?("\n") ? "\n" : ""
+    header = line.delete_prefix("diff --git ").delete_suffix("\n")
+
+    sorted_paths = target_to_source_paths.sort_by { |target_path, _source_path| -target_path.length }
+    sorted_paths.each do |target_path, source_path|
+      next if target_path == source_path
+
+      mapped_headers = [
+        "a/#{target_path} b/#{target_path}",
+        "a/#{source_path} b/#{target_path}"
+      ]
+      next unless mapped_headers.include?(header)
+
+      return "diff --git a/#{source_path} b/#{source_path}#{trailing_newline}"
+    end
+
+    line
+  end
+
+  def normalize_prefixed_patch_path_line(line, target_to_source_paths)
+    trailing_newline = line.end_with?("\n") ? "\n" : ""
+    prefix = line[0, 4]
+    path, separator, metadata = line[4..].delete_suffix("\n").partition("\t")
+    return line if path == "/dev/null"
+
+    normalized_path = normalize_prefixed_patch_path(path, path[0, 2], target_to_source_paths)
+    "#{prefix}#{normalized_path}#{separator}#{metadata}#{trailing_newline}"
+  end
+
+  def normalize_unprefixed_patch_path_line(line, target_to_source_paths)
+    return "" if line.start_with?("similarity index ", "dissimilarity index ")
+
+    path_headers = ["rename from ", "rename to ", "copy from ", "copy to "]
+    path_header = path_headers.find { |header| line.start_with?(header) }
+    return line unless path_header
+
+    trailing_newline = line.end_with?("\n") ? "\n" : ""
+    path = line.delete_prefix(path_header).delete_suffix("\n")
+    return "" if path_header.start_with?("rename ") &&
+                 (target_to_source_paths.key?(path) || target_to_source_paths.value?(path))
+
+    "#{path_header}#{target_to_source_paths.fetch(path, path)}#{trailing_newline}"
+  end
+
+  def normalize_prefixed_patch_path(path, prefix, target_to_source_paths)
+    return path unless path.start_with?(prefix)
+
+    target_path = path.delete_prefix(prefix)
+    "#{prefix}#{target_to_source_paths.fetch(target_path, target_path)}"
+  end
+
+  def patch_id_for_patch(patch, label)
     # Empty commits carry no file changes; cherry-picking them would only create
     # a no-op commit, so treat the patch as already present.
     return EMPTY_PATCH_ID if empty_patch?(patch)
 
     stdout, stderr, status = capture_git("patch-id", "--stable", stdin_data: patch)
-    raise GitError, "#{git_error(['patch-id', '--stable'], stdout, stderr, status)} for #{sha}" unless status.success?
+    raise GitError, "#{git_error(['patch-id', '--stable'], stdout, stderr, status)} for #{label}" unless status.success?
 
     patch_id = stdout.split.first
     return hunkless_patch_id(patch) if patch_id.nil?
@@ -596,13 +902,17 @@ class ReleaseForwardPort
   end
 
   def ensure_clean_worktree!
-    if cherry_pick_in_progress?
-      raise GitError, "a cherry-pick is already in progress; run git cherry-pick --continue or --abort first"
-    end
+    ensure_no_cherry_pick_in_progress!
 
     return if git("status", "--porcelain").strip.empty?
 
     raise GitError, "working tree is not clean; commit, stash, or discard local changes before normal mode"
+  end
+
+  def ensure_no_cherry_pick_in_progress!
+    return unless cherry_pick_in_progress?
+
+    raise GitError, "a cherry-pick is already in progress; run git cherry-pick --continue or --abort first"
   end
 
   def ensure_local_target_branch!(target)
@@ -650,6 +960,10 @@ class ReleaseForwardPort
 
   def actionable_plan?(plan)
     plan.any? { |entry| entry.action == :pick || (entry.manual? && !acknowledged_manual_entry?(entry)) }
+  end
+
+  def acknowledged_manual_entries?(plan)
+    plan.any? { |entry| entry.manual? && acknowledged_manual_entry?(entry) }
   end
 
   def remaining_picks(plan, index)
