@@ -34,6 +34,7 @@ module AgentWorkflowSeamDoctor
     hosted_ci_trigger
     ci_parity_environment
     secret_redaction_patterns
+    trusted_github_actor_boundary
     benchmark_labels
     follow_up_prefix
     changelog
@@ -53,6 +54,7 @@ module AgentWorkflowSeamDoctor
   ].freeze
   CONFIG_RELATIVE_PATH = ".agents/agent-workflow.yml"
   COMMAND_README_RELATIVE_PATH = ".agents/bin/README.md"
+  FOLLOW_UP_PREFIX = "Follow-up:"
   CONFIG_KEY_PATTERN = /^-\s+\*\*(.+?)\*\*:\s*(.*)$/
 
   SEAM_PLACEHOLDER = %r{
@@ -173,8 +175,8 @@ module AgentWorkflowSeamDoctor
     end
 
     follow_up_prefix = config["follow_up_prefix"]
-    if !follow_up_prefix.nil? && !unresolved_yaml_value?(follow_up_prefix) && follow_up_prefix != "Follow-up:"
-      issues << 'invalid agent workflow config value for key: follow_up_prefix (expected "Follow-up:")'
+    if !follow_up_prefix.nil? && !unresolved_yaml_value?(follow_up_prefix) && follow_up_prefix != FOLLOW_UP_PREFIX
+      issues << "invalid agent workflow config value for key: follow_up_prefix (expected #{FOLLOW_UP_PREFIX.inspect})"
     end
 
     config.each do |key, value|
@@ -195,6 +197,8 @@ module AgentWorkflowSeamDoctor
     parsed
   rescue Psych::SyntaxError => e
     ["invalid #{CONFIG_RELATIVE_PATH}: #{e.message}"]
+  rescue Errno::SystemCallError => e
+    ["unable to read #{CONFIG_RELATIVE_PATH}: #{e.message}"]
   end
 
   def unresolved_yaml_value?(value)
@@ -202,9 +206,9 @@ module AgentWorkflowSeamDoctor
     when String
       unresolved_template_value?(value)
     when Array
-      value.empty? || value.any? { |item| unresolved_yaml_value?(item) }
+      value.any? { |item| unresolved_yaml_value?(item) }
     when Hash
-      value.empty? || value.any? { |_key, item| unresolved_yaml_value?(item) }
+      value.any? { |_key, item| unresolved_yaml_value?(item) }
     when NilClass
       true
     else

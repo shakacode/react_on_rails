@@ -45,8 +45,9 @@ module AgentWorkflowSeamDoctorTestHelpers
       "hosted_ci_trigger" => "+ci-* PR-comment commands",
       "ci_parity_environment" => "No dedicated act/local runner image; use bin/ci-local.",
       "secret_redaction_patterns" => "Redact SECRET, TOKEN, KEY, PASSWORD, and LICENSE.",
+      "trusted_github_actor_boundary" => ".agents/trusted-github-actors.yml does not trust bots by default.",
       "benchmark_labels" => "benchmark, benchmark-core",
-      "follow_up_prefix" => "Follow-up:",
+      "follow_up_prefix" => AgentWorkflowSeamDoctor::FOLLOW_UP_PREFIX,
       "changelog" => "/CHANGELOG.md, user-visible changes only.",
       "merge_ledger" => "script/pr-merge-ledger <PR> --strict",
       "review_gate" => "claude-review",
@@ -142,6 +143,19 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
       refute status.success?
       assert_includes out, "missing agent workflow config key: follow_up_prefix"
       refute_includes out, "invalid agent workflow config value for key: follow_up_prefix"
+    end
+  end
+
+  def test_portable_contract_allows_empty_collection_values
+    with_repo do |root|
+      write_portable_contract(root)
+      write_agent_workflow_config(root, "benchmark_labels" => [])
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+      assert_includes out, "PASS"
     end
   end
 
