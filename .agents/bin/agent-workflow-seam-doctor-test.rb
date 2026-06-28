@@ -21,7 +21,49 @@ module AgentWorkflowSeamDoctorTestHelpers
     Dir.mktmpdir("agent-workflow-seam-doctor-test") do |dir|
       FileUtils.mkdir_p(File.join(dir, ".agents/skills/example"))
       FileUtils.mkdir_p(File.join(dir, ".agents/workflows"))
+      FileUtils.mkdir_p(File.join(dir, ".agents/bin"))
       yield dir
+    end
+  end
+
+  def write_portable_contract(root)
+    body = +"# AGENTS.md\n\n"
+    body << "## Agent Workflow Configuration\n\n"
+    body << "Portable shared skills resolve this repo's commands and policy through:\n\n"
+    body << "- **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, `lint`, "
+    body << "`build`, `docs`, `ci-detect`); see [`.agents/bin/README.md`](.agents/bin/README.md).\n"
+    body << "- **Policy / config** — [`.agents/agent-workflow.yml`](.agents/agent-workflow.yml).\n"
+    body << "\n## Commands\n"
+    File.write(File.join(root, "AGENTS.md"), body)
+    write_agent_workflow_config(root)
+    write_agent_workflow_scripts(root)
+  end
+
+  def write_agent_workflow_config(root, overrides = {})
+    config = {
+      "base_branch" => "main",
+      "hosted_ci_trigger" => "+ci-* PR-comment commands",
+      "ci_parity_environment" => "No dedicated act/local runner image; use bin/ci-local.",
+      "secret_redaction_patterns" => "Redact SECRET, TOKEN, KEY, PASSWORD, and LICENSE.",
+      "benchmark_labels" => "benchmark, benchmark-core",
+      "follow_up_prefix" => "Follow-up:",
+      "changelog" => "/CHANGELOG.md, user-visible changes only.",
+      "merge_ledger" => "script/pr-merge-ledger <PR> --strict",
+      "review_gate" => "claude-review",
+      "approval_exempt" => "focused trusted workflow/build/dependency edits",
+      "coordination_backend" => "private shakacode/agent-coordination"
+    }.merge(overrides)
+
+    File.write(File.join(root, ".agents/agent-workflow.yml"), YAML.dump(config))
+  end
+
+  def write_agent_workflow_scripts(root, omit: [])
+    AgentWorkflowSeamDoctor::REQUIRED_COMMAND_SCRIPTS.each do |script_name|
+      next if omit.include?(script_name)
+
+      path = File.join(root, ".agents/bin", script_name)
+      File.write(path, "#!/usr/bin/env bash\nexit 0\n")
+      FileUtils.chmod("+x", path)
     end
   end
 
@@ -50,6 +92,73 @@ end
 
 class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
   include AgentWorkflowSeamDoctorTestHelpers
+
+  def test_portable_contract_without_inline_keys_passes
+    with_repo do |root|
+      write_portable_contract(root)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+      assert_includes out, "PASS"
+    end
+  end
+
+  def test_portable_contract_missing_script_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      FileUtils.rm_f(File.join(root, ".agents/bin/lint"))
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "missing agent workflow command script: .agents/bin/lint"
+    end
+  end
+
+  def test_portable_contract_invalid_yaml_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      File.write(File.join(root, ".agents/agent-workflow.yml"), "base_branch: [\n")
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "invalid .agents/agent-workflow.yml"
+    end
+  end
+
+  def test_portable_contract_missing_yaml_key_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      write_agent_workflow_config(root, "follow_up_prefix" => nil)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "missing agent workflow config key: follow_up_prefix"
+    end
+  end
+
+  def test_portable_contract_follow_up_prefix_must_be_literal_prefix
+    with_repo do |root|
+      write_portable_contract(root)
+      write_agent_workflow_config(
+        root,
+        "follow_up_prefix" => "Follow-up: (default to no new issue; see policy)"
+      )
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "invalid agent workflow config value for key: follow_up_prefix"
+    end
+  end
 
   def test_complete_seam_without_executable_placeholders_passes
     with_repo do |root|

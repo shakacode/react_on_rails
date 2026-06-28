@@ -3,3 +3,5 @@
 set -euo pipefail
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 ( cd react_on_rails && bundle exec rake lint )
+pnpm run lint
+pnpm start format.listDifferent

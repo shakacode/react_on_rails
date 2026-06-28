@@ -6,7 +6,8 @@ ci_parity_environment: "No dedicated act/local runner image; use bin/ci-local an
 secret_redaction_patterns: "Redact env/log fields whose names contain SECRET, TOKEN, KEY, PASSWORD, CREDENTIAL, CERT, PASSPHRASE, PEM, PRIVATE, DSN, or LICENSE, plus REACT_ON_RAILS_PRO_LICENSE, REACT_ON_RAILS_PRO_LICENSE_V2, BENCHER_API_TOKEN, CLAUDE_CODE_OAUTH_TOKEN, GITHUB_TOKEN, GH_TOKEN, NPM_OTP, RUBYGEMS_OTP, DOCS_DISPATCH_APP_KEY, RENDERER_PASSWORD, and SECRET_KEY_BASE. Favor conservative over-redaction."
 trusted_github_actor_boundary: ".agents/trusted-github-actors.yml does not trust github-actions[bot] by default; adding it requires auditing comment-producing workflows and updating preflight policy in the same PR."
 benchmark_labels: "benchmark, benchmark-core, benchmark-pro, benchmark-pro-node-renderer, hosted-ci-no-benchmarks (suppress); opt-in on PRs."
-follow_up_prefix: "Follow-up: (default to no new issue; see the Maintainer Attention Contract)"
+# Policy: default to no new issue; see the Maintainer Attention Contract section in AGENTS.md.
+follow_up_prefix: "Follow-up:"
 changelog: "/CHANGELOG.md, user-visible changes only; [Pro] scope tag; version-stamp via the rake update_changelog task; taxonomy in the Changelog section."
 merge_ledger: "script/pr-merge-ledger <PR> --strict — per-PR merge-readiness check emitting changelog classification and a complete_allowed verdict."
 review_gate: "claude-review is the preferred independent review check; see the Review Workflow section."

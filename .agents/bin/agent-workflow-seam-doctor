@@ -5,6 +5,7 @@
 
 require "json"
 require "optparse"
+require "yaml"
 
 module AgentWorkflowSeamDoctor
   SECTION = "Agent Workflow Configuration"
@@ -28,6 +29,30 @@ module AgentWorkflowSeamDoctor
     "Approval-exempt change categories",
     "Coordination backend"
   ].freeze
+  REQUIRED_CONFIG_KEYS = %w[
+    base_branch
+    hosted_ci_trigger
+    ci_parity_environment
+    secret_redaction_patterns
+    benchmark_labels
+    follow_up_prefix
+    changelog
+    merge_ledger
+    review_gate
+    approval_exempt
+    coordination_backend
+  ].freeze
+  REQUIRED_COMMAND_SCRIPTS = %w[
+    setup
+    validate
+    test
+    lint
+    build
+    docs
+    ci-detect
+  ].freeze
+  CONFIG_RELATIVE_PATH = ".agents/agent-workflow.yml"
+  COMMAND_README_RELATIVE_PATH = ".agents/bin/README.md"
   CONFIG_KEY_PATTERN = /^-\s+\*\*(.+?)\*\*:\s*(.*)$/
 
   SEAM_PLACEHOLDER = %r{
@@ -84,10 +109,16 @@ module AgentWorkflowSeamDoctor
 
     # Read as UTF-8 regardless of locale; a non-UTF-8 default external encoding
     # (e.g. LANG=C) otherwise crashes the parser on non-ASCII bytes in AGENTS.md.
-    config = parse_config(File.binread(agents_path).force_encoding("UTF-8").scrub)
-    if config.nil?
+    agents_text = File.binread(agents_path).force_encoding("UTF-8").scrub
+    section = extract_section(agents_text)
+    if section.nil?
       issues << "missing AGENTS.md section: #{SECTION}"
+    elsif File.file?(File.join(root, CONFIG_RELATIVE_PATH))
+      issues.concat(portable_contract_issues(section))
+      issues.concat(command_script_issues(root))
+      issues.concat(yaml_config_issues(root))
     else
+      config = parse_config(agents_text)
       issues.concat(missing_key_issues(config))
       issues.concat(unresolved_extra_key_issues(config))
     end
@@ -99,6 +130,86 @@ module AgentWorkflowSeamDoctor
     end
 
     issues
+  end
+
+  def portable_contract_issues(section)
+    issues = []
+    unless section.include?(COMMAND_README_RELATIVE_PATH) && section.include?(".agents/bin/<name>")
+      issues << "AGENTS.md section must point to #{COMMAND_README_RELATIVE_PATH} and .agents/bin/<name>"
+    end
+
+    unless section.include?(CONFIG_RELATIVE_PATH)
+      issues << "AGENTS.md section must point to #{CONFIG_RELATIVE_PATH}"
+    end
+
+    issues
+  end
+
+  def command_script_issues(root)
+    REQUIRED_COMMAND_SCRIPTS.flat_map do |script_name|
+      path = File.join(root, ".agents/bin", script_name)
+      if !File.file?(path)
+        ["missing agent workflow command script: .agents/bin/#{script_name}"]
+      elsif !File.executable?(path)
+        ["agent workflow command script is not executable: .agents/bin/#{script_name}"]
+      else
+        []
+      end
+    end
+  end
+
+  def yaml_config_issues(root)
+    path = File.join(root, CONFIG_RELATIVE_PATH)
+    config = load_yaml_config(path)
+    return config if config.is_a?(Array)
+
+    issues = REQUIRED_CONFIG_KEYS.filter_map do |key|
+      value = config[key]
+      if value.nil?
+        "missing agent workflow config key: #{key}"
+      elsif unresolved_yaml_value?(value)
+        "unresolved agent workflow config value for key: #{key}"
+      end
+    end
+
+    if config["follow_up_prefix"] != "Follow-up:"
+      issues << 'invalid agent workflow config value for key: follow_up_prefix (expected "Follow-up:")'
+    end
+
+    config.each do |key, value|
+      next if REQUIRED_CONFIG_KEYS.include?(key)
+      next unless unresolved_yaml_value?(value)
+
+      issues << "unresolved agent workflow config value for key: #{key}"
+    end
+
+    issues
+  end
+
+  def load_yaml_config(path)
+    parsed = YAML.safe_load(File.read(path), permitted_classes: [], permitted_symbols: [], aliases: false)
+    return ["#{CONFIG_RELATIVE_PATH} must be a mapping"] unless parsed.is_a?(Hash)
+
+    parsed
+  rescue Psych::SyntaxError => e
+    ["invalid #{CONFIG_RELATIVE_PATH}: #{e.message}"]
+  rescue Errno::ENOENT
+    ["missing #{CONFIG_RELATIVE_PATH}"]
+  end
+
+  def unresolved_yaml_value?(value)
+    case value
+    when String
+      unresolved_template_value?(value)
+    when Array
+      value.empty? || value.any? { |item| unresolved_yaml_value?(item) }
+    when Hash
+      value.empty? || value.any? { |_key, item| unresolved_yaml_value?(item) }
+    when NilClass
+      true
+    else
+      false
+    end
   end
 
   def parse_config(text)
