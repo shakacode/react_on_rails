@@ -149,7 +149,9 @@ RSpec.describe "TypeScript response type raw validation" do
   end
 
   it "reserves TypeScript globals commonly used in raw type specs" do
-    %w[Array Date Promise ReadonlyArray Record].each do |type_name|
+    %w[
+      Array Date Error Map Partial Promise ReadonlyArray Record Request Response ReturnType Set URL URLSearchParams
+    ].each do |type_name|
       expect do
         response_types.define_type(type_name, fields: {})
       end.to raise_error(ReactOnRails::Error, /reserved/)

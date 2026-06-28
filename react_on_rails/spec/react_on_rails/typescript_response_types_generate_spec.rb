@@ -133,5 +133,25 @@ module ReactOnRails
         expect(File).not_to exist(output_dir)
       end
     end
+
+    it "removes the highest newly created output ancestor when a nested final write fails" do
+      described_class.define_response("health.show", type_name: "HealthResponse", fields: { ok: :boolean })
+
+      Dir.mktmpdir do |dir|
+        allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+        FileUtils.mkdir_p(File.join(dir, "existing"))
+        output_path = "existing/generated/nested/rails_response_types.d.ts"
+        generated_root = File.join(dir, "existing/generated")
+        generated_path = File.join(dir, output_path)
+        allow(FileUtils).to receive(:mv).and_call_original
+        allow(FileUtils).to receive(:mv).with(anything, generated_path).and_raise(Errno::ENOSPC)
+
+        expect do
+          described_class.generate(output_path:)
+        end.to raise_error(Errno::ENOSPC)
+        expect(File).to exist(File.join(dir, "existing"))
+        expect(File).not_to exist(generated_root)
+      end
+    end
   end
 end

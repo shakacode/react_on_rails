@@ -28,7 +28,12 @@ module ReactOnRails
       public
       readonly return satisfies static string super switch symbol this throw true try type typeof undefined unique
       unknown using var void while with yield
-      Array Date Promise ReadonlyArray Record
+      AbortController Array ArrayBuffer ArrayBufferLike Awaited Blob Boolean Capitalize ConstructorParameters DataView
+      Date Error EvalError Event EventTarget Exclude Extract File Float32Array Float64Array FormData Function Headers
+      InstanceType Int8Array Int16Array Int32Array JSON Lowercase Map Math NonNullable Number Object Omit
+      OmitThisParameter Parameters Partial Pick Promise RangeError Readonly ReadonlyArray Record ReferenceError RegExp
+      Request Required Response ReturnType Set String SyntaxError ThisParameterType ThisType TypeError Uint8Array
+      Uint8ClampedArray Uint16Array Uint32Array Uncapitalize URIError URL URLSearchParams Uppercase WeakMap WeakSet
     ].freeze
     GENERATED_TYPE_NAMES = %w[
       JsonValue RailsResponseTypes RailsResponseTypeName RailsResponseType
@@ -39,6 +44,7 @@ module ReactOnRails
       any: "any",
       bool: "boolean",
       boolean: "boolean",
+      # JSON responses serialize dates as strings; use raw: "Date" only for non-JSON values.
       date: "string",
       float: "number",
       integer: "number",
@@ -48,9 +54,9 @@ module ReactOnRails
       string: "string",
       unknown: "unknown"
     }.freeze
-    private_constant :REGISTRY_MUTEX
 
     Definition = Struct.new(:name, :fields, :response_key, keyword_init: true)
+    private_constant :Definition, :REGISTRY_MUTEX
 
     module TypeSpecHelpers
       private
@@ -223,7 +229,7 @@ module ReactOnRails
       end
 
       def write_generated_file(path, content)
-        created_directory = !path.dirname.exist?
+        cleanup_directory = highest_missing_ancestor(path.dirname)
         FileUtils.mkdir_p(path.dirname)
         tempfile = Tempfile.new([".react_on_rails_types", ".tmp"], path.dirname)
         tempfile.write(content)
@@ -231,7 +237,7 @@ module ReactOnRails
         FileUtils.mv(tempfile.path, path.to_s)
       rescue StandardError
         cleanup_tempfile(tempfile)
-        FileUtils.rm_rf(path.dirname) if created_directory && path.dirname.exist?
+        FileUtils.rm_rf(cleanup_directory) if cleanup_directory&.exist?
         raise
       end
 
@@ -240,6 +246,21 @@ module ReactOnRails
 
         tempfile.close unless tempfile.closed?
         tempfile.unlink if tempfile.path && File.exist?(tempfile.path)
+      end
+
+      def highest_missing_ancestor(path)
+        missing_path = nil
+        current_path = path
+
+        until current_path.exist? || current_path.symlink?
+          missing_path = current_path
+          parent_path = current_path.dirname
+          break if parent_path == current_path
+
+          current_path = parent_path
+        end
+
+        missing_path
       end
 
       def nearest_existing_path(path)
