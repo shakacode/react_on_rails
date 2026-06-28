@@ -392,12 +392,12 @@ Before upgrading:
   read timeout on each renderer socket. It no longer wraps the entire request as a single task-level timeout.
 - Treat `config.renderer_http_pool_timeout` as the TCP connect timeout. After the socket connects, individual reads
   are bounded by `ssr_timeout`.
-- Treat `config.renderer_http_pool_size` as an HTTP/2 stream limit on the async-http client, not as a
-  process-wide renderer connection count. With a long-lived `Fiber.scheduler` (for example Falcon or Puma configured
-  with an async scheduler), the client is reused across renderer requests within that scheduler and the setting bounds
-  multiplexed renders on the pooled client. Under standard Puma streaming, `Sync {}` creates a per-request scheduler
-  and cleans up the client when that streaming response ends, so reuse does not persist across consecutive Rails
-  requests. Setting it to `nil` keeps the default stream limit; it does not make the async-http client unlimited.
+- Treat `config.renderer_http_pool_size` as the TCP connection-pool limit for the async-http client, not as an HTTP/2
+  stream limit. With a long-lived `Fiber.scheduler` (for example Falcon or Puma configured with an async scheduler),
+  the client is reused across renderer requests within that scheduler and the setting bounds pooled connections to the
+  renderer. Under standard Puma streaming, `Sync {}` creates a per-request scheduler and cleans up the client when that
+  streaming response ends, so reuse does not persist across consecutive Rails requests. Setting it to `nil` keeps the
+  default pool limit; it does not make the async-http client unlimited.
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.

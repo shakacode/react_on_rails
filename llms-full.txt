@@ -18095,12 +18095,13 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_use_fallback_exec_js` is true.
   config.renderer_use_fallback_exec_js = false
 
-  # Maximum number of concurrent HTTP/2 streams to the Node renderer per async-http client.
+  # Maximum number of concurrent TCP connections in the async-http client pool to the Node renderer.
   # When a Fiber.scheduler already exists before the renderer request enters `Sync {}`, the
   # client is reused across requests within that long-lived scheduler (persistent connection /
-  # keep-alive, issue #3283), so this limit bounds multiplexed renders on the pooled client.
+  # keep-alive, issue #3283), so this limit bounds pooled TCP connections to the renderer.
   # Under standard Puma streaming, `Sync {}` creates a per-request scheduler and the client is
-  # cleaned up when that response ends; the limit still applies within the streaming request.
+  # cleaned up when that response ends; the connection-pool limit still applies within the
+  # streaming request.
   # Without a scheduler (non-streaming paths), a client is created per request. See
   # "Renderer Performance Tuning for Streamed RSC" below.
   # Default for `renderer_http_pool_size` is 10
@@ -18194,22 +18195,22 @@ Full warm-up patterns (Kubernetes probes, `postStart` hooks, the `/ready` cold-s
 
 Two independent limits gate renderer throughput:
 
-| Setting                                                                                             | Where    | Default  | Governs                                                          |
-| --------------------------------------------------------------------------------------------------- | -------- | -------- | ---------------------------------------------------------------- |
-| [`workersCount`](../building-features/node-renderer/js-configuration.md) / `RENDERER_WORKERS_COUNT` | Renderer | CPUs − 1 | How many renders the renderer can execute concurrently.          |
-| `renderer_http_pool_size`                                                                           | Rails    | 10       | Max concurrent HTTP/2 streams Rails multiplexes to the renderer. |
+| Setting                                                                                             | Where    | Default  | Governs                                                            |
+| --------------------------------------------------------------------------------------------------- | -------- | -------- | ------------------------------------------------------------------ |
+| [`workersCount`](../building-features/node-renderer/js-configuration.md) / `RENDERER_WORKERS_COUNT` | Renderer | CPUs − 1 | How many renders the renderer can execute concurrently.            |
+| `renderer_http_pool_size`                                                                           | Rails    | 10       | Max TCP connections in the async-http client pool to the renderer. |
 
 Guidance:
 
-- Keep `renderer_http_pool_size` close to (and generally not far above) `workersCount`; sending many more concurrent streams than there are workers just queues renders at the renderer.
+- Keep `renderer_http_pool_size` close to (and generally not far above) `workersCount`; sending many more concurrent renderer requests than there are workers just queues renders at the renderer while adding socket overhead.
 - Account for your Rails concurrency: with many Puma threads/workers all streaming, a renderer with only one or two workers becomes the bottleneck. Scale `workersCount` (and renderer replicas) to your real concurrent streamed-render load.
-- Raise `ssr_timeout` for long-running streamed responses — it is the socket idle timeout for the streaming connection. It fires when the renderer sends no data for `ssr_timeout` seconds, not when the total response duration exceeds that value.
+- Raise `ssr_timeout` for long-running streamed responses — it is the per-read socket timeout on the renderer connection. It fires when the renderer sends no data during a single read for `ssr_timeout` seconds, not when the total response duration exceeds that value.
 
 ### 3. Rails ↔ renderer keep-alive (persistent on Falcon/async scheduler; per-request on standard Puma)
 
 Connection reuse is automatic when the renderer request runs under a long-lived `Fiber.scheduler`, such as Falcon or Puma configured with an async scheduler. In that setup, the async-http client is stored on the scheduler and reused across streaming requests, so HTTP/2 connections stay alive and renders multiplex over them instead of paying TCP/TLS setup per request (issue #3283). No React on Rails configuration is required to enable this.
 
-Under standard Puma, the streaming helper's `Sync {}` block creates a per-request scheduler. The async-http client is cleaned up when that streaming response ends, so connection reuse does not persist across consecutive Rails requests. The benefit is still meaningful inside a single streamed response: renderer calls in that response can share the same client lifecycle and `renderer_http_pool_size` still bounds concurrent HTTP/2 streams.
+Under standard Puma, the streaming helper's `Sync {}` block creates a per-request scheduler. The async-http client is cleaned up when that streaming response ends, so connection reuse does not persist across consecutive Rails requests. The benefit is still meaningful inside a single streamed response: renderer calls in that response can share the same client lifecycle and `renderer_http_pool_size` still bounds TCP connections created during the request.
 
 `config.renderer_http_keep_alive_timeout` is **deprecated** and ignored: the async-http adapter manages connection lifecycle automatically (connections are reused within the scheduler and cleaned up when it ends). Setting it to a non-`nil` value logs a deprecation warning; `nil` is accepted silently.
 
