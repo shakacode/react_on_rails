@@ -174,8 +174,12 @@ module ReactOnRailsPro
       response.headers["Server-Timing"] = existing.present? ? "#{existing}, #{entry}" : entry
     rescue StandardError => e
       # Observability must never break a real response. Swallow and log.
-      Rails.logger.warn do
-        "[React on Rails Pro] Failed to emit RSC stream Server-Timing header: #{e.class}: #{e.message}"
+      begin
+        Rails.logger.warn(
+          "[React on Rails Pro] Failed to emit RSC stream Server-Timing header: #{e.class}: #{e.message}"
+        )
+      rescue StandardError
+        # Logging itself can fail if the logger is unavailable; keep the response alive.
       end
     end
 

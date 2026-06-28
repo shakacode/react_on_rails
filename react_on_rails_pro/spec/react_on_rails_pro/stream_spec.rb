@@ -225,6 +225,22 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(server_timing).to start_with("action_total;dur=5, ror_stream_shell;dur=")
     end
 
+    it "swallows Server-Timing header emission errors even when logging fails" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+      failing_headers = instance_double(Hash)
+      allow(failing_headers).to receive(:[]).and_raise(StandardError, "headers unavailable")
+      allow(controller.response).to receive(:headers).and_return(failing_headers)
+
+      failing_logger = instance_double(Logger)
+      allow(failing_logger).to receive(:warn).and_raise(StandardError, "logger unavailable")
+      allow(Rails).to receive(:logger).and_return(failing_logger)
+
+      controller.instance_variable_set(:@react_on_rails_rsc_stream_observability, true)
+      controller.instance_variable_set(:@react_on_rails_rsc_stream_initial_render_duration_ms, 12.3)
+
+      expect { controller.send(:emit_rsc_stream_server_timing_header) }.not_to raise_error
+    end
+
     it "escapes the final observability mark name inside the generated script" do
       _queues, controller, _stream = setup_stream_test(component_count: 0)
 
