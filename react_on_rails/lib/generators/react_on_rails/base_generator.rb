@@ -459,7 +459,7 @@ module ReactOnRails
         controller_full_path = File.join(destination_root, controller_path)
         return unless File.exist?(controller_full_path)
 
-        layout_name = literal_controller_layout_name(File.read(controller_full_path)) || "application"
+        layout_name = extract_declared_layout_name(File.read(controller_full_path)) || inherited_application_layout_name
         return if layout_name_links_tailwind_pack?(layout_name)
 
         say_status :warning, "#{controller_path} may not use the Tailwind-aware React on Rails layout.", :yellow
@@ -468,11 +468,6 @@ module ReactOnRails
 
           #{tailwind_layout_helper_block}
         MSG
-      end
-
-      def literal_controller_layout_name(controller_content)
-        match = controller_content.match(/^\s*layout(?:\s+|\s*\(\s*)(?:"([^"]+)"|'([^']+)')(?=\s*(?:\)|,|#|$))/)
-        match&.captures&.compact&.first
       end
 
       def layout_name_links_tailwind_pack?(layout_name)

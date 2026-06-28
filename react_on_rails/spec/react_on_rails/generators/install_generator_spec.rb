@@ -1459,6 +1459,46 @@ describe InstallGenerator, type: :generator do
       expect(base_generator).to have_received(:say)
         .with(include('prepend_javascript_pack_tag "react_on_rails_tailwind"'), :yellow)
     end
+
+    it "does not warn when HelloWorldController inherits a Tailwind-aware ApplicationController layout" do
+      simulate_existing_file("app/controllers/application_controller.rb", <<~RUBY)
+        class ApplicationController < ActionController::Base
+          layout "react_on_rails_default"
+        end
+      RUBY
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          def index
+          end
+        end
+      RUBY
+      simulate_named_pack_tag_layout("application")
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:warn_existing_hello_world_tailwind_layout)
+
+      expect(base_generator).not_to have_received(:say_status)
+        .with(
+          :warning,
+          "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout.",
+          :yellow
+        )
+      expect(base_generator).not_to have_received(:say)
+    end
   end
 
   context "with --tailwind --no-rspack" do

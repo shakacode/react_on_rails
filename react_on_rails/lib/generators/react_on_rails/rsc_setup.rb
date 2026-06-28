@@ -292,13 +292,6 @@ module ReactOnRails
         layout_file_links_tailwind_pack?(layout_name)
       end
 
-      def inherited_application_layout_name
-        application_controller_path = File.join(destination_root, "app/controllers/application_controller.rb")
-        return "application" unless File.exist?(application_controller_path)
-
-        extract_declared_layout_name(File.read(application_controller_path)) || "application"
-      end
-
       def layout_file_links_tailwind_pack?(layout_name)
         layout_path = layout_destination_path(layout_name)
         layout_full_path = File.join(destination_root, layout_path)

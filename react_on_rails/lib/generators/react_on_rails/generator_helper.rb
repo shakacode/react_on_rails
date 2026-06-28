@@ -21,9 +21,12 @@ module GeneratorHelper
     [ \t]*<%=\s*javascript_pack_tag(?:\s|\(|%>)
   /x
   HTML_COMMENT_PATTERN = /<!--(?:[^-]|-(?!-)|--(?!>))*-->/m
+  CONTROLLER_LAYOUT_DECLARATION_PATTERN =
+    /^\s*layout(?:\s+|\s*\(\s*)(?:"([^"]+)"|'([^']+)')(?=\s*(?:\)|,|#|$))/
   private_constant :DEFAULT_SHAKAPACKER_SOURCE_PATH, :DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH,
                    :TAILWIND_PACK_NAME, :TAILWIND_STYLESHEET_NAME, :RAILS_APP_SOURCE_PATH,
-                   :TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN, :HTML_COMMENT_PATTERN
+                   :TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN, :HTML_COMMENT_PATTERN,
+                   :CONTROLLER_LAYOUT_DECLARATION_PATTERN
 
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
@@ -189,6 +192,18 @@ module GeneratorHelper
 
   def range_overlaps_any?(range, ranges)
     ranges.any? { |candidate| range.begin < candidate.end && candidate.begin < range.end }
+  end
+
+  def extract_declared_layout_name(controller_content)
+    match = controller_content.match(CONTROLLER_LAYOUT_DECLARATION_PATTERN)
+    match&.captures&.compact&.first
+  end
+
+  def inherited_application_layout_name
+    application_controller_path = File.join(destination_root, "app/controllers/application_controller.rb")
+    return "application" unless File.exist?(application_controller_path)
+
+    extract_declared_layout_name(File.read(application_controller_path)) || "application"
   end
 
   def example_component_source_directory(component_name)
