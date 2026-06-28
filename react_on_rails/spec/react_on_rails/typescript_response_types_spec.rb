@@ -96,6 +96,33 @@ module ReactOnRails
       expect(described_class.to_d_ts).to include("created_on: string;")
     end
 
+    it "does not treat shorthand object child fields as parent modifiers" do
+      described_class.define_response(
+        "metadata.show",
+        type_name: "MetadataShowResponse",
+        fields: {
+          metadata: {
+            optional: :boolean,
+            nullable: :boolean,
+            name: :string
+          }
+        }
+      )
+
+      declaration = described_class.to_d_ts
+
+      expected_metadata_type = [
+        "  metadata: {",
+        "    optional: boolean;",
+        "    nullable: boolean;",
+        "    name: string;",
+        "  };"
+      ].join("\n")
+
+      expect(declaration).to include(expected_metadata_type)
+      expect(declaration).not_to include("metadata?:")
+    end
+
     it "rejects duplicate response keys" do
       described_class.define_response("projects.index", type_name: "ProjectsIndexResponse", fields: {})
 

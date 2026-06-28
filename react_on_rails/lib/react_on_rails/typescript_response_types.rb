@@ -234,13 +234,20 @@ module ReactOnRails
       end
 
       def options_for(spec)
-        return {} unless spec.is_a?(Hash)
+        return {} unless explicit_option_hash?(spec)
 
         normalized = normalize_option_hash(spec)
         {
           nullable: normalized.fetch(:nullable, false),
           optional: normalized.fetch(:optional, false)
         }
+      end
+
+      def explicit_option_hash?(spec)
+        return false unless spec.is_a?(Hash)
+
+        normalized = normalize_option_hash(spec)
+        normalized.key?(:array) || normalized.key?(:fields) || normalized.key?(:type)
       end
 
       def normalize_option_hash(spec)
