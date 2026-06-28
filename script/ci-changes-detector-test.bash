@@ -919,10 +919,14 @@ assert_release_tooling_contract() {
   # Primary goal: NOT generator-sensitive, so required-pr-gate won't force hosted CI.
   assert_contains "$out" '"run_generators": false' "$label"
   assert_contains "$out" '"run_js_tests": false' "$label"
-  # Release tooling does not exercise the dummy app, E2E, or benchmarks.
+  # Release tooling does not exercise the dummy app, E2E, or benchmarks. Assert
+  # the FULL benchmark contract so a regression that flips any benchmark suite
+  # (e.g. a stray BENCH_PRO_CHANGED) cannot pass.
   assert_contains "$out" '"run_dummy_tests": false' "$label"
   assert_contains "$out" '"run_e2e_tests": false' "$label"
   assert_contains "$out" '"run_core_benchmarks": false' "$label"
+  assert_contains "$out" '"run_pro_benchmarks": false' "$label"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "$label"
 }
 
 test_release_rake_change_runs_ruby_tests_and_lint_without_generators() {
@@ -966,6 +970,31 @@ test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators() {
   assert_release_tooling_contract "$(detector_output)" "release-finish-test output"
 }
 
+# Comment-only change to release tooling takes the SOURCE_COMMENT_ONLY_CHANGED
+# branch of the release arm (not RELEASE_TOOLING_CHANGED), so it stays
+# non-runtime — rubocop still runs (lint catches comment-affecting style) but the
+# release rspec suite does not. Mirrors
+# test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint. The fixture
+# uses plain Ruby with no heredoc so source_file_has_multiline_string_construct
+# does not (correctly, conservatively) force a full run.
+test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint() {
+  setup_repo
+  mkdir -p rakelib
+  printf 'namespace :release do\n  task :stub do\n    puts "ok"\n  end\nend\n' > rakelib/release.rake
+  commit_change "add release rake stub"
+  perl -0pi -e 's/namespace :release do/# Describe the release tasks.\nnamespace :release do/' \
+    rakelib/release.rake
+  commit_change "release rake comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release comment output"
+  assert_contains "$out" '"non_runtime_only": true' "release comment output"
+  assert_contains "$out" '"run_lint": true' "release comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "release comment output"
+  assert_contains "$out" '"run_generators": false' "release comment output"
+}
+
 # Regression guard: a CHANGELOG.md-only change is documentation (matched by the
 # *.md docs arm) and must stay skippable — docs_only / non_runtime_only true,
 # every run_* false. Release stamping touches CHANGELOG.md, so this keeps that
@@ -1003,6 +1032,7 @@ run_test test_release_finish_script_change_runs_ruby_tests_and_lint_without_gene
 run_test test_release_forward_port_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_forward_port_test_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint
 run_test test_changelog_only_change_is_non_runtime_only
 run_test test_docs_changes_are_non_runtime_only
 run_test test_internal_non_markdown_docs_are_non_runtime_only
