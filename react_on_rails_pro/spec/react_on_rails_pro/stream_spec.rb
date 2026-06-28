@@ -239,6 +239,14 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(server_timing).not_to include("[")
     end
 
+    it "escapes description values for Server-Timing quoted strings" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+
+      expect(controller.send(:server_timing_quoted_string, 'quote " and slash \\')).to eq(
+        'quote \" and slash \\\\'
+      )
+    end
+
     it "swallows Server-Timing header emission errors even when logging fails" do
       _queues, controller, _stream = setup_stream_test(component_count: 0)
       failing_headers = instance_double(Hash)

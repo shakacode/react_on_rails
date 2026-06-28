@@ -168,7 +168,7 @@ module ReactOnRailsPro
       duration = @react_on_rails_rsc_stream_initial_render_duration_ms
       return if duration.nil?
 
-      desc = "RoR Pro streamed RSC shell render (includes first renderer chunk)"
+      desc = server_timing_quoted_string("RoR Pro streamed RSC shell render (includes first renderer chunk)")
       entry = "ror_stream_shell;dur=#{duration};desc=\"#{desc}\""
       existing = response.headers["Server-Timing"]
       entries = Array(existing).flatten.compact.reject(&:blank?) + [entry]
@@ -182,6 +182,10 @@ module ReactOnRailsPro
       rescue StandardError
         # Logging itself can fail if the logger is unavailable; keep the response alive.
       end
+    end
+
+    def server_timing_quoted_string(value)
+      value.to_s.gsub(/["\\]/) { |char| "\\#{char}" }
     end
 
     def write_rsc_stream_observability_mark

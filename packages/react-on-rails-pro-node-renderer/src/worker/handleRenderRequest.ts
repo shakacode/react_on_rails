@@ -80,6 +80,10 @@ export type ProvidedNewBundle = {
  *
  * Exported for unit testing.
  */
+export function escapeServerTimingDescription(description: string): string {
+  return description.replace(/["\\]/g, (char) => `\\${char}`);
+}
+
 export function addRendererServerTiming(
   response: ResponseResult,
   startedAtMs: number,
@@ -90,7 +94,7 @@ export function addRendererServerTiming(
   }
   const durMs = (performance.now() - startedAtMs).toFixed(3);
   const desc = 'Node renderer prepare (bundle sync + exec context build + render start)';
-  const entry = `ror_renderer_prepare;dur=${durMs};desc="${desc}"`;
+  const entry = `ror_renderer_prepare;dur=${durMs};desc="${escapeServerTimingDescription(desc)}"`;
   const existing = response.headers['Server-Timing'];
   response.headers['Server-Timing'] = existing ? `${existing}, ${entry}` : entry;
 }

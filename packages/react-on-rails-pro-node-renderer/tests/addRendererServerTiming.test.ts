@@ -14,7 +14,7 @@
  */
 
 import { Readable } from 'stream';
-import { addRendererServerTiming } from '../src/worker/handleRenderRequest';
+import { addRendererServerTiming, escapeServerTimingDescription } from '../src/worker/handleRenderRequest';
 import { ResponseResult } from '../src/shared/utils';
 
 const streamingResponse = (): ResponseResult => ({
@@ -57,5 +57,9 @@ describe('addRendererServerTiming', () => {
     addRendererServerTiming(response, performance.now(), true);
 
     expect(response.headers['Server-Timing']).toMatch(/^upstream;dur=1, ror_renderer_prepare;dur=/);
+  });
+
+  it('escapes description values for Server-Timing quoted strings', () => {
+    expect(escapeServerTimingDescription('quote " and slash \\')).toBe('quote \\" and slash \\\\');
   });
 });
