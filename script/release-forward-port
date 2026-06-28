@@ -226,8 +226,8 @@ class ReleaseForwardPort
   end
 
   def patch_equivalent_skip_reason(sha, target, patch_equivalent_commits)
-    return unless patch_equivalent_commits[sha] &&
-                  patch_equivalent_commit_present_on_target?(sha, target)
+    return unless patch_equivalent_commits[sha] || target_has_renamed_source_paths?(target, sha)
+    return unless patch_equivalent_commit_present_on_target?(sha, target)
 
     "patch already exists on #{target} according to target history with no later standard revert"
   end
@@ -404,10 +404,13 @@ class ReleaseForwardPort
   end
 
   def revert_changes_source_paths?(revert_sha, sha)
-    paths = changed_paths_for_commit(sha)
+    parents = git("rev-list", "--parents", "-n", "1", revert_sha).split.drop(1)
+    return false if parents.empty?
+
+    paths = source_paths_for_target_diff(parents.first, sha)
     return false if paths.empty?
 
-    commit_changes_paths?(revert_sha, paths)
+    diff_changes_paths?(parents.first, revert_sha, paths)
   end
 
   def source_revert_superseded_on_target?(sha, target, revert_sha)
@@ -427,9 +430,9 @@ class ReleaseForwardPort
     source_patch_id = patch_id_for_commit(sha)
 
     patch_equivalent_target_candidates(sha, target).any? do |target_sha|
-      patch_id_for_commit(target_sha) == source_patch_id &&
-        target_commit_introduced_after_revert?(target_sha, target, revert_sha) &&
-        target_commit_live_on_target?(target_sha, target)
+      target_commit_introduced_after_revert?(target_sha, target, revert_sha) &&
+        target_commit_live_on_target?(target_sha, target) &&
+        patch_id_for_target_candidate(target_sha, sha) == source_patch_id
     end
   end
 
@@ -451,10 +454,10 @@ class ReleaseForwardPort
     return if parents.length < 2
 
     first_parent = parents.first
-    paths = source_paths_for_target_diff(first_parent, sha)
-    return if paths.empty?
+    target_to_source_paths = target_to_source_path_map(first_parent, sha)
+    return if target_to_source_paths.empty?
 
-    patch_id_for_diff(first_parent, merge_sha, paths)
+    patch_id_for_diff(first_parent, merge_sha, target_to_source_paths.keys, target_to_source_paths:)
   end
 
   def target_commit_introduced_after_revert?(sha, target, revert_sha)
@@ -516,7 +519,8 @@ class ReleaseForwardPort
     source_patch_id = patch_id_for_commit(sha)
 
     patch_equivalent_target_candidates(sha, target).any? do |target_sha|
-      patch_id_for_commit(target_sha) == source_patch_id && target_commit_live_on_target?(target_sha, target)
+      patch_id_for_target_candidate(target_sha, sha) == source_patch_id &&
+        target_commit_live_on_target?(target_sha, target)
     end
   end
 
@@ -569,13 +573,6 @@ class ReleaseForwardPort
     diff_changes_paths?(first_parent, merge_sha, paths)
   end
 
-  def commit_changes_paths?(commit_sha, paths)
-    parents = git("rev-list", "--parents", "-n", "1", commit_sha).split.drop(1)
-    return false if parents.empty?
-
-    diff_changes_paths?(parents.first, commit_sha, paths)
-  end
-
   def diff_changes_paths?(from_ref, to_ref, paths)
     args = ["diff", "--quiet", from_ref, to_ref, "--", *paths]
     stdout, stderr, status = capture_git(*args)
@@ -586,30 +583,63 @@ class ReleaseForwardPort
   end
 
   def patch_equivalent_target_candidates(sha, target)
-    paths = changed_paths_for_commit(sha)
+    paths = source_paths_for_target_diff(target, sha)
     return [] if paths.empty?
 
     # This path-history walk can be broad for high-churn files, but it only runs
     # for no-footer patch-equivalent candidates after git cherry marks a commit
-    # equivalent. Normal helper reruns use the faster -x footer path.
+    # equivalent or when target-side renames need a path-aware fallback. Normal
+    # helper reruns use the faster -x footer path.
     git_lines("log", target, "--format=%H", "--no-merges", "--", *paths)
   end
 
-  def source_paths_for_target_diff(first_parent, sha)
-    paths = changed_paths_for_commit(sha)
-    return [] if paths.empty?
-
-    (paths + renamed_target_paths_for_source_paths(first_parent, sha, paths)).uniq
+  def target_has_renamed_source_paths?(target, sha)
+    (source_paths_for_target_diff(target, sha) - changed_paths_for_commit(sha)).any?
   end
 
-  def renamed_target_paths_for_source_paths(first_parent, sha, paths)
-    merge_base = git("merge-base", first_parent, sha).strip
-    source_paths = paths.to_h { |path| [path, true] }
+  def patch_id_for_target_candidate(target_sha, source_sha)
+    parents = git("rev-list", "--parents", "-n", "1", target_sha).split.drop(1)
+    return patch_id_for_commit(target_sha) if parents.empty?
 
-    git_lines("diff", "--name-status", "--find-renames", merge_base, first_parent).filter_map do |line|
+    target_to_source_paths = target_to_source_path_map(target_sha, source_sha)
+    patch_id_for_commit(target_sha, target_to_source_paths:)
+  end
+
+  def source_paths_for_target_diff(first_parent, sha)
+    target_to_source_path_map(first_parent, sha).keys
+  end
+
+  def target_to_source_path_map(first_parent, sha)
+    paths = changed_paths_for_commit(sha)
+    return {} if paths.empty?
+
+    path_map = paths.to_h { |path| [path, path] }
+    renamed_target_path_pairs_for_source_paths(first_parent, sha, paths).each do |source_path, target_path|
+      path_map[target_path] = source_path
+    end
+
+    path_map
+  end
+
+  def renamed_target_path_pairs_for_source_paths(first_parent, sha, paths)
+    @renamed_target_path_pairs_cache ||= {}
+    cache_key = [first_parent, sha]
+    return @renamed_target_path_pairs_cache.fetch(cache_key) if @renamed_target_path_pairs_cache.key?(cache_key)
+
+    source_paths = paths.to_h { |path| [path, true] }
+    rename_base_refs = [git("merge-base", first_parent, sha).strip, sha].uniq
+
+    @renamed_target_path_pairs_cache[cache_key] =
+      rename_base_refs.flat_map do |from_ref|
+        renamed_target_path_pairs_from_ref(from_ref, first_parent, source_paths)
+      end.uniq
+  end
+
+  def renamed_target_path_pairs_from_ref(from_ref, first_parent, source_paths)
+    git_lines("diff", "--name-status", "--find-renames", from_ref, first_parent).filter_map do |line|
       status, old_path, new_path = line.split("\t", 3)
-      new_path if status.start_with?("R") && new_path && source_paths.key?(old_path)
-    end.uniq
+      [old_path, new_path] if status.start_with?("R") && new_path && source_paths.key?(old_path)
+    end
   end
 
   def changed_paths_for_commit(sha)
@@ -617,17 +647,109 @@ class ReleaseForwardPort
     @changed_paths_cache[sha] ||= git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
   end
 
-  def patch_id_for_commit(sha)
+  def patch_id_for_commit(sha, target_to_source_paths: {})
     # git show --format= emits diff-only output. git patch-id still hashes the
     # hunk content and emits a commit field we discard; the first token is the
     # content hash used for comparisons.
-    patch = git("show", "--format=", "--full-index", "--find-renames", sha).b
+    patch =
+      git(
+        "show",
+        "--no-ext-diff",
+        "--format=",
+        "--full-index",
+        rename_detection_option(target_to_source_paths),
+        sha
+      ).b
+    patch = normalize_patch_paths(patch, target_to_source_paths)
     patch_id_for_patch(patch, sha)
   end
 
-  def patch_id_for_diff(from_ref, to_ref, paths)
-    patch = git("diff", "--full-index", "--find-renames", from_ref, to_ref, "--", *paths).b
+  def patch_id_for_diff(from_ref, to_ref, paths, target_to_source_paths: {})
+    patch =
+      git(
+        "diff",
+        "--no-ext-diff",
+        "--full-index",
+        rename_detection_option(target_to_source_paths),
+        from_ref,
+        to_ref,
+        "--",
+        *paths
+      ).b
+    patch = normalize_patch_paths(patch, target_to_source_paths)
     patch_id_for_patch(patch, "#{from_ref}..#{to_ref}")
+  end
+
+  def rename_detection_option(target_to_source_paths)
+    return "--find-renames=20%" if target_to_source_paths.any? { |target_path, source_path| target_path != source_path }
+
+    "--find-renames"
+  end
+
+  def normalize_patch_paths(patch, target_to_source_paths)
+    changed_paths = target_to_source_paths.reject { |target_path, source_path| target_path == source_path }
+    return patch if changed_paths.empty?
+
+    patch.each_line.map { |line| normalize_patch_path_line(line, changed_paths) }.join.b
+  end
+
+  def normalize_patch_path_line(line, target_to_source_paths)
+    return normalize_patch_diff_header(line, target_to_source_paths) if line.start_with?("diff --git ")
+    return normalize_prefixed_patch_path_line(line, target_to_source_paths) if line.start_with?("--- ", "+++ ")
+
+    normalize_unprefixed_patch_path_line(line, target_to_source_paths)
+  end
+
+  def normalize_patch_diff_header(line, target_to_source_paths)
+    trailing_newline = line.end_with?("\n") ? "\n" : ""
+    header = line.delete_prefix("diff --git ").delete_suffix("\n")
+
+    sorted_paths = target_to_source_paths.sort_by { |target_path, _source_path| -target_path.length }
+    sorted_paths.each do |target_path, source_path|
+      next if target_path == source_path
+
+      mapped_headers = [
+        "a/#{target_path} b/#{target_path}",
+        "a/#{source_path} b/#{target_path}"
+      ]
+      next unless mapped_headers.include?(header)
+
+      return "diff --git a/#{source_path} b/#{source_path}#{trailing_newline}"
+    end
+
+    line
+  end
+
+  def normalize_prefixed_patch_path_line(line, target_to_source_paths)
+    trailing_newline = line.end_with?("\n") ? "\n" : ""
+    prefix = line[0, 4]
+    path, separator, metadata = line[4..].delete_suffix("\n").partition("\t")
+    return line if path == "/dev/null"
+
+    normalized_path = normalize_prefixed_patch_path(path, path[0, 2], target_to_source_paths)
+    "#{prefix}#{normalized_path}#{separator}#{metadata}#{trailing_newline}"
+  end
+
+  def normalize_unprefixed_patch_path_line(line, target_to_source_paths)
+    return "" if line.start_with?("similarity index ", "dissimilarity index ")
+
+    path_headers = ["rename from ", "rename to ", "copy from ", "copy to "]
+    path_header = path_headers.find { |header| line.start_with?(header) }
+    return line unless path_header
+
+    trailing_newline = line.end_with?("\n") ? "\n" : ""
+    path = line.delete_prefix(path_header).delete_suffix("\n")
+    return "" if path_header.start_with?("rename ") &&
+                 (target_to_source_paths.key?(path) || target_to_source_paths.value?(path))
+
+    "#{path_header}#{target_to_source_paths.fetch(path, path)}#{trailing_newline}"
+  end
+
+  def normalize_prefixed_patch_path(path, prefix, target_to_source_paths)
+    return path unless path.start_with?(prefix)
+
+    target_path = path.delete_prefix(prefix)
+    "#{prefix}#{target_to_source_paths.fetch(target_path, target_path)}"
   end
 
   def patch_id_for_patch(patch, label)
