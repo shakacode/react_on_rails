@@ -49,6 +49,18 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
     end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
   end
 
+  it "requires scalar aliases to use documented lowercase symbols" do
+    described_class.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: { starts_at: :String }
+    )
+
+    expect do
+      described_class.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /Unknown scalar response type alias: :String/)
+  end
+
   it "reports unknown option keys on wrapper-looking specs" do
     described_class.define_response(
       "payload.show",

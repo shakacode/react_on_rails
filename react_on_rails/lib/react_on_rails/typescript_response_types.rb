@@ -47,7 +47,7 @@ module ReactOnRails
       end
 
       def generate(output_path: nil)
-        path = output_path ? root_relative_output_path(output_path) : default_output_path
+        path = root_relative_output_path(output_path || DEFAULT_OUTPUT_PATH)
         FileUtils.mkdir_p(path.dirname)
         File.write(path, to_d_ts)
         path.to_s
@@ -67,19 +67,41 @@ module ReactOnRails
 
       private
 
-      def default_output_path
-        Rails.root.join(DEFAULT_OUTPUT_PATH)
-      end
-
       def root_relative_output_path(output_path)
         path = Pathname.new(output_path)
         path = Rails.root.join(path) unless path.absolute?
 
         expanded_path = path.expand_path
         expanded_root = Rails.root.expand_path
-        root_prefix = "#{expanded_root}#{File::SEPARATOR}"
-        return expanded_path if expanded_path.to_s.start_with?(root_prefix)
+        real_root = expanded_root.realpath
+        real_parent = nearest_existing_path(expanded_path).realpath
+        return expanded_path if child_path?(expanded_path, expanded_root) && same_or_child_path?(real_parent, real_root)
 
+        output_path_error!(output_path)
+      rescue Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES, Errno::EPERM
+        output_path_error!(output_path)
+      end
+
+      def nearest_existing_path(path)
+        current_path = path
+        until current_path.exist? || current_path.symlink?
+          parent_path = current_path.dirname
+          return parent_path if parent_path == current_path
+
+          current_path = parent_path
+        end
+        current_path
+      end
+
+      def child_path?(path, parent_path)
+        path.to_s.start_with?("#{parent_path}#{File::SEPARATOR}")
+      end
+
+      def same_or_child_path?(path, parent_path)
+        path.to_s == parent_path.to_s || child_path?(path, parent_path)
+      end
+
+      def output_path_error!(output_path)
         raise ReactOnRails::Error, "Response types output path must be inside Rails.root: #{output_path.inspect}"
       end
     end
@@ -272,7 +294,7 @@ module ReactOnRails
 
       def render_named_type(name)
         if name.is_a?(Symbol)
-          scalar_type = SCALAR_TYPES[name.to_s.downcase.to_sym]
+          scalar_type = SCALAR_TYPES[name]
           return scalar_type if scalar_type
 
           raise ReactOnRails::Error, "Unknown scalar response type alias: #{name.inspect}"

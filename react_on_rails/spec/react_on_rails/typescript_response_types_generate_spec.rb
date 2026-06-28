@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require "fileutils"
 require "tmpdir"
 
 module ReactOnRails
@@ -39,6 +40,21 @@ module ReactOnRails
         expect do
           described_class.generate(output_path: dir)
         end.to raise_error(ReactOnRails::Error, /must be inside Rails\.root/)
+      end
+    end
+
+    it "rejects output paths that escape Rails.root through a symlink" do
+      Dir.mktmpdir do |dir|
+        Dir.mktmpdir do |outside_dir|
+          allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+          FileUtils.mkdir_p(File.join(dir, "generated"))
+          File.symlink(outside_dir, File.join(dir, "generated/escape"))
+
+          expect do
+            described_class.generate(output_path: "generated/escape/rails_response_types.d.ts")
+          end.to raise_error(ReactOnRails::Error, /must be inside Rails\.root/)
+          expect(File).not_to exist(File.join(outside_dir, "rails_response_types.d.ts"))
+        end
       end
     end
   end
