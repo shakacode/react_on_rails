@@ -184,6 +184,25 @@ async function firstParentSha({ github, context, sha }) {
   return response.data.parents?.[0]?.sha;
 }
 
+function githubApiErrorStatus(error) {
+  return error?.status || error?.response?.status;
+}
+
+function githubApiFailureDetails(error) {
+  const status = githubApiErrorStatus(error);
+  const details = [];
+
+  if (status) {
+    details.push(`GitHub API status: ${status}.`);
+  }
+
+  if (error?.message) {
+    details.push(error.message);
+  }
+
+  return details.join(' ');
+}
+
 async function isCommitReachableFromDefaultBranch({ github, context, sha }) {
   const defaultBranch = context.payload?.repository?.default_branch || 'main';
 
@@ -196,8 +215,18 @@ async function isCommitReachableFromDefaultBranch({ github, context, sha }) {
 
     return response.data.status === 'ahead' || response.data.status === 'identical';
   } catch (error) {
-    if (error.status === 404) {
+    const status = githubApiErrorStatus(error);
+
+    if (status === 404 || status === 422) {
       return false;
+    }
+
+    if (status) {
+      const wrappedError = new Error(
+        `GitHub compare API failed while checking whether ${sha} is reachable from ${defaultBranch}. ${githubApiFailureDetails(error)}`,
+      );
+      wrappedError.status = status;
+      throw wrappedError;
     }
 
     throw error;
@@ -374,7 +403,23 @@ async function checkPreviousMainCommitStatus({
     await checkSha(parentSha, remainingGuardOnlyHops - 1, remainingNoRunsHops);
   }
 
-  await checkSha(previousSha, maxGuardOnlyHops, maxNoRunsHops);
+  try {
+    await checkSha(previousSha, maxGuardOnlyHops, maxNoRunsHops);
+  } catch (error) {
+    if (!githubApiErrorStatus(error)) {
+      throw error;
+    }
+
+    core.setFailed(
+      [
+        'Cannot determine prior real CI status because a GitHub API request failed.',
+        githubApiFailureDetails(error),
+        'Retry after the GitHub API recovers, or push a non-docs change to trigger hosted CI.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  }
 }
 
 module.exports = {

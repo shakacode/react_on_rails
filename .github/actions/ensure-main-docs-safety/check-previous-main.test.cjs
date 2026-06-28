@@ -69,6 +69,7 @@ function makeGithub({
   jobIteratorDataByRunId,
   parentsBySha,
   defaultBranchContainsSha = {},
+  compareErrorByBase = {},
 }) {
   const listWorkflowRunsForRepo = async () => {};
   const listJobsForWorkflowRun = async ({ run_id: runId }) => ({
@@ -100,6 +101,10 @@ function makeGithub({
     },
     request: async (_route, { basehead }) => {
       const [base] = basehead.split('...');
+      if (compareErrorByBase[base]) {
+        throw compareErrorByBase[base];
+      }
+
       return { data: { status: defaultBranchContainsSha[base] ? 'ahead' : 'diverged' } };
     },
     rest: {
@@ -462,6 +467,69 @@ async function testNoRunHopLimitStopsAtConfiguredLimitWithTrail() {
   assert.match(core.failed[0], /synthetic-base/);
 }
 
+async function testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure() {
+  const syntheticBase = 'synthetic-base';
+  const realFailure = 'real-failure';
+  const failingRun = run({ id: 16, sha: realFailure, name: 'Ruby Tests', conclusion: 'failure' });
+  const compareError = new Error('No common ancestor');
+  compareError.status = 422;
+  const github = makeGithub({
+    pages: [[failingRun]],
+    jobsByRunId: {
+      16: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [syntheticBase]: realFailure,
+    },
+    compareErrorByBase: {
+      [syntheticBase]: compareError,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit real-failure still has failing workflows/);
+  assert.match(core.failed[0], /synthetic-base/);
+}
+
+async function testCompareTransientFailureSetsHelpfulFailure() {
+  const syntheticBase = 'synthetic-base';
+  const compareError = new Error('GitHub is unavailable');
+  compareError.status = 502;
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+    compareErrorByBase: {
+      [syntheticBase]: compareError,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Cannot determine prior real CI status because a GitHub API request failed/);
+  assert.match(core.failed[0], /502/);
+  assert.match(core.failed[0], /GitHub is unavailable/);
+}
+
 async function testGuardOnlyFailuresLookThroughToParentSuccess() {
   const previous = 'docs-1';
   const parent = 'green';
@@ -514,6 +582,8 @@ async function main() {
   await testNoRunSyntheticBaseAllowsQuietParentSkip();
   await testNoRunSyntheticChainLooksThroughToParentFailure();
   await testNoRunHopLimitStopsAtConfiguredLimitWithTrail();
+  await testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure();
+  await testCompareTransientFailureSetsHelpfulFailure();
   await testGuardOnlyFailuresLookThroughToParentSuccess();
   await testNonContiguousWorkflowRunPagesAreChecked();
   await testPaginatedJobsAreChecked();
