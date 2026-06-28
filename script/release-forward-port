@@ -636,7 +636,7 @@ class ReleaseForwardPort
   end
 
   def renamed_target_path_pairs_from_ref(from_ref, first_parent, source_paths)
-    git_lines("diff", "--name-status", "--find-renames", from_ref, first_parent).filter_map do |line|
+    git_lines("diff", "--name-status", "--find-renames=20%", from_ref, first_parent).filter_map do |line|
       status, old_path, new_path = line.split("\t", 3)
       [old_path, new_path] if status.start_with?("R") && new_path && source_paths.key?(old_path)
     end
