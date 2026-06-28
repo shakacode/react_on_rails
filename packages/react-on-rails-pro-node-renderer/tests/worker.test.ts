@@ -201,6 +201,27 @@ describe('worker', () => {
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest treats null rscStreamObservability as absent', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+    });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: 'ReactOnRails.dummy',
+        rscStreamObservability: null,
+      })
+      .end();
+
+    expect(res.statusCode).toBe(410);
+    expect(res.payload).toContain('No bundle uploaded');
+  });
+
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is empty string', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),

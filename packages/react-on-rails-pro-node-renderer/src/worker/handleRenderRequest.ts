@@ -70,9 +70,10 @@ export type ProvidedNewBundle = {
  *
  * Scoped to streamed responses only: the header rides on the renderer's HTTP response head,
  * which the Rails gem receives before the body chunks. The measured window spans execution
- * context build (cold or cached) plus the synchronous render that produces the stream object —
- * i.e. the work before the first chunk is emitted. Per-chunk and total render time are not
- * known until the stream is consumed, so they are intentionally excluded here.
+ * context lookup/build plus the synchronous render that produces the stream object. Cache-miss
+ * requests also include bundle upload and validation so first-deploy cold starts are comparable
+ * with cache-hit requests. Per-chunk and total render time are not known until the stream is
+ * consumed, so they are intentionally excluded here.
  *
  * Non-streaming (buffered `data`) responses are left untouched: the issue targets the streamed
  * path, and their full duration is already attributable via the renderer's tracing spans.
@@ -88,7 +89,8 @@ export function addRendererServerTiming(
     return;
   }
   const durMs = (performance.now() - startedAtMs).toFixed(3);
-  const entry = `ror_renderer_prepare;dur=${durMs};desc="Node renderer prepare (exec context build + render start)"`;
+  const desc = 'Node renderer prepare (bundle sync + exec context build + render start)';
+  const entry = `ror_renderer_prepare;dur=${durMs};desc="${desc}"`;
   const existing = response.headers['Server-Timing'];
   response.headers['Server-Timing'] = existing ? `${existing}, ${entry}` : entry;
 }
@@ -328,8 +330,10 @@ export async function handleRenderRequest({
       };
     }
 
+    // Start before the first VM lookup so cache-hit and cache-miss timings cover
+    // the same request span, including bundle upload on first deploy.
+    const rendererServerTimingStartedAt = performance.now();
     try {
-      const rendererServerTimingStartedAt = performance.now();
       const executionContext = await subSpan(
         {
           name: 'ror.bundle.build_execution_context',
@@ -395,7 +399,6 @@ export async function handleRenderRequest({
       entryBundleFilePath,
       workerIdLabel(),
     );
-    const rendererServerTimingStartedAt = performance.now();
     const executionContext = await subSpan(
       {
         name: 'ror.bundle.build_execution_context',

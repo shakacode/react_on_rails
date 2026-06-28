@@ -291,7 +291,8 @@ const setResponseAndReleaseExecutionContext = async (
   }
 };
 
-const isAsset = (value: unknown): value is Asset => (value as { type?: string }).type === 'asset';
+const isAsset = (value: unknown): value is Asset =>
+  typeof value === 'object' && value !== null && (value as { type?: string }).type === 'asset';
 
 function conflictingHealthEndpointPath(error: unknown): (typeof HEALTH_ENDPOINT_ROUTES)[number] | undefined {
   if (typeof error !== 'object' || error === null) {
@@ -403,7 +404,7 @@ const isBooleanField = (value: unknown): value is boolean | 'true' | 'false' =>
 
 const parseOptionalBooleanField = (body: Record<string, unknown>, key: string): boolean | undefined => {
   const value = body[key];
-  if (value === undefined) {
+  if (value === undefined || value === null) {
     return undefined;
   }
   if (!isBooleanField(value)) {
@@ -596,7 +597,11 @@ export default function run(config: Partial<Config>) {
       return;
     }
     const rscStreamObservability = parseOptionalBooleanField(body, 'rscStreamObservability');
-    if ('rscStreamObservability' in body && rscStreamObservability === undefined) {
+    if (
+      body.rscStreamObservability !== undefined &&
+      body.rscStreamObservability !== null &&
+      rscStreamObservability === undefined
+    ) {
       await setResponse(
         badRequestResponseResult('Invalid "rscStreamObservability" field in render request.'),
         res,
