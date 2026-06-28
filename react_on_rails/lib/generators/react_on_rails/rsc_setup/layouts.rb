@@ -15,7 +15,7 @@ module ReactOnRails
           return reusable_layout_name if reusable_layout_name
 
           create_new_hello_server_layout(
-            skipped_layout_paths: skipped_existing_layout_paths(classification_by_layout)
+            skipped_layouts: skipped_existing_layouts(classification_by_layout)
           )
         end
 
@@ -118,7 +118,7 @@ module ReactOnRails
           :reusable
         end
 
-        def skipped_existing_layout_paths(classification_by_layout)
+        def skipped_existing_layouts(classification_by_layout)
           classification_by_layout.filter_map do |layout_name, classification|
             layout_path = layout_destination_path(layout_name)
             full_path = File.join(destination_root, layout_path)
@@ -126,7 +126,7 @@ module ReactOnRails
             next unless File.exist?(full_path)
             next if reusable_layout_classification?(classification)
 
-            layout_path
+            { path: layout_path, classification: }
           end
         end
 
@@ -180,11 +180,11 @@ module ReactOnRails
           arguments[1...-1].strip
         end
 
-        def create_new_hello_server_layout(skipped_layout_paths: [])
+        def create_new_hello_server_layout(skipped_layouts: [])
           layout_name = next_available_hello_server_layout_name
           layout_path = layout_destination_path(layout_name)
 
-          announce_skipped_layout_fallback(skipped_layout_paths, layout_path) if skipped_layout_paths.any?
+          announce_skipped_layout_fallback(skipped_layouts, layout_path) if skipped_layouts.any?
 
           say "📝 Creating #{layout_path} for HelloServerController...", :yellow
           empty_directory("app/views/layouts")
@@ -195,24 +195,24 @@ module ReactOnRails
           layout_name
         end
 
-        def announce_skipped_layout_fallback(skipped_layout_paths, new_layout_path)
-          skipped_paths = skipped_layout_paths.map { |path| "  - #{path}" }.join("\n")
+        def announce_skipped_layout_fallback(skipped_layouts, new_layout_path)
+          skipped_paths = skipped_layouts.map { |layout| "  - #{layout.fetch(:path)}" }.join("\n")
 
           say <<~MSG, :yellow
             ℹ️  Found existing layout file(s) in your app that were not reused for HelloServerController:
             #{skipped_paths}
 
-            #{skipped_layout_fallback_reason}
+            #{skipped_layout_fallback_reason(skipped_layouts)}
             The generator will create #{new_layout_path} instead of overwriting them.
             #{fallback_layout_description}
           MSG
         end
 
-        def skipped_layout_fallback_reason
-          if use_tailwind?
-            "Those file(s) do not include the layout-owned Tailwind pack block required by `--tailwind`."
-          else
+        def skipped_layout_fallback_reason(skipped_layouts)
+          if !use_tailwind? || skipped_layouts.any? { |layout| layout.fetch(:classification) == :missing_pack_tags }
             "Those file(s) do not include both `stylesheet_pack_tag` and `javascript_pack_tag`."
+          else
+            "Those file(s) do not include the layout-owned Tailwind pack block required by `--tailwind`."
           end
         end
 

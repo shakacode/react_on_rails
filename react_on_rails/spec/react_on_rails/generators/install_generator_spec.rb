@@ -1200,7 +1200,9 @@ describe InstallGenerator, type: :generator do
       expect(base_generator).to have_received(:say_status)
         .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
       expect(base_generator).to have_received(:say)
-        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include('  <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>'), :yellow)
       assert_file layout_path do |content|
         expect(content).to eq(original_layout)
       end
@@ -1231,7 +1233,7 @@ describe InstallGenerator, type: :generator do
       expect(base_generator).to have_received(:say_status)
         .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
       expect(base_generator).to have_received(:say)
-        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
       assert_file layout_path do |content|
         expect(content).to eq(original_layout)
       end
@@ -1262,7 +1264,38 @@ describe InstallGenerator, type: :generator do
       expect(base_generator).to have_received(:say_status)
         .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
       expect(base_generator).to have_received(:say)
-        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind pack tags inside triple-dash HTML comments" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!--
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+            --->
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
       assert_file layout_path do |content|
         expect(content).to eq(original_layout)
       end
@@ -1291,7 +1324,7 @@ describe InstallGenerator, type: :generator do
       expect(base_generator).to have_received(:say_status)
         .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
       expect(base_generator).to have_received(:say)
-        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
       assert_file layout_path do |content|
         expect(content).to eq(original_layout)
       end
@@ -1320,7 +1353,7 @@ describe InstallGenerator, type: :generator do
       expect(base_generator).to have_received(:say_status)
         .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
       expect(base_generator).to have_received(:say)
-        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
       assert_file layout_path do |content|
         expect(content).to eq(original_layout)
       end
@@ -1350,7 +1383,37 @@ describe InstallGenerator, type: :generator do
       expect(base_generator).to have_received(:say_status)
         .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
       expect(base_generator).to have_received(:say)
-        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "skips Tailwind layouts that use keyword options and blank lines in the helper block" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+
+            <%= javascript_pack_tag defer: true %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:skip, "#{layout_path} already links react_on_rails_tailwind", :yellow)
+      expect(base_generator).not_to have_received(:say)
       assert_file layout_path do |content|
         expect(content).to eq(original_layout)
       end
@@ -1378,7 +1441,7 @@ describe InstallGenerator, type: :generator do
       expect(base_generator).to have_received(:say_status)
         .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
       expect(base_generator).to have_received(:say)
-        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
       assert_file layout_path do |content|
         expect(content).to eq(original_layout)
       end
@@ -1407,7 +1470,7 @@ describe InstallGenerator, type: :generator do
       expect(base_generator).to have_received(:say_status)
         .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
       expect(base_generator).to have_received(:say)
-        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
       assert_file layout_path do |content|
         expect(content).to eq(original_layout)
       end
@@ -1476,17 +1539,18 @@ describe InstallGenerator, type: :generator do
       simulate_named_pack_tag_layout("hello_world")
       allow(base_generator).to receive(:say_status)
       allow(base_generator).to receive(:say)
+      GeneratorMessages.clear
 
       base_generator.send(:warn_existing_hello_world_tailwind_layout)
 
-      expect(base_generator).to have_received(:say_status)
-        .with(
-          :warning,
-          "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout.",
-          :yellow
-        )
-      expect(base_generator).to have_received(:say)
-        .with(include('prepend_javascript_pack_tag "react_on_rails_tailwind"'), :yellow)
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include(
+        "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout."
+      )
+      expect(warning_text).to include("preserving any existing app-specific pack tags")
+      expect(warning_text).to include('  <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+      expect(base_generator).not_to have_received(:say_status)
+      expect(base_generator).not_to have_received(:say)
     end
 
     it "does not warn when HelloWorldController inherits a Tailwind-aware ApplicationController layout" do
@@ -1517,16 +1581,46 @@ describe InstallGenerator, type: :generator do
       ERB
       allow(base_generator).to receive(:say_status)
       allow(base_generator).to receive(:say)
+      GeneratorMessages.clear
 
       base_generator.send(:warn_existing_hello_world_tailwind_layout)
 
-      expect(base_generator).not_to have_received(:say_status)
-        .with(
-          :warning,
-          "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout.",
-          :yellow
-        )
+      expect(GeneratorMessages.messages.join("\n")).not_to include(
+        "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout."
+      )
       expect(base_generator).not_to have_received(:say)
+    end
+  end
+
+  describe "#announce_skipped_layout_fallback" do
+    let(:rsc_generator) { rsc_generator_fixture(tailwind: true) }
+
+    before do
+      allow(rsc_generator).to receive(:say)
+    end
+
+    it "names missing basic pack tags before Tailwind-specific layout requirements" do
+      rsc_generator.send(
+        :announce_skipped_layout_fallback,
+        [{ path: "app/views/layouts/application.html.erb", classification: :missing_pack_tags }],
+        "app/views/layouts/react_on_rails_rsc.html.erb"
+      )
+
+      expect(rsc_generator).to have_received(:say)
+        .with(include("do not include both `stylesheet_pack_tag` and `javascript_pack_tag`"), :yellow)
+      expect(rsc_generator).not_to have_received(:say)
+        .with(include("do not include the layout-owned Tailwind pack block"), :yellow)
+    end
+
+    it "uses the Tailwind-specific reason when basic pack tags are present" do
+      rsc_generator.send(
+        :announce_skipped_layout_fallback,
+        [{ path: "app/views/layouts/application.html.erb", classification: :missing_tailwind_pack }],
+        "app/views/layouts/react_on_rails_rsc.html.erb"
+      )
+
+      expect(rsc_generator).to have_received(:say)
+        .with(include("do not include the layout-owned Tailwind pack block required by `--tailwind`"), :yellow)
     end
   end
 
@@ -5461,6 +5555,29 @@ describe InstallGenerator, type: :generator do
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("This generator requires the react_on_rails_pro gem.")
       expect(error_text).not_to include("You specified")
+    end
+  end
+
+  context "when --tailwind is used with an unsupported Shakapacker version" do
+    let(:install_generator) { install_generator_fixture(tailwind: true) }
+
+    before do
+      allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(false)
+      allow(install_generator).to receive(:cli_exists?).with("git").and_return(true)
+      allow(install_generator).to receive_messages(missing_node?: false, missing_package_manager?: false)
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+        .with("6.5.6")
+        .and_return(false)
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("6.5.5")
+    end
+
+    specify "installation_prerequisites_met? reports the Tailwind-only version gate" do
+      expect(install_generator.send(:installation_prerequisites_met?)).to be false
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("Tailwind layout wiring requires Shakapacker >= 6.5.6")
+      expect(error_text).to include("Installed version: 6.5.5")
+      expect(error_text).to include("Upgrade shakapacker or omit --tailwind")
     end
   end
 

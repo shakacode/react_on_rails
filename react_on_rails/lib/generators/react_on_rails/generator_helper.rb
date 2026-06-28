@@ -15,12 +15,16 @@ module GeneratorHelper
   RAILS_APP_SOURCE_PATH = "app"
   TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN = /
     ^[ \t]*<%\s*prepend_javascript_pack_tag(?:\s|\()
-    \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
-    [ \t]*<%=\s*stylesheet_pack_tag(?:\s|\()
-    \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
-    [ \t]*<%=\s*javascript_pack_tag\s*%>
+    \s*["']react_on_rails_tailwind["'][^\n]*%>(?:\r?\n[ \t]*)*
+    <%=\s*stylesheet_pack_tag(?:\s|\()
+    \s*["']react_on_rails_tailwind["'][^\n]*%>(?:\r?\n[ \t]*)*
+    <%=\s*javascript_pack_tag(?:
+      \s*%> |
+      \s+(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:)[^\n]*%> |
+      \(\s*(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:)[^\n]*\)\s*%>
+    )
   /x
-  HTML_COMMENT_PATTERN = /<!--(?:[^-]|-(?!-)|--(?!>))*-->/m
+  HTML_COMMENT_PATTERN = /<!--[\s\S]*?-->/
   CONTROLLER_LAYOUT_DECLARATION_PATTERN =
     /^\s*layout(?:\s+|\s*\(\s*)(?:"([^"]+)"|'([^']+)')(?=\s*(?:\)|,|#|$))/
   private_constant :DEFAULT_SHAKAPACKER_SOURCE_PATH, :DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH,

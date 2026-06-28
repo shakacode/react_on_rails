@@ -462,11 +462,12 @@ module ReactOnRails
         layout_name = extract_declared_layout_name(File.read(controller_full_path)) || inherited_application_layout_name
         return if layout_file_links_tailwind_pack?(layout_name)
 
-        say_status :warning, "#{controller_path} may not use the Tailwind-aware React on Rails layout.", :yellow
-        say <<~MSG, :yellow
-          Ensure app/views/layouts/#{layout_name}.html.erb includes:
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          #{controller_path} may not use the Tailwind-aware React on Rails layout.
 
-          #{tailwind_layout_helper_block}
+          Ensure app/views/layouts/#{layout_name}.html.erb includes the Tailwind layout pack tags while
+          preserving any existing app-specific pack tags:
+          #{tailwind_layout_helper_block('  ')}
         MSG
       end
 
@@ -525,9 +526,11 @@ module ReactOnRails
       def warn_tailwind_layout_manual_step(layout_path, reason:)
         say_status :warning, "Could not update #{layout_path}: #{reason}.", :yellow
         say <<~MSG, :yellow
-          Replace the existing React on Rails pack-tag block in the layout head with:
+          Add the Tailwind layout pack tags in the layout head while preserving any existing app-specific pack tags.
+          Keep an existing javascript_pack_tag call if it already renders your app packs; otherwise include the
+          empty javascript_pack_tag flush shown here:
 
-          #{tailwind_layout_helper_block}
+          #{tailwind_layout_helper_block('  ')}
         MSG
       end
 
