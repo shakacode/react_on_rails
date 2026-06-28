@@ -11,8 +11,8 @@ module ReactOnRails
     IDENTIFIER_PATTERN = /\A[$A-Z_a-z][$0-9A-Z_a-z]*\z/
     OPTION_KEYS = %i[array fields nullable optional type].freeze
     RESERVED_TYPE_NAMES = %w[
-      any as boolean break case catch class const continue debugger default delete do else enum export extends false
-      finally for function if implements import in instanceof interface let namespace never new null number object
+      any as await boolean break case catch class const continue debugger default delete do else enum export extends
+      false finally for function if implements import in instanceof interface let namespace never new null number object
       package private protected public return static string super switch symbol this throw true try typeof undefined
       unknown var void while with yield
     ].freeze
@@ -218,6 +218,8 @@ module ReactOnRails
 
       def array_type(member_spec, indentation:, closing_indentation:)
         member_type = render_type(member_spec, indentation:, closing_indentation:)
+        member_options = options_for(member_spec)
+        member_type = "#{member_type} | null" if member_options.fetch(:nullable, false)
         member_type = "(#{member_type})" if member_type.include?("\n") || member_type.include?(" | ")
         "#{member_type}[]"
       end

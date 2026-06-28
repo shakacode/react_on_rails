@@ -147,6 +147,22 @@ module ReactOnRails
       expect(described_class.to_d_ts).to include(expected_payload_type)
     end
 
+    it "preserves nullable array member wrappers" do
+      described_class.define_response(
+        "payload.show",
+        type_name: "PayloadShowResponse",
+        fields: {
+          values: { array: { type: :string, nullable: true } },
+          optional_values: { array: { type: :number, nullable: true }, nullable: true }
+        }
+      )
+
+      declaration = described_class.to_d_ts
+
+      expect(declaration).to include("  values: (string | null)[];")
+      expect(declaration).to include("  optional_values: (number | null)[] | null;")
+    end
+
     it "rejects duplicate response keys" do
       described_class.define_response("projects.index", type_name: "ProjectsIndexResponse", fields: {})
 
@@ -168,6 +184,10 @@ module ReactOnRails
 
       expect do
         described_class.define_type("default", fields: {})
+      end.to raise_error(ReactOnRails::Error, /valid identifier/)
+
+      expect do
+        described_class.define_type("await", fields: {})
       end.to raise_error(ReactOnRails::Error, /valid identifier/)
 
       expect do
