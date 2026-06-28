@@ -67,8 +67,7 @@ module ReactOnRails
                     "#{component_dir}/components/HelloWorld.module.css")
         end
 
-        return unless use_tailwind?
-        return unless options[:pretend]
+        return unless use_tailwind? && options[:pretend]
 
         say_status :pretend, "Tailwind stylesheet is linked from the React on Rails layout", :yellow
       end

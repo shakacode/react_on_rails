@@ -463,6 +463,13 @@ RSpec.describe GeneratorHelper, type: :generator do
       expect { tailwind_source_statement("../bad\npath") }
         .to raise_error(ArgumentError, "Tailwind source paths cannot contain control characters")
     end
+
+    it "rejects Unicode line separators in Tailwind source paths" do
+      ["\u2028", "\u2029"].each do |separator|
+        expect { tailwind_source_statement("../bad#{separator}path") }
+          .to raise_error(ArgumentError, "Tailwind source paths cannot contain control characters")
+      end
+    end
   end
 
   describe "#active_precompile_hook_configured?" do

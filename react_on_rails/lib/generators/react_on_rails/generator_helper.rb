@@ -253,7 +253,9 @@ module GeneratorHelper
 
   def tailwind_css_string(value)
     css_string = value.to_s
-    raise ArgumentError, "Tailwind source paths cannot contain control characters" if css_string.match?(/[[:cntrl:]]/)
+    if css_string.match?(/[[:cntrl:]\u2028\u2029]/)
+      raise ArgumentError, "Tailwind source paths cannot contain control characters"
+    end
 
     JSON.generate(css_string)
   end
