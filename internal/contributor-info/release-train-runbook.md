@@ -268,6 +268,21 @@ git push   # or open a PR if main is protected / the fix needs review on main
 
 When the hard gates pass for a specific RC, promote **that** RC. Do not re-cut from `main`.
 
+**Scripted path (recommended).** `script/release-finish promote X.Y.Z` orchestrates this whole step:
+it runs `git fetch`, asserts you are on `release/X.Y.Z` with a clean tree, verifies the tip equals the
+accepted RC tag (`git diff --stat vX.Y.Z.rc.N` is empty), prompts you to collapse the rc CHANGELOG, then
+asks for explicit confirmation before running `bundle exec rake release[X.Y.Z]`. It wraps — does not
+replace — the rake promotion guards (`stable_release_branch_allowed?`,
+`ensure_release_branch_promotes_tagged_rc!`). Preview the exact commands first with `--dry-run`:
+
+```bash
+script/release-finish promote 17.0.0 --dry-run   # prints every command, executes nothing
+script/release-finish promote 17.0.0             # runs it, with a confirmation before rake release
+```
+
+By default it resolves the highest `v17.0.0.rc.N` tag as the accepted RC; pass `--rc-tag v17.0.0.rc.3`
+to pin a specific one. The manual equivalent the script runs is below.
+
 ```bash
 git fetch origin
 git checkout release/17.0.0
@@ -312,6 +327,24 @@ be re-spun, and an explicit human sign-off on the promotion itself (see
 and publish phase `final` for the release line during the promotion freeze.
 
 ### 5. Close out the release line
+
+**Scripted path (recommended).** `script/release-finish close-out X.Y.Z` orchestrates this step: it runs
+`git fetch`, asserts you are on `main` with a clean tree, shows the real `script/release-forward-port`
+dry-run plan, then asks for explicit confirmation before applying the forward-port and, separately,
+before deleting the release branch on the remote. It shells out to the existing
+`script/release-forward-port` interface (it does not re-implement forward-porting), so the same plan,
+skips, and `MANUAL` handling described in step 3 apply. Preview everything first with `--dry-run`:
+
+```bash
+git fetch origin
+git checkout main
+git pull --rebase
+script/release-finish close-out 17.0.0 --dry-run   # prints commands + the real forward-port plan
+script/release-finish close-out 17.0.0             # applies, with confirmations before each outward op
+# Then `git push` the forward-ported commits to main (or open a PR if main is protected).
+```
+
+The manual equivalent the script wraps is below.
 
 ```bash
 # After v17.0.0 is published and the GitHub release exists:
