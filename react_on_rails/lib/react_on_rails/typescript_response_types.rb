@@ -199,11 +199,10 @@ module ReactOnRails
       def render_hash_type(spec, indentation:, closing_indentation:)
         normalized = normalize_option_hash(spec)
 
-        if normalized.key?(:array)
-          return array_type(normalized.fetch(:array), indentation:, closing_indentation:)
-        elsif normalized.key?(:type)
-          return render_type(normalized.fetch(:type), indentation:, closing_indentation:)
-        elsif normalized.key?(:fields)
+        if option_wrapper_hash?(spec, normalized)
+          return array_type(normalized.fetch(:array), indentation:, closing_indentation:) if normalized.key?(:array)
+          return render_type(normalized.fetch(:type), indentation:, closing_indentation:) if normalized.key?(:type)
+
           return object_type(normalized.fetch(:fields), indentation:, closing_indentation:)
         end
 
@@ -234,20 +233,23 @@ module ReactOnRails
       end
 
       def options_for(spec)
-        return {} unless explicit_option_hash?(spec)
+        return {} unless spec.is_a?(Hash)
 
         normalized = normalize_option_hash(spec)
+        return {} unless option_wrapper_hash?(spec, normalized)
+
         {
           nullable: normalized.fetch(:nullable, false),
           optional: normalized.fetch(:optional, false)
         }
       end
 
-      def explicit_option_hash?(spec)
+      def option_wrapper_hash?(spec, normalized = nil)
         return false unless spec.is_a?(Hash)
 
-        normalized = normalize_option_hash(spec)
-        normalized.key?(:array) || normalized.key?(:fields) || normalized.key?(:type)
+        normalized ||= normalize_option_hash(spec)
+        has_wrapper_type = normalized.key?(:array) || normalized.key?(:fields) || normalized.key?(:type)
+        has_wrapper_type && normalized.length == spec.length
       end
 
       def normalize_option_hash(spec)

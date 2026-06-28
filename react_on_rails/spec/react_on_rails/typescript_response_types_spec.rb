@@ -123,6 +123,30 @@ module ReactOnRails
       expect(declaration).not_to include("metadata?:")
     end
 
+    it "preserves shorthand object child fields named like wrapper options" do
+      described_class.define_response(
+        "payload.show",
+        type_name: "PayloadShowResponse",
+        fields: {
+          payload: {
+            array: :string,
+            fields: :json,
+            count: :number
+          }
+        }
+      )
+
+      expected_payload_type = [
+        "  payload: {",
+        "    array: string;",
+        "    fields: JsonValue;",
+        "    count: number;",
+        "  };"
+      ].join("\n")
+
+      expect(described_class.to_d_ts).to include(expected_payload_type)
+    end
+
     it "rejects duplicate response keys" do
       described_class.define_response("projects.index", type_name: "ProjectsIndexResponse", fields: {})
 
