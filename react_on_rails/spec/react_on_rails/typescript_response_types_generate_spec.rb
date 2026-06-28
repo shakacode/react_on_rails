@@ -154,6 +154,25 @@ module ReactOnRails
       end
     end
 
+    it "preserves the original write error when tempfile cleanup fails" do
+      described_class.define_response("health.show", type_name: "HealthResponse", fields: { ok: :boolean })
+
+      Dir.mktmpdir do |dir|
+        allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+        output_path = "generated/rails_response_types.d.ts"
+        output_dir = File.join(dir, "generated")
+        generated_path = File.join(dir, output_path)
+        allow(FileUtils).to receive(:mv).and_call_original
+        allow(FileUtils).to receive(:mv).with(anything, generated_path).and_raise(Errno::ENOSPC)
+        allow(described_class).to receive(:cleanup_tempfile).and_raise(Errno::EACCES)
+
+        expect do
+          described_class.generate(output_path:)
+        end.to raise_error(Errno::ENOSPC)
+        expect(File).not_to exist(output_dir)
+      end
+    end
+
     it "rejects output parent symlink swaps before creating the generated file" do
       described_class.define_response("health.show", type_name: "HealthResponse", fields: { ok: :boolean })
 

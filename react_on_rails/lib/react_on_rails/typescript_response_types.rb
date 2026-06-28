@@ -240,10 +240,17 @@ module ReactOnRails
         tempfile.write(content)
         tempfile.close
         FileUtils.mv(tempfile.path, path.to_s)
-      rescue StandardError
+      rescue StandardError => error
+        cleanup_generated_file_write(tempfile, cleanup_directory)
+        raise error
+      end
+
+      def cleanup_generated_file_write(tempfile, cleanup_directory)
         cleanup_tempfile(tempfile)
-        FileUtils.rm_rf(cleanup_directory) if cleanup_directory&.exist?
-        raise
+      rescue StandardError
+        nil
+      ensure
+        cleanup_created_directory(cleanup_directory)
       end
 
       def cleanup_tempfile(tempfile)
@@ -251,6 +258,12 @@ module ReactOnRails
 
         tempfile.close unless tempfile.closed?
         tempfile.unlink if tempfile.path && File.exist?(tempfile.path)
+      end
+
+      def cleanup_created_directory(cleanup_directory)
+        FileUtils.rm_rf(cleanup_directory) if cleanup_directory&.exist?
+      rescue StandardError
+        nil
       end
 
       def highest_missing_ancestor(path)
