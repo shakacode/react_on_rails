@@ -387,7 +387,7 @@ Streaming RSC renders HTML directly into the document instead of serializing a J
 config.middleware.use Rack::Deflater
 ```
 
-For Brotli (`br`), which typically beats gzip on HTML, add the [`rack-brotli`](https://github.com/marcandre/rack-brotli) gem and insert it the same way:
+For Brotli (`br`), which typically beats gzip on HTML, add the [`rack-brotli`](https://github.com/marcotc/rack-brotli) gem and insert it the same way:
 
 ```ruby
 # Gemfile
@@ -432,7 +432,7 @@ The same applies to `Rack::Brotli` or any middleware that accepts an `:if` callb
 
 ### Compression at the Reverse Proxy
 
-You can compress in Rails (above) **or** at the reverse proxy — do not do both, or you will double-compress. The critical constraint for streaming is that the proxy must **not buffer the whole response** before forwarding it, or you lose the streaming TTFB advantage.
+You can compress in Rails (above) **or** at the reverse proxy. nginx will not recompress a response whose `Content-Encoding` is already set by Rails, but configuring compression at multiple layers adds complexity and can cause surprises with CDNs or older proxies. Pick one layer for predictable behavior. The critical constraint for streaming is that the proxy must **not buffer the whole response** before forwarding it, or you lose the streaming TTFB advantage.
 
 **nginx.** By default nginx buffers proxied responses (`proxy_buffering on`), which holds the stream until it is complete. Two options:
 
@@ -441,8 +441,9 @@ location / {
   proxy_pass http://rails_app;
 
   # Option A — disable buffering for everything proxied here. Simplest; the
-  # whole location streams. Compression can be handled by Rails (Rack::Deflater
-  # / Rack::Brotli) or by nginx `gzip`/`brotli` directives, but not both.
+  # whole location streams. Pick Rails compression (Rack::Deflater /
+  # Rack::Brotli) or nginx `gzip`/`brotli` directives so operators only need
+  # to reason about one compression layer.
   proxy_buffering off;
 
   proxy_set_header Host $host;
@@ -461,7 +462,7 @@ def show
 end
 ```
 
-`X-Accel-Buffering: no` only disables **proxy** buffering; it does not affect compression. If nginx itself compresses (`gzip on` / the brotli module), it still streams the compressed chunks through once buffering is off. If Rails already set `Content-Encoding`, nginx will not recompress.
+`X-Accel-Buffering: no` only disables **proxy** buffering; it does not affect compression. If Rails already set `Content-Encoding`, nginx will not recompress. If nginx itself compresses (`gzip on` / the brotli module), chunk flushing depends on upstream flush signals and nginx's compression buffers. For guaranteed per-chunk TTFB with arbitrary streaming intervals, compress at the Rails layer (`Rack::Deflater` / `Rack::Brotli`) rather than at nginx.
 
 **Cloudflare.** Cloudflare compresses eligible responses automatically (gzip, and Brotli to clients that support it) and respects an existing `Content-Encoding` from your origin rather than double-compressing. It streams chunked responses through; you do not need to disable buffering. If your origin already sets `Content-Encoding: br`, Cloudflare passes it through.
 

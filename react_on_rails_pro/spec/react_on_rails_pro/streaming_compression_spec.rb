@@ -27,18 +27,20 @@ RSpec.describe "Streamed RSC compression" do
   # Mimics ActionController::Live::Buffer's Rack body: enumerable, chunked, and deliberately
   # WITHOUT `to_ary`, so the Rack SPEC requires middleware to stream via `each` (sync flush per
   # chunk) rather than buffer the whole response.
-  class StreamingBody
-    include Enumerable
+  let(:streaming_body_class) do
+    Class.new do
+      include Enumerable
 
-    def initialize(chunks)
-      @chunks = chunks
+      def initialize(chunks)
+        @chunks = chunks
+      end
+
+      def each(&block)
+        @chunks.each(&block)
+      end
+
+      def close; end
     end
-
-    def each
-      @chunks.each { |chunk| yield chunk }
-    end
-
-    def close; end
   end
 
   let(:chunks) { ["<!DOCTYPE html><html><body>", "<div>chunk one</div>", "<div>chunk two</div>", "</body></html>"] }
@@ -46,14 +48,14 @@ RSpec.describe "Streamed RSC compression" do
 
   def deflater_response(accept_encoding:)
     app = lambda do |_env|
-      [200, { "Content-Type" => "text/html" }, StreamingBody.new(chunks)]
+      [200, { "Content-Type" => "text/html" }, streaming_body_class.new(chunks)]
     end
     env = Rack::MockRequest.env_for("/", "HTTP_ACCEPT_ENCODING" => accept_encoding)
     Rack::Deflater.new(app).call(env)
   end
 
   def read_body(body)
-    buffer = +""
+    buffer = +"".b
     body.each { |chunk| buffer << chunk }
     body.close if body.respond_to?(:close)
     buffer
@@ -79,14 +81,14 @@ RSpec.describe "Streamed RSC compression" do
     compressed = read_body(body)
 
     expect(compressed.byteslice(0, 2)).to eq("\x1f\x8b".b) # gzip magic bytes
-    decompressed = Zlib::GzipReader.new(StringIO.new(compressed)).read
+    decompressed = Zlib::GzipReader.new(StringIO.new(compressed.b)).read
     expect(decompressed).to eq(full_html)
   end
 
   it "compresses HTML to fewer bytes than the identity response" do
     larger_chunks = Array.new(50) { |i| "<div class='card'>Repeated marketplace card markup ##{i}</div>" }
     app = lambda do |_env|
-      [200, { "Content-Type" => "text/html" }, StreamingBody.new(larger_chunks)]
+      [200, { "Content-Type" => "text/html" }, streaming_body_class.new(larger_chunks)]
     end
     env = Rack::MockRequest.env_for("/", "HTTP_ACCEPT_ENCODING" => "gzip")
     _status, _headers, body = Rack::Deflater.new(app).call(env)
