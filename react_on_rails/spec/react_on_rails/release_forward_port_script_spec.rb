@@ -1187,6 +1187,22 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "keeps empty stable version bump commits manual" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      git(repo, "commit", "--allow-empty", "--no-gpg-sign", "-m", "Bump version to 1.0.1")
+      stable_bump_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("MANUAL #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).to include("stable release version bump commit")
+      expect(stdout).not_to include("empty commit; cherry-picking would only create a no-op commit")
+    end
+  end
+
   it "skips an -x cherry-pick restored by reverting its revert" do
     with_release_repo do |repo|
       add_rc_bump_and_fix(repo)

@@ -200,6 +200,9 @@ class ReleaseForwardPort
     special_reason = special_skip_reason(sha, subject, target, target_version)
     return special_reason if special_reason
 
+    version_bump_reason = version_bump_skip_reason(subject, target, target_version)
+    return version_bump_reason if version_bump_reason
+
     return "empty commit; cherry-picking would only create a no-op commit on #{target}" if
       patch_id_for_commit(sha) == EMPTY_PATCH_ID
 
@@ -213,12 +216,14 @@ class ReleaseForwardPort
     # re-apply it even if git cherry reports a patch match.
     return if source_cherry_pick_origin_reverted_on_target?(sha, target)
 
-    if patch_equivalent_commits[sha] &&
-       patch_equivalent_commit_present_on_target?(sha, target)
-      return "patch already exists on #{target} according to target history with no later standard revert"
-    end
+    patch_equivalent_skip_reason(sha, target, patch_equivalent_commits)
+  end
 
-    version_bump_skip_reason(subject, target, target_version)
+  def patch_equivalent_skip_reason(sha, target, patch_equivalent_commits)
+    return unless patch_equivalent_commits[sha] &&
+                  patch_equivalent_commit_present_on_target?(sha, target)
+
+    "patch already exists on #{target} according to target history with no later standard revert"
   end
 
   def active_source_revert_skip_reason(subject, target, target_version)
@@ -383,7 +388,6 @@ class ReleaseForwardPort
   def source_standard_revert_on_target?(sha, target)
     active_revert_shas =
       standard_revert_shas_on_target(sha, target)
-      .reject { |revert_sha| standard_revert_on_target?(revert_sha, target) }
       .select { |revert_sha| target_commit_live_on_target?(revert_sha, target) }
       .select { |revert_sha| revert_changes_source_paths?(revert_sha, sha) }
     return false if active_revert_shas.empty?
@@ -603,7 +607,8 @@ class ReleaseForwardPort
   end
 
   def changed_paths_for_commit(sha)
-    git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
+    @changed_paths_cache ||= {}
+    @changed_paths_cache[sha] ||= git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
   end
 
   def patch_id_for_commit(sha)
