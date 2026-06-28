@@ -1108,6 +1108,35 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "warns instead of skipping Tailwind pack tags stitched together by HTML comments" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% pre<!-- hidden -->pend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
     it "warns instead of skipping Tailwind pack tags that are not a contiguous helper block" do
       original_layout = <<~ERB
         <!DOCTYPE html>

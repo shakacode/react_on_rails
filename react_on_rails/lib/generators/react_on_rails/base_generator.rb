@@ -153,10 +153,11 @@ module ReactOnRails
         \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
         [ \t]*<%=\s*javascript_pack_tag(?:\s|\(|%>)
       /x
+      HTML_COMMENT_PATTERN = /<!--.*?-->/m
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED, :REACT_ON_RAILS_DEFAULT_LAYOUT_PATH,
                        :TAILWIND_LAYOUT_HELPER_LINES, :DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN,
-                       :TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN
+                       :TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN, :HTML_COMMENT_PATTERN
 
       def add_root_route
         return unless options.new_app?
@@ -483,9 +484,26 @@ module ReactOnRails
       end
 
       def layout_links_tailwind_pack?(content)
-        content_without_html_comments = content.gsub(/<!--.*?-->/m, "")
+        comment_ranges = html_comment_ranges(content)
+        return content.match?(TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN) if comment_ranges.empty?
 
-        content_without_html_comments.match?(TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN)
+        content.to_enum(:scan, TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN).any? do
+          helper_match = Regexp.last_match
+
+          !range_overlaps_any?(helper_match.begin(0)...helper_match.end(0), comment_ranges)
+        end
+      end
+
+      def html_comment_ranges(content)
+        content.to_enum(:scan, HTML_COMMENT_PATTERN).map do
+          comment_match = Regexp.last_match
+
+          comment_match.begin(0)...comment_match.end(0)
+        end
+      end
+
+      def range_overlaps_any?(range, ranges)
+        ranges.any? { |candidate| range.begin < candidate.end && candidate.begin < range.end }
       end
 
       def warn_tailwind_layout_manual_step(layout_path, reason:)
