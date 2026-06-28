@@ -68,7 +68,27 @@ module ReactOnRails
       private
 
       def prerequisites_met?
-        !missing_pro_installation?
+        !missing_pro_installation? && !unsupported_standalone_tailwind?
+      end
+
+      def unsupported_standalone_tailwind?
+        return false unless use_tailwind?
+
+        GeneratorMessages.add_error(<<~MSG.strip)
+          🚫 The standalone react_on_rails:rsc generator does not support --tailwind.
+
+          Tailwind setup requires the base React on Rails installer so it can create the
+          react_on_rails_tailwind pack, stylesheet, dependencies, and webpack/Rspack config.
+
+          Use the install generator for RSC + Tailwind setup:
+
+            rails generate react_on_rails:install --rsc --tailwind
+
+          If this app already has RSC and you want to add Tailwind later, run the install
+          generator with --tailwind so the base Tailwind files are installed before RSC
+          layout wiring is reused.
+        MSG
+        true
       end
 
       def missing_pro_installation?

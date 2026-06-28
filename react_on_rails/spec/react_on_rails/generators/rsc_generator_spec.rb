@@ -28,6 +28,36 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when standalone Tailwind flag is passed" do
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+
+      Dir.chdir(destination_root) do
+        run_generator(["--tailwind", "--force"])
+      end
+    end
+
+    it "rejects standalone Tailwind setup instead of creating a broken layout" do
+      error_text = GeneratorMessages.messages.join("\n")
+
+      expect(error_text).to include("standalone react_on_rails:rsc generator does not support --tailwind")
+      expect(error_text).to include("rails generate react_on_rails:install --rsc --tailwind")
+      assert_no_file "app/views/layouts/react_on_rails_rsc.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_default.html.erb"
+      assert_no_file "app/javascript/packs/react_on_rails_tailwind.js"
+      assert_no_file "app/javascript/stylesheets/application.css"
+    end
+  end
+
   # Integration test for standalone happy path
 
   context "when Pro is installed" do

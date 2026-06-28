@@ -40,9 +40,10 @@ Gem::Specification.new do |s|
   s.add_dependency "execjs", "~> 2.5"
   s.add_dependency "rails", ">= 5.2"
   s.add_dependency "rainbow", "~> 3.0"
-  # Minimum 6.0 for base compatibility; auto_load_bundle feature requires >= 7.0
+  # Minimum 6.5.6 for prepend_javascript_pack_tag, used by generated Tailwind layouts.
+  # auto_load_bundle feature requires >= 7.0
   # (see PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING)
-  s.add_dependency "shakapacker", ">= 6.0"
+  s.add_dependency "shakapacker", ">= 6.5.6"
 
   s.add_development_dependency "gem-release"
   s.post_install_message = <<~MESSAGE

@@ -330,8 +330,7 @@ configuration model:
 import '../stylesheets/application.css';
 ```
 
-The generated React on Rails layout declares that pack before the queued
-component packs:
+The generated React on Rails layout declares that pack from the layout:
 
 ```erb
 <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
