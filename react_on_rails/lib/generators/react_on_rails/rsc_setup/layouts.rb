@@ -66,7 +66,13 @@ module ReactOnRails
 
         def announce_reused_hello_server_layout(layout_name, classification)
           message = +"ℹ️  Reusing existing #{layout_name} layout for HelloServerController"
-          message << " (new generated layouts use empty pack tags by default)" if classification == :reusable
+          if classification == :reusable
+            message << if use_tailwind?
+                         " (layout links #{tailwind_pack_name})"
+                       else
+                         " (new generated layouts use empty pack tags by default)"
+                       end
+          end
           say message, :yellow
         end
 
@@ -105,6 +111,7 @@ module ReactOnRails
 
           layout_content = File.read(full_path)
           return :missing_pack_tags unless layout_has_required_pack_tags?(layout_content)
+          return :missing_tailwind_pack if use_tailwind? && !layout_links_tailwind_pack?(layout_content)
 
           return :canonical if layout_uses_canonical_pack_tags?(layout_content)
 
@@ -195,10 +202,18 @@ module ReactOnRails
             ℹ️  Found existing layout file(s) in your app that were not reused for HelloServerController:
             #{skipped_paths}
 
-            Those file(s) do not include both `stylesheet_pack_tag` and `javascript_pack_tag`, so the generator
-            will create #{new_layout_path} instead of overwriting them.
+            #{skipped_layout_fallback_reason}
+            The generator will create #{new_layout_path} instead of overwriting them.
             #{fallback_layout_description}
           MSG
+        end
+
+        def skipped_layout_fallback_reason
+          if use_tailwind?
+            "Those file(s) do not include the layout-owned Tailwind pack block required by `--tailwind`."
+          else
+            "Those file(s) do not include both `stylesheet_pack_tag` and `javascript_pack_tag`."
+          end
         end
 
         def fallback_layout_description
