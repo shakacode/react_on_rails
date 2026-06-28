@@ -133,6 +133,21 @@ describe('createRailsAction', () => {
     expect(headerValue(init.headers, 'Content-Type')).toBeNull();
   });
 
+  it('omits the JSON body when a body callback returns null', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
+    const pingProject = createRailsAction<{ id: number }, null>({
+      path: ({ id }) => `/api/projects/${id}/ping`,
+      body: () => null,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+
+    await expect(pingProject({ id: 1 })).resolves.toBeNull();
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.body).toBeUndefined();
+    expect(headerValue(init.headers, 'Content-Type')).toBeNull();
+  });
+
   it('rejects before fetch when the Rails CSRF meta tag is missing', async () => {
     const csrfMeta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]');
     csrfMeta?.remove();

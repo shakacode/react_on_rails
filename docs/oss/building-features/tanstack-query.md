@@ -212,25 +212,30 @@ type ProjectFormValues = {
 
 const createProject = createRailsAction<{ project: ProjectFormValues }, RailsResponseType<'projects.create'>>(
   {
-    path: api.projectsPath,
+    path: '/api/projects',
   },
 );
 
-const queryClient = useQueryClient();
+function useCreateProjectMutation() {
+  const queryClient = useQueryClient();
 
-const mutation = useMutation({
-  mutationFn: createProject,
-  onSuccess: ({ project }) => {
-    queryClient.setQueryData(['project', String(project.id)], { project });
-    queryClient.invalidateQueries({ queryKey: ['projects'] });
-    queryClient.invalidateQueries({ queryKey: ['metrics'] });
-  },
-});
+  return useMutation({
+    mutationFn: createProject,
+    onSuccess: ({ project }) => {
+      queryClient.setQueryData(['project', String(project.id)], { project });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['metrics'] });
+    },
+  });
+}
 ```
 
 `createRailsAction` uses the same same-origin, JSON, and CSRF assumptions as the starter's `apiFetch`
 pattern, but returns a standalone function that drops directly into `useMutation`. It does not replace
 Rails routes, strong parameters, authorization, or runtime response validation.
+Endpoints should return JSON for 2xx responses unless the caller's response type is `null`; browser
+redirects reject like network failures, so Rails auth failures should return JSON `401` or `403`
+responses for mutation endpoints.
 
 This is cleaner than threading "reload this section" callbacks through many components: the cache is the single place that knows what is stale.
 

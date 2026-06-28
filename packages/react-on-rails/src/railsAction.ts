@@ -86,6 +86,8 @@ const buildRailsActionHeaders = (
   headers.set('Accept', 'application/json');
   if (hasJsonBody) {
     headers.set('Content-Type', 'application/json');
+  } else {
+    headers.delete('Content-Type');
   }
   headers.set('X-CSRF-Token', csrfToken);
   headers.set('X-Requested-With', 'XMLHttpRequest');
@@ -113,6 +115,8 @@ const resolveHeaders = <TVariables>(
  * ```
  *
  * The returned function is directly usable as a TanStack Query `mutationFn`.
+ * It always requests JSON, rejects browser-followed redirects, and resolves 204 or non-JSON success
+ * responses as `null`. Return `null` or `undefined` from `body` when the request should not send JSON.
  */
 export function createRailsAction<TVariables = undefined, TResponse = unknown>(
   options: RailsActionOptions<TVariables>,
@@ -138,7 +142,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     }
 
     const requestBody = options.body ? options.body(typedVariables) : variables;
-    const hasJsonBody = requestBody !== undefined;
+    const hasJsonBody = requestBody !== undefined && requestBody !== null;
     const response = await fetch(requestUrl, {
       method,
       credentials: 'same-origin',
