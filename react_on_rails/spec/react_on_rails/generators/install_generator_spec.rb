@@ -1077,8 +1077,15 @@ describe InstallGenerator, type: :generator do
           include("Could not insert viewport meta into #{layout_path}: no title or csrf_meta_tags anchor found"),
           :yellow
         )
+      expect(base_generator).to have_received(:say_status)
+        .with(
+          :warning,
+          include("Could not insert csp_meta_tag into #{layout_path}: no csrf_meta_tags anchor found"),
+          :yellow
+        )
       assert_file layout_path do |content|
         expect(content).not_to include('<meta name="viewport" content="width=device-width,initial-scale=1">')
+        expect(content).not_to include("<%= csp_meta_tag %>")
         expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
       end
     end

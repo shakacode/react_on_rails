@@ -487,11 +487,20 @@ module ReactOnRails
           content = File.read(layout_full_path)
         end
 
+        csp_tag = "<%= csp_meta_tag %>"
         return if content.match?(/<%=\s*csp_meta_tag\s*%>/)
 
-        return unless (csrf_match = content.match(CSRF_META_TAG_PATTERN))
+        unless (csrf_match = content.match(CSRF_META_TAG_PATTERN))
+          say_status(
+            :warning,
+            "Could not insert csp_meta_tag into #{layout_path}: no csrf_meta_tags anchor found. " \
+            "Add #{csp_tag} manually.",
+            :yellow
+          )
+          return
+        end
 
-        insert_into_file(layout_path, %(#{csrf_match[:indent]}<%= csp_meta_tag %>\n), after: csrf_match[0])
+        insert_into_file(layout_path, %(#{csrf_match[:indent]}#{csp_tag}\n), after: csrf_match[0])
       end
 
       def warn_tailwind_layout_manual_step(layout_path, reason:)
