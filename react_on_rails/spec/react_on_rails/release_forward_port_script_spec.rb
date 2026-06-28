@@ -1307,6 +1307,27 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "checks out the target branch before completing acknowledged manual-only plans" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
+      write_file(repo, "CHANGELOG.md", "# Change Log\n\n### [1.0.1]\n- Final notes\n")
+      stable_bump_sha = commit_all(repo, "Bump version to 1.0.1")
+
+      git(repo, "checkout", "main")
+      git(repo, "checkout", "-b", "operator-notes")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--ack-manual", stable_bump_sha)
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("ACK-MANUAL #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).to include("Checking out main")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(git(repo, "rev-parse", "--abbrev-ref", "HEAD").strip).to eq("main")
+    end
+  end
+
   it "picks version bumps when the target prerelease label is unknown" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")

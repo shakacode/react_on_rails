@@ -85,7 +85,7 @@ class ReleaseForwardPort
       return 0
     end
 
-    return finish_no_action_plan(plan) unless actionable_plan?(plan)
+    return finish_no_action_plan(plan, target) unless actionable_plan?(plan)
 
     ensure_clean_worktree!
     checkout_target!(target)
@@ -102,8 +102,14 @@ class ReleaseForwardPort
 
   private
 
-  def finish_no_action_plan(plan)
-    acknowledged_manual_entries?(plan) ? ensure_clean_worktree! : ensure_no_cherry_pick_in_progress!
+  def finish_no_action_plan(plan, target)
+    if acknowledged_manual_entries?(plan)
+      ensure_clean_worktree!
+      checkout_target!(target)
+    else
+      ensure_no_cherry_pick_in_progress!
+    end
+
     puts "\nNothing to cherry-pick."
     0
   end
