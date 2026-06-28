@@ -3,6 +3,8 @@
 set -euo pipefail
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 ( cd react_on_rails && bundle exec rake lint )
-( cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion )
+if [ -d react_on_rails_pro ]; then
+  ( cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion )
+fi
 pnpm run lint
 pnpm start format.listDifferent

@@ -119,6 +119,19 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
     end
   end
 
+  def test_portable_contract_non_executable_script_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      FileUtils.chmod("-x", File.join(root, ".agents/bin/lint"))
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "agent workflow command script is not executable: .agents/bin/lint"
+    end
+  end
+
   def test_portable_contract_invalid_yaml_fails
     with_repo do |root|
       write_portable_contract(root)
