@@ -78,7 +78,8 @@ jobs:
       - name: Guard docs-only main pushes
         if: |
           (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-          github.event_name == 'merge_group'
+          (github.event_name == 'merge_group' &&
+           github.event.merge_group.base_ref == 'refs/heads/main')
         uses: ./.github/actions/ensure-main-docs-safety
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}

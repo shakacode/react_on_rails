@@ -265,7 +265,7 @@ async function checkPreviousMainCommitStatus({
           shouldTraceNoRunsParent
             ? 'No parent commit was found to inspect for an underlying CI state.'
             : 'Only merge_group SHAs outside the default branch history are traced through their first parent.',
-        ].join(' '),
+        ].join('\n'),
       );
       return;
     }
