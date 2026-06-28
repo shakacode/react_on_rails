@@ -49,6 +49,18 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
     end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
   end
 
+  it "rejects raw TypeScript expressions with unbalanced braces" do
+    described_class.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: { starts_at: { raw: "string } export type Injected = any" } }
+    )
+
+    expect do
+      described_class.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
+  end
+
   it "requires scalar aliases to use documented lowercase symbols" do
     described_class.define_response(
       "events.show",
@@ -85,6 +97,25 @@ RSpec.describe ReactOnRails::TypeScriptResponseTypes do
     expect do
       described_class.to_d_ts
     end.to raise_error(ReactOnRails::Error, /Unrecognized option key\(s\).*:nullablee/)
+  end
+
+  it "preserves plain object fields when wrapper-like keys are paired with regular field names" do
+    described_class.define_response(
+      "payload.show",
+      type_name: "PayloadShowResponse",
+      fields: {
+        event: { type: :string, source: :string }
+      }
+    )
+
+    expected_event_type = [
+      "  event: {",
+      "    type: string;",
+      "    source: string;",
+      "  };"
+    ].join("\n")
+
+    expect(described_class.to_d_ts).to include(expected_event_type)
   end
 
   it "omits keyed response helpers when no responses are registered" do
