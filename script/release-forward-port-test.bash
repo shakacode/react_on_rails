@@ -654,6 +654,108 @@ test_target_without_unreleased_errors_clearly() {
   assert_contains "$out" "has no ### [Unreleased] section" "missing unreleased error"
 }
 
+# A SOURCE with no prerelease sections (e.g. forward-porting from release/16.6.0,
+# a patch line) must NOT reach into the TARGET's RC base: a stray rc section on
+# main belonging to an unrelated line must be left untouched. The branch's own
+# [Unreleased] backport still re-homes. Regression for the target-RC-fallback bug.
+test_non_prerelease_source_does_not_touch_target_rc_section() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Fixed
+
+- **Main fix**: here. $(pr_link 100) by [a](https://github.com/a).
+
+### [17.0.0.rc.5] - 2026-06-16
+
+#### Added
+
+- **Stray rc5 on main**: belongs to the 17.0.0 line, not 16.6.0. $(pr_link 50) by [a](https://github.com/a).
+
+### [16.6.0] - 2026-04-09
+
+#### Added
+
+- **Old stable**: shipped. $(pr_link 1) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Fixed
+
+- **Backport on 16.6 branch**: no rc sections here. $(pr_link 900) by [a](https://github.com/a).
+
+### [16.6.0] - 2026-04-09
+
+#### Added
+
+- **Old stable**: shipped. $(pr_link 1) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md "release/16.6.0"
+
+  local out
+  out="$(run_changelog release/16.6.0)"
+  # The branch [Unreleased] backport is still re-homed ...
+  assert_contains "$out" "Backport on 16.6 branch" "backport re-homed"
+  # ... but the unrelated 17.0.0 RC section is NOT dropped.
+  assert_not_contains "$out" "RC-header sections to DROP" "no RC drop for non-prerelease source"
+
+  local changelog
+  changelog="$(cat CHANGELOG.md)"
+  assert_contains "$changelog" "### [17.0.0.rc.5]" "stray rc5 section preserved"
+  assert_contains "$changelog" "Stray rc5 on main" "stray rc5 entry preserved"
+  assert_contains "$changelog" "Backport on 16.6 branch" "backport written under unreleased"
+}
+
+# De-duplication keys on the entry's OWN PR (the "[PR NNNN](...) by [author]"
+# trailer), not on a PR it merely references. An entry that references PR 4227 but
+# is itself PR 4234 must dedupe against main's PR 4234, and must NOT dedupe against
+# a main entry that is PR 4227.
+test_dedupes_on_own_pr_trailer_not_referenced_pr() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Fixed
+
+- **Already on main as 4234**: main's copy. [PR 4234](https://github.com/shakacode/react_on_rails/pull/4234) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [17.0.0.rc.0] - 2026-05-30
+
+#### Fixed
+
+- **Branch copy of 4234**: references [PR 4227](https://github.com/shakacode/react_on_rails/pull/4227) but is itself [PR 4234](https://github.com/shakacode/react_on_rails/pull/4234) by [a](https://github.com/a).
+- **Genuinely new, references 4227**: follow-up to [PR 4227](https://github.com/shakacode/react_on_rails/pull/4227), itself [PR 4250](https://github.com/shakacode/react_on_rails/pull/4250) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md
+
+  local out
+  out="$(run_changelog)"
+  # The 4234 branch entry is deduped (own PR matches main's 4234) ...
+  assert_not_contains "$(cat CHANGELOG.md)" "Branch copy of 4234" "own-PR 4234 deduped"
+  # ... while the 4250 entry (which only REFERENCES 4227) is added, not deduped.
+  assert_contains "$(cat CHANGELOG.md)" "Genuinely new, references 4227" "referenced-PR not treated as own"
+  assert_contains "$out" "1 entry to add" "exactly one new entry"
+}
+
 # UTF-8 content (e.g. the ⚠️ breaking-change marker) must parse and round-trip
 # even when Ruby's default external encoding is US-ASCII (a C/POSIX-locale CI
 # runner). Regression for the "invalid byte sequence in US-ASCII" failure.
@@ -729,6 +831,8 @@ run_test test_multiline_entry_preserved
 run_test test_hash_shorthand_pr_reference_dedupes
 run_test test_empty_main_unreleased_receives_entries
 run_test test_target_without_unreleased_errors_clearly
+run_test test_non_prerelease_source_does_not_touch_target_rc_section
+run_test test_dedupes_on_own_pr_trailer_not_referenced_pr
 run_test test_utf8_changelog_parses_and_round_trips_under_ascii_locale
 run_test test_default_mode_unchanged_without_flag
 run_test test_missing_source_changelog_errors_clearly

@@ -972,6 +972,9 @@ class ReleaseForwardPort
     end
 
     apply_changelog_reconciliation(target, result)
+  rescue ChangelogReconciler::ReconcileError => e
+    # Map the reconciler's own error onto the shared GitError exit path.
+    raise GitError, e.message
   end
 
   def apply_changelog_reconciliation(target, result)
@@ -1266,14 +1269,25 @@ end
 # but is reimplemented self-contained here so this script has no rake dependency.
 # rubocop:disable Metrics/ClassLength
 class ChangelogReconciler
+  # Raised for changelog structures the reconciler cannot operate on (e.g. a target
+  # with no [Unreleased] section). Kept local so the reconciler does not depend on
+  # ReleaseForwardPort's error types; the caller maps it to the same exit status.
+  class ReconcileError < StandardError; end
+
   UNRELEASED = "Unreleased"
   DEFAULT_HEADING = "#### Changed"
   CHANGELOG_FILE = "CHANGELOG.md"
   SECTION_HEADER = /^### \[([^\]]+)\].*$/
   BLOCK_HEADING = /^####+\s+/
   PRERELEASE_SUFFIX = /\.(?:test|beta|alpha|rc|pre)(?:\.\d+)?\z/i
-  # A changelog entry cites its PR as a /pull/NNNN compare/issue link or as the
-  # "PR NNNN" / "#NNNN" shorthand. Any of these is enough to de-duplicate by PR.
+  # An entry's OWN PR is, by changelog convention, the "[PR NNNN](...) by [author]"
+  # trailer at the end. Many entries also reference OTHER PRs mid-text ("Follow-up
+  # to [PR 4227]... [PR 4234] by [author]"), so this trailer anchor is matched first
+  # to avoid de-duplicating on a referenced PR instead of the entry's own.
+  PR_TRAILER_PATTERN = /\[PR\s*#?(\d+)\]\([^)]*\)\s*by\b/i
+  # Fallbacks when there is no "... by [author]" trailer: a /pull/NNNN link, the
+  # "PR NNNN" / "#NNNN" shorthand. The LAST occurrence wins, since the entry's own
+  # PR conventionally comes after any PRs it references.
   PR_REFERENCE_PATTERNS = [
     %r{/pull/(\d+)\b},
     /\bPR\s*\[?#?(\d+)\b/i,
@@ -1307,7 +1321,7 @@ class ChangelogReconciler
     target = parse_sections(@target_changelog)
     source = parse_sections(@source_changelog)
 
-    base_version = release_base_version(source, target)
+    base_version = source_release_base_version(source)
     removed_sections = stray_rc_sections(target, base_version)
 
     target_entries = section_entries(find_unreleased(target))
@@ -1387,7 +1401,7 @@ class ChangelogReconciler
   def rebuild_changelog(target, entries, removed_sections)
     sections = target[:sections].reject { |section| removed_sections.include?(section) }
     unreleased = sections.find { |section| section[:version] == UNRELEASED }
-    raise ReleaseForwardPort::GitError, "target #{CHANGELOG_FILE} has no ### [#{UNRELEASED}] section" unless unreleased
+    raise ReconcileError, "target #{CHANGELOG_FILE} has no ### [#{UNRELEASED}] section" unless unreleased
 
     unreleased = unreleased.dup
     unreleased[:body] = render_unreleased_body(entries)
@@ -1426,9 +1440,14 @@ class ChangelogReconciler
   end
 
   def collect_pr_number(text)
+    trailer = text.scan(PR_TRAILER_PATTERN).last
+    return trailer.first.to_i if trailer
+
+    # No "... by [author]" trailer: take the last match of the first pattern that
+    # matches at all (last-ref-wins).
     PR_REFERENCE_PATTERNS.each do |pattern|
-      match = text.match(pattern)
-      return match[1].to_i if match
+      last = text.scan(pattern).last
+      return last.first.to_i if last
     end
     nil
   end
@@ -1437,8 +1456,14 @@ class ChangelogReconciler
     text.to_s.gsub(/\s+/, " ").strip
   end
 
-  def release_base_version(source, target)
-    highest_prerelease_base(source) || highest_prerelease_base(target)
+  # The active release line is defined by the SOURCE branch's prerelease sections.
+  # We must NOT fall back to the target's RC base: if the source has no prerelease
+  # sections, there is nothing to re-home and no basis to claim a target RC section
+  # belongs to this line, so the run is a clean no-op (handled by the empty-base
+  # guards in prerelease_sections / stray_rc_sections). Forward-porting from a
+  # non-prerelease ref such as release/16.6.0 must not reach into main's RC base.
+  def source_release_base_version(source)
+    highest_prerelease_base(source)
   end
 
   def highest_prerelease_base(parsed)
@@ -1447,23 +1472,26 @@ class ChangelogReconciler
 
       section[:version].sub(PRERELEASE_SUFFIX, "")
     end.uniq
+    highest_version(bases)
+  end
+
+  # Order version strings, tolerating a malformed base that Gem::Version rejects
+  # (only the parse is rescued, not the surrounding section scan).
+  def highest_version(bases)
     bases.max_by { |base| Gem::Version.new(base) }
   rescue ArgumentError
     bases.max
   end
 
-  # Sections on the TARGET that a cherry-pick introduced: any prerelease-headed
-  # section whose base matches the active release line. These are the residue the
+  # Sections on the TARGET that a cherry-pick introduced: prerelease-headed
+  # sections whose base matches the active release line. These are the residue the
   # reconciliation must drop so entries live only under [Unreleased] on main.
   def stray_rc_sections(target, base_version)
-    return [] unless base_version
-
-    target[:sections].select do |section|
-      section[:version].match?(PRERELEASE_SUFFIX) &&
-        section[:version].sub(PRERELEASE_SUFFIX, "") == base_version
-    end
+    prerelease_sections(target, base_version)
   end
 
+  # Prerelease (rc.N / beta.N / ...) sections in `parsed` whose base equals
+  # base_version. Empty base (source had no prerelease sections) selects nothing.
   def prerelease_sections(parsed, base_version)
     return [] unless base_version
 
