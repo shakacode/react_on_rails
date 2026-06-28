@@ -94,13 +94,14 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_use_fallback_exec_js` is true.
   config.renderer_use_fallback_exec_js = false
 
-  # Maximum number of concurrent HTTP/2 streams to the Node renderer per persistent client.
-  # When a Fiber.scheduler is present — which is the case for streaming SSR/RSC, since the
-  # streaming helper runs inside a `Sync {}` block — the async-http client is reused across
-  # requests within that scheduler (persistent connection / keep-alive, issue #3283), so this
-  # limit is effective and bounds how many renders multiplex over the pooled connection(s).
-  # Without a scheduler (non-streaming paths), a client is created per request and this limit
-  # applies to that single request. See "Renderer performance tuning for streamed RSC" below.
+  # Maximum number of concurrent HTTP/2 streams to the Node renderer per async-http client.
+  # When a Fiber.scheduler already exists before the renderer request enters `Sync {}`, the
+  # client is reused across requests within that long-lived scheduler (persistent connection /
+  # keep-alive, issue #3283), so this limit bounds multiplexed renders on the pooled client.
+  # Under standard Puma streaming, `Sync {}` creates a per-request scheduler and the client is
+  # cleaned up when that response ends; the limit still applies within the streaming request.
+  # Without a scheduler (non-streaming paths), a client is created per request. See
+  # "Renderer performance tuning for streamed RSC" below.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
 
@@ -177,7 +178,7 @@ end
 
 ## Renderer Performance Tuning for Streamed RSC
 
-The dominant contributors to a streamed route's `responseEnd` tail are Node renderer round-trip overhead, cold or under-warmed renderer workers, and per-request connection setup between Rails and the renderer. Three levers address these (see [issue #4240](https://github.com/shakacode/react_on_rails/issues/4240)). To measure the effect of each, enable the streamed RSC `Server-Timing` attribution described in the [Streaming SSR guide](../../pro/streaming-ssr.md) and watch the `ror_renderer_prepare` and `ror_stream_shell` metrics before/after.
+The dominant contributors to a streamed route's `responseEnd` tail are Node renderer round-trip overhead, cold or under-warmed renderer workers, and per-request connection setup between Rails and the renderer. Three levers address these (see [issue #4240](https://github.com/shakacode/react_on_rails/issues/4240)). Measure changes with before/after page-load timing for the streamed route, the inline RSC stream performance marks described in the [Streaming SSR guide](../../pro/streaming-ssr.md), and renderer logs or tracing for cold-worker behavior. Streamed responses do not use `Server-Timing` headers because `ActionController::Live` commits headers on the first stream write.
 
 ### 1. Warm up renderer workers
 
@@ -205,11 +206,13 @@ Guidance:
 
 ### 3. Rails ↔ renderer keep-alive (already on for streaming)
 
-Connection reuse is automatic on the streaming path. The streaming helper runs inside a `Sync {}` block, so a `Fiber.scheduler` is present and the async-http client is **reused across requests** within that scheduler — an HTTP/2 connection is kept alive and renders multiplex over it instead of paying TCP/TLS setup per request (issue #3283). No configuration is required to enable this.
+Connection reuse is automatic when the renderer request runs under a long-lived `Fiber.scheduler`, such as Falcon or Puma configured with an async scheduler. In that setup, the async-http client is stored on the scheduler and reused across streaming requests, so HTTP/2 connections stay alive and renders multiplex over them instead of paying TCP/TLS setup per request (issue #3283). No React on Rails configuration is required to enable this.
+
+Under standard Puma, the streaming helper's `Sync {}` block creates a per-request scheduler. The async-http client is cleaned up when that streaming response ends, so connection reuse does not persist across consecutive Rails requests. The benefit is still meaningful inside a single streamed response: renderer calls in that response can share the same client lifecycle and `renderer_http_pool_size` still bounds concurrent HTTP/2 streams.
 
 `config.renderer_http_keep_alive_timeout` is **deprecated** and ignored: the async-http adapter manages connection lifecycle automatically (connections are reused within the scheduler and cleaned up when it ends). Setting it only logs a deprecation warning.
 
-To confirm reuse, watch for the absence of repeated connection-setup cost in the `ror_renderer_prepare` Server-Timing metric across consecutive streamed requests, or trace the renderer connection at the socket level.
+To confirm reuse, compare before/after `responseEnd` timing and streamed RSC performance marks, and trace renderer sockets when you need to distinguish long-lived scheduler reuse from standard Puma's per-request scheduler cleanup.
 
 ## Need Help?
 

@@ -392,22 +392,22 @@ Before upgrading:
   read timeout on each renderer socket. It no longer wraps the entire request as a single task-level timeout.
 - Treat `config.renderer_http_pool_timeout` as the TCP connect timeout. After the socket connects, individual reads
   are bounded by `ssr_timeout`.
-- Treat `config.renderer_http_pool_size` as a per-request HTTP/2 stream limit, not as a persistent process-wide
-  connection pool size. The current async-http adapter opens a request-scoped client for each renderer request and
-  does not reuse TCP connections between Rails requests, so high-latency networks or very high request rates can see
-  extra connection and HTTP/2 handshake overhead compared with HTTPX. Setting this value now emits a warning to make
-  the changed meaning visible during upgrades. Setting it to `nil` keeps the default stream limit; it does not make
-  the request-scoped async-http client unlimited. Persistent async-http connection reuse is tracked in
-  [Issue 3283](https://github.com/shakacode/react_on_rails/issues/3283).
+- Treat `config.renderer_http_pool_size` as an HTTP/2 stream limit on the async-http client, not as a
+  process-wide renderer connection count. With a long-lived `Fiber.scheduler` (for example Falcon or Puma configured
+  with an async scheduler), the client is reused across renderer requests within that scheduler and the setting bounds
+  multiplexed renders on the pooled client. Under standard Puma streaming, `Sync {}` creates a per-request scheduler
+  and cleans up the client when that streaming response ends, so reuse does not persist across consecutive Rails
+  requests. Setting it to `nil` keeps the default stream limit; it does not make the async-http client unlimited.
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
-- Run the node renderer client from the normal synchronous Rails request path. Async Rails servers or middleware that
-  call the renderer from inside an existing Async reactor without an `Async::Task.current?` context are not currently
-  supported because the sync fallback may create a nested reactor. Keep Falcon/async-rails deployments on the previous
-  HTTPX renderer client until this support is explicitly added.
+- Run the node renderer client from the normal Rails request path. Async Rails servers or middleware should call the
+  renderer from inside the request's running scheduler/task context so the async-http client can use scheduler-scoped
+  connection reuse. Avoid invoking renderer requests from a scheduler-only context that lacks an `Async::Task.current?`
+  task; that path may still fall back to a nested reactor.
 - `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
-  async-http clients are currently scoped to individual requests. Setting it now emits a deprecation warning.
+  async-http manages connection lifecycle through its scheduler-scoped clients and ephemeral request clients. Setting
+  it now emits a deprecation warning.
 
 #### Upgrading to 16.4.0 or later
 
