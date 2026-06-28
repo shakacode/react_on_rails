@@ -989,6 +989,64 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "adds the generated viewport tag when only the default title was customized" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Custom app</title>
+            <%= csrf_meta_tags %>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        viewport_index = content.index('<meta name="viewport" content="width=device-width,initial-scale=1">')
+        csrf_index = content.index("<%= csrf_meta_tags %>")
+
+        expect(viewport_index).to be < csrf_index
+        expect(content).to include("<%= csp_meta_tag %>")
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+      end
+    end
+
+    it "updates the generated default layout when helper indentation differs" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>React on Rails</title>
+            <%= csrf_meta_tags %>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+        \t<%= stylesheet_pack_tag %>
+              <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+        expect(content).to include("<%= javascript_pack_tag %>")
+        expect(content).not_to include("<!-- Empty pack tags")
+      end
+    end
+
     it "does not update the recognizable generated default layout in --pretend mode" do
       original_layout = <<~ERB
         <!DOCTYPE html>
@@ -1083,6 +1141,37 @@ describe InstallGenerator, type: :generator do
         <html>
           <head>
             <!--
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+            -->
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("Replace the existing React on Rails pack-tag block"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind pack tags inside HTML comments that contain double dashes" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!-- disabled -- historical Tailwind block
             <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
             <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
             <%= javascript_pack_tag %>

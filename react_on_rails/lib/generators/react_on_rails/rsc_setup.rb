@@ -34,6 +34,14 @@ module ReactOnRails
       RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
       RSC_GENERATED_LAYOUT_NAME_PATTERN = /\Areact_on_rails_rsc(?:_(?:[2-9]|[1-9]\d+))?\z/
       MAX_LAYOUT_NAME_ATTEMPTS = 99
+      TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN = /
+        ^[ \t]*<%\s*prepend_javascript_pack_tag(?:\s|\()
+        \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
+        [ \t]*<%=\s*stylesheet_pack_tag(?:\s|\()
+        \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
+        [ \t]*<%=\s*javascript_pack_tag(?:\s|\(|%>)
+      /x
+      HTML_COMMENT_PATTERN = /<!--(?:[^-]|-(?!-)|--(?!>))*-->/m
 
       # Main entry point for RSC setup.
       # Orchestrates creation of all RSC-related files and configuration.
@@ -231,6 +239,7 @@ module ReactOnRails
         controller_path = "app/controllers/hello_server_controller.rb"
 
         if File.exist?(File.join(destination_root, controller_path))
+          warn_existing_hello_server_tailwind_layout(controller_path)
           say "ℹ️  HelloServerController already exists, skipping", :yellow
           return
         end
@@ -267,6 +276,58 @@ module ReactOnRails
                  ))
 
         say "✅ Created #{view_path}", :green
+      end
+
+      def warn_existing_hello_server_tailwind_layout(controller_path)
+        return unless use_tailwind?
+        return if hello_server_controller_uses_tailwind_layout?(controller_path)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  HelloServerController already exists and may not use the Tailwind-aware React on Rails layout.
+
+          Ensure #{controller_path} uses a layout that includes:
+            <% prepend_javascript_pack_tag "#{tailwind_pack_name}" %>
+            <%= stylesheet_pack_tag "#{tailwind_pack_name}", media: "all" %>
+            <%= javascript_pack_tag %>
+        MSG
+      end
+
+      def hello_server_controller_uses_tailwind_layout?(controller_path)
+        controller_full_path = File.join(destination_root, controller_path)
+        layout_name = extract_declared_layout_name(File.read(controller_full_path))
+
+        layout_name && layout_file_links_tailwind_pack?(layout_name)
+      end
+
+      def layout_file_links_tailwind_pack?(layout_name)
+        layout_path = layout_destination_path(layout_name)
+        layout_full_path = File.join(destination_root, layout_path)
+
+        return false unless File.exist?(layout_full_path)
+
+        layout_links_tailwind_pack?(File.read(layout_full_path))
+      end
+
+      def layout_links_tailwind_pack?(layout_content)
+        comment_ranges = html_comment_ranges(layout_content)
+
+        layout_content.to_enum(:scan, TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN).any? do
+          helper_match = Regexp.last_match
+
+          !range_overlaps_any?(helper_match.begin(0)...helper_match.end(0), comment_ranges)
+        end
+      end
+
+      def html_comment_ranges(content)
+        content.to_enum(:scan, HTML_COMMENT_PATTERN).map do
+          comment_match = Regexp.last_match
+
+          comment_match.begin(0)...comment_match.end(0)
+        end
+      end
+
+      def range_overlaps_any?(range, ranges)
+        ranges.any? { |candidate| range.begin < candidate.end && candidate.begin < range.end }
       end
 
       def add_rsc_routes

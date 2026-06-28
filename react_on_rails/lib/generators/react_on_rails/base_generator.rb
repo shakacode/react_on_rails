@@ -143,8 +143,8 @@ module ReactOnRails
       DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN = %r{
         (?<indent>^[ \t]*)
         <!--\s*Empty\ pack\ tags\ -\ React\ on\ Rails\ injects\ component\ CSS/JS\ here\s*-->\r?\n
-        \k<indent><%=\s*stylesheet_pack_tag\s*%>\r?\n
-        \k<indent><%=\s*javascript_pack_tag\s*%>
+        [ \t]*<%=\s*stylesheet_pack_tag\s*%>\r?\n
+        [ \t]*<%=\s*javascript_pack_tag\s*%>
       }x
       TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN = /
         ^[ \t]*<%\s*prepend_javascript_pack_tag(?:\s|\()
@@ -153,11 +153,12 @@ module ReactOnRails
         \s*["']react_on_rails_tailwind["'][^\n]*%>\r?\n
         [ \t]*<%=\s*javascript_pack_tag(?:\s|\(|%>)
       /x
-      HTML_COMMENT_PATTERN = /<!--.*?-->/m
+      HTML_COMMENT_PATTERN = /<!--(?:[^-]|-(?!-)|--(?!>))*-->/m
+      CSRF_META_TAG_PATTERN = /^(?<indent>[ \t]*)<%=\s*csrf_meta_tags\s*%>\r?\n/
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED, :REACT_ON_RAILS_DEFAULT_LAYOUT_PATH,
                        :TAILWIND_LAYOUT_HELPER_LINES, :DEFAULT_LAYOUT_EMPTY_PACK_HELPERS_PATTERN,
-                       :TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN, :HTML_COMMENT_PATTERN
+                       :TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN, :HTML_COMMENT_PATTERN, :CSRF_META_TAG_PATTERN
 
       def add_root_route
         return unless options.new_app?
@@ -466,19 +467,29 @@ module ReactOnRails
         layout_full_path = File.join(destination_root, layout_path)
         content = File.read(layout_full_path)
         title_match = content.match(%r{^(?<indent>[ \t]*)<title>React on Rails</title>\r?\n})
+        csrf_match = content.match(CSRF_META_TAG_PATTERN)
 
-        if !content.match?(/<meta\s+name=["']viewport["']/) && title_match
-          insert_into_file(
-            layout_path,
-            %(#{title_match[:indent]}<meta name="viewport" content="width=device-width,initial-scale=1">\n),
-            after: title_match[0]
-          )
+        unless content.match?(/<meta\s+name=["']viewport["']/)
+          if title_match
+            insert_into_file(
+              layout_path,
+              %(#{title_match[:indent]}<meta name="viewport" content="width=device-width,initial-scale=1">\n),
+              after: title_match[0]
+            )
+          elsif csrf_match
+            insert_into_file(
+              layout_path,
+              %(#{csrf_match[:indent]}<meta name="viewport" content="width=device-width,initial-scale=1">\n),
+              before: csrf_match[0]
+            )
+          end
+
           content = File.read(layout_full_path)
         end
 
         return if content.match?(/<%=\s*csp_meta_tag\s*%>/)
 
-        return unless (csrf_match = content.match(/^(?<indent>[ \t]*)<%=\s*csrf_meta_tags\s*%>\r?\n/))
+        return unless (csrf_match = content.match(CSRF_META_TAG_PATTERN))
 
         insert_into_file(layout_path, %(#{csrf_match[:indent]}<%= csp_meta_tag %>\n), after: csrf_match[0])
       end
