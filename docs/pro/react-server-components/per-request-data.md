@@ -370,7 +370,7 @@ export default function Breadcrumbs({ railsContext }) {
 
 Top-level components registered with `registerServerComponent` can also be render functions. React on Rails calls those functions with `(props, railsContext)` during RSC rendering, so a page-level entry can pass selected Rails context values into a request-local store seeder before the rest of the Server Component tree reads them. This only applies to the registered render-function entry path; if you render the entry as an ordinary component elsewhere, `railsContext` is not provided and those values should come through explicit props instead.
 
-This is the RSC-safe replacement for layout helpers that write Rails request data into module-level refs:
+This is the RSC-safe replacement for layout helpers that write Rails request data into module-level refs. It applies the [Seed Once, Read Anywhere](#pattern-seed-once-read-anywhere) pattern scoped to layout context:
 
 ```jsx
 // lib/layoutRequestStore.js
@@ -413,8 +413,10 @@ export default function ProductPage(props, railsContext) {
     locale: railsContext.i18nLocale,
     pathname: railsContext.pathname,
     publicEnv: {
-      assetHost: railsContext.assetHost,
-      analyticsPublicKey: railsContext.analyticsPublicKey,
+      host: railsContext.host,
+      href: railsContext.href,
+      // Add app-specific public fields via rendering_extension.custom_context
+      // on the Rails side.
     },
   };
 
@@ -437,14 +439,14 @@ import { getLayoutRequestStore } from '../lib/layoutRequestStore';
 export default function DeepServerComponent() {
   const { locale, publicEnv } = getLayoutRequestStore();
   if (!publicEnv) {
-    throw new Error('DeepServerComponent must render inside LayoutRequestStoreSeeder');
+    throw new Error('seedLayoutRequestStore must be called above this component in the render tree');
   }
 
-  return <span data-locale={locale}>{publicEnv.assetHost}</span>;
+  return <span data-locale={locale}>{publicEnv.host}</span>;
 }
 ```
 
-Seed in a Server Component that renders above every reader. The two-argument entry function is useful for selecting values from `railsContext`, but the `React.cache()` call should happen while React is rendering the seeder component. Keep the stored values immutable after seeding; if a reader might run outside that entry, pass the needed value as a prop instead.
+Seed in a Server Component that renders above every reader. The two-argument entry function is useful for selecting values from `railsContext`, but the invocation of `_getLayoutRequestStore()` and the seeding should happen while React is rendering the seeder component. Keep the `cache(() => ({}))` definition at module level, keep the stored values immutable after seeding, and pass needed values as props if a reader might run outside that entry.
 
 ### Concurrency model
 
