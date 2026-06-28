@@ -50,6 +50,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **RSC Rspack doctor no longer false-warns on equivalent `lazyCompilation` configs**:
+  `react_on_rails:doctor:rsc` only recognizes the generated literal
+  `clientWebpackConfig.lazyCompilation = false` assignment. Apps that disable lazy
+  compilation an equivalent way (object form, `Object.assign`, a helper, a ternary,
+  or a different config file) now get a warning that says doctor could not _confirm_
+  the setting rather than asserting lazy compilation is still enabled, plus guidance
+  to confirm the effective dev-server config and ignore the warning if it is already
+  disabled. Follow-up to
+  [PR 4234](https://github.com/shakacode/react_on_rails/pull/4234).
+  [PR 4249](https://github.com/shakacode/react_on_rails/pull/4249) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Rspack RSC dev-server setup is easier to diagnose and customize**:
   Generated RSC helper code now verifies client-reference discovery support
   through the sibling `rscWebpackConfig.js` file instead of assuming

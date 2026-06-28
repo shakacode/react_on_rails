@@ -77,6 +77,7 @@ PRO_DUMMY_CHANGED=false
 PRO_NODE_RENDERER_CHANGED=false
 UNCATEGORIZED_CHANGED=false
 CI_INFRA_CHANGED=false
+RELEASE_TOOLING_CHANGED=false
 SOURCE_COMMENT_ONLY_CHANGED=false
 PRO_SOURCE_COMMENT_ONLY_CHANGED=false
 # Benchmark relevance, tracked separately from the test-selection flags above.
@@ -464,6 +465,38 @@ while IFS= read -r file; do
       PRO_LINT_CONFIG_CHANGED=true
       ;;
 
+    # Release tooling (rake release tasks + their helper scripts). The ONLY
+    # automated coverage for these paths is the release rspec suite
+    # (react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb and
+    # release_forward_port_script_spec.rb), so route them to RSPEC_CHANGED (runs
+    # those specs) plus RELEASE_TOOLING_CHANGED (runs rubocop) rather than the
+    # CI-infrastructure arm below. That arm's catch-all-equivalent behavior set
+    # RUN_GENERATORS=true, which makes required-pr-gate force the full hosted
+    # matrix (Generator/Playwright/Integration/JS) — none of which exercise
+    # release tooling (see script/ci-required-hosted-gate). This arm is
+    # deliberately NOT generator-/JS-sensitive: it sets no GENERATORS_CHANGED or
+    # JS_CHANGED, so run_generators / run_js_tests stay false and hosted CI is
+    # optional rather than gate-forced. RELEASE_TOOLING_CHANGED only drives
+    # RUN_LINT (release tooling is Ruby/Bash that rubocop covers); it is kept
+    # separate from RSPEC_CHANGED so the lint trigger does not leak to unrelated
+    # core/Pro spec-only changes. It must precede the script/* CI-infra arm
+    # (which would otherwise swallow script/release-*) and follow the more
+    # specific source/spec arms above. Sets no BENCH_* flag: release tooling is
+    # never shipped in the gem and cannot move runtime performance.
+    # NOTE: the bare `script/release` stub (a 3-line `echo "See rake -D release"`)
+    # is intentionally NOT listed here — it has no release-spec coverage, so it
+    # stays in the script/* CI-infra arm below rather than claiming a test suite
+    # that does not exercise it.
+    rakelib/release.rake|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
+      DOCS_ONLY=false
+      if source_file_comment_only_change "$file"; then
+        SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        RSPEC_CHANGED=true
+        RELEASE_TOOLING_CHANGED=true
+      fi
+      ;;
+
     # CI infrastructure files (scripts, workflows, CI configs).
     # These change HOW the suite runs but never the gem/package runtime, so they
     # trigger the full TEST suite to validate the change (see the CI_INFRA_CHANGED
@@ -631,6 +664,14 @@ fi
 # only need lint here. The benchmarks_changed output drives the benchmark
 # workflow's script-validation step.
 if [ "$BENCHMARKS_CHANGED" = true ]; then
+  RUN_LINT=true
+fi
+
+# Release tooling (rakelib/release.rake + script/release-* helpers) is Ruby/Bash
+# that rubocop lints. Its release-spec coverage already rides RSPEC_CHANGED into
+# RUN_RUBY_TESTS above; this adds the lint job without re-introducing the
+# generator/JS sensitivity that would force the full hosted matrix.
+if [ "$RELEASE_TOOLING_CHANGED" = true ]; then
   RUN_LINT=true
 fi
 
