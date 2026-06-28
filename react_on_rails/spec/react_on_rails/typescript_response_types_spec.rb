@@ -161,6 +161,17 @@ module ReactOnRails
       ].join("\n")
 
       expect(described_class.to_d_ts).to include(expected_payload_type)
+
+      described_class.reset!
+      described_class.define_response(
+        "payload.show",
+        type_name: "PayloadShowResponse",
+        fields: { payload: { array: :string, fields: :json } }
+      )
+
+      expect do
+        described_class.to_d_ts
+      end.to raise_error(ReactOnRails::Error, /only use one of :array, :fields, or :type/)
     end
 
     it "preserves nullable array member wrappers" do
@@ -194,21 +205,11 @@ module ReactOnRails
     end
 
     it "rejects names that would collide with TypeScript or generated declarations" do
-      expect do
-        described_class.define_type("string", fields: {})
-      end.to raise_error(ReactOnRails::Error, /valid identifier/)
-
-      expect do
-        described_class.define_type("default", fields: {})
-      end.to raise_error(ReactOnRails::Error, /valid identifier/)
-
-      expect do
-        described_class.define_type("await", fields: {})
-      end.to raise_error(ReactOnRails::Error, /valid identifier/)
-
-      expect do
-        described_class.define_type("JsonValue", fields: {})
-      end.to raise_error(ReactOnRails::Error, /valid identifier/)
+      %w[string default await type readonly JsonValue].each do |type_name|
+        expect do
+          described_class.define_type(type_name, fields: {})
+        end.to raise_error(ReactOnRails::Error, /valid identifier/)
+      end
     end
   end
 end
