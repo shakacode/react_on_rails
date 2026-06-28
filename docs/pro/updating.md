@@ -392,12 +392,13 @@ Before upgrading:
   read timeout on each renderer socket. It no longer wraps the entire request as a single task-level timeout.
 - Treat `config.renderer_http_pool_timeout` as the TCP connect timeout. After the socket connects, individual reads
   are bounded by `ssr_timeout`.
-- Treat `config.renderer_http_pool_size` as the TCP connection-pool limit for the async-http client, not as an HTTP/2
-  stream limit. With a long-lived `Fiber.scheduler` (for example Falcon or Puma configured with an async scheduler),
-  the client is reused across renderer requests within that scheduler and the setting bounds pooled connections to the
-  renderer. Under standard Puma streaming, `Sync {}` creates a per-request scheduler and cleans up the client when that
-  streaming response ends, so reuse does not persist across consecutive Rails requests. Setting it to `nil` keeps the
-  default pool limit; it does not make the async-http client unlimited.
+- Treat `config.renderer_http_pool_size` as the concurrent HTTP/2 stream limit per async-http client, not as a TCP
+  connection-pool limit. With a long-lived `Fiber.scheduler` (for example Falcon or Puma configured with an async
+  scheduler), the client is reused across renderer requests within that scheduler and the setting bounds concurrent
+  streamed renders sharing one client. HTTP/2 may multiplex those streams over fewer TCP connections. Under standard
+  Puma streaming, `Sync {}` creates a per-request scheduler and cleans up the client when that streaming response ends,
+  so reuse does not persist across consecutive Rails requests. Setting it to `nil` keeps the default stream limit; it
+  does not make the async-http client unlimited.
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
@@ -407,8 +408,9 @@ Before upgrading:
   renderer from a scheduler with a deliberate request or service lifecycle; a custom scheduler-only context can keep
   renderer clients alive longer than intended.
 - `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
-  async-http manages connection lifecycle through its scheduler-scoped clients and ephemeral request clients. Setting
-  it to a non-`nil` value emits a deprecation warning; `nil` is accepted silently.
+  async-http manages connection lifecycle through its scheduler-scoped clients and ephemeral request clients. Explicitly
+  setting it to a non-`nil` value in your `configure` block emits a deprecation warning; leaving it unset or setting it
+  to `nil` is accepted silently.
 
 #### Upgrading to 16.4.0 or later
 
