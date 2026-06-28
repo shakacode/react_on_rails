@@ -12,6 +12,8 @@ hand-written interfaces that drift.
 
 This first supported path is an explicit Rails contract. Define the contract next to the serializer,
 query object, or controller that owns the JSON shape, then run a rake task to emit TypeScript.
+The task loads the Rails environment and eager loads app code before generating declarations so contracts
+registered from app classes are available.
 
 ## Define Response Contracts
 
@@ -139,6 +141,8 @@ controller/action-style name such as `projects.index` so later route changes do 
 | `{ fields: { id: :number } }`        | `{ id: number; }`                 |
 | `{ type: :string, optional: true }`   | `field?: string`                  |
 | `{ type: :string, nullable: true }`   | `field: string \| null`           |
+
+Use symbols for built-in scalar aliases and strings for named TypeScript contract references.
 
 When an object field itself has a property named `type`, wrap it in `fields:` so the contract is
 unambiguous:

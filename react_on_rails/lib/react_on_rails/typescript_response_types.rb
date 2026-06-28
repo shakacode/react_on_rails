@@ -224,7 +224,7 @@ module ReactOnRails
       end
 
       def render_named_type(name)
-        scalar_type = SCALAR_TYPES[name.to_s.downcase.to_sym]
+        scalar_type = SCALAR_TYPES[name.to_s.downcase.to_sym] if name.is_a?(Symbol)
         return scalar_type if scalar_type
 
         type_name = name.to_s

@@ -6,6 +6,7 @@ namespace :react_on_rails do
   desc "Generate TypeScript declarations for registered Rails JSON response contracts"
   task generate_response_types: :environment do
     output_path = ENV.fetch("REACT_ON_RAILS_RESPONSE_TYPES_OUT", nil)
+    Rails.application.eager_load!
     generated_path = ReactOnRails::TypeScriptResponseTypes.generate(output_path:)
 
     puts "Generated React on Rails response types in #{generated_path}"

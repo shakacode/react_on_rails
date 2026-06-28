@@ -81,6 +81,21 @@ module ReactOnRails
       end
     end
 
+    it "treats symbols as scalar aliases and strings as custom type references" do
+      described_class.define_type("ApiDate", fields: { iso8601: :string })
+      described_class.define_response(
+        "events.show",
+        type_name: "EventsShowResponse",
+        fields: {
+          starts_at: "ApiDate",
+          created_on: :date
+        }
+      )
+
+      expect(described_class.to_d_ts).to include("starts_at: ApiDate;")
+      expect(described_class.to_d_ts).to include("created_on: string;")
+    end
+
     it "rejects duplicate response keys" do
       described_class.define_response("projects.index", type_name: "ProjectsIndexResponse", fields: {})
 
