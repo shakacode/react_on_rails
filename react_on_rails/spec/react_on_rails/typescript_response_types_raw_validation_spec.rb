@@ -29,6 +29,7 @@ RSpec.describe "TypeScript response type raw validation" do
       type_name: "EventsShowResponse",
       fields: {
         starts_at: { raw: "Date" },
+        callback_url: { raw: "'https://example.com/events'" },
         metadata: { raw: "Record<string, { value: number, label: string }>", optional: true }
       }
     )
@@ -36,6 +37,7 @@ RSpec.describe "TypeScript response type raw validation" do
     declaration = response_types.to_d_ts
 
     expect(declaration).to include("  starts_at: Date;")
+    expect(declaration).to include("  callback_url: 'https://example.com/events';")
     expect(declaration).to include("  metadata?: Record<string, { value: number, label: string }>;")
   end
 
@@ -122,6 +124,18 @@ RSpec.describe "TypeScript response type raw validation" do
     end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
   end
 
+  it "rejects raw TypeScript expressions with bare closing generic brackets inside other groups" do
+    response_types.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: { starts_at: { raw: "(A > B)" } }
+    )
+
+    expect do
+      response_types.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
+  end
+
   it "requires scalar aliases to use documented lowercase symbols" do
     response_types.define_response(
       "events.show",
@@ -181,6 +195,7 @@ RSpec.describe "TypeScript response type raw validation" do
       fields: {
         formatter: { raw: "(value: Project) => string", nullable: true },
         label: { raw: "Project extends { id: number } ? string : number", nullable: true },
+        compact_label: { raw: "Project extends { id: number }?string:number", nullable: true },
         labels: { array: { raw: "Project extends { id: number } ? string : number", nullable: true } }
       }
     )
@@ -189,7 +204,22 @@ RSpec.describe "TypeScript response type raw validation" do
 
     expect(declaration).to include("  formatter: ((value: Project) => string) | null;")
     expect(declaration).to include("  label: (Project extends { id: number } ? string : number) | null;")
+    expect(declaration).to include("  compact_label: (Project extends { id: number }?string:number) | null;")
     expect(declaration).to include("  labels: ((Project extends { id: number } ? string : number) | null)[];")
+  end
+
+  it "reports modifier-only specs with a targeted wrapper error" do
+    response_types.define_response(
+      "payload.show",
+      type_name: "PayloadShowResponse",
+      fields: {
+        value: { nullable: true }
+      }
+    )
+
+    expect do
+      response_types.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /Modifier-only response type spec.*:type, :array, :fields, or :raw/)
   end
 
   it "reports unknown option keys on wrapper-looking specs" do

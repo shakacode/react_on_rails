@@ -4,6 +4,7 @@ require "fileutils"
 require "json"
 require "pathname"
 require "react_on_rails/error"
+require "tempfile"
 
 module ReactOnRails
   module TypeScriptResponseTypes
@@ -13,8 +14,10 @@ module ReactOnRails
     OPTION_KEYS = %i[array fields nullable optional raw type].freeze
     RAW_TYPE_GROUP_CLOSES = { "(" => ")", "[" => "]", "{" => "}", "<" => ">" }.freeze
     RAW_TYPE_GROUP_ENDS = RAW_TYPE_GROUP_CLOSES.values.freeze
-    RAW_TYPE_NESTING_TOKEN_PATTERN = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`|=>|[({\[<]|[)}\]>]|,/
-    RAW_TYPE_UNSAFE_PATTERN = %r{[\r\n\u2028\u2029;]|//|/\*|\*/}
+    RAW_TYPE_STRING_LITERAL_PATTERN = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/
+    RAW_TYPE_NESTING_TOKEN_PATTERN = /#{RAW_TYPE_STRING_LITERAL_PATTERN.source}|=>|[({\[<]|[)}\]>]|,/
+    RAW_TYPE_UNSAFE_LINE_BREAK_PATTERN = /[\r\n\u2028\u2029]/
+    RAW_TYPE_UNSAFE_NON_STRING_PATTERN = %r{;|//|/\*|\*/}
     REGISTRY_MUTEX = Mutex.new
     WRAPPER_TYPE_KEYS = %i[array fields raw type].freeze
     RESERVED_TYPE_NAMES = %w[
@@ -58,7 +61,9 @@ module ReactOnRails
       end
 
       def unsafe_raw_type_expression?(expression)
-        expression.match?(RAW_TYPE_UNSAFE_PATTERN) || unsafe_raw_type_nesting?(expression)
+        expression.match?(RAW_TYPE_UNSAFE_LINE_BREAK_PATTERN) ||
+          expression.gsub(RAW_TYPE_STRING_LITERAL_PATTERN, "").match?(RAW_TYPE_UNSAFE_NON_STRING_PATTERN) ||
+          unsafe_raw_type_nesting?(expression)
       end
 
       def unsafe_raw_type_nesting?(expression)
@@ -80,7 +85,7 @@ module ReactOnRails
           return false
         end
 
-        return expected_group_ends.empty? if token == ">" && expected_group_ends.last != ">"
+        return true if token == ">" && expected_group_ends.last != ">"
         return false unless RAW_TYPE_GROUP_ENDS.include?(token)
 
         expected_group_ends.pop != token
@@ -88,6 +93,15 @@ module ReactOnRails
 
       def wrapper_keys_for(normalized)
         WRAPPER_TYPE_KEYS.select { |key| normalized.key?(key) }
+      end
+
+      def validate_modifier_only_hash!(spec, normalized)
+        return unless wrapper_keys_for(normalized).empty?
+        return unless normalized.key?(:nullable) || normalized.key?(:optional)
+        return unless non_option_keys_for(spec).empty?
+
+        raise ReactOnRails::Error,
+              "Modifier-only response type spec #{spec.inspect} must include :type, :array, :fields, or :raw"
       end
 
       def non_option_keys_for(spec)
@@ -129,7 +143,7 @@ module ReactOnRails
       end
 
       def raw_type_needs_parentheses_for_union?(type)
-        type.match?(/=>|\s\?\s/)
+        type.match?(/=>|\?/)
       end
     end
 
@@ -145,8 +159,7 @@ module ReactOnRails
       def generate(output_path: nil)
         path = root_relative_output_path(output_path || DEFAULT_OUTPUT_PATH)
         content = to_d_ts
-        FileUtils.mkdir_p(path.dirname)
-        File.write(path, content)
+        write_generated_file(path, content)
         path.to_s
       end
 
@@ -179,6 +192,26 @@ module ReactOnRails
         output_path_error!(output_path)
       rescue ArgumentError, Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES, Errno::EPERM
         output_path_error!(output_path)
+      end
+
+      def write_generated_file(path, content)
+        created_directory = !path.dirname.exist?
+        FileUtils.mkdir_p(path.dirname)
+        tempfile = Tempfile.new([".react_on_rails_types", ".tmp"], path.dirname)
+        tempfile.write(content)
+        tempfile.close
+        FileUtils.mv(tempfile.path, path.to_s)
+      rescue StandardError
+        cleanup_tempfile(tempfile)
+        FileUtils.rm_rf(path.dirname) if created_directory && path.dirname.exist?
+        raise
+      end
+
+      def cleanup_tempfile(tempfile)
+        return unless tempfile
+
+        tempfile.close unless tempfile.closed?
+        tempfile.unlink if tempfile.path && File.exist?(tempfile.path)
       end
 
       def nearest_existing_path(path)
@@ -219,23 +252,28 @@ module ReactOnRails
       def initialize
         @types = []
         @responses = []
+        @mutex = Mutex.new
       end
 
       def define_type(type_name, fields:)
-        name = normalize_type_name(type_name)
-        validate_fields!(fields)
-        ensure_unique_type_name!(name)
-        @types << Definition.new(name:, fields:, response_key: nil)
+        @mutex.synchronize do
+          name = normalize_type_name(type_name)
+          validate_fields!(fields)
+          ensure_unique_type_name!(name)
+          @types << Definition.new(name:, fields:, response_key: nil)
+        end
       end
 
       def define_response(response_key, type_name:, fields:)
-        key = response_key.to_s.strip
-        validate_response_key!(key)
-        name = normalize_type_name(type_name)
-        validate_fields!(fields)
-        ensure_unique_response_key!(key)
-        ensure_unique_type_name!(name)
-        @responses << Definition.new(name:, fields:, response_key: key)
+        @mutex.synchronize do
+          key = response_key.to_s.strip
+          validate_response_key!(key)
+          name = normalize_type_name(type_name)
+          validate_fields!(fields)
+          ensure_unique_response_key!(key)
+          ensure_unique_type_name!(name)
+          @responses << Definition.new(name:, fields:, response_key: key)
+        end
       end
 
       private
@@ -353,6 +391,7 @@ module ReactOnRails
 
       def render_hash_type(spec, indentation:, closing_indentation:)
         normalized = normalize_option_hash(spec)
+        validate_modifier_only_hash!(spec, normalized)
 
         if option_wrapper_hash?(spec, normalized)
           return array_type(normalized.fetch(:array), indentation:, closing_indentation:) if normalized.key?(:array)
@@ -382,7 +421,7 @@ module ReactOnRails
         member_type = render_type(member_spec, indentation:, closing_indentation:)
         raw_member = raw_wrapper_hash?(member_spec)
         member_type = nullable_type(member_type, raw: raw_member) if member_options.fetch(:nullable, false)
-        member_type = "(#{member_type})" if raw_member || member_type.match?(/[\n|&]|=>|\s\?\s/)
+        member_type = "(#{member_type})" if raw_member || member_type.match?(/[\n|&]|=>|\?/)
         "#{member_type}[]"
       end
 
