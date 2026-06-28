@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Run tests (Ruby gem specs + JS).
+set -euo pipefail
+( cd react_on_rails && bundle exec rake run_rspec )
+pnpm run test

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# CI change detector (inspect suite routing). Optional base ref (default origin/main).
+set -euo pipefail
+exec script/ci-changes-detector "${1:-origin/main}"

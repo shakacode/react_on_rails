@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Lint / format check. Fix with: (cd react_on_rails && bundle exec rake autofix)
+set -euo pipefail
+( cd react_on_rails && bundle exec rake lint )

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Pre-push gate. Flags pass through (--changed narrow, --all broad, --fast quick).
+set -euo pipefail
+exec bin/ci-local "$@"

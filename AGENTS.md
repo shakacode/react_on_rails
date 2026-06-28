@@ -150,75 +150,18 @@ upgrade-agent-workflows --host codex --consumer-root "$(pwd)"
 
 ## Agent Workflow Configuration
 
-Shared workflow skills are repo-agnostic whether they are installed in the
-user/agent environment or present as repo-local compatibility copies: they carry
-the workflow logic but defer every repo-specific command, branch, label, path,
-and policy to this section. When a skill says "run the repo's local validation"
-or "use the hosted-CI trigger," the concrete value is here. Adopting repos
-replace these values with their own and validate the seam with
-`.agents/bin/agent-workflow-seam-doctor`, plus `--shared <agent-workflows-root>`
-when checking user-installed shared skills outside the checkout. The shared
-source lives at
-[`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows);
-see
-[`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
+Portable shared skills resolve this repo's commands and policy through:
 
-- **Base branch**: `main` (fetch and compare via `origin/main`).
-- **Pre-push local validation**: `bin/ci-local` (optimized by default; `--changed` narrow,
-  `--all` broad, `--fast` quick). The script owns base discovery — do not pass a base ref.
-  Broad suites: `bundle exec rake all_but_examples` vs `bundle exec rake`. Contract:
-  [`internal/contributor-info/local-ci-contract.md`](internal/contributor-info/local-ci-contract.md).
-- **CI change detector**: `script/ci-changes-detector origin/main` (inspect suite routing).
-- **Hosted-CI trigger**: `+ci-*` PR-comment commands (`+ci-status`, `+ci-run-hosted`,
-  `+ci-force-full`, `+ci-stop-hosted`, `+ci-stop-full`, `+ci-skip-hosted [reason]`, `+ci-help`);
-  labels `ready-for-hosted-ci` and `force-full-hosted-ci`; human helper `bin/request-hosted-ci`.
-  Decision rules are in the **Review Workflow → PR CI Labels** section.
-- **CI parity environment**: no dedicated `act`/local runner image is currently documented.
-  Use `bin/ci-local` and `script/ci-changes-detector origin/main` for local routing, then reproduce
-  CI-only failures from the exact GitHub Actions workflow/job, `runs-on` image, matrix, services,
-  and commands in `.github/workflows/**`; record any runner, service, or secret gap as `UNKNOWN`.
-- **Secret redaction patterns**: redact values for environment variables or log fields whose names
-  contain `SECRET`, `TOKEN`, `KEY`, `PASSWORD`, `CREDENTIAL`, `CERT`, `PASSPHRASE`, `PEM`,
-  `PRIVATE`, `DSN`, or `LICENSE`, plus repo-specific names including `REACT_ON_RAILS_PRO_LICENSE`,
-  `REACT_ON_RAILS_PRO_LICENSE_V2`, `BENCHER_API_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN`,
-  `GH_TOKEN`, `NPM_OTP`, `RUBYGEMS_OTP`, `DOCS_DISPATCH_APP_KEY`, `RENDERER_PASSWORD`, and
-  `SECRET_KEY_BASE`. These patterns intentionally favor conservative over-redaction of logs, prompts,
-  and issue comments over preserving non-secret diagnostic text. Repo-specific entries are public
-  identifier names, not values; list them here so agents redact exact aliases even when generic patterns
-  would also match.
-- **Trusted GitHub actor boundary**: `.agents/trusted-github-actors.yml` does
-  not trust `github-actions[bot]` by default because issue-comment-triggered
-  workflows can mint bot comments from untrusted user input. Adding it requires
-  auditing comment-producing workflows and updating preflight policy in the same
-  PR.
-- **Benchmark labels**: `benchmark`, `benchmark-core`, `benchmark-pro`,
-  `benchmark-pro-node-renderer`, and `hosted-ci-no-benchmarks` (suppress). Opt-in on PRs.
-- **Follow-up issue prefix**: `Follow-up:`. Default to no new issue; see the **Maintainer
-  Attention Contract** section.
-- **Changelog**: `/CHANGELOG.md`, user-visible changes only. Entry format, the `**[Pro]**`
-  scope tag, the version-stamping task (`bundle exec rake "update_changelog[...]"`), and the
-  classification taxonomy are in the **Changelog** section.
-- **Lint / format**: `(cd react_on_rails && bundle exec rake lint)` (package lint),
-  `(cd react_on_rails && bundle exec rake autofix)` (fix),
-  `pnpm start format.listDifferent` (Prettier check), `bin/check-links` (markdown links). Full
-  list in the **Commands** section.
-- **Merge ledger**: `script/pr-merge-ledger <PR> --strict` — machine-checkable per-PR
-  merge-readiness check emitting changelog classification and a `complete_allowed` verdict.
-- **Docs checks**: `script/check-docs-sidebar` (sidebar coverage), `bin/check-links` (links).
-- **Tests**: unit/integration/e2e per the **Testing** and **Commands** sections
-  (`bundle exec rake run_rspec:*`, `pnpm run test`,
-  `(cd react_on_rails/spec/dummy && pnpm test:e2e)`).
-- **Build / type checks**: `pnpm run build`, `pnpm run type-check`, `bundle exec rake rbs:validate`,
-  `actionlint`, `yamllint .github/` — see the **Commands** section.
-- **Review gate**: `claude-review` is the preferred independent review check; see the
-  **Review Workflow** section.
-- **Approval-exempt change categories**: workflow, build-config, package-script, dependency,
-  lockfile, and Pro edits on trusted assignments — allowed with focused scope, validation, and
-  clear PR evidence (not standing pre-approval). See the **Boundaries → Always** section.
-- **Coordination backend**: ShakaCode-internal repos share the private
-  `shakacode/agent-coordination` backend (claims/heartbeats namespaced by full repo name).
-  External adopters use the structured public claim-comment fallback in
-  [`.agents/workflows/pr-processing.md`](.agents/workflows/pr-processing.md).
+- **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, `lint`,
+  `build`, `docs`, `ci-detect`); see [`.agents/bin/README.md`](.agents/bin/README.md).
+  A missing script means that capability is n/a here.
+- **Policy / config** — [`.agents/agent-workflow.yml`](.agents/agent-workflow.yml)
+  (base branch, hosted-CI trigger, benchmark labels, changelog, merge ledger, review
+  gate, secret redaction, coordination backend, and other non-command keys).
+
+The shared source lives at
+[`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows); see
+[`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
 
 ## Agent Coordination Reads
 

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Install dependencies.
+set -euo pipefail
+exec script/bootstrap

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Build and type-check.
+set -euo pipefail
+pnpm run build
+pnpm run type-check

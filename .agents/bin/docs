@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Docs checks (sidebar coverage + markdown links).
+set -euo pipefail
+script/check-docs-sidebar
+bin/check-links
