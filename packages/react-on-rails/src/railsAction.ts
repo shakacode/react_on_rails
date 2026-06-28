@@ -153,11 +153,12 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
       body: hasJsonBody ? JSON.stringify(requestBody) : undefined,
     });
 
-    const responseBody = await parseJsonBody(response);
     if (!response.ok) {
+      const responseBody = await parseJsonBody(response.clone());
       throw new RailsActionRequestError(response, responseBody);
     }
 
+    const responseBody = await parseJsonBody(response);
     return responseBody as TResponse;
   };
 

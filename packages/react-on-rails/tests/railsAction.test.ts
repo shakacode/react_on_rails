@@ -16,12 +16,28 @@ const mockResponse = (options: MockResponseOptions = {}): Response => {
   return {
     ok: status >= 200 && status < 300,
     status,
+    clone: () => {
+      if (bodyUsed) {
+        throw new TypeError('body already used');
+      }
+      return mockResponse(options);
+    },
     json: () => {
       if (bodyUsed) {
         return Promise.reject(new TypeError('body already used'));
       }
       bodyUsed = true;
-      return body === null ? Promise.reject(new Error('no body')) : Promise.resolve(body);
+      if (body === null || typeof body === 'string') {
+        return Promise.reject(new Error('no JSON body'));
+      }
+      return Promise.resolve(body);
+    },
+    text: () => {
+      if (bodyUsed) {
+        return Promise.reject(new TypeError('body already used'));
+      }
+      bodyUsed = true;
+      return Promise.resolve(typeof body === 'string' ? body : JSON.stringify(body));
     },
   } as unknown as Response;
 };
@@ -161,6 +177,26 @@ describe('createRailsAction', () => {
     if (caughtError instanceof RailsActionRequestError) {
       expect(caughtError.response.status).toBe(422);
       expect(caughtError.responseBody).toEqual({ errors: { name: ['is blank'] } });
+    }
+  });
+
+  it('leaves the failed response body readable after parsing an error body clone', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 500, body: '<html>boom</html>' }));
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    let caughtError: unknown;
+    try {
+      await createProject({ name: 'Apollo' });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(RailsActionRequestError);
+    if (caughtError instanceof RailsActionRequestError) {
+      expect(caughtError.responseBody).toBeNull();
+      await expect(caughtError.response.text()).resolves.toBe('<html>boom</html>');
     }
   });
 });
