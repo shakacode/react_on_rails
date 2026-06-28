@@ -503,7 +503,7 @@ After adding `'use client'` to all entry points, rebuild all three bundles and v
 
 Replace synchronous view helpers and controller rendering with their streaming equivalents.
 
-> **Warning: Compression middleware callbacks.** Default `Rack::Deflater`, `Rack::Brotli`, and similar compression middleware work with streaming responses, but a custom `:if` condition that calls `body.each` to check response size will deadlock on `ActionController::Live::Buffer`. See [Compression for Streamed RSC Responses](../../pro/streaming-ssr.md#compression-for-streamed-rsc-responses) for the safe pattern.
+> **Warning: Compression middleware callbacks.** Default `Rack::Deflater`, `Rack::Brotli`, and similar compression middleware work with streaming responses, but a custom `:if` condition that calls `body.each` to check response size will deadlock on `ActionController::Live::Buffer`. See the Pro guide [Compression for Streamed RSC Responses](../../pro/streaming-ssr.md#compression-for-streamed-rsc-responses) for the safe pattern.
 
 ### 6a. Update controllers
 

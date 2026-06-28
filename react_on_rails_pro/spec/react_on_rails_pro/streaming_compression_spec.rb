@@ -74,7 +74,7 @@ RSpec.describe "Streamed RSC compression" do
     expect(read_body(body).byteslice(0, 2)).to eq("\x1f\x8b".b)
   end
 
-  it "does not buffer the stream into a Content-Length (stays chunked)" do
+  it "does not add a Content-Length to gzip streams" do
     _status, headers, body = deflater_response(accept_encoding: "gzip")
 
     expect(header(headers, "Content-Length")).to be_nil

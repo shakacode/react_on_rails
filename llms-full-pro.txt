@@ -2346,7 +2346,7 @@ In the browser, open DevTools → Network → select the navigation request → 
 
 `Rack::Deflater` appends `Vary: Accept-Encoding` when it compresses a response. Keep that header intact through custom middleware and proxies so CDNs do not serve a cached gzip response to a client that did not advertise gzip support.
 
-The gem's own coverage of this path lives in `react_on_rails_pro/spec/react_on_rails_pro/streaming_compression_spec.rb`, which asserts that an `ActionController::Live`-style streamed body is gzip-compressed with the decompressed bytes unchanged.
+The gem's own coverage of this path lives in `react_on_rails_pro/spec/react_on_rails_pro/streaming_compression_spec.rb`, which asserts that a Rack body shaped like `ActionController::Live::Buffer` is gzip-compressed with the decompressed bytes unchanged.
 
 ## Metadata with Streaming
 
