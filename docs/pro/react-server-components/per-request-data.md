@@ -409,12 +409,19 @@ export default function ProductPage(props, railsContext) {
     );
   }
 
+  const { pageHref, pagePathname } = props;
+  if (!pageHref || !pagePathname) {
+    throw new Error(
+      'Pass pageHref and pagePathname from Rails props when layout readers need the current page URL.',
+    );
+  }
+
   const layoutContext = {
     locale: railsContext.i18nLocale,
-    pathname: railsContext.pathname,
+    pathname: pagePathname,
     publicEnv: {
       host: railsContext.host,
-      href: railsContext.href,
+      href: pageHref,
       // Add app-specific public fields via rendering_extension.custom_context
       // on the Rails side.
     },
@@ -432,17 +439,23 @@ export default function ProductPage(props, railsContext) {
 
 The render function returns `ProductPageWithLayoutContext` instead of JSX directly so React on Rails renders a component and the seeder runs during React render. The `LayoutRequestStoreSeeder` wrapper makes the seeding boundary explicit in JSX. If this entry has only one seeder, calling `seedLayoutRequestStore(layoutContext)` at the top of `ProductPageWithLayoutContext` before `return` is equivalent; keep the seed call inside a component render, before any descendant readers render.
 
+Pass current-page URL values, such as `pageHref` and `pagePathname`, through props from Rails when readers need them. During client RSC payload refetches, `railsContext.href` and `railsContext.pathname` describe the `/rsc_payload/:component` request, not the page that originally hosted the component.
+
 ```jsx
 // DeepServerComponent.jsx
 import { getLayoutRequestStore } from '../lib/layoutRequestStore';
 
 export default function DeepServerComponent() {
-  const { locale, publicEnv } = getLayoutRequestStore();
+  const { locale, pathname, publicEnv } = getLayoutRequestStore();
   if (!publicEnv) {
     throw new Error('seedLayoutRequestStore must be called above this component in the render tree');
   }
 
-  return <span data-locale={locale}>{publicEnv.host}</span>;
+  return (
+    <span data-locale={locale} data-pathname={pathname}>
+      {publicEnv.host}
+    </span>
+  );
 }
 ```
 
