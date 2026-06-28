@@ -271,7 +271,7 @@ describe('createRailsAction', () => {
     }
   });
 
-  it('warns in development when a fetch rejection looks like a Rails redirect', async () => {
+  it('warns in development when a fetch rejection could be a redirect or network failure', async () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const redirectError = new TypeError('Failed to fetch');
     fetchMock.mockRejectedValueOnce(redirectError);
@@ -283,6 +283,7 @@ describe('createRailsAction', () => {
 
       await expect(createProject({ name: 'Apollo' })).rejects.toBe(redirectError);
       expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('createRailsAction'));
+      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('network is unavailable'));
     } finally {
       consoleWarn.mockRestore();
     }

@@ -70,8 +70,9 @@ const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
     return;
   }
   console.warn(
-    '[createRailsAction] The request may have been rejected because the server responded with a redirect. ' +
-      'createRailsAction requires JSON responses; Rails `redirect_to` is not supported for mutation endpoints.',
+    '[createRailsAction] The request may have failed because the server responded with a redirect or ' +
+      'because the network is unavailable. createRailsAction requires JSON responses; Rails `redirect_to` ' +
+      'is not supported for mutation endpoints.',
   );
 };
 
@@ -149,6 +150,7 @@ const resolveHeaders = <TVariables>(
  * responses as `null`. Include `null` in `TResponse` when a successful empty response is expected.
  * Omitting `body` sends `variables` as the JSON body verbatim; supply `body` to map or filter fields before
  * serialization.
+ * When `variables` only populate `path`, supply `body: () => null` or a mapper to avoid forwarding them.
  * Return `null` or `undefined` from `body` when the request should not send JSON. DELETE requests never
  * send a JSON body; identify the resource in the URL instead.
  */
