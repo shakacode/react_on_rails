@@ -40,7 +40,7 @@ module ReactOnRailsPro
         perform_request(path, form:)
       end
 
-      def render_code_as_stream(path, js_code, is_rsc_payload:)
+      def render_code_as_stream(path, js_code, is_rsc_payload:, rsc_stream_observability: false)
         Rails.logger.info { "[ReactOnRailsPro] Perform rendering request as a stream #{path}" }
         if is_rsc_payload && !ReactOnRailsPro.configuration.enable_rsc_support
           raise ReactOnRailsPro::Error,
@@ -56,7 +56,7 @@ module ReactOnRailsPro
             upload_assets
           end
 
-          form = form_with_code(js_code, false)
+          form = form_with_code(js_code, false, rsc_stream_observability:)
           perform_request(path, form:, stream: true)
         end
       end
@@ -87,7 +87,14 @@ module ReactOnRailsPro
       # - When the block finishes, we close the output (END_STREAM flag)
       # - Node's handleRequestClosed then calls asyncPropsManager.endStream()
       #
-      def render_code_with_incremental_updates(path, js_code, async_props_block:, pull_enabled: false, push_props: nil)
+      def render_code_with_incremental_updates(
+        path,
+        js_code,
+        async_props_block:,
+        pull_enabled: false,
+        push_props: nil,
+        rsc_stream_observability: false
+      )
         Rails.logger.info { "[ReactOnRailsPro] Perform incremental rendering request #{path}" }
 
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
@@ -118,7 +125,7 @@ module ReactOnRailsPro
             pull_enabled:
           )
           initial_data = build_initial_incremental_request(
-            js_code, emitter, pull_enabled:, push_props:
+            js_code, emitter, pull_enabled:, push_props:, rsc_stream_observability:
           )
 
           # Send the initial render request as first NDJSON line
@@ -268,9 +275,10 @@ module ReactOnRailsPro
                           "expected at most #{warn_timeout}."
       end
 
-      def form_with_code(js_code, send_bundle)
+      def form_with_code(js_code, send_bundle, rsc_stream_observability: false)
         form = common_form_data
         form["renderingRequest"] = js_code
+        form["rscStreamObservability"] = true if rsc_stream_observability
         populate_form_with_bundle_and_assets(form, check_bundle: false) if send_bundle
         form
       end
@@ -352,11 +360,18 @@ module ReactOnRailsPro
         ReactOnRailsPro::Utils.common_form_data
       end
 
-      def build_initial_incremental_request(js_code, emitter, pull_enabled: false, push_props: nil)
+      def build_initial_incremental_request(
+        js_code,
+        emitter,
+        pull_enabled: false,
+        push_props: nil,
+        rsc_stream_observability: false
+      )
         data = common_form_data.merge(
           renderingRequest: js_code,
           onRequestClosedUpdateChunk: emitter.end_stream_chunk
         )
+        data[:rscStreamObservability] = true if rsc_stream_observability
         if pull_enabled
           data[:pullEnabled] = true
           data[:pushProps] = Array(push_props)

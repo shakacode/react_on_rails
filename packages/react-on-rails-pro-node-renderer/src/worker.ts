@@ -398,6 +398,20 @@ const errorCode = (error: unknown): string | undefined => {
 const isValidRenderingRequest = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
 
+const isBooleanField = (value: unknown): value is boolean | 'true' | 'false' =>
+  typeof value === 'boolean' || value === 'true' || value === 'false';
+
+const parseOptionalBooleanField = (body: Record<string, unknown>, key: string): boolean | undefined => {
+  const value = body[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!isBooleanField(value)) {
+    return undefined;
+  }
+  return value === true || value === 'true';
+};
+
 const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   const { renderingRequest } = body;
   let renderingRequestType: string = typeof renderingRequest;
@@ -581,6 +595,14 @@ export default function run(config: Partial<Config>) {
       await setResponse(badRequestResponseResult(invalidRenderingRequestMessage(body)), res);
       return;
     }
+    const rscStreamObservability = parseOptionalBooleanField(body, 'rscStreamObservability');
+    if ('rscStreamObservability' in body && rscStreamObservability === undefined) {
+      await setResponse(
+        badRequestResponseResult('Invalid "rscStreamObservability" field in render request.'),
+        res,
+      );
+      return;
+    }
 
     const { bundleTimestamp } = req.params;
     const { providedNewBundles, assetsToCopy } = extractBundlesAndAssets(body, bundleTimestamp);
@@ -595,6 +617,7 @@ export default function run(config: Partial<Config>) {
             dependencyBundleTimestamps,
             providedNewBundles,
             assetsToCopy,
+            rscStreamObservability: rscStreamObservability === true,
             tracingContext: context,
           });
           await setResponseAndReleaseExecutionContext(result.response, res, result.executionContext);

@@ -123,6 +123,7 @@ export type FirstIncrementalRenderRequestChunk = {
   onRequestClosedUpdateChunk?: UpdateChunk;
   pullEnabled?: boolean;
   pushProps?: string[];
+  rscStreamObservability?: boolean;
 };
 
 function assertFirstIncrementalRenderRequestChunk(
@@ -144,6 +145,16 @@ function assertFirstIncrementalRenderRequestChunk(
 
   if ('pullEnabled' in chunk && chunk.pullEnabled !== undefined && typeof chunk.pullEnabled !== 'boolean') {
     throw new Error('Invalid first incremental render request chunk: pullEnabled must be a boolean');
+  }
+
+  if (
+    'rscStreamObservability' in chunk &&
+    chunk.rscStreamObservability !== undefined &&
+    typeof chunk.rscStreamObservability !== 'boolean'
+  ) {
+    throw new Error(
+      'Invalid first incremental render request chunk: rscStreamObservability must be a boolean',
+    );
   }
 
   if (
@@ -193,7 +204,7 @@ export async function handleIncrementalRenderRequest(
 ): Promise<IncrementalRenderResult> {
   const { firstRequestChunk, bundleTimestamp, dependencyBundleTimestamps } = initial;
   assertFirstIncrementalRenderRequestChunk(firstRequestChunk);
-  const { renderingRequest, onRequestClosedUpdateChunk } = firstRequestChunk;
+  const { renderingRequest, onRequestClosedUpdateChunk, rscStreamObservability } = firstRequestChunk;
 
   try {
     // Call handleRenderRequest internally to handle all validation and VM execution
@@ -205,6 +216,7 @@ export async function handleIncrementalRenderRequest(
       dependencyBundleTimestamps,
       providedNewBundles: undefined,
       assetsToCopy: undefined,
+      rscStreamObservability: rscStreamObservability === true,
     });
 
     // If we don't get an execution context, it means there was an early error

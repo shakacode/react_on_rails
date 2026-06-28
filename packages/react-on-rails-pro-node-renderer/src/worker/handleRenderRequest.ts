@@ -22,7 +22,6 @@
 
 import cluster from 'cluster';
 import path from 'path';
-import { performance } from 'perf_hooks';
 import { mkdir, stat } from 'fs/promises';
 import { lock, unlock } from '../shared/locks.js';
 import fileExistsAsync from '../shared/fileExistsAsync.js';
@@ -80,8 +79,12 @@ export type ProvidedNewBundle = {
  *
  * Exported for unit testing.
  */
-export function addRendererServerTiming(response: ResponseResult, startedAtMs: number): void {
-  if (!response.stream) {
+export function addRendererServerTiming(
+  response: ResponseResult,
+  startedAtMs: number,
+  enabled: boolean,
+): void {
+  if (!enabled || !response.stream) {
     return;
   }
   const durMs = (performance.now() - startedAtMs).toFixed(3);
@@ -152,6 +155,24 @@ async function prepareResult(
       return errorResponseResult(exceptionMessage);
     }
   });
+}
+
+async function prepareResponseWithServerTiming(
+  renderingRequest: string,
+  bundleTimestamp: string | number,
+  bundleFilePathPerTimestamp: string,
+  executionContext: ExecutionContext,
+  rendererServerTimingStartedAtMs: number,
+  rscStreamObservability: boolean,
+): Promise<{ response: ResponseResult; executionContext: ExecutionContext }> {
+  const response = await prepareResult(
+    renderingRequest,
+    bundleTimestamp,
+    bundleFilePathPerTimestamp,
+    executionContext,
+  );
+  addRendererServerTiming(response, rendererServerTimingStartedAtMs, rscStreamObservability);
+  return { response, executionContext };
 }
 
 /**
@@ -277,6 +298,7 @@ export async function handleRenderRequest({
   dependencyBundleTimestamps,
   providedNewBundles,
   assetsToCopy,
+  rscStreamObservability = false,
   tracingContext,
 }: {
   renderingRequest: string;
@@ -284,11 +306,9 @@ export async function handleRenderRequest({
   dependencyBundleTimestamps?: string[] | number[];
   providedNewBundles?: ProvidedNewBundle[] | null;
   assetsToCopy?: Asset[] | null;
+  rscStreamObservability?: boolean;
   tracingContext?: TracingContext;
 }): Promise<{ response: ResponseResult; executionContext?: ExecutionContext }> {
-  // Monotonic clock; spans exec-context build + render start so streamed responses can expose
-  // the renderer-internal slice of the responseEnd tail via Server-Timing (issue #4239).
-  const renderStartedAt = performance.now();
   try {
     // const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
     const allBundleFilePaths = Array.from(
@@ -309,6 +329,7 @@ export async function handleRenderRequest({
     }
 
     try {
+      const rendererServerTimingStartedAt = performance.now();
       const executionContext = await subSpan(
         {
           name: 'ror.bundle.build_execution_context',
@@ -320,14 +341,14 @@ export async function handleRenderRequest({
         },
         () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false),
       );
-      const response = await prepareResult(
+      return await prepareResponseWithServerTiming(
         renderingRequest,
         bundleTimestamp,
         entryBundleFilePath,
         executionContext,
+        rendererServerTimingStartedAt,
+        rscStreamObservability,
       );
-      addRendererServerTiming(response, renderStartedAt);
-      return { response, executionContext };
     } catch (e) {
       // Ignore VMContextNotFoundError, it means the bundle does not exist.
       // The following code will handle this case.
@@ -374,6 +395,7 @@ export async function handleRenderRequest({
       entryBundleFilePath,
       workerIdLabel(),
     );
+    const rendererServerTimingStartedAt = performance.now();
     const executionContext = await subSpan(
       {
         name: 'ror.bundle.build_execution_context',
@@ -385,14 +407,14 @@ export async function handleRenderRequest({
       },
       () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true),
     );
-    const response = await prepareResult(
+    return await prepareResponseWithServerTiming(
       renderingRequest,
       bundleTimestamp,
       entryBundleFilePath,
       executionContext,
+      rendererServerTimingStartedAt,
+      rscStreamObservability,
     );
-    addRendererServerTiming(response, renderStartedAt);
-    return { response, executionContext };
   } catch (error) {
     const msg = formatExceptionMessage(
       { renderingRequest },

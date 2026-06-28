@@ -54,9 +54,7 @@ module ReactOnRailsPro
     def stream_view_containing_react_components(
       template:, close_stream_at_end: true, content_type: nil, rsc_stream_observability: false, **render_options
     )
-      require "async"
-      require "async/barrier"
-      require "async/limited_queue"
+      require_streaming_dependencies
       previous_rsc_stream_observability_state = current_rsc_stream_observability_state
       warn_on_non_html_formats_without_content_type(render_options[:formats], content_type)
       initialize_rsc_stream_observability_state(rsc_stream_observability)
@@ -105,6 +103,12 @@ module ReactOnRailsPro
     end
 
     private
+
+    def require_streaming_dependencies
+      require "async"
+      require "async/barrier"
+      require "async/limited_queue"
+    end
 
     def current_rsc_stream_observability_state
       {
@@ -170,7 +174,9 @@ module ReactOnRailsPro
       response.headers["Server-Timing"] = existing.present? ? "#{existing}, #{entry}" : entry
     rescue StandardError => e
       # Observability must never break a real response. Swallow and log.
-      Rails.logger.debug { "[React on Rails Pro] Failed to emit RSC stream Server-Timing header: #{e.class}" }
+      Rails.logger.debug do
+        "[React on Rails Pro] Failed to emit RSC stream Server-Timing header: #{e.class}: #{e.message}"
+      end
     end
 
     def write_rsc_stream_observability_mark

@@ -61,19 +61,22 @@ RSpec.describe ReactOnRailsPro::Stream do
       component_queues = Array.new(component_count) { Async::Queue.new }
       controller = StreamController.new(component_queues:, initial_response:)
 
-      mocked_response = instance_double(ActionController::Live::Response)
-      mocked_stream = instance_double(ActionController::Live::Buffer)
-      allow(mocked_response).to receive(:stream).and_return(mocked_stream)
-      allow(mocked_response).to receive(:content_type=)
-      # `and_return` yields the same Hash instance on every call, so header writes performed
-      # before the first stream write (e.g. Server-Timing) persist and are observable in tests.
-      allow(mocked_response).to receive(:headers).and_return({})
-      allow(mocked_stream).to receive(:write)
-      allow(mocked_stream).to receive(:close)
-      allow(mocked_stream).to receive(:closed?).and_return(false)
+      mocked_response, mocked_stream = build_mocked_response
       allow(controller).to receive(:response).and_return(mocked_response)
 
       [component_queues, controller, mocked_stream]
+    end
+
+    def build_mocked_response
+      mocked_response = instance_double(ActionController::Live::Response)
+      mocked_stream = instance_double(ActionController::Live::Buffer)
+      allow(mocked_response).to receive_messages(stream: mocked_stream, headers: {})
+      allow(mocked_response).to receive(:content_type=)
+      # `receive_messages` yields the same Hash instance on every call, so header writes performed
+      # before the first stream write (e.g. Server-Timing) persist and are observable in tests.
+      allow(mocked_stream).to receive_messages(write: nil, close: nil, closed?: false)
+
+      [mocked_response, mocked_stream]
     end
 
     it "streams components concurrently" do
@@ -212,7 +215,7 @@ RSpec.describe ReactOnRailsPro::Stream do
     it "appends to an existing Server-Timing header rather than replacing it" do
       _queues, controller, stream = setup_stream_test(component_count: 0)
       allow(stream).to receive(:write)
-      controller.response.headers["Server-Timing"] = 'action_total;dur=5'
+      controller.response.headers["Server-Timing"] = "action_total;dur=5"
 
       run_stream(controller, rsc_stream_observability: true) do |_parent|
         sleep 0.1

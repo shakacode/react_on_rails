@@ -32,14 +32,21 @@ const bufferedResponse = (): ResponseResult => ({
 describe('addRendererServerTiming', () => {
   it('adds a renderer Server-Timing entry to a streamed response', () => {
     const response = streamingResponse();
-    addRendererServerTiming(response, performance.now() - 5);
+    addRendererServerTiming(response, performance.now() - 5, true);
 
     expect(response.headers['Server-Timing']).toMatch(/^ror_renderer_prepare;dur=\d+(\.\d+)?;desc="[^"]+"$/);
   });
 
+  it('does not touch a streamed response when renderer timing is disabled', () => {
+    const response = streamingResponse();
+    addRendererServerTiming(response, performance.now(), false);
+
+    expect(response.headers['Server-Timing']).toBeUndefined();
+  });
+
   it('does not touch a buffered (non-streaming) response', () => {
     const response = bufferedResponse();
-    addRendererServerTiming(response, performance.now());
+    addRendererServerTiming(response, performance.now(), true);
 
     expect(response.headers['Server-Timing']).toBeUndefined();
   });
@@ -47,7 +54,7 @@ describe('addRendererServerTiming', () => {
   it('appends to an existing Server-Timing header rather than replacing it', () => {
     const response = streamingResponse();
     response.headers['Server-Timing'] = 'upstream;dur=1';
-    addRendererServerTiming(response, performance.now());
+    addRendererServerTiming(response, performance.now(), true);
 
     expect(response.headers['Server-Timing']).toMatch(/^upstream;dur=1, ror_renderer_prepare;dur=/);
   });

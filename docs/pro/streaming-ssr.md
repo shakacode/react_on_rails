@@ -287,6 +287,8 @@ The browser-observable marks above close the client loop. To attribute the serve
 
 `ror_stream_shell` appears on the navigation response your browser sees (visible in the Network panel and in `PerformanceResourceTiming.serverTiming`). `ror_renderer_prepare` rides on the renderer's HTTP response to Rails; it is visible to anything inspecting that hop (logs, tracing, a direct probe of the renderer).
 
+Both metrics are emitted only when `rsc_stream_observability: true` is set for the streamed render.
+
 Two figures are intentionally **not** on the browser-facing header:
 
 - **Total / stream-complete renderer time** is only known after the body is flushed, and `ActionController::Live` does not support HTTP trailers (see the caveat above). It remains available via the `react-on-rails:rsc:stream` mark's `sinceStreamStartMs`.
