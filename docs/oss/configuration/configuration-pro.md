@@ -211,6 +211,8 @@ Connection reuse is automatic when the renderer request runs under a long-lived 
 
 Under standard Puma, the streaming helper's `Sync {}` block creates a per-request scheduler. The async-http client is cleaned up when that streaming response ends, so connection reuse does not persist across consecutive Rails requests. The benefit is still meaningful inside a single streamed response: renderer calls in that response can share the same client lifecycle and `renderer_http_pool_size` still bounds TCP connections created during the request.
 
+Call the renderer from the normal Rails request path. The adapter chooses scheduler-scoped reuse whenever a `Fiber.scheduler` already exists before it enters `Sync {}`; custom middleware or background code that installs a scheduler with an unclear lifecycle can therefore keep renderer clients alive longer than intended. Keep those calls inside the request's scheduler lifecycle, or use the standard path where `Sync {}` creates and cleans up the per-request client.
+
 `config.renderer_http_keep_alive_timeout` is **deprecated** and ignored: the async-http adapter manages connection lifecycle automatically (connections are reused within the scheduler and cleaned up when it ends). Setting it to a non-`nil` value logs a deprecation warning; `nil` is accepted silently.
 
 To confirm reuse, compare before/after `responseEnd` timing and streamed RSC performance marks, and trace renderer sockets when you need to distinguish long-lived scheduler reuse from standard Puma's per-request scheduler cleanup.

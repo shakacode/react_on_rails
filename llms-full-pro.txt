@@ -603,10 +603,10 @@ Before upgrading:
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
 - Run the node renderer client from the normal Rails request path. Async Rails servers (Falcon, Puma with an async
-  scheduler) are supported: the async-http client uses scheduler-scoped connection reuse automatically. Middleware
-  should call the renderer from inside the request's running scheduler/task context. Avoid invoking renderer requests
-  from a scheduler-only context that lacks an `Async::Task.current?` task; that path may still fall back to a nested
-  reactor.
+  scheduler) are supported: the async-http client uses scheduler-scoped connection reuse automatically when a
+  `Fiber.scheduler` already exists before the adapter enters `Sync {}`. Middleware and background code should call the
+  renderer from a scheduler with a deliberate request or service lifecycle; a custom scheduler-only context can keep
+  renderer clients alive longer than intended.
 - `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
   async-http manages connection lifecycle through its scheduler-scoped clients and ephemeral request clients. Setting
   it to a non-`nil` value emits a deprecation warning; `nil` is accepted silently.
