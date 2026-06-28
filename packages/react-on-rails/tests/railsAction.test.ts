@@ -164,6 +164,30 @@ describe('createRailsAction', () => {
     expect(headerValue(init.headers, 'Content-Type')).toBeNull();
   });
 
+  it('warns in development when a DELETE body callback returns a discarded body', async () => {
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
+
+    try {
+      const deleteProject = createRailsAction<{ id: number; reason: string }, null>({
+        method: 'DELETE',
+        path: ({ id }) => `/api/projects/${id}`,
+        body: ({ reason }) => ({ reason }),
+      });
+
+      await expect(deleteProject({ id: 7, reason: 'spam' })).resolves.toBeNull();
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.body).toBeUndefined();
+      expect(headerValue(init.headers, 'Content-Type')).toBeNull();
+      expect(consoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE request but will not be sent'),
+      );
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
   it('rejects before fetch when the Rails CSRF meta tag is missing', async () => {
     const csrfMeta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]');
     csrfMeta?.remove();

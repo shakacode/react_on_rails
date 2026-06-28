@@ -75,6 +75,23 @@ const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
   );
 };
 
+const warnOnDiscardedDeleteBody = (method: string, bodyOption: unknown, requestBody: unknown): void => {
+  if (
+    process.env.NODE_ENV === 'production' ||
+    method !== 'DELETE' ||
+    bodyOption === undefined ||
+    requestBody === undefined ||
+    requestBody === null
+  ) {
+    return;
+  }
+
+  console.warn(
+    '[createRailsAction] A `body` option was supplied for a DELETE request but will not be sent. ' +
+      'Identify the resource in the URL instead.',
+  );
+};
+
 const mergeHeaders = (...headersList: Array<HeadersInit | undefined>): Headers => {
   const headers = new Headers();
 
@@ -130,6 +147,8 @@ const resolveHeaders = <TVariables>(
  * The returned function is directly usable as a TanStack Query `mutationFn`.
  * It always requests JSON, rejects browser-followed redirects, and resolves 204 or non-JSON success
  * responses as `null`. Include `null` in `TResponse` when a successful empty response is expected.
+ * Omitting `body` sends `variables` as the JSON body verbatim; supply `body` to map or filter fields before
+ * serialization.
  * Return `null` or `undefined` from `body` when the request should not send JSON. DELETE requests never
  * send a JSON body; identify the resource in the URL instead.
  */
@@ -158,6 +177,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
 
     const requestBody = options.body ? options.body(typedVariables) : variables;
     const hasJsonBody = method !== 'DELETE' && requestBody !== undefined && requestBody !== null;
+    warnOnDiscardedDeleteBody(method, options.body, requestBody);
     let response: Response;
     try {
       response = await fetch(requestUrl, {
