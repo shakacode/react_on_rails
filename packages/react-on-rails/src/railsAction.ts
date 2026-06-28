@@ -76,14 +76,8 @@ const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
   );
 };
 
-const warnOnDiscardedDeleteBody = (method: string, bodyOption: unknown, requestBody: unknown): void => {
-  if (
-    process.env.NODE_ENV === 'production' ||
-    method !== 'DELETE' ||
-    bodyOption === undefined ||
-    requestBody === undefined ||
-    requestBody === null
-  ) {
+const warnOnDiscardedDeleteBody = (method: string, bodyOption: unknown): void => {
+  if (process.env.NODE_ENV === 'production' || method !== 'DELETE' || bodyOption === undefined) {
     return;
   }
 
@@ -179,11 +173,12 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
 
     const requestBody = options.body ? options.body(typedVariables) : variables;
     const hasJsonBody = method !== 'DELETE' && requestBody !== undefined && requestBody !== null;
-    warnOnDiscardedDeleteBody(method, options.body, requestBody);
+    warnOnDiscardedDeleteBody(method, options.body);
     let response: Response;
     try {
       response = await fetch(requestUrl, {
         method,
+        mode: 'same-origin',
         credentials: 'same-origin',
         redirect: 'error',
         signal: callOptions.signal,

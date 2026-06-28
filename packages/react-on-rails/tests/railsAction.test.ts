@@ -83,6 +83,7 @@ describe('createRailsAction', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(new URL('/api/projects', document.baseURI).href);
     expect(init.method).toBe('POST');
+    expect(init.mode).toBe('same-origin');
     expect(init.credentials).toBe('same-origin');
     expect(init.redirect).toBe('error');
     expect(init.body).toBe(JSON.stringify({ project: { name: 'Apollo' } }));
@@ -180,6 +181,29 @@ describe('createRailsAction', () => {
       const [, init] = fetchMock.mock.calls[0];
       expect(init.body).toBeUndefined();
       expect(headerValue(init.headers, 'Content-Type')).toBeNull();
+      expect(consoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE request but will not be sent'),
+      );
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
+  it('warns in development when a DELETE body callback returns null', async () => {
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
+
+    try {
+      const deleteProject = createRailsAction<{ id: number }, null>({
+        method: 'DELETE',
+        path: ({ id }) => `/api/projects/${id}`,
+        body: () => null,
+      });
+
+      await expect(deleteProject({ id: 7 })).resolves.toBeNull();
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.body).toBeUndefined();
       expect(consoleWarn).toHaveBeenCalledWith(
         expect.stringContaining('DELETE request but will not be sent'),
       );
