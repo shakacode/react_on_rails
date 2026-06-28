@@ -5169,7 +5169,7 @@ describe InstallGenerator, type: :generator do
         expect(content).to include('[Encoding::US_ASCII, Encoding::ASCII_8BIT].include?(Encoding.find("locale"))')
         expect(content).to include('"LANG" => "C.UTF-8"')
         expect(content).to include('"LC_ALL" => "C.UTF-8"')
-        expect(content).to include('"RUBYOPT" => utf8_widened_rubyopt(ENV.fetch("RUBYOPT", ""))')
+        expect(content).to include('"RUBYOPT" => utf8_widened_rubyopt(subprocess_rubyopt(extra))')
         expect(content).to include('"REACT_ON_RAILS_SKIP_VALIDATION" => "true"')
         expect(content).to include('"RSC_BUNDLE_ONLY" => "true"')
         expect(content).to include('"CLIENT_BUNDLE_ONLY" => nil')
