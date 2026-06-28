@@ -72,6 +72,22 @@ class ReleaseForwardPort
 
     return run_changelog_reconciliation(source, target) if @options[:changelog]
 
+    # This final expression is the process exit status.
+    run_cherry_pick_forward_port(source, target)
+  rescue OptionParser::ParseError, UsageError => e
+    warn "ERROR: #{e.message}"
+    warn @parser
+    2
+  rescue GitError => e
+    warn "ERROR: #{e.message}"
+    1
+  end
+
+  private
+
+  # Default mode: cherry-pick -x the source-only commits onto the target. Called
+  # within run's begin block, so its UsageError/GitError raises are caught there.
+  def run_cherry_pick_forward_port(source, target)
     commits = source_only_commits(source, target)
     equiv_commits = patch_equivalent_candidates(source, target)
     target_version = version_at(target)
@@ -93,18 +109,8 @@ class ReleaseForwardPort
 
     ensure_clean_worktree!
     checkout_target!(target)
-    # This final expression is the process exit status.
     apply_plan(plan)
-  rescue OptionParser::ParseError, UsageError => e
-    warn "ERROR: #{e.message}"
-    warn @parser
-    2
-  rescue GitError => e
-    warn "ERROR: #{e.message}"
-    1
   end
-
-  private
 
   def finish_no_action_plan(plan, target)
     if acknowledged_manual_entries?(plan)
