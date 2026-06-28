@@ -161,6 +161,11 @@ Portable shared skills resolve this repo's commands and policy through:
 
 Compatibility for older repo-local skills that still name the former inline keys:
 
+- **Base branch** → `.agents/agent-workflow.yml` key `base_branch`
+- **Hosted-CI trigger** → `.agents/agent-workflow.yml` key `hosted_ci_trigger`
+- **Changelog** → `.agents/agent-workflow.yml` key `changelog`
+- **Lint / format** → `.agents/bin/lint`
+- **Merge ledger** → `.agents/agent-workflow.yml` key `merge_ledger`
 - **Tests** → `.agents/bin/test`
 - **Pre-push local validation** → `.agents/bin/validate`
 - **CI change detector** → `.agents/bin/ci-detect`

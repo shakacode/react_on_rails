@@ -145,6 +145,19 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
     end
   end
 
+  def test_portable_contract_yaml_list_not_mapping_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      File.write(File.join(root, ".agents/agent-workflow.yml"), "- item1\n- item2\n")
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, ".agents/agent-workflow.yml must be a mapping"
+    end
+  end
+
   def test_portable_contract_missing_yaml_key_fails
     with_repo do |root|
       write_portable_contract(root)
@@ -169,6 +182,19 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
 
       assert status.success?, out
       assert_includes out, "PASS"
+    end
+  end
+
+  def test_portable_contract_unresolved_yaml_value_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      write_agent_workflow_config(root, "benchmark_labels" => "<benchmark labels>")
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "unresolved agent workflow config value for key: benchmark_labels"
     end
   end
 

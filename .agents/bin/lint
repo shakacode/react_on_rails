@@ -2,9 +2,11 @@
 # Lint / format check. Fix with: (cd react_on_rails && bundle exec rake autofix)
 set -euo pipefail
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-( cd react_on_rails && bundle exec rake lint )
+rc=0
+( cd react_on_rails && bundle exec rake lint ) || rc=1
 if [ -d react_on_rails_pro ]; then
-  ( cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion )
+  ( cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion ) || rc=1
 fi
-pnpm run lint
-pnpm start format.listDifferent
+pnpm run lint || rc=1
+pnpm start format.listDifferent || rc=1
+exit "$rc"
