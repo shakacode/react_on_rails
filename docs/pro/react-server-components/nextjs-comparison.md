@@ -254,3 +254,4 @@ chunk-loading primitives differ.
 - [Rspack Compatibility](./rspack-compatibility.md) — bundler support status and the native `RSCRspackPlugin`
 - [RSC Glossary](./glossary.md) — terminology reference
 - [RSC overview](./index.md) — the full React Server Components documentation set
+- [React on Rails Pro and TanStack Start](./tanstack-start-comparison.md) — the same kind of architecture comparison, for TanStack Start

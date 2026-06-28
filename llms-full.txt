@@ -2067,7 +2067,7 @@ Choose TanStack Start when you are greenfield, have no Rails investment, want a 
 
 Choose React on Rails when you want a real backend — Rails — under a modern React frontend, and would rather adopt the TanStack client libraries on top of Rails than move your business logic into JavaScript.
 
-A runnable example of this architecture — React on Rails Pro with TanStack Query, Router, and Table against a Rails backend — is the [React on Rails Pro + TanStack starter](https://github.com/shakacode/react-on-rails-starter-tanstack). React Server Components require React on Rails Pro with the Node renderer.
+A runnable example of this architecture — React on Rails Pro with TanStack Query, Router, and Table against a Rails backend — is the [React on Rails Pro + TanStack starter](https://github.com/shakacode/react-on-rails-starter-tanstack). React Server Components require React on Rails Pro with the Node renderer. For a deeper architecture comparison — where each stack's server tier lives — see [React on Rails Pro and TanStack Start: Two Ways to Own the Full Stack](../../pro/react-server-components/tanstack-start-comparison.md).
 
 Official docs:
 
