@@ -368,7 +368,7 @@ export default function Breadcrumbs({ railsContext }) {
 
 ## Scenario 5: Layout Context for Top-Level RSC Entries
 
-Top-level components registered with `registerServerComponent` can also be render functions. React on Rails calls those functions with `(props, railsContext)` during RSC rendering, so a page-level entry can pass selected Rails context values into a request-local store seeder before the rest of the Server Component tree reads them.
+Top-level components registered with `registerServerComponent` can also be render functions. React on Rails calls those functions with `(props, railsContext)` during RSC rendering, so a page-level entry can pass selected Rails context values into a request-local store seeder before the rest of the Server Component tree reads them. This only applies to the registered render-function entry path; if you render the entry as an ordinary component elsewhere, `railsContext` is not provided and those values should come through explicit props instead.
 
 This is the RSC-safe replacement for layout helpers that write Rails request data into module-level refs:
 
@@ -380,6 +380,8 @@ const _getLayoutRequestStore = cache(() => ({}));
 
 export function seedLayoutRequestStore(layoutContext) {
   const store = _getLayoutRequestStore();
+  // Mutation is safe here: this seeder runs once in a parent component before
+  // any reader renders. See "Seed Once, Read Anywhere" for the full rationale.
   store.locale = layoutContext.locale;
   store.pathname = layoutContext.pathname;
   store.publicEnv = Object.freeze(layoutContext.publicEnv);
@@ -401,6 +403,12 @@ function LayoutRequestStoreSeeder({ layoutContext, children }) {
 }
 
 export default function ProductPage(props, railsContext) {
+  if (!railsContext) {
+    throw new Error(
+      'ProductPage must be registered with registerServerComponent as a render function to receive railsContext.',
+    );
+  }
+
   const layoutContext = {
     locale: railsContext.i18nLocale,
     pathname: railsContext.pathname,
@@ -410,13 +418,17 @@ export default function ProductPage(props, railsContext) {
     },
   };
 
-  return (
-    <LayoutRequestStoreSeeder layoutContext={layoutContext}>
-      <ProductShell {...props} />
-    </LayoutRequestStoreSeeder>
-  );
+  return function ProductPageWithLayoutContext() {
+    return (
+      <LayoutRequestStoreSeeder layoutContext={layoutContext}>
+        <ProductShell {...props} />
+      </LayoutRequestStoreSeeder>
+    );
+  };
 }
 ```
+
+The render function returns `ProductPageWithLayoutContext` instead of JSX directly so React on Rails renders a component and the seeder runs during React render. The `LayoutRequestStoreSeeder` wrapper makes the seeding boundary explicit in JSX. If this entry has only one seeder, calling `seedLayoutRequestStore(layoutContext)` at the top of `ProductPageWithLayoutContext` before `return` is equivalent; keep the seed call inside a component render, before any descendant readers render.
 
 ```jsx
 // DeepServerComponent.jsx
@@ -424,6 +436,10 @@ import { getLayoutRequestStore } from '../lib/layoutRequestStore';
 
 export default function DeepServerComponent() {
   const { locale, publicEnv } = getLayoutRequestStore();
+  if (!publicEnv) {
+    throw new Error('DeepServerComponent must render inside LayoutRequestStoreSeeder');
+  }
+
   return <span data-locale={locale}>{publicEnv.assetHost}</span>;
 }
 ```
