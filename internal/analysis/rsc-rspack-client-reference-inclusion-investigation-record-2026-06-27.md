@@ -1,10 +1,10 @@
-# RSC Rspack client reference inclusion decision record — 2026-06-27
+# RSC Rspack client reference inclusion investigation record — 2026-06-27
 
 ## Purpose
 
-Record the maintainer-facing history and current decision points for React on Rails Pro + React Server Components + Rspack client-reference manifest generation.
+Record the maintainer-facing investigation history and current recommended direction for React on Rails Pro + React Server Components + Rspack client-reference manifest generation.
 
-This is an internal decision record, not user docs. It reconstructs the sequence from the first Rspack client-manifest plugin through the lazyCompilation fix, then records which longer-term Rspack inclusion mechanisms remain viable. It exists so future ROR/RORP/RSC work does not rediscover the same traps around:
+This is an internal investigation record, not user docs. It reconstructs the sequence from the first Rspack client-manifest plugin through the lazyCompilation fix, then records which longer-term Rspack inclusion mechanisms remain viable. It exists so future ROR/RORP/RSC work does not rediscover the same traps around:
 
 - RSC client manifest entries;
 - async client-reference chunks;
@@ -352,15 +352,15 @@ Implication:
 | Native Rspack RSC plugin                               |          Yes, via internal primitives | Rspack solved in native path |                                         Native model | Bigger architecture migration; not drop-in for RORP                          |
 | Public JS `module.addBlock` / `AsyncDependenciesBlock` |                               Desired |     Would avoid fake imports |                         Desired with server handling | Not available today; track Rspack #7174                                      |
 
-## Decisions
+## Findings and recommended direction
 
-### Decision 1: Keep #4227 as short-term fix
+### Finding 1: Keep #4227 as short-term fix
 
 Disabling top-level `lazyCompilation` for generated RSC + Rspack dev-server config is justified and already shipped.
 
 Reason: the current client inclusion mechanism uses dynamic imports to create async chunks. Rspack lazy compilation proxies those imports. RSC server render needs the manifest before browser lazy triggers can compile modules.
 
-### Decision 2: Do not ship client-side `addInclude`-only as long-term fix yet
+### Finding 2: Do not ship client-side `addInclude`-only as long-term fix yet
 
 Two tested shapes are bad in different ways:
 
@@ -369,7 +369,7 @@ Two tested shapes are bad in different ways:
 
 A client-side `addInclude` design should not proceed unless it proves async chunk preservation or explicitly accepts eager client refs with measured bundle impact.
 
-### Decision 3: Treat injection-loader as a pragmatic async-chunk bridge, not just a hack
+### Finding 3: Treat injection-loader as a pragmatic async-chunk bridge, not just a hack
 
 Given missing public Rspack JS `AsyncDependenciesBlock` mutation APIs, source-level dynamic imports are currently the public Rspack-compatible way for a JS plugin to create async chunks.
 
@@ -383,7 +383,7 @@ The injection-loader remains fragile because it:
 
 But with lazy disabled, it preserves async chunk behavior better than the tested `addInclude` approaches.
 
-### Decision 4: Best near-term architectural candidate is hybrid, not full `addInclude`
+### Finding 4: Best near-term architectural candidate is hybrid, not full `addInclude`
 
 Candidate:
 
@@ -402,7 +402,7 @@ This matches the #36 research direction: client async chunks need bundler code-s
 
 This candidate still needs implementation and validation against current `react_on_rails_rsc` main before PR work.
 
-### Decision 5: Native Rspack RSC remains possible but larger
+### Finding 5: Native Rspack RSC remains possible but larger
 
 Native Rspack RSC has mechanisms RORP needs:
 
@@ -445,7 +445,7 @@ But adopting it in RORP is a larger architecture migration, not a narrow fix for
    - Multi-owner refs need explicit policy, not arbitrary first-owner assignment.
 
 5. **Tracking issue update**
-   - Link this decision record from #3488 after the doc lands so future Rspack RSC work starts from this context.
+   - Link this investigation record from #3488 after the doc lands so future Rspack RSC work starts from this context.
 
 ## Reference links
 
