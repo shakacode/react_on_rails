@@ -1507,9 +1507,12 @@ describe('RSCRoute successful-version error reset', () => {
     };
 
     const rejectLoad = async (started: Awaited<ReturnType<typeof startLoad>>, message: string) => {
+      void started.promise.catch(() => undefined);
       await act(async () => {
         started.deferred.reject(new Error(message));
         await expect(started.promise).rejects.toThrow(message);
+        // evictPromiseIfRejected removes the cached promise via setTimeout(0),
+        // so wait one macrotask before asserting the slot is free.
         await flushMacrotasks();
       });
     };
