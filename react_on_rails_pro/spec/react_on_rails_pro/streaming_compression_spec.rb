@@ -57,8 +57,9 @@ RSpec.describe "Streamed RSC compression" do
   def read_body(body)
     buffer = +"".b
     body.each { |chunk| buffer << chunk.b }
-    body.close if body.respond_to?(:close)
     buffer
+  ensure
+    body.close if body.respond_to?(:close)
   end
 
   # Rack 2 uses "Content-Encoding"; Rack 3 lowercases header keys to "content-encoding".
