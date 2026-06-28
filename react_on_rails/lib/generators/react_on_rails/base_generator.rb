@@ -462,7 +462,7 @@ module ReactOnRails
         csrf_match = content.match(CSRF_META_TAG_PATTERN)
         viewport_tag = '<meta name="viewport" content="width=device-width,initial-scale=1">'
 
-        unless content.match?(/<meta\s+name=["']viewport["']/)
+        unless content.match?(/<meta\b[^>]*\bname=["']viewport["']/)
           if title_match
             insert_into_file(
               layout_path,

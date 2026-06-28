@@ -1023,6 +1023,34 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "does not duplicate an existing viewport tag when name is not the first attribute" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>React on Rails</title>
+            <meta content="width=device-width,initial-scale=1" name="viewport">
+            <%= csrf_meta_tags %>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        expect(content.scan(/\bname=["']viewport["']/).size).to eq(1)
+        expect(content).to include('<meta content="width=device-width,initial-scale=1" name="viewport">')
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+      end
+    end
+
     it "warns when the generated layout has no viewport insertion anchor" do
       simulate_existing_layout("react_on_rails_default", <<~ERB)
         <!DOCTYPE html>
