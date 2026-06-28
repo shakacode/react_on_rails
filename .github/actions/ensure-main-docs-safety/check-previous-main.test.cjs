@@ -62,7 +62,7 @@ function successJob(name = 'build') {
   };
 }
 
-function makeGithub({ pages, jobsByRunId, jobPagesByRunId, parentsBySha }) {
+function makeGithub({ pages, jobsByRunId, jobPagesByRunId, jobIteratorDataByRunId, parentsBySha }) {
   const listWorkflowRunsForRepo = async () => {};
   const listJobsForWorkflowRun = async ({ run_id: runId }) => ({
     data: { jobs: jobsByRunId[runId] || [] },
@@ -72,6 +72,13 @@ function makeGithub({ pages, jobsByRunId, jobPagesByRunId, parentsBySha }) {
     paginate: {
       iterator: async function* iterator(endpoint, options = {}) {
         if (endpoint === listJobsForWorkflowRun) {
+          if (jobIteratorDataByRunId?.[options.run_id]) {
+            for (const data of jobIteratorDataByRunId[options.run_id]) {
+              yield { data };
+            }
+            return;
+          }
+
           const jobPages = jobPagesByRunId?.[options.run_id] || [jobsByRunId[options.run_id] || []];
           for (const jobs of jobPages) {
             yield { data: { jobs } };
@@ -174,6 +181,32 @@ async function testPaginatedJobsAreChecked() {
 
   assert.equal(core.failed.length, 1);
   assert.match(core.failed[0], /Large workflow/);
+}
+
+async function testOctokitJobIteratorArrayPagesAreChecked() {
+  const previous = 'previous';
+  const failingRun = run({ id: 14, sha: previous, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[failingRun]],
+    jobsByRunId: {},
+    jobIteratorDataByRunId: {
+      14: [[successJob('setup')], [buildFailureJob()]],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Main push lint/);
 }
 
 async function testGuardOnlyHopLimitStopsAtConfiguredLimit() {
@@ -295,6 +328,7 @@ async function main() {
   await testGuardOnlyFailuresLookThroughToParentSuccess();
   await testNonContiguousWorkflowRunPagesAreChecked();
   await testPaginatedJobsAreChecked();
+  await testOctokitJobIteratorArrayPagesAreChecked();
   await testGuardOnlyHopLimitStopsAtConfiguredLimit();
 }
 

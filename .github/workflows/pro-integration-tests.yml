@@ -76,11 +76,13 @@ jobs:
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Guard docs-only main pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          github.event_name == 'merge_group'
         uses: ./.github/actions/ensure-main-docs-safety
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
-          previous-sha: ${{ github.event.before }}
+          previous-sha: ${{ github.event.before || github.event.merge_group.base_sha }}
 
   # Build webpack test bundles for dummy app
   build-dummy-app-webpack-test-bundles:

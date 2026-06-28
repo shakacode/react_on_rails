@@ -87,7 +87,13 @@ async function listJobsForRun({ github, context, run }) {
     run_id: run.id,
     per_page: 100,
   })) {
-    jobs.push(...response.data.jobs);
+    const pageJobs = Array.isArray(response.data) ? response.data : response.data?.jobs;
+
+    if (!Array.isArray(pageJobs)) {
+      throw new TypeError(`Expected jobs array while listing workflow run ${run.id} (${run.name}).`);
+    }
+
+    jobs.push(...pageJobs);
   }
 
   return jobs;
