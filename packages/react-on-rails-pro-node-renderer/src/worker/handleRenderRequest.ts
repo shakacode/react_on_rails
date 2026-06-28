@@ -81,7 +81,7 @@ export type ProvidedNewBundle = {
  * Exported for unit testing.
  */
 export function escapeServerTimingDescription(description: string): string {
-  return description.replace(/["\\]/g, (char) => `\\${char}`);
+  return description.replace(/[\r\n\0]/g, '').replace(/["\\]/g, (char) => `\\${char}`);
 }
 
 export function addRendererServerTiming(

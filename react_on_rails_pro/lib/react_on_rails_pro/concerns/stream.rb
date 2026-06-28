@@ -185,7 +185,7 @@ module ReactOnRailsPro
     end
 
     def server_timing_quoted_string(value)
-      value.to_s.gsub(/["\\]/) { |char| "\\#{char}" }
+      value.to_s.gsub(/[\r\n\0]/, "").gsub(/["\\]/) { |char| "\\#{char}" }
     end
 
     def write_rsc_stream_observability_mark

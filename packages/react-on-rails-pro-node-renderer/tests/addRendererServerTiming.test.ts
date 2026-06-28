@@ -60,6 +60,8 @@ describe('addRendererServerTiming', () => {
   });
 
   it('escapes description values for Server-Timing quoted strings', () => {
-    expect(escapeServerTimingDescription('quote " and slash \\')).toBe('quote \\" and slash \\\\');
+    expect(escapeServerTimingDescription('quote " and slash \\ and \r\n\0 controls')).toBe(
+      'quote \\" and slash \\\\ and  controls',
+    );
   });
 });
