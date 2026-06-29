@@ -1,7 +1,9 @@
 const FAILURE_CONCLUSIONS = new Set(['failure', 'timed_out', 'cancelled', 'action_required']);
 const GUARD_JOB_NAME = 'detect-changes';
 const GUARD_STEP_NAME = 'Guard docs-only main pushes';
+const TRUSTED_RUN_EVENTS = new Set(['push', 'merge_group']);
 const MAX_GUARD_ONLY_HOPS = 10;
+const MAX_NO_RUNS_HOPS = 50;
 
 function parseExcludeWorkflows(excludeWorkflowsInput) {
   return (excludeWorkflowsInput || '')
@@ -19,7 +21,11 @@ function latestRunsByWorkflow(workflowRuns) {
 
   for (const run of workflowRuns) {
     const existing = latestByWorkflow.get(run.workflow_id);
-    if (!existing || run.run_number > existing.run_number) {
+    if (
+      !existing ||
+      (existing.event !== 'push' && run.event === 'push') ||
+      (existing.event === run.event && run.run_number > existing.run_number)
+    ) {
       latestByWorkflow.set(run.workflow_id, run);
     }
   }
@@ -55,39 +61,125 @@ function isGuardOnlyFailure(jobs) {
   );
 }
 
-async function listWorkflowRunsForSha({ github, context, sha, createdAfter }) {
+function githubApiErrorStatus(error) {
+  return error?.status ?? error?.response?.status;
+}
+
+function isGithubApiFailure(error) {
+  return Boolean(error?.githubApiFailure);
+}
+
+function githubApiFailureDetails(error, status = githubApiErrorStatus(error)) {
+  if (error?.githubApiFailure) {
+    return error.message || '';
+  }
+
+  const details = [];
+
+  if (status !== undefined) {
+    details.push(`GitHub API status: ${status}.`);
+  }
+
+  if (error?.message) {
+    details.push(error.message);
+  }
+
+  return details.join(' ');
+}
+
+function wrapGithubApiFailure(error, message) {
+  const status = githubApiErrorStatus(error);
+  const wrappedError = new Error([message, githubApiFailureDetails(error, status)].filter(Boolean).join(' '));
+
+  wrappedError.githubApiFailure = true;
+
+  if (status !== undefined) {
+    wrappedError.status = status;
+  }
+
+  return wrappedError;
+}
+
+function unexpectedGithubApiResponse(message) {
+  const error = new TypeError(message);
+  error.unexpectedGithubApiResponse = true;
+  return error;
+}
+
+function isUnexpectedGithubApiResponse(error) {
+  return Boolean(error?.unexpectedGithubApiResponse);
+}
+
+async function listWorkflowRunsForEvent({ github, context, sha, createdAfter, event }) {
   const workflowRuns = [];
 
-  for await (const response of github.paginate.iterator(github.rest.actions.listWorkflowRunsForRepo, {
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    event: 'push',
-    per_page: 30,
-    created: `>${createdAfter}`,
-    sort: 'created',
-    direction: 'desc',
-  })) {
-    const pageRuns = response.data;
-    const relevantInPage = pageRuns.filter((run) => run.head_sha === sha);
+  try {
+    for await (const response of github.paginate.iterator(github.rest.actions.listWorkflowRunsForRepo, {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      event,
+      head_sha: sha,
+      per_page: 30,
+      created: `>${createdAfter}`,
+      sort: 'created',
+      direction: 'desc',
+    })) {
+      const pageRuns = response.data;
+      const relevantInPage = pageRuns.filter((run) => run.head_sha === sha);
 
-    if (relevantInPage.length > 0) {
-      workflowRuns.push(...relevantInPage);
+      if (relevantInPage.length > 0) {
+        workflowRuns.push(...relevantInPage);
+      }
     }
+  } catch (error) {
+    throw wrapGithubApiFailure(
+      error,
+      `GitHub Actions API failed while listing ${event} workflow runs for ${sha}.`,
+    );
   }
 
   return workflowRuns;
 }
 
+async function listWorkflowRunsForSha({ github, context, sha, createdAfter }) {
+  const runsByEvent = await Promise.all(
+    Array.from(TRUSTED_RUN_EVENTS, (event) =>
+      listWorkflowRunsForEvent({ github, context, sha, createdAfter, event }),
+    ),
+  );
+
+  return runsByEvent.flat();
+}
+
 async function listJobsForRun({ github, context, run }) {
   const jobs = [];
 
-  for await (const response of github.paginate.iterator(github.rest.actions.listJobsForWorkflowRun, {
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    run_id: run.id,
-    per_page: 100,
-  })) {
-    jobs.push(...response.data.jobs);
+  try {
+    for await (const response of github.paginate.iterator(github.rest.actions.listJobsForWorkflowRun, {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      run_id: run.id,
+      per_page: 100,
+    })) {
+      const pageJobs = Array.isArray(response.data) ? response.data : response.data?.jobs;
+
+      if (!Array.isArray(pageJobs)) {
+        throw unexpectedGithubApiResponse(
+          `Expected jobs array while listing workflow run ${run.id} (${run.name}).`,
+        );
+      }
+
+      jobs.push(...pageJobs);
+    }
+  } catch (error) {
+    if (isUnexpectedGithubApiResponse(error) || error instanceof TypeError) {
+      throw error;
+    }
+
+    throw wrapGithubApiFailure(
+      error,
+      `GitHub Actions API failed while listing jobs for workflow run ${run.id} (${run.name}).`,
+    );
   }
 
   return jobs;
@@ -168,13 +260,68 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
 }
 
 async function firstParentSha({ github, context, sha }) {
-  const response = await github.rest.repos.getCommit({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    ref: sha,
-  });
+  try {
+    const response = await github.rest.repos.getCommit({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      ref: sha,
+    });
 
-  return response.data.parents?.[0]?.sha;
+    return response.data.parents?.[0]?.sha;
+  } catch (error) {
+    throw wrapGithubApiFailure(error, `GitHub commit API failed while reading first parent for ${sha}.`);
+  }
+}
+
+async function isCommitReachableFromDefaultBranch({ github, context, sha }) {
+  const defaultBranch = context.payload?.repository?.default_branch || 'main';
+
+  try {
+    const response = await github.request('GET /repos/{owner}/{repo}/compare/{basehead}', {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      basehead: `${sha}...${defaultBranch}`,
+    });
+
+    return response.data.status === 'ahead' || response.data.status === 'identical';
+  } catch (error) {
+    const status = githubApiErrorStatus(error);
+
+    if (status === 404 || status === 422) {
+      return false;
+    }
+
+    throw wrapGithubApiFailure(
+      error,
+      `GitHub compare API failed while checking whether ${sha} is reachable from ${defaultBranch}.`,
+    );
+  }
+}
+
+function formatNoRunsTrailDetails(noRunsTrail) {
+  if (noRunsTrail.length === 0) {
+    return '';
+  }
+
+  return [
+    '',
+    'Skipped candidate commits with no trusted workflow runs while looking for the underlying CI state:',
+    ...noRunsTrail.map((sha) => `- ${sha}`),
+  ].join('\n');
+}
+
+function formatGuardOnlyTrailDetails(guardOnlyTrail) {
+  if (guardOnlyTrail.length === 0) {
+    return '';
+  }
+
+  return [
+    '',
+    'Ignored docs-only guard-only failures while looking for the underlying CI state:',
+    ...guardOnlyTrail.map(
+      ({ sha, runs }) => `- ${sha}: ${runs.map((run) => `${run.name} #${run.run_number}`).join(', ')}`,
+    ),
+  ].join('\n');
 }
 
 async function checkPreviousMainCommitStatus({
@@ -184,6 +331,7 @@ async function checkPreviousMainCommitStatus({
   previousSha,
   excludeWorkflowsInput,
   maxGuardOnlyHops = MAX_GUARD_ONLY_HOPS,
+  maxNoRunsHops = MAX_NO_RUNS_HOPS,
   createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
 }) {
   const excludeWorkflows = parseExcludeWorkflows(excludeWorkflowsInput);
@@ -193,11 +341,28 @@ async function checkPreviousMainCommitStatus({
   }
 
   const guardOnlyTrail = [];
+  const noRunsTrail = [];
 
-  async function checkSha(shaToCheck, remainingGuardOnlyHops) {
-    if (remainingGuardOnlyHops <= 0) {
+  async function checkSha(shaToCheck, remainingGuardOnlyHops, remainingNoRunsHops) {
+    if (remainingGuardOnlyHops <= 0 || remainingNoRunsHops <= 0) {
+      const exhaustedLimit =
+        remainingGuardOnlyHops <= 0
+          ? `${maxGuardOnlyHops} docs-only guard-only commits`
+          : `${maxNoRunsHops} no-run merge queue candidate commits`;
+      const noRunsTrailForFailure =
+        remainingNoRunsHops <= 0 && !noRunsTrail.includes(shaToCheck)
+          ? [...noRunsTrail, shaToCheck]
+          : noRunsTrail;
+
       core.setFailed(
-        `Cannot determine prior real CI status after ${maxGuardOnlyHops} docs-only guard-only commits. Push a non-docs change to trigger hosted CI.`,
+        [
+          `Cannot determine prior real CI status after ${exhaustedLimit}.`,
+          formatNoRunsTrailDetails(noRunsTrailForFailure),
+          formatGuardOnlyTrailDetails(guardOnlyTrail),
+          'Push a non-docs change to trigger hosted CI.',
+        ]
+          .filter(Boolean)
+          .join('\n'),
       );
       return;
     }
@@ -212,7 +377,51 @@ async function checkPreviousMainCommitStatus({
     });
 
     if (result.status === 'no-runs') {
-      core.info(`No workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`);
+      const shouldTraceNoRunsParent =
+        context.eventName === 'merge_group' &&
+        !(await isCommitReachableFromDefaultBranch({ github, context, sha: shaToCheck }));
+      const parentSha = shouldTraceNoRunsParent
+        ? await firstParentSha({ github, context, sha: shaToCheck })
+        : null;
+
+      if (parentSha) {
+        core.info(
+          [
+            `No trusted workflow runs found for ${shaToCheck} in the last 7 days.`,
+            'For batched merge queues, github.event.merge_group.base_sha can be a synthetic queue commit',
+            `that was never pushed to main. Checking first parent ${parentSha} for the underlying CI state.`,
+          ].join(' '),
+        );
+        noRunsTrail.push(shaToCheck);
+        await checkSha(parentSha, remainingGuardOnlyHops, remainingNoRunsHops - 1);
+        return;
+      }
+
+      if (shouldTraceNoRunsParent) {
+        core.setFailed(
+          [
+            `Cannot determine prior real CI status because merge queue SHA ${shaToCheck} is not in the default branch and has no parent commits to inspect.`,
+            formatNoRunsTrailDetails(noRunsTrail),
+            'Push a non-docs change to trigger hosted CI.',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        );
+        return;
+      }
+
+      if (context.eventName === 'merge_group') {
+        core.info(
+          [
+            `No trusted workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
+            'This SHA is already in the default branch history; no parent tracing needed.',
+          ].join('\n'),
+        );
+      } else {
+        core.info(
+          `No trusted workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
+        );
+      }
       return;
     }
 
@@ -232,23 +441,13 @@ async function checkPreviousMainCommitStatus({
 
     if (result.failingRuns.length > 0) {
       const details = result.failingRuns.map(summarizeRun).join('\n');
-      const guardTrailDetails =
-        guardOnlyTrail.length > 0
-          ? [
-              '',
-              'Ignored docs-only guard-only failures while looking for the underlying CI state:',
-              ...guardOnlyTrail.map(
-                ({ sha, runs }) =>
-                  `- ${sha}: ${runs.map((run) => `${run.name} #${run.run_number}`).join(', ')}`,
-              ),
-            ].join('\n')
-          : '';
 
       core.setFailed(
         [
           `Cannot skip CI for docs-only commit because main commit ${shaToCheck} still has failing workflows:`,
           details,
-          guardTrailDetails,
+          formatNoRunsTrailDetails(noRunsTrail),
+          formatGuardOnlyTrailDetails(guardOnlyTrail),
           '',
           'Fix these failures before pushing docs-only changes, or push non-docs changes to trigger hosted CI.',
         ]
@@ -281,10 +480,43 @@ async function checkPreviousMainCommitStatus({
       `Main commit ${shaToCheck} only has docs-only guard failures. Checking first parent ${parentSha} for the underlying CI state.`,
     );
     guardOnlyTrail.push({ sha: shaToCheck, runs: result.guardOnlyRuns });
-    await checkSha(parentSha, remainingGuardOnlyHops - 1);
+    await checkSha(parentSha, remainingGuardOnlyHops - 1, remainingNoRunsHops);
   }
 
-  await checkSha(previousSha, maxGuardOnlyHops);
+  try {
+    await checkSha(previousSha, maxGuardOnlyHops, maxNoRunsHops);
+  } catch (error) {
+    if (isUnexpectedGithubApiResponse(error)) {
+      core.setFailed(
+        [
+          'Cannot determine prior real CI status because the GitHub API returned an unexpected response.',
+          error.message,
+          formatNoRunsTrailDetails(noRunsTrail),
+          formatGuardOnlyTrailDetails(guardOnlyTrail),
+          'Retry after the GitHub API recovers, or push a non-docs change to trigger hosted CI.',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      );
+      return;
+    }
+
+    if (!isGithubApiFailure(error)) {
+      throw error;
+    }
+
+    core.setFailed(
+      [
+        'Cannot determine prior real CI status because a GitHub API request failed.',
+        githubApiFailureDetails(error),
+        formatNoRunsTrailDetails(noRunsTrail),
+        formatGuardOnlyTrailDetails(guardOnlyTrail),
+        'Retry after the GitHub API recovers, or push a non-docs change to trigger hosted CI.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  }
 }
 
 module.exports = {
