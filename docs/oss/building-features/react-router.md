@@ -106,9 +106,42 @@ export default HelloWorldApp;
 - Use `element` prop to specify components (not `component` or `render` props from v5)
 - Routes are automatically matched by best fit, not render order
 
-## Server-Side Rendering with React Router
+## Basic Server-Side Rendering with React Router
 
-For server rendering, use `StaticRouter` instead of `BrowserRouter`.
+For server rendering without Redux, use the same route tree with `StaticRouter` instead of `BrowserRouter`.
+
+**File: `app/javascript/src/RouterApp/ror_components/RouterApp.server.jsx`**
+
+```jsx
+import React from 'react';
+import { renderToString } from 'react-dom/server';
+import { StaticRouter } from 'react-router-dom/server';
+import { Routes, Route } from 'react-router-dom';
+
+const Home = ({ name }) => <div>Hello, {name}!</div>;
+const About = () => <div>About</div>;
+
+const RouterApp = (props, railsContext) => {
+  const { location } = railsContext;
+
+  const html = renderToString(
+    <StaticRouter location={location}>
+      <Routes>
+        <Route path="/" element={<Home {...props} />} />
+        <Route path="/about" element={<About />} />
+      </Routes>
+    </StaticRouter>,
+  );
+
+  return { renderedHtml: html };
+};
+
+export default RouterApp;
+```
+
+## Legacy Server-Side Setup with Redux
+
+If your app still uses the legacy shared Redux store, keep the provider around the `StaticRouter`.
 
 **File: `app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx`**
 
