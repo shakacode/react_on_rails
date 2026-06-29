@@ -18117,8 +18117,8 @@ ReactOnRailsPro.configure do |config|
 
   # Set the `ssr_timeout` configuration so the Rails server will not wait more than this many seconds
   # for a SSR request to return once issued. With the async-http renderer client, this is applied as
-  # the per-read socket timeout on the renderer connection. Increase this value for long-running
-  # streaming SSR responses.
+  # the socket I/O timeout on the renderer connection. Increase this value for long-running
+  # streaming SSR responses with legitimate gaps between chunks.
   config.ssr_timeout = 5
 
   # If false, then crash if no backup rendering when the remote renderer is not available
@@ -18211,7 +18211,7 @@ end
 
 ## Renderer Performance Tuning for Streamed RSC
 
-The dominant contributors to a streamed route's `responseEnd` tail are Node renderer round-trip overhead, cold or under-warmed renderer workers, and per-request connection setup between Rails and the renderer. Three levers address these (see [issue #4240](https://github.com/shakacode/react_on_rails/issues/4240)). Measure changes with before/after page-load timing for the streamed route, the inline RSC stream performance marks described in the [Streaming SSR guide](../../pro/streaming-ssr.md), and renderer logs or tracing for cold-worker behavior. Streamed responses do not use `Server-Timing` headers because `ActionController::Live` commits headers on the first stream write.
+The dominant contributors to a streamed route's `responseEnd` tail are Node renderer round-trip overhead, cold or under-warmed renderer workers, and per-request connection setup between Rails and the renderer. Three levers address these (see [issue #4240](https://github.com/shakacode/react_on_rails/issues/4240)). Measure changes with before/after page-load timing for the streamed route, `Server-Timing` for the early Rails/renderer phases that are known before the first stream write, the inline RSC stream performance marks described in the [Streaming SSR guide](../../pro/streaming-ssr.md), and renderer logs or tracing for cold-worker behavior. Inline marks remain the source for late payload, flush, hydration, and stream-drain timing because `ActionController::Live` commits headers on the first stream write.
 
 ### 1. Warm up renderer workers
 
@@ -18236,7 +18236,7 @@ Guidance:
 - With Falcon or another long-lived scheduler, keep `renderer_http_pool_size` close to (and generally not far above) `workersCount`; streamed renders sharing that scheduler multiplex through the same async-http client, and sending many more concurrent renderer requests than there are workers just queues renders at the renderer while adding stream overhead.
 - Under standard Puma streaming, `Sync {}` creates a request-scoped client, so `renderer_http_pool_size` only bounds concurrent renderer calls inside one streamed response. Use a value near the number of renderer calls one response can overlap; scale `workersCount` and renderer replicas for cross-request concurrency.
 - Account for your Rails concurrency: with many Puma threads/workers all streaming, a renderer with only one or two workers becomes the bottleneck. Scale `workersCount` (and renderer replicas) to your real concurrent streamed-render load.
-- Tune `ssr_timeout` for legitimate long gaps between streamed chunks — it is the per-read socket timeout on the renderer connection. It fires when the renderer sends no data during a single read for `ssr_timeout` seconds, not when the total response duration exceeds that value; avoid masking renderer hangs with an unnecessarily high value.
+- Tune `ssr_timeout` for legitimate long gaps between streamed chunks — it applies to renderer socket I/O, so it can fire when a read or write operation blocks for `ssr_timeout` seconds. It is not a total response-duration cap; avoid masking renderer hangs with an unnecessarily high value.
 
 ### 3. Rails ↔ renderer keep-alive (persistent on Falcon/async scheduler; per-request on standard Puma)
 
