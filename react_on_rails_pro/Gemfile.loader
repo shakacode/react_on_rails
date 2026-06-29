@@ -13,31 +13,49 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
-# Load base dependencies
-base_deps_path = File.expand_path("./Gemfile.development_dependencies", __dir__)
-base_deps = File.read(base_deps_path)
-
-# Determine which override file to use
-override_deps_path = if ENV["CI"] == "true" && File.exist?(File.expand_path("./Gemfile.ci", __dir__))
-  # In CI environment, use CI dependencies
-  File.expand_path("./Gemfile.ci", __dir__)
-elsif File.exist?(File.expand_path("./Gemfile.local", __dir__))
-  # In non-CI environment, use local dependencies if they exist
-  File.expand_path("./Gemfile.local", __dir__)
+detect_source_encoding = lambda do |path, content|
+  header = content.lines.first(2).join
+  match = header.match(/(?:coding|encoding)\s*[:=]\s*([A-Za-z0-9._-]+)/ni)
+  match ? Encoding.find(match[1]) : Encoding::UTF_8
+rescue ArgumentError => e
+  raise ArgumentError, "#{path} declares unsupported source encoding #{match[1].inspect}: #{e.message}"
 end
 
-override_deps = override_deps_path ? File.read(override_deps_path) : ""
+read_gemfile_fragment = lambda do |path|
+  content = File.binread(path)
+  encoding = detect_source_encoding.call(path, content)
+  content.force_encoding(encoding)
+  raise ArgumentError, "#{path} is not valid #{encoding.name}" unless content.valid_encoding?
+
+  content
+end
+
+# Load base dependencies
+base_deps_path = File.expand_path("./Gemfile.development_dependencies", __dir__)
+base_deps = read_gemfile_fragment.call(base_deps_path)
+
+# Determine which override file to use
+override_deps_path =
+  if ENV["CI"] == "true" && File.exist?(File.expand_path("./Gemfile.ci", __dir__))
+    # In CI environment, use CI dependencies
+    File.expand_path("./Gemfile.ci", __dir__)
+  elsif File.exist?(File.expand_path("./Gemfile.local", __dir__))
+    # In non-CI environment, use local dependencies if they exist
+    File.expand_path("./Gemfile.local", __dir__)
+  end
+
+override_deps = override_deps_path ? read_gemfile_fragment.call(override_deps_path) : ""
 
 # Parse override gems
 override_gem_names = override_deps.scan(/^\s*gem\s+["']([^"']+)["']/).flatten
 
 # Remove overridden gems from base dependencies
 override_gem_names.each do |gem_name|
-  base_deps.gsub!(/^\s*gem\s+["']#{gem_name}["'].*$/, '')
+  base_deps.gsub!(/^\s*gem\s+["']#{gem_name}["'].*$/, "")
 end
 
 # Clean up any blank lines created by removals
-base_deps.gsub!(/^\s*$\n/, '')
+base_deps.gsub!(/^\s*$\n/, "")
 
 # Evaluate the modified base dependencies
 # Using instance_eval with filepath preserves __dir__ in evaluated content,
