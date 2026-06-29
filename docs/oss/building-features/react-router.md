@@ -109,6 +109,9 @@ export default HelloWorldApp;
 ## Basic Server-Side Rendering with React Router
 
 For server rendering without Redux, use the same route tree with `StaticRouter` instead of `BrowserRouter`.
+This `.client.jsx` / `.server.jsx` split assumes
+[auto-bundling](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)
+is configured so React on Rails registers the client and server files separately.
 
 **File: `app/javascript/src/RouterApp/ror_components/RouterApp.server.jsx`**
 
