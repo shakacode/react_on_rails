@@ -8,13 +8,22 @@ const {
   parseExcludeWorkflows,
 } = require('./check-previous-main.cjs');
 
-const context = { repo: { owner: 'shakacode', repo: 'react_on_rails' } };
+const context = { eventName: 'push', repo: { owner: 'shakacode', repo: 'react_on_rails' } };
 
-function run({ id, workflowId = id, sha, name = `Workflow ${id}`, runNumber = id, conclusion = 'success' }) {
+function run({
+  id,
+  workflowId = id,
+  sha,
+  name = `Workflow ${id}`,
+  runNumber = id,
+  conclusion = 'success',
+  event = 'push',
+}) {
   return {
     id,
     workflow_id: workflowId,
     head_sha: sha,
+    event,
     name,
     run_number: runNumber,
     status: 'completed',
@@ -62,7 +71,20 @@ function successJob(name = 'build') {
   };
 }
 
-function makeGithub({ pages, jobsByRunId, jobPagesByRunId, parentsBySha }) {
+function makeGithub({
+  pages,
+  jobsByRunId,
+  jobPagesByRunId,
+  jobIteratorDataByRunId,
+  parentsBySha,
+  defaultBranchContainsSha = {},
+  compareBaseheads = [],
+  compareErrorByBase = {},
+  commitErrorByRef = {},
+  workflowRunListOptions = [],
+  workflowRunIteratorError,
+  jobIteratorErrorByRunId = {},
+}) {
   const listWorkflowRunsForRepo = async () => {};
   const listJobsForWorkflowRun = async ({ run_id: runId }) => ({
     data: { jobs: jobsByRunId[runId] || [] },
@@ -72,6 +94,17 @@ function makeGithub({ pages, jobsByRunId, jobPagesByRunId, parentsBySha }) {
     paginate: {
       iterator: async function* iterator(endpoint, options = {}) {
         if (endpoint === listJobsForWorkflowRun) {
+          if (jobIteratorErrorByRunId[options.run_id]) {
+            throw jobIteratorErrorByRunId[options.run_id];
+          }
+
+          if (jobIteratorDataByRunId?.[options.run_id]) {
+            for (const data of jobIteratorDataByRunId[options.run_id]) {
+              yield { data };
+            }
+            return;
+          }
+
           const jobPages = jobPagesByRunId?.[options.run_id] || [jobsByRunId[options.run_id] || []];
           for (const jobs of jobPages) {
             yield { data: { jobs } };
@@ -79,10 +112,36 @@ function makeGithub({ pages, jobsByRunId, jobPagesByRunId, parentsBySha }) {
           return;
         }
 
+        workflowRunListOptions.push(options);
+        if (workflowRunIteratorError) {
+          throw workflowRunIteratorError;
+        }
+
         for (const page of pages) {
-          yield { data: page };
+          yield {
+            data: page.filter(
+              (run) => (!options.event || run.event === options.event) && run.head_sha === options.head_sha,
+            ),
+          };
         }
       },
+    },
+    request: async (_route, { basehead }) => {
+      compareBaseheads.push(basehead);
+      const [base] = basehead.split('...');
+      if (compareErrorByBase[base]) {
+        throw compareErrorByBase[base];
+      }
+
+      const configuredStatus = defaultBranchContainsSha[base];
+      let status = 'diverged';
+      if (typeof configuredStatus === 'string') {
+        status = configuredStatus;
+      } else if (configuredStatus) {
+        status = 'ahead';
+      }
+
+      return { data: { status } };
     },
     rest: {
       actions: {
@@ -90,9 +149,15 @@ function makeGithub({ pages, jobsByRunId, jobPagesByRunId, parentsBySha }) {
         listJobsForWorkflowRun,
       },
       repos: {
-        getCommit: async ({ ref }) => ({
-          data: { parents: parentsBySha[ref] ? [{ sha: parentsBySha[ref] }] : [] },
-        }),
+        getCommit: async ({ ref }) => {
+          if (commitErrorByRef[ref]) {
+            throw commitErrorByRef[ref];
+          }
+
+          return {
+            data: { parents: parentsBySha[ref] ? [{ sha: parentsBySha[ref] }] : [] },
+          };
+        },
       },
     },
   };
@@ -176,6 +241,59 @@ async function testPaginatedJobsAreChecked() {
   assert.match(core.failed[0], /Large workflow/);
 }
 
+async function testOctokitJobIteratorArrayPagesAreChecked() {
+  const previous = 'previous';
+  const failingRun = run({ id: 14, sha: previous, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[failingRun]],
+    jobsByRunId: {},
+    jobIteratorDataByRunId: {
+      14: [[successJob('setup')], [buildFailureJob()]],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Main push lint/);
+}
+
+async function testUnexpectedJobIteratorShapeFailsClearly() {
+  const previous = 'previous';
+  const failingRun = run({ id: 15, sha: previous, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[failingRun]],
+    jobsByRunId: {},
+    jobIteratorDataByRunId: {
+      15: [{}],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /GitHub API returned an unexpected response/);
+  assert.match(core.failed[0], /Expected jobs array while listing workflow run 15 \(Main push lint\)\./);
+}
+
 async function testGuardOnlyHopLimitStopsAtConfiguredLimit() {
   const previous = 'docs-2';
   const parent = 'docs-1';
@@ -245,6 +363,487 @@ async function testGuardOnlyFailuresLookThroughToParentFailure() {
   assert.match(core.failed[0], /Ignored docs-only guard-only failures/);
 }
 
+async function testNoRunSyntheticBaseLooksThroughToParentFailure() {
+  const syntheticBase = 'synthetic-base';
+  const realFailure = 'real-failure';
+  const realRun = run({ id: 16, sha: realFailure, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[realRun]],
+    jobsByRunId: {
+      16: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [syntheticBase]: realFailure,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit real-failure still has failing workflows/);
+}
+
+async function testNoRunPushBaseAllowsQuietMainSkip() {
+  const quietMain = 'quiet-main';
+  const olderFailure = 'older-failure';
+  const realRun = run({ id: 17, sha: olderFailure, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[realRun]],
+    jobsByRunId: {
+      17: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [quietMain]: olderFailure,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: quietMain,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.deepEqual(core.failed, []);
+  assert.match(core.infoMessages.at(-1), /Allowing docs-only skip/);
+}
+
+async function testNoRunSyntheticBaseAllowsQuietParentSkip() {
+  const syntheticBase = 'synthetic-base';
+  const quietMain = 'quiet-main';
+  const olderFailure = 'older-failure';
+  const realRun = run({ id: 18, sha: olderFailure, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[realRun]],
+    jobsByRunId: {
+      18: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [syntheticBase]: quietMain,
+      [quietMain]: olderFailure,
+    },
+    defaultBranchContainsSha: {
+      [quietMain]: 'identical',
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.deepEqual(core.failed, []);
+  assert.match(core.infoMessages.at(-1), /Allowing docs-only skip/);
+}
+
+async function testReachableMergeQueueRunFailureIsChecked() {
+  const previous = 'merge-queue-main';
+  const failingRun = run({
+    id: 23,
+    sha: previous,
+    name: 'Main queue CI',
+    conclusion: 'failure',
+    event: 'merge_group',
+  });
+  const github = makeGithub({
+    pages: [[failingRun]],
+    jobsByRunId: {
+      23: [buildFailureJob()],
+    },
+    parentsBySha: {},
+    defaultBranchContainsSha: {
+      [previous]: true,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit merge-queue-main still has failing workflows/);
+}
+
+async function testWorkflowDispatchRunDoesNotHideFailingTrustedRun() {
+  const previous = 'previous-main';
+  const failingPushRun = run({
+    id: 24,
+    workflowId: 240,
+    sha: previous,
+    name: 'Main CI',
+    runNumber: 1,
+    conclusion: 'failure',
+    event: 'push',
+  });
+  const passingManualRun = run({
+    id: 25,
+    workflowId: 240,
+    sha: previous,
+    name: 'Main CI',
+    runNumber: 2,
+    event: 'workflow_dispatch',
+  });
+  const github = makeGithub({
+    pages: [[failingPushRun, passingManualRun]],
+    jobsByRunId: {
+      24: [buildFailureJob()],
+      25: [successJob()],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit previous-main still has failing workflows/);
+}
+
+async function testWorkflowRunsQueryTrustedEventsAndHeadShaOnly() {
+  const workflowRunListOptions = [];
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+    workflowRunListOptions,
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: 'quiet-main',
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.deepEqual(
+    workflowRunListOptions.map((options) => ({ event: options.event, headSha: options.head_sha })),
+    [
+      { event: 'push', headSha: 'quiet-main' },
+      { event: 'merge_group', headSha: 'quiet-main' },
+    ],
+  );
+}
+
+async function testWorkflowRunListNetworkFailureSetsHelpfulFailure() {
+  const workflowRunError = new Error('read ECONNRESET');
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+    workflowRunIteratorError: workflowRunError,
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: 'previous-main',
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Cannot determine prior real CI status because a GitHub API request failed/);
+  assert.match(core.failed[0], /workflow runs for previous-main/);
+  assert.match(core.failed[0], /read ECONNRESET/);
+}
+
+async function testJobListNetworkFailureSetsHelpfulFailure() {
+  const previous = 'previous-main';
+  const failingRun = run({ id: 26, sha: previous, name: 'Main CI', conclusion: 'failure' });
+  const jobError = new Error('read ECONNRESET');
+  const github = makeGithub({
+    pages: [[failingRun]],
+    jobsByRunId: {},
+    parentsBySha: {},
+    jobIteratorErrorByRunId: {
+      26: jobError,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Cannot determine prior real CI status because a GitHub API request failed/);
+  assert.match(core.failed[0], /jobs for workflow run 26/);
+  assert.match(core.failed[0], /read ECONNRESET/);
+}
+
+async function testNoRunSyntheticChainLooksThroughToParentFailure() {
+  const syntheticBase = 'synthetic-base';
+  const priorSyntheticBase = 'prior-synthetic-base';
+  const realFailure = 'real-failure';
+  const realRun = run({ id: 19, sha: realFailure, name: 'Main push lint', conclusion: 'failure' });
+  const github = makeGithub({
+    pages: [[realRun]],
+    jobsByRunId: {
+      19: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [syntheticBase]: priorSyntheticBase,
+      [priorSyntheticBase]: realFailure,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit real-failure still has failing workflows/);
+}
+
+async function testNoRunHopLimitStopsAtConfiguredLimitWithTrail() {
+  const syntheticBase = 'synthetic-base';
+  const priorSyntheticBase = 'prior-synthetic-base';
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {
+      [syntheticBase]: priorSyntheticBase,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    maxNoRunsHops: 1,
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /after 1 no-run merge queue candidate commits/);
+  assert.match(core.failed[0], /synthetic-base/);
+  assert.match(core.failed[0], /prior-synthetic-base/);
+}
+
+async function testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure() {
+  const syntheticBase = 'synthetic-base';
+  const realFailure = 'real-failure';
+  const failingRun = run({ id: 16, sha: realFailure, name: 'Ruby Tests', conclusion: 'failure' });
+  const compareError = new Error('No common ancestor');
+  compareError.status = 422;
+  const github = makeGithub({
+    pages: [[failingRun]],
+    jobsByRunId: {
+      16: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [syntheticBase]: realFailure,
+    },
+    compareErrorByBase: {
+      [syntheticBase]: compareError,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit real-failure still has failing workflows/);
+  assert.match(core.failed[0], /synthetic-base/);
+}
+
+async function testCompareTransientFailureSetsHelpfulFailure() {
+  const syntheticBase = 'synthetic-base';
+  const priorSyntheticBase = 'prior-synthetic-base';
+  const compareError = new Error('GitHub is unavailable');
+  compareError.status = 502;
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {
+      [syntheticBase]: priorSyntheticBase,
+    },
+    compareErrorByBase: {
+      [priorSyntheticBase]: compareError,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Cannot determine prior real CI status because a GitHub API request failed/);
+  assert.match(core.failed[0], /502/);
+  assert.equal(core.failed[0].match(/GitHub API status: 502/g).length, 1);
+  assert.match(core.failed[0], /Skipped candidate commits[\s\S]*- synthetic-base/);
+  assert.match(core.failed[0], /prior-synthetic-base/);
+  assert.match(core.failed[0], /GitHub is unavailable/);
+}
+
+async function testCompareNetworkFailureSetsHelpfulFailure() {
+  const syntheticBase = 'synthetic-base';
+  const compareError = new Error('read ECONNRESET');
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+    compareErrorByBase: {
+      [syntheticBase]: compareError,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Cannot determine prior real CI status because a GitHub API request failed/);
+  assert.match(core.failed[0], /synthetic-base/);
+  assert.match(core.failed[0], /read ECONNRESET/);
+}
+
+async function testFirstParentNetworkFailureSetsHelpfulFailure() {
+  const syntheticBase = 'synthetic-base';
+  const commitError = new Error('read ECONNRESET');
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+    commitErrorByRef: {
+      [syntheticBase]: commitError,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Cannot determine prior real CI status because a GitHub API request failed/);
+  assert.match(core.failed[0], /synthetic-base/);
+  assert.match(core.failed[0], /read ECONNRESET/);
+}
+
+async function testNoRunUnreachableSyntheticBaseWithoutParentFailsClosed() {
+  const syntheticBase = 'synthetic-base';
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /not in the default branch and has no parent commits to inspect/);
+  assert.match(core.failed[0], /synthetic-base/);
+}
+
+async function testMergeGroupReachabilityUsesRepositoryDefaultBranch() {
+  const syntheticBase = 'synthetic-base';
+  const compareBaseheads = [];
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+    compareBaseheads,
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: {
+      ...context,
+      eventName: 'merge_group',
+      payload: { repository: { default_branch: 'trunk' } },
+    },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.deepEqual(compareBaseheads, ['synthetic-base...trunk']);
+}
+
 async function testGuardOnlyFailuresLookThroughToParentSuccess() {
   const previous = 'docs-1';
   const parent = 'green';
@@ -290,11 +889,36 @@ async function main() {
     ]).get(10).id,
     7,
   );
+  assert.equal(
+    latestRunsByWorkflow([
+      run({ id: 8, workflowId: 11, sha: 'a', runNumber: 1, event: 'push' }),
+      run({ id: 9, workflowId: 11, sha: 'a', runNumber: 2, event: 'merge_group' }),
+    ]).get(11).id,
+    8,
+  );
 
   await testGuardOnlyFailuresLookThroughToParentFailure();
+  await testNoRunSyntheticBaseLooksThroughToParentFailure();
+  await testNoRunPushBaseAllowsQuietMainSkip();
+  await testNoRunSyntheticBaseAllowsQuietParentSkip();
+  await testReachableMergeQueueRunFailureIsChecked();
+  await testWorkflowDispatchRunDoesNotHideFailingTrustedRun();
+  await testWorkflowRunsQueryTrustedEventsAndHeadShaOnly();
+  await testWorkflowRunListNetworkFailureSetsHelpfulFailure();
+  await testJobListNetworkFailureSetsHelpfulFailure();
+  await testNoRunSyntheticChainLooksThroughToParentFailure();
+  await testNoRunHopLimitStopsAtConfiguredLimitWithTrail();
+  await testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure();
+  await testCompareTransientFailureSetsHelpfulFailure();
+  await testCompareNetworkFailureSetsHelpfulFailure();
+  await testFirstParentNetworkFailureSetsHelpfulFailure();
+  await testNoRunUnreachableSyntheticBaseWithoutParentFailsClosed();
+  await testMergeGroupReachabilityUsesRepositoryDefaultBranch();
   await testGuardOnlyFailuresLookThroughToParentSuccess();
   await testNonContiguousWorkflowRunPagesAreChecked();
   await testPaginatedJobsAreChecked();
+  await testOctokitJobIteratorArrayPagesAreChecked();
+  await testUnexpectedJobIteratorShapeFailsClearly();
   await testGuardOnlyHopLimitStopsAtConfiguredLimit();
 }
 

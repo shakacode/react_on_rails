@@ -64,6 +64,26 @@ export type ProvidedNewBundle = {
   bundle: Asset;
 };
 
+export function escapeServerTimingDescription(description: string): string {
+  return description.replace(/[\r\n\0]/g, '').replace(/["\\]/g, (char) => `\\${char}`);
+}
+
+/** Adds renderer prepare Server-Timing to streamed responses when enabled. */
+export function addRendererServerTiming(
+  response: ResponseResult,
+  startedAtMs: number,
+  enabled: boolean,
+): void {
+  if (!enabled || !response.stream) {
+    return;
+  }
+  const durMs = (performance.now() - startedAtMs).toFixed(3);
+  const desc = 'Node renderer prepare (bundle sync + exec context build + render start)';
+  const entry = `ror_renderer_prepare;dur=${durMs};desc="${escapeServerTimingDescription(desc)}"`;
+  const existing = response.headers['Server-Timing'];
+  response.headers['Server-Timing'] = existing ? `${existing}, ${entry}` : entry;
+}
+
 async function prepareResult(
   renderingRequest: string,
   bundleTimestamp: string | number,
@@ -126,6 +146,24 @@ async function prepareResult(
       return errorResponseResult(exceptionMessage);
     }
   });
+}
+
+async function prepareResponseWithServerTiming(
+  renderingRequest: string,
+  bundleTimestamp: string | number,
+  bundleFilePathPerTimestamp: string,
+  executionContext: ExecutionContext,
+  rendererServerTimingStartedAtMs: number,
+  rscStreamObservability: boolean,
+): Promise<{ response: ResponseResult; executionContext: ExecutionContext }> {
+  const response = await prepareResult(
+    renderingRequest,
+    bundleTimestamp,
+    bundleFilePathPerTimestamp,
+    executionContext,
+  );
+  addRendererServerTiming(response, rendererServerTimingStartedAtMs, rscStreamObservability);
+  return { response, executionContext };
 }
 
 /**
@@ -251,6 +289,7 @@ export async function handleRenderRequest({
   dependencyBundleTimestamps,
   providedNewBundles,
   assetsToCopy,
+  rscStreamObservability = false,
   tracingContext,
 }: {
   renderingRequest: string;
@@ -258,6 +297,7 @@ export async function handleRenderRequest({
   dependencyBundleTimestamps?: string[] | number[];
   providedNewBundles?: ProvidedNewBundle[] | null;
   assetsToCopy?: Asset[] | null;
+  rscStreamObservability?: boolean;
   tracingContext?: TracingContext;
 }): Promise<{ response: ResponseResult; executionContext?: ExecutionContext }> {
   try {
@@ -279,6 +319,9 @@ export async function handleRenderRequest({
       };
     }
 
+    // Start before the first VM lookup so cache-hit and cache-miss timings cover
+    // the same request span, including bundle upload on first deploy.
+    const rendererServerTimingStartedAtMs = performance.now();
     try {
       const executionContext = await subSpan(
         {
@@ -291,15 +334,14 @@ export async function handleRenderRequest({
         },
         () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false),
       );
-      return {
-        response: await prepareResult(
-          renderingRequest,
-          bundleTimestamp,
-          entryBundleFilePath,
-          executionContext,
-        ),
+      return await prepareResponseWithServerTiming(
+        renderingRequest,
+        bundleTimestamp,
+        entryBundleFilePath,
         executionContext,
-      };
+        rendererServerTimingStartedAtMs,
+        rscStreamObservability,
+      );
     } catch (e) {
       // Ignore VMContextNotFoundError, it means the bundle does not exist.
       // The following code will handle this case.
@@ -357,10 +399,14 @@ export async function handleRenderRequest({
       },
       () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true),
     );
-    return {
-      response: await prepareResult(renderingRequest, bundleTimestamp, entryBundleFilePath, executionContext),
+    return await prepareResponseWithServerTiming(
+      renderingRequest,
+      bundleTimestamp,
+      entryBundleFilePath,
       executionContext,
-    };
+      rendererServerTimingStartedAtMs,
+      rscStreamObservability,
+    );
   } catch (error) {
     const msg = formatExceptionMessage(
       { renderingRequest },

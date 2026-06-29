@@ -16,7 +16,7 @@
 require_relative "../spec_helper"
 
 module ReactOnRailsPro
-  module ServerRenderingPool
+  module ServerRenderingPool # rubocop:disable Metrics/ModuleLength
     RSpec.describe NodeRenderingPool do
       describe ".eval_js" do
         let(:render_options) { instance_double(ReactOnRails::ReactComponent::RenderOptions) }
@@ -164,6 +164,7 @@ module ReactOnRailsPro
             ).tap do |opts|
               allow(opts).to receive(:internal_option).with(:async_props_block).and_return(async_props_block)
               allow(opts).to receive(:internal_option).with(:push_props).and_return(nil)
+              allow(opts).to receive(:internal_option).with(:rsc_stream_observability).and_return(false)
             end
           end
 
@@ -179,7 +180,14 @@ module ReactOnRailsPro
             expect(described_class).to have_received(:prepare_incremental_render_path)
               .with(js_code, render_options)
             expect(ReactOnRailsPro::Request).to have_received(:render_code_with_incremental_updates)
-              .with(expected_path, js_code, async_props_block:, pull_enabled: false, push_props: nil)
+              .with(
+                expected_path,
+                js_code,
+                async_props_block:,
+                pull_enabled: false,
+                push_props: nil,
+                rsc_stream_observability: false
+              )
           end
 
           it "enables pull mode when push_props is provided" do
@@ -193,17 +201,23 @@ module ReactOnRailsPro
             described_class.eval_streaming_js(js_code, render_options)
 
             expect(ReactOnRailsPro::Request).to have_received(:render_code_with_incremental_updates)
-              .with(expected_path, js_code, async_props_block:, pull_enabled: true, push_props: [])
+              .with(
+                expected_path,
+                js_code,
+                async_props_block:,
+                pull_enabled: true,
+                push_props: [],
+                rsc_stream_observability: false
+              )
           end
         end
 
         context "when async_props_block is NOT present" do
           let(:render_options) do
-            instance_double(
-              ReactOnRails::ReactComponent::RenderOptions,
-              rsc_payload_streaming?: false,
-              internal_option: nil
-            )
+            instance_double(ReactOnRails::ReactComponent::RenderOptions, rsc_payload_streaming?: false).tap do |opts|
+              allow(opts).to receive(:internal_option).with(:async_props_block).and_return(nil)
+              allow(opts).to receive(:internal_option).with(:rsc_stream_observability).and_return(false)
+            end
           end
 
           it "calls prepare_render_path and render_code_as_stream" do
@@ -218,7 +232,7 @@ module ReactOnRailsPro
             expect(described_class).to have_received(:prepare_render_path)
               .with(js_code, render_options)
             expect(ReactOnRailsPro::Request).to have_received(:render_code_as_stream)
-              .with(expected_path, js_code, is_rsc_payload: false)
+              .with(expected_path, js_code, is_rsc_payload: false, rsc_stream_observability: false)
           end
         end
       end

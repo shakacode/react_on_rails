@@ -61,16 +61,22 @@ RSpec.describe ReactOnRailsPro::Stream do
       component_queues = Array.new(component_count) { Async::Queue.new }
       controller = StreamController.new(component_queues:, initial_response:)
 
-      mocked_response = instance_double(ActionController::Live::Response)
-      mocked_stream = instance_double(ActionController::Live::Buffer)
-      allow(mocked_response).to receive(:stream).and_return(mocked_stream)
-      allow(mocked_response).to receive(:content_type=)
-      allow(mocked_stream).to receive(:write)
-      allow(mocked_stream).to receive(:close)
-      allow(mocked_stream).to receive(:closed?).and_return(false)
+      mocked_response, mocked_stream = build_mocked_response
       allow(controller).to receive(:response).and_return(mocked_response)
 
       [component_queues, controller, mocked_stream]
+    end
+
+    def build_mocked_response
+      mocked_response = instance_double(ActionController::Live::Response)
+      mocked_stream = instance_double(ActionController::Live::Buffer)
+      allow(mocked_response).to receive_messages(stream: mocked_stream, headers: {})
+      allow(mocked_response).to receive(:content_type=)
+      # `receive_messages` yields the same Hash instance on every call, so header writes performed
+      # before the first stream write (e.g. Server-Timing) persist and are observable in tests.
+      allow(mocked_stream).to receive_messages(write: nil, close: nil, closed?: false)
+
+      [mocked_response, mocked_stream]
     end
 
     it "streams components concurrently" do
@@ -180,6 +186,81 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(written_chunks.second).to include('perf.mark("react-on-rails:rsc:stream"')
       expect(written_chunks.second).to include('"phase":"stream-complete"')
       expect(written_chunks.second).to include('"initialChunkBytes":8')
+    end
+
+    it "emits a Server-Timing response header for the shell render when observability is on" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      allow(stream).to receive(:write)
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        sleep 0.1
+      end
+
+      server_timing = controller.response.headers["Server-Timing"]
+      expect(server_timing).to be_present
+      expect(server_timing).to match(/\Aror_stream_shell;dur=\d+(\.\d+)?;desc="[^"]+"\z/)
+    end
+
+    it "does not emit a Server-Timing header when observability is off" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      allow(stream).to receive(:write)
+
+      run_stream(controller) do |_parent|
+        sleep 0.1
+      end
+
+      expect(controller.response.headers["Server-Timing"]).to be_nil
+    end
+
+    it "appends to an existing Server-Timing header rather than replacing it" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      allow(stream).to receive(:write)
+      controller.response.headers["Server-Timing"] = "action_total;dur=5"
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        sleep 0.1
+      end
+
+      server_timing = controller.response.headers["Server-Timing"]
+      expect(server_timing).to start_with("action_total;dur=5, ror_stream_shell;dur=")
+    end
+
+    it "appends to array-valued Server-Timing headers without stringifying the array" do
+      _queues, controller, stream = setup_stream_test(component_count: 0)
+      allow(stream).to receive(:write)
+      controller.response.headers["Server-Timing"] = ["cdn-cache;dur=10"]
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        sleep 0.1
+      end
+
+      server_timing = controller.response.headers["Server-Timing"]
+      expect(server_timing).to start_with("cdn-cache;dur=10, ror_stream_shell;dur=")
+      expect(server_timing).not_to include("[")
+    end
+
+    it "escapes description values for Server-Timing quoted strings" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+
+      expect(controller.send(:server_timing_quoted_string, "quote \" and slash \\ and \r\n\0 controls")).to eq(
+        'quote \" and slash \\\\ and  controls'
+      )
+    end
+
+    it "swallows Server-Timing header emission errors even when logging fails" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+      failing_headers = instance_double(Hash)
+      allow(failing_headers).to receive(:[]).and_raise(StandardError, "headers unavailable")
+      allow(controller.response).to receive(:headers).and_return(failing_headers)
+
+      failing_logger = instance_double(Logger)
+      allow(failing_logger).to receive(:warn).and_raise(StandardError, "logger unavailable")
+      allow(Rails).to receive(:logger).and_return(failing_logger)
+
+      controller.instance_variable_set(:@react_on_rails_rsc_stream_observability, true)
+      controller.instance_variable_set(:@react_on_rails_rsc_stream_initial_render_duration_ms, 12.3)
+
+      expect { controller.send(:emit_rsc_stream_server_timing_header) }.not_to raise_error
     end
 
     it "escapes the final observability mark name inside the generated script" do
