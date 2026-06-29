@@ -4575,9 +4575,34 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:add_legacy_redux_install_warning)
         .and_raise(StandardError, "warning failed")
       allow(install_generator).to receive(:print_generator_messages)
+      allow(install_generator).to receive(:warn)
 
       expect { install_generator.run_generators }.to raise_error(Thor::Error, "generator failed")
       expect(install_generator).to have_received(:print_generator_messages)
+    end
+
+    specify "warning failures do not mask shakapacker gemfile errors" do
+      install_generator = install_generator_fixture(redux: true)
+
+      allow(install_generator).to receive(:add_legacy_redux_install_warning)
+        .and_raise(StandardError, "warning failed")
+      allow(install_generator).to receive(:warn)
+
+      expect do
+        install_generator.send(:handle_shakapacker_gemfile_error)
+      end.to raise_error(Thor::Error, /Failed to add Shakapacker/)
+    end
+
+    specify "warning failures do not mask shakapacker install errors" do
+      install_generator = install_generator_fixture(redux: true)
+
+      allow(install_generator).to receive(:add_legacy_redux_install_warning)
+        .and_raise(StandardError, "warning failed")
+      allow(install_generator).to receive(:warn)
+
+      expect do
+        install_generator.send(:handle_shakapacker_install_error)
+      end.to raise_error(Thor::Error, /Failed to install Shakapacker/)
     end
 
     specify "hidden install --redux --tailwind warning stays on the install path" do

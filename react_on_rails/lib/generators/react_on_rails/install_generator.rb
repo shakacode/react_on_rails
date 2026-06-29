@@ -221,6 +221,7 @@ module ReactOnRails
         # print_generator_messages raises an exception. This prevents ENV pollution
         # that could affect subsequent processes.
         ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
+        # Keep primary failure details first; the legacy Redux advisory is best-effort.
         add_legacy_redux_install_warning_once_safely
         print_generator_messages
       end
@@ -816,15 +817,14 @@ module ReactOnRails
       def add_legacy_redux_install_warning_once
         return if @legacy_redux_install_warning_added
 
-        # Set the flag after enqueueing so a failed warning add can be retried.
         add_legacy_redux_install_warning
         @legacy_redux_install_warning_added = true
       end
 
       def add_legacy_redux_install_warning_once_safely
         add_legacy_redux_install_warning_once
-      rescue StandardError
-        # Preserve the primary generator output; this legacy advisory is best-effort.
+      rescue StandardError => e
+        warn "[react_on_rails] Skipped legacy Redux warning: #{e.message}"
         nil
       end
 
@@ -1111,7 +1111,7 @@ module ReactOnRails
           Then re-run: #{recovery_install_command}
         MSG
         GeneratorMessages.add_error(error)
-        add_legacy_redux_install_warning_once
+        add_legacy_redux_install_warning_once_safely
         raise Thor::Error, error unless options.ignore_warnings?
       end
 
@@ -1136,7 +1136,7 @@ module ReactOnRails
           Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
         MSG
         GeneratorMessages.add_error(error)
-        add_legacy_redux_install_warning_once
+        add_legacy_redux_install_warning_once_safely
         raise Thor::Error, error unless options.ignore_warnings?
       end
 

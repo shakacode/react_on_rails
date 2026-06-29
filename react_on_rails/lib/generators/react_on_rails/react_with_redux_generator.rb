@@ -13,7 +13,8 @@ module ReactOnRails
 
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
-      # Keep this standalone warning aligned with InstallGenerator#add_legacy_redux_install_warning.
+      # Keep the runtime API compatibility sentence aligned with InstallGenerator#add_legacy_redux_install_warning.
+      # The install path adds recovery docs and command guidance that this standalone warning intentionally omits.
       LEGACY_REDUX_GENERATOR_WARNING = <<~MSG.strip.freeze
         The react_on_rails:react_with_redux generator is a hidden legacy Redux generator path and is not
         recommended for new React on Rails apps.
@@ -28,6 +29,7 @@ module ReactOnRails
       class_option :rsc, type: :boolean, default: false, hide: true
       class_option :tailwind, type: :boolean, default: false, hide: true
 
+      # Only this public method is dispatched by Rails; helpers below stay private.
       def run_generator
         add_legacy_redux_generator_warning
         validate_standalone_tailwind
