@@ -180,14 +180,14 @@ module ReactOnRailsProHelper
     end
 
     on_complete = options.delete(:on_complete)
-    chunks = [] if on_complete
+    chunks = [] if on_complete.respond_to?(:call)
     html = +""
 
     internal_stream_react_component(component_name, options).each_chunk do |chunk|
       chunks&.push(chunk)
       html << chunk.to_s
     end
-    on_complete&.call(chunks)
+    on_complete.call(chunks) if on_complete.respond_to?(:call)
 
     html.html_safe
   end
@@ -312,17 +312,15 @@ module ReactOnRailsProHelper
           raw_cache_key = raw_options[:cache_key]
           cache_key_value = raw_cache_key.respond_to?(:call) ? raw_cache_key.call : raw_cache_key
 
-          if ReactOnRailsPro.configuration.enable_rsc_support
-            [cache_key_value, ReactOnRailsPro::Utils.rsc_bundle_hash]
-          else
-            cache_key_value
-          end
+          key_parts = ["buffered_stream_react_component", cache_key_value]
+          key_parts << ReactOnRailsPro::Utils.rsc_bundle_hash if ReactOnRailsPro.configuration.enable_rsc_support
+          key_parts
         end,
         prerender: true
       )
 
       cached_result = fetch_react_component(component_name, cache_options) do
-        options = raw_options.merge(
+        options = raw_options.except(:on_complete).merge(
           props: yield,
           skip_prerender_cache: true,
           auto_load_bundle: ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]

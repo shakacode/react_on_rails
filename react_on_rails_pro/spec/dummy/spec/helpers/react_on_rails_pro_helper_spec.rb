@@ -462,6 +462,18 @@ describe ReactOnRailsProHelper do
         expect(result).to script_tag_be_included(react_component_specification_tag)
         expect(chunks_read.count).to eq(chunks.count)
       end
+
+      it "ignores false on_complete values" do
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = buffered_stream_react_component(component_name, props:, on_complete: false, **component_options)
+        end
+
+        expect(result).to include(react_component_div_with_initial_chunk)
+        expect(chunks_read.count).to eq(chunks.count)
+      end
     end
 
     describe "#stream_react_component" do # rubocop:disable RSpec/MultipleMemoizedHelpers
@@ -1083,7 +1095,11 @@ describe ReactOnRailsProHelper do
           mock_request_and_response
           expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
             component_name,
-            cache_key: [["buffered-stream-cache-spec", component_name], "#{'b' * 32}-test"],
+            cache_key: [
+              "buffered_stream_react_component",
+              ["buffered-stream-cache-spec", component_name],
+              "#{'b' * 32}-test"
+            ],
             prerender: true
           )
 
@@ -1131,7 +1147,10 @@ describe ReactOnRailsProHelper do
           )
           expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
             component_name,
-            cache_key: ["buffered-stream-cache-spec-no-rsc", component_name],
+            cache_key: [
+              "buffered_stream_react_component",
+              ["buffered-stream-cache-spec-no-rsc", component_name]
+            ],
             prerender: true
           )
 
@@ -1151,6 +1170,66 @@ describe ReactOnRailsProHelper do
         expect(props_calls).to eq(1)
       ensure
         ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
+      end
+
+      it "does not collide with cached stream entries when RSC support is disabled" do
+        original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+        ReactOnRailsPro.configuration.enable_rsc_support = false
+        user_cache_key = ["buffered-stream-cache-collision", component_name]
+        streaming_cache_key = nil
+        buffered_cache_key = nil
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          streaming_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: user_cache_key,
+            prerender: true
+          )
+          buffered_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["buffered_stream_react_component", user_cache_key],
+            prerender: true
+          )
+          Rails.cache.write(streaming_cache_key, [+"stream chunk"], expires_in: 60)
+
+          result = cached_buffered_stream_react_component(
+            component_name,
+            cache_key: user_cache_key,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to be_html_safe
+        expect(Rails.cache.read(streaming_cache_key)).to eq(["stream chunk"])
+        expect(Rails.cache.read(buffered_cache_key)).to eq(result)
+      ensure
+        ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
+      end
+
+      it "ignores on_complete on cache miss so hits and misses have the same callback behavior" do
+        on_complete_called = false
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = cached_buffered_stream_react_component(
+            component_name,
+            cache_key: ["buffered-stream-cache-on-complete", component_name],
+            id: "#{component_name}-react-component-0",
+            on_complete: ->(_chunks) { on_complete_called = true },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to be_html_safe
+        expect(on_complete_called).to be false
       end
     end
 

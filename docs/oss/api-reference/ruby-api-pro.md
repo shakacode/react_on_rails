@@ -101,7 +101,7 @@ Same caching options as `cached_react_component`.
 
 Fragment-cached version of `buffered_stream_react_component`. Cache hits return the complete buffered HTML string without evaluating the props block or re-rendering in Node.
 
-Same caching options as `cached_react_component`.
+Cache key, tag, and expiry options are the same as `cached_react_component`. Unlike `cached_react_component`, this helper always forces `prerender: true`, so the server bundle digest is always included in the cache key. It also uses a buffered-stream cache namespace, and when `enable_rsc_support` is true, the RSC bundle digest is appended so cached payloads expire with the RSC bundle.
 
 ```ruby
 <%= cached_buffered_stream_react_component("MarketingPage",
