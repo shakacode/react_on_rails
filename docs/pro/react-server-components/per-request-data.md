@@ -411,15 +411,15 @@ export default function ProductPage(props, railsContext) {
     );
   }
 
-  const { pageHref, pagePathname } = props;
-  if (!pageHref || !pagePathname) {
+  const { pageHref, pageLocale, pagePathname } = props;
+  if (!pageHref || pageLocale == null || !pagePathname) {
     throw new Error(
-      'ProductPage requires pageHref and pagePathname props; pass them from Rails instead of using the RSC payload URL.',
+      'ProductPage requires pageHref, pageLocale, and pagePathname props; pass them from Rails instead of using the RSC payload request context.',
     );
   }
 
   const layoutContext = {
-    locale: railsContext.i18nLocale,
+    locale: pageLocale,
     pathname: pagePathname,
     publicEnv: {
       host: railsContext.host,
@@ -441,7 +441,7 @@ export default function ProductPage(props, railsContext) {
 
 The render function returns `ProductPageWithLayoutContext` instead of JSX directly because React on Rails invokes `ProductPage(props, railsContext)` before React starts rendering. At that point `React.cache()` is not yet request-scoped, so seeding must happen inside a component that React renders. The `LayoutRequestStoreSeeder` wrapper makes the seeding boundary explicit in JSX. If this entry has only one seeder, calling `seedLayoutRequestStore(layoutContext)` at the top of `ProductPageWithLayoutContext` before `return` is also valid for the seeding-order guarantee; use the wrapper when you want the JSX tree to show the boundary clearly.
 
-Pass current-page URL values, such as `pageHref` and `pagePathname`, through props from Rails when readers need them. During client RSC payload refetches, `railsContext.href` and `railsContext.pathname` describe the `/rsc_payload/:component` request, not the page that originally hosted the component.
+Pass current-page values, such as `pageHref`, `pageLocale`, and `pagePathname`, through props from Rails when readers need them. During client RSC payload refetches, `railsContext.href` and `railsContext.pathname` describe the `/rsc_payload/:component` request, not the page that originally hosted the component. In apps that derive locale from the route or controller, `railsContext.i18nLocale` can likewise describe the payload request rather than the original page.
 
 ```jsx
 // DeepServerComponent.jsx
