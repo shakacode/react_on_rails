@@ -4403,7 +4403,7 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to include("legacy Redux generator path")
       expect(output_text).to include("React on Rails generator prerequisites not met")
       expect(output_text.index("legacy Redux generator path"))
-        .to be < output_text.index("React on Rails generator prerequisites not met")
+        .to be > output_text.index("React on Rails generator prerequisites not met")
     end
 
     specify "shows incomplete-installation guidance when shakapacker setup fails" do
@@ -4767,6 +4767,15 @@ describe InstallGenerator, type: :generator do
       message_text = GeneratorMessages.messages.join("\n")
       expect(message_text).to include("legacy Redux generator path")
       expect(message_text).to match(/not\s+recommended for new React on Rails apps/)
+    end
+
+    it "does not warn from the standalone Redux generator when invoked by install" do
+      redux_generator = redux_generator_fixture(invoked_by_install: true)
+      GeneratorMessages.clear
+
+      redux_generator.send(:add_legacy_redux_generator_warning)
+
+      expect(GeneratorMessages.messages.join("\n")).not_to include("legacy Redux generator path")
     end
 
     it "queues the standalone Redux warning before fallible scaffold work" do

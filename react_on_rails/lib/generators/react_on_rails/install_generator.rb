@@ -816,6 +816,7 @@ module ReactOnRails
       def add_legacy_redux_install_warning_once
         return if @legacy_redux_install_warning_added
 
+        # Set the flag after enqueueing so a failed warning add can be retried.
         add_legacy_redux_install_warning
         @legacy_redux_install_warning_added = true
       end
