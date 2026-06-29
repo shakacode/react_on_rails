@@ -411,7 +411,8 @@ Before upgrading:
 - `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
   async-http manages connection lifecycle through its scheduler-scoped clients and ephemeral request clients. Explicitly
   setting it to a non-`nil` value in your `configure` block emits a deprecation warning; leaving it unset or setting it
-  to `nil` is accepted silently.
+  to `nil` is accepted silently. If you previously set it to `30` (the old default), remove the line from your
+  `configure` block entirely.
 
 #### Upgrading to 16.4.0 or later
 

@@ -184,7 +184,7 @@ The dominant contributors to a streamed route's `responseEnd` tail are Node rend
 Each worker compiles its bundle on its **first** render request, so the first measured render after a deploy is cold. Pre-warm every worker before serving real traffic so cold-start cost does not land on a user (or skew a benchmark):
 
 - Send a warm-up render (or hit `/ready` after a warm-up render) to each replica during deploy.
-- With `workersCount > 1`, a single warm-up render is not enough. Route warm-up traffic so it reaches **every** worker under your actual load-balancing policy; sticky or hash-based routing may require replica-local hooks or an explicit fan-out endpoint.
+- With `workersCount > 1`, a single warm-up render is not enough. Route warm-up traffic so it reaches **every** worker under your actual load-balancing policy; sticky or hash-based routing may require replica-local hooks or an explicit fan-out endpoint. **Do not gate all traffic on `/ready` without a separate warm-up path** — if no render requests reach the renderer, `/ready` never flips to 200 (deadlock).
 
 Full warm-up patterns (Kubernetes probes, `postStart` hooks, the `/ready` cold-start contract) are in [Node renderer health checks → Gating traffic on `/ready`](../building-features/node-renderer/health-checks.md#gating-traffic-on-ready).
 
@@ -202,7 +202,7 @@ Guidance:
 - With Falcon or another long-lived scheduler, keep `renderer_http_pool_size` close to (and generally not far above) `workersCount`; streamed renders sharing that scheduler multiplex through the same async-http client, and sending many more concurrent renderer requests than there are workers just queues renders at the renderer while adding stream overhead.
 - Under standard Puma streaming, `Sync {}` creates a request-scoped client, so `renderer_http_pool_size` only bounds concurrent renderer calls inside one streamed response. Use a value near the number of renderer calls one response can overlap; scale `workersCount` and renderer replicas for cross-request concurrency.
 - Account for your Rails concurrency: with many Puma threads/workers all streaming, a renderer with only one or two workers becomes the bottleneck. Scale `workersCount` (and renderer replicas) to your real concurrent streamed-render load.
-- Tune `ssr_timeout` for legitimate long gaps between streamed chunks — it applies to renderer socket I/O, so it can fire when a read or write operation blocks for `ssr_timeout` seconds. It is not a total response-duration cap; avoid masking renderer hangs with an unnecessarily high value.
+- Tune `ssr_timeout` for legitimate long gaps between streamed chunks — it applies as a per-read socket timeout, so it fires when a single read from the renderer blocks for `ssr_timeout` seconds. It is not a total response-duration cap; avoid masking renderer hangs with an unnecessarily high value.
 
 ### 3. Rails ↔ renderer keep-alive (persistent on Falcon/async scheduler; per-request on standard Puma)
 
@@ -212,7 +212,7 @@ Under standard Puma, the streaming helper's `Sync {}` block creates a per-reques
 
 Call the renderer from the normal Rails request path. The adapter chooses scheduler-scoped reuse whenever a `Fiber.scheduler` already exists before it enters `Sync {}`; custom middleware or background code that installs a scheduler with an unclear lifecycle can therefore keep renderer clients alive longer than intended. Keep those calls inside the request's scheduler lifecycle, or use the standard path where `Sync {}` creates and cleans up the per-request client.
 
-`config.renderer_http_keep_alive_timeout` is **deprecated** and ignored: the async-http adapter manages connection lifecycle automatically (connections are reused within the scheduler and cleaned up when it ends). Explicitly setting it to a non-`nil` value in your `configure` block logs a deprecation warning; leaving it unset or setting it to `nil` is accepted silently.
+`config.renderer_http_keep_alive_timeout` is **deprecated** and ignored: the async-http adapter manages connection lifecycle automatically (connections are reused within the scheduler and cleaned up when it ends). Explicitly setting it to a non-`nil` value in your `configure` block emits a deprecation warning; leaving it unset or setting it to `nil` is accepted silently. If you previously set it to `30` (the old default), remove the line from your `configure` block entirely.
 
 To confirm reuse, compare before/after `responseEnd` timing and streamed RSC performance marks, and trace renderer sockets when you need to distinguish long-lived scheduler reuse from standard Puma's per-request scheduler cleanup.
 
