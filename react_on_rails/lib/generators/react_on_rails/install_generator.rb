@@ -198,8 +198,8 @@ module ReactOnRails
         ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
 
         if installation_prerequisites_met? || options.ignore_warnings?
-          add_legacy_redux_install_warning
           invoke_generators
+          add_legacy_redux_install_warning
           add_package_json_scripts
           add_ci_workflow
           add_bin_scripts
@@ -786,6 +786,7 @@ module ReactOnRails
       def add_legacy_redux_install_warning
         return unless options.redux?
 
+        legacy_docs_url = "https://reactonrails.com/docs/api-reference/generator-details/"
         legacy_guidance, legacy_command =
           if use_tailwind?
             [
@@ -807,6 +808,7 @@ module ReactOnRails
 
               #{legacy_command}
 
+          For legacy Redux recovery details, see #{legacy_docs_url}.
           Runtime Redux APIs such as redux_store remain supported.
         MSG
       end

@@ -4676,7 +4676,7 @@ describe InstallGenerator, type: :generator do
       redux_generator = redux_generator_fixture(tailwind: true)
       GeneratorMessages.clear
 
-      expect { redux_generator.validate_standalone_tailwind }
+      expect { redux_generator.send(:validate_standalone_tailwind) }
         .to raise_error(Thor::Error, /react_with_redux generator does not support --tailwind/)
 
       error_text = GeneratorMessages.messages.join("\n")
@@ -4691,7 +4691,7 @@ describe InstallGenerator, type: :generator do
       redux_generator = redux_generator_fixture(tailwind: true, invoked_by_install: true)
       GeneratorMessages.clear
 
-      expect { redux_generator.validate_standalone_tailwind }.not_to raise_error
+      expect { redux_generator.send(:validate_standalone_tailwind) }.not_to raise_error
       expect(GeneratorMessages.messages.join("\n")).not_to include(
         "standalone react_on_rails:react_with_redux generator does not support --tailwind"
       )
@@ -4699,13 +4699,21 @@ describe InstallGenerator, type: :generator do
 
     it "warns that direct standalone Redux generation is legacy" do
       redux_generator = redux_generator_fixture
-      allow(redux_generator).to receive(:print_generator_messages)
 
-      redux_generator.add_redux_specific_messages
+      redux_generator.send(:add_redux_specific_messages)
 
       message_text = GeneratorMessages.messages.join("\n")
       expect(message_text).to include("legacy Redux generator path")
       expect(message_text).to match(/not\s+recommended for new React on Rails apps/)
+    end
+
+    it "prints queued messages when standalone Redux Tailwind validation fails" do
+      redux_generator = redux_generator_fixture(tailwind: true)
+      allow(redux_generator).to receive(:print_generator_messages)
+
+      expect { redux_generator.run_generator }
+        .to raise_error(Thor::Error, /react_with_redux generator does not support --tailwind/)
+
       expect(redux_generator).to have_received(:print_generator_messages)
     end
   end

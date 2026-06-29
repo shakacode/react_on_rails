@@ -20,31 +20,25 @@ module ReactOnRails
         redux_store remain supported.
       MSG
 
-      class_option :typescript,
-                   type: :boolean,
-                   default: false,
-                   desc: "Generate TypeScript files",
-                   aliases: "-T"
+      class_option :typescript, type: :boolean, default: false, desc: "Generate TypeScript files", aliases: "-T"
+      class_option :invoked_by_install, type: :boolean, default: false, hide: true
+      class_option :new_app, type: :boolean, default: false, hide: true
+      class_option :rsc, type: :boolean, default: false, hide: true
+      class_option :tailwind, type: :boolean, default: false, hide: true
 
-      class_option :invoked_by_install,
-                   type: :boolean,
-                   default: false,
-                   hide: true
+      def run_generator
+        validate_standalone_tailwind
+        create_redux_directories
+        copy_base_files
+        copy_base_redux_files
+        create_appropriate_templates
+        add_redux_npm_dependencies
+        add_redux_specific_messages
+      ensure
+        print_generator_messages unless options[:invoked_by_install]
+      end
 
-      class_option :new_app,
-                   type: :boolean,
-                   default: false,
-                   hide: true
-
-      class_option :rsc,
-                   type: :boolean,
-                   default: false,
-                   hide: true
-
-      class_option :tailwind,
-                   type: :boolean,
-                   default: false,
-                   hide: true
+      private
 
       def validate_standalone_tailwind
         return unless unsupported_standalone_tailwind?
@@ -144,10 +138,7 @@ module ReactOnRails
                                                                tailwind: use_tailwind?,
                                                                app_root: destination_root)
         )
-        print_generator_messages
       end
-
-      private
 
       def unsupported_standalone_tailwind?
         return false unless use_tailwind?
