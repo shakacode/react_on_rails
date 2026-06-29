@@ -380,7 +380,7 @@ const _getLayoutRequestStore = cache(() => ({}));
 
 export function seedLayoutRequestStore(layoutContext) {
   const store = _getLayoutRequestStore();
-  // Mutation is safe in an RSC render context: this seeder runs once in a parent
+  // Mutation is safe under the RSC renderer: this seeder runs once in a parent
   // component before any reader renders. See "Seed Once, Read Anywhere" for the
   // full rationale.
   store.locale = layoutContext.locale;
@@ -432,7 +432,7 @@ export default function ProductPage(props, railsContext) {
 }
 ```
 
-The render function returns `ProductPageWithLayoutContext` instead of JSX directly because React on Rails invokes `ProductPage(props, railsContext)` before React enters the RSC render work loop. Calling `_getLayoutRequestStore()` there has no active React request scope to attach to, so seeding must happen inside a component that React renders. If you want the JSX tree to show the boundary explicitly, wrap children in a `LayoutRequestStoreSeeder` component that calls `seedLayoutRequestStore(layoutContext)` and returns `<>{children}</>`.
+The render function returns `ProductPageWithLayoutContext` instead of JSX directly because React on Rails invokes `ProductPage(props, railsContext)` before React enters the RSC render work loop. At that point, `React.cache()` is outside the per-request AsyncLocalStorage scope React establishes for each render tree, so `_getLayoutRequestStore()` would not access the same request-local slot used by components rendered by React. Seeding must happen inside a component that React renders. If you want the JSX tree to show the boundary explicitly, wrap children in a `LayoutRequestStoreSeeder` component that calls `seedLayoutRequestStore(layoutContext)` and returns `<>{children}</>`.
 
 Pass current-page values, such as `pageHref`, `pageLocale`, and `pagePathname`, through props from Rails when readers need them. During client RSC payload refetches, `railsContext.href` and `railsContext.pathname` describe the `/rsc_payload/:component` request, not the page that originally hosted the component. In apps that derive locale from the route or controller, `railsContext.i18nLocale` can likewise describe the payload request rather than the original page.
 
@@ -561,12 +561,13 @@ export default function UserGreeting() {
 
 ## When to Use Each Approach
 
-| Approach                    | Use when                                                           | Example                              |
-| --------------------------- | ------------------------------------------------------------------ | ------------------------------------ |
-| `React.cache(fn)` with args | Multiple components call the same function with the same arguments | `getIntl(locale)`, `getUser(userId)` |
-| Seed once, read anywhere    | You want Context-like zero-argument access across the tree         | `getRequestStore().locale`           |
-| Props from Rails            | Data is used by a single component or a small subtree              | `<ProductCard product={product} />`  |
-| Client Component Context    | Interactive components need reactive state                         | `<IntlProvider>`, `<ThemeProvider>`  |
+| Approach                    | Use when                                                                                        | Example                                 |
+| --------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `React.cache(fn)` with args | Multiple components call the same function with the same arguments                              | `getIntl(locale)`, `getUser(userId)`    |
+| Seed once, read anywhere    | You want Context-like zero-argument access across the tree                                      | `getRequestStore().locale`              |
+| Render-function layout seed | A top-level RSC entry needs Rails page data available to deep readers without module-level refs | `seedLayoutRequestStore(layoutContext)` |
+| Props from Rails            | Data is used by a single component or a small subtree                                           | `<ProductCard product={product} />`     |
+| Client Component Context    | Interactive components need reactive state                                                      | `<IntlProvider>`, `<ThemeProvider>`     |
 
 ## Rules and Pitfalls
 
