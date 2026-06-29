@@ -248,6 +248,30 @@ function bundleTimestampPathComponent(bundleTimestamp: string | number) {
   return pathComponent;
 }
 
+export function assetFilenamePathComponent(filename: string) {
+  const pathComponent = filename;
+
+  if (
+    !pathComponent ||
+    pathComponent === '.' ||
+    pathComponent === '..' ||
+    path.isAbsolute(pathComponent) ||
+    path.posix.isAbsolute(pathComponent) ||
+    path.win32.isAbsolute(pathComponent) ||
+    pathComponent.includes('/') ||
+    pathComponent.includes('\\') ||
+    path.basename(pathComponent) !== pathComponent ||
+    path.posix.basename(pathComponent) !== pathComponent ||
+    path.win32.basename(pathComponent) !== pathComponent
+  ) {
+    throw new Error(
+      `Invalid asset filename path component: ${pathComponent}. Expected a single filename, not a path.`,
+    );
+  }
+
+  return pathComponent;
+}
+
 export function getBundleDirectory(bundleTimestamp: string | number) {
   const { serverBundleCachePath } = getConfig();
   return path.resolve(serverBundleCachePath, bundleTimestampPathComponent(bundleTimestamp));
@@ -261,7 +285,7 @@ export function getRequestBundleFilePath(bundleTimestamp: string | number) {
 
 export function getAssetPath(bundleTimestamp: string | number, filename: string) {
   const bundleDirectory = getBundleDirectory(bundleTimestamp);
-  return path.join(bundleDirectory, filename);
+  return path.join(bundleDirectory, assetFilenamePathComponent(filename));
 }
 
 export async function validateBundlesExist(

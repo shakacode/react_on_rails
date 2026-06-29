@@ -524,6 +524,34 @@ describe('worker', () => {
     });
   });
 
+  test('post /asset-exists rejects traversal filenames', async () => {
+    const bundleHash = 'some-bundle-hash';
+    await createAsset(testName, bundleHash);
+    const sentinelPath = path.resolve(serverBundleCachePathForTest(), '..', 'asset-exists-sentinel.txt');
+    fs.writeFileSync(sentinelPath, 'outside renderer cache');
+
+    const app = createWorker({
+      password: 'my_password',
+    });
+
+    const query = querystring.stringify({ filename: '../../asset-exists-sentinel.txt' });
+
+    try {
+      const res = await app
+        .inject()
+        .post(`/asset-exists?${query}`)
+        .payload({
+          password: 'my_password',
+          targetBundles: [bundleHash],
+        })
+        .end();
+      expect(res.statusCode).toBe(400);
+      expect(res.payload).toContain('Invalid asset filename');
+    } finally {
+      fs.rmSync(sentinelPath, { force: true });
+    }
+  });
+
   test('post /asset-exists requires targetBundles (protocol version 2.0.0)', async () => {
     await createAsset(testName, String(BUNDLE_TIMESTAMP));
     const app = createWorker({
