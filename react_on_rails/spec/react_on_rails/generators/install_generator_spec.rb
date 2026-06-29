@@ -4473,6 +4473,7 @@ describe InstallGenerator, type: :generator do
       install_generator = install_generator_fixture(
         redux: true,
         typescript: true,
+        tailwind: true,
         rspack: true,
         rsc: true,
         pro: true,
@@ -4484,7 +4485,7 @@ describe InstallGenerator, type: :generator do
 
       command = install_generator.send(:recovery_install_command)
 
-      expect(command).to eq("rails generate react_on_rails:install --redux --typescript --rspack --rsc")
+      expect(command).to eq("rails generate react_on_rails:install --redux --typescript --tailwind --rspack --rsc")
       expect(command).not_to include("--ignore-warnings")
       expect(command).not_to include("--force")
       expect(command).not_to include("--skip")
@@ -4605,14 +4606,14 @@ describe InstallGenerator, type: :generator do
       end.to raise_error(Thor::Error, /Failed to install Shakapacker/)
     end
 
-    specify "hidden install --redux --tailwind warning stays on the install path" do
-      install_generator = install_generator_fixture(redux: true, tailwind: true)
+    specify "hidden install --redux --tailwind warning preserves meaningful install flags" do
+      install_generator = install_generator_fixture(redux: true, tailwind: true, typescript: true)
 
       install_generator.send(:add_legacy_redux_install_warning)
       output_text = GeneratorMessages.messages.join("\n")
 
       expect(output_text).to include("Redux with Tailwind")
-      expect(output_text).to include("rails generate react_on_rails:install --redux --tailwind")
+      expect(output_text).to include("rails generate react_on_rails:install --redux --typescript --tailwind")
       expect(output_text).not_to include("react_on_rails:react_with_redux")
     end
 

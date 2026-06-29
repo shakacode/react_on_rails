@@ -792,7 +792,7 @@ module ReactOnRails
           if use_tailwind?
             [
               "Existing apps that need Redux with Tailwind should keep using the hidden install path:",
-              "rails generate react_on_rails:install --redux --tailwind"
+              recovery_install_command
             ]
           else
             [
@@ -817,6 +817,7 @@ module ReactOnRails
       def add_legacy_redux_install_warning_once
         return if @legacy_redux_install_warning_added
 
+        # Set only after enqueueing; safe callers may retry if the warning helper fails.
         add_legacy_redux_install_warning
         @legacy_redux_install_warning_added = true
       end
@@ -829,25 +830,39 @@ module ReactOnRails
       end
 
       def recovery_install_command
-        flags = []
-        flags << "--redux" if options.redux?
-        flags << "--typescript" if options.typescript?
-        # Echo the resolved bundler choice (normalized to --rspack/--no-rspack, so a --webpack
-        # alias re-runs as --no-rspack) only when the user passed one explicitly. An unset choice
-        # re-resolves to the fresh-install default on re-run, so we don't pin it here.
-        flags << (using_rspack? ? "--rspack" : "--no-rspack") if bundler_flag_given?
-
-        if options.rsc?
-          flags << "--rsc"
-        elsif options.pro?
-          flags << "--pro"
-        end
+        flags = optional_install_flags
+        flags << explicit_bundler_install_flag
+        flags << product_stack_install_flag
 
         # Preserve an explicit agent-files opt-out so the suggested re-run doesn't emit
         # AGENTS.md/editor files a user deliberately skipped (--agent-files defaults to on).
         flags << "--no-agent-files" unless options.agent_files?
 
-        ["rails generate react_on_rails:install", *flags].join(" ")
+        ["rails generate react_on_rails:install", *flags.compact].join(" ")
+      end
+
+      def optional_install_flags
+        [
+          ["--redux", options.redux?],
+          ["--typescript", options.typescript?],
+          ["--tailwind", use_tailwind?]
+        ].filter_map { |flag, enabled| flag if enabled }
+      end
+
+      def explicit_bundler_install_flag
+        # Echo the resolved bundler choice (normalized to --rspack/--no-rspack, so a --webpack
+        # alias re-runs as --no-rspack) only when the user passed one explicitly. An unset choice
+        # re-resolves to the fresh-install default on re-run, so we don't pin it here.
+        return unless bundler_flag_given?
+
+        using_rspack? ? "--rspack" : "--no-rspack"
+      end
+
+      def product_stack_install_flag
+        return "--rsc" if options.rsc?
+        return "--pro" if options.pro?
+
+        nil
       end
 
       def rsc_verification_message
