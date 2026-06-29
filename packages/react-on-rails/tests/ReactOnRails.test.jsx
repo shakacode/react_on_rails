@@ -161,6 +161,7 @@ describe('ReactOnRails', () => {
           getStoreGenerator: jest.fn(),
           setStore: jest.fn(),
           clearHydratedStores: jest.fn(),
+          clearStoreGenerators: jest.fn(),
           storeGenerators: jest.fn(() => new Map()),
           stores: jest.fn(() => new Map()),
         },
