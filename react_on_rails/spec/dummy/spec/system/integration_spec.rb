@@ -190,7 +190,13 @@ describe "Pages/index after using browser's back button", :js do
     go_back
   end
 
-  include_examples "React Component", "div#HelloWorld-react-component-1"
+  context "with server-rendered non-Redux component" do
+    include_examples "React Component", "div#HelloWorld-react-component-1"
+  end
+
+  context "with legacy Redux render function" do
+    include_examples "React Component", "div#ReduxApp-react-component-0"
+  end
 end
 
 describe "React Router", :js do
@@ -352,6 +358,10 @@ end
 
 describe "legacy Redux shared store, client only", :js do
   include_examples "React Component Shared Store", "/client_side_hello_world_shared_store"
+end
+
+describe "legacy Redux shared store, server side", :js do
+  include_examples "React Component Shared Store", "/server_side_hello_world_shared_store"
 end
 
 describe "legacy Redux shared store, server side, defer", :js do

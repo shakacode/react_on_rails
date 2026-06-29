@@ -854,6 +854,12 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator"
   end
 
+  context "with legacy -R alias" do
+    before(:all) { run_generator_test_with_args(%w[-R], package_json: true) }
+
+    include_examples "react_with_redux_generator"
+  end
+
   context "with --typescript" do
     before(:all) { run_generator_test_with_args(%w[--typescript], package_json: true) }
 
