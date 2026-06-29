@@ -6038,7 +6038,7 @@ describe InstallGenerator, type: :generator do
 
       shared_hook_content = File.read(File.expand_path("../../support/shakapacker_precompile_hook_shared.rb", __dir__))
       extract_utf8_helper = lambda do |source|
-        start_index = source.index("SHORT_ENCODING_RUBYOPT_SWITCHES")
+        start_index = source.index("def utf8_subprocess_env")
         end_index = source.index(/\n(?:# Detect which package manager|def clear_stale_rsc_manifest_client_references)/)
 
         expect(start_index).not_to be_nil
@@ -6058,11 +6058,12 @@ describe InstallGenerator, type: :generator do
         expect(content).to include('ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"')
         expect(content).to include("ReactOnRailsPro::Utils.rsc_support_enabled?")
         expect(content).to include("def utf8_subprocess_env")
-        expect(content).to include("def force_utf8_rubyopt")
-        expect(content).to include("RUBYOPT is parsed by Ruby as whitespace-separated options")
-        expect(content).to include('"LANG" => ENV.fetch("LANG", "C.UTF-8")')
-        expect(content).to include('"LC_ALL" => ENV.fetch("LC_ALL", "C.UTF-8")')
-        expect(content).to include('env["RUBYOPT"] = force_utf8_rubyopt(env["RUBYOPT"])')
+        expect(content).to include("def utf8_widened_rubyopt")
+        expect(content).to include("def rubyopt_pins_encoding?")
+        expect(content).to include('[Encoding::US_ASCII, Encoding::ASCII_8BIT].include?(Encoding.find("locale"))')
+        expect(content).to include('"LANG" => "C.UTF-8"')
+        expect(content).to include('"LC_ALL" => "C.UTF-8"')
+        expect(content).to include('"RUBYOPT" => utf8_widened_rubyopt(subprocess_rubyopt(extra))')
         expect(content).to include('"REACT_ON_RAILS_SKIP_VALIDATION" => "true"')
         expect(content).to include('"RSC_BUNDLE_ONLY" => "true"')
         expect(content).to include('"CLIENT_BUNDLE_ONLY" => nil')
