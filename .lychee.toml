@@ -88,6 +88,8 @@ exclude = [
   '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI
   '^https://www\.developerway\.com/posts/react-server-components-performance$', # Returns 503 from CI
   '^https://webaim\.org/techniques/css/invisiblecontent/?$', # Returns 504 from CI
+  '^https://compiledcssinjs\.com/?$', # Times out during automated link checks
+  '^https://vanilla-extract\.style/?$', # Times out during automated link checks
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE

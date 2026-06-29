@@ -40,6 +40,13 @@ module ReactOnRails
                    default: false,
                    hide: true
 
+      def validate_standalone_tailwind
+        return unless unsupported_standalone_tailwind?
+
+        raise Thor::Error,
+              "The standalone react_on_rails:react_with_redux generator does not support --tailwind"
+      end
+
       def create_redux_directories
         component_dir = example_component_source_directory("HelloWorldApp")
 
@@ -62,24 +69,10 @@ module ReactOnRails
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.#{ext}",
                   "#{component_dir}/ror_components/HelloWorldApp.server.#{ext}")
 
-        unless use_tailwind?
-          copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
-                    "#{component_dir}/components/HelloWorld.module.css")
-        end
+        return if use_tailwind?
 
-        return unless use_tailwind?
-
-        ror_client_file = "#{component_dir}/ror_components/HelloWorldApp.client.#{ext}"
-        if options[:pretend]
-          say_status :pretend, "Would add Tailwind stylesheet import to #{ror_client_file}", :yellow
-          return
-        end
-
-        stylesheet_import = "import '#{relative_stylesheet_import_path(ror_client_file)}';\n"
-        ror_client_file_path = File.join(destination_root, ror_client_file)
-        return if File.read(ror_client_file_path).include?(stylesheet_import)
-
-        prepend_to_file(ror_client_file, stylesheet_import)
+        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
+                  "#{component_dir}/components/HelloWorld.module.css")
       end
 
       def copy_base_redux_files
@@ -142,11 +135,29 @@ module ReactOnRails
         GeneratorMessages.add_info(
           GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world",
                                                                pro: Gem.loaded_specs.key?("react_on_rails_pro"),
+                                                               tailwind: use_tailwind?,
                                                                app_root: destination_root)
         )
       end
 
       private
+
+      def unsupported_standalone_tailwind?
+        return false unless use_tailwind?
+        return false if options[:invoked_by_install]
+
+        GeneratorMessages.add_error(<<~MSG.strip)
+          🚫 The standalone react_on_rails:react_with_redux generator does not support --tailwind.
+
+          Tailwind setup requires the base React on Rails installer so it can create the
+          react_on_rails_tailwind pack, stylesheet, dependencies, and webpack/Rspack config.
+
+          Use the install generator for Redux + Tailwind setup:
+
+            rails generate react_on_rails:install --redux --tailwind
+        MSG
+        true
+      end
 
       def install_packages_with_fallback(packages, dev:, package_manager:)
         install_args = build_install_args(package_manager, dev, packages)
