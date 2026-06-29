@@ -503,14 +503,17 @@ async function testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure(
 
 async function testCompareTransientFailureSetsHelpfulFailure() {
   const syntheticBase = 'synthetic-base';
+  const priorSyntheticBase = 'prior-synthetic-base';
   const compareError = new Error('GitHub is unavailable');
   compareError.status = 502;
   const github = makeGithub({
     pages: [],
     jobsByRunId: {},
-    parentsBySha: {},
+    parentsBySha: {
+      [syntheticBase]: priorSyntheticBase,
+    },
     compareErrorByBase: {
-      [syntheticBase]: compareError,
+      [priorSyntheticBase]: compareError,
     },
   });
   const core = makeCore();
@@ -527,7 +530,32 @@ async function testCompareTransientFailureSetsHelpfulFailure() {
   assert.equal(core.failed.length, 1);
   assert.match(core.failed[0], /Cannot determine prior real CI status because a GitHub API request failed/);
   assert.match(core.failed[0], /502/);
+  assert.match(core.failed[0], /Skipped candidate commits[\s\S]*- synthetic-base/);
+  assert.match(core.failed[0], /prior-synthetic-base/);
   assert.match(core.failed[0], /GitHub is unavailable/);
+}
+
+async function testNoRunUnreachableSyntheticBaseWithoutParentFailsClosed() {
+  const syntheticBase = 'synthetic-base';
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /not in the default branch and has no parent commits to inspect/);
+  assert.match(core.failed[0], /synthetic-base/);
 }
 
 async function testGuardOnlyFailuresLookThroughToParentSuccess() {
@@ -584,6 +612,7 @@ async function main() {
   await testNoRunHopLimitStopsAtConfiguredLimitWithTrail();
   await testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure();
   await testCompareTransientFailureSetsHelpfulFailure();
+  await testNoRunUnreachableSyntheticBaseWithoutParentFailsClosed();
   await testGuardOnlyFailuresLookThroughToParentSuccess();
   await testNonContiguousWorkflowRunPagesAreChecked();
   await testPaginatedJobsAreChecked();

@@ -328,13 +328,25 @@ async function checkPreviousMainCommitStatus({
         return;
       }
 
+      if (shouldTraceNoRunsParent) {
+        noRunsTrail.push(shaToCheck);
+        core.setFailed(
+          [
+            `Cannot determine prior real CI status because merge queue SHA ${shaToCheck} is not in the default branch and has no parent commits to inspect.`,
+            formatNoRunsTrailDetails(noRunsTrail),
+            'Push a non-docs change to trigger hosted CI.',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        );
+        return;
+      }
+
       if (context.eventName === 'merge_group') {
         core.info(
           [
             `No push-event workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
-            shouldTraceNoRunsParent
-              ? 'No parent commit was found to inspect for an underlying CI state.'
-              : 'This SHA is already in the default branch history; no parent tracing needed.',
+            'This SHA is already in the default branch history; no parent tracing needed.',
           ].join('\n'),
         );
       } else {
@@ -414,6 +426,8 @@ async function checkPreviousMainCommitStatus({
       [
         'Cannot determine prior real CI status because a GitHub API request failed.',
         githubApiFailureDetails(error),
+        formatNoRunsTrailDetails(noRunsTrail),
+        formatGuardOnlyTrailDetails(guardOnlyTrail),
         'Retry after the GitHub API recovers, or push a non-docs change to trigger hosted CI.',
       ]
         .filter(Boolean)
