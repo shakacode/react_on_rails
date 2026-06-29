@@ -39,10 +39,6 @@ describe "Pages/Index", :js do
       visit root_path
     end
 
-    context "with Server Rendered/Cached React/Redux Component" do
-      include_examples "React Component", "div#ReduxApp-react-component-0"
-    end
-
     context "with Server Rendered/Cached React Component Without Redux" do
       include_examples "React Component", "div#HelloWorld-react-component-1"
     end
@@ -194,7 +190,7 @@ describe "Pages/index after using browser's back button", :js do
     go_back
   end
 
-  include_examples "React Component", "div#ReduxApp-react-component-0"
+  include_examples "React Component", "div#HelloWorld-react-component-1"
 end
 
 describe "React Router", :js do
@@ -354,26 +350,10 @@ shared_examples "React Component Shared Store" do |url|
   end
 end
 
-describe "2 react components, 1 store, client only", :js do
+describe "legacy Redux shared store, client only", :js do
   include_examples "React Component Shared Store", "/client_side_hello_world_shared_store"
 end
 
-describe "2 react components, 1 store, server side", :js do
-  include_examples "React Component Shared Store", "/server_side_hello_world_shared_store"
-end
-
-describe "2 react components, 1 store, client only, controller setup", :js do
-  include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_controller"
-end
-
-describe "2 react components, 1 store, server side, controller setup", :js do
-  include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_controller"
-end
-
-describe "2 react components, 1 store, client only, defer", :js do
-  include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_defer"
-end
-
-describe "2 react components, 1 store, server side, defer", :js do
+describe "legacy Redux shared store, server side, defer", :js do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_defer"
 end

@@ -6,10 +6,13 @@ import * as React from 'react';
 import * as createReactClass from 'create-react-class';
 import ReactOnRails from '../src/ReactOnRails.client.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
+import StoreRegistry from '../src/StoreRegistry.ts';
 
 describe('ReactOnRails', () => {
   afterEach(() => {
     ComponentRegistry.clear();
+    StoreRegistry.storeGenerators().clear();
+    StoreRegistry.stores().clear();
   });
 
   it('render returns a virtual DOM element for component', () => {
@@ -182,7 +185,24 @@ describe('ReactOnRails', () => {
     expect(() => ReactOnRails.registerStore(false)).toThrow(/null or undefined/);
   });
 
-  it('register store and getStoreGenerator allow registration', () => {
+  it('registerStoreGenerators and getStoreGenerator allow legacy Redux-compatible registration', () => {
+    function reducer() {
+      return {};
+    }
+
+    function storeGenerator(props) {
+      return createStore(reducer, props);
+    }
+
+    ReactOnRails.registerStoreGenerators({ storeGenerator });
+
+    const actual = ReactOnRails.getStoreGenerator('storeGenerator');
+    expect(actual).toEqual(storeGenerator);
+
+    expect(ReactOnRails.storeGenerators()).toEqual(new Map([['storeGenerator', storeGenerator]]));
+  });
+
+  it('registerStore remains a deprecated alias for store generator registration', () => {
     function reducer() {
       return {};
     }
@@ -193,10 +213,7 @@ describe('ReactOnRails', () => {
 
     ReactOnRails.registerStore({ storeGenerator });
 
-    const actual = ReactOnRails.getStoreGenerator('storeGenerator');
-    expect(actual).toEqual(storeGenerator);
-
-    expect(ReactOnRails.storeGenerators()).toEqual(new Map([['storeGenerator', storeGenerator]]));
+    expect(ReactOnRails.getStoreGenerator('storeGenerator')).toEqual(storeGenerator);
   });
 
   it('setStore and getStore', () => {

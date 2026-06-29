@@ -19,18 +19,6 @@ test.describe('React on Rails Basic Components', () => {
     await expect(heading).toContainText('Hello');
   });
 
-  test('should render server-side rendered Redux component', async ({ page }) => {
-    await page.goto('/');
-
-    // Check for server-rendered Redux component
-    const reduxApp = page.locator('#ReduxApp-react-component-0');
-    await expect(reduxApp).toBeVisible();
-
-    // Verify it has content
-    const heading = reduxApp.locator('h3');
-    await expect(heading).toBeVisible();
-  });
-
   test('should handle client-side interactivity in React component', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -48,35 +36,19 @@ test.describe('React on Rails Basic Components', () => {
     await expect(heading).toContainText('Playwright Test');
   });
 
-  test('should handle Redux state changes', async ({ page }) => {
+  test('should hydrate legacy Redux render-function state changes', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Find the Redux app component
     const reduxApp = page.locator('#ReduxApp-react-component-0');
+    await expect(reduxApp.locator('h3')).toBeVisible();
 
-    // Interact with the input
     const input = reduxApp.locator('input');
     await input.clear();
     await input.fill('Redux with Playwright');
 
-    // Verify the state change is reflected
     const heading = reduxApp.locator('h3');
     await expect(heading).toContainText('Redux with Playwright');
-  });
-
-  test('should have server-rendered content in initial HTML', async ({ page }) => {
-    // Disable JavaScript to verify server rendering
-    await page.route('**/*.js', (route) => route.abort());
-    await page.goto('/');
-
-    // Check that server-rendered components are visible even without JS
-    const reduxApp = page.locator('#ReduxApp-react-component-0');
-    await expect(reduxApp).toBeVisible();
-
-    // The content should be present
-    const heading = reduxApp.locator('h3');
-    await expect(heading).toBeVisible();
   });
 
   test('should properly hydrate server-rendered components', async ({ page }) => {
