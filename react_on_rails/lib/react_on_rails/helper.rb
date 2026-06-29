@@ -414,6 +414,16 @@ module ReactOnRails
       context[:rscStreamObservability] = true
     end
 
+    # Set by ReactOnRailsPro::Stream#initialize_rsc_stream_observability_state.
+    # Keep this ivar name in sync with the Pro stream concern.
+    def add_rsc_stream_observability_to_render_options(render_options)
+      return unless render_options.streaming?
+      return unless defined?(@react_on_rails_rsc_stream_observability) &&
+                    @react_on_rails_rsc_stream_observability
+
+      render_options.set_option(:rsc_stream_observability, true)
+    end
+
     def add_csp_nonce_to_context(result)
       nonce = csp_nonce
       result[:cspNonce] = nonce if nonce.present?
@@ -486,8 +496,10 @@ module ReactOnRails
         store_dependencies = registered_stores_including_deferred.map { |store| store[:store_name] }
         options = options.merge(store_dependencies: store_dependencies.presence)
       end
-      ReactOnRails::ReactComponent::RenderOptions.new(react_component_name:,
-                                                      options:)
+      render_options = ReactOnRails::ReactComponent::RenderOptions.new(react_component_name:,
+                                                                       options:)
+      add_rsc_stream_observability_to_render_options(render_options)
+      render_options
     end
 
     def generated_components_pack_path(component_name)

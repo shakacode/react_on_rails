@@ -10,7 +10,28 @@ module GeneratorHelper
 
   DEFAULT_SHAKAPACKER_SOURCE_PATH = "app/javascript"
   DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH = "packs"
-  private_constant :DEFAULT_SHAKAPACKER_SOURCE_PATH, :DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH
+  TAILWIND_PACK_NAME = "react_on_rails_tailwind"
+  TAILWIND_STYLESHEET_NAME = "application.css"
+  RAILS_APP_SOURCE_PATH = "app"
+  TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN = /
+    ^[ \t]*<%\s*prepend_javascript_pack_tag(?:\s|\()
+    \s*["']react_on_rails_tailwind["'][^\n]*%>(?:\r?\n[ \t]*)*
+    ^[ \t]*<%=\s*stylesheet_pack_tag(?:\s|\()
+    \s*["']react_on_rails_tailwind["'][^\n]*%>(?:\r?\n[ \t]*)*
+    ^[ \t]*<%=\s*javascript_pack_tag(?:
+      \s*%> |
+      \s*\(\s*\)\s*%> |
+      \s+(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:)[^\n]*%> |
+      \(\s*(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:)[^\n]*\)\s*%>
+    )
+  /x
+  HTML_COMMENT_PATTERN = /<!--[\s\S]*?-->/
+  CONTROLLER_LAYOUT_DECLARATION_PATTERN =
+    /^\s*layout(?:\s+|\s*\(\s*)(?:"([^"]+)"|'([^']+)')(?=\s*(?:\)|,|#|$))/
+  private_constant :DEFAULT_SHAKAPACKER_SOURCE_PATH, :DEFAULT_SHAKAPACKER_SOURCE_ENTRY_PATH,
+                   :TAILWIND_PACK_NAME, :TAILWIND_STYLESHEET_NAME, :RAILS_APP_SOURCE_PATH,
+                   :TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN, :HTML_COMMENT_PATTERN,
+                   :CONTROLLER_LAYOUT_DECLARATION_PATTERN
 
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
@@ -107,15 +128,87 @@ module GeneratorHelper
     File.join(shakapacker_source_path, "stylesheets", filename)
   end
 
-  def relative_stylesheet_import_path(entry_path, filename: "application.css")
-    # InstallGenerator copies the final Shakapacker config before path-dependent demo files are generated.
-    safe_entry_path = safe_generator_destination_path(entry_path, default: nil)
-    raise ArgumentError, "entry_path must stay inside the generator destination" if safe_entry_path.nil?
+  def tailwind_pack_name
+    TAILWIND_PACK_NAME
+  end
 
-    entry_dir = Pathname.new(File.join(destination_root, safe_entry_path)).dirname
-    stylesheet = Pathname.new(File.join(destination_root, shakapacker_stylesheet_path(filename)))
+  def tailwind_pack_filename
+    "#{tailwind_pack_name}.js"
+  end
 
-    stylesheet.relative_path_from(entry_dir).to_s
+  def tailwind_pack_path
+    shakapacker_entrypoint_path(tailwind_pack_filename)
+  end
+
+  def tailwind_stylesheet_path
+    shakapacker_stylesheet_path(TAILWIND_STYLESHEET_NAME)
+  end
+
+  def relative_tailwind_stylesheet_import_path
+    javascript_relative_import_path(tailwind_pack_path, tailwind_stylesheet_path)
+  end
+
+  def tailwind_css_source_directives
+    stylesheet_dir = absolute_generator_path(tailwind_stylesheet_path).dirname
+    rails_app_source = absolute_generator_path(RAILS_APP_SOURCE_PATH)
+    shakapacker_source = absolute_generator_path(shakapacker_source_path)
+
+    if path_inside_or_equal?(shakapacker_source, rails_app_source)
+      rails_app_relative_source = stylesheet_dir_relative_path(stylesheet_dir, rails_app_source)
+      tailwind_import_statement(source: rails_app_relative_source)
+    else
+      sources = [shakapacker_source, rails_app_source].uniq.map do |source_path|
+        tailwind_source_statement(stylesheet_dir_relative_path(stylesheet_dir, source_path))
+      end
+
+      [tailwind_import_statement(source: "none"), *sources].join("\n")
+    end
+  end
+
+  def layout_links_tailwind_pack?(content)
+    comment_ranges = html_comment_ranges(content)
+    return content.match?(TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN) if comment_ranges.empty?
+
+    content.to_enum(:scan, TAILWIND_LAYOUT_PACK_HELPER_BLOCK_PATTERN).any? do
+      helper_match = Regexp.last_match
+
+      !range_overlaps_any?(helper_match.begin(0)...helper_match.end(0), comment_ranges)
+    end
+  end
+
+  def html_comment_ranges(content)
+    content.to_enum(:scan, HTML_COMMENT_PATTERN).map do
+      comment_match = Regexp.last_match
+
+      comment_match.begin(0)...comment_match.end(0)
+    end
+  end
+
+  def range_overlaps_any?(range, ranges)
+    ranges.any? { |candidate| range.begin < candidate.end && candidate.begin < range.end }
+  end
+
+  def extract_declared_layout_name(controller_content)
+    match = controller_content.match(CONTROLLER_LAYOUT_DECLARATION_PATTERN)
+    match&.captures&.compact&.first
+  end
+
+  def inherited_application_layout_name
+    application_controller_path = File.join(destination_root, "app/controllers/application_controller.rb")
+    return "application" unless File.exist?(application_controller_path)
+
+    extract_declared_layout_name(File.read(application_controller_path)) || "application"
+  end
+
+  def layout_destination_path(layout_name)
+    "app/views/layouts/#{layout_name}.html.erb"
+  end
+
+  def layout_file_links_tailwind_pack?(layout_name)
+    layout_full_path = File.join(destination_root, layout_destination_path(layout_name))
+    return false unless File.exist?(layout_full_path)
+
+    layout_links_tailwind_pack?(File.read(layout_full_path))
   end
 
   def example_component_source_directory(component_name)
@@ -176,6 +269,48 @@ module GeneratorHelper
     pathname.relative_path_from(destination).to_s
   rescue ArgumentError
     nil # Signals the caller to fall back to the default path.
+  end
+
+  def absolute_generator_path(relative_path)
+    Pathname.new(File.join(destination_root, relative_path)).cleanpath
+  end
+
+  def stylesheet_dir_relative_path(stylesheet_dir, source_path)
+    source_path.relative_path_from(stylesheet_dir).to_s
+  end
+
+  def javascript_relative_import_path(from_file, to_file)
+    from_dir = absolute_generator_path(from_file).dirname
+    relative_path = absolute_generator_path(to_file).relative_path_from(from_dir).to_s
+
+    relative_path.start_with?(".") ? relative_path : "./#{relative_path}"
+  end
+
+  def path_inside_or_equal?(child_path, parent_path)
+    relative_path = child_path.relative_path_from(parent_path).to_s
+    relative_path == "." || (relative_path != ".." && !relative_path.start_with?("../"))
+  rescue ArgumentError
+    false
+  end
+
+  def tailwind_import_statement(source:)
+    css_source = source == "none" ? "none" : tailwind_css_string(source)
+
+    %( @import "tailwindcss" source(#{css_source});).strip
+  end
+
+  def tailwind_source_statement(source)
+    %( @source #{tailwind_css_string(source)};).strip
+  end
+
+  def tailwind_css_string(value)
+    css_string = value.to_s
+    if css_string.match?(/[[:cntrl:]\u2028\u2029]/)
+      raise ArgumentError, "Tailwind source paths cannot contain control characters"
+    end
+
+    # JSON quoting keeps CSS punctuation inside the string literal.
+    JSON.generate(css_string)
   end
 
   def unsafe_generator_destination_path?(path)

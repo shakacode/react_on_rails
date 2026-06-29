@@ -115,21 +115,24 @@ describe InstallGenerator, type: :generator do
 
   def assert_tailwind_ssr_setup(config_dir:, extension:)
     assert_tailwind_dependencies
-    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+    assert_tailwind_stylesheet
+    assert_tailwind_pack_entry
     assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
 
     assert_tailwind_component(extension)
     assert_tailwind_bundler_config(config_dir)
-    assert_tailwind_ssr_stylesheet_placeholder
+    assert_tailwind_hello_world_view
+    assert_tailwind_layout_owned_pack
   end
 
   def assert_tailwind_redux_setup(config_dir:, extension:)
     assert_tailwind_dependencies
-    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+    assert_tailwind_stylesheet
+    assert_tailwind_pack_entry
     assert_no_file "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css"
 
     assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{extension}" do |content|
-      expect(content).to include("../../../stylesheets/application.css")
+      expect(content).not_to include("application.css")
     end
 
     assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.#{extension}" do |content|
@@ -141,13 +144,32 @@ describe InstallGenerator, type: :generator do
     end
 
     assert_tailwind_bundler_config(config_dir)
+    assert_tailwind_layout_owned_pack
   end
 
   def assert_tailwind_component(extension)
     assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{extension}" do |content|
-      expect(content).to include("../../../stylesheets/application.css")
+      expect(content).not_to include("application.css")
       expect(content).to include("React on Rails + Tailwind CSS")
       expect(content).to include("rounded-lg")
+    end
+  end
+
+  def assert_tailwind_stylesheet(path: "app/javascript/stylesheets/application.css",
+                                 source_directive: '@import "tailwindcss" source("../..");')
+    assert_file path do |content|
+      expect(content).to include("Tailwind v4 scans generated Rails app and Shakapacker source paths by default")
+      expect(content).to include("add @source directives here")
+      expect(content).to include('@source "../../../lib";')
+      expect(content).to include('@source "../../../engines/my_engine/app";')
+      expect(content).to include(source_directive)
+    end
+  end
+
+  def assert_tailwind_pack_entry(path: "app/javascript/packs/react_on_rails_tailwind.js",
+                                 import_path: "../stylesheets/application.css")
+    assert_file path do |content|
+      expect(content).to eq("import '#{import_path}';\n")
     end
   end
 
@@ -162,32 +184,51 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  def assert_tailwind_ssr_stylesheet_placeholder
+  def assert_tailwind_layout_owned_pack
+    assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+      expect_tailwind_pack_order(content)
+      expect_generated_layout_head_tags(content)
+      expect(content).to include("Tailwind is layout-owned")
+      expect(content).not_to include("<!-- Empty pack tags")
+    end
+  end
+
+  def expect_tailwind_pack_order(content)
+    prepend_index = content.index('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+    stylesheet_index = content.index('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+    javascript_index = content.index("<%= javascript_pack_tag %>")
+
+    expect(prepend_index).not_to be_nil
+    expect(stylesheet_index).not_to be_nil
+    expect(javascript_index).not_to be_nil
+    expect(prepend_index).to be < stylesheet_index
+    expect(stylesheet_index).to be < javascript_index
+  end
+
+  def expect_generated_layout_head_tags(content)
+    expect(content).to include('<meta name="viewport" content="width=device-width,initial-scale=1">')
+    expect(content).to include("<%= csrf_meta_tags %>")
+    expect(content).to include("<%= csp_meta_tag %>")
+  end
+
+  def assert_tailwind_hello_world_view
     assert_file "app/views/hello_world/index.html.erb" do |content|
       expect(content).to include('react_component("HelloWorld", props: @hello_world_props, prerender: true)')
-    end
-
-    assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
-      stylesheet_index = content.index("<%= stylesheet_pack_tag %>")
-      javascript_index = content.index("<%= javascript_pack_tag %>")
-
-      expect(stylesheet_index).not_to be_nil
-      expect(javascript_index).not_to be_nil
-      expect(stylesheet_index).to be < javascript_index
-      expect(content).to include("React on Rails injects component CSS/JS here")
     end
   end
 
   def assert_tailwind_rsc_setup(config_dir:, extension:)
     assert_tailwind_dependencies
-    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+    assert_tailwind_stylesheet
+    assert_tailwind_pack_entry
 
     assert_file "app/javascript/src/HelloServer/components/LikeButton.#{extension}" do |content|
-      expect(content).to include("../../../stylesheets/application.css")
+      expect(content).not_to include("application.css")
       expect(content).to start_with("'use client';")
     end
 
     assert_tailwind_bundler_config(config_dir)
+    assert_tailwind_layout_owned_pack
   end
 
   def simulate_managed_stock_webpack_files(options = {})
@@ -512,13 +553,19 @@ describe InstallGenerator, type: :generator do
 
     it "keeps Tailwind assets and imports anchored to the configured source path" do
       assert_file "client/app/server-bundle.js"
-      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_file "client/app/react_on_rails_tailwind.js", "import './stylesheets/application.css';\n"
+      assert_file "client/app/stylesheets/application.css" do |content|
+        expect(content).to include('@import "tailwindcss" source(none);')
+        expect(content).to include('@source "..";')
+        expect(content).to include('@source "../../../app";')
+      end
       assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx" do |content|
-        expect(content).to include("import '../../../stylesheets/application.css';")
+        expect(content).not_to include("application.css")
       end
 
       assert_no_file "client/app/packs/server-bundle.js"
       assert_no_file "app/javascript/stylesheets/application.css"
+      assert_no_file "app/javascript/packs/react_on_rails_tailwind.js"
     end
   end
 
@@ -581,13 +628,20 @@ describe InstallGenerator, type: :generator do
     end
 
     it "generates Tailwind assets under the configured Shakapacker source path" do
-      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_file "client/app/entrypoints/react_on_rails_tailwind.js",
+                  "import '../stylesheets/application.css';\n"
+      assert_file "client/app/stylesheets/application.css" do |content|
+        expect(content).to include('@import "tailwindcss" source(none);')
+        expect(content).to include('@source "..";')
+        expect(content).to include('@source "../../../app";')
+      end
       assert_no_file "app/javascript/stylesheets/application.css"
+      assert_no_file "app/javascript/packs/react_on_rails_tailwind.js"
     end
 
-    it "injects the stylesheet import into the generated client component" do
+    it "keeps the generated client component free of global stylesheet imports" do
       assert_file "client/app/src/HelloWorld/ror_components/HelloWorld.client.jsx" do |content|
-        expect(content).to include("import '../../../stylesheets/application.css';")
+        expect(content).not_to include("application.css")
       end
     end
   end
@@ -646,13 +700,19 @@ describe InstallGenerator, type: :generator do
     end
 
     it "generates Tailwind assets under the configured Shakapacker source path" do
-      assert_file "client/app/stylesheets/application.css", /@import "tailwindcss";/
+      assert_file "client/app/entrypoints/react_on_rails_tailwind.js",
+                  "import '../stylesheets/application.css';\n"
+      assert_file "client/app/stylesheets/application.css" do |content|
+        expect(content).to include('@import "tailwindcss" source(none);')
+        expect(content).to include('@source "..";')
+        expect(content).to include('@source "../../../app";')
+      end
       assert_no_file "app/javascript/stylesheets/application.css"
     end
 
-    it "injects the stylesheet import into the generated Redux client component" do
+    it "keeps the generated Redux client component free of global stylesheet imports" do
       assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx" do |content|
-        expect(content).to include("import '../../../stylesheets/application.css';")
+        expect(content).not_to include("application.css")
       end
     end
   end
@@ -706,9 +766,16 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "injects the stylesheet import into the generated RSC client component" do
+    it "keeps Tailwind owned by the layout pack instead of the generated RSC client component" do
+      assert_file "client/app/entrypoints/react_on_rails_tailwind.js",
+                  "import '../stylesheets/application.css';\n"
+      assert_file "client/app/stylesheets/application.css" do |content|
+        expect(content).to include('@import "tailwindcss" source(none);')
+        expect(content).to include('@source "..";')
+        expect(content).to include('@source "../../../app";')
+      end
       assert_file "client/app/src/HelloServer/components/LikeButton.jsx" do |content|
-        expect(content).to include("import '../../../stylesheets/application.css';")
+        expect(content).not_to include("application.css")
       end
     end
   end
@@ -887,13 +954,811 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "#copy_or_update_tailwind_layout" do
+    let(:base_generator) { base_generator_fixture(tailwind: true) }
+    let(:layout_path) { "app/views/layouts/react_on_rails_default.html.erb" }
+
+    before do
+      prepare_destination
+    end
+
+    it "updates the recognizable generated default layout" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>React on Rails</title>
+            <%= csrf_meta_tags %>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        expect(content).to include('<meta name="viewport" content="width=device-width,initial-scale=1">')
+        expect(content).to include("<%= csrf_meta_tags %>")
+        expect(content).to include("<%= csp_meta_tag %>")
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+        expect(content).to include("<%= javascript_pack_tag %>")
+        expect(content).not_to include("<!-- Empty pack tags")
+      end
+    end
+
+    it "announces generated viewport and CSP tag insertions" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>React on Rails</title>
+            <%= csrf_meta_tags %>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      allow(base_generator).to receive(:say_status).and_call_original
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:insert, "Added viewport meta to #{layout_path}", :green)
+      expect(base_generator).to have_received(:say_status)
+        .with(:insert, "Added csp_meta_tag to #{layout_path}", :green)
+    end
+
+    it "adds the generated viewport tag when only the default title was customized" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Custom app</title>
+            <%= csrf_meta_tags %>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        viewport_index = content.index('<meta name="viewport" content="width=device-width,initial-scale=1">')
+        csrf_index = content.index("<%= csrf_meta_tags %>")
+
+        expect(viewport_index).to be < csrf_index
+        expect(content).to include("<%= csp_meta_tag %>")
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+      end
+    end
+
+    it "does not duplicate an existing viewport tag when name is not the first attribute" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>React on Rails</title>
+            <meta content="width=device-width,initial-scale=1" name="viewport">
+            <%= csrf_meta_tags %>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        expect(content.scan(/\bname=["']viewport["']/).size).to eq(1)
+        expect(content).to include('<meta content="width=device-width,initial-scale=1" name="viewport">')
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+      end
+    end
+
+    it "warns when the generated layout has no viewport insertion anchor" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Custom app</title>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      allow(base_generator).to receive(:say_status).and_call_original
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(
+          :warning,
+          include("Could not insert viewport meta into #{layout_path}: no title or csrf_meta_tags anchor found"),
+          :yellow
+        )
+      expect(base_generator).to have_received(:say_status)
+        .with(
+          :warning,
+          include("Could not insert csp_meta_tag into #{layout_path}: no csrf_meta_tags anchor found"),
+          :yellow
+        )
+      assert_file layout_path do |content|
+        expect(content).not_to include('<meta name="viewport" content="width=device-width,initial-scale=1">')
+        expect(content).not_to include("<%= csp_meta_tag %>")
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+      end
+    end
+
+    it "updates the generated default layout when helper indentation differs" do
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>React on Rails</title>
+            <%= csrf_meta_tags %>
+
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+        \t<%= stylesheet_pack_tag %>
+              <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+        expect(content).to include("<%= javascript_pack_tag %>")
+        expect(content).not_to include("<!-- Empty pack tags")
+      end
+    end
+
+    it "does not update the recognizable generated default layout in --pretend mode" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      pretend_generator = base_generator_fixture(tailwind: true, pretend: true)
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(pretend_generator).to receive(:say_status)
+
+      pretend_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(pretend_generator).to have_received(:say_status)
+        .with(:pretend, "Would update #{layout_path} to link react_on_rails_tailwind", :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "reports a pretend manual step instead of warning when a customized layout needs Tailwind wiring" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag "application" %>
+            <%= javascript_pack_tag "application" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      pretend_generator = base_generator_fixture(tailwind: true, pretend: true)
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(pretend_generator).to receive(:say_status)
+      allow(pretend_generator).to receive(:say)
+
+      pretend_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(pretend_generator).to have_received(:say_status)
+        .with(
+          :pretend,
+          "#{layout_path} is customized and would need the Tailwind pack-tag block added manually",
+          :yellow
+        )
+      expect(pretend_generator).not_to have_received(:say)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of rewriting layouts without the generated pack-tag comment" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!-- TODO: add react_on_rails_tailwind when Tailwind is enabled -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include('  <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>'), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind pack tags that only appear inside an HTML comment" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!--
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+            -->
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind pack tags inside HTML comments that contain double dashes" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!-- disabled -- historical Tailwind block
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+            -->
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind pack tags inside triple-dash HTML comments" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!--
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+            --->
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind pack tags that only appear inside ERB comments" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%# prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%#= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%#= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind pack tags stitched together by HTML comments" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% pre<!-- hidden -->pend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind pack tags that are not a contiguous helper block" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <meta name="theme-color" content="#ffffff">
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "skips Tailwind layouts that use keyword options and blank lines in the helper block" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+
+            <%= javascript_pack_tag defer: true %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:skip, "#{layout_path} already links react_on_rails_tailwind", :yellow)
+      expect(base_generator).not_to have_received(:say)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "skips Tailwind layouts that use an empty-parentheses JavaScript pack flush" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag() %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:skip, "#{layout_path} already links react_on_rails_tailwind", :yellow)
+      expect(base_generator).not_to have_received(:say)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of skipping Tailwind layouts without a JavaScript pack flush" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns instead of accepting a named JavaScript pack tag as the generated pack flush" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag "application" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(base_generator).to have_received(:say_status)
+        .with(:warning, "Could not update #{layout_path}: layout is customized.", :yellow)
+      expect(base_generator).to have_received(:say)
+        .with(include("preserving any existing app-specific pack tags"), :yellow)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "does not rewrite customized layouts without --force" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag "application" %>
+            <%= javascript_pack_tag "application" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+
+      base_generator.send(:copy_or_update_tailwind_layout)
+
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "does not rewrite existing layouts in --skip mode" do
+      original_layout = <<~ERB
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      simulate_existing_layout("react_on_rails_default", original_layout)
+      skip_generator = base_generator_fixture(tailwind: true, skip: true)
+      allow(skip_generator).to receive(:say_status)
+      allow(skip_generator).to receive(:say)
+
+      skip_generator.send(:copy_or_update_tailwind_layout)
+
+      expect(skip_generator).to have_received(:say_status)
+        .with(:skip, "#{layout_path} exists and was not updated (--skip)", :yellow)
+      expect(skip_generator).not_to have_received(:say)
+      assert_file layout_path do |content|
+        expect(content).to eq(original_layout)
+      end
+    end
+
+    it "warns when --skip leaves the existing HelloWorldController default layout without Tailwind tags" do
+      skip_generator = base_generator_fixture(tailwind: true, skip: true)
+      simulate_existing_file("app/controllers/application_controller.rb", <<~RUBY)
+        class ApplicationController < ActionController::Base
+          layout "react_on_rails_default"
+        end
+      RUBY
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          def index
+          end
+        end
+      RUBY
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag "application" %>
+            <%= javascript_pack_tag "application" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      GeneratorMessages.clear
+
+      skip_generator.send(:warn_existing_hello_world_tailwind_layout)
+
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include(
+        "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout."
+      )
+      expect(warning_text).to include("app/views/layouts/react_on_rails_default.html.erb")
+    end
+
+    it "warns when the existing HelloWorldController renders through a non-Tailwind layout" do
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          layout "hello_world"
+
+          def index
+          end
+        end
+      RUBY
+      simulate_named_pack_tag_layout("hello_world")
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+      GeneratorMessages.clear
+
+      base_generator.send(:warn_existing_hello_world_tailwind_layout)
+
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include(
+        "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout."
+      )
+      expect(warning_text).to include("preserving any existing app-specific pack names")
+      expect(warning_text).to include("Keep an existing javascript_pack_tag call if it already renders your app packs")
+      expect(warning_text).to include('  <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+      expect(base_generator).not_to have_received(:say_status)
+      expect(base_generator).not_to have_received(:say)
+    end
+
+    it "does not duplicate the manual Tailwind warning for the default generated layout" do
+      simulate_existing_file("app/controllers/application_controller.rb", <<~RUBY)
+        class ApplicationController < ActionController::Base
+          layout "react_on_rails_default"
+        end
+      RUBY
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          def index
+          end
+        end
+      RUBY
+      simulate_named_pack_tag_layout("application")
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag "application" %>
+            <%= javascript_pack_tag "application" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      GeneratorMessages.clear
+
+      base_generator.send(:warn_existing_hello_world_tailwind_layout)
+
+      expect(GeneratorMessages.messages.join("\n")).not_to include(
+        "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout."
+      )
+    end
+
+    it "does not warn when HelloWorldController inherits a Tailwind-aware ApplicationController layout" do
+      simulate_existing_file("app/controllers/application_controller.rb", <<~RUBY)
+        class ApplicationController < ActionController::Base
+          layout "react_on_rails_default"
+        end
+      RUBY
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          def index
+          end
+        end
+      RUBY
+      simulate_named_pack_tag_layout("application")
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+      allow(base_generator).to receive(:say_status)
+      allow(base_generator).to receive(:say)
+      GeneratorMessages.clear
+
+      base_generator.send(:warn_existing_hello_world_tailwind_layout)
+
+      expect(GeneratorMessages.messages.join("\n")).not_to include(
+        "app/controllers/hello_world_controller.rb may not use the Tailwind-aware React on Rails layout."
+      )
+      expect(base_generator).not_to have_received(:say)
+    end
+  end
+
+  describe "#announce_skipped_layout_fallback" do
+    let(:rsc_generator) { rsc_generator_fixture(tailwind: true) }
+
+    before do
+      allow(rsc_generator).to receive(:say)
+    end
+
+    it "names missing basic pack tags before Tailwind-specific layout requirements" do
+      rsc_generator.send(
+        :announce_skipped_layout_fallback,
+        [{ path: "app/views/layouts/application.html.erb", classification: :missing_pack_tags }],
+        "app/views/layouts/react_on_rails_rsc.html.erb"
+      )
+
+      expect(rsc_generator).to have_received(:say)
+        .with(include("do not include both `stylesheet_pack_tag` and `javascript_pack_tag`"), :yellow)
+      expect(rsc_generator).not_to have_received(:say)
+        .with(include("do not include the layout-owned Tailwind pack block"), :yellow)
+    end
+
+    it "uses the Tailwind-specific reason when basic pack tags are present" do
+      rsc_generator.send(
+        :announce_skipped_layout_fallback,
+        [{ path: "app/views/layouts/application.html.erb", classification: :missing_tailwind_pack }],
+        "app/views/layouts/react_on_rails_rsc.html.erb"
+      )
+
+      expect(rsc_generator).to have_received(:say)
+        .with(include("lack the Tailwind pack block"), :yellow)
+      expect(rsc_generator).to have_received(:say)
+        .with(include("update/remove the old layout if replacing"), :yellow)
+    end
+  end
+
   context "with --tailwind --no-rspack" do
     before(:all) { run_generator_test_with_args(%w[--tailwind --no-rspack], package_json: true) }
 
-    include_examples "base_generator_common", application_js: true
+    include_examples "base_generator_common", application_js: true, tailwind: true
     include_examples "no_redux_generator"
 
-    it "generates a Tailwind v4 SSR setup for Webpack with extracted CSS enabled" do
+    it "generates a layout-owned Tailwind v4 SSR setup for Webpack" do
       assert_tailwind_ssr_setup(config_dir: "config/webpack", extension: "jsx")
     end
   end
@@ -901,10 +1766,10 @@ describe InstallGenerator, type: :generator do
   context "with --tailwind --rspack --typescript" do
     before(:all) { run_generator_test_with_args(%w[--tailwind --rspack --typescript], package_json: true) }
 
-    include_examples "base_generator_common", application_js: true
+    include_examples "base_generator_common", application_js: true, tailwind: true
     include_examples "no_redux_generator"
 
-    it "generates a Tailwind v4 SSR setup for Rspack with extracted CSS enabled" do
+    it "generates a layout-owned Tailwind v4 SSR setup for Rspack" do
       assert_tailwind_ssr_setup(config_dir: "config/rspack", extension: "tsx")
     end
   end
@@ -912,7 +1777,7 @@ describe InstallGenerator, type: :generator do
   context "with --redux --tailwind --typescript" do
     before(:all) { run_generator_test_with_args(%w[--redux --tailwind --typescript], package_json: true) }
 
-    include_examples "base_generator_common", application_js: true
+    include_examples "base_generator_common", application_js: true, tailwind: true
 
     it "wires Tailwind into the Redux SSR example" do
       assert_tailwind_redux_setup(config_dir: "config/rspack", extension: "tsx")
@@ -3065,29 +3930,11 @@ describe InstallGenerator, type: :generator do
   context "with --rsc --rspack --tailwind --typescript" do
     before(:all) { run_generator_test_with_args(%w[--rsc --rspack --tailwind --typescript], package_json: true) }
 
-    include_examples "rsc_common_files"
+    include_examples "rsc_common_files", tailwind: true
 
     it "wires Tailwind into the generated RSC client component" do
       assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
       assert_tailwind_rsc_setup(config_dir: "config/rspack", extension: "tsx")
-    end
-  end
-
-  describe "RSC Tailwind client component import insertion" do
-    let(:components_dir) { "app/javascript/src/HelloServer/components" }
-    let(:client_component_path) { "#{components_dir}/LikeButton.jsx" }
-
-    it "anchors after quote and semicolon variants of the use client directive" do
-      simulate_existing_file(client_component_path, "\"use client\"\n\nexport default function LikeButton() {}\n")
-
-      Dir.chdir(destination_root) do
-        expect(rsc_generator_fixture(tailwind: true).send(:add_tailwind_import_to_rsc_client_component, components_dir))
-          .to be(true)
-      end
-
-      expect(File.read(File.join(destination_root, client_component_path))).to start_with(
-        "\"use client\"\nimport '../../../stylesheets/application.css';\n\n"
-      )
     end
   end
 
@@ -3779,10 +4626,34 @@ describe InstallGenerator, type: :generator do
       allow(File).to receive(:read).and_call_original
 
       expect(File).not_to receive(:read).with(File.join(destination_root, client_entry))
-      expect(redux_generator).to receive(:say_status)
-        .with(:pretend, "Would add Tailwind stylesheet import to #{client_entry}", :yellow)
+      expect(redux_generator).not_to receive(:say_status)
+        .with(:pretend, "Tailwind stylesheet would be linked from the React on Rails layout", :yellow)
 
       redux_generator.send(:copy_base_files)
+    end
+
+    it "rejects standalone Redux Tailwind setup instead of creating unstyled components" do
+      redux_generator = redux_generator_fixture(tailwind: true)
+      GeneratorMessages.clear
+
+      expect { redux_generator.validate_standalone_tailwind }
+        .to raise_error(Thor::Error, /react_with_redux generator does not support --tailwind/)
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include(
+        "standalone react_on_rails:react_with_redux generator does not support --tailwind"
+      )
+      expect(error_text).to include("rails generate react_on_rails:install --redux --tailwind")
+    end
+
+    it "allows Redux Tailwind setup when invoked by the install generator" do
+      redux_generator = redux_generator_fixture(tailwind: true, invoked_by_install: true)
+      GeneratorMessages.clear
+
+      expect { redux_generator.validate_standalone_tailwind }.not_to raise_error
+      expect(GeneratorMessages.messages.join("\n")).not_to include(
+        "standalone react_on_rails:react_with_redux generator does not support --tailwind"
+      )
     end
   end
 
@@ -4836,6 +5707,29 @@ describe InstallGenerator, type: :generator do
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("This generator requires the react_on_rails_pro gem.")
       expect(error_text).not_to include("You specified")
+    end
+  end
+
+  context "when --tailwind is used with an unsupported Shakapacker version" do
+    let(:install_generator) { install_generator_fixture(tailwind: true) }
+
+    before do
+      allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(false)
+      allow(install_generator).to receive(:cli_exists?).with("git").and_return(true)
+      allow(install_generator).to receive_messages(missing_node?: false, missing_package_manager?: false)
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+        .with("6.5.6")
+        .and_return(false)
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("6.5.5")
+    end
+
+    specify "installation_prerequisites_met? reports the Tailwind-only version gate" do
+      expect(install_generator.send(:installation_prerequisites_met?)).to be false
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("Tailwind layout wiring requires Shakapacker >= 6.5.6")
+      expect(error_text).to include("Installed version: 6.5.5")
+      expect(error_text).to include("Upgrade shakapacker or omit --tailwind")
     end
   end
 
