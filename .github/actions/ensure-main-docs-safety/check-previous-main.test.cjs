@@ -10,11 +10,20 @@ const {
 
 const context = { eventName: 'push', repo: { owner: 'shakacode', repo: 'react_on_rails' } };
 
-function run({ id, workflowId = id, sha, name = `Workflow ${id}`, runNumber = id, conclusion = 'success' }) {
+function run({
+  id,
+  workflowId = id,
+  sha,
+  name = `Workflow ${id}`,
+  runNumber = id,
+  conclusion = 'success',
+  event = 'push',
+}) {
   return {
     id,
     workflow_id: workflowId,
     head_sha: sha,
+    event,
     name,
     run_number: runNumber,
     status: 'completed',
@@ -96,7 +105,7 @@ function makeGithub({
         }
 
         for (const page of pages) {
-          yield { data: page };
+          yield { data: options.event ? page.filter((run) => run.event === options.event) : page };
         }
       },
     },
@@ -106,7 +115,15 @@ function makeGithub({
         throw compareErrorByBase[base];
       }
 
-      return { data: { status: defaultBranchContainsSha[base] ? 'ahead' : 'diverged' } };
+      const configuredStatus = defaultBranchContainsSha[base];
+      let status = 'diverged';
+      if (typeof configuredStatus === 'string') {
+        status = configuredStatus;
+      } else if (configuredStatus) {
+        status = 'ahead';
+      }
+
+      return { data: { status } };
     },
     rest: {
       actions: {
@@ -399,7 +416,7 @@ async function testNoRunSyntheticBaseAllowsQuietParentSkip() {
       [quietMain]: olderFailure,
     },
     defaultBranchContainsSha: {
-      [quietMain]: true,
+      [quietMain]: 'identical',
     },
   });
   const core = makeCore();
@@ -415,6 +432,40 @@ async function testNoRunSyntheticBaseAllowsQuietParentSkip() {
 
   assert.deepEqual(core.failed, []);
   assert.match(core.infoMessages.at(-1), /Allowing docs-only skip/);
+}
+
+async function testReachableMergeQueueRunFailureIsChecked() {
+  const previous = 'merge-queue-main';
+  const failingRun = run({
+    id: 23,
+    sha: previous,
+    name: 'Main queue CI',
+    conclusion: 'failure',
+    event: 'merge_group',
+  });
+  const github = makeGithub({
+    pages: [[failingRun]],
+    jobsByRunId: {
+      23: [buildFailureJob()],
+    },
+    parentsBySha: {},
+    defaultBranchContainsSha: {
+      [previous]: true,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit merge-queue-main still has failing workflows/);
 }
 
 async function testNoRunSyntheticChainLooksThroughToParentFailure() {
@@ -671,6 +722,7 @@ async function main() {
   await testNoRunSyntheticBaseLooksThroughToParentFailure();
   await testNoRunPushBaseAllowsQuietMainSkip();
   await testNoRunSyntheticBaseAllowsQuietParentSkip();
+  await testReachableMergeQueueRunFailureIsChecked();
   await testNoRunSyntheticChainLooksThroughToParentFailure();
   await testNoRunHopLimitStopsAtConfiguredLimitWithTrail();
   await testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure();

@@ -62,7 +62,6 @@ async function listWorkflowRunsForSha({ github, context, sha, createdAfter }) {
   for await (const response of github.paginate.iterator(github.rest.actions.listWorkflowRunsForRepo, {
     owner: context.repo.owner,
     repo: context.repo.repo,
-    event: 'push',
     per_page: 30,
     created: `>${createdAfter}`,
     sort: 'created',
@@ -182,8 +181,7 @@ function isGithubApiFailure(error) {
   return Boolean(error?.githubApiFailure);
 }
 
-function githubApiFailureDetails(error) {
-  const status = githubApiErrorStatus(error);
+function githubApiFailureDetails(error, status = githubApiErrorStatus(error)) {
   const details = [];
 
   if (status !== undefined) {
@@ -199,7 +197,7 @@ function githubApiFailureDetails(error) {
 
 function wrapGithubApiFailure(error, message) {
   const status = githubApiErrorStatus(error);
-  const wrappedError = new Error([message, githubApiFailureDetails(error)].filter(Boolean).join(' '));
+  const wrappedError = new Error([message, githubApiFailureDetails(error, status)].filter(Boolean).join(' '));
 
   wrappedError.githubApiFailure = true;
 
@@ -256,7 +254,7 @@ function formatNoRunsTrailDetails(noRunsTrail) {
 
   return [
     '',
-    'Skipped candidate commits with no push-event runs while looking for the underlying CI state:',
+    'Skipped candidate commits with no workflow runs while looking for the underlying CI state:',
     ...noRunsTrail.map((sha) => `- ${sha}`),
   ].join('\n');
 }
@@ -334,7 +332,7 @@ async function checkPreviousMainCommitStatus({
       if (parentSha) {
         core.info(
           [
-            `No push-event workflow runs found for ${shaToCheck} in the last 7 days.`,
+            `No workflow runs found for ${shaToCheck} in the last 7 days.`,
             'For batched merge queues, github.event.merge_group.base_sha can be a synthetic queue commit',
             `that was never pushed to main. Checking first parent ${parentSha} for the underlying CI state.`,
           ].join(' '),
@@ -360,14 +358,12 @@ async function checkPreviousMainCommitStatus({
       if (context.eventName === 'merge_group') {
         core.info(
           [
-            `No push-event workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
+            `No workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
             'This SHA is already in the default branch history; no parent tracing needed.',
           ].join('\n'),
         );
       } else {
-        core.info(
-          `No push-event workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
-        );
+        core.info(`No workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`);
       }
       return;
     }
