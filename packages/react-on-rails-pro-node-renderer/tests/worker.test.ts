@@ -524,30 +524,35 @@ describe('worker', () => {
     });
   });
 
-  test('post /asset-exists rejects traversal filenames', async () => {
+  test('post /asset-exists rejects unsafe filenames without reporting them', async () => {
     const bundleHash = 'some-bundle-hash';
     await createAsset(testName, bundleHash);
     const sentinelPath = path.resolve(serverBundleCachePathForTest(), '..', 'asset-exists-sentinel.txt');
     fs.writeFileSync(sentinelPath, 'outside renderer cache');
+    const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
     const app = createWorker({
       password: 'my_password',
     });
 
-    const query = querystring.stringify({ filename: '../../asset-exists-sentinel.txt' });
-
     try {
-      const res = await app
-        .inject()
-        .post(`/asset-exists?${query}`)
-        .payload({
-          password: 'my_password',
-          targetBundles: [bundleHash],
-        })
-        .end();
-      expect(res.statusCode).toBe(400);
-      expect(res.payload).toContain('Invalid asset filename');
+      for (const filename of ['../../asset-exists-sentinel.txt', 'foo\0bar', 'foo\nbar']) {
+        const query = querystring.stringify({ filename });
+
+        const res = await app
+          .inject()
+          .post(`/asset-exists?${query}`)
+          .payload({
+            password: 'my_password',
+            targetBundles: [bundleHash],
+          })
+          .end();
+        expect(res.statusCode).toBe(400);
+        expect(res.payload).toContain('Invalid asset filename');
+      }
+      expect(reportMessageSpy).not.toHaveBeenCalled();
     } finally {
+      reportMessageSpy.mockRestore();
       fs.rmSync(sentinelPath, { force: true });
     }
   });

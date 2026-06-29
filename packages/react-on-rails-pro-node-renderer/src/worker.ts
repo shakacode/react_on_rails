@@ -1173,7 +1173,7 @@ export default function run(config: Partial<Config>) {
       const message =
         err instanceof Error ? err.message : `Invalid asset filename path component: ${filename}`;
       log.info(message);
-      await setResponse(errorResponseResult(message), res);
+      await setResponse(badRequestResponseResult(message), res);
       return;
     }
 
