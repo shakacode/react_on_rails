@@ -60,6 +60,9 @@ describe('shared utils', () => {
       'assets\\loadable-stats.json',
       '/tmp/loadable-stats.json',
       'C:\\tmp\\loadable-stats.json',
+      'foo\0bar',
+      'foo\nbar',
+      'foo\x7Fbar',
     ])('rejects asset filename path "%s"', (filename) => {
       expect(() => assetFilenamePathComponent(filename)).toThrow('Invalid asset filename path component');
     });
