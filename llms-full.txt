@@ -18116,8 +18116,8 @@ ReactOnRailsPro.configure do |config|
   # config.renderer_password = ENV["RENDERER_PASSWORD"]
 
   # Set the `ssr_timeout` configuration so the Rails server will not wait more than this many seconds
-  # for a SSR request to return once issued. With the async-http renderer client, this is applied as
-  # the socket I/O timeout on the renderer connection. Increase this value for long-running
+  # for a renderer socket read once issued. With the async-http renderer client, this is applied as
+  # the per-read socket timeout on the renderer connection. Increase this value for long-running
   # streaming SSR responses with legitimate gaps between chunks.
   config.ssr_timeout = 5
 
@@ -18132,8 +18132,8 @@ ReactOnRailsPro.configure do |config|
   # When a Fiber.scheduler already exists before the renderer request enters `Sync {}`, the
   # client is reused across requests within that long-lived scheduler (persistent connection /
   # keep-alive; see the tuning section below), so this limit bounds streamed renders sharing one client.
-  # Otherwise the adapter uses a request-scoped client. Under standard Puma streaming, `Sync {}`
-  # creates that scheduler/client for the response and cleans it up when the response ends.
+  # Otherwise the adapter uses a request-scoped client. Under standard Puma (no pre-existing scheduler), `Sync {}`
+  # creates that scheduler/client for the request and cleans it up when the request ends.
   # See "Renderer Performance Tuning for Streamed RSC" below.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
@@ -18240,7 +18240,7 @@ Guidance:
 
 ### 3. Rails ↔ renderer keep-alive (persistent on Falcon/async scheduler; per-request on standard Puma)
 
-Connection reuse is automatic when the renderer request runs under a long-lived `Fiber.scheduler`, such as Falcon or Puma configured with an async scheduler. In that setup, the async-http client is stored on the scheduler and reused across streaming requests, so HTTP/2 connections stay alive and renders multiplex over them instead of paying TCP handshake and H2 connection setup per request (issue #3283). No React on Rails configuration is required to enable this.
+Connection reuse is automatic when the renderer request runs under a long-lived `Fiber.scheduler`, such as Falcon or Puma configured with an async scheduler. In that setup, the async-http client is stored on the scheduler and reused across streaming requests, so HTTP/2 connections stay alive and renders multiplex over them instead of paying TCP handshake and H2 connection setup per request ([issue #3283](https://github.com/shakacode/react_on_rails/issues/3283)). No React on Rails configuration is required to enable this.
 
 Under standard Puma, the streaming helper's `Sync {}` block creates a per-request scheduler. The async-http client is cleaned up when that streaming response ends, so connection reuse does not persist across consecutive Rails requests. The benefit is still meaningful inside a single streamed response: renderer calls in that response can share the same client lifecycle and `renderer_http_pool_size` still bounds concurrent HTTP/2 streams within that request.
 
