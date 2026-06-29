@@ -181,7 +181,7 @@ module ReactOnRailsProHelper
 
     on_complete = options.delete(:on_complete)
     collect_chunks = on_complete.respond_to?(:call)
-    chunks = [] if collect_chunks
+    chunks = []
     html = collect_chunks ? nil : +""
 
     internal_stream_react_component(component_name, options).each_chunk do |chunk|
