@@ -4502,6 +4502,7 @@ describe InstallGenerator, type: :generator do
 
       expect(output_text).to include("clean up your working tree before rerunning")
       expect(output_text).to include("Re-run: rails generate react_on_rails:install --redux --typescript")
+      expect(output_text).to include("legacy Redux generator path")
     end
 
     specify "hidden install --redux emits a legacy warning" do
@@ -4535,6 +4536,16 @@ describe InstallGenerator, type: :generator do
 
       expect(output_text).to include("clean up your working tree before rerunning")
       expect(output_text).to include("Then re-run: rails generate react_on_rails:install --rspack --pro")
+    end
+
+    specify "shakapacker gemfile error warns for hidden redux recovery" do
+      install_generator = install_generator_fixture(redux: true, ignore_warnings: true)
+
+      install_generator.send(:handle_shakapacker_gemfile_error)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("Then re-run: rails generate react_on_rails:install --redux")
+      expect(output_text).to include("legacy Redux generator path")
     end
 
     specify "rsc installs include the Pro verification checklist message" do

@@ -199,7 +199,7 @@ module ReactOnRails
 
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
-          add_legacy_redux_install_warning
+          add_legacy_redux_install_warning_once
           add_package_json_scripts
           add_ci_workflow
           add_bin_scripts
@@ -813,6 +813,13 @@ module ReactOnRails
         MSG
       end
 
+      def add_legacy_redux_install_warning_once
+        return if @legacy_redux_install_warning_added
+
+        add_legacy_redux_install_warning
+        @legacy_redux_install_warning_added = true if options.redux?
+      end
+
       def recovery_install_command
         flags = []
         flags << "--redux" if options.redux?
@@ -1096,6 +1103,7 @@ module ReactOnRails
           Then re-run: #{recovery_install_command}
         MSG
         GeneratorMessages.add_error(error)
+        add_legacy_redux_install_warning_once
         raise Thor::Error, error unless options.ignore_warnings?
       end
 
@@ -1120,6 +1128,7 @@ module ReactOnRails
           Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
         MSG
         GeneratorMessages.add_error(error)
+        add_legacy_redux_install_warning_once
         raise Thor::Error, error unless options.ignore_warnings?
       end
 
