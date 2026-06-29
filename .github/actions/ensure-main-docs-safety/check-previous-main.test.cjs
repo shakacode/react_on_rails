@@ -70,6 +70,7 @@ function makeGithub({
   parentsBySha,
   defaultBranchContainsSha = {},
   compareErrorByBase = {},
+  commitErrorByRef = {},
 }) {
   const listWorkflowRunsForRepo = async () => {};
   const listJobsForWorkflowRun = async ({ run_id: runId }) => ({
@@ -113,9 +114,15 @@ function makeGithub({
         listJobsForWorkflowRun,
       },
       repos: {
-        getCommit: async ({ ref }) => ({
-          data: { parents: parentsBySha[ref] ? [{ sha: parentsBySha[ref] }] : [] },
-        }),
+        getCommit: async ({ ref }) => {
+          if (commitErrorByRef[ref]) {
+            throw commitErrorByRef[ref];
+          }
+
+          return {
+            data: { parents: parentsBySha[ref] ? [{ sha: parentsBySha[ref] }] : [] },
+          };
+        },
       },
     },
   };
@@ -563,6 +570,34 @@ async function testCompareNetworkFailureSetsHelpfulFailure() {
   assert.match(core.failed[0], /read ECONNRESET/);
 }
 
+async function testFirstParentNetworkFailureSetsHelpfulFailure() {
+  const syntheticBase = 'synthetic-base';
+  const commitError = new Error('read ECONNRESET');
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+    commitErrorByRef: {
+      [syntheticBase]: commitError,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Cannot determine prior real CI status because a GitHub API request failed/);
+  assert.match(core.failed[0], /synthetic-base/);
+  assert.match(core.failed[0], /read ECONNRESET/);
+}
+
 async function testNoRunUnreachableSyntheticBaseWithoutParentFailsClosed() {
   const syntheticBase = 'synthetic-base';
   const github = makeGithub({
@@ -641,6 +676,7 @@ async function main() {
   await testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure();
   await testCompareTransientFailureSetsHelpfulFailure();
   await testCompareNetworkFailureSetsHelpfulFailure();
+  await testFirstParentNetworkFailureSetsHelpfulFailure();
   await testNoRunUnreachableSyntheticBaseWithoutParentFailsClosed();
   await testGuardOnlyFailuresLookThroughToParentSuccess();
   await testNonContiguousWorkflowRunPagesAreChecked();

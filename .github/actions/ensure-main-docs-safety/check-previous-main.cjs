@@ -174,22 +174,12 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
   };
 }
 
-async function firstParentSha({ github, context, sha }) {
-  const response = await github.rest.repos.getCommit({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    ref: sha,
-  });
-
-  return response.data.parents?.[0]?.sha;
-}
-
 function githubApiErrorStatus(error) {
   return error?.status ?? error?.response?.status;
 }
 
 function isGithubApiFailure(error) {
-  return Boolean(error?.githubApiFailure) || githubApiErrorStatus(error) !== undefined;
+  return Boolean(error?.githubApiFailure);
 }
 
 function githubApiFailureDetails(error) {
@@ -205,6 +195,33 @@ function githubApiFailureDetails(error) {
   }
 
   return details.join(' ');
+}
+
+function wrapGithubApiFailure(error, message) {
+  const status = githubApiErrorStatus(error);
+  const wrappedError = new Error([message, githubApiFailureDetails(error)].filter(Boolean).join(' '));
+
+  wrappedError.githubApiFailure = true;
+
+  if (status !== undefined) {
+    wrappedError.status = status;
+  }
+
+  return wrappedError;
+}
+
+async function firstParentSha({ github, context, sha }) {
+  try {
+    const response = await github.rest.repos.getCommit({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      ref: sha,
+    });
+
+    return response.data.parents?.[0]?.sha;
+  } catch (error) {
+    throw wrapGithubApiFailure(error, `GitHub commit API failed while reading first parent for ${sha}.`);
+  }
 }
 
 async function isCommitReachableFromDefaultBranch({ github, context, sha }) {
@@ -225,17 +242,10 @@ async function isCommitReachableFromDefaultBranch({ github, context, sha }) {
       return false;
     }
 
-    const details = githubApiFailureDetails(error);
-    const wrappedError = new Error(
-      [`GitHub compare API failed while checking whether ${sha} is reachable from ${defaultBranch}.`, details]
-        .filter(Boolean)
-        .join(' '),
+    throw wrapGithubApiFailure(
+      error,
+      `GitHub compare API failed while checking whether ${sha} is reachable from ${defaultBranch}.`,
     );
-    wrappedError.githubApiFailure = true;
-    if (status !== undefined) {
-      wrappedError.status = status;
-    }
-    throw wrappedError;
   }
 }
 
