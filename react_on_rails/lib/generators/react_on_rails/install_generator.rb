@@ -197,8 +197,6 @@ module ReactOnRails
         # See lib/react_on_rails/engine.rb for the validation skip logic
         ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
 
-        add_legacy_redux_install_warning_once
-
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
           add_package_json_scripts
@@ -223,6 +221,7 @@ module ReactOnRails
         # print_generator_messages raises an exception. This prevents ENV pollution
         # that could affect subsequent processes.
         ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
+        add_legacy_redux_install_warning_once
         print_generator_messages
       end
 
@@ -817,8 +816,8 @@ module ReactOnRails
       def add_legacy_redux_install_warning_once
         return if @legacy_redux_install_warning_added
 
-        @legacy_redux_install_warning_added = true
         add_legacy_redux_install_warning
+        @legacy_redux_install_warning_added = true
       end
 
       def recovery_install_command
@@ -1103,8 +1102,8 @@ module ReactOnRails
           #{recovery_working_tree_note}
           Then re-run: #{recovery_install_command}
         MSG
-        add_legacy_redux_install_warning_once
         GeneratorMessages.add_error(error)
+        add_legacy_redux_install_warning_once
         raise Thor::Error, error unless options.ignore_warnings?
       end
 
@@ -1128,8 +1127,8 @@ module ReactOnRails
 
           Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
         MSG
-        add_legacy_redux_install_warning_once
         GeneratorMessages.add_error(error)
+        add_legacy_redux_install_warning_once
         raise Thor::Error, error unless options.ignore_warnings?
       end
 

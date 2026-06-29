@@ -19,7 +19,6 @@ module ReactOnRails
         New apps should use the default React on Rails installer without Redux. Runtime Redux APIs such as
         redux_store remain supported.
       MSG
-      private_constant :LEGACY_REDUX_GENERATOR_WARNING
 
       class_option :typescript, type: :boolean, default: false, desc: "Generate TypeScript files", aliases: "-T"
       class_option :invoked_by_install, type: :boolean, default: false, hide: true
