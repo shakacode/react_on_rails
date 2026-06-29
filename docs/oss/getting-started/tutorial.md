@@ -303,7 +303,7 @@ Use Redux when your app already has Redux conventions, needs a shared client sto
 - **Server state:** pass initial data through Rails controller props, then refresh data through your Rails JSON endpoints, GraphQL layer, or a server-state cache such as [TanStack Query](../building-features/tanstack-query.md).
 - **Multi-island shared client state:** use Redux only when separate React roots on the same page must coordinate through one client store, such as a header counter and body list that update each other without a full page refresh.
 
-The installer has a hidden legacy Redux path for maintaining or recreating older generated apps, but this tutorial does not use it and new apps should not start with `--redux`. The legacy Redux structure has actions, reducers, store setup, presentational components, containers, and auto-registered entry points under `ror_components`.
+The installer has a [hidden legacy Redux path](../api-reference/generator-details.md#legacy-redux-structure-hidden---redux-path) for maintaining or recreating older generated apps, but this tutorial does not use it and new apps should not start with `--redux`. The legacy Redux structure has actions, reducers, store setup, presentational components, containers, and auto-registered entry points under `ror_components`.
 
 When rendering an existing Redux-backed component, the Rails side still uses the same view helper style:
 

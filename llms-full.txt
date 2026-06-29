@@ -286,7 +286,7 @@ Find guidance for your specific scenario:
 | **Compare Rails + frontend options** | [Comparison Guide](./getting-started/comparing-react-on-rails-to-alternatives.md)     |
 | **Enable server-side rendering**     | [SSR Guide](./core-concepts/react-server-rendering.md)                                |
 | **Set up hot reloading**             | [HMR Setup](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
-| **Use legacy shared Redux stores**   | [Redux Integration](./building-features/react-and-redux.md)                           |
+| **Use legacy shared Redux stores**   | [Legacy Redux Guidance](./building-features/react-and-redux.md)                       |
 | **Use TanStack Router**              | [TanStack Router Guide](./building-features/tanstack-router.md)                       |
 | **Deploy to production**             | [Deployment Guide](./deployment/README.md)                                            |
 | **Troubleshoot issues**              | [Troubleshooting](./deployment/troubleshooting.md)                                    |
@@ -1156,7 +1156,7 @@ Use Redux when your app already has Redux conventions, needs a shared client sto
 - **Server state:** pass initial data through Rails controller props, then refresh data through your Rails JSON endpoints, GraphQL layer, or a server-state cache such as [TanStack Query](../building-features/tanstack-query.md).
 - **Multi-island shared client state:** use Redux only when separate React roots on the same page must coordinate through one client store, such as a header counter and body list that update each other without a full page refresh.
 
-The installer has a hidden legacy Redux path for maintaining or recreating older generated apps, but this tutorial does not use it and new apps should not start with `--redux`. The legacy Redux structure has actions, reducers, store setup, presentational components, containers, and auto-registered entry points under `ror_components`.
+The installer has a [hidden legacy Redux path](../api-reference/generator-details.md#legacy-redux-structure-hidden---redux-path) for maintaining or recreating older generated apps, but this tutorial does not use it and new apps should not start with `--redux`. The legacy Redux structure has actions, reducers, store setup, presentational components, containers, and auto-registered entry points under `ror_components`.
 
 When rendering an existing Redux-backed component, the Rails side still uses the same view helper style:
 
@@ -4986,25 +4986,40 @@ React Router v6 offers multiple routing approaches. For React on Rails, we recom
 
 Most React Router integrations do not need Redux. Route ordinary components inside one React root, pass initial data from Rails as props, and use your normal server-state approach for follow-up data loading.
 
-**File: `app/javascript/src/RouterApp/ror_components/RouterApp.client.jsx`**
+**File: `app/javascript/src/RouterApp/ror_components/RouterApp.jsx`**
 
 ```jsx
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 
 const Home = ({ name }) => <div>Hello, {name}!</div>;
 const About = () => <div>About</div>;
 
 const RouterApp = (props) => (
-  <BrowserRouter>
-    <Routes>
-      <Route path="/" element={<Home {...props} />} />
-      <Route path="/about" element={<About />} />
-    </Routes>
-  </BrowserRouter>
+  <Routes>
+    <Route path="/" element={<Home {...props} />} />
+    <Route path="/about" element={<About />} />
+  </Routes>
 );
 
 export default RouterApp;
+```
+
+**File: `app/javascript/src/RouterApp/ror_components/RouterApp.client.jsx`**
+
+```jsx
+import React from 'react';
+import { BrowserRouter } from 'react-router-dom';
+
+import RouterApp from './RouterApp';
+
+const RouterAppClient = (props) => (
+  <BrowserRouter>
+    <RouterApp {...props} />
+  </BrowserRouter>
+);
+
+export default RouterAppClient;
 ```
 
 ## Legacy Client-Side Setup with Redux
@@ -5063,25 +5078,19 @@ is configured so React on Rails registers the client and server files separately
 ```jsx
 import React from 'react';
 import { StaticRouter } from 'react-router-dom/server';
-import { Routes, Route } from 'react-router-dom';
+import RouterApp from './RouterApp';
 
-const Home = ({ name }) => <div>Hello, {name}!</div>;
-const About = () => <div>About</div>;
-
-const RouterApp = (props, railsContext) => {
+const RouterAppServer = (props, railsContext) => {
   const { location } = railsContext;
 
   return () => (
     <StaticRouter location={location}>
-      <Routes>
-        <Route path="/" element={<Home {...props} />} />
-        <Route path="/about" element={<About />} />
-      </Routes>
+      <RouterApp {...props} />
     </StaticRouter>
   );
 };
 
-export default RouterApp;
+export default RouterAppServer;
 ```
 
 ## Legacy Server-Side Setup with Redux
@@ -5092,7 +5101,6 @@ If your app still uses the legacy shared Redux store, keep the provider around t
 
 ```jsx
 import React from 'react';
-import { renderToString } from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom/server';
 import { Provider } from 'react-redux';
 import { Routes, Route } from 'react-router-dom';
@@ -5107,7 +5115,7 @@ const HelloWorldApp = (props, railsContext) => {
   const store = configureStore(props);
   const { location } = railsContext;
 
-  const html = renderToString(
+  return () => (
     <Provider store={store}>
       <StaticRouter location={location}>
         <Routes>
@@ -5117,10 +5125,8 @@ const HelloWorldApp = (props, railsContext) => {
           {/* <Route path="/contact" element={<Contact />} /> */}
         </Routes>
       </StaticRouter>
-    </Provider>,
+    </Provider>
   );
-
-  return { renderedHtml: html };
 };
 
 export default HelloWorldApp;

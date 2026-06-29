@@ -41,25 +41,40 @@ React Router v6 offers multiple routing approaches. For React on Rails, we recom
 
 Most React Router integrations do not need Redux. Route ordinary components inside one React root, pass initial data from Rails as props, and use your normal server-state approach for follow-up data loading.
 
-**File: `app/javascript/src/RouterApp/ror_components/RouterApp.client.jsx`**
+**File: `app/javascript/src/RouterApp/ror_components/RouterApp.jsx`**
 
 ```jsx
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 
 const Home = ({ name }) => <div>Hello, {name}!</div>;
 const About = () => <div>About</div>;
 
 const RouterApp = (props) => (
-  <BrowserRouter>
-    <Routes>
-      <Route path="/" element={<Home {...props} />} />
-      <Route path="/about" element={<About />} />
-    </Routes>
-  </BrowserRouter>
+  <Routes>
+    <Route path="/" element={<Home {...props} />} />
+    <Route path="/about" element={<About />} />
+  </Routes>
 );
 
 export default RouterApp;
+```
+
+**File: `app/javascript/src/RouterApp/ror_components/RouterApp.client.jsx`**
+
+```jsx
+import React from 'react';
+import { BrowserRouter } from 'react-router-dom';
+
+import RouterApp from './RouterApp';
+
+const RouterAppClient = (props) => (
+  <BrowserRouter>
+    <RouterApp {...props} />
+  </BrowserRouter>
+);
+
+export default RouterAppClient;
 ```
 
 ## Legacy Client-Side Setup with Redux
@@ -118,25 +133,19 @@ is configured so React on Rails registers the client and server files separately
 ```jsx
 import React from 'react';
 import { StaticRouter } from 'react-router-dom/server';
-import { Routes, Route } from 'react-router-dom';
+import RouterApp from './RouterApp';
 
-const Home = ({ name }) => <div>Hello, {name}!</div>;
-const About = () => <div>About</div>;
-
-const RouterApp = (props, railsContext) => {
+const RouterAppServer = (props, railsContext) => {
   const { location } = railsContext;
 
   return () => (
     <StaticRouter location={location}>
-      <Routes>
-        <Route path="/" element={<Home {...props} />} />
-        <Route path="/about" element={<About />} />
-      </Routes>
+      <RouterApp {...props} />
     </StaticRouter>
   );
 };
 
-export default RouterApp;
+export default RouterAppServer;
 ```
 
 ## Legacy Server-Side Setup with Redux
@@ -147,7 +156,6 @@ If your app still uses the legacy shared Redux store, keep the provider around t
 
 ```jsx
 import React from 'react';
-import { renderToString } from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom/server';
 import { Provider } from 'react-redux';
 import { Routes, Route } from 'react-router-dom';
@@ -162,7 +170,7 @@ const HelloWorldApp = (props, railsContext) => {
   const store = configureStore(props);
   const { location } = railsContext;
 
-  const html = renderToString(
+  return () => (
     <Provider store={store}>
       <StaticRouter location={location}>
         <Routes>
@@ -172,10 +180,8 @@ const HelloWorldApp = (props, railsContext) => {
           {/* <Route path="/contact" element={<Contact />} /> */}
         </Routes>
       </StaticRouter>
-    </Provider>,
+    </Provider>
   );
-
-  return { renderedHtml: html };
 };
 
 export default HelloWorldApp;
