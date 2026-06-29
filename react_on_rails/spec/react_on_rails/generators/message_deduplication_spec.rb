@@ -55,6 +55,8 @@ describe "Message Deduplication", type: :generator do
 
         expect(output_text).to include("hidden legacy Redux generator path")
         expect(output_text).to include("HelloWorldApp")
+        expect(output_text).to include("📋 QUICK START:")
+        expect(output_text).to include("✨ KEY FEATURES:")
       end
     end
   end

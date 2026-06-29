@@ -39,6 +39,10 @@ describe "Pages/Index", :js do
       visit root_path
     end
 
+    context "with legacy Redux server-rendered component" do
+      include_examples "React Component", "div#ReduxApp-react-component-0"
+    end
+
     context "with Server Rendered/Cached React Component Without Redux" do
       include_examples "React Component", "div#HelloWorld-react-component-1"
     end
