@@ -214,6 +214,7 @@ describe('ReactOnRails', () => {
     ReactOnRails.registerStore({ storeGenerator });
 
     expect(ReactOnRails.getStoreGenerator('storeGenerator')).toEqual(storeGenerator);
+    expect(ReactOnRails.storeGenerators()).toEqual(new Map([['storeGenerator', storeGenerator]]));
   });
 
   it('setStore and getStore', () => {
