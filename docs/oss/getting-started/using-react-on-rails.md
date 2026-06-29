@@ -158,7 +158,7 @@ The generator creates `bin/dev` for starting both:
 Sometimes you need more than just a simple React component. **Render-Functions** let you:
 
 1. Access Rails context (current URL, locale, etc.)
-2. Initialize Redux stores with props
+2. Initialize legacy shared Redux stores with props
 3. Set up React Router or TanStack Router (TanStack SSR requires React on Rails Pro)
 4. Return different components based on props
 
@@ -180,7 +180,7 @@ export default MyApp;
 ### When to Use Render-Functions
 
 - **Need railsContext** - Access current URL, locale, or custom Rails data
-- **Redux integration** - Initialize store with server-side props
+- **Redux integration** - Initialize a legacy or advanced shared store with server-side props
 - **React Router** - Set up routing with initial URL from Rails
 - **Conditional rendering** - Return different components based on props
 
@@ -237,7 +237,7 @@ Now that you understand the core concepts, here are recommended paths forward:
 
 ### Build Features
 
-- **[Redux Integration](../building-features/react-and-redux.md)** - Add state management
+- **[Redux Integration](../building-features/react-and-redux.md)** - Maintain legacy or advanced shared-store state
 - **[React Router](../building-features/react-router.md)** - Client-side routing
 - **[TanStack Router](../building-features/tanstack-router.md)** - Pro-only first-class router integration with SSR dehydration/hydration
 - **[Server-Side Rendering](../core-concepts/react-server-rendering.md)** - Deep dive into SSR

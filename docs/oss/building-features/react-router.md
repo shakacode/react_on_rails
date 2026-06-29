@@ -37,9 +37,34 @@ React Router v6 offers multiple routing approaches. For React on Rails, we recom
 
 **Note on Data Mode:** React Router's Data Mode (with loaders/actions) is designed for SPAs where the client handles data fetching. Since React on Rails uses Rails controllers to load data and pass it as props to React components, Data Mode would create duplicate data loading. Stick with Declarative Mode to leverage React on Rails' server-side data loading pattern.
 
-## Basic Client-Side Setup with Redux
+## Basic Client-Side Setup
 
-If you're using Redux (created with `rails generate react_on_rails:install --redux`), you can add React Router by wrapping your app:
+Most React Router integrations do not need Redux. Route ordinary components inside one React root, pass initial data from Rails as props, and use your normal server-state approach for follow-up data loading.
+
+**File: `app/javascript/src/RouterApp/ror_components/RouterApp.client.jsx`**
+
+```jsx
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+const Home = ({ name }) => <div>Hello, {name}!</div>;
+const About = () => <div>About</div>;
+
+const RouterApp = (props) => (
+  <BrowserRouter>
+    <Routes>
+      <Route path="/" element={<Home {...props} />} />
+      <Route path="/about" element={<About />} />
+    </Routes>
+  </BrowserRouter>
+);
+
+export default RouterApp;
+```
+
+## Legacy Client-Side Setup with Redux
+
+If you're maintaining an app that already uses Redux, including the hidden legacy Redux generator output, you can add React Router by wrapping your app:
 
 **File: `app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx`**
 
@@ -76,7 +101,7 @@ export default HelloWorldApp;
 
 **Key points:**
 
-- `<Provider>` wraps `<BrowserRouter>` so all routes have Redux access
+- In Redux-backed legacy apps, `<Provider>` wraps `<BrowserRouter>` so all routes have Redux access
 - Use `<Routes>` and `<Route>` (not `<Switch>` from React Router v5)
 - Use `element` prop to specify components (not `component` or `render` props from v5)
 - Routes are automatically matched by best fit, not render order

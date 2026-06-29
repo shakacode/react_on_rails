@@ -15,7 +15,7 @@ React on Rails bridges the gap between Ruby on Rails and React, allowing you to:
 - Pass props from Rails to React without building a separate API
 - Enable server-side rendering for better SEO and initial page load performance
 - Use hot module replacement (HMR) for fast development iterations
-- Integrate with Redux, React Router, and the modern React ecosystem
+- Integrate with React Router, server-state tools, and advanced shared-store libraries such as Redux
 
 Unlike a separate SPA approach, React on Rails lets you leverage Rails conventions while progressively enhancing your UI with React components.
 
@@ -67,7 +67,7 @@ Detailed integration instructions for existing Rails applications with Shakapack
 
 **[Complete Tutorial →](./getting-started/tutorial.md)**
 
-Step-by-step walkthrough building a full app with Redux, routing, and deployment.
+Step-by-step walkthrough building a TypeScript component with hooks, server rendering, and deployment guidance.
 
 ### 👀 Learn by Example?
 
@@ -85,7 +85,7 @@ Find guidance for your specific scenario:
 | **Compare Rails + frontend options** | [Comparison Guide](./getting-started/comparing-react-on-rails-to-alternatives.md)     |
 | **Enable server-side rendering**     | [SSR Guide](./core-concepts/react-server-rendering.md)                                |
 | **Set up hot reloading**             | [HMR Setup](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
-| **Use Redux with Rails**             | [Redux Integration](./building-features/react-and-redux.md)                           |
+| **Use legacy shared Redux stores**   | [Redux Integration](./building-features/react-and-redux.md)                           |
 | **Use TanStack Router**              | [TanStack Router Guide](./building-features/tanstack-router.md)                       |
 | **Deploy to production**             | [Deployment Guide](./deployment/README.md)                                            |
 | **Troubleshoot issues**              | [Troubleshooting](./deployment/troubleshooting.md)                                    |

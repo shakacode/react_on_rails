@@ -1,25 +1,31 @@
-# Redux Store
+# Redux Store API
 
 > [!WARNING]
 >
-> This Redux API is no longer recommended as it prevents dynamic code splitting for performance. Instead, you should use the standard `react_component` view helper passing in a "Render-Function."
+> This runtime API remains supported for existing apps and advanced shared-store use cases, but it is not recommended as the default state model for new React on Rails apps. Prefer the standard `react_component` view helper with props or a render-function unless multiple React islands must coordinate through one client store.
 
 > [!IMPORTANT]
 >
 > **Script Loading Requirement:** If you use Redux shared stores with inline component registration (registering components in view templates with `<script>ReactOnRails.register({ MyComponent })</script>`), you **must use `defer: true`** in your `javascript_pack_tag` instead of `async: true`. With async loading, the bundle may execute before inline scripts, causing component registration failures. See the [Streaming Server Rendering documentation](../building-features/streaming-server-rendering.md#important-redux-shared-store-caveat) for details and alternatives.
 
-You don't need to use the `redux_store` api to use Redux. This API was set up to support multiple calls to `react_component` on one page that all talk to the same Redux store.
+You don't need to use the `redux_store` API to use Redux inside a single React root. This API was set up to support multiple calls to `react_component` on one page that all talk to the same Redux store.
 
-If you are only rendering one React component on a page, as is typical to do a "Single Page App" in React, then you should _probably_ pass the props to your React component in a "Render-Function."
+If you are rendering one React component on a page, pass props to that component through `react_component` and keep local UI state inside that React tree. A render-function is also a better fit when you need `railsContext`, routing setup, or custom hydration behavior for one root.
 
-Consider using the `redux_store` helper for the two following use cases:
+Choose state ownership before reaching for `redux_store`:
+
+- **Local island state:** use React Hooks or React Context inside one `react_component` root.
+- **Server state:** use Rails controller props for initial data, then Rails JSON endpoints, GraphQL, or a server-state cache such as [TanStack Query](../building-features/tanstack-query.md) for data that belongs on the server.
+- **Multi-island shared client state:** use `redux_store` when separate React roots on one Rails page must read and update the same client-side state.
+
+Consider using the `redux_store` helper for the following advanced use cases:
 
 1. You want to have multiple React components accessing the same store at once.
-2. You want to place the props to hydrate the client side stores at the very end of your HTML, probably server rendered, so that the browser can render all earlier HTML first. This is particularly useful if your props will be large. However, you're probably better off using [React on Rails Pro](../../pro/react-on-rails-pro.md) if you're at all concerned about performance.
+2. Place the props that hydrate client-side stores at the very end of your HTML, probably server-rendered, so that the browser can render all earlier HTML first. This is particularly useful if your props will be large. However, you're probably better off using [React on Rails Pro](../../pro/react-on-rails-pro.md) if you're at all concerned about performance.
 
-## Multiple React Components on a Page with One Store
+## Multiple React Islands on a Page with One Store
 
-You may wish to have 2 React components share the same the Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. Also, you may want this to work with Turbolinks to minimize reloading the JavaScript.
+You may wish to have two separate React roots share the same Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. Also, you may want this to work with Turbo or Turbolinks to minimize reloading the JavaScript.
 
 A good example of this would be something like a notifications counter in a header. As each notification is read in the body of the page, you would like to update the header. If both the header and body share the same Redux store, then this is trivial. Otherwise, we have to rely on other solutions, such as the header polling the server to see how many unread notifications exist.
 
