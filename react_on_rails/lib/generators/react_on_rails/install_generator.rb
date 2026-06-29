@@ -801,6 +801,8 @@ module ReactOnRails
             ]
           end
 
+        # Keep this install-specific warning aligned with
+        # ReactWithReduxGenerator::LEGACY_REDUX_GENERATOR_WARNING.
         GeneratorMessages.add_warning(<<~MSG.strip)
           The install --redux option is a hidden legacy Redux generator path and is not recommended
           for new React on Rails apps.
@@ -817,7 +819,7 @@ module ReactOnRails
         return if @legacy_redux_install_warning_added
 
         add_legacy_redux_install_warning
-        @legacy_redux_install_warning_added = true if options.redux?
+        @legacy_redux_install_warning_added = true
       end
 
       def recovery_install_command

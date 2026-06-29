@@ -35,7 +35,7 @@ module ReactOnRails
         add_redux_npm_dependencies
         add_redux_specific_messages
       ensure
-        print_generator_messages unless options[:invoked_by_install]
+        print_generator_messages unless options.invoked_by_install?
       end
 
       private
@@ -142,7 +142,7 @@ module ReactOnRails
 
       def unsupported_standalone_tailwind?
         return false unless use_tailwind?
-        return false if options[:invoked_by_install]
+        return false if options.invoked_by_install?
 
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 The standalone react_on_rails:react_with_redux generator does not support --tailwind.
