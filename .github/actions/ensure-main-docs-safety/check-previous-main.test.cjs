@@ -535,6 +535,34 @@ async function testCompareTransientFailureSetsHelpfulFailure() {
   assert.match(core.failed[0], /GitHub is unavailable/);
 }
 
+async function testCompareNetworkFailureSetsHelpfulFailure() {
+  const syntheticBase = 'synthetic-base';
+  const compareError = new Error('read ECONNRESET');
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+    compareErrorByBase: {
+      [syntheticBase]: compareError,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: { ...context, eventName: 'merge_group' },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Cannot determine prior real CI status because a GitHub API request failed/);
+  assert.match(core.failed[0], /synthetic-base/);
+  assert.match(core.failed[0], /read ECONNRESET/);
+}
+
 async function testNoRunUnreachableSyntheticBaseWithoutParentFailsClosed() {
   const syntheticBase = 'synthetic-base';
   const github = makeGithub({
@@ -612,6 +640,7 @@ async function main() {
   await testNoRunHopLimitStopsAtConfiguredLimitWithTrail();
   await testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure();
   await testCompareTransientFailureSetsHelpfulFailure();
+  await testCompareNetworkFailureSetsHelpfulFailure();
   await testNoRunUnreachableSyntheticBaseWithoutParentFailsClosed();
   await testGuardOnlyFailuresLookThroughToParentSuccess();
   await testNonContiguousWorkflowRunPagesAreChecked();

@@ -185,14 +185,18 @@ async function firstParentSha({ github, context, sha }) {
 }
 
 function githubApiErrorStatus(error) {
-  return error?.status || error?.response?.status;
+  return error?.status ?? error?.response?.status;
+}
+
+function isGithubApiFailure(error) {
+  return Boolean(error?.githubApiFailure) || githubApiErrorStatus(error) !== undefined;
 }
 
 function githubApiFailureDetails(error) {
   const status = githubApiErrorStatus(error);
   const details = [];
 
-  if (status) {
+  if (status !== undefined) {
     details.push(`GitHub API status: ${status}.`);
   }
 
@@ -221,15 +225,17 @@ async function isCommitReachableFromDefaultBranch({ github, context, sha }) {
       return false;
     }
 
-    if (status) {
-      const wrappedError = new Error(
-        `GitHub compare API failed while checking whether ${sha} is reachable from ${defaultBranch}. ${githubApiFailureDetails(error)}`,
-      );
+    const details = githubApiFailureDetails(error);
+    const wrappedError = new Error(
+      [`GitHub compare API failed while checking whether ${sha} is reachable from ${defaultBranch}.`, details]
+        .filter(Boolean)
+        .join(' '),
+    );
+    wrappedError.githubApiFailure = true;
+    if (status !== undefined) {
       wrappedError.status = status;
-      throw wrappedError;
     }
-
-    throw error;
+    throw wrappedError;
   }
 }
 
@@ -329,7 +335,6 @@ async function checkPreviousMainCommitStatus({
       }
 
       if (shouldTraceNoRunsParent) {
-        noRunsTrail.push(shaToCheck);
         core.setFailed(
           [
             `Cannot determine prior real CI status because merge queue SHA ${shaToCheck} is not in the default branch and has no parent commits to inspect.`,
@@ -418,7 +423,7 @@ async function checkPreviousMainCommitStatus({
   try {
     await checkSha(previousSha, maxGuardOnlyHops, maxNoRunsHops);
   } catch (error) {
-    if (!githubApiErrorStatus(error)) {
+    if (!isGithubApiFailure(error)) {
       throw error;
     }
 
