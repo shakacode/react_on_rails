@@ -43,7 +43,7 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 3. The rendered HTML is returned to Rails and inserted into the view
 4. Workers are pooled and can be automatically restarted to mitigate memory leaks
 
-Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Framework-owned request state, such as async props, post-SSR hooks, and RSC payload tracking, is stored in per-request `sharedExecutionContext` and tracker instances so concurrent renders do not share that framework state:
+Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Framework-owned request state, such as async props, post-SSR hooks, and RSC payload tracking, is stored in per-request `sharedExecutionContext` and tracker instances so concurrent renders do not share that framework state. The diagram below shows how render jobs fan out across reusable Node workers:
 
 <p>
   <img src="images/worker-pool-dispatch.svg" alt="Many concurrent Rails page requests send render jobs to the Node Renderer's dispatcher, which fans them out across a pool of workers that each render several pages at once." width="840" />

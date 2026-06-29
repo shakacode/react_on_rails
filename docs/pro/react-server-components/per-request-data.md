@@ -368,7 +368,7 @@ export default function Breadcrumbs({ railsContext }) {
 
 ## Scenario 5: Layout Context for Top-Level RSC Entries
 
-Top-level components registered with `registerServerComponent` can also be render functions. React on Rails calls those functions with `(props, railsContext)` during RSC rendering, so a page-level entry can pass selected Rails context values into a request-local store seeder before the rest of the Server Component tree reads them. This only applies to the registered render-function entry path; if you render the entry as an ordinary component elsewhere, `railsContext` is not provided and those values should come through explicit props instead.
+Top-level components registered with `registerServerComponent` can also be [render functions](../../oss/core-concepts/render-functions.md). React on Rails calls those functions with `(props, railsContext)` during RSC rendering, so a page-level entry can pass selected Rails context values into a request-local store seeder before the rest of the Server Component tree reads them. This only applies to the registered render-function entry path; if you render the entry as an ordinary component elsewhere, `railsContext` is not provided and those values should come through explicit props instead.
 
 This is the RSC-safe replacement for layout helpers that write Rails request data into module-level refs. It applies the [Seed Once, Read Anywhere](#pattern-seed-once-read-anywhere) pattern scoped to layout context:
 
@@ -380,8 +380,9 @@ const _getLayoutRequestStore = cache(() => ({}));
 
 export function seedLayoutRequestStore(layoutContext) {
   const store = _getLayoutRequestStore();
-  // Mutation is safe here: this seeder runs once in a parent component before
-  // any reader renders. See "Seed Once, Read Anywhere" for the full rationale.
+  // Mutation is safe in an RSC render context: this seeder runs once in a parent
+  // component before any reader renders. See "Seed Once, Read Anywhere" for the
+  // full rationale.
   store.locale = layoutContext.locale;
   store.pathname = layoutContext.pathname;
   // Object.freeze is shallow. Keep publicEnv primitive-only, or explicitly
@@ -399,11 +400,6 @@ export function getLayoutRequestStore() {
 import { seedLayoutRequestStore } from '../lib/layoutRequestStore';
 import ProductShell from './ProductShell';
 
-function LayoutRequestStoreSeeder({ layoutContext, children }) {
-  seedLayoutRequestStore(layoutContext);
-  return children;
-}
-
 export default function ProductPage(props, railsContext) {
   if (!railsContext) {
     throw new Error(
@@ -412,7 +408,7 @@ export default function ProductPage(props, railsContext) {
   }
 
   const { pageHref, pageLocale, pagePathname } = props;
-  if (!pageHref || pageLocale == null || !pagePathname) {
+  if (!pageHref || !pageLocale || !pagePathname) {
     throw new Error(
       'ProductPage requires pageHref, pageLocale, and pagePathname props; pass them from Rails instead of using the RSC payload request context.',
     );
@@ -430,16 +426,13 @@ export default function ProductPage(props, railsContext) {
   };
 
   return function ProductPageWithLayoutContext() {
-    return (
-      <LayoutRequestStoreSeeder layoutContext={layoutContext}>
-        <ProductShell {...props} />
-      </LayoutRequestStoreSeeder>
-    );
+    seedLayoutRequestStore(layoutContext);
+    return <ProductShell {...props} />;
   };
 }
 ```
 
-The render function returns `ProductPageWithLayoutContext` instead of JSX directly because React on Rails invokes `ProductPage(props, railsContext)` before React starts rendering. At that point `React.cache()` is not yet request-scoped, so seeding must happen inside a component that React renders. The `LayoutRequestStoreSeeder` wrapper makes the seeding boundary explicit in JSX. If this entry has only one seeder, calling `seedLayoutRequestStore(layoutContext)` at the top of `ProductPageWithLayoutContext` before `return` is also valid for the seeding-order guarantee; use the wrapper when you want the JSX tree to show the boundary clearly.
+The render function returns `ProductPageWithLayoutContext` instead of JSX directly because React on Rails invokes `ProductPage(props, railsContext)` before React enters the RSC render work loop. Calling `_getLayoutRequestStore()` there has no active React request scope to attach to, so seeding must happen inside a component that React renders. If you want the JSX tree to show the boundary explicitly, wrap children in a `LayoutRequestStoreSeeder` component that calls `seedLayoutRequestStore(layoutContext)` and returns `<>{children}</>`.
 
 Pass current-page values, such as `pageHref`, `pageLocale`, and `pagePathname`, through props from Rails when readers need them. During client RSC payload refetches, `railsContext.href` and `railsContext.pathname` describe the `/rsc_payload/:component` request, not the page that originally hosted the component. In apps that derive locale from the route or controller, `railsContext.i18nLocale` can likewise describe the payload request rather than the original page.
 
@@ -449,8 +442,8 @@ import { getLayoutRequestStore } from '../lib/layoutRequestStore';
 
 export default function DeepServerComponent() {
   const store = getLayoutRequestStore();
-  if (!store.publicEnv || store.locale == null || store.pathname == null) {
-    throw new Error('seedLayoutRequestStore must be called above this component in the render tree');
+  if (!store.publicEnv?.host || !store.publicEnv?.href || !store.locale || !store.pathname) {
+    throw new Error('seedLayoutRequestStore must provide host, href, locale, and pathname');
   }
   const { locale, pathname, publicEnv } = store;
 
@@ -466,9 +459,7 @@ Seed in a Server Component that renders above every reader. The two-argument ent
 
 ### Concurrency model
 
-React on Rails Pro creates request-scoped RSC payload trackers and passes the current `railsContext` through the render function path for each RSC render. That framework state is isolated per render request.
-
-App module state is different. The Node renderer keeps bundle modules alive inside reusable worker VM contexts, so values assigned to module-level variables can outlive the request that wrote them. Under overlapping streaming renders, a later request can overwrite those variables while an earlier request is still rendering. Do not use module-level refs for Rails context, secrets, credentials, feature flags, public tokens, analytics keys, or other request-derived values. Use `React.cache()` stores seeded from the top-level entry, or pass data explicitly through props.
+React on Rails Pro creates request-scoped RSC payload trackers and passes the current `railsContext` through the render function path for each RSC render. That framework state is isolated per render request. App module state is different; see [Don't: Store module-level mutable state](#dont-store-module-level-mutable-state) for the Node renderer leakage pitfall.
 
 ## Scenario 6: Deduplicating Expensive Computations
 
