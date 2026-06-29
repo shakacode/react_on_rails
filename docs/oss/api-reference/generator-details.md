@@ -31,8 +31,8 @@ configuration.
 
 > [!WARNING]
 > The Redux installer path (`--redux` / `-R`) is a hidden legacy escape hatch, not
-> a recommended starter architecture. New apps should start with plain
-> `react_component` entries, React local state or context for island-local UI
+> a recommended starter architecture. New apps should start with the
+> `react_component` view helper, React local state or context for island-local UI
 > state, and Rails props or server-state tools such as TanStack Query for data
 > loaded from the server. Use Redux only for an existing Redux app or an advanced
 > multi-island page where separate React roots must coordinate through one shared

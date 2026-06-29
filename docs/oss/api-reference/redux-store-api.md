@@ -20,12 +20,12 @@ Choose state ownership before reaching for `redux_store`:
 
 Consider using the `redux_store` helper for the following advanced use cases:
 
-1. You want to have multiple React components accessing the same store at once.
-2. Place the props that hydrate client-side stores at the very end of your HTML, probably server-rendered, so that the browser can render all earlier HTML first. This is particularly useful if your props will be large. However, you're probably better off using [React on Rails Pro](../../pro/react-on-rails-pro.md) if you're at all concerned about performance.
+1. You want multiple React roots or islands to access the same store at once.
+2. You want to place the props that hydrate client-side stores at the very end of your HTML, probably server-rendered, so that the browser can render all earlier HTML first. This is particularly useful if your props will be large. However, you're probably better off using [React on Rails Pro](../../pro/react-on-rails-pro.md) if you're at all concerned about performance.
 
 ## Multiple React Islands on a Page with One Store
 
-You may wish to have two separate React roots share the same Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. Also, you may want this to work with Turbo or Turbolinks to minimize reloading the JavaScript.
+You may wish to have two separate React roots share the same Redux store. For example, if your navbar is a React island, you may want it to use the same store as another island in the main area of the page. You may even want multiple React islands in the main area, which allows for greater modularity. Also, you may want this to work with Turbo or Turbolinks to minimize reloading the JavaScript.
 
 A good example of this would be something like a notifications counter in a header. As each notification is read in the body of the page, you would like to update the header. If both the header and body share the same Redux store, then this is trivial. Otherwise, we have to rely on other solutions, such as the header polling the server to see how many unread notifications exist.
 

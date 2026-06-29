@@ -123,7 +123,7 @@ const About = () => <div>About</div>;
 const RouterApp = (props, railsContext) => {
   const { location } = railsContext;
 
-  return (
+  return () => (
     <StaticRouter location={location}>
       <Routes>
         <Route path="/" element={<Home {...props} />} />
