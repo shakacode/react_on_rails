@@ -2249,11 +2249,11 @@ gem "rack-brotli"
 config.middleware.use Rack::Brotli
 ```
 
-Either middleware negotiates the encoding from the request's `Accept-Encoding` header and sets `Content-Encoding: gzip` / `br` on the response. Decompressed content is byte-for-byte identical to the uncompressed stream.
+Either middleware negotiates the encoding from the request's `Accept-Encoding` header and sets `Content-Encoding: gzip` / `br` on the response. The regression coverage in this repository verifies `Rack::Deflater` end to end for gzip-compressed streaming responses. If your application intentionally runs both `Rack::Deflater` and `Rack::Brotli`, treat the combined middleware order as an application-level Rack stack choice: React on Rails Pro does not reorder compression middleware, so verify the final stack order, `Accept-Encoding` negotiation, and streamed flush behavior in your app before relying on both encodings in production.
 
 ### Why It Works With Streaming
 
-Streaming responses use `ActionController::Live`, which writes chunks to a `SizedQueue` (a destructive, non-idempotent data structure). Standard Rack compression middleware (`Rack::Deflater`, `Rack::Brotli`) works correctly with streaming **by default** because it wraps the response body and compresses as Rack iterates the stream. Downstream proxy or CDN buffering can still affect observed TTFB, so verify the full path with the checks below.
+Streaming responses use `ActionController::Live`, which writes chunks to a `SizedQueue` (a destructive, non-idempotent data structure). Standard Rack compression middleware works with streaming by wrapping the response body and compressing as Rack iterates the stream; this repository verifies that behavior with `Rack::Deflater`. Downstream proxy, CDN buffering, or stacked third-party compression middleware can still affect observed TTFB, so verify the full path with the checks below.
 
 However, if you pass an `:if` condition that calls `body.each` to check the response size, **streaming responses will deadlock**. The `:if` callback destructively consumes all chunks from the queue, leaving nothing for the compressor to read.
 
