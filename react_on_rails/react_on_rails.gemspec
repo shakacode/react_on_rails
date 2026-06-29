@@ -4,7 +4,7 @@ lib = File.expand_path("lib", __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require "react_on_rails/version"
 
-# rubocop:disable Metrics/BlockLength
+# rubocop:disable Gemspec/DevelopmentDependencies, Metrics/BlockLength
 Gem::Specification.new do |s|
   s.name          = "react_on_rails"
   s.version       = ReactOnRails::VERSION
@@ -55,4 +55,4 @@ Gem::Specification.new do |s|
     --------------------------------------------------------------------------------
   MESSAGE
 end
-# rubocop:enable Metrics/BlockLength
+# rubocop:enable Gemspec/DevelopmentDependencies, Metrics/BlockLength
