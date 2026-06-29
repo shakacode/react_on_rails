@@ -2,12 +2,6 @@ Description:
 
 The react_on_rails:install generator integrates a React frontend, including SSR, with Rails.
 
-* Redux (Optional)
-
-    Passing the --redux generator option causes the generated Hello World example
-    to integrate the Redux state container framework. The necessary node modules
-    will be automatically included for you.
-
 * Tailwind CSS v4 (Optional)
 
     Passing the --tailwind generator option installs Tailwind CSS v4, configures

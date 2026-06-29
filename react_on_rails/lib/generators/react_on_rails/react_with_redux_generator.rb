@@ -13,6 +13,12 @@ module ReactOnRails
 
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
+      LEGACY_REDUX_GENERATOR_WARNING = <<~MSG.strip
+        The react_on_rails:react_with_redux generator is a hidden legacy Redux generator path and is not
+        recommended for new React on Rails apps.
+        New apps should use the default React on Rails installer without Redux. Runtime Redux APIs such as
+        redux_store remain supported.
+      MSG
 
       class_option :typescript,
                    type: :boolean,
@@ -131,13 +137,14 @@ module ReactOnRails
       def add_redux_specific_messages
         return if options.invoked_by_install?
 
-        # Append Redux-specific post-install instructions
+        GeneratorMessages.add_warning(LEGACY_REDUX_GENERATOR_WARNING)
         GeneratorMessages.add_info(
           GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world",
                                                                pro: Gem.loaded_specs.key?("react_on_rails_pro"),
                                                                tailwind: use_tailwind?,
                                                                app_root: destination_root)
         )
+        print_generator_messages
       end
 
       private
@@ -152,9 +159,13 @@ module ReactOnRails
           Tailwind setup requires the base React on Rails installer so it can create the
           react_on_rails_tailwind pack, stylesheet, dependencies, and webpack/Rspack config.
 
-          Use the install generator for Redux + Tailwind setup:
+          Use the hidden legacy installer path if you intentionally need the Redux scaffold with Tailwind:
 
-            rails generate react_on_rails:install --redux --tailwind
+            bundle exec rails generate react_on_rails:install --redux --tailwind
+
+          For new apps, run the default installer without Redux:
+
+            bundle exec rails generate react_on_rails:install --tailwind
         MSG
         true
       end

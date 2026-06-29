@@ -32,12 +32,13 @@ module ReactOnRails
       # fetch USAGE file for details generator description
       source_root(File.expand_path(__dir__))
 
-      # --redux
+      # Hidden legacy --redux escape hatch for existing scripted installs.
       class_option :redux,
                    type: :boolean,
                    default: false,
-                   desc: "Install Redux package and Redux version of Hello World Example. Default: false",
-                   aliases: "-R"
+                   desc: "Deprecated legacy Redux install path; use react_on_rails:react_with_redux directly.",
+                   aliases: "-R",
+                   hide: true
 
       # --typescript
       class_option :typescript,
@@ -195,6 +196,7 @@ module ReactOnRails
         # This is inherited by all invoked generators and persists through Rails initialization
         # See lib/react_on_rails/engine.rb for the validation skip logic
         ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
+        add_legacy_redux_install_warning
 
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
@@ -252,9 +254,9 @@ module ReactOnRails
         end
 
         # Component generator logic:
-        # - --rsc without --redux: Skip HelloWorld, HelloServer will be generated in setup_rsc
-        # - --rsc with --redux: Generate HelloWorldApp (user explicitly wants Redux) + HelloServer
-        # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
+        # - --rsc without hidden legacy Redux: Skip HelloWorld; setup_rsc generates HelloServer.
+        # - Hidden legacy --redux: Generate HelloWorldApp as a one-major escape hatch.
+        # - Without --rsc: Generate the default HelloWorld example unless the legacy flag is present.
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
                                                           tailwind: use_tailwind?,
@@ -779,6 +781,33 @@ module ReactOnRails
       def shakapacker_setup_incomplete?
         # Strict comparison keeps nil (unset) distinct from true.
         @shakapacker_setup_incomplete == true
+      end
+
+      def add_legacy_redux_install_warning
+        return unless options.redux?
+
+        legacy_guidance, legacy_command =
+          if use_tailwind?
+            [
+              "Existing apps that need Redux with Tailwind should keep using the hidden install path:",
+              "bundle exec rails generate react_on_rails:install --redux --tailwind"
+            ]
+          else
+            [
+              "Existing apps that need the legacy Redux scaffold can run:",
+              "bundle exec rails generate react_on_rails:react_with_redux"
+            ]
+          end
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          The install --redux option is a hidden legacy Redux generator path and is not recommended
+          for new React on Rails apps.
+          Use the default install generator for new apps. #{legacy_guidance}
+
+              #{legacy_command}
+
+          Runtime Redux APIs such as redux_store remain supported.
+        MSG
       end
 
       def recovery_install_command
