@@ -13,6 +13,7 @@ module ReactOnRails
 
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
+      # Keep this standalone warning aligned with InstallGenerator#add_legacy_redux_install_warning.
       LEGACY_REDUX_GENERATOR_WARNING = <<~MSG.strip.freeze
         The react_on_rails:react_with_redux generator is a hidden legacy Redux generator path and is not
         recommended for new React on Rails apps.
@@ -27,6 +28,7 @@ module ReactOnRails
       class_option :tailwind, type: :boolean, default: false, hide: true
 
       def run_generator
+        add_legacy_redux_generator_warning
         validate_standalone_tailwind
         create_redux_directories
         copy_base_files
@@ -128,10 +130,15 @@ module ReactOnRails
         install_packages_with_fallback(regular_packages, dev: false, package_manager:)
       end
 
-      def add_redux_specific_messages
+      def add_legacy_redux_generator_warning
         return if options[:invoked_by_install]
 
         GeneratorMessages.add_warning(LEGACY_REDUX_GENERATOR_WARNING)
+      end
+
+      def add_redux_specific_messages
+        return if options[:invoked_by_install]
+
         GeneratorMessages.add_info(
           GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world",
                                                                pro: Gem.loaded_specs.key?("react_on_rails_pro"),
@@ -145,8 +152,6 @@ module ReactOnRails
         return false if options[:invoked_by_install]
 
         GeneratorMessages.add_error(<<~MSG.strip)
-          🚫 The standalone react_on_rails:react_with_redux generator does not support --tailwind.
-
           Tailwind setup requires the base React on Rails installer so it can create the
           react_on_rails_tailwind pack, stylesheet, dependencies, and webpack/Rspack config.
 

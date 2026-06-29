@@ -4743,9 +4743,8 @@ describe InstallGenerator, type: :generator do
         .to raise_error(Thor::Error, /react_with_redux generator does not support --tailwind/)
 
       error_text = GeneratorMessages.messages.join("\n")
-      expect(error_text).to include(
-        "standalone react_on_rails:react_with_redux generator does not support --tailwind"
-      )
+      expect(error_text).to include("Tailwind setup requires the base React on Rails installer")
+      expect(error_text).not_to include("standalone react_on_rails:react_with_redux generator does not support")
       expect(error_text).to include("rails generate react_on_rails:install --redux --tailwind")
       expect(error_text).to include("rails generate react_on_rails:install --tailwind")
     end
@@ -4763,11 +4762,23 @@ describe InstallGenerator, type: :generator do
     it "warns that direct standalone Redux generation is legacy" do
       redux_generator = redux_generator_fixture
 
-      redux_generator.send(:add_redux_specific_messages)
+      redux_generator.send(:add_legacy_redux_generator_warning)
 
       message_text = GeneratorMessages.messages.join("\n")
       expect(message_text).to include("legacy Redux generator path")
       expect(message_text).to match(/not\s+recommended for new React on Rails apps/)
+    end
+
+    it "queues the standalone Redux warning before fallible scaffold work" do
+      redux_generator = redux_generator_fixture
+      allow(redux_generator).to receive(:create_redux_directories).and_raise(Thor::Error, "copy failed")
+      allow(redux_generator).to receive(:print_generator_messages)
+
+      expect { redux_generator.run_generator }.to raise_error(Thor::Error, "copy failed")
+
+      message_text = GeneratorMessages.messages.join("\n")
+      expect(message_text).to include("legacy Redux generator path")
+      expect(redux_generator).to have_received(:print_generator_messages)
     end
 
     it "prints queued messages when standalone Redux Tailwind validation fails" do
