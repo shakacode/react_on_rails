@@ -78,6 +78,7 @@ function makeGithub({
   jobIteratorDataByRunId,
   parentsBySha,
   defaultBranchContainsSha = {},
+  compareBaseheads = [],
   compareErrorByBase = {},
   commitErrorByRef = {},
   workflowRunListOptions = [],
@@ -126,6 +127,7 @@ function makeGithub({
       },
     },
     request: async (_route, { basehead }) => {
+      compareBaseheads.push(basehead);
       const [base] = basehead.split('...');
       if (compareErrorByBase[base]) {
         throw compareErrorByBase[base];
@@ -278,18 +280,18 @@ async function testUnexpectedJobIteratorShapeFailsClearly() {
   });
   const core = makeCore();
 
-  await assert.rejects(
-    () =>
-      checkPreviousMainCommitStatus({
-        github,
-        context,
-        core,
-        previousSha: previous,
-        excludeWorkflowsInput: '',
-        createdAfter: '2026-01-01T00:00:00.000Z',
-      }),
-    /Expected jobs array while listing workflow run 15 \(Main push lint\)\./,
-  );
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /GitHub API returned an unexpected response/);
+  assert.match(core.failed[0], /Expected jobs array while listing workflow run 15 \(Main push lint\)\./);
 }
 
 async function testGuardOnlyHopLimitStopsAtConfiguredLimit() {
@@ -814,6 +816,34 @@ async function testNoRunUnreachableSyntheticBaseWithoutParentFailsClosed() {
   assert.match(core.failed[0], /synthetic-base/);
 }
 
+async function testMergeGroupReachabilityUsesRepositoryDefaultBranch() {
+  const syntheticBase = 'synthetic-base';
+  const compareBaseheads = [];
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+    compareBaseheads,
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context: {
+      ...context,
+      eventName: 'merge_group',
+      payload: { repository: { default_branch: 'trunk' } },
+    },
+    core,
+    previousSha: syntheticBase,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.deepEqual(compareBaseheads, ['synthetic-base...trunk']);
+}
+
 async function testGuardOnlyFailuresLookThroughToParentSuccess() {
   const previous = 'docs-1';
   const parent = 'green';
@@ -883,6 +913,7 @@ async function main() {
   await testCompareNetworkFailureSetsHelpfulFailure();
   await testFirstParentNetworkFailureSetsHelpfulFailure();
   await testNoRunUnreachableSyntheticBaseWithoutParentFailsClosed();
+  await testMergeGroupReachabilityUsesRepositoryDefaultBranch();
   await testGuardOnlyFailuresLookThroughToParentSuccess();
   await testNonContiguousWorkflowRunPagesAreChecked();
   await testPaginatedJobsAreChecked();

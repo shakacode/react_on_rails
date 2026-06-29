@@ -100,6 +100,16 @@ function wrapGithubApiFailure(error, message) {
   return wrappedError;
 }
 
+function unexpectedGithubApiResponse(message) {
+  const error = new TypeError(message);
+  error.unexpectedGithubApiResponse = true;
+  return error;
+}
+
+function isUnexpectedGithubApiResponse(error) {
+  return Boolean(error?.unexpectedGithubApiResponse);
+}
+
 async function listWorkflowRunsForEvent({ github, context, sha, createdAfter, event }) {
   const workflowRuns = [];
 
@@ -154,13 +164,15 @@ async function listJobsForRun({ github, context, run }) {
       const pageJobs = Array.isArray(response.data) ? response.data : response.data?.jobs;
 
       if (!Array.isArray(pageJobs)) {
-        throw new TypeError(`Expected jobs array while listing workflow run ${run.id} (${run.name}).`);
+        throw unexpectedGithubApiResponse(
+          `Expected jobs array while listing workflow run ${run.id} (${run.name}).`,
+        );
       }
 
       jobs.push(...pageJobs);
     }
   } catch (error) {
-    if (error instanceof TypeError) {
+    if (isUnexpectedGithubApiResponse(error) || error instanceof TypeError) {
       throw error;
     }
 
@@ -474,6 +486,21 @@ async function checkPreviousMainCommitStatus({
   try {
     await checkSha(previousSha, maxGuardOnlyHops, maxNoRunsHops);
   } catch (error) {
+    if (isUnexpectedGithubApiResponse(error)) {
+      core.setFailed(
+        [
+          'Cannot determine prior real CI status because the GitHub API returned an unexpected response.',
+          error.message,
+          formatNoRunsTrailDetails(noRunsTrail),
+          formatGuardOnlyTrailDetails(guardOnlyTrail),
+          'Retry after the GitHub API recovers, or push a non-docs change to trigger hosted CI.',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      );
+      return;
+    }
+
     if (!isGithubApiFailure(error)) {
       throw error;
     }
