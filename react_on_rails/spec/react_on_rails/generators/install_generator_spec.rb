@@ -4566,6 +4566,19 @@ describe InstallGenerator, type: :generator do
       expect(GeneratorMessages.messages.join("\n")).to include("legacy Redux generator path")
     end
 
+    specify "warning failures do not suppress queued generator messages" do
+      install_generator = install_generator_fixture(redux: true)
+
+      allow(install_generator).to receive(:installation_prerequisites_met?).and_return(true)
+      allow(install_generator).to receive(:invoke_generators).and_raise(Thor::Error, "generator failed")
+      allow(install_generator).to receive(:add_legacy_redux_install_warning)
+        .and_raise(StandardError, "warning failed")
+      allow(install_generator).to receive(:print_generator_messages)
+
+      expect { install_generator.run_generators }.to raise_error(Thor::Error, "generator failed")
+      expect(install_generator).to have_received(:print_generator_messages)
+    end
+
     specify "hidden install --redux --tailwind warning stays on the install path" do
       install_generator = install_generator_fixture(redux: true, tailwind: true)
 

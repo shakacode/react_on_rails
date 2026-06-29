@@ -221,7 +221,7 @@ module ReactOnRails
         # print_generator_messages raises an exception. This prevents ENV pollution
         # that could affect subsequent processes.
         ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
-        add_legacy_redux_install_warning_once
+        add_legacy_redux_install_warning_once_safely
         print_generator_messages
       end
 
@@ -819,6 +819,13 @@ module ReactOnRails
         # Set the flag after enqueueing so a failed warning add can be retried.
         add_legacy_redux_install_warning
         @legacy_redux_install_warning_added = true
+      end
+
+      def add_legacy_redux_install_warning_once_safely
+        add_legacy_redux_install_warning_once
+      rescue StandardError
+        # Preserve the primary generator output; this legacy advisory is best-effort.
+        nil
       end
 
       def recovery_install_command
