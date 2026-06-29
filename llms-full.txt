@@ -216,7 +216,7 @@ React on Rails bridges the gap between Ruby on Rails and React, allowing you to:
 - Pass props from Rails to React without building a separate API
 - Enable server-side rendering for better SEO and initial page load performance
 - Use hot module replacement (HMR) for fast development iterations
-- Integrate with Redux, React Router, and the modern React ecosystem
+- Integrate with React Router, server-state tools, and advanced shared-store libraries such as Redux
 
 Unlike a separate SPA approach, React on Rails lets you leverage Rails conventions while progressively enhancing your UI with React components.
 
@@ -268,7 +268,7 @@ Detailed integration instructions for existing Rails applications with Shakapack
 
 **[Complete Tutorial →](./getting-started/tutorial.md)**
 
-Step-by-step walkthrough building a full app with Redux, routing, and deployment.
+Step-by-step walkthrough building a TypeScript component with hooks, server rendering, and deployment guidance.
 
 ### 👀 Learn by Example?
 
@@ -286,7 +286,7 @@ Find guidance for your specific scenario:
 | **Compare Rails + frontend options** | [Comparison Guide](./getting-started/comparing-react-on-rails-to-alternatives.md)     |
 | **Enable server-side rendering**     | [SSR Guide](./core-concepts/react-server-rendering.md)                                |
 | **Set up hot reloading**             | [HMR Setup](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
-| **Use Redux with Rails**             | [Redux Integration](./building-features/react-and-redux.md)                           |
+| **Use legacy shared Redux stores**   | [Redux Integration](./building-features/react-and-redux.md)                           |
 | **Use TanStack Router**              | [TanStack Router Guide](./building-features/tanstack-router.md)                       |
 | **Deploy to production**             | [Deployment Guide](./deployment/README.md)                                            |
 | **Troubleshoot issues**              | [Troubleshooting](./deployment/troubleshooting.md)                                    |
@@ -547,7 +547,7 @@ Now that you have React on Rails working, here's what to explore next:
 
 ### Advanced Features
 
-1. **[Redux Integration](../building-features/react-and-redux.md)** - Manage application state
+1. **[Redux Integration](../building-features/react-and-redux.md)** - Maintain legacy or advanced shared-store integrations
 2. **[React Router](../building-features/react-router.md)** - Client-side routing
 
 ### Pro Features
@@ -862,7 +862,7 @@ This tutorial starts from the [Quick Start](./quick-start.md) app and builds a s
 - `bin/dev` with HMR during development
 - Optional server rendering with `prerender: true`
 
-Redux is still supported, but it is no longer the main path for a first React on Rails app. See [Appendix: Redux Integration](#appendix-redux-integration) when you need a shared client store or you are maintaining an existing Redux setup.
+Redux is still supported, but it is no longer the main path for a first React on Rails app. See [Appendix: Redux and State Choices](#appendix-redux-and-state-choices) when you need a multi-island shared client store or you are maintaining an existing Redux setup.
 
 ## Table of Contents
 
@@ -876,7 +876,7 @@ Redux is still supported, but it is no longer the main path for a first React on
 - [Optional: Turn On Server Rendering](#optional-turn-on-server-rendering)
 - [Production Build And Deployment](#production-build-and-deployment)
 - [Troubleshooting](#troubleshooting)
-- [Appendix: Redux Integration](#appendix-redux-integration)
+- [Appendix: Redux and State Choices](#appendix-redux-and-state-choices)
 - [What's Next?](#whats-next)
 
 ## Prerequisites
@@ -1148,27 +1148,25 @@ Temporarily set `prerender: false` to confirm the browser render works, then rem
 <%= react_component("Counter", props: @counter_props, prerender: true, auto_load_bundle: true, trace: true) %>
 ```
 
-## Appendix: Redux Integration
+## Appendix: Redux and State Choices
 
-Use Redux when your app already has Redux conventions, needs a shared client store across many React islands, or benefits from Redux middleware and DevTools. For local UI state, React Hooks are usually simpler.
+Use Redux when your app already has Redux conventions, needs a shared client store across many React islands, or benefits from Redux middleware and DevTools. For most new React on Rails apps, choose the smallest state tool that matches the data:
 
-To generate the Redux example for a new app, run the installer with both TypeScript and Redux:
+- **Local island state:** use React Hooks such as `useState` and `useReducer`, or React Context when nearby components under one React root need the same UI state.
+- **Server state:** pass initial data through Rails controller props, then refresh data through your Rails JSON endpoints, GraphQL layer, or a server-state cache such as [TanStack Query](../building-features/tanstack-query.md).
+- **Multi-island shared client state:** use Redux only when separate React roots on the same page must coordinate through one client store, such as a header counter and body list that update each other without a full page refresh.
 
-```bash
-bin/rails generate react_on_rails:install --typescript --redux
-```
+The installer has a hidden legacy Redux path for maintaining or recreating older generated apps, but this tutorial does not use it and new apps should not start with `--redux`. The legacy Redux structure has actions, reducers, store setup, presentational components, containers, and auto-registered entry points under `ror_components`.
 
-The Redux installer creates a larger structure with actions, reducers, store setup, presentational components, containers, and auto-registered entry points under `ror_components`.
-
-When rendering a Redux-backed component, the Rails side still uses the same view helper style:
+When rendering an existing Redux-backed component, the Rails side still uses the same view helper style:
 
 ```erb
 <%= react_component("HelloWorldApp", props: @hello_world_props, auto_load_bundle: true) %>
 ```
 
-The component is named `HelloWorldApp` because that is what the Redux installer generates. Adjust the component name and props key to match your app's controller setup.
+The component is named `HelloWorldApp` when you are working with the legacy generated Redux example. Adjust the component name and props key to match your app's controller setup.
 
-For manually wired stores or advanced store sharing, use the [`redux_store` helper](../api-reference/redux-store-api.md) and the [Redux integration guide](../building-features/react-and-redux.md).
+For manually wired stores or advanced store sharing, use the [`redux_store` helper](../api-reference/redux-store-api.md) and the [legacy Redux reducer guidance](../building-features/react-and-redux.md).
 
 ## What's Next?
 
@@ -1738,7 +1736,7 @@ The generator creates `bin/dev` for starting both:
 Sometimes you need more than just a simple React component. **Render-Functions** let you:
 
 1. Access Rails context (current URL, locale, etc.)
-2. Initialize Redux stores with props
+2. Initialize legacy shared Redux stores with props
 3. Set up React Router or TanStack Router (TanStack SSR requires React on Rails Pro)
 4. Return different components based on props
 
@@ -1760,7 +1758,7 @@ export default MyApp;
 ### When to Use Render-Functions
 
 - **Need railsContext** - Access current URL, locale, or custom Rails data
-- **Redux integration** - Initialize store with server-side props
+- **Redux integration** - Initialize a legacy or advanced shared store with server-side props
 - **React Router** - Set up routing with initial URL from Rails
 - **Conditional rendering** - Return different components based on props
 
@@ -1817,7 +1815,7 @@ Now that you understand the core concepts, here are recommended paths forward:
 
 ### Build Features
 
-- **[Redux Integration](../building-features/react-and-redux.md)** - Add state management
+- **[Redux Integration](../building-features/react-and-redux.md)** - Maintain legacy or advanced shared-store state
 - **[React Router](../building-features/react-router.md)** - Client-side routing
 - **[TanStack Router](../building-features/tanstack-router.md)** - Pro-only first-class router integration with SSR dehydration/hydration
 - **[Server-Side Rendering](../core-concepts/react-server-rendering.md)** - Deep dive into SSR
@@ -2428,7 +2426,7 @@ Ensure these generated bundle files are in your `.gitignore`, as you never want 
 
 Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the React component helper.
 
-Optionally, you can also initialize a Redux store with the view or controller helper `redux_store` so that the Redux store can be shared amongst multiple React components.
+For legacy or advanced shared-store pages, you can also initialize a Redux store with the view or controller helper `redux_store` so that separate React roots can coordinate through one client store.
 
 ## Client-Side Rendering vs. Server-Side Rendering
 
@@ -2569,7 +2567,7 @@ SOURCE: docs/oss/core-concepts/render-functions-and-railscontext.md
 ## Render-Functions
 
 When you use a render-function to create React components (or `renderedHtml` on the server), or you
-use shared Redux stores, you get two params passed to your function that creates a React component:
+register legacy or advanced shared Redux stores, React on Rails passes two params to the function it calls:
 
 1. `props`: Props that you pass in the view helper of either `react_component` or `redux_store`
 2. `railsContext`: Rails contextual information, such as the current pathname. You can customize
@@ -2644,7 +2642,7 @@ reduxStore = MyReduxStore(props, railsContext);
 > You never make these calls. React on Rails makes these calls when it does either client or server rendering. You will define functions that take these 2 params and return a React component or a Redux Store. Naturally, you do not have to use second parameter, `railsContext`, if you do not need it. If you don't take a second parameter, then you're probably defining a React function component and you will simply return a React Element, often just JSX.
 
 > [!NOTE]
-> See [Redux Store](../api-reference/redux-store-api.md#multiple-react-components-on-a-page-with-one-store) on how to set up Redux stores that allow multiple components to talk to the same store.
+> See [Redux Store](../api-reference/redux-store-api.md#multiple-react-islands-on-a-page-with-one-store) on how to set up Redux stores that allow multiple React roots to talk to the same store.
 
 The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/lib/react_on_rails/helper.rb), method `rails_context` for the definitive list).
 
@@ -4012,7 +4010,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 ## Redux Store Auto-Registration
 
 > [!NOTE]
-> Most applications use React components without Redux. If you don't use Redux stores, you can skip this section entirely.
+> Most applications use React components without Redux. If you don't maintain a legacy Redux app or an advanced multi-island shared store, you can skip this section entirely.
 
 In addition to components, React on Rails can automatically register Redux stores based on file system conventions. This eliminates manual `ReactOnRails.registerStore()` calls and generates individual packs for each store. The feature works the same way as component auto-registration.
 
@@ -4984,9 +4982,34 @@ React Router v6 offers multiple routing approaches. For React on Rails, we recom
 
 **Note on Data Mode:** React Router's Data Mode (with loaders/actions) is designed for SPAs where the client handles data fetching. Since React on Rails uses Rails controllers to load data and pass it as props to React components, Data Mode would create duplicate data loading. Stick with Declarative Mode to leverage React on Rails' server-side data loading pattern.
 
-## Basic Client-Side Setup with Redux
+## Basic Client-Side Setup
 
-If you're using Redux (created with `rails generate react_on_rails:install --redux`), you can add React Router by wrapping your app:
+Most React Router integrations do not need Redux. Route ordinary components inside one React root, pass initial data from Rails as props, and use your normal server-state approach for follow-up data loading.
+
+**File: `app/javascript/src/RouterApp/ror_components/RouterApp.client.jsx`**
+
+```jsx
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+const Home = ({ name }) => <div>Hello, {name}!</div>;
+const About = () => <div>About</div>;
+
+const RouterApp = (props) => (
+  <BrowserRouter>
+    <Routes>
+      <Route path="/" element={<Home {...props} />} />
+      <Route path="/about" element={<About />} />
+    </Routes>
+  </BrowserRouter>
+);
+
+export default RouterApp;
+```
+
+## Legacy Client-Side Setup with Redux
+
+If you're maintaining an app that already uses Redux, including the hidden legacy Redux generator output, you can add React Router by wrapping your app:
 
 **File: `app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx`**
 
@@ -5023,14 +5046,47 @@ export default HelloWorldApp;
 
 **Key points:**
 
-- `<Provider>` wraps `<BrowserRouter>` so all routes have Redux access
+- In Redux-backed legacy apps, `<Provider>` wraps `<BrowserRouter>` so all routes have Redux access
 - Use `<Routes>` and `<Route>` (not `<Switch>` from React Router v5)
 - Use `element` prop to specify components (not `component` or `render` props from v5)
 - Routes are automatically matched by best fit, not render order
 
-## Server-Side Rendering with React Router
+## Basic Server-Side Rendering with React Router
 
-For server rendering, use `StaticRouter` instead of `BrowserRouter`.
+For server rendering without Redux, use the same route tree with `StaticRouter` instead of `BrowserRouter`.
+This `.client.jsx` / `.server.jsx` split assumes
+[auto-bundling](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)
+is configured so React on Rails registers the client and server files separately.
+
+**File: `app/javascript/src/RouterApp/ror_components/RouterApp.server.jsx`**
+
+```jsx
+import React from 'react';
+import { StaticRouter } from 'react-router-dom/server';
+import { Routes, Route } from 'react-router-dom';
+
+const Home = ({ name }) => <div>Hello, {name}!</div>;
+const About = () => <div>About</div>;
+
+const RouterApp = (props, railsContext) => {
+  const { location } = railsContext;
+
+  return () => (
+    <StaticRouter location={location}>
+      <Routes>
+        <Route path="/" element={<Home {...props} />} />
+        <Route path="/about" element={<About />} />
+      </Routes>
+    </StaticRouter>
+  );
+};
+
+export default RouterApp;
+```
+
+## Legacy Server-Side Setup with Redux
+
+If your app still uses the legacy shared Redux store, keep the provider around the `StaticRouter`.
 
 **File: `app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx`**
 
@@ -8701,7 +8757,9 @@ PAGE: https://reactonrails.com/docs/building-features/react-and-redux
 SOURCE: docs/oss/building-features/react-and-redux.md
 ================================================================================
 
-# Communication between React Components and Redux Reducers
+# Legacy Redux Reducer Guidance
+
+Redux remains supported for existing React on Rails apps and advanced pages that need one client store shared across multiple React roots. For new apps, prefer local component state for island-specific UI, Rails props plus server-state tools for server-owned data, and reach for Redux only when those smaller patterns do not fit.
 
 ## Communication Between Components
 
@@ -8709,7 +8767,7 @@ See [Sharing State Between Components](https://react.dev/learn/sharing-state-bet
 
 ## Redux Reducers
 
-The `helloWorld/reducers/index.jsx` example that results from running the generator with the Redux option may be slightly confusing because of its simplicity. For clarity, what follows is a more fleshed-out example of what a reducer might look like:
+The `helloWorld/reducers/index.jsx` example from the hidden legacy Redux generator may be slightly confusing because of its simplicity. For clarity, what follows is a more fleshed-out example of what a reducer might look like:
 
 ```javascript
 import usersReducer from './usersReducer';
@@ -18695,9 +18753,10 @@ The best source of docs is the `interface ReactOnRails` in [types/index.ts](http
 register(components);
 
 /**
- * Allows registration of store generators to be used by multiple React components on one Rails
- * view. Store generators are functions that take one arg, props, and return a store. Note that
- * the setStore API is different in that it's the actual store hydrated with props.
+ * Allows registration of store generators for legacy or advanced pages where multiple React
+ * roots on one Rails view share a Redux store. Store generators receive props and railsContext,
+ * then return a store. Note that the setStore API is different in that it's the actual store
+ * hydrated with props.
  * @param stores (key is store name, value is the store generator)
  */
 registerStoreGenerators(storesGenerators);
@@ -18769,28 +18828,34 @@ PAGE: https://reactonrails.com/docs/api-reference/redux-store-api
 SOURCE: docs/oss/api-reference/redux-store-api.md
 ================================================================================
 
-# Redux Store
+# Redux Store API
 
 > [!WARNING]
 >
-> This Redux API is no longer recommended as it prevents dynamic code splitting for performance. Instead, you should use the standard `react_component` view helper passing in a "Render-Function."
+> This runtime API remains supported for existing apps and advanced shared-store use cases, but it is not recommended as the default state model for new React on Rails apps. Prefer the standard `react_component` view helper with props or a render-function unless multiple React islands must coordinate through one client store.
 
 > [!IMPORTANT]
 >
 > **Script Loading Requirement:** If you use Redux shared stores with inline component registration (registering components in view templates with `<script>ReactOnRails.register({ MyComponent })</script>`), you **must use `defer: true`** in your `javascript_pack_tag` instead of `async: true`. With async loading, the bundle may execute before inline scripts, causing component registration failures. See the [Streaming Server Rendering documentation](../building-features/streaming-server-rendering.md#important-redux-shared-store-caveat) for details and alternatives.
 
-You don't need to use the `redux_store` api to use Redux. This API was set up to support multiple calls to `react_component` on one page that all talk to the same Redux store.
+You don't need to use the `redux_store` API to use Redux inside a single React root. This API was set up to support multiple calls to `react_component` on one page that all talk to the same Redux store.
 
-If you are only rendering one React component on a page, as is typical to do a "Single Page App" in React, then you should _probably_ pass the props to your React component in a "Render-Function."
+If you are rendering one React component on a page, pass props to that component through `react_component` and keep local UI state inside that React tree. A render-function is also a better fit when you need `railsContext`, routing setup, or custom hydration behavior for one root.
 
-Consider using the `redux_store` helper for the two following use cases:
+Choose state ownership before reaching for `redux_store`:
 
-1. You want to have multiple React components accessing the same store at once.
-2. You want to place the props to hydrate the client side stores at the very end of your HTML, probably server rendered, so that the browser can render all earlier HTML first. This is particularly useful if your props will be large. However, you're probably better off using [React on Rails Pro](../../pro/react-on-rails-pro.md) if you're at all concerned about performance.
+- **Local island state:** use React Hooks or React Context inside one `react_component` root.
+- **Server state:** use Rails controller props for initial data, then Rails JSON endpoints, GraphQL, or a server-state cache such as [TanStack Query](../building-features/tanstack-query.md) for data that belongs on the server.
+- **Multi-island shared client state:** use `redux_store` when separate React roots on one Rails page must read and update the same client-side state.
 
-## Multiple React Components on a Page with One Store
+Consider using the `redux_store` helper for the following advanced use cases:
 
-You may wish to have 2 React components share the same the Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. Also, you may want this to work with Turbolinks to minimize reloading the JavaScript.
+1. You want multiple React roots or islands to access the same store at once.
+2. You want to place the props that hydrate client-side stores at the very end of your HTML, probably server-rendered, so that the browser can render all earlier HTML first. This is particularly useful if your props will be large. However, you're probably better off using [React on Rails Pro](../../pro/react-on-rails-pro.md) if you're at all concerned about performance.
+
+## Multiple React Islands on a Page with One Store
+
+You may wish to have two separate React roots share the same Redux store. For example, if your navbar is a React island, you may want it to use the same store as another island in the main area of the page. You may even want multiple React islands in the main area, which allows for greater modularity. Also, you may want this to work with Turbo or Turbolinks to minimize reloading the JavaScript.
 
 A good example of this would be something like a notifications counter in a header. As each notification is read in the body of the page, you would like to update the header. If both the header and body share the same Redux store, then this is trivial. Otherwise, we have to rely on other solutions, such as the header polling the server to see how many unread notifications exist.
 
@@ -19056,7 +19121,7 @@ SOURCE: docs/oss/api-reference/generator-details.md
 
 # Generator Details
 
-The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off — for example, the default for `-R` is that `redux` is off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` (or its alias `--webpack`) if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
+The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` (or its alias `--webpack`) if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
@@ -19065,7 +19130,6 @@ Usage:
   rails generate react_on_rails:install [options]
 
 Options:
-  -R, [--redux], [--no-redux]                      # Install Redux package and Redux version of Hello World Example. Default: false
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
       [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
       [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack)
@@ -19083,13 +19147,17 @@ Runtime options:
 Description:
 
 The react_on_rails:install generator integrates webpack with rails with ease. You
-can pass the redux option if you'd like to have redux setup for you automatically.
+can pass the options below to customize the generated example and supporting
+configuration.
 
-* Redux
-
-    Passing the --redux generator option causes the generated Hello World example
-    to integrate the Redux state container framework. The necessary node modules
-    will be automatically included for you.
+> [!WARNING]
+> The Redux installer path (`--redux` / `-R`) is a hidden legacy escape hatch, not
+> a recommended starter architecture. New apps should start with the
+> `react_component` view helper, React local state or context for island-local UI
+> state, and Rails props or server-state tools such as TanStack Query for data
+> loaded from the server. Use Redux only for an existing Redux app or an advanced
+> multi-island page where separate React roots must coordinate through one shared
+> client store.
 
 * TypeScript
 
@@ -19138,9 +19206,9 @@ Another good option is to create a simple test app per the [Tutorial](../getting
 
 ## Understanding the Organization of the Generated Client Code
 
-The React on Rails generator creates different directory structures depending on whether you use the `--redux` option.
+The React on Rails generator normally creates the simple component structure below. A hidden legacy Redux path remains available for existing apps and recovery work, but it is not the structure recommended for new React on Rails apps.
 
-### Default Structure (Without Redux)
+### Default Structure (Recommended, Without Redux)
 
 The basic generator creates a simple, flat structure optimized for auto-bundling:
 
@@ -19160,9 +19228,9 @@ app/javascript/
 
 For components that need different client vs. server implementations, use `.client.jsx` and `.server.jsx` suffixes (e.g., `HelloWorld.client.jsx` and `HelloWorld.server.jsx`).
 
-### Redux Structure (With `--redux` Option)
+### Legacy Redux Structure (Hidden `--redux` Path)
 
-The Redux generator creates a more structured organization with familiar Redux patterns:
+The hidden legacy Redux generator creates a more structured organization with familiar Redux patterns:
 
 ```text
 app/javascript/
@@ -19186,12 +19254,22 @@ app/javascript/
             └── helloWorldStore.js
 ```
 
-This structure follows Redux best practices:
+This legacy structure is useful only when you intentionally maintain Redux:
 
 - **`components/`**: Presentational "dumb" components that receive data via props
 - **`containers/`**: Container "smart" components connected to Redux store
 - **`actions/`** and **`reducers/`**: Standard Redux patterns
 - **`ror_components/`**: Entry point files that initialize Redux and render the app
+
+If you already have a React on Rails app and intentionally need to recreate the legacy Redux example, use the direct hidden generator after the base installer has configured React on Rails:
+
+```bash
+rails generate react_on_rails:react_with_redux
+```
+
+For an app that is already configured for TypeScript, add `--typescript` to generate `.ts` and `.tsx` Redux example files.
+
+For full install recovery of an older Redux-generated app, the hidden `react_on_rails:install --redux` option still exists, but do not use it for greenfield apps.
 
 ### TypeScript Support
 
@@ -19262,11 +19340,8 @@ For apps with custom webpack configurations, review the generated config templat
 # Rspack (default) with TypeScript
 rails generate react_on_rails:install --typescript
 
-# Webpack with Redux
-rails generate react_on_rails:install --no-rspack --redux
-
-# Explicit Rspack with TypeScript and Redux
-rails generate react_on_rails:install --rspack --typescript --redux
+# Webpack with TypeScript
+rails generate react_on_rails:install --no-rspack --typescript
 ```
 
 For more details on Rspack configuration, see the [Webpack Configuration](../core-concepts/webpack-configuration.md#rspack-vs-webpack) docs.
@@ -19301,9 +19376,6 @@ For production, configure your license token: `export REACT_ON_RAILS_PRO_LICENSE
 ```bash
 # Pro with TypeScript
 rails generate react_on_rails:install --pro --typescript
-
-# Pro with Redux
-rails generate react_on_rails:install --pro --redux
 
 # Pro with Rspack
 rails generate react_on_rails:install --pro --rspack
@@ -19356,12 +19428,11 @@ In addition to all Pro files:
 # RSC with TypeScript
 rails generate react_on_rails:install --rsc --typescript
 
-# RSC with Redux (generates both HelloWorldApp and HelloServer)
-rails generate react_on_rails:install --rsc --redux
-
 # RSC with Rspack
 rails generate react_on_rails:install --rsc --rspack
 ```
+
+Do not combine RSC with the hidden legacy Redux installer for new apps. Existing Redux Client Components can continue to work beside RSC when Redux access stays in Client Components; see [RSC context and state migration](../migrating/rsc-context-and-state.md#redux-toolkit).
 
 **Upgrading an existing Pro app to RSC:**
 
