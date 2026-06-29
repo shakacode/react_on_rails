@@ -50,6 +50,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
+  The Pro Gemfile loader now reads dependency fragments in binary mode, applies Ruby source-encoding
+  magic comments or a UTF-8 default, and validates content before override-gem scanning and evaluation.
+  Pro Gemfiles with non-ASCII dependency comments no longer fail under shells where Ruby's default
+  external encoding is US-ASCII. Fixes [Issue 4276](https://github.com/shakacode/react_on_rails/issues/4276).
+  [PR 4281](https://github.com/shakacode/react_on_rails/pull/4281) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **RSC Rspack doctor no longer false-warns on equivalent `lazyCompilation` configs**:
   `react_on_rails:doctor:rsc` only recognizes the generated literal
   `clientWebpackConfig.lazyCompilation = false` assignment. Apps that disable lazy
