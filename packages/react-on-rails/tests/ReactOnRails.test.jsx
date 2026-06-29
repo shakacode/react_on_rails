@@ -11,7 +11,7 @@ import StoreRegistry from '../src/StoreRegistry.ts';
 describe('ReactOnRails', () => {
   afterEach(() => {
     ComponentRegistry.clear();
-    StoreRegistry.storeGenerators().clear();
+    StoreRegistry.clearStoreGenerators();
     StoreRegistry.clearHydratedStores();
   });
 

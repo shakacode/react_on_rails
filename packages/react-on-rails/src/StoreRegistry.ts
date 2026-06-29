@@ -101,6 +101,13 @@ This can happen if you are server rendering and either:
   },
 
   /**
+   * Internally used function to completely clear registeredStoreGenerators Map.
+   */
+  clearStoreGenerators(): void {
+    registeredStoreGenerators.clear();
+  },
+
+  /**
    * Get a Map containing all registered store generators. Useful for debugging.
    * @returns Map where key is the component name and values are the store generators.
    */

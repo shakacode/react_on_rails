@@ -16,8 +16,8 @@ function storeGenerator2(props) {
 
 describe('StoreRegistry', () => {
   beforeEach(() => {
-    StoreRegistry.stores().clear();
-    StoreRegistry.storeGenerators().clear();
+    StoreRegistry.clearHydratedStores();
+    StoreRegistry.clearStoreGenerators();
   });
 
   it('StoreRegistry throws error for registering null or undefined store', () => {
@@ -105,6 +105,15 @@ describe('StoreRegistry', () => {
     expect(actual.get('storeGenerator')).toEqual(storeGenerator);
     expect(actual.get('storeGenerator2')).toEqual(storeGenerator2);
     expect(actual.size).toBe(2);
+  });
+
+  it('StoreRegistry clearStoreGenerators', () => {
+    StoreRegistry.register({ storeGenerator, storeGenerator2 });
+    expect(StoreRegistry.storeGenerators().size).toBe(2);
+
+    StoreRegistry.clearStoreGenerators();
+
+    expect(StoreRegistry.storeGenerators()).toEqual(new Map());
   });
 
   it('StoreRegistry does not error when re-registering the same store generator', () => {
